@@ -23,7 +23,6 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/DiagnosticConsumer.h"
@@ -2546,7 +2545,7 @@ public:
   }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRe, Type T,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                           SemaReferenceKind Kind) override {
     if (SeenDecls.insert(D).second)
       tryDemangleDecl(D, Range, /*isRef=*/true);
