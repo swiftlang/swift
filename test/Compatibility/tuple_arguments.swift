@@ -1434,3 +1434,11 @@ func processArrayOfFunctions(f1: [((Bool, Bool)) -> ()],
     block(c, c)
   }
 }
+
+// expected-error@+1 {{cannot create a single-element tuple with an element label}}
+func singleElementTupleArgument(completion: ((didAdjust: Bool)) -> Void) {
+    // TODO: Error could be improved.
+    // expected-error@+1 {{cannot convert value of type '(didAdjust: Bool)' to expected argument type 'Bool'}}
+    completion((didAdjust: true))
+}
+
