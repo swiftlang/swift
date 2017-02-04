@@ -2003,12 +2003,13 @@ public:
           return T;
 
         // For everything else, substitute in the base type.
-        auto Subs = MaybeNominalType->getMemberSubstitutions(VD);
+        auto Subs = MaybeNominalType->getMemberSubstitutionMap(M, VD);
 
         // Pass in DesugarMemberTypes so that we see the actual
         // concrete type witnesses instead of type alias types.
-        T = T.subst(M, Subs, (SubstFlags::DesugarMemberTypes |
-                              SubstFlags::UseErrorType));
+        T = T.subst(Subs,
+                    (SubstFlags::DesugarMemberTypes |
+                     SubstFlags::UseErrorType));
       }
     }
 

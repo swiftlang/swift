@@ -763,7 +763,7 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   // Reabstract to the substituted type, if needed.
   CanType substEltTy =
     value.getSwiftType()->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
-                                      ElementDecl, nullptr,
+                                      ElementDecl,
                                       ElementDecl->getArgumentInterfaceType())
       ->getCanonicalType();
 

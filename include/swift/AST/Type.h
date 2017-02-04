@@ -252,21 +252,6 @@ public:
   /// Replace references to substitutable types with new, concrete types and
   /// return the substituted result.
   ///
-  /// \param module The module to use for conformance lookups.
-  ///
-  /// \param substitutions The mapping from substitutable types to their
-  /// replacements.
-  ///
-  /// \param options Options that affect the substitutions.
-  ///
-  /// \returns the substituted type, or a null type if an error occurred.
-  Type subst(ModuleDecl *module,
-             const TypeSubstitutionMap &substitutions,
-             SubstOptions options = None) const;
-
-  /// Replace references to substitutable types with new, concrete types and
-  /// return the substituted result.
-  ///
   /// \param substitutions The mapping from substitutable types to their
   /// replacements and conformances.
   ///
