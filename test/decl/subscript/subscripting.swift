@@ -310,3 +310,12 @@ struct S4 {
     }
   }
 }
+
+// SR-2575
+struct SR2575 {
+  subscript() -> Int {
+    return 1
+  }
+}
+
+SR2575().subscript() // expected-error{{type 'SR2575' has no member 'subscript'}}

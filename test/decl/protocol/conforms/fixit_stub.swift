@@ -145,3 +145,10 @@ protocol ProtocolRequiresInit3 {
 
 struct Adopter14 {} // expected-note{{candidate}}
 extension Adopter14 : ProtocolRequiresInit3 {} //expected-error {{type 'Adopter14' does not conform to protocol 'ProtocolRequiresInit3'}}
+
+protocol ProtocolHasSubscriptFunction {
+  func `subscript`() // expected-note{{protocol requires function 'subscript()' with type '() -> ()'; do you want to add a stub?}} {{74-74=\n    func `subscript`() {\n        <#code#>\n    \}\n}}
+}
+class ProtocolHasSubscriptFunctionAdopter: ProtocolHasSubscriptFunction { // expected-error{{type 'ProtocolHasSubscriptFunctionAdopter' does not conform to protocol 'ProtocolHasSubscriptFunction'}}
+
+}

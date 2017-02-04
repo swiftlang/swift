@@ -169,3 +169,15 @@ class DerivedWithoutDefaults : BaseWithDefaults {
 
 // CHECK-LABEL: sil_vtable DerivedWithoutDefaults {
 // CHECK:         #BaseWithDefaults.a!1: {{.*}} : _T07vtables22DerivedWithoutDefaultsC1a{{[_0-9a-zA-Z]*}}F
+
+
+
+// Escape identifiers that represent special names
+
+class SubscriptAsFunction {
+  func `subscript`() {}
+}
+
+// CHECK-LABEL: sil_vtable SubscriptAsFunction {
+// CHECK-NOT:     #SubscriptAsFunction.subscript
+// CHECK:         #SubscriptAsFunction.`subscript`!1
