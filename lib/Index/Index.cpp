@@ -999,7 +999,7 @@ bool IndexSwiftASTWalker::initFuncRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
   if (!CurrentE)
     return false;
 
-  // FIXME: the below check maintains existing indexing behaviour with
+  // FIXME: the below check maintains existing indexing behavior with
   // pseudo/accessor output but seems incorrect. E.g otherGlobal in:
   // let global = otherGlobal
   // will not have a parent expression so no accessor call is reported
