@@ -2457,13 +2457,14 @@ static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
 /// \param genericEnv - the new generic environment
 /// \param contextSubs - map old archetypes to new archetypes
 /// \param interfaceSubs - map interface types to old archetypes
-CanGenericSignature
+static CanGenericSignature
 buildThunkSignature(SILGenFunction &gen,
                     bool inheritGenericSig,
                     ArchetypeType *openedExistential,
                     GenericEnvironment *&genericEnv,
                     SubstitutionMap &contextSubs,
-                    SubstitutionMap &interfaceSubs) {
+                    SubstitutionMap &interfaceSubs,
+                    ArchetypeType *&newArchetype) {
   auto *mod = gen.F.getModule().getSwiftModule();
   auto &ctx = mod->getASTContext();
 
@@ -2491,6 +2492,7 @@ buildThunkSignature(SILGenFunction &gen,
 
   // Add a new generic parameter to replace the opened existential.
   auto *newGenericParam = GenericTypeParamType::get(depth, 0, ctx);
+
   builder.addGenericParameter(newGenericParam);
   Requirement newRequirement(RequirementKind::Conformance, newGenericParam,
                              openedExistential->getOpenedExistentialType());
@@ -2500,58 +2502,41 @@ buildThunkSignature(SILGenFunction &gen,
   GenericSignature *genericSig = builder.getGenericSignature();
   genericEnv = builder.getGenericEnvironment(genericSig);
 
-  // Calculate substitutions to map the original function's archetypes to
-  // the new generic environment's archetypes.
-  genericSig->enumeratePairedRequirements(
-      [&](Type depTy, ArrayRef<Requirement> reqs) -> bool {
-    auto canTy = depTy->getCanonicalType();
+  newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)
+    ->castTo<ArchetypeType>();
 
-    ArchetypeType *oldArchetype;
-    // The opened existential archetype maps to the new generic parameter's
-    // archetype.
-    if (depTy->isEqual(newGenericParam))
-      oldArchetype = openedExistential;
-    else
-      oldArchetype = gen.F.mapTypeIntoContext(depTy)->castTo<ArchetypeType>();
+  // Calculate substitutions to map the caller's archetypes to the thunk's
+  // archetypes.
+  if (auto *calleeGenericEnv = gen.F.getGenericEnvironment()) {
+    contextSubs = calleeGenericEnv->getSubstitutionMap(
+      mod,
+      [&](SubstitutableType *type) -> Type {
+        auto depTy = calleeGenericEnv->mapTypeOutOfContext(type);
+        return genericEnv->mapTypeIntoContext(mod, depTy);
+      },
+      MakeAbstractConformanceForGenericType());
+  }
 
-    // Add the replacement mapping.
-    auto newArchetype = genericEnv->mapTypeIntoContext(mod, depTy)
-        ->castTo<ArchetypeType>();
-
-    contextSubs.addSubstitution(CanArchetypeType(oldArchetype), newArchetype);
-
-    if (isa<SubstitutableType>(canTy)) {
-      interfaceSubs.addSubstitution(cast<SubstitutableType>(canTy),
-                                    oldArchetype);
-    }
-
-    // Add abstract conformances.
-    for (unsigned i = 0, e = reqs.size(); i < e; i++) {
-      auto reqt = reqs[i];
-      assert(reqt.getKind() == RequirementKind::Conformance);
-      auto *proto = reqt.getSecondType()
-          ->castTo<ProtocolType>()->getDecl();
-      auto conformance = ProtocolConformanceRef(proto);
-      contextSubs.addConformance(CanType(oldArchetype), conformance);
-      interfaceSubs.addConformance(canTy, conformance);
-    }
-
-    return false;
-  });
+  // Calculate substitutions to map interface types to the caller's archetypes.
+  interfaceSubs = genericSig->getSubstitutionMap(
+    [&](SubstitutableType *type) -> Type {
+      if (type->isEqual(newGenericParam))
+        return openedExistential;
+      return gen.F.mapTypeIntoContext(type);
+    },
+    MakeAbstractConformanceForGenericType());
 
   return genericSig->getCanonicalSignature();
 }
 
 /// Build the type of a function transformation thunk.
 CanSILFunctionType SILGenFunction::buildThunkType(
-                                         ManagedValue fn,
-                                         CanSILFunctionType expectedType,
-                                         CanSILFunctionType &substFnType,
-                                         GenericEnvironment *&genericEnv,
-                                         SubstitutionMap &contextSubs,
-                                         SubstitutionMap &interfaceSubs) {
-  auto sourceType = fn.getType().castTo<SILFunctionType>();
-
+    CanSILFunctionType &sourceType,
+    CanSILFunctionType &expectedType,
+    CanType &inputSubstType,
+    CanType &outputSubstType,
+    GenericEnvironment *&genericEnv,
+    SubstitutionMap &interfaceSubs) {
   assert(!expectedType->isPolymorphic());
   assert(!sourceType->isPolymorphic());
 
@@ -2581,6 +2566,9 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // Use the generic signature from the context if the thunk involves
   // generic parameters.
   CanGenericSignature genericSig;
+  SubstitutionMap contextSubs;
+  ArchetypeType *newArchetype = nullptr;
+
   if (expectedType->hasArchetype() || sourceType->hasArchetype()) {
     expectedType.visit(archetypeVisitor);
     sourceType.visit(archetypeVisitor);
@@ -2590,7 +2578,37 @@ CanSILFunctionType SILGenFunction::buildThunkType(
                                      openedExistential,
                                      genericEnv,
                                      contextSubs,
-                                     interfaceSubs);
+                                     interfaceSubs,
+                                     newArchetype);
+  }
+
+  // Utility function to apply contextSubs, and also replace the
+  // opened existential with the new archetype.
+  auto substIntoThunkContext = [&](CanType t) -> CanType {
+    return t.subst(
+      [&](SubstitutableType *type) -> Type {
+        if (type == openedExistential)
+          return newArchetype;
+        return Type(type).subst(contextSubs);
+      },
+      LookUpConformanceInSubstitutionMap(contextSubs),
+      SubstFlags::AllowLoweredTypes)
+        ->getCanonicalType();
+  };
+
+  sourceType = cast<SILFunctionType>(
+    substIntoThunkContext(sourceType));
+  expectedType = cast<SILFunctionType>(
+    substIntoThunkContext(expectedType));
+
+  if (inputSubstType) {
+    inputSubstType = cast<AnyFunctionType>(
+      substIntoThunkContext(inputSubstType));
+  }
+
+  if (outputSubstType) {
+    outputSubstType = cast<AnyFunctionType>(
+      substIntoThunkContext(outputSubstType));
   }
 
   // If our parent function was pseudogeneric, this thunk must also be
@@ -2620,10 +2638,8 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   SmallVector<SILParameterInfo, 4> interfaceParams;
   interfaceParams.reserve(params.size());
   for (auto &param : params) {
-    auto paramTy = param.getType().subst(contextSubs,
-                                         SubstFlags::AllowLoweredTypes);
     auto paramIfaceTy = GenericEnvironment::mapTypeOutOfContext(
-        genericEnv, paramTy);
+        genericEnv, param.getType());
     interfaceParams.push_back(
       SILParameterInfo(getCanonicalType(paramIfaceTy),
                        param.getConvention()));
@@ -2631,10 +2647,8 @@ CanSILFunctionType SILGenFunction::buildThunkType(
 
   SmallVector<SILResultInfo, 4> interfaceResults;
   for (auto &result : expectedType->getResults()) {
-    auto resultTy = result.getType().subst(contextSubs,
-                                           SubstFlags::AllowLoweredTypes);
     auto resultIfaceTy = GenericEnvironment::mapTypeOutOfContext(
-        genericEnv, resultTy);
+        genericEnv, result.getType());
     auto interfaceResult = result.getWithType(getCanonicalType(resultIfaceTy));
     interfaceResults.push_back(interfaceResult);
   }
@@ -2642,33 +2656,19 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   Optional<SILResultInfo> interfaceErrorResult;
   if (expectedType->hasErrorResult()) {
     auto errorResult = expectedType->getErrorResult();
-    auto errorTy = errorResult.getType().subst(contextSubs,
-                                               SubstFlags::AllowLoweredTypes);
     auto errorIfaceTy = GenericEnvironment::mapTypeOutOfContext(
-        genericEnv, errorTy);
+        genericEnv, errorResult.getType());
     interfaceErrorResult = SILResultInfo(
         getCanonicalType(errorIfaceTy),
         expectedType->getErrorResult().getConvention());
   }
   
   // The type of the thunk function.
-  auto thunkType = SILFunctionType::get(genericSig, extInfo,
-                                        ParameterConvention::Direct_Unowned,
-                                        interfaceParams, interfaceResults,
-                                        interfaceErrorResult,
-                                        getASTContext());
-
-  // Define the substituted function type for partial_apply's purposes.
-  if (!genericSig) {
-    substFnType = thunkType;
-  } else {
-    substFnType = SILFunctionType::get(
-        nullptr, extInfo, ParameterConvention::Direct_Unowned, params,
-        expectedType->getResults(), expectedType->getOptionalErrorResult(),
-        getASTContext());
-  }
-
-  return thunkType;
+  return SILFunctionType::get(genericSig, extInfo,
+                              ParameterConvention::Direct_Unowned,
+                              interfaceParams, interfaceResults,
+                              interfaceErrorResult,
+                              getASTContext());
 }
 
 /// Create a reabstraction thunk.
@@ -2680,6 +2680,7 @@ static ManagedValue createThunk(SILGenFunction &gen,
                                 AbstractionPattern outputOrigType,
                                 CanAnyFunctionType outputSubstType,
                                 const TypeLowering &expectedTL) {
+  auto sourceType = fn.getType().castTo<SILFunctionType>();
   auto expectedType = expectedTL.getLoweredType().castTo<SILFunctionType>();
 
   // We can't do bridging here.
@@ -2688,36 +2689,23 @@ static ManagedValue createThunk(SILGenFunction &gen,
          "bridging in re-abstraction thunk?");
 
   // Declare the thunk.
-  CanSILFunctionType substFnType;
-
-  SubstitutionMap contextSubs, interfaceSubs;
+  SubstitutionMap interfaceSubs;
   GenericEnvironment *genericEnv = nullptr;
-  auto thunkType = gen.buildThunkType(fn, expectedType,
-                                      substFnType, genericEnv,
-                                      contextSubs, interfaceSubs);
-
-  auto fromType = fn.getType()
-      .subst(gen.F.getModule(), contextSubs)
-      .castTo<SILFunctionType>();
-  auto toType = SILType::getPrimitiveObjectType(expectedType)
-      .subst(gen.F.getModule(), contextSubs)
-      .castTo<SILFunctionType>();
-
+  auto toType = expectedType;
+  auto thunkType = gen.buildThunkType(sourceType, toType,
+                                      inputSubstType,
+                                      outputSubstType,
+                                      genericEnv,
+                                      interfaceSubs);
   auto thunk = gen.SGM.getOrCreateReabstractionThunk(
                                        genericEnv,
                                        thunkType,
-                                       fromType,
+                                       sourceType,
                                        toType,
                                        gen.F.isFragile());
 
   // Build it if necessary.
   if (thunk->empty()) {
-    inputSubstType = cast<AnyFunctionType>(inputSubstType.subst(contextSubs)
-            ->getCanonicalType());
-    outputSubstType = cast<AnyFunctionType>(outputSubstType.subst(contextSubs)
-            ->getCanonicalType());
-
-    // Borrow the context archetypes from the enclosing function.
     thunk->setGenericEnvironment(genericEnv);
     SILGenFunction thunkSGF(gen.SGM, *thunk);
     auto loc = RegularLocation::getAutoGeneratedLocation();
@@ -2728,9 +2716,14 @@ static ManagedValue createThunk(SILGenFunction &gen,
                    outputSubstType);
   }
 
+  CanSILFunctionType substFnType = thunkType;
+
   SmallVector<Substitution, 4> subs;
-  if (auto genericSig = thunkType->getGenericSignature())
+  if (auto genericSig = thunkType->getGenericSignature()) {
     genericSig->getSubstitutions(interfaceSubs, subs);
+    substFnType = thunkType->substGenericArgs(gen.F.getModule(),
+                                              interfaceSubs);
+  }
 
   // Create it in our current function.
   auto thunkValue = gen.B.createFunctionRef(loc, thunk);

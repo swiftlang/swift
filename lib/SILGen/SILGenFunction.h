@@ -1463,12 +1463,12 @@ public:
                           bool allowPlusZero);
 
   /// Build the type of a function transformation thunk.
-  CanSILFunctionType buildThunkType(ManagedValue fn,
-                                    CanSILFunctionType expectedType,
-                                    CanSILFunctionType &substFnType,
+  CanSILFunctionType buildThunkType(CanSILFunctionType &sourceType,
+                                    CanSILFunctionType &expectedType,
+                                    CanType &inputSubstType,
+                                    CanType &outputSubstType,
                                     GenericEnvironment *&genericEnv,
-                                    SubstitutionMap &contextSubMap,
-                                    SubstitutionMap &interfaceSubMap);
+                                    SubstitutionMap &interfaceSubs);
 
   //===--------------------------------------------------------------------===//
   // Declarations
