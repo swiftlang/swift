@@ -879,31 +879,14 @@ extension Sequence {
   public func suffix(_ maxLength: Int) -> AnySequence<Iterator.Element> {
     _precondition(maxLength >= 0, "Can't take a suffix of negative length from a sequence")
     if maxLength == 0 { return AnySequence([]) }
-    // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
+    
     // Put incoming elements into a ring buffer to save space. Once all
     // elements are consumed, reorder the ring buffer into an `Array`
     // and return it. This saves memory for sequences particularly longer
     // than `maxLength`.
-    var ringBuffer: [Iterator.Element] = []
-    ringBuffer.reserveCapacity(Swift.min(maxLength, underestimatedCount))
-
-    var i = ringBuffer.startIndex
-
-    for element in self {
-      if ringBuffer.count < maxLength {
-        ringBuffer.append(element)
-      } else {
-        ringBuffer[i] = element
-        i += 1
-        i %= maxLength
-      }
-    }
-
-    if i != ringBuffer.startIndex {
-      let s0 = ringBuffer[i..<ringBuffer.endIndex]
-      let s1 = ringBuffer[0..<i]
-      return AnySequence([s0, s1].joined())
-    }
+    let capacity = Swift.min(maxLength, underestimatedCount)
+    var ringBuffer = RingBuffer<Iterator.Element>(capacity: capacity)
+    ringBuffer.append(contentsOf: self)
     return AnySequence(ringBuffer)
   }
 
@@ -1206,24 +1189,19 @@ extension Sequence where
     _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
 
-    // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
     // Put incoming elements from this sequence in a holding tank, a ring buffer
     // of size <= n. If more elements keep coming in, pull them out of the
     // holding tank into the result, an `Array`. This saves
     // `n` * sizeof(Iterator.Element) of memory, because slices keep the entire
     // memory of an `Array` alive.
     var result: [Iterator.Element] = []
-    var ringBuffer: [Iterator.Element] = []
-    var i = ringBuffer.startIndex
-
+    var ringBuffer = RingBuffer<Iterator.Element>(capacity: n)
+    
     for element in self {
-      if ringBuffer.count < n {
-        ringBuffer.append(element)
-      } else {
-        result.append(ringBuffer[i])
-        ringBuffer[i] = element
-        i = ringBuffer.index(after: i) % n
+      if ringBuffer.isFull, let first = ringBuffer.first {
+        result.append(first)
       }
+      ringBuffer.append(element)
     }
     return AnySequence(result)
   }
