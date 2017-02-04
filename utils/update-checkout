@@ -78,10 +78,15 @@ def update_single_repository(args):
             # we previously checked out a tag rather than a branch.
             detached_head = False
             try:
-                # This git command returns an error code if HEAD is detached.
+                # This git command returns error code 1 if HEAD is detached.
+                # Otherwise there was some other error, and we need to handle
+                # it like other command errors.
                 shell.run(["git", "symbolic-ref", "-q", "HEAD"], echo=False)
-            except:
-                detached_head = True
+            except Exception as e:
+                if e.ret == 1:
+                    detached_head = True
+                else:
+                    raise  # Pass this error up the chain.
 
             # If we have a detached HEAD in this repository, we don't want
             # to rebase. With a detached HEAD, the fetch will have marked
