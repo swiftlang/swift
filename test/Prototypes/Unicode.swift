@@ -366,7 +366,7 @@ extension UnicodeStorage {
   /// Given `CodeUnits` representing text that has been encoded with
   /// `FromEncoding`, provides a collection of `ToEncoding.CodeUnit`s
   /// representing the same text.
-  struct TranscodedView<ToEncoding : UnicodeEncoding> {
+  struct TranscodedView<ToEncoding : UnicodeEncoding> : BidirectionalCollection {
     typealias FromEncoding = Encoding
     
     // We could just be a generic typealias as this type, but it turns
@@ -380,34 +380,33 @@ extension UnicodeStorage {
     >
     let base: Base
 
+    public init(_ codeUnits: CodeUnits,
+      from src: FromEncoding.Type = FromEncoding.self,
+      to dst: ToEncoding.Type = ToEncoding.self
+    ) {
+      base = Base(UnicodeStorage<CodeUnits, FromEncoding>.EncodedScalars(codeUnits, src).lazy.map {
+          dst.encode($0)!
+        })
+    }
+    
     // FIXME: this should go in the extension below but for <rdar://30320012>
+    //typealias SubSequence = BidirectionalSlice<TranscodedView>
+    public var startIndex : Base.Index {
+      return base.startIndex
+    }
+    public var endIndex : Base.Index {
+      return base.endIndex
+    }
+    public subscript(i: Base.Index) -> Base.Iterator.Element {
+      return base[i]
+    }
+    public func index(after i: Base.Index) -> Base.Index {
+      return base.index(after: i)
+    }
+    public func index(before i: Base.Index) -> Base.Index {
+      return base.index(before: i)
+    }
     typealias SubSequence = BidirectionalSlice<TranscodedView>
-  }
-}
-
-extension UnicodeStorage.TranscodedView : BidirectionalCollection {
-  public var startIndex : Base.Index {
-    return base.startIndex
-  }
-  public var endIndex : Base.Index {
-    return base.endIndex
-  }
-  public subscript(i: Base.Index) -> Base.Iterator.Element {
-    return base[i]
-  }
-  public init(_ codeUnits: CodeUnits,
-    from src: FromEncoding.Type = FromEncoding.self,
-    to dst: ToEncoding.Type = ToEncoding.self
-  ) {
-    base = Base(UnicodeStorage<CodeUnits, FromEncoding>.EncodedScalars(codeUnits, src).lazy.map {
-        dst.encode($0)!
-      })
-  }
-  public func index(after i: Base.Index) -> Base.Index {
-    return base.index(after: i)
-  }
-  public func index(before i: Base.Index) -> Base.Index {
-    return base.index(before: i)
   }
 }
 
@@ -798,7 +797,7 @@ extension UnicodeStorage {
   struct CharacterView<
     CodeUnits : RandomAccessCollection,
     Encoding : UnicodeEncoding
-  > 
+  > : BidirectionalCollection
   where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
     CodeUnits.SubSequence : RandomAccessCollection,
     CodeUnits.SubSequence.Index == CodeUnits.Index,
@@ -811,70 +810,68 @@ extension UnicodeStorage {
 
     fileprivate let storage: UnicodeStorage<CodeUnits, Encoding>
 
-    // FIXME: this should go in the extension below but for <rdar://30320012>
     typealias SubSequence = BidirectionalSlice<CharacterView>
-  }
-}
 
-extension UnicodeStorage.CharacterView : BidirectionalCollection {
-  typealias Index = CodeUnits.Index
-  
-  public var startIndex: Index { return storage.codeUnits.startIndex }
-  public var endIndex: Index { return storage.codeUnits.endIndex }
+    typealias Index = CodeUnits.Index
 
-  fileprivate func _withUBreakIterator<R>(
-    at i: Index, _ body: (UBreakIterator)->R
-  ) -> R {
-    var err = U_ZERO_ERROR;
+    public var startIndex: Index { return storage.codeUnits.startIndex }
+    public var endIndex: Index { return storage.codeUnits.endIndex }
 
-    // debugLog("ubrk_open")
-    let bi = ubrk_open(
-      /*type:*/ UBRK_CHARACTER, /*locale:*/ nil,
-      /*text:*/ nil, /*textLength:*/ 0, /*status:*/ &err)
-    precondition(err.isSuccess, "unexpected ubrk_open failure, \(err)")
-    defer { ubrk_close(bi) }
-    
-    return storage.withUText { u in
-      //let access = u.pointee.pFuncs.pointee.access(u, storage.codeUnits.offset(of: i)^, 1)
-      //// debugLog("access result:", access)
-      // debugLog("ubrk_setUText")
-      ubrk_setUText(bi, u, &err)
-      precondition(err.isSuccess, "unexpected ubrk_setUText failure: \(err)")
-      return body(bi!)
+    subscript(i: Index) -> Character {
+      // debugLog("subscript: i=\(i)")
+      let j = index(after: i)
+      // debugLog("subscript: j=\(j)")
+      let scalars = UnicodeStorage<CodeUnits.SubSequence, Encoding>(
+        storage.codeUnits[i..<j], Encoding.self
+      ).scalars
+      // debugLog("scalars: \(Array(scalars))")
+      return Character(scalars.lazy.map { UnicodeScalar($0) })
+    }    
+
+    func index(after i: Index) -> Index {
+      // FIXME: there is always a grapheme break between two scalars that are both
+      // < U+0300.  Use that to optimize.  Can we make a stronger statement, that
+      // there's always a break before any scalar < U+0300?
+      // debugLog("index(after: \(i))")
+      let nextOffset = _withUBreakIterator(at: i) {
+        ubrk_following($0, storage.codeUnits.offset(of: i)^)
+      }
+      // debugLog("  index(after: \(i)): \(nextOffset)")
+      return storage.codeUnits.index(atOffset: nextOffset)
     }
-  }
-  
-  subscript(i: Index) -> Character {
-    // debugLog("subscript: i=\(i)")
-    let j = index(after: i)
-    // debugLog("subscript: j=\(j)")
-    let scalars = UnicodeStorage(storage.codeUnits[i..<j], Encoding.self).scalars
-    // debugLog("scalars: \(Array(scalars))")
-    return Character(scalars.lazy.map { UnicodeScalar($0) })
-  }    
 
-  func index(after i: Index) -> Index {
-    // FIXME: there is always a grapheme break between two scalars that are both
-    // < U+0300.  Use that to optimize.  Can we make a stronger statement, that
-    // there's always a break before any scalar < U+0300?
-    // debugLog("index(after: \(i))")
-    let nextOffset = _withUBreakIterator(at: i) {
-      ubrk_following($0, storage.codeUnits.offset(of: i)^)
+    func index(before i: Index) -> Index {
+      // FIXME: there is always a grapheme break between two scalars that are both
+      // < U+0300.  Use that to optimize.  Can we make a stronger statement, that
+      // there's always a break before any scalar < U+0300?
+      // debugLog("index(before: \(i))")
+      let previousOffset = _withUBreakIterator(at: i) {
+        ubrk_preceding($0, storage.codeUnits.offset(of: i)^)
+      }
+      // debugLog("  -> \(previousOffset)")
+      return storage.codeUnits.index(atOffset: previousOffset)
     }
-    // debugLog("  index(after: \(i)): \(nextOffset)")
-    return storage.codeUnits.index(atOffset: nextOffset)
-  }
-  
-  func index(before i: Index) -> Index {
-    // FIXME: there is always a grapheme break between two scalars that are both
-    // < U+0300.  Use that to optimize.  Can we make a stronger statement, that
-    // there's always a break before any scalar < U+0300?
-    // debugLog("index(before: \(i))")
-    let previousOffset = _withUBreakIterator(at: i) {
-      ubrk_preceding($0, storage.codeUnits.offset(of: i)^)
-    }
-    // debugLog("  -> \(previousOffset)")
-    return storage.codeUnits.index(atOffset: previousOffset)
+    fileprivate func _withUBreakIterator<R>(
+      at i: Index, _ body: (UBreakIterator)->R
+    ) -> R {
+      var err = U_ZERO_ERROR;
+
+      // debugLog("ubrk_open")
+      let bi = ubrk_open(
+        /*type:*/ UBRK_CHARACTER, /*locale:*/ nil,
+        /*text:*/ nil, /*textLength:*/ 0, /*status:*/ &err)
+      precondition(err.isSuccess, "unexpected ubrk_open failure, \(err)")
+      defer { ubrk_close(bi) }
+
+      return storage.withUText { u in
+        //let access = u.pointee.pFuncs.pointee.access(u, storage.codeUnits.offset(of: i)^, 1)
+        //// debugLog("access result:", access)
+        // debugLog("ubrk_setUText")
+        ubrk_setUText(bi, u, &err)
+        precondition(err.isSuccess, "unexpected ubrk_setUText failure: \(err)")
+        return body(bi!)
+      }
+    }  
   }
 }
 
