@@ -161,16 +161,10 @@ foreach(sdk ${ELFISH_SDKS})
     set(section_magic_begin_obj "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/section_magic_begin-${arch_suffix}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}")
     set(section_magic_end_obj "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/section_magic_end-${arch_suffix}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}")
 
-    if(SWIFT_ENABLE_GOLD_LINKER)
-      set(LD_COMMAND "gold")
-    else()
-      set(LD_COMMAND "ld")
-    endif()
-
     add_custom_command_target(section_magic_${arch_suffix}_begin_object
       COMMAND
           # Merge ImageInspectionInit.o + swift_sections.S(BEGIN) => swift_begin.o
-          ${LD_COMMAND} -r -o "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
+          ${CMAKE_LINKER} -r -o "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
           "${section_magic_begin_obj}" "${section_magic_loader_obj}"
       OUTPUT
           "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
