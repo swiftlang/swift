@@ -1558,8 +1558,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       break;
 
     case TypeKind::Tuple: {
+      assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
       // Try the tuple-to-tuple conversion.
-      conversionsOrFixes.push_back(ConversionRestrictionKind::TupleToTuple);
+      if (!type1->is<LValueType>())
+        conversionsOrFixes.push_back(ConversionRestrictionKind::TupleToTuple);
       break;
     }
 
@@ -1568,7 +1570,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Class: {
       auto nominal1 = cast<NominalType>(desugar1);
       auto nominal2 = cast<NominalType>(desugar2);
-      if (nominal1->getDecl() == nominal2->getDecl()) {
+      assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
+      if (!type1->is<LValueType>() &&
+          nominal1->getDecl() == nominal2->getDecl()) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
       }
 
@@ -1579,7 +1583,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         auto class2 = cast<ClassDecl>(nominal2->getDecl());
 
         // CF -> Objective-C via toll-free bridging.
-        if (class1->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
+        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
+        if (!type1->is<LValueType>() &&
+            class1->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
             class2->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
             class1->getAttrs().hasAttribute<ObjCBridgedAttr>()) {
           conversionsOrFixes.push_back(
@@ -1587,7 +1593,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
 
         // Objective-C -> CF via toll-free bridging.
-        if (class2->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
+        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
+        if (!type1->is<LValueType>() &&
+            class2->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
             class1->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
             class2->getAttrs().hasAttribute<ObjCBridgedAttr>()) {
           conversionsOrFixes.push_back(
@@ -1678,7 +1686,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto bound1 = cast<BoundGenericType>(desugar1);
       auto bound2 = cast<BoundGenericType>(desugar2);
       
-      if (bound1->getDecl() == bound2->getDecl()) {
+      assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
+      if (!type1->is<LValueType>() && bound1->getDecl() == bound2->getDecl()) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
       }
       break;
@@ -1713,12 +1722,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // there is at most one non-defaulted element.
       // For non-argument tuples, we can do the same conversion but not
       // to a tuple with varargs.
-      if ((tuple2->getNumElements() == 1 &&
-           !tuple2->getElement(0).isVararg()) ||
-          (kind >= ConstraintKind::Conversion &&
-           tuple2->getElementForScalarInit() >= 0 &&
-           (isArgumentTupleConversion ||
-            !tuple2->getVarArgsBaseType()))) {
+      if (!type1->is<LValueType>() &&
+          ((tuple2->getNumElements() == 1 &&
+            !tuple2->getElement(0).isVararg()) ||
+           (kind >= ConstraintKind::Conversion &&
+            tuple2->getElementForScalarInit() >= 0 &&
+            (isArgumentTupleConversion ||
+             !tuple2->getVarArgsBaseType())))) {
         conversionsOrFixes.push_back(
           ConversionRestrictionKind::ScalarToTuple);
 
@@ -1732,6 +1742,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         type2->getClassOrBoundGenericClass() &&
         type1->getClassOrBoundGenericClass()
           != type2->getClassOrBoundGenericClass()) {
+      assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
       conversionsOrFixes.push_back(ConversionRestrictionKind::Superclass);
     }
     
@@ -1740,7 +1751,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // Don't allow this in operator contexts or we'll end up allowing
       // 'T() == U()' for unrelated T and U that just happen to be Hashable.
       // We can remove this special case when we implement operator hiding.
-      if (kind != ConstraintKind::OperatorArgumentConversion) {
+      if (!type1->is<LValueType>() &&
+          kind != ConstraintKind::OperatorArgumentConversion) {
+        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
         conversionsOrFixes.push_back(
                               ConversionRestrictionKind::HashableToAnyHashable);
       }
@@ -1800,16 +1813,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
     
     // Special implicit nominal conversions.
-    if (kind >= ConstraintKind::Conversion) {      
+    if (!type1->is<LValueType>() &&
+        kind >= ConstraintKind::Conversion) {
       // Array -> Array.
       if (isArrayType(desugar1) && isArrayType(desugar2)) {
+        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
         conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
       // Dictionary -> Dictionary.
       } else if (isDictionaryType(desugar1) && isDictionaryType(desugar2)) {
+        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
         conversionsOrFixes.push_back(
           ConversionRestrictionKind::DictionaryUpcast);
       // Set -> Set.
       } else if (isSetType(desugar1) && isSetType(desugar2)) {
+        assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
         conversionsOrFixes.push_back(
           ConversionRestrictionKind::SetUpcast);
       }
@@ -1981,7 +1998,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // we hit commit_to_conversions below, but we have to add a token restriction
   // to ensure we wrap the metatype value in a metatype erasure.
   if (concrete && type2->isExistentialType() &&
+      !type1->is<LValueType>() &&
       kind >= ConstraintKind::Subtype) {
+
+    // Penalize conversions to Any.
+    if (kind >= ConstraintKind::Conversion && type2->isAny())
+      increaseScore(ScoreKind::SK_EmptyExistentialConversion);
+
     conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
   }
 
@@ -1992,7 +2015,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   {
     BoundGenericType *boundGenericType2;
     
-    if (concrete && kind >= ConstraintKind::Subtype &&
+    if (concrete && !type1->is<LValueType>() &&
+        kind >= ConstraintKind::Subtype &&
         (boundGenericType2 = type2->getAs<BoundGenericType>())) {
       auto decl2 = boundGenericType2->getDecl();
       if (auto optionalKind2 = decl2->classifyAsOptionalType()) {
@@ -2025,6 +2049,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             ConversionRestrictionKind::ValueToOptional);
       }
     }
+
   }
 
   // A value of type T! can be (unsafely) forced to U if T
