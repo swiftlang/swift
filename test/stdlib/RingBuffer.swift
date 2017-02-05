@@ -131,7 +131,7 @@ func make(_ prefix: [Int],
   precondition(suffix.count == 0 || (suffix.count + prefix.count) == 5)
   var buffer = RingBuffer(ContiguousArray(suffix + prefix),
     capacity: 5,
-  offset: suffix.count)
+    offset: suffix.count)
   apply(&buffer)
   return buffer
 }
