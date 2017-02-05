@@ -230,9 +230,11 @@ class SubclassOfInner<T, U> : OuterRing<T>.InnerRing<U> {
 // CHECK:   [[SELF_COPY:%[0-9]+]] = alloc_stack $OuterRing<τ_0_0>.InnerRing<τ_1_0>
 // CHECK:   copy_addr [[SELF]] to [initialization] [[SELF_COPY]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>
 // CHECK:   [[SELF_COPY_VAL:%[0-9]+]] = load [take] [[SELF_COPY]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>
-// CHECK:   [[METHOD:%[0-9]+]] = class_method [[SELF_COPY_VAL]] : $OuterRing<τ_0_0>.InnerRing<τ_1_0>, #OuterRing.InnerRing.method!1 : <T><U><V> (OuterRing<T>.InnerRing<U>) -> (T, U, V) -> (T, U, V), $@convention(method) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0)
-// CHECK:   apply [[METHOD]]<τ_0_0, τ_1_0, τ_2_0>([[T]], [[U]], [[V]], [[TOut]], [[UOut]], [[VOut]], [[SELF_COPY_VAL]]) : $@convention(method) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0)
+// CHECK:   [[BORROWED_SELF_COPY_VAL:%.*]] = begin_borrow [[SELF_COPY_VAL]]
+// CHECK:   [[METHOD:%[0-9]+]] = class_method [[BORROWED_SELF_COPY_VAL]] : $OuterRing<τ_0_0>.InnerRing<τ_1_0>, #OuterRing.InnerRing.method!1 : <T><U><V> (OuterRing<T>.InnerRing<U>) -> (T, U, V) -> (T, U, V), $@convention(method) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0)
+// CHECK:   apply [[METHOD]]<τ_0_0, τ_1_0, τ_2_0>([[T]], [[U]], [[V]], [[TOut]], [[UOut]], [[VOut]], [[BORROWED_SELF_COPY_VAL]]) : $@convention(method) <τ_0_0><τ_1_0><τ_2_0> (@in τ_0_0, @in τ_1_0, @in τ_2_0, @guaranteed OuterRing<τ_0_0>.InnerRing<τ_1_0>) -> (@out τ_0_0, @out τ_1_0, @out τ_2_0)
 // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
+// CHECK:   end_borrow [[BORROWED_SELF_COPY_VAL]] from [[SELF_COPY_VAL]]
 // CHECK:   destroy_value [[SELF_COPY_VAL]] : $OuterRing<τ_0_0>.InnerRing<τ_1_0>
 // CHECK:   dealloc_stack [[SELF_COPY]] : $*OuterRing<τ_0_0>.InnerRing<τ_1_0>
 // CHECK:   return [[RESULT]] : $()

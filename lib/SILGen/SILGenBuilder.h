@@ -120,6 +120,7 @@ public:
 
   ManagedValue createUnsafeCopyUnownedValue(SILLocation Loc,
                                             ManagedValue OriginalValue);
+  ManagedValue createOwnedPHIArgument(SILType Type);
 };
 
 } // namespace Lowering
