@@ -1,3 +1,8 @@
+
+if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
+  set(EXTRA_TYPECHECKER_FLAGS "FORCE_BUILD_OPTIMIZED")
+endif()
+
 add_swift_library(swiftSema STATIC
   CSApply.cpp
   CSDiag.cpp
@@ -44,5 +49,7 @@ add_swift_library(swiftSema STATIC
   TypeChecker.cpp
   LINK_LIBRARIES
     swiftParse
-    swiftAST)
+    swiftAST
+  ${EXTRA_TYPECHECKER_FLAGS}
+)
 
