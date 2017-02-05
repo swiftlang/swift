@@ -37,7 +37,10 @@ class B : A, Barrable {}
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_T021witnesses_inheritance1BCAA8BarrableAaaDP3bar{{[_0-9a-zA-Z]*}}FTW
 // CHECK:         [[B:%.*]] = load [take] {{%.*}} : $*B
 // CHECK-NEXT:    [[A:%.*]] = upcast [[B]] : $B to $A
-// CHECK-NEXT:    [[METH:%.*]] = class_method [[A]] : $A, #A.bar!1
+// CHECK-NEXT:    [[BORROWED_A:%.*]] = begin_borrow [[A]]
+// CHECK-NEXT:    [[METH:%.*]] = class_method [[BORROWED_A]] : $A, #A.bar!1
+// CHECK-NEXT:    apply [[METH]]([[BORROWED_A]]) : $@convention(method) (@guaranteed A) -> ()
+// CHECK:         end_borrow [[BORROWED_A]] from [[A]]
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_T021witnesses_inheritance1BCAA8BarrableAaaDP9class_bar{{[_0-9a-zA-Z]*}}FZTW
 // CHECK:         upcast {{%.*}} : $@thick B.Type to $@thick A.Type
 

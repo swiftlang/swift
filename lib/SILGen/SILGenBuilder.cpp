@@ -183,3 +183,9 @@ SILGenBuilder::createUnsafeCopyUnownedValue(SILLocation Loc,
   SILBuilder::createUnmanagedRetainValue(Loc, Result);
   return gen.emitManagedRValueWithCleanup(Result);
 }
+
+ManagedValue SILGenBuilder::createOwnedPHIArgument(SILType Type) {
+  SILPHIArgument *Arg =
+      getInsertionBB()->createPHIArgument(Type, ValueOwnershipKind::Owned);
+  return gen.emitManagedRValueWithCleanup(Arg);
+}

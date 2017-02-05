@@ -745,7 +745,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
     SWIFT_FALLTHROUGH;
   case ParameterConvention::Direct_Guaranteed:
     if (allowPlusZero)
-      return ManagedValue::forUnmanaged(paramValue);
+      return gen.emitManagedBeginBorrow(loc, paramValue);
     SWIFT_FALLTHROUGH;
   // Unowned parameters are only guaranteed at the instant of the call, so we
   // must retain them even if we're in a context that can accept a +0 value.
@@ -1237,12 +1237,42 @@ namespace {
       switch (result.getConvention()) {
       // Direct translation is relatively easy.
       case ParameterConvention::Direct_Owned:
-      case ParameterConvention::Direct_Unowned:
+      case ParameterConvention::Direct_Unowned: {
+        auto output =
+            translatePrimitive(inputOrigType, inputSubstType, outputOrigType,
+                               outputSubstType, input);
+        assert(output.getType() == SGF.getSILType(result));
+
+        // If our output is guaranteed, we need to create a copy here.
+        if (output.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+          output = output.copyUnmanaged(SGF, Loc);
+        Outputs.push_back(output);
+        return;
+      }
       case ParameterConvention::Direct_Guaranteed: {
         auto output = translatePrimitive(inputOrigType, inputSubstType,
                                          outputOrigType, outputSubstType,
                                          input);
         assert(output.getType() == SGF.getSILType(result));
+
+        // If our output value is not guaranteed, we need to:
+        //
+        // 1. Unowned - Copy + Borrow.
+        // 2. Owned - Borrow.
+        // 3. Trivial - do nothing.
+        //
+        // This means we can first transition unowned => owned and then handle
+        // the new owned value using the same code path as values that are
+        // initially owned.
+        if (output.getOwnershipKind() == ValueOwnershipKind::Unowned) {
+          assert(!output.hasCleanup());
+          output = SGF.emitManagedRetain(Loc, output.getValue());
+        }
+
+        if (output.getOwnershipKind() == ValueOwnershipKind::Owned) {
+          output = SGF.emitManagedBeginBorrow(Loc, output.getValue());
+        }
+
         Outputs.push_back(output);
         return;
       }
@@ -1327,8 +1357,18 @@ static void forwardFunctionArguments(SILGenFunction &gen,
   for (auto index : indices(managedArgs)) {
     auto &arg = managedArgs[index];
     auto argTy = argTypes[index];
-    forwardedArgs.push_back(argTy.isConsumed() ? arg.forward(gen)
-                                               : arg.getValue());
+    if (argTy.isConsumed()) {
+      forwardedArgs.push_back(arg.forward(gen));
+      continue;
+    }
+
+    if (argTy.getConvention() == ParameterConvention::Direct_Guaranteed) {
+      forwardedArgs.push_back(
+          gen.emitManagedBeginBorrow(loc, arg.getValue()).getValue());
+      continue;
+    }
+
+    forwardedArgs.push_back(arg.getValue());
   }
 }
 
