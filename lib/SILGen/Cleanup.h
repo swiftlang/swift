@@ -14,20 +14,25 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CLEANUP_H
-#define CLEANUP_H
+#ifndef SWIFT_SILGEN_CLEANUP_H
+#define SWIFT_SILGEN_CLEANUP_H
 
 #include "swift/Basic/DiverseStack.h"
 #include "swift/SIL/SILLocation.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
-  class SILBasicBlock;
-  class SILFunction;
-  class SILValue;
-  
+
+class SILBasicBlock;
+class SILFunction;
+class SILValue;
+
 namespace Lowering {
-  class JumpDest;
-  class SILGenFunction;
+
+class JumpDest;
+class SILGenFunction;
+class ManagedValue;
+class BorrowedManagedValue;
 
 /// The valid states that a cleanup can be in.
 enum class CleanupState {
@@ -112,7 +117,8 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   void setCleanupState(Cleanup &cleanup, CleanupState state);
 
   friend class CleanupStateRestorationScope;
-  
+  friend class BorrowedManagedValue;
+
 public:
   CleanupManager(SILGenFunction &Gen)
     : Gen(Gen), InnermostScope(Stack.stable_end()) {

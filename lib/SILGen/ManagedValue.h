@@ -31,6 +31,8 @@ enum class CastConsumptionKind : unsigned char;
 
 namespace Lowering {
 
+class SILGenFunction;
+
 /// ManagedValue - represents a singular SIL value and an optional cleanup.
 /// Ownership of the ManagedValue can be "forwarded" to disable its cleanup when
 /// the rvalue is consumed. A ManagedValue can also represent an LValue used as
@@ -358,8 +360,41 @@ public:
     return { asUnmanagedValue(), CastConsumptionKind::CopyOnSuccess };
   }
 };
-  
-} // end namespace Lowering
+
+/// An RAII object that allows a user to borrow a value without a specific scope
+/// that ensures that the object is cleaned up before other scoped cleanups
+/// occur. The way cleanup is triggered is by calling:
+///
+///   std::move(value).cleanup();
+class BorrowedManagedValue {
+  SILGenFunction &gen;
+  ManagedValue borrowedValue;
+  Optional<CleanupHandle> handle;
+  SILLocation loc;
+
+public:
+  BorrowedManagedValue(SILGenFunction &gen, ManagedValue originalValue,
+                       SILLocation loc);
+  ~BorrowedManagedValue() {
+    assert(!borrowedValue &&
+           "Did not manually cleanup borrowed managed value?!");
+  }
+  BorrowedManagedValue(const BorrowedManagedValue &) = delete;
+  BorrowedManagedValue(BorrowedManagedValue &&) = delete;
+  BorrowedManagedValue &operator=(const BorrowedManagedValue &) = delete;
+  BorrowedManagedValue &operator=(BorrowedManagedValue &&) = delete;
+
+  void cleanup() && { cleanupImpl(); }
+  operator ManagedValue() const { return borrowedValue; }
+
+private:
+  void cleanupImpl();
+};
+
+} // namespace Lowering
+} // namespace swift
+
+namespace swift {
 
 template <typename To> inline bool isa(const Lowering::ManagedValue &M) {
   return isa<To>(M.getValue());
