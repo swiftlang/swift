@@ -547,6 +547,12 @@ class subject_subscriptInvalid8 {
   }
 }
 
+class subject_propertyInvalid1 {
+  @objc
+  let plainStruct = PlainStruct() // expected-error {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // expected-note@-1{{Swift structs cannot be represented in Objective-C}}
+}
+
 //===--- Tests for @objc inference.
 
 @objc
@@ -1758,12 +1764,15 @@ enum BadEnum1: Int { case X }
 
 @objc
 enum BadEnum2: Int {
-  @objc(X:)   // expected-error{{'@objc' enum case must have a simple name}}{{10-11=}}
+  @objc(X:)   // expected-error{{'@objc' enum element must have a simple name}}{{10-11=}}
   case X
 }
 
 class BadClass2 {
-  @objc(badprop:foo:wibble:) // expected-error{{'@objc' property must have a simple name}}{{16-28=}}
+  @objc(realDealloc) // expected-error{{'@objc' deinitializer cannot have a name}}
+  deinit { }
+
+  @objc(badprop:foo:wibble:) // expected-error{{'@objc' var must have a simple name}}{{16-28=}}
   var badprop: Int = 5
 
   @objc(foo) // expected-error{{'@objc' subscript cannot have a name; did you mean to put the name on the getter or setter?}}

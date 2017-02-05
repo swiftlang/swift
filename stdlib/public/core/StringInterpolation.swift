@@ -1,4 +1,4 @@
-//===--- StringInterpolation.swift.gyb - String Interpolation -*- swift -*-===//
+//===--- StringInterpolation.swift - String Interpolation -----*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,30 +9,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
-%{
-
-from SwiftIntTypes import all_integer_types
-
-# Number of bits in the Builtin.Word type
-word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
-
-StreamableTypes = [
-    'String',
-    'Character',
-    'UnicodeScalar',
-  ]
-
-PrintableTypes = [
-    'Bool',
-    'Float32',
-    'Float64'
-  ]
-
-for int_ty in all_integer_types(word_bits):
-    PrintableTypes.append(int_ty.stdlib_name)
-
-}%
 
 extension String : _ExpressibleByStringInterpolation {
   /// Creates a new string by concatenating the given interpolations.
@@ -68,31 +44,33 @@ extension String : _ExpressibleByStringInterpolation {
     self = String(describing: expr)
   }
 
-% for Type in StreamableTypes:
   /// Creates a string containing the given value's textual representation.
   ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
   ///
   /// - SeeAlso: `ExpressibleByStringInterpolation`
-  public init(stringInterpolationSegment expr: ${Type}) {
+  public init<T: TextOutputStreamable> (stringInterpolationSegment expr: T) {
     self = _toStringReadOnlyStreamable(expr)
   }
-% end
 
-% for Type in PrintableTypes:
   /// Creates a string containing the given value's textual representation.
   ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
   ///
   /// - SeeAlso: `ExpressibleByStringInterpolation`
-  public init(stringInterpolationSegment expr: ${Type}) {
+  public init<T: CustomStringConvertible> (stringInterpolationSegment expr: T) {
     self = _toStringReadOnlyPrintable(expr)
   }
-% end
-}
 
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:
+  /// Creates a string containing the given value's textual representation.
+  ///
+  /// Do not call this initializer directly. It is used by the compiler when
+  /// interpreting string interpolations.
+  ///
+  /// - SeeAlso: `ExpressibleByStringInterpolation`
+  public init<T: TextOutputStreamable & CustomStringConvertible> (stringInterpolationSegment expr: T) {
+    self = _toStringReadOnlyStreamable(expr)
+  }
+}

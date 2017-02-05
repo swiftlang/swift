@@ -124,7 +124,7 @@ class AnnotatingPrinter : public StreamPrinter {
   }
 
   void deinitDefaultMapToUse(const Decl*D) {
-    if (D->getKind() == DeclKind::Extension) {
+    if (isa<ExtensionDecl>(D)) {
       DefaultMapToUse = nullptr;
     }
   }
@@ -154,7 +154,7 @@ public:
   bool shouldContinuePre(const Decl *D, Optional<BracketOptions> Bracket) {
     assert(Bracket.hasValue());
     if (!Bracket.getValue().shouldOpenExtension(D) &&
-        D->getKind() == DeclKind::Extension)
+        isa<ExtensionDecl>(D))
       return false;
     return true;
   }
@@ -164,7 +164,7 @@ public:
     if (!Bracket.getValue().shouldCloseNominal(D) && dyn_cast<NominalTypeDecl>(D))
       return false;
     if (!Bracket.getValue().shouldCloseExtension(D) &&
-        D->getKind() == DeclKind::Extension)
+        isa<ExtensionDecl>(D))
       return false;
     return true;
   }
@@ -984,7 +984,7 @@ public:
   }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type Ty,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type Ty,
                           SemaReferenceKind Kind) override {
     unsigned StartOffset = getOffset(Range.getStart());
     References.emplace_back(D, StartOffset, Range.getByteLength(), Ty);
@@ -994,7 +994,7 @@ public:
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override {
     // Treat both open and close brackets equally
-    return visitDeclReference(D, Range, nullptr, Type(),
+    return visitDeclReference(D, Range, nullptr, nullptr, Type(),
                               SemaReferenceKind::SubscriptRef);
   }
 

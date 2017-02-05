@@ -223,22 +223,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
 
-    case ConstraintLocator::InterpolationArgument:
-      if (auto interp = dyn_cast<InterpolatedStringLiteralExpr>(anchor)) {
-        unsigned index = path[0].getValue();
-        if (index < interp->getSegments().size()) {
-          // No additional target locator information.
-          // FIXME: Dig out the constructor we're trying to call?
-          targetAnchor = nullptr;
-          targetPath.clear();
-
-          anchor = interp->getSegments()[index];
-          path = path.slice(1);
-          continue;
-        }
-      }
-      break;
-
     case ConstraintLocator::SubscriptIndex:
       if (auto subscript = dyn_cast<SubscriptExpr>(anchor)) {
         targetAnchor = subscript->getBase();
@@ -947,8 +931,9 @@ namespace {
 
           // The associated data of the case.
           if (level == 1) {
-            if (!enumElt->hasArgumentType()) return { };
-            gatherArgumentLabels(enumElt->getArgumentType(), scratch);
+            auto argTy = enumElt->getArgumentInterfaceType();
+            if (!argTy) return { };
+            gatherArgumentLabels(argTy, scratch);
             return scratch;
           }
         }
@@ -1570,7 +1555,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     auto instanceType = TE->getInstanceType();
     
     // TODO: figure out right value for isKnownPrivate
-    if (!instanceType->getAs<TupleType>()) {
+    if (instanceType->mayHaveMembers()) {
       auto ctors = CS->TC.lookupConstructors(CS->DC, instanceType,
                                        NameLookupFlags::IgnoreAccessibility);
       for (auto ctor : ctors)
@@ -2661,12 +2646,12 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
 /// lower case counterparts are identical.
 ///   - DeclName is valid when such a correct case is found; invalid otherwise.
 static DeclName
-findCorrectEnumCaseName(MetatypeType *MetaTy, LookupResult &Result,
+findCorrectEnumCaseName(Type Ty, LookupResult &Result,
                         DeclName memberName) {
   if (!memberName.isSimpleName())
     return DeclName();
-  if (!MetaTy->getInstanceType()->is<EnumType>() &&
-      !MetaTy->getInstanceType()->is<BoundGenericEnumType>())
+  if (!Ty->is<EnumType>() &&
+      !Ty->is<BoundGenericEnumType>())
     return DeclName();
   llvm::SmallVector<DeclName, 4> candidates;
   for (auto &correction : Result) {
@@ -2707,17 +2692,19 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     if (memberName.isSimpleName("subscript")) {
       diagnose(loc, diag::type_not_subscriptable, baseObjTy)
         .highlight(baseRange);
-    } else if (auto MTT = baseObjTy->getAs<MetatypeType>()) {
+    } else if (auto metatypeTy = baseObjTy->getAs<MetatypeType>()) {
+      auto instanceTy = metatypeTy->getInstanceType();
       tryTypoCorrection();
-      if (DeclName rightName = findCorrectEnumCaseName(MTT, correctionResults,
+
+      if (DeclName rightName = findCorrectEnumCaseName(instanceTy,
+                                                       correctionResults,
                                                        memberName)) {
-        diagnose(loc, diag::could_not_find_enum_case, MTT->getInstanceType(),
+        diagnose(loc, diag::could_not_find_enum_case, instanceTy,
           memberName, rightName).fixItReplace(nameLoc.getBaseNameLoc(),
                                               rightName.getBaseName().str());
         return;
       }
-      diagnose(loc, diag::could_not_find_type_member,
-               MTT->getInstanceType(), memberName)
+      diagnose(loc, diag::could_not_find_type_member, instanceTy, memberName)
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
     } else {
       diagnose(loc, diag::could_not_find_value_member,

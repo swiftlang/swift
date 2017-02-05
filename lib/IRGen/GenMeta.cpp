@@ -2438,7 +2438,8 @@ namespace {
                          NominalTypeDecl::StoredPropertyRange storedProperties){
     SmallVector<FieldTypeInfo, 4> types;
     for (VarDecl *prop : storedProperties) {
-      auto propertyType = prop->getType()->getCanonicalType();
+      auto propertyType = type->mapTypeIntoContext(prop->getInterfaceType())
+                              ->getCanonicalType();
       types.push_back(FieldTypeInfo(propertyType,
                                     /*indirect*/ false,
                                     propertyType->is<WeakStorageType>()));
@@ -2458,16 +2459,18 @@ namespace {
     // using the lowered cases, i.e. the cases for Optional<>.
     if (type->classifyAsOptionalType() == OTK_ImplicitlyUnwrappedOptional) {
       assert(enumElements.size() == 1);
-      auto caseType =
-        IGM.Context.getImplicitlyUnwrappedOptionalSomeDecl()
-           ->getArgumentType()->getCanonicalType();
+      auto decl = IGM.Context.getImplicitlyUnwrappedOptionalSomeDecl();
+      auto caseType = decl->getParentEnum()->mapTypeIntoContext(
+        decl->getArgumentInterfaceType())
+          ->getCanonicalType();
       types.push_back(FieldTypeInfo(caseType, false, false));
       return getFieldTypeAccessorFn(IGM, type, types);
     }
 
     for (auto &elt : enumElements) {
-      assert(elt.decl->hasArgumentType() && "enum case doesn't have arg?!");
-      auto caseType = elt.decl->getArgumentType()->getCanonicalType();
+      auto caseType = elt.decl->getParentEnum()->mapTypeIntoContext(
+        elt.decl->getArgumentInterfaceType())
+          ->getCanonicalType();
       bool isIndirect = elt.decl->isIndirect()
         || elt.decl->getParentEnum()->isIndirect();
       types.push_back(FieldTypeInfo(caseType, isIndirect, /*weak*/ false));
@@ -3211,7 +3214,8 @@ static llvm::Value *emitInitializeFieldOffsetVector(IRGenFunction &IGF,
   Address firstField;
   unsigned index = 0;
   for (auto prop : storedProperties) {
-    auto propFormalTy = prop->getType()->getCanonicalType();
+    auto propFormalTy = target->mapTypeIntoContext(prop->getInterfaceType())
+                            ->getCanonicalType();
     SILType propLoweredTy = IGF.IGM.getLoweredType(propFormalTy);
     auto &propTI = IGF.getTypeInfo(propLoweredTy);
     auto sizeAndAlignMask

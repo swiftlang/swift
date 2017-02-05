@@ -8,6 +8,7 @@
 // RUN: not %target-swift-frontend -typecheck %s -import-objc-header %S/../../Inputs/empty.swift 2>&1 | %FileCheck -check-prefix=EMPTY-HEADER %s
 
 // REQUIRES: objc_interop
+// REQUIRES: rdar30287833
 
 // EMPTY-HEADER-NOT: header
 

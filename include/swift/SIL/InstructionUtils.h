@@ -123,6 +123,13 @@ public:
 
   ConformanceCollector(SILModule &M) : M(M) { }
 
+#ifndef NDEBUG
+  static bool verifyInIRGen() {
+    // TODO: currently disabled because of several problems.
+    return false;
+  }
+#endif
+
   /// Collect all used conformances of an instruction.
   ///
   /// If the instruction can escape a metatype, also record this metatype.

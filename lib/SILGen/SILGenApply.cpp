@@ -117,6 +117,11 @@ static bool canUseStaticDispatch(SILGenFunction &gen,
 
   if (funcDecl->isFinal())
     return true;
+  // Extension methods currently must be statically dispatched, unless they're
+  // @objc or dynamic.
+  if (funcDecl->getDeclContext()->isExtensionContext()
+      && !constant.isForeign)
+    return true;
 
   // We cannot form a direct reference to a method body defined in
   // Objective-C.
@@ -694,9 +699,10 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
         !cast<ArchetypeType>(selfValue.getSubstRValueType())->requiresClass())
       return;
 
-    auto selfParameter = getSelfParameter();
-    assert(gen.silConv.isSILIndirect(selfParameter));
-    (void)selfParameter;
+    assert(gen.silConv.useLoweredAddresses()
+           == gen.silConv.isSILIndirect(getSelfParameter()));
+    if (!gen.silConv.useLoweredAddresses())
+      return;
 
     SILLocation selfLoc = selfValue.getLocation();
 
@@ -3667,11 +3673,13 @@ void ArgEmitter::emitShuffle(Expr *inner,
   // Emit the inner expression.
   SmallVector<ManagedValue, 8> innerArgs;
   SmallVector<InOutArgument, 2> innerInOutArgs;
-  ArgEmitter(SGF, Rep, ClaimedParamsRef(innerParams), innerArgs, innerInOutArgs,
-             /*foreign error*/ None, /*foreign self*/ ImportAsMemberStatus(),
-             (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
-                                : Optional<ArgSpecialDestArray>()))
-    .emitTopLevel(ArgumentSource(inner), innerOrigParamType);
+  if (!innerParams.empty()) {
+    ArgEmitter(SGF, Rep, ClaimedParamsRef(innerParams), innerArgs, innerInOutArgs,
+               /*foreign error*/ None, /*foreign self*/ ImportAsMemberStatus(),
+               (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
+                                  : Optional<ArgSpecialDestArray>()))
+      .emitTopLevel(ArgumentSource(inner), innerOrigParamType);
+  }
 
   // Make a second pass to split the inner arguments correctly.
   {
@@ -4317,7 +4325,7 @@ namespace {
 
         // Get the payload argument.
         ArgumentSource payload;
-        if (element->hasArgumentType()) {
+        if (element->getArgumentInterfaceType()) {
           assert(uncurriedSites.size() == 2);
           formalResultType = formalType.getResult();
           claimNextParamClause(origFormalType);

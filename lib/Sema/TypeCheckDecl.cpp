@@ -2192,7 +2192,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   case DeclKind::EnumElement: {
     auto EED = cast<EnumElementDecl>(D);
 
-    if (!EED->hasArgumentType())
+    if (!EED->getArgumentTypeLoc().getType())
       return;
     checkTypeAccessibility(TC, EED->getArgumentTypeLoc(), EED,
                            [&](AccessScope typeAccessScope,
@@ -2796,7 +2796,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
       continue;
 
     // We don't yet support raw values on payload cases.
-    if (elt->hasArgumentType()) {
+    if (elt->getArgumentInterfaceType()) {
       TC.diagnose(elt->getLoc(),
                   diag::enum_with_raw_type_case_with_argument);
       TC.diagnose(ED->getInherited().front().getSourceRange().Start,
@@ -6277,10 +6277,10 @@ public:
       return;
 
     // Require the carried type to be materializable.
-    if (EED->getArgumentType() &&
-        !EED->getArgumentType()->isMaterializable()) {
+    if (EED->getArgumentInterfaceType() &&
+        !EED->getArgumentInterfaceType()->isMaterializable()) {
       TC.diagnose(EED->getLoc(), diag::enum_element_not_materializable,
-                  EED->getArgumentType());
+                  EED->getArgumentInterfaceType());
       EED->setInterfaceType(ErrorType::get(TC.Context));
       EED->setInvalid();
     }
@@ -6848,34 +6848,34 @@ static bool checkStructDeclCircularity(StructDecl *S, NominalDeclSet &known,
 static bool checkEnumDeclCircularity(EnumDecl *E, NominalDeclSet &known,
                                      Type baseType, bool isGenericArg) {
   // enums marked as 'indirect' are safe
-  if (E->isIndirect()) { return false; }
-
+  if (E->isIndirect())
+    return false;
 
   // if we are checking a generic argument, don't make it a starting point
   // of a circularity.
-  if (!isGenericArg) {
+  if (!isGenericArg)
     known.insert(E);
-  }
 
   for (auto elt: E->getAllElements()) {
-    // skip uninteresting fields.
-    if (!elt->hasArgumentType() || elt->isIndirect()) {
+    // FIXME: Strange that this can happen, it means we're potentially
+    // not diagnosing circularity when we should be.
+    if (!elt->hasInterfaceType())
       continue;
-    }
+
+    // skip uninteresting fields.
+    if (!elt->getArgumentInterfaceType() || elt->isIndirect())
+      continue;
+
     auto eltType = baseType->getTypeOfMember(E->getModuleContext(), elt,
       nullptr, elt->getArgumentInterfaceType());
 
-    if (!eltType) { continue; }
-
-    if (deconstructTypeForDeclCircularity(eltType, known)) {
+    if (deconstructTypeForDeclCircularity(eltType, known))
       return true;
-    }
   }
 
   // we didn't find any circularity, clean up.
-  if (!isGenericArg) {
+  if (!isGenericArg)
     known.erase(E);
-  }
 
   return false;
 }
@@ -8162,23 +8162,21 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         // names. Complain and recover by chopping off everything
         // after the first name.
         if (objcName->getNumArgs() > 0) {
-          int which = isa<ClassDecl>(D)? 0
-                    : isa<ProtocolDecl>(D)? 1
-                    : isa<EnumDecl>(D)? 2
-                    : isa<EnumElementDecl>(D)? 3
-                    : 4;
           SourceLoc firstNameLoc = objcAttr->getNameLocs().front();
           SourceLoc afterFirstNameLoc = 
             Lexer::getLocForEndOfToken(TC.Context.SourceMgr, firstNameLoc);
-          TC.diagnose(firstNameLoc, diag::objc_name_req_nullary, which)
+          TC.diagnose(firstNameLoc, diag::objc_name_req_nullary,
+                      D->getDescriptiveKind())
             .fixItRemoveChars(afterFirstNameLoc, objcAttr->getRParenLoc());
           const_cast<ObjCAttr *>(objcAttr)->setName(
             ObjCSelector(TC.Context, 0, objcName->getSelectorPieces()[0]),
             /*implicit=*/false);
         }
-      } else if (isa<SubscriptDecl>(D)) {
-        // Subscripts can never have names.
-        TC.diagnose(objcAttr->getLParenLoc(), diag::objc_name_subscript);
+      } else if (isa<SubscriptDecl>(D) || isa<DestructorDecl>(D)) {
+        TC.diagnose(objcAttr->getLParenLoc(),
+                    isa<SubscriptDecl>(D)
+                      ? diag::objc_name_subscript
+                      : diag::objc_name_deinit);
         const_cast<ObjCAttr *>(objcAttr)->clearName();
       } else {
         // We have a function. Make sure that the number of parameters

@@ -91,7 +91,7 @@ func missingControllingExprInIf() {
   if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-warning {{boolean literal is unused}}
   }
 
-  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{boolean literal is unused}}
+  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error 2 {{consecutive statements on a line must be separated by ';'}} expected-error {{expression resolves to an unused function}} expected-warning {{boolean literal is unused}}
   }
 
   // <rdar://problem/18940198>
@@ -113,7 +113,7 @@ func missingControllingExprInWhile() {
   while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-warning {{boolean literal is unused}}
   }
 
-  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-error{{cannot call value of non-function type '()'}} expected-warning {{boolean literal is unused}}
+  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error 2 {{consecutive statements on a line must be separated by ';'}} expected-error {{expression resolves to an unused function}} expected-warning {{boolean literal is unused}}
   }
 
   // <rdar://problem/18940198>
@@ -223,7 +223,7 @@ func missingControllingExprInSwitch() {
     case _: return // expected-error{{'case' label can only appear inside a 'switch' statement}}
   }
 
-  switch { 42 }() { // expected-error {{expected expression in 'switch' statement}} expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error {{consecutive statements on a line must be separated by ';'}} {{16-16=;}} expected-error {{cannot call value of non-function type '()'}}
+  switch { 42 }() { // expected-error {{expected expression in 'switch' statement}} expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error {{braced block of statements is an unused closure}} expected-error 2 {{consecutive statements on a line must be separated by ';'}} expected-error {{expression resolves to an unused function}}
     case _: return // expected-error{{'case' label can only appear inside a 'switch' statement}}
   }
 }
@@ -244,54 +244,54 @@ extension NoBracesStruct2 // expected-error {{expected '{' in extension}}
 
 //===--- Recovery for multiple identifiers in decls
 
-enum EE EE {}
+protocol Multi ident {}
+// expected-error @-1 {{found an unexpected second identifier in protocol declaration; is there an accidental break?}}
+// expected-note @-2 {{join the identifiers together}} {{10-21=Multiident}}
+// expected-note @-3 {{join the identifiers together with camel-case}} {{10-21=MultiIdent}}
+
+class CCC CCC<T> {}
+// expected-error @-1 {{found an unexpected second identifier in class declaration; is there an accidental break?}}
+// expected-note @-2 {{join the identifiers together}} {{7-14=CCCCCC}}
+
+enum EE EE<T> where T : Multi {
 // expected-error @-1 {{found an unexpected second identifier in enum declaration; is there an accidental break?}} 
 // expected-note @-2 {{join the identifiers together}} {{6-11=EEEE}}
-
-struct SS SS {}
-// expected-error @-1 {{found an unexpected second identifier in struct declaration; is there an accidental break?}}
-// expected-note @-2 {{join the identifiers together}} {{8-13=SSSS}}
-
-class CC CC {}
-// expected-error @-1 {{found an unexpected second identifier in class declaration; is there an accidental break?}}
-// expected-note @-2 {{join the identifiers together}} {{7-12=CCCC}}
-// expected-note @-3 {{did you mean 'CC'}}
-
-enum EEE {
   
   case a a
-  // expected-error @-1 {{found an unexpected second identifier in enum case declaration; is there an accidental break?}} 
+  // expected-error @-1 {{found an unexpected second identifier in enum 'case' declaration; is there an accidental break?}} 
   // expected-note @-2 {{join the identifiers together}} {{8-11=aa}}
   // expected-note @-3 {{join the identifiers together with camel-case}} {{8-11=aA}}
   
   case b
 }
 
-struct AA {
+struct SS SS : Multi {
+// expected-error @-1 {{found an unexpected second identifier in struct declaration; is there an accidental break?}}
+// expected-note @-2 {{join the identifiers together}} {{8-13=SSSS}}
   
-  private var a b = 0
-  // expected-error @-1 {{found an unexpected second identifier in property declaration; is there an accidental break?}}
+  private var a b : Int = ""
+  // expected-error @-1 {{found an unexpected second identifier in variable declaration; is there an accidental break?}}
   // expected-note @-2 {{join the identifiers together}} {{15-18=ab}}
   // expected-note @-3 {{join the identifiers together with camel-case}} {{15-18=aB}}
-  // expected-error @-4 {{type annotation missing in pattern}}
+  // expected-error @-4 {{cannot convert value of type 'String' to specified type 'Int'}}
   
   func f() {
     var c d = 5
     // expected-error @-1 {{found an unexpected second identifier in variable declaration; is there an accidental break?}}
     // expected-note @-2 {{join the identifiers together}} {{9-12=cd}}
     // expected-note @-3 {{join the identifiers together with camel-case}} {{9-12=cD}}
-    // expected-error @-4 {{type annotation missing in pattern}}
+    // expected-warning @-4 {{initialization of variable 'c' was never used; consider replacing with assignment to '_' or removing it}}
     
     let _ = 0
   }
 }
 
-let e f = 5
-// expected-error @-1 {{found an unexpected second identifier in variable declaration; is there an accidental break?}}
-// expected-note @-2 {{join the identifiers together}} {{5-8=ef}}
-// expected-note @-3 {{join the identifiers together with camel-case}} {{5-8=eF}}
-// expected-error @-4 {{type annotation missing in pattern}}
-// expected-note @-5 * {{did you mean 'e'?}}
+let (efg hij, foobar) = (5, 6)
+// expected-error @-1 {{found an unexpected second identifier in constant declaration; is there an accidental break?}}
+// expected-note @-2 {{join the identifiers together}} {{6-13=efghij}}
+// expected-note @-3 {{join the identifiers together with camel-case}} {{6-13=efgHij}}
+
+_ = foobar // OK.
 
 
 //===--- Recovery for parse errors in types.

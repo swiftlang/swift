@@ -79,7 +79,15 @@ ValueOwnershipKind::ValueOwnershipKind(SILModule &M, SILType Type,
     : Value() {
   switch (Convention) {
   case SILArgumentConvention::Indirect_In:
+    Value = SILModuleConventions(M).useLoweredAddresses()
+      ? ValueOwnershipKind::Trivial
+      : ValueOwnershipKind::Owned;
+    break;
   case SILArgumentConvention::Indirect_In_Guaranteed:
+    Value = SILModuleConventions(M).useLoweredAddresses()
+      ? ValueOwnershipKind::Trivial
+      : ValueOwnershipKind::Guaranteed;
+    break;
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:
   case SILArgumentConvention::Indirect_Out:

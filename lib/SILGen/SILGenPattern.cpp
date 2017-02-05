@@ -1702,7 +1702,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
 
     SILType eltTy;
     bool hasElt = false;
-    if (elt->hasArgumentType()) {
+    if (elt->getArgumentInterfaceType()) {
       eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
       hasElt = !eltTy.getSwiftRValueType()->isVoid();
     }

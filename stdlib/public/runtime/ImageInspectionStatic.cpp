@@ -14,11 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ImageInspection.h"
-#include <cstring>
-
 // Currently only tested on linux but should work for any ELF platform
 #if defined(__ELF__) && defined(__linux__)
+
+#include "ImageInspection.h"
+#include <cstring>
 
 // These are defined in swift_sections.S to mark the start of a section with the
 // length of the data followed immediately by the section data
@@ -26,10 +26,7 @@ struct alignas(uint64_t) Section;
 extern const Section protocolConformancesStart asm(".swift2_protocol_conformances_start");
 extern const Section typeMetadataStart asm(".swift2_type_metadata_start");
 
-struct SectionInfo {
-  uint64_t size;
-  const char *data;
-};
+using namespace swift;
 
 static SectionInfo
 getSectionInfo(const Section *section) {

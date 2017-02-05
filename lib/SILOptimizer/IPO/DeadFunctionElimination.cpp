@@ -28,6 +28,10 @@ using namespace swift;
 STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
 STATISTIC(NumEliminatedExternalDefs, "Number of external function definitions eliminated");
 
+llvm::cl::opt<bool> RemoveDeadConformances(
+    "remove-dead-conformances", llvm::cl::init(false),
+    llvm::cl::desc("Remove dead conformances"));
+
 namespace {
 
 /// This is a base class for passes that are based on function liveness
@@ -318,7 +322,8 @@ protected:
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
           ensureAlive(FRI->getReferencedFunction());
         }
-        FoundConformances.collect(&I);
+        if (RemoveDeadConformances)
+          FoundConformances.collect(&I);
       }
     }
     // Now we scan all _new_ conformances we found in the function.
@@ -339,7 +344,7 @@ protected:
   }
 
   /// Retrieve the visibility information from the AST.
-  bool isVisibleExternally(ValueDecl *decl) {
+  bool isVisibleExternally(const ValueDecl *decl) {
     Accessibility accessibility = decl->getEffectiveAccess();
     SILLinkage linkage;
     switch (accessibility) {
@@ -546,7 +551,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
 
       ProtocolConformance *C = WT.getConformance();
       CanType ConformingTy = C->getType()->getCanonicalType();
-      if (ConformingTy.isAnyClassReferenceType()) {
+      if (!RemoveDeadConformances || ConformingTy.isAnyClassReferenceType()) {
         // We are very conservative with class conformances. Even if a private/
         // internal class is never instantiated, it might be created via
         // reflection by using the stdlib's _getTypeByMangledName function.
@@ -558,15 +563,27 @@ class DeadFunctionElimination : FunctionLivenessComputation {
           makeAlive(&WT);
       }
     }
+
     // Check default witness methods.
     for (SILDefaultWitnessTable &WT : Module->getDefaultWitnessTableList()) {
-      for (const SILDefaultWitnessTable::Entry &entry : WT.getEntries()) {
-        if (!entry.isValid())
-          continue;
+      if (isVisibleExternally(WT.getProtocol())) {
+        // The default witness table is visible from "outside". Therefore all
+        // methods might be called and we mark all methods as alive.
+        for (const SILDefaultWitnessTable::Entry &entry : WT.getEntries()) {
+          if (!entry.isValid())
+            continue;
 
-        auto *fd = cast<AbstractFunctionDecl>(entry.getRequirement().getDecl());
-        MethodInfo *mi = getMethodInfo(fd, /*isWitnessTable*/ true);
-        ensureAliveProtocolMethod(mi);
+          auto *fd =
+              cast<AbstractFunctionDecl>(entry.getRequirement().getDecl());
+          assert(fd == getBase(fd) &&
+                 "key in default witness table is overridden");
+          SILFunction *F = entry.getWitness();
+          if (!F)
+            continue;
+
+          MethodInfo *mi = getMethodInfo(fd, /*isWitnessTable*/ true);
+          ensureAliveProtocolMethod(mi);
+        }
       }
     }
   }
@@ -592,6 +609,24 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         if (!isAlive(MW.Witness)) {
           DEBUG(llvm::dbgs() << "  erase dead witness method " <<
                 MW.Witness->getName() << "\n");
+          return true;
+        }
+        return false;
+      });
+    }
+
+    auto DefaultWitnessTables = Module->getDefaultWitnessTables();
+    for (auto WI = DefaultWitnessTables.begin(),
+              EI = DefaultWitnessTables.end();
+         WI != EI;) {
+      SILDefaultWitnessTable *WT = &*WI;
+      WI++;
+      WT->clearMethods_if([this](SILFunction *MW) -> bool {
+        if (!MW)
+          return false;
+        if (!isAlive(MW)) {
+          DEBUG(llvm::dbgs() << "  erase dead default witness method "
+                             << MW->getName() << "\n");
           return true;
         }
         return false;

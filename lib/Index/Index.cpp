@@ -278,7 +278,7 @@ private:
   }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type T,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                           SemaReferenceKind Kind) override {
     SourceLoc Loc = Range.getStart();
 
@@ -302,12 +302,13 @@ private:
   }
 
   void repressRefAtLoc(SourceLoc Loc) {
+    if (Loc.isInvalid()) return;
     assert(!EntitiesStack.empty());
     EntitiesStack.back().RefsToSuppress.push_back(Loc);
   }
 
   bool isRepressed(SourceLoc Loc) {
-    if (EntitiesStack.empty())
+    if (EntitiesStack.empty() || Loc.isInvalid())
       return false;
     auto &Suppressed = EntitiesStack.back().RefsToSuppress;
     return std::find(Suppressed.begin(), Suppressed.end(), Loc) != Suppressed.end();
@@ -568,9 +569,13 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
     if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Overridden))
       return false;
   }
-  for (auto Conf : D->getSatisfiedProtocolRequirements()) {
-    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Conf))
-      return false;
+  // FIXME: This is quite expensive and not worth the cost for indexing purposes
+  // of system modules. Revisit if this becomes more efficient.
+  if (!isSystemModule) {
+    for (auto Conf : D->getSatisfiedProtocolRequirements()) {
+      if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Conf))
+        return false;
+    }
   }
 
   if (auto Parent = getParentDecl()) {
@@ -786,7 +791,17 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
   return !Cancelled;
 }
 
-//
+static bool hasUsefulRoleInSystemModule(SymbolRoleSet roles) {
+  return roles | (SymbolRoleSet)SymbolRole::Definition |
+  (SymbolRoleSet)SymbolRole::Declaration |
+  (SymbolRoleSet)SymbolRole::RelationChildOf |
+  (SymbolRoleSet)SymbolRole::RelationBaseOf |
+  (SymbolRoleSet)SymbolRole::RelationOverrideOf |
+  (SymbolRoleSet)SymbolRole::RelationExtendedBy |
+  (SymbolRoleSet)SymbolRole::RelationAccessorOf |
+  (SymbolRoleSet)SymbolRole::RelationIBTypeOf;
+}
+
 bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
                                     IndexSymbol &Info) {
   if (!shouldIndex(D))
@@ -803,10 +818,11 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
       return true;
   }
 
-
-  if (!startEntity(D, Info)) {
+  if (isSystemModule && !hasUsefulRoleInSystemModule(Info.roles))
     return true;
-  }
+
+  if (!startEntity(D, Info))
+    return true;
 
   // Report the accessors that were utilized.
   if (AbstractStorageDecl *ASD = dyn_cast<AbstractStorageDecl>(D)) {

@@ -5,7 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: OS=linux-gnu
-// REQUIRES: asserts
 // RUN: not --crash %target-swift-frontend %s -emit-ir
-struct A:RangeReplaceableCollection{var f=max
+let x[{{{{{{{{{{{{{{{{{{{{{{{{struct c{func b(UInt=1 + 1 + 1 + 1 + 1 as?Int){{{{{{{{{{{{struct P

@@ -1857,6 +1857,9 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
 void IRGenModule::checkEligibleConf(const ProtocolConformance *Conf) {
   return; // FIXME: Remove temporary workaround for <rdar://30247881>
 #ifndef NDEBUG
+  if (!ConformanceCollector::verifyInIRGen())
+    return;
+
   if (EligibleConfs.isUsed(Conf))
     return;
 
@@ -1877,6 +1880,9 @@ void IRGenModule::checkEligibleConf(const ProtocolConformance *Conf) {
 
 void IRGenModule::checkEligibleMetaType(NominalTypeDecl *NT) {
 #ifndef NDEBUG
+  if (!ConformanceCollector::verifyInIRGen())
+    return;
+
   if (!NT || EligibleConfs.isMetaTypeEscaping(NT))
     return;
 

@@ -113,9 +113,23 @@ public class PublicCl {
 // Check if unused witness table methods are removed.
 
 protocol Prot {
-	func aliveWitness()
+  func aliveWitness()
 
-	func DeadWitness()
+  func DeadWitness()
+
+  func aliveDefaultWitness()
+
+  func DeadDefaultWitness()
+}
+
+extension Prot {
+  @inline(never)
+  func aliveDefaultWitness() {
+  }
+
+  @inline(never)
+  func DeadDefaultWitness() {
+  }
 }
 
 struct Adopt : Prot {
@@ -134,6 +148,11 @@ func testProtocols(_ p: Prot) {
 	p.aliveWitness()
 }
 
+@inline(never)
+@_semantics("optimize.sil.never") // avoid devirtualization
+func testDefaultWitnessMethods(_ p: Prot) {
+	p.aliveDefaultWitness()
+}
 
 @_semantics("optimize.sil.never") // avoid devirtualization
 public func callTest() {
@@ -198,3 +217,14 @@ internal func donotEliminate() {
 // CHECK-TESTING-LABEL: sil_witness_table [fragile] Adopt: Prot
 // CHECK-TESTING: DeadWitness{{.*}}: @{{.*}}DeadWitness
 
+// CHECK-LABEL: sil_default_witness_table hidden Prot
+// CHECK:  no_default
+// CHECK:  no_default
+// CHECK:  method #Prot.aliveDefaultWitness!1: {{.*}} : @{{.*}}aliveDefaultWitness
+// CHECK:  no_default
+
+// CHECK-TESTING-LABEL: sil_default_witness_table Prot
+// CHECK-TESTING:  no_default
+// CHECK-TESTING:  no_default
+// CHECK-TESTING:  method #Prot.aliveDefaultWitness!1: {{.*}} : @{{.*}}aliveDefaultWitness
+// CHECK-TESTING:  method #Prot.DeadDefaultWitness!1: {{.*}} : @{{.*}}DeadDefaultWitness

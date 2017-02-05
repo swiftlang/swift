@@ -77,27 +77,42 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
                                             const ValueDecl *D,
                                             const DeclContext *DC) {
   auto expansion = DC->getResilienceExpansion();
-  if (expansion == ResilienceExpansion::Minimal) {
-    if (!isa<GenericTypeParamDecl>(D) &&
-        // Protocol requirements are not versioned because there's no
-        // global entry point
-        !(isa<ProtocolDecl>(D->getDeclContext()) && isRequirement(D)) &&
-        // FIXME: Figure out what to do with typealiases
-        !isa<TypeAliasDecl>(D) &&
-        !D->getDeclContext()->isLocalContext() &&
-        D->hasAccessibility()) {
-      if (D->getEffectiveAccess() < Accessibility::Public) {
-        diagnose(loc, diag::resilience_decl_unavailable,
-                 D->getDescriptiveKind(), D->getFullName(),
-                 D->getFormalAccess(), getFragileFunctionKind(DC));
-        diagnose(D, diag::resilience_decl_declared_here,
-                 D->getDescriptiveKind(), D->getFullName());
-        return true;
-      }
-    }
-  }
 
-  return false;
+  // Internal declarations referenced from non-inlineable contexts are OK.
+  if (expansion == ResilienceExpansion::Maximal)
+    return false;
+
+  // Local declarations are OK.
+  if (D->getDeclContext()->isLocalContext())
+    return false;
+
+  // Type parameters are OK.
+  if (isa<AbstractTypeParamDecl>(D))
+    return false;
+
+  // Public declarations are OK.
+  if (D->getEffectiveAccess() >= Accessibility::Public)
+    return false;
+
+  // Enum cases are handled as part of their containing enum.
+  if (isa<EnumElementDecl>(D))
+    return false;
+    
+  // Protocol requirements are not versioned because there's no
+  // global entry point.
+  if (isa<ProtocolDecl>(D->getDeclContext()) && isRequirement(D))
+    return false;
+
+  // FIXME: Figure out what to do with typealiases
+  if (isa<TypeAliasDecl>(D))
+    return false;
+
+  diagnose(loc, diag::resilience_decl_unavailable,
+           D->getDescriptiveKind(), D->getFullName(),
+           D->getFormalAccess(), getFragileFunctionKind(DC));
+  diagnose(D, diag::resilience_decl_declared_here,
+           D->getDescriptiveKind(), D->getFullName());
+  return true;
 }
 
 void TypeChecker::diagnoseResilientValueConstructor(ConstructorDecl *ctor) {

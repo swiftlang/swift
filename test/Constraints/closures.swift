@@ -64,19 +64,21 @@ func test13811882() {
 
 
 // <rdar://problem/21544303> QoI: "Unexpected trailing closure" should have a fixit to insert a 'do' statement
+// <https://bugs.swift.org/browse/SR-3671>
 func r21544303() {
-  var inSubcall = true
+  let val = true
+  var inSubcall = val
   {   // expected-error {{expected 'do' keyword to designate a block of statements}} {{3-3=do }}
   }
   inSubcall = false
 
   // This is a problem, but isn't clear what was intended.
-  var somethingElse = true { // expected-error {{cannot call value of non-function type 'Bool'}}
+  var somethingElse = val { // expected-error {{cannot call value of non-function type 'Bool'}}
   }
   inSubcall = false
 
   var v2 : Bool = false
-  v2 = true
+  v2 = val
   {  // expected-error {{expected 'do' keyword to designate a block of statements}}
   }
 }
@@ -437,3 +439,8 @@ func sr3497_unfold<A, B>(_ a0: A, next: (inout A) -> B) {}
 func sr3497() {
   let _ = sr3497_unfold((0, 0)) { s in 0 } // ok
 }
+
+// SR-3758: Swift 3.1 fails to compile 3.0 code involving closures and IUOs
+let _: ((Any?) -> Void) = { (arg: Any!) in }
+// This example was rejected in 3.0 as well, but accepting it is correct.
+let _: ((Int?) -> Void) = { (arg: Int!) in }

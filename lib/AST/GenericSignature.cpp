@@ -260,14 +260,15 @@ bool GenericSignature::enumeratePairedRequirements(
 
     // Utility to skip over non-conformance constraints that apply to this
     // type.
-    bool sawSameTypeConstraint = false;
+    bool sawSameTypeToConcreteConstraint = false;
     auto skipNonConformanceConstraints = [&] {
       while (curReqIdx != numReqs &&
              reqs[curReqIdx].getKind() != RequirementKind::Conformance &&
              reqs[curReqIdx].getFirstType()->getCanonicalType() == depTy) {
         // Record whether we saw a same-type constraint mentioning this type.
-        if (reqs[curReqIdx].getKind() == RequirementKind::SameType)
-          sawSameTypeConstraint = true;
+        if (reqs[curReqIdx].getKind() == RequirementKind::SameType &&
+            !reqs[curReqIdx].getSecondType()->isTypeParameter())
+          sawSameTypeToConcreteConstraint = true;
 
         ++curReqIdx;
       }
@@ -292,7 +293,7 @@ bool GenericSignature::enumeratePairedRequirements(
     // If there were any conformance constraints, or we have a generic
     // parameter we can't skip, invoke the callback.
     if ((startIdx != endIdx ||
-         (isa<GenericTypeParamType>(depTy) && !sawSameTypeConstraint)) &&
+         (isa<GenericTypeParamType>(depTy) && !sawSameTypeToConcreteConstraint)) &&
         fn(depTy, reqs.slice(startIdx, endIdx-startIdx)))
       return true;
   }

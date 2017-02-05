@@ -119,7 +119,7 @@ set(SWIFTLIB_ESSENTIAL
   StringComparable.swift
   StringCore.swift
   StringHashable.swift
-  StringInterpolation.swift.gyb
+  StringInterpolation.swift
   StringLegacy.swift
   StringRangeReplaceableCollection.swift.gyb
   StringIndexConversions.swift

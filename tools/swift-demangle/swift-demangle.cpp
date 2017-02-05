@@ -60,6 +60,10 @@ static llvm::cl::opt<bool>
 Simplified("simplified",
            llvm::cl::desc("Don't display module names or implicit self types"));
 
+static llvm::cl::opt<bool>
+Classify("classify",
+           llvm::cl::desc("Display symbol classification characters"));
+
 static llvm::cl::list<std::string>
 InputNames(llvm::cl::Positional, llvm::cl::desc("[mangled name...]"),
                llvm::cl::ZeroOrMore);
@@ -120,6 +124,16 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     std::string string = swift::Demangle::nodeToString(pointer, options);
     if (!CompactMode)
       llvm::outs() << name << " ---> ";
+
+    if (Classify) {
+      std::string Classifications;
+      if (!swift::Demangle::isSwiftSymbol(name.data(), name.size()))
+        Classifications += 'N';
+      if (swift::Demangle::isThunkSymbol(name.data(), name.size()))
+        Classifications += 'T';
+      if (!Classifications.empty())
+        llvm::outs() << '{' << Classifications << "} ";
+    }
     llvm::outs() << (string.empty() ? name : llvm::StringRef(string));
   }
 }

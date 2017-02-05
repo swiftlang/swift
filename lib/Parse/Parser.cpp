@@ -737,27 +737,6 @@ void Parser::diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New) {
              Prev->getName());
 }
 
-/// True if Tok is the second consecutive identifier in a variable decl.
-bool Parser::isSecondVarIdentifier() {
-  auto PreviousTok = L->getTokenAt(PreviousLoc);
-  if (Tok.isNot(tok::identifier) || PreviousTok.isNot(tok::identifier)) {
-    return false;
-  }
-  auto LineStart = L->getLocForStartOfLine(SourceMgr, Tok.getLoc());
-  auto FirstTok = L->getTokenAt(LineStart);
-  Lexer::State FirstTokState = L->getStateForBeginningOfToken(FirstTok);
-  auto StartPos = ParserPosition(FirstTokState, LineStart);
-  auto RestorePos = getParserPosition();
-  backtrackToPosition(StartPos);
-  while (Tok.isNot(tok::kw_let) && Tok.isNot(tok::kw_var)
-         && Tok.getLoc() != PreviousTok.getLoc()) {
-    consumeToken();
-  }
-  bool IsConsecutiveLoc = peekToken().getLoc() == PreviousTok.getLoc();
-  restoreParserPosition(RestorePos);
-  return IsConsecutiveLoc;
-}
-
 struct ParserUnit::Implementation {
   LangOptions LangOpts;
   SearchPathOptions SearchPathOpts;

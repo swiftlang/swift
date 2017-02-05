@@ -163,6 +163,11 @@ namespace swift {
     /// and methods.
     bool InferImportAsMember = false;
 
+    /// If set to true, compile with the SIL Opaque Values enabled.
+    /// This is for bootstrapping. It can't be in SILOptions because the
+    /// TypeChecker uses it to set resolve the ParameterConvention.
+    bool EnableSILOpaqueValues = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///

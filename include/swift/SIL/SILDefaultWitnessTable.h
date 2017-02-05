@@ -57,7 +57,7 @@ public:
       : Requirement(Requirement), Witness(Witness) {}
 
     bool isValid() const {
-      return !Requirement.isNull();
+      return !Requirement.isNull() && Witness;
     }
 
     const SILDeclRef &getRequirement() const {
@@ -67,6 +67,12 @@ public:
     SILFunction *getWitness() const {
       assert(Witness != nullptr);
       return Witness;
+    }
+    void removeWitnessMethod() {
+      if (Witness) {
+        Witness->decrementRefCount();
+      }
+      Witness = nullptr;
     }
   };
  
@@ -130,6 +136,19 @@ public:
 
   /// Return the AST ProtocolDecl this default witness table is associated with.
   const ProtocolDecl *getProtocol() const { return Protocol; }
+
+  /// Clears methods in witness entries.
+  /// \p predicate Returns true if the passed entry should be set to null.
+  template <typename Predicate> void clearMethods_if(Predicate predicate) {
+    for (Entry &entry : Entries) {
+      if (!entry.isValid())
+        continue;
+      auto *MW = entry.getWitness();
+      if (MW && predicate(MW)) {
+        entry.removeWitnessMethod();
+      }
+    }
+  }
 
   /// Return the minimum witness table size, in words.
   ///

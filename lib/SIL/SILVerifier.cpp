@@ -103,6 +103,7 @@ namespace {
 class SILVerifier : public SILVerifierBase<SILVerifier> {
   ModuleDecl *M;
   const SILFunction &F;
+  SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
   SILOpenedArchetypesTracker OpenedArchetypes;
   const SILInstruction *CurInstruction = nullptr;
@@ -409,8 +410,9 @@ public:
   }
 
   SILVerifier(const SILFunction &F, bool SingleFunction = true)
-      : M(F.getModule().getSwiftModule()), F(F), TC(F.getModule().Types),
-        OpenedArchetypes(F), Dominance(nullptr),
+      : M(F.getModule().getSwiftModule()), F(F),
+        fnConv(F.getLoweredFunctionType(), F.getModule()),
+        TC(F.getModule().Types), OpenedArchetypes(F), Dominance(nullptr),
         SingleFunction(SingleFunction) {
     if (F.isExternalDeclaration())
       return;
@@ -847,13 +849,13 @@ public:
             "substituted callee type does not match substitutions");
 
     // Check that the arguments and result match.
-    SILFunctionConventions fnConv(substTy, F.getModule());
+    SILFunctionConventions substConv(substTy, F.getModule());
     //require(site.getArguments().size() == substTy->getNumSILArguments(),
-    require(site.getNumCallArguments() == fnConv.getNumSILArguments(),
+    require(site.getNumCallArguments() == substConv.getNumSILArguments(),
             "apply doesn't have right number of arguments for function");
     for (size_t i = 0, size = site.getNumCallArguments(); i < size; ++i) {
       requireSameType(site.getArguments()[i]->getType(),
-                      fnConv.getSILArgumentType(i),
+                      substConv.getSILArgumentType(i),
                       "operand of 'apply' doesn't match function input type");
     }
   }
@@ -861,14 +863,14 @@ public:
   void checkApplyInst(ApplyInst *AI) {
     checkFullApplySite(AI);
 
-    SILFunctionConventions fnConv(AI->getSubstCalleeType(), F.getModule());
-    require(AI->getType() == fnConv.getSILResultType(),
+    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), F.getModule());
+    require(AI->getType() == calleeConv.getSILResultType(),
             "type of apply instruction doesn't match function result type");
     if (AI->isNonThrowing()) {
-      require(fnConv.funcTy->hasErrorResult(),
+      require(calleeConv.funcTy->hasErrorResult(),
               "nothrow flag used for callee without error result");
     } else {
-      require(!fnConv.funcTy->hasErrorResult(),
+      require(!calleeConv.funcTy->hasErrorResult(),
               "apply instruction cannot call function with error result");
     }
 
@@ -884,23 +886,23 @@ public:
   void checkTryApplyInst(TryApplyInst *AI) {
     checkFullApplySite(AI);
 
-    SILFunctionConventions fnConv(AI->getSubstCalleeType(), F.getModule());
+    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), F.getModule());
 
     auto normalBB = AI->getNormalBB();
     require(normalBB->args_size() == 1,
             "normal destination of try_apply must take one argument");
     requireSameType((*normalBB->args_begin())->getType(),
-                    fnConv.getSILResultType(),
+                    calleeConv.getSILResultType(),
                     "normal destination of try_apply must take argument "
                     "of normal result type");
 
     auto errorBB = AI->getErrorBB();
-    require(fnConv.funcTy->hasErrorResult(),
+    require(calleeConv.funcTy->hasErrorResult(),
             "try_apply must call function with error result");
     require(errorBB->args_size() == 1,
             "error destination of try_apply must take one argument");
     requireSameType((*errorBB->args_begin())->getType(),
-                    fnConv.getSILErrorType(),
+                    calleeConv.getSILErrorType(),
                     "error destination of try_apply must take argument "
                     "of error result type");
   }
@@ -1126,7 +1128,8 @@ public:
 
   void checkLoadInst(LoadInst *LI) {
     require(LI->getType().isObject(), "Result of load must be an object");
-    require(LI->getType().isLoadable(LI->getModule()),
+    require(!fnConv.useLoweredAddresses()
+                || LI->getType().isLoadable(LI->getModule()),
             "Load must have a loadable type");
     require(LI->getOperand()->getType().isAddress(),
             "Load operand must be an address");
@@ -1188,7 +1191,8 @@ public:
   void checkStoreInst(StoreInst *SI) {
     require(SI->getSrc()->getType().isObject(),
             "Can't store from an address source");
-    require(SI->getSrc()->getType().isLoadable(SI->getModule()),
+    require(!fnConv.useLoweredAddresses()
+                || SI->getSrc()->getType().isLoadable(SI->getModule()),
             "Can't store a non loadable type");
     require(SI->getDest()->getType().isAddress(),
             "Must store to an address dest");
@@ -1322,8 +1326,7 @@ public:
                                                MU->getSetterSubstitutions());
     require(SubstSetterTy->getParameters().size() == 2,
             "mark_uninitialized setter must have a value and self param");
-    auto silConv = SILModuleConventions(F.getModule());
-    requireSameType(silConv.getSILType(SubstSetterTy->getSelfParameter()),
+    requireSameType(fnConv.getSILType(SubstSetterTy->getSelfParameter()),
                     MU->getSelf()->getType(),
                     "self type must match setter's self parameter type");
 
@@ -1366,7 +1369,7 @@ public:
   void checkCopyValueInst(CopyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(F.hasQualifiedOwnership(),
+    require(!fnConv.useLoweredAddresses() || F.hasQualifiedOwnership(),
             "copy_value is only valid in functions with qualified "
             "ownership");
   }
@@ -1384,7 +1387,7 @@ public:
   void checkDestroyValueInst(DestroyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(F.hasQualifiedOwnership(),
+    require(!fnConv.useLoweredAddresses() || F.hasQualifiedOwnership(),
             "destroy_value is only valid in functions with qualified "
             "ownership");
   }
@@ -1508,10 +1511,10 @@ public:
             "EnumInst case must be a case of the result enum type");
     require(UI->getType().isObject(),
             "EnumInst must produce an object");
-    require(UI->hasOperand() == UI->getElement()->hasArgumentType(),
+    require(UI->hasOperand() == !!UI->getElement()->getArgumentInterfaceType(),
             "EnumInst must take an argument iff the element does");
 
-    if (UI->getElement()->hasArgumentType()) {
+    if (UI->getElement()->getArgumentInterfaceType()) {
       require(UI->getOperand()->getType().isObject(),
               "EnumInst operand must be an object");
       SILType caseTy = UI->getType().getEnumElementType(UI->getElement(),
@@ -1526,7 +1529,7 @@ public:
     require(ud, "InitEnumDataAddrInst must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "InitEnumDataAddrInst case must be a case of the enum operand type");
-    require(UI->getElement()->hasArgumentType(),
+    require(UI->getElement()->getArgumentInterfaceType(),
             "InitEnumDataAddrInst case must have a data type");
     require(UI->getOperand()->getType().isAddress(),
             "InitEnumDataAddrInst must take an address operand");
@@ -1545,7 +1548,7 @@ public:
     require(ud, "UncheckedEnumData must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "UncheckedEnumData case must be a case of the enum operand type");
-    require(UI->getElement()->hasArgumentType(),
+    require(UI->getElement()->getArgumentInterfaceType(),
             "UncheckedEnumData case must have a data type");
     require(UI->getOperand()->getType().isObject(),
             "UncheckedEnumData must take an address operand");
@@ -1564,7 +1567,7 @@ public:
     require(ud, "UncheckedTakeEnumDataAddrInst must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "UncheckedTakeEnumDataAddrInst case must be a case of the enum operand type");
-    require(UI->getElement()->hasArgumentType(),
+    require(UI->getElement()->getArgumentInterfaceType(),
             "UncheckedTakeEnumDataAddrInst case must have a data type");
     require(UI->getOperand()->getType().isAddress(),
             "UncheckedTakeEnumDataAddrInst must take an address operand");
@@ -1912,8 +1915,7 @@ public:
   }
   
   SILType getMethodSelfType(CanSILFunctionType ft) {
-    auto silConv = SILModuleConventions(F.getModule());
-    return silConv.getSILType(ft->getParameters().back());
+    return fnConv.getSILType(ft->getParameters().back());
   }
 
   void checkWitnessMethodInst(WitnessMethodInst *AMI) {
@@ -1938,9 +1940,17 @@ public:
     require(selfGenericParam->getDepth() == 0
             && selfGenericParam->getIndex() == 0,
             "method should be polymorphic on Self parameter at depth 0 index 0");
-    auto selfRequirement = genericSig->getRequirements()[0];
-    require(selfRequirement.getKind() == RequirementKind::Conformance,
-            "first requirement should be conformance requirement");
+    Optional<Requirement> selfRequirement;
+    for (auto req : genericSig->getRequirements()) {
+      if (req.getKind() != RequirementKind::SameType) {
+        selfRequirement = req;
+        break;
+      }
+    }
+
+    require(selfRequirement &&
+            selfRequirement->getKind() == RequirementKind::Conformance,
+            "first non-same-typerequirement should be conformance requirement");
     auto conformsTo = genericSig->getConformsTo(selfGenericParam,
                                                 *F.getModule().getSwiftModule());
     require(conformsTo.size() == 1,
@@ -2798,7 +2808,7 @@ public:
     DEBUG(RI->print(llvm::dbgs()));
 
     SILType functionResultType =
-        F.mapTypeIntoContext(F.getConventions().getSILResultType());
+        F.mapTypeIntoContext(fnConv.getSILResultType());
     SILType instResultType = RI->getOperand()->getType();
     DEBUG(llvm::dbgs() << "function return type: ";
           functionResultType.dump();
@@ -2815,8 +2825,7 @@ public:
     require(fnType->hasErrorResult(),
             "throw in function that doesn't have an error result");
 
-    SILType functionResultType =
-        F.mapTypeIntoContext(F.getConventions().getSILErrorType());
+    SILType functionResultType = F.mapTypeIntoContext(fnConv.getSILErrorType());
     SILType instResultType = TI->getOperand()->getType();
     DEBUG(llvm::dbgs() << "function error result type: ";
           functionResultType.dump();
@@ -2991,7 +3000,7 @@ public:
 
       // The destination BB can take the argument payload, if any, as a BB
       // arguments, or it can ignore it and take no arguments.
-      if (elt->hasArgumentType()) {
+      if (elt->getArgumentInterfaceType()) {
         require(dest->getArguments().size() == 0 ||
                     dest->getArguments().size() == 1,
                 "switch_enum destination for case w/ args must take 0 or 1 "
@@ -3248,7 +3257,6 @@ public:
   }
 
   void verifyEntryPointArguments(SILBasicBlock *entry) {
-    auto fnConv = F.getConventions();
     DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
           for (auto *arg
                : make_range(entry->args_begin(), entry->args_end()))
@@ -3267,14 +3275,13 @@ public:
     bool matched = true;
     auto argI = entry->args_begin();
     SILModule &M = F.getModule();
-    auto funcConv = F.getConventions();
 
     auto check = [&](const char *what, SILType ty) {
       auto mappedTy = F.mapTypeIntoContext(ty);
       SILArgument *bbarg = *argI;
       ++argI;
       auto ownershipkind = ValueOwnershipKind(
-          M, mappedTy, funcConv.getSILArgumentConvention(bbarg->getIndex()));
+          M, mappedTy, fnConv.getSILArgumentConvention(bbarg->getIndex()));
       if (bbarg->getType() != mappedTy) {
         llvm::errs() << what << " type mismatch!\n";
         llvm::errs() << "  argument: "; bbarg->dump();

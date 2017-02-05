@@ -922,3 +922,24 @@ func se0101<P: Pse0101>(x: Cse0101<P>) {
   _ = strideof(P.Type.self) // expected-error {{'strideof' is unavailable: use MemoryLayout<T>.stride instead.}} {{7-16=MemoryLayout<}} {{22-28=>.stride}} {{none}}
   _ = sizeof(type(of: x)) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-26=MemoryLayout<Cse0101<P>>.size}} {{none}}
 }
+
+// SR-3439 subscript with pound exprssions.
+Sr3439: do {
+  class B {
+    init() {}
+    subscript(x: Int) -> Int { return x }
+    subscript(x: String) -> String { return x }
+
+    func foo() {
+      _ = self[#line] // Ok.
+    }
+  }
+  class C : B {
+    func bar() {
+      _ = super[#file] // Ok.
+    }
+  }
+
+  let obj = C();
+  _ = obj[#column] // Ok.
+}

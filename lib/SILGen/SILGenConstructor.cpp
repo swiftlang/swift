@@ -392,7 +392,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
 
   // Emit the exploded constructor argument.
   ArgumentSource payload;
-  if (element->hasArgumentType()) {
+  if (element->getArgumentInterfaceType()) {
     RValue arg = emitImplicitValueConstructorArg
       (*this, Loc, element->getArgumentInterfaceType()->getCanonicalType(),
        element->getDeclContext());

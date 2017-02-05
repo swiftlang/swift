@@ -1232,7 +1232,7 @@ static bool isPotentiallyMoreOptionalThan(Type objType1,
 /// Enumerate all of the applicable optional conversion restrictions
 static void enumerateOptionalConversionRestrictions(
                     Type type1, Type type2,
-                    ConstraintKind kind,
+                    ConstraintKind kind, ConstraintLocatorBuilder locator,
                     llvm::function_ref<void(ConversionRestrictionKind)> fn) {
   SmallVector<Type, 2> optionals1;
   Type objType1 = type1->lookThroughAllAnyOptionalTypes(optionals1);
@@ -1251,6 +1251,7 @@ static void enumerateOptionalConversionRestrictions(
     // Break cyclic conversions between T? and U! by only allowing it for
     // conversion constraints.
     if (kind >= ConstraintKind::Conversion ||
+        locator.isFunctionConversion() ||
         !(optionalKind1 == OTK_Optional &&
           optionalKind2 == OTK_ImplicitlyUnwrappedOptional))
       fn(ConversionRestrictionKind::OptionalToOptional);
@@ -1638,7 +1639,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
 
       // Check for CF <-> ObjectiveC bridging.
-      if (desugar1->getKind() == TypeKind::Class &&
+      if (isa<ClassType>(desugar1) &&
           kind >= ConstraintKind::Subtype) {
         auto class1 = cast<ClassDecl>(nominal1->getDecl());
         auto class2 = cast<ClassDecl>(nominal2->getDecl());
@@ -2055,16 +2056,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // A value of type T, T?, or T! can be converted to type U? or U! if
   // T is convertible to U.
   if (concrete && kind >= ConstraintKind::Subtype) {
-    enumerateOptionalConversionRestrictions(type1, type2, kind,
-      [&](ConversionRestrictionKind restriction) {
-        conversionsOrFixes.push_back(restriction);
+    enumerateOptionalConversionRestrictions(
+        type1, type2, kind, locator,
+        [&](ConversionRestrictionKind restriction) {
+      conversionsOrFixes.push_back(restriction);
     });
   }
 
   // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
   // literals.
   if (auto elt = locator.last()) {
-    if (elt->getKind() == ConstraintLocator::ClosureResult) {
+    if (elt->getKind() == ConstraintLocator::ClosureResult &&
+        !(subflags & TMF_UnwrappingOptional)) {
       if (concrete && kind >= ConstraintKind::Subtype &&
           (type1->isUninhabited() || type2->isVoid())) {
         increaseScore(SK_FunctionConversion);
@@ -3661,9 +3664,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 retry:
   // For a function, bind the output and convert the argument to the input.
   auto func1 = type1->castTo<FunctionType>();
-  if (desugar2->getKind() == TypeKind::Function) {
-    auto func2 = cast<FunctionType>(desugar2);
-
+  if (auto func2 = dyn_cast<FunctionType>(desugar2)) {
     // If this application is part of an operator, then we allow an implicit
     // lvalue to be compatible with inout arguments.  This is used by
     // assignment operators.
