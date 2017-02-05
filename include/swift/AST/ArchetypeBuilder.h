@@ -127,6 +127,7 @@ public:
 private:
   class InferRequirementsWalker;
   friend class InferRequirementsWalker;
+  friend class GenericSignature;
 
   ASTContext &Context;
   DiagnosticEngine &Diags;
@@ -146,6 +147,11 @@ private:
                                  ProtocolDecl *Proto,
                                  RequirementSource Source,
                                 llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
+
+  /// "Expand" all of the archetypes in the generic environment.
+  /// FIXME: This is a hack we need until we're able to lazily create
+  /// archetypes.
+  void expandGenericEnvironment(GenericEnvironment *genericEnv);
 
 public:
   /// \brief Add a new conformance requirement specifying that the given

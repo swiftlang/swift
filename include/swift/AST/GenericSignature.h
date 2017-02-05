@@ -194,6 +194,11 @@ public:
   /// Canonicalize the components of a generic signature.
   CanGenericSignature getCanonicalSignature() const;
 
+  /// Create a new generic environment that provides fresh contextual types
+  /// (archetypes) that correspond to the interface types in this generic
+  /// signature.
+  GenericEnvironment *createGenericEnvironment(ModuleDecl &mod);
+
   /// Uniquing for the ASTContext.
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericParams(), getRequirements());

@@ -2454,26 +2454,22 @@ GenericSignature *ArchetypeBuilder::getGenericSignature() {
   return sig;
 }
 
-GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
-                                                  GenericSignature *signature) {
-  assert(Impl->finalized && "Must finalize builder first");
+void ArchetypeBuilder::expandGenericEnvironment(GenericEnvironment *env) {
 
-  // Create the generic environment, which will be lazily populated with
-  // archetypes.
-  auto genericEnv = GenericEnvironment::getIncomplete(signature, this);
+  assert(Impl->finalized && "Must finalize builder first");
 
   // Force the creation of all of the archetypes.
   // FIXME: This isn't a well-formed notion with recursive protocol constraints.
+  auto signature = env->getGenericSignature();
   visitPotentialArchetypes([&](PotentialArchetype *pa) {
     if (auto archetype =
-          genericEnv->mapTypeIntoContext(
+            env->mapTypeIntoContext(
               pa->getDependentType(signature->getGenericParams(),
-                                   /*allowUnresolved=*/false),
-              getLookupConformanceFn())
-            ->getAs<ArchetypeType>())
+                                  /*allowUnresolved=*/false),
+             getLookupConformanceFn())
+          ->getAs<ArchetypeType>())
       (void)archetype->getAllNestedTypes();
   });
-  genericEnv->clearArchetypeBuilder();
 
 #ifndef NDEBUG
   // FIXME: This property should be maintained when there are errors, too.
@@ -2484,14 +2480,13 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
 
       auto depTy = pa->getDependentType(genericParams,
                                         /*allowUnresolved=*/false);
-      auto inContext = genericEnv->mapTypeIntoContext(depTy,
-                                                      getLookupConformanceFn());
+      auto inContext = env->mapTypeIntoContext(depTy, getLookupConformanceFn());
 
       auto repDepTy = pa->getRepresentative()->getDependentType(
                                                     genericParams,
                                                     /*allowUnresolved=*/false);
       auto repInContext =
-        genericEnv->mapTypeIntoContext(repDepTy, getLookupConformanceFn());
+        env->mapTypeIntoContext(repDepTy, getLookupConformanceFn());
       assert((inContext->isEqual(repInContext) ||
               inContext->hasError() ||
               repInContext->hasError()) &&
@@ -2499,6 +2494,20 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
     });
   }
 #endif
+}
+
+GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
+                                                  GenericSignature *signature) {
+  assert(Impl->finalized && "Must finalize builder first");
+
+  // Create the generic environment, which will be lazily populated with
+  // archetypes.
+  auto genericEnv = GenericEnvironment::getIncomplete(signature, this);
+
+  // Force the creation of all of the archetypes.
+  expandGenericEnvironment(genericEnv);
+  genericEnv->clearArchetypeBuilder();
+
 
   return genericEnv;
 }

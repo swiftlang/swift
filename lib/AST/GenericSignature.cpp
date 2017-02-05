@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 
@@ -181,6 +182,15 @@ GenericSignature::getCanonicalSignature() const {
   return CanGenericSignature(
            CanonicalSignatureOrASTContext.get<GenericSignature*>());
 }
+
+GenericEnvironment *GenericSignature::createGenericEnvironment(
+                                                             ModuleDecl &mod) {
+  auto *builder = getArchetypeBuilder(mod);
+  auto env = GenericEnvironment::getIncomplete(this, builder);
+  builder->expandGenericEnvironment(env);
+  return env;
+}
+
 
 ASTContext &GenericSignature::getASTContext() const {
   // Canonical signatures store the ASTContext directly.
@@ -684,7 +694,8 @@ GenericEnvironment *CanGenericSignature::getGenericEnvironment(
                                                      ModuleDecl &module) const {
   // Archetype builders are stored on the ASTContext.
   return module.getASTContext().getOrCreateCanonicalGenericEnvironment(
-           module.getASTContext().getOrCreateArchetypeBuilder(*this, &module));
+           module.getASTContext().getOrCreateArchetypeBuilder(*this, &module),
+           module);
 }
 
 unsigned GenericParamKey::findIndexIn(
