@@ -55,7 +55,8 @@ class SwiftTestCase(unittest.TestCase):
             benchmark=False,
             benchmark_num_onone_iterations=3,
             benchmark_num_o_iterations=3,
-            enable_sil_ownership=False)
+            enable_sil_ownership=False,
+            force_optimized_typechecker=False)
 
         # Setup shell
         shell.dry_run = True
@@ -84,7 +85,8 @@ class SwiftTestCase(unittest.TestCase):
             build_dir='/path/to/build')
         self.assertEqual(set(swift.cmake_options), set([
                          '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
-                         '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE']))
+                         '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE',
+                         '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE']))
 
     def test_swift_runtime_tsan(self):
         self.args.enable_tsan_runtime = True
@@ -96,7 +98,8 @@ class SwiftTestCase(unittest.TestCase):
         self.assertEqual(set(swift.cmake_options),
                          set(['-DSWIFT_RUNTIME_USE_SANITIZERS=Thread',
                               '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
-                              '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE']))
+                              '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE',
+                              '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE']))
 
     def test_swift_compiler_vendor_flags(self):
         self.args.compiler_vendor = "none"
@@ -281,3 +284,15 @@ class SwiftTestCase(unittest.TestCase):
             ['-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=TRUE'],
             [x for x in swift.cmake_options
              if 'SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP' in x])
+
+    def test_force_optimized_typechecker_flags(self):
+        self.args.force_optimized_typechecker = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=TRUE'],
+            [x for x in swift.cmake_options
+             if 'SWIFT_FORCE_OPTIMIZED_TYPECHECKER' in x])
