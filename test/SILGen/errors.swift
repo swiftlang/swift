@@ -232,15 +232,18 @@ struct DoomedStruct : Doomed {
 // CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
 // CHECK:      [[SELF:%.*]] = load [take] [[TEMP]] : $*DoomedClass
-// CHECK:      [[T0:%.*]] = class_method [[SELF]] : $DoomedClass, #DoomedClass.check!1 : (DoomedClass) -> () throws -> (), $@convention(method) (@guaranteed DoomedClass) -> @error Error
-// CHECK-NEXT: try_apply [[T0]]([[SELF]])
+// CHECK:      [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+// CHECK:      [[T0:%.*]] = class_method [[BORROWED_SELF]] : $DoomedClass, #DoomedClass.check!1 : (DoomedClass) -> () throws -> (), $@convention(method) (@guaranteed DoomedClass) -> @error Error
+// CHECK-NEXT: try_apply [[T0]]([[BORROWED_SELF]])
 // CHECK:    bb1([[T0:%.*]] : $()):
 // CHECK:      [[T0:%.*]] = tuple ()
+// CHECK:      end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK:      destroy_value [[SELF]] : $DoomedClass
 // CHECK:      dealloc_stack [[TEMP]]
 // CHECK:      return [[T0]] : $()
 // CHECK:    bb2([[T0:%.*]] : $Error):
 // CHECK:      builtin "willThrow"([[T0]] : $Error)
+// CHECK:      end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK:      destroy_value [[SELF]] : $DoomedClass
 // CHECK:      dealloc_stack [[TEMP]]
 // CHECK:      throw [[T0]] : $Error
@@ -265,9 +268,11 @@ struct HappyStruct : Doomed {
 // CHECK:      [[TEMP:%.*]] = alloc_stack $HappyClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
 // CHECK:      [[SELF:%.*]] = load [take] [[TEMP]] : $*HappyClass
-// CHECK:      [[T0:%.*]] = class_method [[SELF]] : $HappyClass, #HappyClass.check!1 : (HappyClass) -> () -> (), $@convention(method) (@guaranteed HappyClass) -> ()
-// CHECK:      [[T1:%.*]] = apply [[T0]]([[SELF]])
+// CHECK:      [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+// CHECK:      [[T0:%.*]] = class_method [[BORROWED_SELF]] : $HappyClass, #HappyClass.check!1 : (HappyClass) -> () -> (), $@convention(method) (@guaranteed HappyClass) -> ()
+// CHECK:      [[T1:%.*]] = apply [[T0]]([[BORROWED_SELF]])
 // CHECK:      [[T1:%.*]] = tuple ()
+// CHECK:      end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK:      destroy_value [[SELF]] : $HappyClass
 // CHECK:      dealloc_stack [[TEMP]]
 // CHECK:      return [[T1]] : $()

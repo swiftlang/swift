@@ -32,7 +32,12 @@ class Phoûx : NSObject, Fooable {
 // CHECK:         [[STACK_SLOT:%.*]] = alloc_stack $Phoûx
 // CHECK:         copy_addr [[IN_ADDR]] to [initialization] [[STACK_SLOT]]
 // CHECK:         [[VALUE:%.*]] = load [take] [[STACK_SLOT]]
-// CHECK:         class_method [[VALUE]] : $Phoûx, #Phoûx.foo!1
+// CHECK:         [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
+// CHECK:         [[CLS_METHOD:%.*]] = class_method [[BORROWED_VALUE]] : $Phoûx, #Phoûx.foo!1
+// CHECK:         apply [[CLS_METHOD]]([[BORROWED_VALUE]])
+// CHECK:         end_borrow [[BORROWED_VALUE]] from [[VALUE]]
+// CHECK:         destroy_value [[VALUE]]
+// CHECK:         dealloc_stack [[STACK_SLOT]]
 
 protocol Bells {
   init(bellsOn: Int)

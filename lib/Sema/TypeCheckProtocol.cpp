@@ -2899,7 +2899,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                        AssociatedTypeDecl *assocType) {
   // Look for a member type with the same name as the associated type.
   auto candidates = TC.lookupMemberType(DC, Adoptee, assocType->getName(),
-                                        /*lookup=*/None);
+                                        /*options=*/None);
 
   // If there aren't any candidates, we're done.
   if (!candidates) {
