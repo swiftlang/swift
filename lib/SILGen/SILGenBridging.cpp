@@ -111,10 +111,9 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
 
   // Call the witness.
   SILType resultTy = gen.getLoweredType(objcType);
-  SILValue bridgedValue = gen.B.createApply(loc, witnessRef, witnessFnTy,
-                                            resultTy, substitutions,
-                                            swiftValue.borrow()
-                                              .getUnmanagedValue());
+  SILValue bridgedValue =
+      gen.B.createApply(loc, witnessRef, witnessFnTy, resultTy, substitutions,
+                        swiftValue.borrow(gen, loc).getValue());
   return gen.emitManagedRValueWithCleanup(bridgedValue);
 }
 

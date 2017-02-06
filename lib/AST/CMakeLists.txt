@@ -1,3 +1,8 @@
+
+if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
+  set(EXTRA_AST_FLAGS "FORCE_BUILD_OPTIMIZED")
+endif()
+
 add_swift_library(swiftAST STATIC
   ArchetypeBuilder.cpp
   ASTContext.cpp
@@ -79,6 +84,8 @@ add_swift_library(swiftAST STATIC
     bitreader bitwriter coroutines coverage irreader debuginfoDWARF
     profiledata instrumentation object objcarcopts mc mcparser
     bitreader bitwriter lto ipo option core support ${LLVM_TARGETS_TO_BUILD}
+
+  ${EXTRA_AST_FLAGS}
   )
 
 # intrinsics_gen is the LLVM tablegen target that generates the include files

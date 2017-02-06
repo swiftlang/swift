@@ -104,3 +104,78 @@ void ManagedValue::assignInto(SILGenFunction &gen, SILLocation loc,
   gen.emitSemanticStore(loc, getValue(), address, addrTL,
                         IsNotInitialization);
 }
+
+ManagedValue ManagedValue::borrow(SILGenFunction &gen, SILLocation loc) const {
+  assert(getValue() && "cannot borrow an invalid or in-context value");
+  if (isLValue())
+    return *this;
+  if (getType().isAddress())
+    return ManagedValue::forUnmanaged(getValue());
+  return gen.emitManagedBeginBorrow(loc, getValue());
+}
+
+void BorrowedManagedValue::cleanupImpl() {
+  if (!gen.B.hasValidInsertionPoint()) {
+    handle.reset();
+    return;
+  }
+
+  // We had a trivial or an address value so there isn't anything to
+  // cleanup. Still be sure to unset borrowedValue though.
+  if (!handle.hasValue()) {
+    borrowedValue = ManagedValue();
+    return;
+  }
+
+  assert(borrowedValue && "already cleaned up this object!?");
+
+  CleanupHandle handleValue = handle.getValue();
+  CleanupLocation cleanupLoc = CleanupLocation::get(loc);
+
+  auto iter = gen.Cleanups.Stack.find(handleValue);
+  assert(iter != gen.Cleanups.Stack.end() &&
+         "can't change end of cleanups stack");
+
+  Cleanup &cleanup = *iter;
+  assert(cleanup.isActive() && "Cleanup emitted out of order?!");
+
+  CleanupState newState =
+      (cleanup.getState() == CleanupState::Active ? CleanupState::Dead
+                                                  : CleanupState::Dormant);
+  cleanup.emit(gen, cleanupLoc);
+  gen.Cleanups.setCleanupState(cleanup, newState);
+
+  borrowedValue = ManagedValue();
+  handle.reset();
+}
+
+BorrowedManagedValue::BorrowedManagedValue(SILGenFunction &gen,
+                                           ManagedValue originalValue,
+                                           SILLocation loc)
+    : gen(gen), borrowedValue(), handle(), loc(loc) {
+  if (!originalValue)
+    return;
+  auto &lowering = gen.F.getTypeLowering(originalValue.getType());
+  assert(lowering.getLoweredType().getObjectType() ==
+         originalValue.getType().getObjectType());
+
+  if (lowering.isTrivial()) {
+    borrowedValue = ManagedValue::forUnmanaged(originalValue.getValue());
+    return;
+  }
+
+  if (originalValue.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
+    borrowedValue = ManagedValue::forUnmanaged(originalValue.getValue());
+    return;
+  }
+
+  if (originalValue.getType().isAddress()) {
+    borrowedValue = ManagedValue::forUnmanaged(originalValue.getValue());
+    return;
+  }
+
+  SILValue borrowed = gen.B.createBeginBorrow(loc, originalValue.getValue());
+  if (borrowed->getType().isObject())
+    handle = gen.enterEndBorrowCleanup(originalValue.getValue(), borrowed);
+  borrowedValue = ManagedValue(borrowed, CleanupHandle::invalid());
+}
