@@ -716,15 +716,20 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject, %
 // result of mark_dependence to move into the non-lifetime ending use set of the
 // base object, this test should be extended with a negative use-after-free test
 // in over-consume.
-sil @mark_dependence_test : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : @owned $Builtin.NativeObject):
-  %1 = alloc_stack $Builtin.Int32
-  %2 = integer_literal $Builtin.Int32, 0
-  %3 = integer_literal $Builtin.Int32, 1
-  store %2 to [trivial] %1 : $*Builtin.Int32
-  %4 = mark_dependence %1 : $*Builtin.Int32 on %0 : $Builtin.NativeObject
-  store %3 to [trivial] %1 : $*Builtin.Int32
-  dealloc_stack %1 : $*Builtin.Int32
+sil @mark_dependence_test : $@convention(thin) (@owned Builtin.NativeObject, @guaranteed RefWithInt) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @guaranteed $RefWithInt):
+  %2 = alloc_stack $Builtin.Int32
+  %3 = integer_literal $Builtin.Int32, 0
+  %4 = integer_literal $Builtin.Int32, 1
+  store %3 to [trivial] %2 : $*Builtin.Int32
+  %5 = mark_dependence %2 : $*Builtin.Int32 on %0 : $Builtin.NativeObject
+  store %4 to [trivial] %5 : $*Builtin.Int32
+  dealloc_stack %2 : $*Builtin.Int32
+  %6 = alloc_stack $Builtin.Int32
+  store %3 to [trivial] %6 : $*Builtin.Int32
+  %7 = mark_dependence %6 : $*Builtin.Int32 on %1 : $RefWithInt
+  store %3 to [trivial] %7 : $*Builtin.Int32
+  dealloc_stack %6 : $*Builtin.Int32
   destroy_value %0 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
