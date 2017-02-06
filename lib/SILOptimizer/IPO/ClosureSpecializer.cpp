@@ -559,7 +559,6 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
       ClosureUser->isThunk(), ClosureUser->getClassVisibility(),
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
-  Fn->setDeclCtx(ClosureUser->getDeclContext());
   if (ClosureUser->hasUnqualifiedOwnership()) {
     Fn->setUnqualifiedOwnership();
   }

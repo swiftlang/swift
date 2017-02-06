@@ -225,7 +225,7 @@ typedef __INT32_TYPE__ int32_t;
 + (nullable instancetype)stringWithPath:(NSString*)path encoding:(int)encoding;
 @end
 
-NSString *NSStringToNSString(NSString *str);
+__attribute__((warn_unused_result)) NSString *NSStringToNSString(NSString *str);
 
 @interface Bee : NSObject
 -(void)buzz;

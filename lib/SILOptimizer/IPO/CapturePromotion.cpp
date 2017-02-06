@@ -455,7 +455,6 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
   if (Orig->hasUnqualifiedOwnership()) {
     Fn->setUnqualifiedOwnership();
   }
-  Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;
 }
 

@@ -400,6 +400,9 @@ public:
     return getNodeAs<T>(Loc.ASTNode.ForDebugger);
   }
 
+  /// Return the location as a DeclContext or null.
+  DeclContext *getAsDeclContext() const;
+
   SourceLoc getDebugSourceLoc() const;
   SourceLoc getSourceLoc() const;
   SourceLoc getStartSourceLoc() const;
