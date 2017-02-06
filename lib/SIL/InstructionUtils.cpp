@@ -226,35 +226,82 @@ SILValue swift::stripExpectIntrinsic(SILValue V) {
   return BI->getArguments()[0];
 }
 
-void ConformanceCollector::scanType(Type type) {
-  type = type->getCanonicalType();
+void ConformanceCollector::scanType(CanType type) {
   if (Visited.count(type.getPointer()) != 0)
     return;
 
   // Look for all possible metatypes and conformances which are used in type.
-  type.visit([this](Type SubType) {
-    if (NominalTypeDecl *NT = SubType->getNominalOrBoundGenericNominal()) {
-      if (Visited.count(SubType.getPointer()) == 0) {
+  type.visit([this](Type RawSubType) {
+    CanType SubType = RawSubType->getCanonicalType();
+    NominalTypeDecl *NT = SubType->getNominalOrBoundGenericNominal();
+    if (!NT || Visited.count(SubType.getPointer()) != 0)
+      return;
 
-        if (Visited.count(NT) == 0) {
-          EscapingMetaTypes.push_back(NT);
-          Visited.insert(NT);
-        }
+    if (Visited.count(NT) == 0) {
+      EscapingMetaTypes.push_back(NT);
+      Visited.insert(NT);
+    }
 
-        // Also inserts the type passed to scanType().
-        Visited.insert(SubType.getPointer());
-        auto substs = SubType->gatherAllSubstitutions(M.getSwiftModule(),
-                                                     nullptr);
-        scanSubsts(substs);
-      }
+    // Also inserts the type passed to scanType().
+    Visited.insert(SubType.getPointer());
+    auto substs = SubType->gatherAllSubstitutions(M.getSwiftModule(),
+                                                 nullptr);
+    scanSubsts(substs);
+
+    // Check the types of all stored properties of the nominal type.
+    for (VarDecl *Field : NT->getStoredProperties()) {
+      // TODO: check why it can happen that a field has no interface type.
+      if (Field->hasClangNode() || !Field->hasInterfaceType())
+        continue;
+      CanType FieldTy = SubType->getTypeOfMember(M.getSwiftModule(),
+                                            Field, nullptr)->getCanonicalType();
+      if (needsMetadata(FieldTy))
+        scanType(FieldTy);
     }
   });
+}
+
+bool ConformanceCollector::needsMetadata(CanType type) {
+  auto Iter = TypeNeedsMetadata.find(type.getPointer());
+  if (Iter != TypeNeedsMetadata.end())
+    return Iter->second;
+
+  // Already set the cache entry eagerly to avoid infinite recursions.
+  TypeNeedsMetadata[type.getPointer()] = true;
+
+  bool NeedMD = type.findIf([this](Type RawSubType) ->bool {
+    CanType SubType = RawSubType->getCanonicalType();
+    if (SubType->hasArchetype())
+      return true;
+
+    NominalTypeDecl *NT = SubType->getNominalOrBoundGenericNominal();
+    if (!NT)
+      return false;
+
+    if (!NT->hasFixedLayout(M.getSwiftModule(), ResilienceExpansion::Maximal))
+      return true;
+
+    // Check the types of all stored properties of the nominal type.
+    for (VarDecl *Field : NT->getStoredProperties()) {
+      // TODO: check why it can happen that a field has no interface type.
+      if (Field->hasClangNode() || !Field->hasInterfaceType())
+        continue;
+      CanType FieldTy = SubType->getTypeOfMember(M.getSwiftModule(),
+                                            Field, nullptr)->getCanonicalType();
+      if (needsMetadata(FieldTy))
+        return true;
+    }
+    return false;
+  });
+  // Finally assign the cache entry.
+  TypeNeedsMetadata[type.getPointer()] = NeedMD;
+  return NeedMD;
 }
 
 void ConformanceCollector::scanSubsts(ArrayRef<Substitution> substs) {
   for (const Substitution &subst : substs) {
     scanConformances(subst.getConformances());
-    scanType(subst.getReplacement());
+    scanType(subst.getReplacement()->getCanonicalType());
   }
 }
 
@@ -367,8 +414,8 @@ void ConformanceCollector::collect(swift::SILInstruction *I) {
       scanType(I->getType().getSwiftRValueType());
       break;
     case ValueKind::AllocStackInst: {
-      Type Ty = I->getType().getSwiftRValueType();
-      if (Ty->hasArchetype())
+      CanType Ty = I->getType().getSwiftRValueType();
+      if (needsMetadata(Ty))
         scanType(Ty);
       break;
     }
@@ -401,10 +448,20 @@ void ConformanceCollector::collect(swift::SILInstruction *I) {
     case ValueKind::SelectEnumAddrInst:
     case ValueKind::IndexAddrInst:
     case ValueKind::RefElementAddrInst:
-    case ValueKind::CopyAddrInst: {
-      Type Ty = I->getOperand(0)->getType().getSwiftRValueType();
-      if (Ty->hasArchetype())
+    case ValueKind::CopyAddrInst:{
+      CanType Ty = I->getOperand(0)->getType().getSwiftRValueType();
+      if (needsMetadata(Ty))
         scanType(Ty);
+      break;
+    }
+    case ValueKind::AllocGlobalInst: {
+      SILGlobalVariable *var = cast<AllocGlobalInst>(I)->getReferencedGlobal();
+      scanType(var->getLoweredType().getSwiftRValueType());
+      break;
+    }
+    case ValueKind::GlobalAddrInst: {
+      SILGlobalVariable *var = cast<GlobalAddrInst>(I)->getReferencedGlobal();
+      scanType(var->getLoweredType().getSwiftRValueType());
       break;
     }
     default:

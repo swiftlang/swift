@@ -94,9 +94,18 @@ class ConformanceCollector {
   /// Conformances and types which have been handled.
   llvm::SmallPtrSet<const void *, 8> Visited;
 
+  llvm::DenseMap<TypeBase *, bool> TypeNeedsMetadata;
+
   SILModule &M;
 
-  void scanType(Type type);
+  void scanType(CanType type);
+
+  /// Returns true if the metadata for the \p type is needed.
+  ///
+  /// This is the case if \p type has not a fixed layout, either because it
+  /// contains a resilient type or an archetype.
+  bool needsMetadata(CanType type);
+
   void scanSubsts(ArrayRef<Substitution> substs);
 
   template <typename T> void scanFuncParams(ArrayRef<T> OrigParams,
@@ -143,6 +152,7 @@ public:
     Conformances.clear();
     EscapingMetaTypes.clear();
     Visited.clear();
+    TypeNeedsMetadata.clear();
   }
 
   /// For debug purposes.
