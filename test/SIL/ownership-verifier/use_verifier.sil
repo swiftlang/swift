@@ -76,6 +76,12 @@ struct Aleph {
 sil @borrow_tuple_user : $@convention(thin) (@guaranteed (Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
 sil @unowned_tuple_user : $@convention(thin) ((Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
 
+struct Int {
+  var value: Builtin.Int64
+}
+
+sil @no_arg_or_output_function : $@convention(thin) () -> ()
+
 ////////////////
 // Test Cases //
 ////////////////
@@ -164,9 +170,35 @@ bb0(%0 : @trivial $*Builtin.UnsafeValueBuffer, %1 : @trivial $Builtin.Int32):
   return %9999 : $()
 }
 
-sil @throws_test : $@convention(thin) (@owned Error) -> ((), @error Error) {
-bb0(%0 : @owned $Error):
+sil @builtins_test : $@convention(thin) (@owned Error, Builtin.Int1, Builtin.RawPointer, Builtin.Word) -> ((), @error Error) {
+bb0(%0 : @owned $Error, %1 : @trivial $Builtin.Int1, %2 : @trivial $Builtin.RawPointer, %3 : @trivial $Builtin.Word):
+  %4 = metatype $@thick Builtin.Int32.Type
   builtin "willThrow"(%0 : $Error) : $()
+  builtin "onFastPath"() : $()
+  builtin "staticReport"(%1 : $Builtin.Int1, %1 : $Builtin.Int1, %2 : $Builtin.RawPointer) : $()
+  builtin "destroyArray"<Builtin.Int32>(%4 : $@thick Builtin.Int32.Type, %2 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
+  builtin "copyArray"<Builtin.Int32>(%4 : $@thick Builtin.Int32.Type, %2 : $Builtin.RawPointer, %2 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
+  builtin "takeArrayFrontToBack"<Builtin.Int32>(%4 : $@thick Builtin.Int32.Type, %2 : $Builtin.RawPointer, %2 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
+  builtin "takeArrayBackToFront"<Builtin.Int32>(%4 : $@thick Builtin.Int32.Type, %2 : $Builtin.RawPointer, %2 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
+  builtin "unexpectedError"(%0 : $Error) : $()
+  builtin "errorInMain"(%0 : $Error) : $()
+  %5 = integer_literal $Builtin.Int64, 0
+  %6 = struct $Int(%5 : $Builtin.Int64)
+  builtin "deallocRaw"(%2 : $Builtin.RawPointer, %6 : $Int, %6 : $Int) : $()
+  builtin "fence_acquire"() : $()
+  builtin "retain"<Error>(%0 : $Error) : $()
+  builtin "release"<Error>(%0 : $Error) : $()
+  builtin "condfail"(%1 : $Builtin.Int1) : $()
+  builtin "fixLifetime"(%0 : $Error) : $()
+  builtin "autorelease"<Error>(%0 : $Error) : $()
+  builtin "unpin"<Error>(%0 : $Error) : $()
+  builtin "destroy"<Error>(%4 : $@thick Builtin.Int32.Type, %2 : $Builtin.RawPointer) : $()
+  builtin "assign"<Builtin.Word>(%3 : $Builtin.Word, %2 : $Builtin.RawPointer) : $()
+  builtin "initialize"<Builtin.Word>(%3 : $Builtin.Word, %2 : $Builtin.RawPointer) : $()
+  %7 = integer_literal $Builtin.Int32, 0
+  builtin "atomicstore_release_Int32"(%2 : $Builtin.RawPointer, %7 : $Builtin.Int32) : $()
+  %8 = function_ref @no_arg_or_output_function : $@convention(thin) () -> ()
+  builtin "once"(%2 : $Builtin.RawPointer, %8 : $@convention(thin) () -> ()) : $()
   throw %0 : $Error
 }
 
@@ -194,6 +226,38 @@ bb0(%0 : @trivial $Builtin.Word, %1 : @trivial $Builtin.Word, %2 : @trivial $@th
   %9999 = tuple()
   return %9999 : $()
 }
+
+// All of these uses should not be consuming except for the destroy.
+sil @select_enum_test : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @owned Builtin.NativeObject, Optional<Builtin.Int32>, @owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $ThreeDifferingPayloadEnum, %1 : @owned $Builtin.NativeObject, %2 : @trivial $Optional<Builtin.Int32>, %3 : @owned $Builtin.NativeObject):
+  %4 = integer_literal $Builtin.Int32, 2
+  select_enum %0 : $ThreeDifferingPayloadEnum, case #ThreeDifferingPayloadEnum.nopayload!enumelt: %4, case #ThreeDifferingPayloadEnum.trivial_payload!enumelt.1: %4, case #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt.1: %4 : $Builtin.Int32
+  %5 = select_enum %2 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: %1, case #Optional.some!enumelt.1: %3 : $Builtin.NativeObject
+  destroy_value %5 : $Builtin.NativeObject
+  destroy_value %0 : $ThreeDifferingPayloadEnum
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @cast_tests : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %2 = unchecked_trivial_bit_cast %0 : $Builtin.NativeObject to $Builtin.RawPointer
+  %3 = unchecked_trivial_bit_cast %2 : $Builtin.RawPointer to $Builtin.RawPointer
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @existential_metatype_test : $@convention(thin) (@owned SwiftKlassP, @in SwiftKlassP) -> () {
+bb0(%0 : @owned $SwiftKlassP, %1 : @trivial $*SwiftKlassP):
+  %2 = existential_metatype $@thick SwiftKlassP.Type, %0 : $SwiftKlassP
+  %3 = existential_metatype $@thick SwiftKlassP.Type, %1 : $*SwiftKlassP
+  destroy_value %0 : $SwiftKlassP
+  destroy_addr %1 : $*SwiftKlassP
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 //////////////////////
 // Terminator Tests //
 //////////////////////
