@@ -7090,10 +7090,8 @@ GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
   // TODO: any need to infer requirements?
   builder.finalize(genericParams->getSourceRange().Start);
 
-  auto *sig = builder.getGenericSignature();
-  auto *env = builder.getGenericEnvironment(sig);
-
-  return env;
+  return builder.getGenericSignature()->createGenericEnvironment(
+                                                       *dc->getParentModule());
 }
 
 DeclContext *

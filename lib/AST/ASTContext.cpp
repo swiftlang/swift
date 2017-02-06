@@ -1271,7 +1271,7 @@ GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
     return known->second;
 
   auto sig = builder->getGenericSignature();
-  auto env = builder->getGenericEnvironment(sig);
+  auto env = sig->createGenericEnvironment(module);
   Impl.CanonicalGenericEnvironments[builder] = env;
   return env;
 }

@@ -2499,7 +2499,7 @@ buildThunkSignature(SILGenFunction &gen,
 
   builder.finalize(SourceLoc(), /*allowConcreteGenericParams=*/true);
   GenericSignature *genericSig = builder.getGenericSignature();
-  genericEnv = builder.getGenericEnvironment(genericSig);
+  genericEnv = genericSig->createGenericEnvironment(*mod);
 
   // Calculate substitutions to map the original function's archetypes to
   // the new generic environment's archetypes.

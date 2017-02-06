@@ -478,8 +478,8 @@ namespace {
         Builder.addGenericParameter(gp);
 
       Builder.finalize(SourceLoc());
-      auto sig = Builder.getGenericSignature();
-      GenericEnv = Builder.getGenericEnvironment(sig);
+      GenericEnv = Builder.getGenericSignature()->createGenericEnvironment(
+                                                        *ctx.TheBuiltinModule);
     }
 
     template <class G>
