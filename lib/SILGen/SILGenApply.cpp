@@ -188,7 +188,7 @@ private:
   SILValue SelfValue;
   ArrayRef<Substitution> Substitutions;
   CanAnyFunctionType OrigFormalInterfaceType;
-  CanAnyFunctionType SubstFormalType;
+  CanFunctionType SubstFormalType;
   Optional<SILLocation> SpecializeLoc;
   bool HasSubstitutions = false;
   Optional<SmallVector<ManagedValue, 2>> Captures;
@@ -200,7 +200,7 @@ private:
 
   Callee(ManagedValue indirectValue,
          CanAnyFunctionType origFormalType,
-         CanAnyFunctionType substFormalType,
+         CanFunctionType substFormalType,
          SILLocation L)
     : kind(Kind::IndirectValue),
       IndirectValue(indirectValue),
@@ -216,7 +216,7 @@ private:
   }
 
   Callee(SILGenFunction &gen, SILDeclRef standaloneFunction,
-         CanAnyFunctionType substFormalType,
+         CanFunctionType substFormalType,
          SILLocation l)
     : kind(Kind::StandaloneFunction), Constant(standaloneFunction),
       OrigFormalInterfaceType(getConstantFormalInterfaceType(gen,
@@ -230,7 +230,7 @@ private:
          SILGenFunction &gen,
          SILValue selfValue,
          SILDeclRef methodName,
-         CanAnyFunctionType substFormalType,
+         CanFunctionType substFormalType,
          SILLocation l)
     : kind(methodKind), Constant(methodName), SelfValue(selfValue),
       OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, methodName)),
@@ -328,7 +328,7 @@ public:
 
   static Callee forIndirect(ManagedValue indirectValue,
                             CanAnyFunctionType origFormalType,
-                            CanAnyFunctionType substFormalType,
+                            CanFunctionType substFormalType,
                             SILLocation l) {
     return Callee(indirectValue,
                   origFormalType,
@@ -336,12 +336,12 @@ public:
                   l);
   }
   static Callee forDirect(SILGenFunction &gen, SILDeclRef c,
-                          CanAnyFunctionType substFormalType,
+                          CanFunctionType substFormalType,
                           SILLocation l) {
     return Callee(gen, c, substFormalType, l);
   }
   static Callee forEnumElement(SILGenFunction &gen, SILDeclRef c,
-                               CanAnyFunctionType substFormalType,
+                               CanFunctionType substFormalType,
                                SILLocation l) {
     assert(isa<EnumElementDecl>(c.getDecl()));
     return Callee(Kind::EnumElement, gen, SILValue(),
@@ -349,14 +349,14 @@ public:
   }
   static Callee forClassMethod(SILGenFunction &gen, SILValue selfValue,
                                SILDeclRef name,
-                               CanAnyFunctionType substFormalType,
+                               CanFunctionType substFormalType,
                                SILLocation l) {
     return Callee(Kind::ClassMethod, gen, selfValue, name,
                   substFormalType, l);
   }
   static Callee forSuperMethod(SILGenFunction &gen, SILValue selfValue,
                                SILDeclRef name,
-                               CanAnyFunctionType substFormalType,
+                               CanFunctionType substFormalType,
                                SILLocation l) {
     while (auto *UI = dyn_cast<UpcastInst>(selfValue))
       selfValue = UI->getOperand();
@@ -368,7 +368,7 @@ public:
                              SILValue optOpeningInstruction,
                              CanType protocolSelfType,
                              SILDeclRef name,
-                             CanAnyFunctionType substFormalType,
+                             CanFunctionType substFormalType,
                              SILLocation l) {
     Callee callee(Kind::WitnessMethod, gen, optOpeningInstruction, name,
                   substFormalType, l);
@@ -376,7 +376,7 @@ public:
     return callee;
   }
   static Callee forDynamic(SILGenFunction &gen, SILValue proto,
-                           SILDeclRef name, CanAnyFunctionType substFormalType,
+                           SILDeclRef name, CanFunctionType substFormalType,
                            SILLocation l) {
     Callee callee(Kind::DynamicMethod, gen, proto, name,
                   substFormalType, l);
@@ -414,7 +414,7 @@ public:
     return OrigFormalInterfaceType;
   }
 
-  CanAnyFunctionType getSubstFormalType() const {
+  CanFunctionType getSubstFormalType() const {
     return SubstFormalType;
   }
 
@@ -650,7 +650,7 @@ static ManagedValue maybeEnterCleanupForTransformed(SILGenFunction &gen,
 static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
                                      SILDeclRef constant,
                                      ArgumentSource &selfValue,
-                                     CanAnyFunctionType substFnType,
+                                     CanFunctionType substFnType,
                                      ArrayRef<Substitution> &substitutions) {
   auto fd = cast<AbstractFunctionDecl>(constant.getDecl());
   auto protocol = cast<ProtocolDecl>(fd->getDeclContext());
@@ -743,7 +743,7 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
   materializeSelfIfNecessary();
 
   // The protocol self is implicitly decurried.
-  substFnType = cast<AnyFunctionType>(substFnType.getResult());
+  substFnType = cast<FunctionType>(substFnType.getResult());
 
   return Callee::forArchetype(gen, openingSite, selfTy,
                               constant, substFnType, loc);
@@ -974,7 +974,7 @@ public:
         // to the +0 value in memory.  We just pass in the address since
         // archetypes are address-only.
 
-        CanAnyFunctionType substFnType = getSubstFnType();
+        auto substFnType = getSubstFnType();
         assert(!CallSites.empty());
         ApplyExpr *thisCallSite = CallSites.back();
         CallSites.pop_back();
@@ -1451,7 +1451,7 @@ public:
                              requiresForeignEntryPoint(ctorRef->getDecl()));
       setCallee(Callee::forArchetype(SGF, SILValue(),
                      self.getType().getSwiftRValueType(), constant,
-                     cast<AnyFunctionType>(expr->getType()->getCanonicalType()),
+                     cast<FunctionType>(expr->getType()->getCanonicalType()),
                      expr));
     } else if (getMethodDispatch(ctorRef->getDecl())
                  == MethodDispatch::Class) {
@@ -4250,14 +4250,15 @@ namespace {
       ApplyOptions initialOptions = ApplyOptions::None;
 
       AbstractionPattern origFormalType(callee.getOrigFormalType());
-      CanAnyFunctionType formalType = callee.getSubstFormalType();
+      CanFunctionType formalType = callee.getSubstFormalType();
 
       if (specializedEmitter || isPartiallyAppliedSuperMethod(uncurryLevel)) {
         // We want to emit the arguments as fully-substituted values
         // because that's what the specialized emitters expect.
         origFormalType = AbstractionPattern(formalType);
-        substFnType = gen.getLoweredType(formalType, uncurryLevel)
-          .castTo<SILFunctionType>();
+        substFnType = gen.getSILFunctionType(origFormalType,
+                                             formalType,
+                                             uncurryLevel);
       } else if (isEnumElementConstructor()) {
         // Enum payloads are always stored at the abstraction level
         // of the unsubstituted payload type. This means that unlike
@@ -4265,9 +4266,8 @@ namespace {
         // the AST-level abstraction pattern, to ensure that function
         // types in payloads are re-abstracted correctly.
         assert(!AssumedPlusZeroSelf);
-        substFnType = gen.getLoweredType(origFormalType, formalType,
-                                         uncurryLevel)
-          .castTo<SILFunctionType>();
+        substFnType = gen.getSILFunctionType(origFormalType, formalType,
+                                             uncurryLevel);
       } else {
         std::tie(mv, substFnType, foreignError, foreignSelf, initialOptions) =
           callee.getAtUncurryLevel(gen, uncurryLevel);
@@ -4627,11 +4627,13 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                                             SGFContext ctx) {
   auto origFormalType =
     cast<AnyFunctionType>(fn->getInterfaceType()->getCanonicalType());
-  auto substFormalType = origFormalType;
+  CanFunctionType substFormalType;
   if (!subs.empty()) {
-    auto genericFnType = cast<GenericFunctionType>(substFormalType);
+    auto genericFnType = cast<GenericFunctionType>(origFormalType);
     auto applied = genericFnType->substGenericArgs(subs);
     substFormalType = cast<FunctionType>(applied->getCanonicalType());
+  } else {
+    substFormalType = cast<FunctionType>(origFormalType);
   }
 
   auto callee = Callee::forDirect(*this, SILDeclRef(fn), substFormalType, loc);
@@ -4688,12 +4690,15 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
   WritebackScope writebackScope(SGF);
 
   // Determine the formal and substituted types.
-  CanAnyFunctionType substFormalType = initConstant.FormalInterfaceType;
+  CanFunctionType substFormalType;
   auto subs = init.getSubstitutions();
   if (!subs.empty()) {
-    auto genericFnType = cast<GenericFunctionType>(substFormalType);
+    auto genericFnType = cast<GenericFunctionType>(
+        initConstant.FormalInterfaceType);
     auto applied = genericFnType->substGenericArgs(subs);
     substFormalType = cast<FunctionType>(applied->getCanonicalType());
+  } else {
+    substFormalType = cast<FunctionType>(initConstant.FormalInterfaceType);
   }
 
   // For an inheritable initializer, determine whether we'll need to adjust the
@@ -4953,7 +4958,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                          ArgumentSource &selfValue,
                                          bool isSuper,
                                          bool isDirectUse,
-                                         CanAnyFunctionType substAccessorType,
+                                         CanFunctionType substAccessorType,
                                          ArrayRef<Substitution> &substitutions){
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
 
@@ -5008,11 +5013,13 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   SILConstantInfo constantInfo = gen.getConstantInfo(constant);
 
   // Apply substitutions to the callee type.
-  CanAnyFunctionType substAccessorType = constantInfo.FormalInterfaceType;
+  CanFunctionType substAccessorType;
   if (!substitutions.empty()) {
-    auto genericFn = cast<GenericFunctionType>(substAccessorType);
+    auto genericFn = cast<GenericFunctionType>(constantInfo.FormalInterfaceType);
     auto substFn = genericFn->substGenericArgs(substitutions);
     substAccessorType = cast<FunctionType>(substFn->getCanonicalType());
+  } else {
+    substAccessorType = cast<FunctionType>(constantInfo.FormalInterfaceType);
   }
 
   // Get the accessor function. The type will be a polymorphic function if
