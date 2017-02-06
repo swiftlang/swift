@@ -61,12 +61,18 @@ func testClosureOverWeak() {
 class CC {
   weak var x: CC?
 
-  // CHECK-LABEL: sil hidden @_T04weak2CCC{{[_0-9a-zA-Z]*}}fc
-  // CHECK:  [[FOO:%.*]] = alloc_box ${ var Optional<CC> }
-  // CHECK:  [[PB:%.*]] = project_box [[FOO]]
-  // CHECK:  [[X:%.*]] = ref_element_addr %2 : $CC, #CC.x
-  // CHECK:  [[VALUE:%.*]] = load_weak [[X]] : $*@sil_weak Optional<CC>
-  // CHECK:  store [[VALUE]] to [init] [[PB]] : $*Optional<CC>
+  // CHECK-LABEL: sil hidden @_T04weak2CCC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned CC) -> @owned CC {
+  // CHECK:  bb0([[SELF:%.*]] : $CC):
+  // CHECK:    [[UNINIT_SELF:%.*]] = mark_uninitialized [rootself] [[SELF]] : $CC
+  // CHECK:    [[FOO:%.*]] = alloc_box ${ var Optional<CC> }, var, name "foo"
+  // CHECK:    [[PB:%.*]] = project_box [[FOO]]
+  // CHECK:    [[BORROWED_UNINIT_SELF:%.*]] = begin_borrow [[UNINIT_SELF]]
+  // CHECK:    [[X:%.*]] = ref_element_addr [[BORROWED_UNINIT_SELF]] : $CC, #CC.x
+  // CHECK:    [[VALUE:%.*]] = load_weak [[X]] : $*@sil_weak Optional<CC>
+  // CHECK:    store [[VALUE]] to [init] [[PB]] : $*Optional<CC>
+  // CHECK:    end_borrow [[BORROWED_UNINIT_SELF]] from [[UNINIT_SELF]]
+  // CHECK:    destroy_value [[FOO]]
+  // CHECK: } // end sil function '_T04weak2CCC{{[_0-9a-zA-Z]*}}fc'
   init() {
     var foo = x
   }

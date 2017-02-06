@@ -24,9 +24,12 @@ func lazyRefPropertiesAreNotStored(_ container: LazyContainerClass) {
 
 // CHECK-LABEL: sil hidden @_T010multi_file25finalVarsAreDevirtualizedyAA18FinalPropertyClassCF
 func finalVarsAreDevirtualized(_ obj: FinalPropertyClass) {
-  // CHECK: ref_element_addr %0 : $FinalPropertyClass, #FinalPropertyClass.foo
+  // CHECK: bb0([[ARG:%.*]] : $FinalPropertyClass):
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   ref_element_addr [[BORROWED_ARG]] : $FinalPropertyClass, #FinalPropertyClass.foo
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   markUsed(obj.foo)
-  // CHECK: class_method %0 : $FinalPropertyClass, #FinalPropertyClass.bar!getter.1
+  // CHECK:   class_method [[ARG]] : $FinalPropertyClass, #FinalPropertyClass.bar!getter.1
   markUsed(obj.bar)
 }
 
