@@ -1855,7 +1855,7 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
       // For generic functions, build a new generic function... but strip off
       // the requirements. They don't add value.
       auto sigWithoutReqts
-        = GenericSignature::get(genericFn->getGenericParams(), {});
+        = GenericSignature::get(genericFn->getGenericParams(), {}, {});
       return GenericFunctionType::get(sigWithoutReqts,
                                       resultFn->getInput(),
                                       resultFn->getResult(),

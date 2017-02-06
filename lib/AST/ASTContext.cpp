@@ -3504,6 +3504,7 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
 
 GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
                                         ArrayRef<Requirement> requirements,
+                                        ArrayRef<StashedConformance> conformances,
                                         bool isKnownCanonical) {
   assert(!params.empty());
 
@@ -3527,10 +3528,11 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
   }
 
   // Allocate and construct the new signature.
-  size_t bytes = totalSizeToAlloc<GenericTypeParamType *, Requirement>(
-      params.size(), requirements.size());
+  size_t bytes = totalSizeToAlloc<GenericTypeParamType *, Requirement, StashedConformance>(
+      params.size(), requirements.size(), conformances.size());
   void *mem = ctx.Allocate(bytes, alignof(GenericSignature));
   auto newSig = new (mem) GenericSignature(params, requirements,
+                                           conformances,
                                            isKnownCanonical);
   ctx.Impl.GenericSignatures.InsertNode(newSig, insertPos);
   return newSig;
@@ -3995,7 +3997,7 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
     return theSig;
   
   auto param = GenericTypeParamType::get(0, 0, *this);
-  auto sig = GenericSignature::get(param, { });
+  auto sig = GenericSignature::get(param, { }, { });
   auto canonicalSig = CanGenericSignature(sig);
   Impl.SingleGenericParameterSignature = canonicalSig;
   return canonicalSig;

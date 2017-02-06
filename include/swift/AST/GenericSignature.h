@@ -31,17 +31,23 @@ class ProtocolType;
 class Substitution;
 class SubstitutionMap;
 
+struct StashedConformance {
+  CanType depTy;
+  ProtocolConformanceRef ref;
+};
+
 /// Describes the generic signature of a particular declaration, including
 /// both the generic type parameters and the requirements placed on those
 /// generic parameters.
 class alignas(1 << TypeAlignInBits) GenericSignature final
   : public llvm::FoldingSetNode,
     private llvm::TrailingObjects<GenericSignature, GenericTypeParamType *,
-                                  Requirement> {
+                                  Requirement, StashedConformance> {
   friend TrailingObjects;
 
   unsigned NumGenericParams;
   unsigned NumRequirements;
+  unsigned NumConformances;
 
   // Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
@@ -52,6 +58,9 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
   }
   size_t numTrailingObjects(OverloadToken<Requirement>) const {
     return NumRequirements;
+  }
+  size_t numTrailingObjects(OverloadToken<StashedConformance>) const {
+    return NumConformances;
   }
 
   /// Retrieve a mutable version of the generic parameters.
@@ -64,8 +73,14 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
     return {getTrailingObjects<Requirement>(), NumRequirements};
   }
 
+  /// Retrieve a mutable version of the requirements.
+  MutableArrayRef<StashedConformance> getConformancesBuffer() {
+    return {getTrailingObjects<StashedConformance>(), NumConformances};
+  }
+
   GenericSignature(ArrayRef<GenericTypeParamType *> params,
                    ArrayRef<Requirement> requirements,
+                   ArrayRef<StashedConformance> conformances,
                    bool isKnownCanonical);
 
   mutable llvm::PointerUnion<GenericSignature *, ASTContext *>
@@ -84,12 +99,14 @@ public:
   /// requirements.
   static GenericSignature *get(ArrayRef<GenericTypeParamType *> params,
                                ArrayRef<Requirement> requirements,
+                               ArrayRef<StashedConformance> conformances,
                                bool isKnownCanonical = false);
 
   /// Create a new generic signature with the given type parameters and
   /// requirements, first canonicalizing the types.
   static CanGenericSignature getCanonical(ArrayRef<GenericTypeParamType *> params,
-                                          ArrayRef<Requirement> requirements);
+                                          ArrayRef<Requirement> requirements,
+                                          ArrayRef<StashedConformance> conformances);
 
   /// Retrieve the generic parameters.
   ArrayRef<GenericTypeParamType *> getGenericParams() const {
@@ -118,6 +135,11 @@ public:
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const {
     return const_cast<GenericSignature *>(this)->getRequirementsBuffer();
+  }
+
+  /// Retrieve the generic parameters.
+  ArrayRef<StashedConformance> getConformances() const {
+    return const_cast<GenericSignature *>(this)->getConformancesBuffer();
   }
 
   /// Check if the generic signature makes all generic parameters

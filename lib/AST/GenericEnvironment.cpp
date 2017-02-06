@@ -351,6 +351,19 @@ void GenericEnvironment::
 getSubstitutionMap(ModuleDecl *mod,
                    ArrayRef<Substitution> subs,
                    SubstitutionMap &result) const {
+
+  // Add stashed conformances.
+  for (auto conformance : getGenericSignature()->getConformances()) {
+    auto depTy = conformance.depTy;
+    
+    // Map the interface type to a context type.
+    auto contextTy = depTy.subst(QueryInterfaceTypeSubstitutions(this),
+                                 LookUpConformanceInModule(mod),
+                                 SubstOptions());
+
+    result.addConformance(contextTy->getCanonicalType(), conformance.ref);
+  }
+
   for (auto depTy : getGenericSignature()->getAllDependentTypes()) {
 
     // Map the interface type to a context type.

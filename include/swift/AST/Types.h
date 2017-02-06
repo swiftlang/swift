@@ -3958,6 +3958,13 @@ public:
   /// \brief Check if the archetype contains a nested type with the given name.
   bool hasNestedType(Identifier Name) const;
 
+  /// \brief Returns the conformance of a nested type to a protocol.
+  ///
+  /// Only available if the conformance was implied by another generic
+  /// requirement of the archetype's generic signature.
+  Optional<ProtocolConformanceRef> getNestedTypeConformance(
+    Identifier Name, ProtocolDecl *Proto) const;
+
   /// \brief Retrieve the known nested types of this archetype.
   ///
   /// Useful only for debugging dumps; all other queries should attempt to
