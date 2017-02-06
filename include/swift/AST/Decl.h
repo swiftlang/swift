@@ -3595,6 +3595,11 @@ public:
     return RequirementSignature;
   }
 
+  /// Has the requirement signature been computed yet?
+  bool isRequirementSignatureComputed() const {
+    return RequirementSignature != nullptr;
+  }
+
   void computeRequirementSignature();
 
   void setRequirementSignature(GenericSignature *sig) {

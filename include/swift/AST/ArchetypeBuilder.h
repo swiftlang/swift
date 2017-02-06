@@ -171,7 +171,8 @@ private:
 
   /// \brief Add a new same-type requirement specifying that the given potential
   /// archetypes should map to the equivalent archetype.
-  bool addSameTypeRequirement(Type T1, Type T2, RequirementSource Source);
+  bool addSameTypeRequirement(Type T1, Type T2, RequirementSource Source,
+                              PotentialArchetype *basePA = nullptr);
 
   /// Add the requirements placed on the given abstract type parameter
   /// to the given potential archetype.
@@ -248,6 +249,10 @@ public:
   /// re-inject requirements from outer contexts.
   void addRequirement(const Requirement &req, RequirementSource source);
 
+  void addRequirement(const Requirement &req, RequirementSource source,
+                      PotentialArchetype *basePA,
+                      llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
+
   bool addLayoutRequirement(PotentialArchetype *PAT,
                             LayoutConstraint Layout,
                             RequirementSource Source);
@@ -310,7 +315,12 @@ public:
   /// signature are fully resolved).
   ///
   /// For any type that cannot refer to an archetype, this routine returns null.
-  PotentialArchetype *resolveArchetype(Type type);
+  ///
+  /// A non-null \c basePA is used in place of the "true" potential archetype
+  /// for a GenericTypeParamType, effectively performing a substitution like,
+  /// e.g., Self = <some PA>.
+  PotentialArchetype *resolveArchetype(Type type,
+                                       PotentialArchetype *basePA = nullptr);
 
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
