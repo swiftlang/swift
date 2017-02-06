@@ -863,7 +863,7 @@ struct LetProperties {
     arr = []
     arr += []      // expected-error {{mutating operator '+=' may not be used on immutable value 'self.arr'}}
     arr.append(4)  // expected-error {{mutating method 'append' may not be used on immutable value 'self.arr'}}
-    arr[12] = 17   // expected-error {{immutable value 'self.arr' may not be assigned to}}
+    arr[12] = 17   // expected-error {{mutating subscript 'subscript' may not be used on immutable value 'self.arr'}}
   }
 }
 
