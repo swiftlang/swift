@@ -2059,6 +2059,11 @@ iterations with -O",
                         help="Enable the SIL ownership model",
                         action='store_true')
 
+    parser.add_argument("--force-optimized-typechecker",
+                        help="Force the type checker to be built with "
+                        "optimization",
+                        action='store_true')
+
     parser.add_argument(
         # Explicitly unavailable options here.
         "--build-jobs",
