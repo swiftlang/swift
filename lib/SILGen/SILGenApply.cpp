@@ -5040,120 +5040,186 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   return callee;
 }
 
+namespace {
+
+struct AccessorBaseArgPreparer final {
+  SILGenFunction &SGF;
+  SILLocation loc;
+  ManagedValue base;
+  CanType baseFormalType;
+  SILDeclRef accessor;
+  SILParameterInfo selfParam;
+  SILType baseLoweredType;
+
+  AccessorBaseArgPreparer(SILGenFunction &SGF, SILLocation loc,
+                          ManagedValue base, CanType baseFormalType,
+                          SILDeclRef accessor);
+  ArgumentSource prepare();
+
+private:
+  bool isDirectGuaranteed() const {
+    return selfParam.getConvention() == ParameterConvention::Direct_Guaranteed;
+  }
+
+  /// Prepare our base if we have an address base.
+  ArgumentSource prepareAccessorAddressBaseArg();
+  /// Prepare our base if we have an object base.
+  ArgumentSource prepareAccessorObjectBaseArg();
+
+  /// Returns true if given an address base, we need to load the underlying
+  /// address. Asserts if baseLoweredType is not an address.
+  bool shouldLoadBaseAddress() const;
+};
+
+} // end anonymous namespace
+
+bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
+  assert(baseLoweredType.isAddress() &&
+         "Should only call this helper method if the base is an address");
+  switch (selfParam.getConvention()) {
+  // If the accessor wants the value 'inout', always pass the
+  // address we were given.  This is semantically required.
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+    return false;
+
+  // If the accessor wants the value 'in', we have to copy if the
+  // base isn't a temporary.  We aren't allowed to pass aliased
+  // memory to 'in', and we have pass at +1.
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Guaranteed:
+    // TODO: We shouldn't be able to get an lvalue here, but the AST
+    // sometimes produces an inout base for non-mutating accessors.
+    // rdar://problem/19782170
+    // assert(!base.isLValue());
+    return base.isLValue() || base.isPlusZeroRValueOrTrivial();
+
+  // If the accessor wants the value directly, we definitely have to
+  // load.  TODO: don't load-and-retain if the value is passed at +0.
+  case ParameterConvention::Direct_Owned:
+  case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Direct_Guaranteed:
+    return true;
+  }
+  llvm_unreachable("bad convention");
+}
+
+ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
+  // If the base is currently an address, we may have to copy it.
+
+  if (shouldLoadBaseAddress()) {
+    // The load can only be a take if the base is a +1 rvalue.
+    auto shouldTake = IsTake_t(base.hasCleanup());
+
+    base = SGF.emitLoad(loc, base.forward(SGF),
+                        SGF.getTypeLowering(baseLoweredType), SGFContext(),
+                        shouldTake);
+    return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
+  }
+
+  // Handle inout bases specially here.
+  if (selfParam.isIndirectInOut()) {
+    // It sometimes happens that we get r-value bases here,
+    // e.g. when calling a mutating setter on a materialized
+    // temporary.  Just don't claim the value.
+    if (!base.isLValue()) {
+      base = ManagedValue::forLValue(base.getValue());
+    }
+
+    // FIXME: this assumes that there's never meaningful
+    // reabstraction of self arguments.
+    return ArgumentSource(
+        loc, LValue::forAddress(base, AbstractionPattern(baseFormalType),
+                                baseFormalType));
+  }
+
+  // Otherwise, we have a value that we can forward without any additional
+  // handling.
+  return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
+}
+
+ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
+  // If the base is currently scalar, we may have to drop it in
+  // memory or copy it.
+  assert(!base.isLValue());
+
+  // We need to produce the value at +1 if it's going to be consumed.
+  if (selfParam.isConsumed() && !base.hasCleanup()) {
+    base = base.copyUnmanaged(SGF, loc);
+  }
+
+  // If the parameter is indirect, we need to drop the value into
+  // temporary memory.
+  if (SGF.silConv.isSILIndirect(selfParam)) {
+    // It's usually a really bad idea to materialize when we're
+    // about to pass a value to an inout argument, because it's a
+    // really easy way to silently drop modifications (e.g. from a
+    // mutating getter in a writeback pair).  Our caller should
+    // always take responsibility for that decision (by doing the
+    // materialization itself).
+    //
+    // However, when the base is a reference type and the target is
+    // a non-class protocol, this is innocuous.
+#ifndef NDEBUG
+    auto isNonClassProtocolMember = [](Decl *d) {
+      auto p = d->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      return (p && !p->requiresClass());
+    };
+#endif
+    assert((!selfParam.isIndirectMutating() ||
+            (baseFormalType->isAnyClassReferenceType() &&
+             isNonClassProtocolMember(accessor.getDecl()))) &&
+           "passing unmaterialized r-value as inout argument");
+
+    base = emitMaterializeIntoTemporary(SGF, loc, base);
+    if (selfParam.isIndirectInOut()) {
+      // Drop the cleanup if we have one.
+      auto baseLV = ManagedValue::forLValue(base.getValue());
+      return ArgumentSource(
+          loc, LValue::forAddress(baseLV, AbstractionPattern(baseFormalType),
+                                  baseFormalType));
+    }
+  }
+
+  return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
+}
+
+AccessorBaseArgPreparer::AccessorBaseArgPreparer(SILGenFunction &SGF,
+                                                 SILLocation loc,
+                                                 ManagedValue base,
+                                                 CanType baseFormalType,
+                                                 SILDeclRef accessor)
+    : SGF(SGF), loc(loc), base(base), baseFormalType(baseFormalType),
+      accessor(accessor),
+      selfParam(SGF.SGM.Types.getConstantSelfParameter(accessor)),
+      baseLoweredType(base.getType()) {
+  assert(!base.isInContext());
+  assert(!base.isLValue() || !base.hasCleanup());
+}
+
+ArgumentSource AccessorBaseArgPreparer::prepare() {
+  // If the base is a boxed existential, we will open it later.
+  if (baseLoweredType.getPreferredExistentialRepresentation(SGF.SGM.M) ==
+      ExistentialRepresentation::Boxed) {
+    assert(!baseLoweredType.isAddress() &&
+           "boxed existential should not be an address");
+    return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
+  }
+
+  if (baseLoweredType.isAddress())
+    return prepareAccessorAddressBaseArg();
+
+  // At this point, we know we have an object.
+  assert(baseLoweredType.isObject());
+  return prepareAccessorObjectBaseArg();
+}
+
 ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
                                                       ManagedValue base,
                                                       CanType baseFormalType,
                                                       SILDeclRef accessor) {
-  SILParameterInfo selfParam = SGM.Types.getConstantSelfParameter(accessor);
-
-  assert(!base.isInContext());
-  assert(!base.isLValue() || !base.hasCleanup());
-  SILType baseLoweredType = base.getType();
-
-  // If the base is a boxed existential, we will open it later.
-  if (baseLoweredType.getPreferredExistentialRepresentation(SGM.M)
-        == ExistentialRepresentation::Boxed) {
-    assert(!baseLoweredType.isAddress()
-           && "boxed existential should not be an address");
-  } else if (baseLoweredType.isAddress()) {
-    // If the base is currently an address, we may have to copy it.
-    auto needsLoad = [&] {
-      switch (selfParam.getConvention()) {
-      // If the accessor wants the value 'inout', always pass the
-      // address we were given.  This is semantically required.
-      case ParameterConvention::Indirect_Inout:
-      case ParameterConvention::Indirect_InoutAliasable:
-        return false;
-
-      // If the accessor wants the value 'in', we have to copy if the
-      // base isn't a temporary.  We aren't allowed to pass aliased
-      // memory to 'in', and we have pass at +1.
-      case ParameterConvention::Indirect_In:
-      case ParameterConvention::Indirect_In_Guaranteed:
-        // TODO: We shouldn't be able to get an lvalue here, but the AST
-        // sometimes produces an inout base for non-mutating accessors.
-        // rdar://problem/19782170
-        // assert(!base.isLValue());
-        return base.isLValue() || base.isPlusZeroRValueOrTrivial();
-
-      // If the accessor wants the value directly, we definitely have to
-      // load.  TODO: don't load-and-retain if the value is passed at +0.
-      case ParameterConvention::Direct_Owned:
-      case ParameterConvention::Direct_Unowned:
-      case ParameterConvention::Direct_Guaranteed:
-        return true;
-      }
-      llvm_unreachable("bad convention");
-    };
-    if (needsLoad()) {
-      // The load can only be a take if the base is a +1 rvalue.
-      auto shouldTake = IsTake_t(base.hasCleanup());
-
-      base = emitLoad(loc, base.forward(*this), getTypeLowering(baseLoweredType),
-                      SGFContext(), shouldTake);
-
-    // Handle inout bases specially here.
-    } else if (selfParam.isIndirectInOut()) {
-      // It sometimes happens that we get r-value bases here,
-      // e.g. when calling a mutating setter on a materialized
-      // temporary.  Just don't claim the value.
-      if (!base.isLValue()) {
-        base = ManagedValue::forLValue(base.getValue());
-      }
-
-      // FIXME: this assumes that there's never meaningful
-      // reabstraction of self arguments.
-      return ArgumentSource(loc,
-                 LValue::forAddress(base, AbstractionPattern(baseFormalType),
-                                    baseFormalType));
-    }
-
-  // If the base is currently scalar, we may have to drop it in
-  // memory or copy it.
-  } else {
-    assert(!base.isLValue());
-
-    // We need to produce the value at +1 if it's going to be consumed.
-    if (selfParam.isConsumed() && !base.hasCleanup()) {
-      base = base.copyUnmanaged(*this, loc);
-    }
-
-    // If the parameter is indirect, we need to drop the value into
-    // temporary memory.
-    if (silConv.isSILIndirect(selfParam)) {
-      // It's usually a really bad idea to materialize when we're
-      // about to pass a value to an inout argument, because it's a
-      // really easy way to silently drop modifications (e.g. from a
-      // mutating getter in a writeback pair).  Our caller should
-      // always take responsibility for that decision (by doing the
-      // materialization itself).
-      //
-      // However, when the base is a reference type and the target is
-      // a non-class protocol, this is innocuous.
-#ifndef NDEBUG
-      auto isNonClassProtocolMember = [](Decl *d) {
-        auto p = d->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
-        return (p && !p->requiresClass());
-      };
-#endif
-      assert((!selfParam.isIndirectMutating() ||
-              (baseFormalType->isAnyClassReferenceType() &&
-               isNonClassProtocolMember(accessor.getDecl()))) &&
-             "passing unmaterialized r-value as inout argument");
-
-      base = emitMaterializeIntoTemporary(*this, loc, base);
-      if (selfParam.isIndirectInOut()) {
-        // Drop the cleanup if we have one.
-        auto baseLV = ManagedValue::forLValue(base.getValue());
-        return ArgumentSource(loc, LValue::forAddress(baseLV,
-                                               AbstractionPattern(baseFormalType),
-                                                      baseFormalType));
-      }
-    }
-  }
-
-  return ArgumentSource(loc, RValue(*this, loc,
-                               baseFormalType, base));
+  AccessorBaseArgPreparer Preparer(*this, loc, base, baseFormalType, accessor);
+  return Preparer.prepare();
 }
 
 static bool shouldReferenceForeignAccessor(AbstractStorageDecl *storage,
