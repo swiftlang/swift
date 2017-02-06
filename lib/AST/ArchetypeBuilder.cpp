@@ -853,7 +853,9 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
     ParentArchetype->registerNestedType(getName(), arch);
   } else {
     // Create a top-level archetype.
-    arch = ArchetypeType::getNew(ctx, genericEnv, getName(), Protos,
+    Identifier name =
+      genericParams[getGenericParamKey().findIndexIn(genericParams)]->getName();
+    arch = ArchetypeType::getNew(ctx, genericEnv, name, Protos,
                                  superclass, layout);
 
     // Register the archetype with the generic environment.
