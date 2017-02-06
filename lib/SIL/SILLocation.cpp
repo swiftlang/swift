@@ -126,6 +126,24 @@ SourceLoc SILLocation::getEndSourceLoc(ASTNodeTy N) const {
   llvm_unreachable("impossible SILLocation");
 }
 
+DeclContext *SILLocation::getAsDeclContext() const {
+  if (!isASTNode())
+    return nullptr;
+  if (auto *D = getAsASTNode<Decl>())
+    switch (D->getKind()) {
+    // These four dual-inherit from DeclContext.
+    case DeclKind::Func:        return cast<FuncDecl>(D);
+    case DeclKind::Constructor: return cast<ConstructorDecl>(D);
+    case DeclKind::Extension:   return cast<ExtensionDecl>(D);
+    case DeclKind::Destructor:  return cast<DestructorDecl>(D);
+    default:                    return D->getDeclContext();
+    }
+  if (auto *E = getAsASTNode<Expr>())
+    if (auto *DC = dyn_cast<AbstractClosureExpr>(E))
+      return DC;
+  return nullptr;
+}
+
 SILLocation::DebugLoc SILLocation::decode(SourceLoc Loc,
                                           const SourceManager &SM) {
   DebugLoc DL;

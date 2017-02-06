@@ -591,7 +591,6 @@ SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
   if (Orig->hasUnqualifiedOwnership()) {
     Fn->setUnqualifiedOwnership();
   }
-  Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;
 }
 
