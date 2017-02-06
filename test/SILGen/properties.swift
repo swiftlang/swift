@@ -847,21 +847,34 @@ class GenericClass<T> {
   init() { fatalError("scaffold") }
 }
 
-// CHECK-LABEL: sil hidden @_T010properties12genericPropsyAA12GenericClassCySSGF 
+// => SEMANTIC SIL TODO: The applies in this function will need to have arg
+// borrowed. They do not today.
+//
+// CHECK-LABEL: sil hidden @_T010properties12genericPropsyAA12GenericClassCySSGF : $@convention(thin) (@owned GenericClass<String>) -> () {
 func genericProps(_ x: GenericClass<String>) {
-  // CHECK: class_method %0 : $GenericClass<String>, #GenericClass.x!getter.1
+  // CHECK: bb0([[ARG:%.*]] : $GenericClass<String>):
+  // CHECK:   class_method [[ARG]] : $GenericClass<String>, #GenericClass.x!getter.1
+  // CHECK:   apply {{.*}}<String>({{.*}}, [[ARG]]) : $@convention(method) <τ_0_0> (@guaranteed GenericClass<τ_0_0>) -> @out τ_0_0
   let _ = x.x
-  // CHECK: class_method %0 : $GenericClass<String>, #GenericClass.y!getter.1
+  // CHECK:   class_method [[ARG]] : $GenericClass<String>, #GenericClass.y!getter.1
+  // CHECK:   apply {{.*}}<String>([[ARG]]) : $@convention(method) <τ_0_0> (@guaranteed GenericClass<τ_0_0>) -> Int
   let _ = x.y
-  // CHECK: [[Z:%.*]] = ref_element_addr %0 : $GenericClass<String>, #GenericClass.z
-  // CHECK: load [copy] [[Z]] : $*String
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   [[Z:%.*]] = ref_element_addr [[BORROWED_ARG]] : $GenericClass<String>, #GenericClass.z
+  // CHECK:   [[LOADED_Z:%.*]] = load [copy] [[Z]] : $*String
+  // CHECK:   destroy_value [[LOADED_Z]]
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK:   destroy_value [[ARG]]
   let _ = x.z
 }
 
 // CHECK-LABEL: sil hidden @_T010properties28genericPropsInGenericContext{{[_0-9a-zA-Z]*}}F
 func genericPropsInGenericContext<U>(_ x: GenericClass<U>) {
-  // CHECK: [[Z:%.*]] = ref_element_addr %0 : $GenericClass<U>, #GenericClass.z
-  // CHECK: copy_addr [[Z]] {{.*}} : $*U
+  // CHECK: bb0([[ARG:%.*]] : $GenericClass<U>):
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   [[Z:%.*]] = ref_element_addr [[BORROWED_ARG]] : $GenericClass<U>, #GenericClass.z
+  // CHECK:   copy_addr [[Z]] {{.*}} : $*U
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   let _ = x.z
 }
 

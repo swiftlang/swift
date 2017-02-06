@@ -1215,6 +1215,15 @@ void SILCloner<ImplClass>::visitAutoreleaseValueInst(
                                         Inst->getAtomicity()));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitUnmanagedAutoreleaseValueInst(
+    UnmanagedAutoreleaseValueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createUnmanagedAutoreleaseValue(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitSetDeallocatingInst(SetDeallocatingInst *Inst) {

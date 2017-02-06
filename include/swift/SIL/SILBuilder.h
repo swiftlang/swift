@@ -848,6 +848,12 @@ public:
         getSILDebugLocation(Loc), operand, atomicity));
   }
 
+  UnmanagedAutoreleaseValueInst *
+  createUnmanagedAutoreleaseValue(SILLocation Loc, SILValue operand) {
+    return insert(new (F.getModule()) UnmanagedAutoreleaseValueInst(
+                      getSILDebugLocation(Loc), operand));
+  }
+
   SetDeallocatingInst *createSetDeallocating(SILLocation Loc,
                                             SILValue operand,
                                             Atomicity atomicity) {

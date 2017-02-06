@@ -241,7 +241,6 @@ NO_OPERAND_INST(StrongRetain)
 NO_OPERAND_INST(StrongRetainUnowned)
 NO_OPERAND_INST(UnownedRetain)
 NO_OPERAND_INST(Unreachable)
-NO_OPERAND_INST(ValueMetatype)
 #undef NO_OPERAND_INST
 
 /// Instructions whose arguments are always compatible with one convention.
@@ -259,6 +258,7 @@ NO_OPERAND_INST(ValueMetatype)
             SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                             \
   }
 CONSTANT_OWNERSHIP_INST(Guaranteed, true, EndBorrowArgument)
+CONSTANT_OWNERSHIP_INST(Guaranteed, false, RefElementAddr)
 CONSTANT_OWNERSHIP_INST(Owned, true, AutoreleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocBox)
 CONSTANT_OWNERSHIP_INST(Owned, true, DeallocExistentialBox)
@@ -357,11 +357,10 @@ ACCEPTS_ANY_OWNERSHIP_INST(FixLifetime)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedBitwiseCast) // Is this right?
 ACCEPTS_ANY_OWNERSHIP_INST(WitnessMethod)        // Is this right?
 ACCEPTS_ANY_OWNERSHIP_INST(ProjectBox)           // The result is a T*.
-ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedRetainValue)
-ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedReleaseValue)
 ACCEPTS_ANY_OWNERSHIP_INST(DynamicMethodBranch)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedTrivialBitCast)
 ACCEPTS_ANY_OWNERSHIP_INST(ExistentialMetatype)
+ACCEPTS_ANY_OWNERSHIP_INST(ValueMetatype)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?
@@ -382,8 +381,6 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ClassMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, CopyBlock)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, DynamicMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, OpenExistentialBox)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(
-    false, RefElementAddr) // TODO: Make this accept a borrowed value.
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefTailAddr)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefToRawPointer)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, RefToUnmanaged)
@@ -393,6 +390,9 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, StrongPin)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, UnownedToRef)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, CopyUnownedValue)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ProjectExistentialBox)
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, UnmanagedRetainValue)
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, UnmanagedReleaseValue)
+ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, UnmanagedAutoreleaseValue)
 #undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP
 
 OwnershipUseCheckerResult
