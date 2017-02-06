@@ -324,11 +324,10 @@ function(print_versions)
   find_version("cmake" "--version" TRUE)
   find_version(${CMAKE_COMMAND} "--version" FALSE)
 
-  if(CMAKE_MAKE_PROGRAM MATCHES "ninja")
-    find_version("ninja" "--version" TRUE)
-    find_version(${CMAKE_MAKE_PROGRAM} "--version" FALSE)
-  elseif(CMAKE_MAKE_PROGRAM MATCHES "make")
-    find_version("make" "--version" TRUE)
+  get_filename_component(CMAKE_MAKE_PROGRAM_BN "${CMAKE_MAKE_PROGRAM}" NAME_WE)
+  if(${CMAKE_MAKE_PROGRAM_BN} STREQUAL "ninja" OR
+     ${CMAKE_MAKE_PROGRAM_BN} STREQUAL "make")
+    find_version(${CMAKE_MAKE_PROGRAM_BN} "--version" TRUE)
     find_version(${CMAKE_MAKE_PROGRAM} "--version" FALSE)
   endif()
 
