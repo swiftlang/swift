@@ -101,10 +101,12 @@ public:
 /// and only trivially resolves dependent member types.
 class DependentGenericTypeResolver : public GenericTypeResolver {
   ArchetypeBuilder &Builder;
+  ArrayRef<GenericTypeParamType *> GenericParams;
 
 public:
-  explicit DependentGenericTypeResolver(ArchetypeBuilder &builder)
-    : Builder(builder) { }
+  DependentGenericTypeResolver(ArchetypeBuilder &builder,
+                               ArrayRef<GenericTypeParamType *> genericParams)
+    : Builder(builder), GenericParams(genericParams) { }
 
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
@@ -169,10 +171,12 @@ public:
 class CompleteGenericTypeResolver : public GenericTypeResolver {
   TypeChecker &TC;
   ArchetypeBuilder &Builder;
+  ArrayRef<GenericTypeParamType *> GenericParams;
 
 public:
-  CompleteGenericTypeResolver(TypeChecker &tc, ArchetypeBuilder &builder)
-    : TC(tc), Builder(builder) { }
+  CompleteGenericTypeResolver(TypeChecker &tc, ArchetypeBuilder &builder,
+                              ArrayRef<GenericTypeParamType *> genericParams)
+    : TC(tc), Builder(builder), GenericParams(genericParams) { }
 
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
