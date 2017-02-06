@@ -44,7 +44,9 @@ if(SWIFT_BUILD_STATIC_STDLIB)
           "${ICU_UC_LIBDIR}"
           "${ICU_I18N_LIBDIR}"
         OUTPUT
-          "${SWIFTSTATICLIB_DIR}/${linkfile}")
+          "${SWIFTSTATICLIB_DIR}/${linkfile}"
+        DEPENDS
+          "${SWIFT_SOURCE_DIR}/utils/gen-static-stdlib-link-args")
 
       list(APPEND static_stdlib_lnk_file_list ${swift_static_stdlib_${sdk}_args})
       swift_install_in_component(stdlib
