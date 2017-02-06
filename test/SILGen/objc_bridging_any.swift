@@ -42,10 +42,12 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[SELF]]
   // CHECK:   [[STRING_COPY:%.*]] = copy_value [[STRING]]
   // CHECK:   [[BRIDGE_STRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveC
-  // CHECK:   [[BRIDGED:%.*]] = apply [[BRIDGE_STRING]]([[STRING_COPY]])
+  // CHECK:   [[BORROWED_STRING_COPY:%.*]] = begin_borrow [[STRING_COPY]]
+  // CHECK:   [[BRIDGED:%.*]] = apply [[BRIDGE_STRING]]([[BORROWED_STRING_COPY]])
   // CHECK:   [[ANYOBJECT:%.*]] = init_existential_ref [[BRIDGED]] : $NSString : $NSString, $AnyObject
   // CHECK:   apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   // CHECK:   destroy_value [[BRIDGED]]
+  // CHECK:   end_borrow [[BORROWED_STRING_COPY]] from [[STRING_COPY]]
   // CHECK:   destroy_value [[STRING_COPY]]
   receiver.takesId(string)
 
@@ -237,10 +239,14 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]]
   // CHECK: [[STRING_COPY:%.*]] = copy_value [[STRING]]
   // CHECK: [[BRIDGE_STRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveC
-  // CHECK: [[BRIDGED:%.*]] = apply [[BRIDGE_STRING]]([[STRING_COPY]])
+  // CHECK: [[BORROWED_STRING_COPY:%.*]] = begin_borrow [[STRING_COPY]]
+  // CHECK: [[BRIDGED:%.*]] = apply [[BRIDGE_STRING]]([[BORROWED_STRING_COPY]])
   // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref [[BRIDGED]] : $NSString : $NSString, $AnyObject
   // CHECK: [[OPT_ANYOBJECT:%.*]] = enum {{.*}} [[ANYOBJECT]]
   // CHECK: apply [[METHOD]]([[OPT_ANYOBJECT]], [[SELF]])
+  // CHECK: destroy_value [[BRIDGED]]
+  // CHECK: end_borrow [[BORROWED_STRING_COPY]] from [[STRING_COPY]]
+  // CHECK: destroy_value [[STRING_COPY]]
   receiver.takesNullableId(string)
 
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,

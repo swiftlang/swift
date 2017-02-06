@@ -405,6 +405,12 @@ namespace {
     void emit(SILGenFunction &SGF, CleanupLocation l) override {
       assert(false && "Sema didn't catch exit out of a defer?");
     }
+    void dump() const override {
+#ifndef NDEBUG
+      llvm::errs() << "DeferEscapeCheckerCleanup\n"
+                   << "State: " << getState() << "\n";
+#endif
+    }
   };
 } // end anonymous namespace
 
@@ -424,6 +430,12 @@ namespace {
       
       if (SGF.B.hasValidInsertionPoint())
         SGF.Cleanups.setCleanupState(TheCleanup, CleanupState::Dead);
+    }
+    void dump() const override {
+#ifndef NDEBUG
+      llvm::errs() << "DeferCleanup\n"
+                   << "State: " << getState() << "\n";
+#endif
     }
   };
 } // end anonymous namespace

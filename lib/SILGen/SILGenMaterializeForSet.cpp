@@ -746,6 +746,12 @@ namespace {
     void emit(SILGenFunction &gen, CleanupLocation loc) override {
       gen.B.createDeallocValueBuffer(loc, ValueType, Buffer);
     }
+    void dump() const override {
+#ifndef NDEBUG
+      llvm::errs() << "DeallocateValueBuffer\n"
+                   << "State: " << getState() << "Buffer: " << Buffer << "\n";
+#endif
+    }
   }; 
 } // end anonymous namespace
 

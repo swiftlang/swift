@@ -337,11 +337,14 @@ function(print_versions)
     find_version("${SWIFT_PATH_TO_CMARK_BUILD}/src/cmark" "--version" FALSE)
   endif()
 
-  find_version(${CMAKE_C_COMPILER} "--version" FALSE)
-  find_version(${CMAKE_CXX_COMPILER} "--version" FALSE)
-endfunction()
+  message(STATUS "Finding version for: ${CMAKE_C_COMPILER}")
+  message(STATUS "Found version: ${CMAKE_C_COMPILER_VERSION}")
+  message(STATUS "")
 
-print_versions()
+  message(STATUS "Finding version for: ${CMAKE_CXX_COMPILER}")
+  message(STATUS "Found version: ${CMAKE_CXX_COMPILER_VERSION}")
+  message(STATUS "")
+endfunction()
 
 
 set(SWIFT_BUILT_STANDALONE FALSE)
@@ -385,6 +388,9 @@ set(CMAKE_CXX_ARCHIVE_FINISH "")
 include(CheckCXXSourceRuns)
 include(CMakeParseArguments)
 include(CMakePushCheckState)
+
+print_versions()
+
 include(SwiftComponents)
 include(SwiftHandleGybSources)
 include(SwiftSetIfArchBitness)
