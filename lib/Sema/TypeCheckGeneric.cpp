@@ -499,7 +499,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
                                                allGenericParams);
   if (checkGenericFuncSignature(*this, nullptr, func, completeResolver))
     invalid = true;
-  if (builder.diagnoseRemainingRenames(func->getLoc()))
+  if (builder.diagnoseRemainingRenames(func->getLoc(), allGenericParams))
     invalid = true;
 
   // The generic function signature is complete and well-formed. Determine
@@ -785,7 +785,8 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
   }
 
   // Complain about any other renamed references.
-  (void)builder.diagnoseRemainingRenames(genericParams->getSourceRange().Start);
+  (void)builder.diagnoseRemainingRenames(genericParams->getSourceRange().Start,
+                                         allGenericParams);
 
   // Record the generic type parameter types and the requirements.
   auto sig = builder.getGenericSignature();

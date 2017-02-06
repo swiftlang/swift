@@ -2041,14 +2041,16 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
   }
 }
 
-bool ArchetypeBuilder::diagnoseRemainingRenames(SourceLoc loc) {
+bool ArchetypeBuilder::diagnoseRemainingRenames(
+                              SourceLoc loc,
+                              ArrayRef<GenericTypeParamType *> genericParams) {
   bool invalid = false;
 
   for (auto pa : Impl->RenamedNestedTypes) {
     if (pa->alreadyDiagnosedRename()) continue;
 
     Diags.diagnose(loc, diag::invalid_member_type_suggest,
-                   pa->getParent()->getDependentType(/*FIXME: */{ },
+                   pa->getParent()->getDependentType(genericParams,
                                                      /*allowUnresolved=*/true),
                    pa->getOriginalName(), pa->getName());
     invalid = true;

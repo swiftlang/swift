@@ -307,7 +307,8 @@ public:
   /// Diagnose any remaining renames.
   ///
   /// \returns \c true if there were any remaining renames to diagnose.
-  bool diagnoseRemainingRenames(SourceLoc loc);
+  bool diagnoseRemainingRenames(SourceLoc loc,
+                                ArrayRef<GenericTypeParamType *> genericParams);
 
   /// \brief Resolve the given type to the potential archetype it names.
   ///
