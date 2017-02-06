@@ -90,6 +90,7 @@ static bool isOwnershipForwardingValueKind(ValueKind K) {
   case ValueKind::StructExtractInst:
   case ValueKind::UncheckedEnumDataInst:
   case ValueKind::MarkUninitializedInst:
+  case ValueKind::SelectEnumInst:
     return true;
   default:
     return false;
@@ -162,10 +163,14 @@ public:
   bool isAddressOrTrivialType() const {
     if (getType().isAddress())
       return true;
-    return getType().isTrivial(Mod);
+    return getOwnershipKind() == ValueOwnershipKind::Trivial;
   }
 
-  OwnershipUseCheckerResult visitForwardingInst(SILInstruction *I);
+  OwnershipUseCheckerResult visitForwardingInst(SILInstruction *I,
+                                                ArrayRef<Operand> Ops);
+  OwnershipUseCheckerResult visitForwardingInst(SILInstruction *I) {
+    return visitForwardingInst(I, I->getAllOperands());
+  }
 
   /// Check if \p User as compatible ownership with the SILValue that we are
   /// checking.
@@ -313,7 +318,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, TupleElementAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, false, UncheckedAddrCast)
 CONSTANT_OWNERSHIP_INST(Trivial, false, UncheckedRefCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, false, UncheckedTakeEnumDataAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, false, UncheckedTrivialBitCast)
 CONSTANT_OWNERSHIP_INST(Trivial, false, UnconditionalCheckedCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, false, UnmanagedToRef)
 CONSTANT_OWNERSHIP_INST(Trivial, false, AllocValueBuffer)
@@ -350,13 +354,14 @@ ACCEPTS_ANY_OWNERSHIP_INST(BeginBorrow)
 ACCEPTS_ANY_OWNERSHIP_INST(CopyValue)
 ACCEPTS_ANY_OWNERSHIP_INST(DebugValue)
 ACCEPTS_ANY_OWNERSHIP_INST(FixLifetime)
-ACCEPTS_ANY_OWNERSHIP_INST(SelectEnum)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedBitwiseCast) // Is this right?
 ACCEPTS_ANY_OWNERSHIP_INST(WitnessMethod)        // Is this right?
 ACCEPTS_ANY_OWNERSHIP_INST(ProjectBox)           // The result is a T*.
 ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedRetainValue)
 ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedReleaseValue)
 ACCEPTS_ANY_OWNERSHIP_INST(DynamicMethodBranch)
+ACCEPTS_ANY_OWNERSHIP_INST(UncheckedTrivialBitCast)
+ACCEPTS_ANY_OWNERSHIP_INST(ExistentialMetatype)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?
@@ -376,7 +381,6 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, BridgeObjectToWord)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ClassMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, CopyBlock)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, DynamicMethod)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ExistentialMetatype)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, OpenExistentialBox)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(
     false, RefElementAddr) // TODO: Make this accept a borrowed value.
@@ -392,12 +396,10 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(false, ProjectExistentialBox)
 #undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP
 
 OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitForwardingInst(SILInstruction *I) {
+OwnershipCompatibilityUseChecker::visitForwardingInst(SILInstruction *I, ArrayRef<Operand> Ops) {
   assert(I->getNumOperands() && "Expected to have non-zero operands");
   assert(isOwnershipForwardingInst(I) &&
          "Expected to have an ownership forwarding inst");
-
-  ArrayRef<Operand> Ops = I->getAllOperands();
 
   // Find the first index where we have a trivial value.
   auto Iter = find_if(Ops, [&I](const Operand &Op) -> bool {
@@ -477,6 +479,15 @@ FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, TupleExtract)
 FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, StructExtract)
 FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, UncheckedEnumData)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitSelectEnumInst(SelectEnumInst *I) {
+  if (getValue() == I->getEnumOperand()) {
+    return {true, false};
+  }
+
+  return visitForwardingInst(I, I->getAllOperands().drop_front());
+}
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitAllocRefInst(AllocRefInst *I) {
@@ -779,8 +790,15 @@ OwnershipCompatibilityUseChecker::visitMarkDependenceInst(
   // I need to talk with John about this. The proper thing to do is treat uses
   // of the result as uses of the base. For now, we just treat the mark
   // dependence as a use of the base.
-  if (getValue() == MDI->getValue())
+  if (getValue() == MDI->getValue()) {
     return {true, false};
+  }
+
+  // We can have an address base. We do not verify these.
+  if (compatibleWithOwnership(ValueOwnershipKind::Trivial)) {
+    return {true, false};
+  }
+
   return {compatibleWithOwnership(ValueOwnershipKind::Owned), false};
 }
 
