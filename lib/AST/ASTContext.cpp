@@ -1587,6 +1587,7 @@ size_t ASTContext::getSolverMemory() const {
   
   if (Impl.CurrentConstraintSolverArena) {
     Size += Impl.CurrentConstraintSolverArena->getTotalMemory();
+    Size += Impl.CurrentConstraintSolverArena->Allocator.getBytesAllocated();
   }
   
   return Size;
