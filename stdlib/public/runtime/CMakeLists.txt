@@ -102,7 +102,9 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
       "${SWIFT_SOURCE_DIR}/utils/${lowercase}/static-executable-args.lnk"
       "${SWIFTSTATICLIB_DIR}/${linkfile}"
     OUTPUT
-      "${SWIFTSTATICLIB_DIR}/${linkfile}")
+      "${SWIFTSTATICLIB_DIR}/${linkfile}"
+    DEPENDS
+      "${SWIFT_SOURCE_DIR}/utils/${lowercase}/static-executable-args.lnk")
 
   list(APPEND static_binary_lnk_file_list ${swift_static_binary_${sdk}_args})
   swift_install_in_component(stdlib
