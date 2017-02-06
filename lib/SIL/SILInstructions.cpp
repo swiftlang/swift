@@ -409,11 +409,6 @@ ApplyInst *ApplyInst::create(SILDebugLocation Loc, SILValue Callee,
                              ArrayRef<SILValue> Args, bool isNonThrowing,
                              SILFunction &F,
                              SILOpenedArchetypesState &OpenedArchetypes) {
-  if (!F.getModule().Types.getCurGenericContext())
-    assert(Callee->getType().castTo<SILFunctionType>()
-                 ->substGenericArgs(F.getModule(), Subs)
-           == SubstCalleeTy.getSwiftRValueType());
-                                  
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                SubstCalleeTy.getSwiftRValueType(), Subs);
