@@ -263,6 +263,11 @@ findDeclContextForType(TypeChecker &TC,
     if (ownerDC == parentDC)
       return std::make_tuple(parentDC, parentNominal, true);
 
+    if (isa<ExtensionDecl>(parentDC) && typeDecl == parentNominal) {
+      assert(parentDC->getParent()->isModuleScopeContext());
+      return std::make_tuple(parentDC, parentNominal, true);
+    }
+
     // FIXME: Horrible hack. Don't allow us to reference a generic parameter
     // from a context outside a ProtocolDecl.
     if (isa<ProtocolDecl>(parentDC) && isa<GenericTypeParamDecl>(typeDecl))
