@@ -322,7 +322,10 @@ endfunction()
 # We migth be using the wrong version of a command, so record them all.
 function(print_versions)
   find_version("cmake" "--version" TRUE)
-  find_version(${CMAKE_COMMAND} "--version" FALSE)
+
+  message(STATUS "Finding version for: ${CMAKE_COMMAND}")
+  message(STATUS "Found version: ${CMAKE_VERSION}")
+  message(STATUS "")
 
   get_filename_component(CMAKE_MAKE_PROGRAM_BN "${CMAKE_MAKE_PROGRAM}" NAME_WE)
   if(${CMAKE_MAKE_PROGRAM_BN} STREQUAL "ninja" OR
