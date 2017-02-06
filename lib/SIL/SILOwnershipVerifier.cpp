@@ -25,6 +25,7 @@
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/Projection.h"
+#include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -780,12 +781,6 @@ OwnershipCompatibilityUseChecker::visitPartialApplyInst(PartialApplyInst *I) {
 }
 
 OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitBuiltinInst(BuiltinInst *I) {
-  // This needs to be updated.
-  return {true, false};
-}
-
-OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitAssignInst(AssignInst *I) {
   if (getValue() == I->getSrc()) {
     if (isAddressOrTrivialType()) {
@@ -814,6 +809,227 @@ OwnershipCompatibilityUseChecker::visitMarkDependenceInst(
   // We always treat mark dependence as a use that keeps a value alive. We will
   // be introducing a begin_dependence/end_dependence version of this later.
   return {true, false};
+}
+
+//===----------------------------------------------------------------------===//
+//                            Builtin Use Checker
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class OwnershipCompatibilityBuiltinUseChecker
+    : public SILBuiltinVisitor<OwnershipCompatibilityBuiltinUseChecker,
+                               OwnershipUseCheckerResult> {
+
+  const OwnershipCompatibilityUseChecker &ParentChecker;
+
+public:
+  OwnershipCompatibilityBuiltinUseChecker(
+      OwnershipCompatibilityUseChecker &ParentChecker)
+      : ParentChecker(ParentChecker) {}
+
+  SILValue getValue() const { return ParentChecker.getValue(); }
+
+  ValueOwnershipKind getOwnershipKind() const {
+    return ParentChecker.getOwnershipKind();
+  }
+
+  unsigned getOperandIndex() const { return ParentChecker.getOperandIndex(); }
+
+  SILType getType() const { return ParentChecker.getType(); }
+
+  bool compatibleWithOwnership(ValueOwnershipKind Kind) const {
+    return ParentChecker.compatibleWithOwnership(Kind);
+  }
+
+  bool isAddressOrTrivialType() const {
+    return ParentChecker.isAddressOrTrivialType();
+  }
+
+  OwnershipUseCheckerResult visitLLVMIntrinsic(BuiltinInst *BI,
+                                               llvm::Intrinsic::ID ID) {
+    // LLVM intrinsics do not traffic in ownership, so if we have a result, it
+    // must be trivial.
+    return {true, false};
+  }
+
+#define BUILTIN(ID, NAME, ATTRS)                                               \
+  OwnershipUseCheckerResult visit##ID(BuiltinInst *BI, StringRef Attr);
+#include "swift/AST/Builtins.def"
+
+  OwnershipUseCheckerResult check(BuiltinInst *BI) { return visit(BI); }
+};
+
+} // end anonymous namespace
+
+// This is correct today since we do not ahve any builtins which return
+// @guaranteed parameters. This means that we can only have a lifetime ending
+// use with our builtins if it is owned.
+#define CONSTANT_OWNERSHIP_BUILTIN(OWNERSHIP, LIFETIME_ENDING_USE, ID)         \
+  OwnershipUseCheckerResult                                                    \
+      OwnershipCompatibilityBuiltinUseChecker::visit##ID(BuiltinInst *BI,      \
+                                                         StringRef Attr) {     \
+    return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
+            LIFETIME_ENDING_USE};                                              \
+  }
+CONSTANT_OWNERSHIP_BUILTIN(Owned, false, ErrorInMain)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, false, UnexpectedError)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, false, WillThrow)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, true, UnsafeGuaranteed)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, AShr)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Add)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Alignof)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, AllocRaw)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, And)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, AssertConf)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, AssumeNonNegative)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, AtomicLoad)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, AtomicRMW)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, AtomicStore)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, BitCast)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, CanBeObjCClass)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, CmpXChg)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, CondUnreachable)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, CopyArray)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, DeallocRaw)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, DestroyArray)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ExactSDiv)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ExactUDiv)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ExtractElement)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FAdd)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FCMP_OEQ)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FCMP_OGE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FCMP_OGT)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FCMP_OLE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FCMP_OLT)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FCMP_ONE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FCMP_ORD)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FCMP_UEQ)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FCMP_UGE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FCMP_UGT)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FCMP_ULE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FCMP_ULT)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FCMP_UNE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FCMP_UNO)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FDiv)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FMul)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FNeg)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FPExt)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FPToSI)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FPToUI)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FPTrunc)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FRem)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, FSub)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Fence)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, GetObjCTypeEncoding)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ICMP_EQ)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ICMP_NE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ICMP_SGE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ICMP_SGT)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ICMP_SLE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ICMP_SLT)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ICMP_UGE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ICMP_UGT)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ICMP_ULE)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ICMP_ULT)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, InsertElement)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, IntToFPWithOverflow)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, IntToPtr)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, IsOptionalType)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, IsPOD)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, LShr)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Mul)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, OnFastPath)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Once)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Or)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, PtrToInt)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, SAddOver)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, SDiv)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, SExt)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, SExtOrBitCast)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, SIToFP)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, SMulOver)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, SRem)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, SSubOver)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, SToSCheckedTrunc)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, SToUCheckedTrunc)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, SUCheckedConversion)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Shl)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Sizeof)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, StaticReport)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Strideof)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Sub)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, TakeArrayBackToFront)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, TakeArrayFrontToBack)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Trunc)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, TruncOrBitCast)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, UAddOver)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, UDiv)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, UIToFP)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, UMulOver)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, URem)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, USCheckedConversion)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, USubOver)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, UToSCheckedTrunc)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, UToUCheckedTrunc)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Unreachable)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, UnsafeGuaranteedEnd)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Xor)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ZExt)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ZExtOrBitCast)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ZeroInitializer)
+#undef CONSTANT_OWNERSHIP_BUILTIN
+
+// Builtins that should be lowered to SIL instructions so we should never see
+// them.
+#define BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(ID)                 \
+  OwnershipUseCheckerResult                                                    \
+      OwnershipCompatibilityBuiltinUseChecker::visit##ID(BuiltinInst *BI,      \
+                                                         StringRef Attr) {     \
+    llvm_unreachable("Builtin should have been lowered to SIL instruction?!"); \
+  }
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Retain)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Release)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Autorelease)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(TryPin)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Unpin)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Load)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(LoadRaw)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Take)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Destroy)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Assign)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Init)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(CastToUnknownObject)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(CastFromUnknownObject)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(CastToNativeObject)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(CastFromNativeObject)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(CastToBridgeObject)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(
+    CastReferenceFromBridgeObject)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(
+    CastBitPatternFromBridgeObject)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(BridgeToRawPointer)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(BridgeFromRawPointer)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(CastReference)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(ReinterpretCast)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(AddressOf)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(GepRaw)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Gep)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(GetTailAddr)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(CondFail)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(FixLifetime)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(IsUnique)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(IsUniqueOrPinned)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(IsUnique_native)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(IsUniqueOrPinned_native)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(BindMemory)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(AllocWithTailElems)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(ProjectTailElems)
+#undef BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS
+
+OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitBuiltinInst(BuiltinInst *BI) {
+  return OwnershipCompatibilityBuiltinUseChecker(*this).check(BI);
 }
 
 //===----------------------------------------------------------------------===//

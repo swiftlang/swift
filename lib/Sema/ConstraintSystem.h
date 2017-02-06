@@ -521,6 +521,8 @@ public:
   Solution(Solution &&other) = default;
   Solution &operator=(Solution &&other) = default;
 
+  size_t getTotalMemory() const;
+
   /// \brief Retrieve the constraint system that this solution solves.
   ConstraintSystem &getConstraintSystem() const { return *constraintSystem; }
 
@@ -874,6 +876,10 @@ private:
   /// scope is created every time we attempt a type variable binding
   /// or explore an option in a disjunction.
   unsigned CountScopes = 0;
+
+  /// High-water mark of measured memory usage in any sub-scope we
+  /// explored.
+  size_t MaxMemory = 0;
 
   /// \brief Cached member lookups.
   llvm::DenseMap<std::pair<Type, DeclName>, Optional<LookupResult>>
@@ -2473,7 +2479,7 @@ public:
   
   /// \brief Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
-  bool getExpressionTooComplex() {
+  bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
     if (!getASTContext().isSwiftVersion3()) {
       if (CountScopes < TypeCounter)
         return false;
@@ -2494,8 +2500,12 @@ public:
     }
 
     auto used = TC.Context.getSolverMemory();
+    for (auto const& s : solutions) {
+      used += s.getTotalMemory();
+    }
+    MaxMemory = std::max(used, MaxMemory);
     auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
-    return used > threshold;
+    return MaxMemory > threshold;
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(
