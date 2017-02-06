@@ -3043,6 +3043,18 @@ class UnmanagedReleaseValueInst
       : UnaryInstructionBase(DebugLoc, operand) {}
 };
 
+/// Transfers ownership of a loadable value to the current autorelease
+/// pool. Unmanaged, so it is ignored from an ownership balancing perspective.
+class UnmanagedAutoreleaseValueInst
+                  : public UnaryInstructionBase<ValueKind::UnmanagedAutoreleaseValueInst,
+                                                RefCountingInst,
+                                                /*HasValue*/ false> {
+  friend SILBuilder;
+
+  UnmanagedAutoreleaseValueInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand) {}
+};
+
 /// Transfers ownership of a loadable value to the current autorelease pool.
 class AutoreleaseValueInst
                   : public UnaryInstructionBase<ValueKind::AutoreleaseValueInst,

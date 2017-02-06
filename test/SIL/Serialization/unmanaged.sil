@@ -14,11 +14,13 @@ class C {}
 // CHECK: bb0([[ARG:%.*]] : $@sil_unmanaged Optional<C>):
 // CHECK: [[REF:%.*]] = unmanaged_to_ref [[ARG]] : $@sil_unmanaged Optional<C> to $Optional<C>
 // CHECK: unmanaged_retain_value [[REF]]
+// CHECK: unmanaged_autorelease_value [[REF]]
 // CHECK: unmanaged_release_value [[REF]]
 sil @retain_release : $@convention(thin) (@sil_unmanaged Optional<C>) -> () {
 bb0(%0 : $@sil_unmanaged Optional<C>):
   %1 = unmanaged_to_ref %0 : $@sil_unmanaged Optional<C> to $Optional<C>
   unmanaged_retain_value %1 : $Optional<C>
+  unmanaged_autorelease_value %1 : $Optional<C>
   unmanaged_release_value %1 : $Optional<C>
   %9999 = tuple()
   return %9999 : $()
