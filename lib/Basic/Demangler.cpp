@@ -27,6 +27,12 @@
 using namespace swift;
 using swift::Demangle::FunctionSigSpecializationParamKind;
 
+[[noreturn]]
+static void demangler_unreachable(const char *Message) {
+  fprintf(stderr, "fatal error: %s\n", Message);
+  std::abort();
+}
+
 namespace {
 
 static bool isDeclName(Node::Kind kind) {
@@ -1657,7 +1663,7 @@ NodePointer Demangler::demangleGenericRequirement() {
         return nullptr;
       name = "m";
     } else {
-      llvm_unreachable("Unknown layout constraint");
+      demangler_unreachable("Unknown layout constraint");
     }
 
     auto NameNode = NodeFactory::create(Node::Kind::Identifier, name);
@@ -1671,7 +1677,7 @@ NodePointer Demangler::demangleGenericRequirement() {
   }
   }
 
-  llvm_unreachable("Unhandled TypeKind in switch.");
+  demangler_unreachable("Unhandled TypeKind in switch.");
 }
 
 NodePointer Demangler::demangleGenericType() {
