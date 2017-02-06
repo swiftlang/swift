@@ -583,6 +583,9 @@ struct ValueOwnershipKindBuiltinVisitor
   }
 CONSTANT_OWNERSHIP_BUILTIN(Owned, Take)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, TryPin)
+// This returns a value at +1 that is destroyed strictly /after/ the
+// UnsafeGuaranteedEnd. This provides the guarantee that we want.
+CONSTANT_OWNERSHIP_BUILTIN(Owned, UnsafeGuaranteed)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, AShr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Add)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, And)
@@ -698,7 +701,6 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, Unreachable)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, AtomicRMW)
 
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, CondUnreachable)
-CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, UnsafeGuaranteed)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, UnsafeGuaranteedEnd)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, GetObjCTypeEncoding)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, CanBeObjCClass)
