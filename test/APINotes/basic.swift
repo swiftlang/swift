@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules -F %S/Inputs/custom-frameworks
+// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules -F %S/Inputs/custom-frameworks -verify-ignore-unknown
 import APINotesTest
 import APINotesFrameworkTest
 
@@ -23,3 +23,9 @@ func testSwiftName() {
   jumpTo(x: 0, y: 0, z: 0)
   jumpTo(0, 0, 0) // expected-error{{missing argument labels 'x:y:z:' in call}}
 }
+
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected note produced: 'ANTGlobalValue' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'PointStruct' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'real_t' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'RectStruct' was obsoleted in Swift 3

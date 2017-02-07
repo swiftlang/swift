@@ -992,7 +992,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     HadError = verifyDiagnostics(
         Instance->getSourceMgr(),
         Instance->getInputBufferIDs(),
-        diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes);
+        diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
+        diagOpts.VerifyIgnoreUnknown);
 
     DiagnosticEngine &diags = Instance->getDiags();
     if (diags.hasFatalErrorOccurred() &&
