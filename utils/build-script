@@ -781,6 +781,7 @@ class BuildScriptInvocation(object):
                 "--toolchain-prefix",
                 swift_build_support.targets.darwin_toolchain_prefix(
                     args.install_prefix),
+                "--host-lipo", toolchain.lipo,
             ]
 
         # If we have extra_swift_args, combine all of them together and then
@@ -1932,6 +1933,11 @@ iterations with -O",
         type=arguments.type.executable,
         metavar="PATH")
     parser.add_argument(
+        "--host-lipo",
+        help="the absolute path to lipo. Default is auto detected.",
+        type=arguments.type.executable,
+        metavar="PATH")
+    parser.add_argument(
         "--distcc",
         help="use distcc in pump mode",
         action=arguments.action.optional_bool)
@@ -2108,6 +2114,8 @@ iterations with -O",
         toolchain.cc = args.host_cc
     if args.host_cxx is not None:
         toolchain.cxx = args.host_cxx
+    if args.host_lipo is not None:
+        toolchain.lipo = args.host_lipo
     if args.cmake is not None:
         toolchain.cmake = args.cmake
 
