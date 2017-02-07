@@ -340,7 +340,7 @@ bool SILType::isAddressOnly(SILModule &M) const {
 }
 
 SILType SILType::substGenericArgs(SILModule &M,
-                                  ArrayRef<Substitution> Subs) const {
+                                  SubstitutionList Subs) const {
   SILFunctionType *fnTy = getSwiftRValueType()->castTo<SILFunctionType>();
   if (Subs.empty()) {
     assert(!fnTy->isPolymorphic() && "function type without subs must not "
@@ -353,7 +353,7 @@ SILType SILType::substGenericArgs(SILModule &M,
   return SILType::getPrimitiveObjectType(canFnTy);
 }
 
-ArrayRef<Substitution> SILType::gatherAllSubstitutions(SILModule &M) {
+SubstitutionList SILType::gatherAllSubstitutions(SILModule &M) {
   return getSwiftRValueType()->gatherAllSubstitutions(M.getSwiftModule(),
                                                       nullptr);
 }

@@ -1407,7 +1407,7 @@ Serializer::writeConformances(ArrayRef<ProtocolConformance*> conformances,
 }
 
 void
-Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
+Serializer::writeSubstitutions(SubstitutionList substitutions,
                                const std::array<unsigned, 256> &abbrCodes,
                                GenericEnvironment *genericEnv) {
   using namespace decls_block;

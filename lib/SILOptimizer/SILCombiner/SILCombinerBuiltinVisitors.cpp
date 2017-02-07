@@ -496,7 +496,7 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
       [](const APInt &i) -> bool { return false; }           /* isZero */,
       Builder, this);
   case BuiltinValueKind::DestroyArray: {
-    ArrayRef<Substitution> Substs = I->getSubstitutions();
+    SubstitutionList Substs = I->getSubstitutions();
     // Check if the element type is a trivial type.
     if (Substs.size() == 1) {
       Substitution Subst = Substs[0];

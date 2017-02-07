@@ -533,7 +533,7 @@ void SILFunction::convertToDeclaration() {
   getBlocks().clear();
 }
 
-ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
+SubstitutionList SILFunction::getForwardingSubstitutions() {
   if (ForwardingSubs)
     return *ForwardingSubs;
 

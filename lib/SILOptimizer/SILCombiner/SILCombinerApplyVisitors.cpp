@@ -298,7 +298,7 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   auto Callee = PAI->getCallee();
   auto FnType = PAI->getSubstCalleeSILType();
   SILType ResultTy = PAI->getSubstCalleeConv().getSILResultType();
-  ArrayRef<Substitution> Subs = PAI->getSubstitutions();
+  SubstitutionList Subs = PAI->getSubstitutions();
 
   // The partial_apply might be substituting in an open existential type.
   Builder.addOpenedArchetypeOperands(PAI);
@@ -454,12 +454,12 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   SILInstruction *NAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
     NAI = Builder.createTryApply(AI.getLoc(), FRI, CCSILTy,
-                                 ArrayRef<Substitution>(), Args,
+                                 SubstitutionList(), Args,
                                  TAI->getNormalBB(), TAI->getErrorBB());
   else
     NAI = Builder.createApply(
         AI.getLoc(), FRI, CCSILTy, convertConventions.getSILResultType(),
-        ArrayRef<Substitution>(), Args, cast<ApplyInst>(AI)->isNonThrowing());
+        SubstitutionList(), Args, cast<ApplyInst>(AI)->isNonThrowing());
   return NAI;
 }
 

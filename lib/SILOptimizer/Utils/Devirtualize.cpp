@@ -745,12 +745,12 @@ DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
 //                        Witness Method Optimization
 //===----------------------------------------------------------------------===//
 
-static ArrayRef<Substitution>
+static SubstitutionList
 getSubstitutionsForProtocolConformance(ProtocolConformanceRef CRef) {
   auto C = CRef.getConcrete();
 
   // Walk down to the base NormalProtocolConformance.
-  ArrayRef<Substitution> Subs;
+  SubstitutionList Subs;
   const ProtocolConformance *ParentC = C;
   while (!isa<NormalProtocolConformance>(ParentC)) {
     switch (ParentC->getKind()) {
@@ -805,7 +805,7 @@ static void getWitnessMethodSubstitutions(
     ProtocolConformanceRef conformanceRef,
     GenericSignature *requirementSig,
     GenericSignature *witnessThunkSig,
-    ArrayRef<Substitution> origSubs,
+    SubstitutionList origSubs,
     bool isDefaultWitness,
     SmallVectorImpl<Substitution> &newSubs) {
 
@@ -821,7 +821,7 @@ static void getWitnessMethodSubstitutions(
   auto conformance = conformanceRef.getConcrete();
 
   // Take apart substitutions from the conforming type.
-  ArrayRef<Substitution> witnessSubs;
+  SubstitutionList witnessSubs;
   auto *rootConformance = conformance->getRootNormalConformance();
   auto *witnessSig = rootConformance->getGenericSignature();
 
@@ -857,7 +857,7 @@ static void getWitnessMethodSubstitutions(ApplySite AI, SILFunction *F,
   auto requirementSig = AI.getOrigCalleeType()->getGenericSignature();
   auto witnessThunkSig = F->getLoweredFunctionType()->getGenericSignature();
 
-  ArrayRef<Substitution> origSubs = AI.getSubstitutions();
+  SubstitutionList origSubs = AI.getSubstitutions();
 
   bool isDefaultWitness =
     F->getLoweredFunctionType()->getRepresentation()

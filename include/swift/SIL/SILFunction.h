@@ -130,7 +130,7 @@ private:
   GenericEnvironment *GenericEnv;
 
   /// The forwarding substitutions, lazily computed.
-  Optional<ArrayRef<Substitution>> ForwardingSubs;
+  Optional<SubstitutionList> ForwardingSubs;
 
   /// The collection of all BasicBlocks in the SILFunction. Empty for external
   /// function references.
@@ -622,7 +622,7 @@ public:
 
   /// Return the identity substitutions necessary to forward this call if it is
   /// generic.
-  ArrayRef<Substitution> getForwardingSubstitutions();
+  SubstitutionList getForwardingSubstitutions();
 
   //===--------------------------------------------------------------------===//
   // Block List Access

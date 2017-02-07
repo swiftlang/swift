@@ -186,7 +186,7 @@ private:
     SILDeclRef Constant;
   };
   SILValue SelfValue;
-  ArrayRef<Substitution> Substitutions;
+  SubstitutionList Substitutions;
   CanAnyFunctionType OrigFormalInterfaceType;
   CanFunctionType SubstFormalType;
   Optional<SILLocation> SpecializeLoc;
@@ -388,7 +388,7 @@ public:
 
   void setSubstitutions(SILGenFunction &gen,
                         SILLocation loc,
-                        ArrayRef<Substitution> newSubs) {
+                        SubstitutionList newSubs) {
     assert(Substitutions.empty() && "Already have substitutions?");
     Substitutions = newSubs;
 
@@ -600,7 +600,7 @@ public:
     return std::make_tuple(mv, substFnType, foreignError, foreignSelf, options);
   }
 
-  ArrayRef<Substitution> getSubstitutions() const {
+  SubstitutionList getSubstitutions() const {
     return Substitutions;
   }
 
@@ -651,7 +651,7 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
                                      SILDeclRef constant,
                                      ArgumentSource &selfValue,
                                      CanFunctionType substFnType,
-                                     ArrayRef<Substitution> &substitutions) {
+                                     SubstitutionList &substitutions) {
   auto fd = cast<AbstractFunctionDecl>(constant.getDecl());
   auto protocol = cast<ProtocolDecl>(fd->getDeclContext());
 
@@ -981,7 +981,7 @@ public:
 
         ArgumentSource selfValue = thisCallSite->getArg();
 
-        ArrayRef<Substitution> subs = e->getDeclRef().getSubstitutions();
+        SubstitutionList subs = e->getDeclRef().getSubstitutions();
 
         SILDeclRef::Kind kind = SILDeclRef::Kind::Func;
         if (isa<ConstructorDecl>(afd)) {
@@ -1135,7 +1135,7 @@ public:
           SGF.getASTContext().TheEmptyTupleType, substFnType);
     }
 
-    ArrayRef<Substitution> subs;
+    SubstitutionList subs;
     if (e->getDeclRef().isSpecialized())
       subs = e->getDeclRef().getSubstitutions();
 
@@ -1182,7 +1182,7 @@ public:
     // really producing a closure object.
     SILDeclRef constant(e);
 
-    ArrayRef<Substitution> subs;
+    SubstitutionList subs;
     if (e->getCaptureInfo().hasGenericParamCaptures())
       subs = SGF.getForwardingSubstitutions();
 
@@ -1256,7 +1256,7 @@ public:
 
     // The callee for a super call has to be either a method or constructor.
     Expr *fn = apply->getFn();
-    ArrayRef<Substitution> substitutions;
+    SubstitutionList substitutions;
     SILDeclRef constant;
     if (auto *ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
       constant = SILDeclRef(ctorRef->getDecl(), SILDeclRef::Kind::Initializer,
@@ -1666,7 +1666,7 @@ static bool hasAbstractionDifference(SILFunctionTypeRepresentation rep,
 SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc,
                                               SILValue fn,
                                               SILType substFnType,
-                                              ArrayRef<Substitution> subs,
+                                              SubstitutionList subs,
                                               ArrayRef<SILValue> args) {
   CanSILFunctionType silFnType = substFnType.castTo<SILFunctionType>();
   SILFunctionConventions fnConv(silFnType, SGM.M);
@@ -1782,7 +1782,7 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
 static SILValue emitRawApply(SILGenFunction &gen,
                              SILLocation loc,
                              ManagedValue fn,
-                             ArrayRef<Substitution> subs,
+                             SubstitutionList subs,
                              ArrayRef<ManagedValue> args,
                              CanSILFunctionType substFnType,
                              ApplyOptions options,
@@ -2326,7 +2326,7 @@ computeResultPlan(SILGenFunction *SGF, CanSILFunctionType substFnType,
 RValue SILGenFunction::emitApply(
                             SILLocation loc,
                             ManagedValue fn,
-                            ArrayRef<Substitution> subs,
+                            SubstitutionList subs,
                             ArrayRef<ManagedValue> args,
                             CanSILFunctionType substFnType,
                             AbstractionPattern origResultType,
@@ -4622,7 +4622,7 @@ RValue SILGenFunction::emitApplyExpr(Expr *e, SGFContext c) {
 RValue
 SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                                             FuncDecl *fn,
-                                            ArrayRef<Substitution> subs,
+                                            SubstitutionList subs,
                                             ArrayRef<ManagedValue> args,
                                             SGFContext ctx) {
   auto origFormalType =
@@ -4959,7 +4959,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                          bool isSuper,
                                          bool isDirectUse,
                                          CanFunctionType substAccessorType,
-                                         ArrayRef<Substitution> &substitutions){
+                                         SubstitutionList &substitutions){
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
 
   // If this is a method in a protocol, generate it as a protocol call.
@@ -5005,7 +5005,7 @@ static Callee
 emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
                                    SILLocation loc,
                                    SILDeclRef constant,
-                                   ArrayRef<Substitution> substitutions,
+                                   SubstitutionList substitutions,
                                    ArgumentSource &selfValue,
                                    bool isSuper,
                                    bool isDirectUse)
@@ -5254,7 +5254,7 @@ SILDeclRef SILGenFunction::getGetterDeclRef(AbstractStorageDecl *storage,
 /// Emit a call to a getter.
 RValue SILGenFunction::
 emitGetAccessor(SILLocation loc, SILDeclRef get,
-                ArrayRef<Substitution> substitutions,
+                SubstitutionList substitutions,
                 ArgumentSource &&selfValue,
                 bool isSuper, bool isDirectUse,
                 RValue &&subscripts, SGFContext c) {
@@ -5297,7 +5297,7 @@ SILDeclRef SILGenFunction::getSetterDeclRef(AbstractStorageDecl *storage,
 }
 
 void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
-                                     ArrayRef<Substitution> substitutions,
+                                     SubstitutionList substitutions,
                                      ArgumentSource &&selfValue,
                                      bool isSuper, bool isDirectUse,
                                      RValue &&subscripts, RValue &&setValue) {
@@ -5350,7 +5350,7 @@ SILGenFunction::getMaterializeForSetDeclRef(AbstractStorageDecl *storage,
 
 MaterializedLValue SILGenFunction::
 emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
-                              ArrayRef<Substitution> substitutions,
+                              SubstitutionList substitutions,
                               ArgumentSource &&selfValue,
                               bool isSuper, bool isDirectUse,
                               RValue &&subscripts, SILValue buffer,
@@ -5437,7 +5437,7 @@ SILDeclRef SILGenFunction::getAddressorDeclRef(AbstractStorageDecl *storage,
 /// pointer, if applicable.
 std::pair<ManagedValue, ManagedValue> SILGenFunction::
 emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
-                      ArrayRef<Substitution> substitutions,
+                      SubstitutionList substitutions,
                       ArgumentSource &&selfValue,
                       bool isSuper, bool isDirectUse,
                       RValue &&subscripts, SILType addressType) {

@@ -117,7 +117,7 @@ protected:
     
     return Substitution(newReplacement, sub.getConformances());
   }
-  ArrayRef<Substitution> getOpSubstitutions(ArrayRef<Substitution> Subs) {
+  SubstitutionList getOpSubstitutions(SubstitutionList Subs) {
     MutableArrayRef<Substitution> newSubsBuf;
     
     auto copySubs = [&]{

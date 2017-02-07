@@ -2939,7 +2939,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
 
   auto fTy = implFn->getLoweredFunctionType();
   
-  ArrayRef<Substitution> subs;
+  SubstitutionList subs;
   if (auto *genericEnv = fd->getGenericEnvironment()) {
     F.setGenericEnvironment(genericEnv);
     subs = getForwardingSubstitutions();
@@ -3092,7 +3092,7 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
                                          CanAnyFunctionType reqtSubstTy,
                                          SILDeclRef requirement,
                                          SILDeclRef witness,
-                                         ArrayRef<Substitution> witnessSubs,
+                                         SubstitutionList witnessSubs,
                                          IsFreeFunctionWitness_t isFree) {
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?

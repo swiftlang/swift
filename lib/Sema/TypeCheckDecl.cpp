@@ -3065,11 +3065,11 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     Substitution(decl->getType(), valueSub.getConformances()),
   };
 
-  ArrayRef<Substitution> interfaceSubs = allInterfaceSubs;
+  SubstitutionList interfaceSubs = allInterfaceSubs;
   if (interfaceSubs.back().getConformances().empty())
     interfaceSubs = interfaceSubs.drop_back();
 
-  ArrayRef<Substitution> contextSubs = allContextSubs;
+  SubstitutionList contextSubs = allContextSubs;
   if (contextSubs.back().getConformances().empty())
     contextSubs = contextSubs.drop_back();
 

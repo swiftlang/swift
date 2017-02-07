@@ -229,15 +229,14 @@ SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
   auto protocolSelfType = protocol->getSelfInterfaceType();
   return protocol->getGenericSignature()->getSubstitutionMap(
     [&](SubstitutableType *type) -> Type {
-      if (type->isEqual(protocolSelfType))
-        return selfType;
+      assert(type->isEqual(protocolSelfType));
+      return selfType;
     },
     [&](CanType origType, Type replacementType, ProtocolType *protoType)
       -> ProtocolConformanceRef {
-      if (origType->isEqual(protocolSelfType) &&
-          protoType->getDecl() == protocol)
-        return conformance;
-      llvm_unreachable("Should not get any other conformance queries here");
+      assert(origType->isEqual(protocolSelfType) &&
+             protoType->getDecl() == protocol);
+      return conformance;
     });
 }
 

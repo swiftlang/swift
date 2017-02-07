@@ -451,7 +451,7 @@ public:
   /// the archetypes within the substitutions. The replacement types within
   /// the substitution will be mapped out of the generic environment before
   /// being written.
-  void writeSubstitutions(ArrayRef<Substitution> substitutions,
+  void writeSubstitutions(SubstitutionList substitutions,
                           const std::array<unsigned, 256> &abbrCodes,
                           GenericEnvironment *genericEnv = nullptr);
 

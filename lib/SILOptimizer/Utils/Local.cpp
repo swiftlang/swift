@@ -322,7 +322,7 @@ void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
   recursivelyDeleteTriviallyDeadInstructions(OldApply, true);
 }
 
-bool swift::hasArchetypes(ArrayRef<Substitution> Subs) {
+bool swift::hasArchetypes(SubstitutionList Subs) {
   // Check whether any of the substitutions are dependent.
   for (auto &sub : Subs)
     if (sub.getReplacement()->hasArchetype())
@@ -984,7 +984,7 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
   auto fnConv = FRIConvertFromBuiltin->getConventions();
   auto STResultType = fnConv.getSILResultType();
   return Builder.createApply(AI->getLoc(), FRIConvertFromBuiltin, FnTy,
-                             STResultType, ArrayRef<Substitution>(), Arguments,
+                             STResultType, SubstitutionList(), Arguments,
                              false);
 }
 
@@ -1641,7 +1641,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     return nullptr;
 
   // Get substitutions, if source is a bound generic type.
-  ArrayRef<Substitution> Subs =
+  SubstitutionList Subs =
       Source->gatherAllSubstitutions(
           M.getSwiftModule(), nullptr);
 

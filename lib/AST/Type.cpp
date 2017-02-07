@@ -2834,7 +2834,7 @@ Type ProtocolCompositionType::get(const ASTContext &C,
 }
 
 FunctionType *
-GenericFunctionType::substGenericArgs(ArrayRef<Substitution> args) {
+GenericFunctionType::substGenericArgs(SubstitutionList args) {
   return substGenericArgs(getGenericSignature()->getSubstitutionMap(args));
 }
 
@@ -4019,7 +4019,7 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
 //
 
 void SILBoxType::Profile(llvm::FoldingSetNodeID &id, SILLayout *Layout,
-                         ArrayRef<Substitution> Args) {
+                         SubstitutionList Args) {
   id.AddPointer(Layout);
   for (auto &arg : Args) {
     id.AddPointer(arg.getReplacement().getPointer());
@@ -4029,7 +4029,7 @@ void SILBoxType::Profile(llvm::FoldingSetNodeID &id, SILLayout *Layout,
 }
 
 SILBoxType::SILBoxType(ASTContext &C,
-                       SILLayout *Layout, ArrayRef<Substitution> Args)
+                       SILLayout *Layout, SubstitutionList Args)
 : TypeBase(TypeKind::SILBox, &C,
            getRecursivePropertiesFromSubstitutions(Args)),
   Layout(Layout),
@@ -4049,7 +4049,7 @@ SILBoxType::SILBoxType(ASTContext &C,
 }
 
 RecursiveTypeProperties SILBoxType::
-getRecursivePropertiesFromSubstitutions(ArrayRef<Substitution> Params) {
+getRecursivePropertiesFromSubstitutions(SubstitutionList Params) {
   RecursiveTypeProperties props;
   for (auto &param : Params) {
     props |= param.getReplacement()->getRecursiveProperties();
