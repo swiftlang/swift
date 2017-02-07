@@ -385,6 +385,21 @@ func inoutAccessOfStaticProperty<T : Beverage>(_ t: T.Type) {
   increment(&t.abv)
 }
 
+// Test for materializeForSet vs overriden computed property of classes.
+class BaseForOverride {
+  var valueStored: Int
+  var valueComputed: Int { get { } set { } }
+
+  init(valueStored: Int) {
+    self.valueStored = valueStored
+  }
+}
+
+class DerivedForOverride : BaseForOverride {
+  override var valueStored: Int { get { } set { } }
+  override var valueComputed: Int { get { } set { } }
+}
+
 // Test for materializeForSet vs static properties of classes.
 
 class ReferenceBeer {
@@ -513,6 +528,15 @@ func testMaterializedSetter() {
   // CHECK: function_ref @_TFV17materializeForSet10FooClosures8computedGSqFFSiSiSi_
   f.computed = f.computed
 }
+
+// CHECK-LABEL: sil_vtable DerivedForOverride {
+// CHECK:   #BaseForOverride.valueComputed!getter.1: _TFC17materializeForSet18DerivedForOverrideg13valueComputedSi
+// CHECK:   #BaseForOverride.valueComputed!setter.1: _TFC17materializeForSet18DerivedForOverrides13valueComputedSi
+// CHECK:   #BaseForOverride.valueComputed!materializeForSet.1: _TFC17materializeForSet18DerivedForOverridem13valueComputedSi
+// CHECK:   #BaseForOverride.valueStored!getter.1: _TFC17materializeForSet18DerivedForOverrideg11valueStoredSi
+// CHECK:   #BaseForOverride.valueStored!setter.1: _TFC17materializeForSet18DerivedForOverrides11valueStoredSi
+// CHECK:   #BaseForOverride.valueStored!materializeForSet.1: _TFC17materializeForSet18DerivedForOverridem11valueStoredSi
+// CHECK: }
 
 // CHECK-LABEL: sil_witness_table hidden Bill: Totalled module materializeForSet {
 // CHECK:   method #Totalled.total!getter.1: @_TTWV17materializeForSet4BillS_8TotalledS_FS1_g5totalSi
