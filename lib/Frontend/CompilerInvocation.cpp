@@ -178,6 +178,11 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   Opts.PrintStats |= Args.hasArg(OPT_print_stats);
   Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
+#if defined(NDEBUG) && !defined(LLVM_ENABLE_STATS)
+  if (Opts.PrintStats || Opts.PrintClangStats)
+    Diags.diagnose(SourceLoc(), diag::stats_disabled);
+#endif
+
   Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
   Opts.DebugTimeExpressionTypeChecking |=
     Args.hasArg(OPT_debug_time_expression_type_checking);
