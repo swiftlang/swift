@@ -337,3 +337,17 @@ class DerivedClass : BaseClass {
     return f2()
   }
 }
+
+// https://bugs.swift.org/browse/SR-3847: Resolve members in inner types.
+// This first extension isn't necessary; we could have put 'originalValue' in
+// the original declaration.
+extension OuterNonGenericClass.InnerNonGenericBase {
+  static let originalValue = 0
+}
+// Each of these two cases used to crash.
+extension OuterNonGenericClass.InnerNonGenericBase {
+  static let propUsingMember = originalValue
+}
+extension OuterNonGenericClass.InnerNonGenericClass1 {
+  static let anotherPropUsingMember = originalValue
+}

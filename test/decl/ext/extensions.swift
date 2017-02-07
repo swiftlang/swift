@@ -113,3 +113,15 @@ extension X3.Assoc { // expected-error{{'Assoc' is not a member type of 'X3'}}
 extension X3 {
   func foo() -> Int { return 0 }
 }
+
+// Make sure the test case from https://bugs.swift.org/browse/SR-3847 doesn't
+// cause problems when the later extension is incorrectly nested inside another
+// declaration.
+extension C1.NestedStruct {
+  static let originalValue = 0
+}
+struct WrapperContext {
+  extension C1.NestedStruct { // expected-error {{declaration is only valid at file scope}}
+    static let propUsingMember = originalValue // expected-error {{use of unresolved identifier 'originalValue'}}
+  }
+}
