@@ -4,6 +4,10 @@ protocol Foo {
   func foo()
 }
 
+protocol P {
+  var x : Int { get }
+}
+
 // Test emitSemanticStore.
 // ---
 // CHECK-LABEL: sil hidden @_TF20opaque_values_silgen11assigninouturFTRxx_T_ : $@convention(thin) <T> (@inout T, @in T) -> () {
@@ -29,6 +33,19 @@ func assigninout<T>(_ a: inout T, _ b: T) {
 // CHECK: } // end sil function '_TF20opaque_values_silgen15materializeSelfuRxs9AnyObjectxS_3FoorFT1tx_T_'
 func materializeSelf<T: Foo>(t: T) where T: AnyObject {
   t.foo()
+}
+
+// Test open existential with opaque values
+// ---
+// CHECK-LABEL: sil hidden @_TF20opaque_values_silgen3barFT1pPS_1P__Si : $@convention(thin) (@in P) -> Int {
+// CHECK: bb0(%0 : $P):
+// CHECK: %[[OPEN:[0-9]+]] = open_existential_opaque %0 : $P to $@opened
+// CHECK: witness_method $@opened
+// CHECK: %{{.*}} = apply %{{.*}}(%[[OPEN]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int
+// CHECK: destroy_value %0 : $P
+// CHECK: return %{{.*}} : $Int
+func bar(p: P) -> Int {
+  return p.x
 }
 
 // Test OpaqueTypeLowering copyValue and destroyValue.

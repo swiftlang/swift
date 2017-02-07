@@ -3930,6 +3930,17 @@ class OpenExistentialAddrInst
                           SILType SelfTy);
 };
 
+/// Given an opaque value refering to an existential, "opens" the
+/// existential by returning a pointer to a fresh archetype T, which also
+/// captures the (dynamic) conformances.
+class OpenExistentialOpaqueInst
+    : public UnaryInstructionBase<ValueKind::OpenExistentialOpaqueInst> {
+  friend SILBuilder;
+
+  OpenExistentialOpaqueInst(SILDebugLocation DebugLoc, SILValue Operand,
+                            SILType SelfTy);
+};
+
 /// Given a class existential, "opens" the
 /// existential by returning a pointer to a fresh archetype T, which also
 /// captures the (dynamic) conformances.

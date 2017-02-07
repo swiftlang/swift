@@ -2224,6 +2224,25 @@ public:
         "SILFunction");
   }
 
+  void checkOpenExistentialOpaqueInst(OpenExistentialOpaqueInst *OEI) {
+    SILType operandType = OEI->getOperand()->getType();
+    require(!operandType.isAddress(),
+            "open_existential_opaque must not be applied to address");
+    require(operandType.canUseExistentialRepresentation(
+                F.getModule(), ExistentialRepresentation::Opaque),
+            "open_existential_opaque must be applied to opaque existential");
+
+    require(!OEI->getType().isAddress(),
+            "open_existential_opaque result must not be an address");
+
+    auto archetype = getOpenedArchetypeOf(OEI->getType().getSwiftRValueType());
+    require(archetype, "open_existential_opaque result must be an opened "
+                       "existential archetype");
+    require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
+            "Archetype opened by open_existential should be registered in "
+            "SILFunction");
+  }
+
   void checkAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
     SILType exType = AEBI->getExistentialType();
     require(exType.isObject(),

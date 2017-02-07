@@ -1489,6 +1489,9 @@ public:
   void visitOpenExistentialBoxInst(OpenExistentialBoxInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
+  void visitOpenExistentialOpaqueInst(OpenExistentialOpaqueInst *OI) {
+    *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
+  }
   void visitInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
     *this << getIDAndType(AEI->getOperand()) << ", $"
           << AEI->getFormalConcreteType();

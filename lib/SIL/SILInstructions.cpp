@@ -1661,6 +1661,11 @@ OpenExistentialBoxInst::OpenExistentialBoxInst(
     : UnaryInstructionBase(DebugLoc, operand, ty) {
 }
 
+OpenExistentialOpaqueInst::OpenExistentialOpaqueInst(SILDebugLocation DebugLoc,
+                                                     SILValue Operand,
+                                                     SILType SelfTy)
+    : UnaryInstructionBase(DebugLoc, Operand, SelfTy) {}
+
 UncheckedRefCastInst *
 UncheckedRefCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                              SILType Ty, SILFunction &F,
