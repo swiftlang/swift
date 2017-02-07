@@ -7411,7 +7411,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   });
 
   Type extContextType =
-    env->mapTypeIntoContext(ext->getModuleContext(), extInterfaceType);
+    env->mapTypeIntoContext(extInterfaceType);
   return { env, extContextType };
 }
 

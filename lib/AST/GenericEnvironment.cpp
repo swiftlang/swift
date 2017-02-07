@@ -155,15 +155,14 @@ bool GenericEnvironment::containsPrimaryArchetype(
                        QueryArchetypeToInterfaceSubstitutions(this)(archetype));
 }
 
-Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M,
-                                            GenericEnvironment *env,
+Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
                                             Type type) {
   assert(!type->hasArchetype() && "already have a contextual type");
 
   if (!env)
     return type.substDependentTypesWithErrorTypes();
 
-  return env->mapTypeIntoContext(M, type);
+  return env->mapTypeIntoContext(type);
 }
 
 Type
@@ -297,8 +296,9 @@ Type GenericEnvironment::mapTypeIntoContext(
 
 }
 
-Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
-  return mapTypeIntoContext(type, LookUpConformanceInModule(M));
+Type GenericEnvironment::mapTypeIntoContext(Type type) const {
+  auto *sig = getGenericSignature();
+  return mapTypeIntoContext(type, LookUpConformanceInSignature(*sig));
 }
 
 Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {

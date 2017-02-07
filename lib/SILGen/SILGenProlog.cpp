@@ -373,8 +373,7 @@ static void emitCaptureArguments(SILGenFunction &gen,
     // non-canonical types in that context. We need the original generic
     // environment from the AST for that.
     auto genericEnv = closure.getGenericEnvironment();
-    return genericEnv->mapTypeIntoContext(gen.F.getModule().getSwiftModule(),
-                                          interfaceType);
+    return genericEnv->mapTypeIntoContext(interfaceType);
   };
 
   switch (gen.SGM.Types.getDeclCaptureKind(capture)) {

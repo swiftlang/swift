@@ -1922,7 +1922,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     }
 
     selfType = GenericEnvironment::mapTypeIntoContext(
-        M.getSwiftModule(), genericEnv, selfInterfaceType);
+        genericEnv, selfInterfaceType);
   }
 
   SILGenFunction gen(*this, *f);

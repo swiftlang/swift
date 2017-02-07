@@ -195,8 +195,7 @@ public:
   }
 
   /// Map an interface type to a contextual type.
-  static Type mapTypeIntoContext(ModuleDecl *M,
-                                 GenericEnvironment *genericEnv,
+  static Type mapTypeIntoContext(GenericEnvironment *genericEnv,
                                  Type type);
 
   /// Map a contextual type to an interface type.
@@ -207,7 +206,7 @@ public:
   Type mapTypeOutOfContext(Type type) const;
 
   /// Map an interface type to a contextual type.
-  Type mapTypeIntoContext(ModuleDecl *M, Type type) const;
+  Type mapTypeIntoContext(Type type) const;
 
   /// Map an interface type to a contextual type.
   Type mapTypeIntoContext(Type type,
