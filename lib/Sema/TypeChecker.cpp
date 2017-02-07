@@ -788,7 +788,10 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
   DiagnosticEngine Diags(Ctx.SourceMgr);
   TypeChecker TC(Ctx, Diags);
 
-  TC.typeCheckDecl(D, true);
+  if (auto ext = dyn_cast<ExtensionDecl>(D))
+    TC.validateExtension(ext);
+  else
+    TC.typeCheckDecl(D, true);
   return true;
 }
 
