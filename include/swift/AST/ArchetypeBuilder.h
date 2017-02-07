@@ -302,7 +302,9 @@ public:
   ///
   /// \param allowConcreteGenericParams If true, allow generic parameters to
   /// be made concrete.
-  void finalize(SourceLoc loc, bool allowConcreteGenericParams=false);
+  void finalize(SourceLoc loc,
+                ArrayRef<GenericTypeParamType *> genericParams,
+                bool allowConcreteGenericParams=false);
 
   /// Diagnose any remaining renames.
   ///

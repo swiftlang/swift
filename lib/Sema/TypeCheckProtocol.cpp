@@ -1156,7 +1156,7 @@ RequirementEnvironment::RequirementEnvironment(
   // Finalize the archetype builder.
   // FIXME: Pass in a source location for the conformance, perhaps? It seems
   // like this could fail.
-  builder.finalize(SourceLoc());
+  builder.finalize(SourceLoc(), allGenericParams);
 
   // Produce the generic signature and environment.
   syntheticSignature = builder.getGenericSignature();

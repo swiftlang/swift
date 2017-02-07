@@ -4834,7 +4834,7 @@ public:
       TC.revertGenericFuncSignature(FD);
 
       // Assign archetypes.
-      builder.finalize(FD->getLoc());
+      builder.finalize(FD->getLoc(), sig->getGenericParams());
       auto *env = builder.getGenericEnvironment(sig);
       FD->setGenericEnvironment(env);
     } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
@@ -6469,7 +6469,7 @@ public:
       TC.revertGenericFuncSignature(CD);
 
       // Assign archetypes.
-      builder.finalize(CD->getLoc());
+      builder.finalize(CD->getLoc(), sig->getGenericParams());
       auto *env = builder.getGenericEnvironment(sig);
       CD->setGenericEnvironment(env);
     } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
