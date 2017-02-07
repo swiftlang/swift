@@ -372,6 +372,36 @@ extension MutableCollection {
   }
 }
 
+extension MutableCollection {
+  /// Copies elements from `source` into `self`, starting at the beginning of
+  /// each.
+  ///
+  /// - Returns:
+  ///
+  ///   - `limit`: the first index in `self` that was not copied into, or
+  ///     `endIndex` if all elements were assigned.
+  ///
+  ///   - `remainder`: the subsequence of source that didn't fit into `self`, 
+  ///     or `source[endIndex...]` if all elements fit.
+  @discardableResult
+  public mutating func copy<Source: Collection>(from source: Source)
+  -> (limit: Index, remainder: Source.SubSequence)
+  where Source.SubSequence : Collection,
+  Source.SubSequence.Iterator.Element == Iterator.Element,
+  Source.SubSequence == Source.SubSequence.SubSequence {
+    // This method should be optimizable for segmented collections
+    var r = source[source.startIndex..<source.endIndex]
+    var i: Index = startIndex
+    while i != endIndex {
+      guard let e = r.popFirst()
+      else { return (limit: i, remainder: r) }
+      self[i] = e
+      i = index(after: i)
+    }
+    return (limit: endIndex, remainder: r)
+  }
+}
+
 extension MutableCollection where Self: BidirectionalCollection {
   public subscript(bounds: Range<Index>) -> MutableBidirectionalSlice<Self> {
     get {

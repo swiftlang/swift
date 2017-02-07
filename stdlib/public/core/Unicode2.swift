@@ -844,6 +844,12 @@ public protocol EncodedScalarProtocol : RandomAccessCollection {
   var utf32: UTF32.EncodedScalar { get }
 }
 
+public extension UnicodeScalar {
+  public init<E: EncodedScalarProtocol>(_ e: E) {
+    self = UnicodeScalar(_unchecked: e.utf32[0])
+  }
+}
+
 extension UTF8.EncodedScalar : EncodedScalarProtocol {
   public init(_ scalarValue: UnicodeScalar) {
     self = UTF32.EncodedScalar(scalarValue).utf8

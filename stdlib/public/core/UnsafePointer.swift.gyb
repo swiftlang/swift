@@ -1190,6 +1190,26 @@ extension UInt {
 }
 % end # for mutable
 
+extension UnsafePointer {
+  public static func == (
+    self_: UnsafePointer, mut: UnsafeMutablePointer<Pointee>) -> Bool {
+    return self_ == UnsafePointer(mut)
+  }
+  public static func == (
+    mut: UnsafeMutablePointer<Pointee>, self_: UnsafePointer) -> Bool {
+    return self_ == UnsafePointer(mut)
+  }
+  public static func != (
+    self_: UnsafePointer, mut: UnsafeMutablePointer<Pointee>) -> Bool {
+    return self_ == UnsafePointer(mut)
+  }
+  public static func != (
+    mut: UnsafeMutablePointer<Pointee>, self_: UnsafePointer) -> Bool {
+    return self_ == UnsafePointer(mut)
+  }
+  // FIXME: add <, >, <=, >=
+}
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

@@ -5,49 +5,6 @@
 import StdlibUnittest
 import ICU
 
-//===----------------------------------------------------------------------===//
-//===--- Missing stdlib niceties ------------------------------------------===//
-//===----------------------------------------------------------------------===//
-
-//===--- UnicodeScalar / Character affordances ----------------------------===//
-extension UnicodeScalar {
-  init<E: EncodedScalarProtocol>(_ e: E) {
-    // FIXME:use init(_unchecked:) when in stdlib
-    self = UnicodeScalar(e.utf32[0])!
-  }
-}
-extension Character {
-  init<S: Sequence>(_ s: S) where S.Iterator.Element == UnicodeScalar {
-    // FIXME: Horribly inefficient, but the stuff to make it fast is private.
-    // FIXME: Also, constructing "👩‍❤️‍👩" is foiled by precondition checks
-    var r = ""
-    for scalar in s {
-      r += String(scalar)
-    }
-    self = Character(r)
-  } 
-}
-
-//===--- Comparison between UnsafePointer<T> and UnsafeMutablePointer<T> ---===//
-extension UnsafePointer {
-  static func == (
-    self_: UnsafePointer, mut: UnsafeMutablePointer<Pointee>) -> Bool {
-    return self_ == UnsafePointer(mut)
-  }
-  static func == (
-    mut: UnsafeMutablePointer<Pointee>, self_: UnsafePointer) -> Bool {
-    return self_ == UnsafePointer(mut)
-  }
-  static func != (
-    self_: UnsafePointer, mut: UnsafeMutablePointer<Pointee>) -> Bool {
-    return self_ == UnsafePointer(mut)
-  }
-  static func != (
-    mut: UnsafeMutablePointer<Pointee>, self_: UnsafePointer) -> Bool {
-    return self_ == UnsafePointer(mut)
-  }
-  // FIXME: add <, >, <=, >=
-}
 
 //===--- Integer coercion operator ----------------------------------------===//
 // You may think it's icky, but it sure cleans up a lot of ugly numericCast()
@@ -68,159 +25,6 @@ extension UnsignedInteger {
   }
   static postfix func ^ <U : SignedInteger>(_ x: Self) -> U {
     return numericCast(x)
-  }
-}
-
-//===--- Missing clamping of Comparable to a Range ------------------------===//
-extension Comparable {
-  func clamped(to r: ClosedRange<Self>) -> Self {
-    return self < r.lowerBound ? r.lowerBound
-         : self > r.upperBound ? r.upperBound
-         : self
-  }
-}
-
-//===--- Index affordances ------------------------------------------------===//
-extension Collection {
-  func index<I: SignedInteger>(atOffset offset: I) -> Index {
-    return index(startIndex, offsetBy: offset^)
-  }
-  func offset(of i: Index) -> IndexDistance {
-    return distance(from: startIndex, to: i)
-  }
-}
-
-//===--- someCollection[...] notation -------------------------------------===//
-// Thanks to Joe Groff for the technique
-enum UnboundedRange_ {
-  static postfix func ... (_: UnboundedRange_) -> () { fatalError("uncallable") }
-}
-typealias UnboundedRange = (UnboundedRange_)->()
-
-extension Collection {
-  subscript(_: UnboundedRange) -> SubSequence {
-    return self[startIndex..<endIndex]
-  }
-}
-
-extension MutableCollection {
-  subscript(_: UnboundedRange) -> SubSequence {
-    get {
-      return self[startIndex...]
-    }
-    set {
-      self[startIndex...] = newValue
-    }
-  }
-}
-
-//===--- Algorithms -------------------------------------------------------===//
-extension MutableCollection {
-  /// Copies elements from `source` into `self`, starting at the beginning of
-  /// each.
-  ///
-  /// - Returns:
-  ///
-  ///   - `limit`: the first index in `self` that was not copied into, or
-  ///     `endIndex` if all elements were assigned.
-  ///
-  ///   - `remainder`: the subsequence of source that didn't fit into `self`, 
-  ///     or `source[endIndex...]` if all elements fit.
-  @discardableResult
-  mutating func copy<Source: Collection>(from source: Source)
-  -> (limit: Index, remainder: Source.SubSequence)
-  where Source.SubSequence : Collection,
-  Source.SubSequence.Iterator.Element == Iterator.Element,
-  Source.SubSequence == Source.SubSequence.SubSequence {
-    // This method should be optimizable for segmented collections
-    var r = source[...]
-    var i: Index = startIndex
-    while i != endIndex {
-      guard let e = r.popFirst()
-      else { return (limit: i, remainder: r) }
-      self[i] = e
-      i = index(after: i)
-    }
-    return (limit: endIndex, remainder: r)
-  }
-}
-
-//===--- One-sided ranges -------------------------------------------------===//
-prefix operator ..<
-struct IncompleteRangeUpTo<T: Comparable> {
-  init(_ upperBound: T) { self.upperBound = upperBound }
-  let upperBound: T
-}
-extension Comparable {
-  static prefix func ..<(x: Self) -> IncompleteRangeUpTo<Self> {
-    return IncompleteRangeUpTo(x)
-  }
-}
-extension Collection {
-  subscript(r: IncompleteRangeUpTo<Index>) -> SubSequence {
-    return self[self.startIndex..<r.upperBound]
-  }
-}
-extension MutableCollection {
-  subscript(r: IncompleteRangeUpTo<Index>) -> SubSequence {
-    get {
-      return self[self.startIndex..<r.upperBound]
-    }
-    set {
-      self[self.startIndex..<r.upperBound] = newValue
-    }
-  }
-}
-
-prefix operator ...
-struct IncompleteRangeThrough<T: Comparable> {
-  init(_ upperBound: T) { self.upperBound = upperBound }
-  let upperBound: T
-}
-extension Comparable {
-  static prefix func ...(x: Self) -> IncompleteRangeThrough<Self> {
-    return IncompleteRangeThrough(x)
-  }
-}
-extension Collection {
-  subscript(r: IncompleteRangeThrough<Index>) -> SubSequence {
-    return self[self.startIndex...r.upperBound]
-  }
-}
-extension MutableCollection {
-  subscript(r: IncompleteRangeThrough<Index>) -> SubSequence {
-    get {
-      return self[self.startIndex...r.upperBound]
-    }
-    set {
-      self[self.startIndex...r.upperBound] = newValue
-    }
-  }
-}
-
-postfix operator ...
-struct IncompleteRangeFrom<T: Comparable> {
-  init(_ lowerBound: T) { self.lowerBound = lowerBound }
-  let lowerBound: T
-}
-extension Comparable {
-  static postfix func ...(x: Self) -> IncompleteRangeFrom<Self> {
-    return IncompleteRangeFrom(x)
-  }
-}
-extension Collection {
-  subscript(r: IncompleteRangeFrom<Index>) -> SubSequence {
-    return self[r.lowerBound..<self.endIndex]
-  }
-}
-extension MutableCollection {
-  subscript(r: IncompleteRangeFrom<Index>) -> SubSequence {
-    get {
-      return self[r.lowerBound..<self.endIndex]
-    }
-    set {
-      self[r.lowerBound..<self.endIndex] = newValue
-    }
   }
 }
 
@@ -320,7 +124,7 @@ extension UnicodeStorage.EncodedScalars : BidirectionalCollection {
   }
 
   public func index(after i: Index) -> Index {
-    var remainder = codeUnits[i.next...]
+    var remainder = codeUnits[i.next..<codeUnits.endIndex]
     while true {
       switch Encoding.parse1Forward(remainder, knownCount: 0) {
       case .valid(let scalar, let nextIndex):
@@ -527,15 +331,15 @@ extension UnicodeStorage : _UTextable {
     _ dst: UnsafeMutablePointer<UText>?, _ src: UnsafePointer<UText>,
     _ deep: Bool, _ status: UnsafeMutablePointer<UErrorCode>?
   ) ->  UnsafeMutablePointer<UText> {
-    UnsafeMutablePointer(mutating: src).pointee.validate()
+    UnsafeMutablePointer(mutating: src)[0].validate()
     // debugLog("_clone with dst = \(String(describing: dst))")
-    // debugLog("src: \(src.pointee)")
+    // debugLog("src: \(src[0])")
     let r = dst
       ?? UnsafeMutablePointer.allocate(capacity: MemoryLayout<UText>.size)
-    r.pointee = src.pointee
-    r.pointee.setup()
-    r.pointee.validate()
-    // debugLog("clone result: \(r.pointee)")
+    r[0] = src[0]
+    r[0].setup()
+    r[0].validate()
+    // debugLog("clone result: \(r[0])")
     return r
   }
 
@@ -646,23 +450,23 @@ extension UnicodeStorage : _UTextable {
       if remainder.isEmpty { return Int32(destination.offset(of: limit)) }
 
       // Report the error and account for the overflow length in the return value
-      error!.pointee = U_BUFFER_OVERFLOW_ERROR
+      error![0] = U_BUFFER_OVERFLOW_ERROR
       return Int32(destination.offset(of: limit) + remainder.count)
     }
     return 0
   }
   
   fileprivate func _mapOffsetToNative(_ u: UnsafePointer<UText>) -> Int64 {
-    UnsafeMutablePointer(mutating: u).pointee.validate()
+    UnsafeMutablePointer(mutating: u)[0].validate()
     
-    if u.pointee.chunkOffset == 0 { return u.pointee.chunkNativeStart }
+    if u[0].chunkOffset == 0 { return u[0].chunkNativeStart }
     
-    let chunkSource = _parsedSuffix(fromOffset: u.pointee.chunkNativeStart)
+    let chunkSource = _parsedSuffix(fromOffset: u[0].chunkNativeStart)
     var chunkOffset = 0
     
     for i in chunkSource.indices {
       chunkOffset += chunkSource[i].utf16.count
-      if chunkOffset == u.pointee.chunkOffset^ {
+      if chunkOffset == u[0].chunkOffset^ {
         return codeUnits.offset(of: i.next)^
       }
     }
@@ -671,12 +475,12 @@ extension UnicodeStorage : _UTextable {
   
   fileprivate func _mapNativeIndexToUTF16(_ u: UnsafePointer<UText>, _ nativeIndex: Int64) -> Int32 {
     // debugLog("_mapNativeIndexToUTF16: \(u)")
-    UnsafeMutablePointer(mutating: u).pointee.validate()
+    UnsafeMutablePointer(mutating: u)[0].validate()
     
-    if u.pointee.chunkNativeStart == nativeIndex { return 0 }
+    if u[0].chunkNativeStart == nativeIndex { return 0 }
 
     let nativeChunk = codeUnits[
-      codeUnits.index(atOffset: u.pointee.chunkNativeStart)
+      codeUnits.index(atOffset: u[0].chunkNativeStart)
       ..<
       codeUnits.index(atOffset: nativeIndex)]
     
@@ -696,56 +500,56 @@ extension UnicodeStorage : _UTextable {
         reserved1: 0, reserved2: 0, reserved3: 0,
         clone: { dst, u, deep, err in
           // debugLog("clone(\(dst!), \(u!), \(deep), \(String(describing: err)))")
-          let _self = u!.pointee.context.assumingMemoryBound(
-            to: _UTextable.self).pointee
+          let _self = u![0].context.assumingMemoryBound(
+            to: _UTextable.self)[0]
           return _self._clone(dst, u!, deep != 0, err)
         },
         
         nativeLength: { u in
           // debugLog("nativeLength(\(u!))")
-          let _self = u!.pointee.context.assumingMemoryBound(
-            to: _UTextable.self).pointee
-          let r = _self._nativeLength(&u!.pointee)
+          let _self = u![0].context.assumingMemoryBound(
+            to: _UTextable.self)[0]
+          let r = _self._nativeLength(&u![0])
           // debugLog("# nativeLength: \(r)")
           return r
         },
         
         access: { u, nativeIndex, forward in
           // debugLog("access(\(u!), \(nativeIndex), \(forward))")
-          let _self = u!.pointee.context.assumingMemoryBound(
-            to: _UTextable.self).pointee
-          return _self._access(&u!.pointee, nativeIndex, forward != 0) 
+          let _self = u![0].context.assumingMemoryBound(
+            to: _UTextable.self)[0]
+          return _self._access(&u![0], nativeIndex, forward != 0) 
             ? 1 : 0
         },
         
         extract: { u, nativeStart, nativeLimit, dest, destCapacity, status in
           // debugLog("extract(\(u!), \(nativeStart), \(nativeLimit), \(dest!), \(destCapacity), \(String(describing: status)))")
-          let _self = u!.pointee.context.assumingMemoryBound(
-            to: _UTextable.self).pointee
+          let _self = u![0].context.assumingMemoryBound(
+            to: _UTextable.self)[0]
           
           let destination = UnsafeMutableBufferPointer(
             start: dest, count: destCapacity^)
 
           return _self._extract(
-            &u!.pointee, nativeStart, nativeLimit, destination, status)
+            &u![0], nativeStart, nativeLimit, destination, status)
         },
         
         replace: nil,
         copy: nil,
         
         mapOffsetToNative: { u in 
-          // debugLog("mapOffsetToNative(\(u!.pointee.chunkOffset))")
-          let _self = u!.pointee.context.assumingMemoryBound(
-            to: _UTextable.self).pointee
+          // debugLog("mapOffsetToNative(\(u![0].chunkOffset))")
+          let _self = u![0].context.assumingMemoryBound(
+            to: _UTextable.self)[0]
           let r = _self._mapOffsetToNative(u!)
           // debugLog("# mapOffsetToNative: \(r)")
           return r
         },
         
         mapNativeIndexToUTF16: { u, nativeIndex in 
-          // debugLog("mapNativeIndexToUTF16(nativeIndex: \(nativeIndex), u: \(u!.pointee))")
-          let _self = u!.pointee.context.assumingMemoryBound(
-            to: _UTextable.self).pointee
+          // debugLog("mapNativeIndexToUTF16(nativeIndex: \(nativeIndex), u: \(u![0]))")
+          let _self = u![0].context.assumingMemoryBound(
+            to: _UTextable.self)[0]
           let r = _self._mapNativeIndexToUTF16(u!, nativeIndex)
           // debugLog("# mapNativeIndexToUTF16: \(r)")
           return r
@@ -864,7 +668,7 @@ extension UnicodeStorage {
       defer { ubrk_close(bi) }
 
       return storage.withUText { u in
-        //let access = u.pointee.pFuncs.pointee.access(u, storage.codeUnits.offset(of: i)^, 1)
+        //let access = u[0].pFuncs[0].access(u, storage.codeUnits.offset(of: i)^, 1)
         //// debugLog("access result:", access)
         // debugLog("ubrk_setUText")
         ubrk_setUText(bi, u, &err)

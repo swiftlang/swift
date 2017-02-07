@@ -459,3 +459,14 @@ extension Character : Comparable {
   }
 }
 
+extension Character {
+  public init<S: Sequence>(_ s: S) where S.Iterator.Element == UnicodeScalar {
+    // FIXME: Horribly inefficient, but the stuff to make it fast is private.
+    // FIXME: Also, constructing "👩‍❤️‍👩" is foiled by precondition checks
+    var r = ""
+    for scalar in s {
+      r += String(scalar)
+    }
+    self = Character(r)
+  } 
+}

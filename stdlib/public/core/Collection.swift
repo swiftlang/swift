@@ -1747,6 +1747,15 @@ extension Collection {
   }
 }
 
+extension Collection {
+  public func index<I: SignedInteger>(atOffset offset: I) -> Index {
+    return index(startIndex, offsetBy: offset^)
+  }
+  public func offset(of i: Index) -> IndexDistance {
+    return distance(from: startIndex, to: i)
+  }
+}
+
 @available(*, unavailable, message: "Bit enum has been removed. Please use Int instead.")
 public enum Bit {}
 
