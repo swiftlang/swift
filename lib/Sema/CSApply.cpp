@@ -1583,37 +1583,32 @@ namespace {
       
       // Form a reference to the function. The bridging operations are generic,
       // so we need to form substitutions and compute the resulting type.
-      auto Conformances =
-        tc.Context.AllocateUninitialized<ProtocolConformanceRef>(
-                                        bridgedToObjectiveCConformance ? 1 : 0);
+      auto genericSig = fn->getGenericSignature();
 
-      if (bridgedToObjectiveCConformance) {
-        Conformances[0] = *bridgedToObjectiveCConformance;
-      }
+      auto subMap = genericSig->getSubstitutionMap(
+        [&](SubstitutableType *type) -> Type {
+          assert(type->isEqual(genericSig->getGenericParams()[0]));
+          return valueType;
+        },
+        [&](CanType origType, Type replacementType, ProtocolType *protoType)
+          -> ProtocolConformanceRef {
+          assert(bridgedToObjectiveCConformance);
+          return *bridgedToObjectiveCConformance;
+        });
 
-      auto fnGenericParams
-        = fn->getGenericSignatureOfContext()->getGenericParams();
+      SmallVector<Substitution, 1> subs;
+      genericSig->getSubstitutions(subMap, subs);
 
-      Substitution Subs[1] = {
-        Substitution(valueType, Conformances)
-      };
-
-      ConcreteDeclRef fnSpecRef(tc.Context, fn, Subs);
+      ConcreteDeclRef fnSpecRef(tc.Context, fn, subs);
       auto fnRef = new (tc.Context) DeclRefExpr(fnSpecRef,
                                                 DeclNameLoc(
                                                   object->getStartLoc()),
                                                 /*Implicit=*/true);
       fnRef->setFunctionRefKind(FunctionRefKind::SingleApply);
 
-      SubstitutionMap subMap;
-      auto genericParam = fnGenericParams[0];
-      auto selfTy = cast<SubstitutableType>(genericParam->getCanonicalType());
-      
-      subMap.addSubstitution(selfTy, valueType);
-      for (auto conformance : Conformances)
-        subMap.addConformance(selfTy, conformance);
-
-      cs.setType(fnRef, fn->getInterfaceType().subst(subMap));
+      cs.setType(fnRef,
+                 fn->getInterfaceType()->castTo<GenericFunctionType>()
+                   ->substGenericArgs(subMap));
 
       // Form the arguments.
       Expr *args[2] = {

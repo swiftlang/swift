@@ -707,8 +707,8 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
 
   SILType NewSubstCalleeType;
 
-  auto FnTy = AI.getCallee()->getType().getAs<SILFunctionType>();
-  if (FnTy && FnTy->isPolymorphic()) {
+  auto FnTy = AI.getCallee()->getType().castTo<SILFunctionType>();
+  if (FnTy->isPolymorphic()) {
     // Handle polymorphic functions by properly substituting
     // their parameter types.
     CanSILFunctionType SFT = FnTy->substGenericArgs(
@@ -716,10 +716,14 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
                                         Substitutions);
     NewSubstCalleeType = SILType::getPrimitiveObjectType(SFT);
   } else {
-    SubstitutionMap Subs;
-    Subs.addSubstitution(CanArchetypeType(OpenedArchetype), ConcreteType);
-    Subs.addConformance(CanType(OpenedArchetype), Conformance);
-    NewSubstCalleeType = SubstCalleeType.subst(AI.getModule(), Subs);
+    NewSubstCalleeType =
+      SubstCalleeType.subst(AI.getModule(),
+                            [&](SubstitutableType *type) -> Type {
+                              if (type == OpenedArchetype)
+                                return ConcreteType;
+                              return type;
+                            },
+                            MakeAbstractConformanceForGenericType());
   }
 
   FullApplySite NewAI;

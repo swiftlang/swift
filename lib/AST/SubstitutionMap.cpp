@@ -223,6 +223,25 @@ addParent(CanType type, CanType parent, AssociatedTypeDecl *assocType) {
 }
 
 SubstitutionMap
+SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
+                                          Type selfType,
+                                          ProtocolConformanceRef conformance) {
+  auto protocolSelfType = protocol->getSelfInterfaceType();
+  return protocol->getGenericSignature()->getSubstitutionMap(
+    [&](SubstitutableType *type) -> Type {
+      if (type->isEqual(protocolSelfType))
+        return selfType;
+    },
+    [&](CanType origType, Type replacementType, ProtocolType *protoType)
+      -> ProtocolConformanceRef {
+      if (origType->isEqual(protocolSelfType) &&
+          protoType->getDecl() == protocol)
+        return conformance;
+      llvm_unreachable("Should not get any other conformance queries here");
+    });
+}
+
+SubstitutionMap
 SubstitutionMap::getOverrideSubstitutions(const ValueDecl *baseDecl,
                                           const ValueDecl *derivedDecl,
                                           Optional<SubstitutionMap> derivedSubs,

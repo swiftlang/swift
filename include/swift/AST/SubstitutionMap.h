@@ -96,6 +96,12 @@ public:
   /// Query whether any replacement type sin the map contain dynamic Self.
   bool hasDynamicSelf() const;
 
+  /// Create a substitution map for a protocol conformance.
+  static SubstitutionMap
+  getProtocolSubstitutions(ProtocolDecl *protocol,
+                           Type selfType,
+                           ProtocolConformanceRef conformance);
+
   /// Given that 'derivedDecl' is an override of 'baseDecl' in a subclass,
   /// and 'derivedSubs' is a set of substitutions written in terms of the
   /// generic signature of 'derivedDecl', produce a set of substitutions
