@@ -3926,7 +3926,7 @@ static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
     Writer.write<uint32_t>(N.size());
     BlobStream << N;
   }
-  BlobStream.str();
+  BlobStream.flush();
   SmallVector<uint64_t, 8> Scratch;
   GroupNames.emit(Scratch, Blob);
 }
