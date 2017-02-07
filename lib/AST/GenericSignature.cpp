@@ -346,6 +346,64 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> subs,
   assert(subs.empty() && "did not use all substitutions?!");
 }
 
+SubstitutionMap
+GenericSignature::
+getSubstitutionMap(TypeSubstitutionFn subs,
+                   GenericSignature::LookupConformanceFn lookupConformance) const {
+  SubstitutionMap subMap;
+
+  // Enumerate all of the requirements that require substitution.
+  enumeratePairedRequirements([&](Type depTy, ArrayRef<Requirement> reqs) {
+    auto canTy = depTy->getCanonicalType();
+
+    // Compute the replacement type.
+    Type currentReplacement = depTy.subst(subs, lookupConformance,
+                                          SubstFlags::UseErrorType);
+    if (auto substTy = dyn_cast<SubstitutableType>(canTy))
+      subMap.addSubstitution(substTy, currentReplacement);
+
+    // Collect the conformances.
+    SmallVector<ProtocolConformanceRef, 2> conformances;
+    for (auto req: reqs) {
+      assert(req.getKind() == RequirementKind::Conformance);
+      auto protoType = req.getSecondType()->castTo<ProtocolType>();
+      if (auto conformance = lookupConformance(canTy,
+                                               currentReplacement,
+                                               protoType)) {
+        conformances.push_back(*conformance);
+      }
+    }
+    subMap.addConformances(canTy, getASTContext().AllocateCopy(conformances));
+
+    return false;
+  });
+
+  for (auto reqt : getRequirements()) {
+    if (reqt.getKind() != RequirementKind::SameType)
+      continue;
+
+    auto first = reqt.getFirstType();
+    auto second = reqt.getSecondType();
+
+    if (!first->isTypeParameter() || !second->isTypeParameter())
+      continue;
+
+    if (auto *firstMemTy = first->getAs<DependentMemberType>()) {
+      subMap.addParent(second->getCanonicalType(),
+                       firstMemTy->getBase()->getCanonicalType(),
+                       firstMemTy->getAssocType());
+    }
+
+    if (auto *secondMemTy = second->getAs<DependentMemberType>()) {
+      subMap.addParent(first->getCanonicalType(),
+                       secondMemTy->getBase()->getCanonicalType(),
+                       secondMemTy->getAssocType());
+    }
+  }
+
+  return subMap;
+}
+
 SmallVector<Type, 4> GenericSignature::getAllDependentTypes() const {
   SmallVector<Type, 4> result;
   enumeratePairedRequirements([&](Type type, ArrayRef<Requirement>) {

@@ -426,80 +426,56 @@ getSubstitutionsForCallee(SILModule &M,
   if (!baseCalleeType->isPolymorphic())
     return;
 
-  auto derivedClass = derivedSelfType;
-  if (auto metatypeType = dyn_cast<MetatypeType>(derivedClass))
-    derivedClass = CanType(metatypeType->getInstanceType());
-
-  SubstitutionMap subMap;
-
-  if (auto origCalleeSig = AI.getOrigCalleeType()->getGenericSignature()) {
-    auto calleeSelfType = AI.getSubstCalleeType()->getSelfParameter().getType();
-    if (auto metatypeType = dyn_cast<MetatypeType>(calleeSelfType))
-      calleeSelfType = CanType(metatypeType->getInstanceType());
-    auto *calleeClassDecl = calleeSelfType->getClassOrBoundGenericClass();
-    assert(calleeClassDecl && "self is not a class type");
-
-    auto origSubs = AI.getSubstitutions();
-
-    // Add generic parameters from the method itself, ignoring any generic
-    // parameters from the derived class.
-    unsigned minDepth = 0;
-    if (auto derivedClassSig = calleeClassDecl->getGenericSignatureOfContext())
-      minDepth = derivedClassSig->getGenericParams().back()->getDepth() + 1;
-
-    for (auto depTy : origCalleeSig->getAllDependentTypes()) {
-      // Grab the next substitution.
-      auto sub = origSubs.front();
-      origSubs = origSubs.slice(1);
-
-      // If the dependent type doesn't contain any generic parameter with
-      // a depth of at least the minimum, skip this type.
-      auto canTy = depTy->getCanonicalType();
-      auto hasInnerGenericParameter = [minDepth](Type type) -> bool {
-        if (auto gp = type->getAs<GenericTypeParamType>()) {
-          return gp->getDepth() >= minDepth;
-        }
-        return false;
-      };
-
-      if (!Type(canTy.getPointer()).findIf(hasInnerGenericParameter))
-        continue;
-
-      // Otherwise, record the replacement and conformances for the mapped
-      // type.
-      if (isa<SubstitutableType>(canTy)) {
-        subMap.addSubstitution(cast<SubstitutableType>(canTy),
-                               sub.getReplacement());
-      }
-      subMap.addConformances(canTy, sub.getConformances());
-    }
-    assert(origSubs.empty());
-  }
-
   // Add any generic substitutions for the base class.
-  auto baseSelfType = baseCalleeType->getSelfParameter().getType();
-  if (auto metatypeType = dyn_cast<MetatypeType>(baseSelfType))
-    baseSelfType = CanType(metatypeType->getInstanceType());
+  Type baseSelfType = baseCalleeType->getSelfParameter().getType();
+  if (auto metatypeType = baseSelfType->getAs<MetatypeType>())
+    baseSelfType = metatypeType->getInstanceType();
 
-  auto *baseClassDecl = baseSelfType.getClassOrBoundGenericClass();
+  auto *baseClassDecl = baseSelfType->getClassOrBoundGenericClass();
   assert(baseClassDecl && "not a class method");
 
+  unsigned baseDepth = 0;
+  SubstitutionMap baseSubMap;
   if (auto baseClassSig = baseClassDecl->getGenericSignatureOfContext()) {
+    baseDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
+
     // Compute the type of the base class, starting from the
     // derived class type and the type of the method's self
     // parameter.
-    auto baseClass = derivedClass->getSuperclassForDecl(baseClassDecl, nullptr)
-        ->getCanonicalType();
-    auto baseClassSubs = baseClass->gatherAllSubstitutions(
+    Type derivedClass = derivedSelfType;
+    if (auto metatypeType = derivedClass->getAs<MetatypeType>())
+      derivedClass = metatypeType->getInstanceType();
+    auto baseClass = derivedClass->getSuperclassForDecl(baseClassDecl, nullptr);
+    auto subs = baseClass->gatherAllSubstitutions(
         M.getSwiftModule(), nullptr);
-
-    // Decompose the base class substitutions, adding them to the same
-    // substitution maps as above.
-    baseClassSig->getSubstitutionMap(baseClassSubs, subMap);
+    baseSubMap = baseClassSig->getSubstitutionMap(subs);
   }
 
-  // Build the new substitutions using the base method signature.
+  SubstitutionMap origSubMap;
+  if (auto origCalleeSig = AI.getOrigCalleeType()->getGenericSignature())
+    origSubMap = origCalleeSig->getSubstitutionMap(AI.getSubstitutions());
+
+  Type calleeSelfType = AI.getOrigCalleeType()->getSelfParameter().getType();
+  if (auto metatypeType = calleeSelfType->getAs<MetatypeType>())
+    calleeSelfType = metatypeType->getInstanceType();
+  auto *calleeClassDecl = calleeSelfType->getClassOrBoundGenericClass();
+  assert(calleeClassDecl && "self is not a class type");
+
+  // Add generic parameters from the method itself, ignoring any generic
+  // parameters from the derived class.
+  unsigned origDepth = 0;
+  if (auto calleeClassSig = calleeClassDecl->getGenericSignatureOfContext())
+    origDepth = calleeClassSig->getGenericParams().back()->getDepth() + 1;
+
   auto baseCalleeSig = baseCalleeType->getGenericSignature();
+
+  auto subMap = SubstitutionMap::combineSubstitutionMaps(baseSubMap,
+                                                         origSubMap,
+                                                         baseDepth,
+                                                         origDepth,
+                                                         baseCalleeSig);
+
+  // Build the new substitutions using the base method signature.
   baseCalleeSig->getSubstitutions(subMap, newSubs);
 }
 
