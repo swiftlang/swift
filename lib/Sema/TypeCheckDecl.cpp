@@ -6365,12 +6365,6 @@ public:
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
-    if (CD->isInvalid()) {
-      CD->setInterfaceType(ErrorType::get(TC.Context));
-      CD->setInvalid();
-      return;
-    }
-
     if (!IsFirstPass) {
       if (CD->getBody()) {
         TC.definedFunctions.push_back(CD);
@@ -6391,9 +6385,6 @@ public:
 
     TC.checkDeclAttributesEarly(CD);
     TC.computeAccessibility(CD);
-
-    assert(CD->getDeclContext()->isTypeContext()
-           && "Decl parsing must prevent constructors outside of types!");
 
     // convenience initializers are only allowed on classes and in
     // extensions thereof.
@@ -6445,7 +6436,8 @@ public:
       }
     }
 
-    configureImplicitSelf(TC, CD);
+    if (CD->getDeclContext()->isTypeContext())
+      configureImplicitSelf(TC, CD);
 
     if (auto gp = CD->getGenericParams()) {
       // Write up generic parameters and check the generic parameter list.
@@ -6481,11 +6473,12 @@ public:
     }
 
     // Set the context type of 'self'.
-    recordSelfContextType(CD);
+    if (CD->getDeclContext()->isTypeContext())
+      recordSelfContextType(CD);
 
     // Type check the constructor parameters.
     GenericTypeToArchetypeResolver resolver(CD);
-    if (CD->isInvalid() || semaFuncParamPatterns(CD, resolver)) {
+    if (semaFuncParamPatterns(CD, resolver) || CD->isInvalid()) {
       CD->setInterfaceType(ErrorType::get(TC.Context));
       CD->setInvalid();
     } else {
