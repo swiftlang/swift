@@ -693,11 +693,6 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
   });
 }
 
-/// Create a fresh archetype builder.
-ArchetypeBuilder TypeChecker::createArchetypeBuilder(ModuleDecl *mod) {
-  return ArchetypeBuilder(Context, LookUpConformanceInModule(mod));
-}
-
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericEnvironment *
 TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
@@ -4814,8 +4809,9 @@ public:
       auto *sig = TC.validateGenericFuncSignature(FD);
 
       // Create a fresh archetype builder.
-      ArchetypeBuilder builder =
-        TC.createArchetypeBuilder(FD->getModuleContext());
+      ArchetypeBuilder builder(
+                             FD->getASTContext(),
+                             LookUpConformanceInModule(FD->getModuleContext()));
       auto *parentSig = FD->getDeclContext()->getGenericSignatureOfContext();
       TC.checkGenericParamList(&builder, gp, parentSig, nullptr);
 
@@ -6457,7 +6453,9 @@ public:
 
       auto *sig = TC.validateGenericFuncSignature(CD);
 
-      auto builder = TC.createArchetypeBuilder(CD->getModuleContext());
+      ArchetypeBuilder builder(
+                             CD->getASTContext(),
+                             LookUpConformanceInModule(CD->getModuleContext()));
       auto *parentSig = CD->getDeclContext()->getGenericSignatureOfContext();
       TC.checkGenericParamList(&builder, gp, parentSig, nullptr);
 
