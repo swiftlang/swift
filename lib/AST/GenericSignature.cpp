@@ -201,13 +201,6 @@ ASTContext &GenericSignature::getASTContext() const {
   return getASTContext(getGenericParams(), getRequirements());
 }
 
-SubstitutionMap
-GenericSignature::getSubstitutionMap(SubstitutionList subs) const {
-  SubstitutionMap result;
-  getSubstitutionMap(subs, result);
-  return result;
-}
-
 bool GenericSignature::enumeratePairedRequirements(
                llvm::function_ref<bool(Type, ArrayRef<Requirement>)> fn) const {
   // We'll be walking through the list of requirements.
@@ -338,9 +331,10 @@ static void populateParentMap(const GenericSignature *sig,
   }
 }
 
-void
-GenericSignature::getSubstitutionMap(SubstitutionList subs,
-                                     SubstitutionMap &result) const {
+SubstitutionMap
+GenericSignature::getSubstitutionMap(SubstitutionList subs) const {
+  SubstitutionMap result;
+
   // An empty parameter list gives an empty map.
   if (subs.empty())
     assert(getGenericParams().empty() || areAllParamsConcrete());
@@ -359,6 +353,7 @@ GenericSignature::getSubstitutionMap(SubstitutionList subs,
 
   assert(subs.empty() && "did not use all substitutions?!");
   populateParentMap(this, result);
+  return result;
 }
 
 SubstitutionMap

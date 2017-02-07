@@ -137,10 +137,6 @@ public:
   /// that correspond to the generic parameters in this generic signature.
   SubstitutionMap getSubstitutionMap(SubstitutionList args) const;
 
-  /// Same as above, but updates an existing map.
-  void getSubstitutionMap(SubstitutionList args,
-                          SubstitutionMap &subMap) const;
-
   /// Build an interface type substitution map from a type substitution function
   /// and conformance lookup function.
   SubstitutionMap

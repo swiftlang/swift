@@ -788,6 +788,7 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
   llvm::raw_svector_ostream OS(SectionName);
   switch (IGM.TargetInfo.OutputObjectFormat) {
   case llvm::Triple::UnknownObjectFormat:
+  case llvm::Triple::Wasm:
     llvm_unreachable("unknown object format");
   case llvm::Triple::COFF:
     assert(FourCC.size() <= 4 &&

@@ -42,7 +42,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
   void computeSubsMap() {
     if (auto *env = Original.getGenericEnvironment()) {
-      SubsMap = env->getSubstitutionMap(SwiftMod, ApplySubs);
+      SubsMap = env->getSubstitutionMap(ApplySubs);
     }
   }
 
