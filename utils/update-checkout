@@ -168,7 +168,11 @@ def update_all_repositories(args, config, scheme_name, cross_repos_pr):
         repo_path = os.path.join(SWIFT_SOURCE_ROOT, repo_name)
         if args.tag:
             my_args = update_repository_to_tag(args, repo_name, repo_path, args.tag)
-            pool_args.append(my_args)
+
+            # We only get args returned if the requested tag exists in this
+            # repository. Otherwise, this repository should be skipped.
+            if my_args:
+                pool_args.append(my_args)
         elif scheme_name:
             my_args = update_repository_to_scheme(args,
                                         config,
