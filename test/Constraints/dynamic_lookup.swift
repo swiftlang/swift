@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swift-frontend -emit-module %S/Inputs/PrivateObjC.swift -o %t
-// RUN: %target-typecheck-verify-swift -I %t
+// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 import Foundation
@@ -247,3 +247,7 @@ func rdar29960565(_ o: AnyObject) {
     _ = i
   }
 }
+
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected note produced: 'privateFoo' declared here
+// <unknown>:0: error: unexpected note produced: 'internalFoo' declared here

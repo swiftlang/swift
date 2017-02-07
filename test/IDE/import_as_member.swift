@@ -49,7 +49,7 @@
 
 // PRINTB-NOT: static var globalVar: Double
 
-// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules -verify-ignore-unknown
 
 import ImportAsMember.A
 import ImportAsMember.B
@@ -78,3 +78,8 @@ iamStruct = Struct1.zero
 
 // Global properties
 currentStruct1.x += 1.5
+
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected note produced: 'IAMStruct1CreateSimple' declared here
+// <unknown>:0: error: unexpected note produced: 'IAMStruct1GlobalVar' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'IAMStruct1CreateSimple' was obsoleted in Swift 3

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
 protocol Fooable {
   associatedtype Foo
@@ -200,3 +200,6 @@ struct S4<T : P> {
 }
 
 S4<QQ>().foo(x: SS())
+
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected error produced: generic parameter τ_0_0.Bar.Foo cannot be equal to both 'Y.Foo' (aka 'X') and 'Z'

@@ -387,7 +387,8 @@ int main(int argc, char **argv) {
   // diagnostics.  Check now to ensure that they meet our expectations.
   if (VerifyMode) {
     HadError = verifyDiagnostics(CI.getSourceMgr(), CI.getInputBufferIDs(),
-                                 /*autoApplyFixes*/false);
+                                 /*autoApplyFixes*/false,
+                                 /*ignoreUnknown*/false);
     DiagnosticEngine &diags = CI.getDiags();
     if (diags.hasFatalErrorOccurred() &&
         !Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
