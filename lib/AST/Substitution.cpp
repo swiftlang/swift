@@ -45,7 +45,7 @@ Substitution::Substitution(Type Replacement,
 
 Substitution Substitution::subst(ModuleDecl *module,
                                  const SubstitutionMap &subMap) const {
-  return subst(module, QueryTypeSubstitutionMap{subMap.getMap()},
+  return subst(module, QuerySubstitutionMap{subMap},
                LookUpConformanceInSubstitutionMap(subMap));
 }
 

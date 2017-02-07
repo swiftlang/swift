@@ -457,7 +457,7 @@ getSubstitutions(TypeSubstitutionFn subs,
 void GenericSignature::
 getSubstitutions(const SubstitutionMap &subMap,
                  SmallVectorImpl<Substitution> &result) const {
-  getSubstitutions(subMap.getMap(),
+  getSubstitutions(QuerySubstitutionMap{subMap},
                    LookUpConformanceInSubstitutionMap(subMap),
                    result);
 }

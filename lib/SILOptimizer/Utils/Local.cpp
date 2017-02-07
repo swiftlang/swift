@@ -322,29 +322,11 @@ void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
   recursivelyDeleteTriviallyDeadInstructions(OldApply, true);
 }
 
-bool swift::hasTypeParameterTypes(SubstitutionMap &SubsMap) {
-  // Check whether any of the substitutions are dependent.
-  for (auto &entry : SubsMap.getMap())
-    if (entry.second->hasArchetype())
-      return true;
-
-  return false;
-}
-
 bool swift::hasArchetypes(ArrayRef<Substitution> Subs) {
   // Check whether any of the substitutions are dependent.
   for (auto &sub : Subs)
     if (sub.getReplacement()->hasArchetype())
       return true;
-  return false;
-}
-
-bool swift::hasDynamicSelfTypes(const SubstitutionMap &SubsMap) {
-  // Check whether any of the substitutions are refer to dynamic self.
-  for (auto &entry : SubsMap.getMap())
-    if (entry.second->hasDynamicSelfType())
-      return true;
-
   return false;
 }
 
