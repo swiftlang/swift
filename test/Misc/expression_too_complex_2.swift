@@ -9,7 +9,7 @@ class MyViewCell: UITableViewCell {
   required init?(coder aDecoder: NSCoder) { fatalError("no") }
   override init(style: UITableViewCellStyle, reuseIdentifier: String?) {
     super.init(style: .default, reuseIdentifier: reuseIdentifier)
-    NSLayoutConstraint.activate([
+    NSLayoutConstraint.activate([ // expected-error{{expression was too complex to be solved in reasonable time; consider breaking up the expression into distinct sub-expressions}}
         NSLayoutConstraint(item: View1, attribute: .top, relatedBy: .equal, toItem: label1, attribute: .top, multiplier: 1, constant: 1),
         NSLayoutConstraint(item: View1, attribute: .top, relatedBy: .equal, toItem: label2, attribute: .top, multiplier: 1, constant: 1),
         NSLayoutConstraint(item: View1, attribute: .top, relatedBy: .equal, toItem: label3, attribute: .top, multiplier: 1, constant: 1),
