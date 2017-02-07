@@ -7,12 +7,3 @@ func hasVarArg(_ args: Any...) {}
 public func callVarArg() {
   hasVarArg(3)
 }
-
-public protocol P {
-  var x : Int { get }
-}
-
-// SILGenFunction::emitOpenExistential: add an open_existential instruction.
-public func foo(p: P) -> Int {
-  return p.x
-}

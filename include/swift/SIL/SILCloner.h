@@ -1482,6 +1482,23 @@ SILCloner<ImplClass>::visitOpenExistentialAddrInst(OpenExistentialAddrInst *Inst
                                        getOpType(Inst->getType())));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitOpenExistentialOpaqueInst(
+    OpenExistentialOpaqueInst *Inst) {
+  // Create a new archetype for this opened existential type.
+  auto archetypeTy =
+      Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
+  registerOpenedExistentialRemapping(
+      archetypeTy,
+      ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));
+
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst, getBuilder().createOpenExistentialOpaque(
+                          getOpLocation(Inst->getLoc()),
+                          getOpValue(Inst->getOperand()),
+                          getOpType(Inst->getType())));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::
