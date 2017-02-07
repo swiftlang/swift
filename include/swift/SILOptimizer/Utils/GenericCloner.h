@@ -41,7 +41,7 @@ public:
   GenericCloner(SILFunction *F,
                 IsFragile_t Fragile,
                 const ReabstractionInfo &ReInfo,
-                ArrayRef<Substitution> ParamSubs,
+                SubstitutionList ParamSubs,
                 StringRef NewName,
                 CloneCollector::CallbackType Callback)
   : TypeSubstCloner(*initCloned(F, Fragile, ReInfo, NewName), *F,
@@ -55,7 +55,7 @@ public:
   cloneFunction(SILFunction *F,
                 IsFragile_t Fragile,
                 const ReabstractionInfo &ReInfo,
-                ArrayRef<Substitution> ParamSubs,
+                SubstitutionList ParamSubs,
                 StringRef NewName,
                 CloneCollector::CallbackType Callback =nullptr) {
     // Clone and specialize the function.

@@ -161,6 +161,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(CopyValueInst, SILInstruction, copy_value, MayHaveSideEffects, DoesNotRelease)
   INST(UnmanagedRetainValueInst, RefCountingInst, unmanaged_retain_value, MayHaveSideEffects, DoesNotRelease)
   INST(UnmanagedReleaseValueInst, RefCountingInst, unmanaged_release_value, MayHaveSideEffects, MayRelease)
+  INST(UnmanagedAutoreleaseValueInst, RefCountingInst, unmanaged_autorelease_value, MayHaveSideEffects, DoesNotRelease)
   INST(CopyUnownedValueInst, SILInstruction, copy_unowned_value, MayHaveSideEffects, DoesNotRelease)
   INST(DestroyValueInst, SILInstruction, destroy_value, MayHaveSideEffects, MayRelease)
 

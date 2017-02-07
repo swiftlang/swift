@@ -63,8 +63,10 @@ class SwiftGizmo : Gizmo {
   // CHECK-NEXT:   [[SELF:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_PARAM]] : $SwiftGizmo
   // CHECK:        [[XINIT:%[0-9]+]] = function_ref @_T012objc_dealloc10SwiftGizmoC1xAA1XCvfi
   // CHECK-NEXT:   [[XOBJ:%[0-9]+]] = apply [[XINIT]]() : $@convention(thin) () -> @owned X
-  // CHECK-NEXT:   [[X:%[0-9]+]] = ref_element_addr [[SELF]] : $SwiftGizmo, #SwiftGizmo.x
+  // CHECK-NEXT:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+  // CHECK-NEXT:   [[X:%[0-9]+]] = ref_element_addr [[BORROWED_SELF]] : $SwiftGizmo, #SwiftGizmo.x
   // CHECK-NEXT:   assign [[XOBJ]] to [[X]] : $*X
+  // CHECK-NEXT:   end_borrow [[BORROWED_SELF]] from [[SELF]]
   // CHECK-NEXT:   return [[SELF]] : $SwiftGizmo
 
   // Objective-C IVar destroyer (i.e., -.cxx_destruct)

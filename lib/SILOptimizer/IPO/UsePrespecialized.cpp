@@ -84,7 +84,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     // available for it already and use this specialization
     // instead of the generic version.
 
-    ArrayRef<Substitution> Subs = AI.getSubstitutions();
+    SubstitutionList Subs = AI.getSubstitutions();
     if (Subs.empty())
       continue;
 

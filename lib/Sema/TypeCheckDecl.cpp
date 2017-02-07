@@ -3065,11 +3065,11 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     Substitution(decl->getType(), valueSub.getConformances()),
   };
 
-  ArrayRef<Substitution> interfaceSubs = allInterfaceSubs;
+  SubstitutionList interfaceSubs = allInterfaceSubs;
   if (interfaceSubs.back().getConformances().empty())
     interfaceSubs = interfaceSubs.drop_back();
 
-  ArrayRef<Substitution> contextSubs = allContextSubs;
+  SubstitutionList contextSubs = allContextSubs;
   if (contextSubs.back().getConformances().empty())
     contextSubs = contextSubs.drop_back();
 
@@ -4834,6 +4834,7 @@ public:
       TC.revertGenericFuncSignature(FD);
 
       // Assign archetypes.
+      builder.finalize(FD->getLoc(), sig->getGenericParams());
       auto *env = builder.getGenericEnvironment(sig);
       FD->setGenericEnvironment(env);
     } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
@@ -6468,6 +6469,7 @@ public:
       TC.revertGenericFuncSignature(CD);
 
       // Assign archetypes.
+      builder.finalize(CD->getLoc(), sig->getGenericParams());
       auto *env = builder.getGenericEnvironment(sig);
       CD->setGenericEnvironment(env);
     } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {

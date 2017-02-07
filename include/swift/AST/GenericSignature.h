@@ -18,7 +18,7 @@
 #define SWIFT_AST_GENERIC_SIGNATURE_H
 
 #include "swift/AST/Requirement.h"
-#include "swift/AST/Substitution.h"
+#include "swift/AST/SubstitutionList.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -135,11 +135,7 @@ public:
 
   /// Build an interface type substitution map from a vector of Substitutions
   /// that correspond to the generic parameters in this generic signature.
-  SubstitutionMap getSubstitutionMap(ArrayRef<Substitution> args) const;
-
-  /// Same as above, but updates an existing map.
-  void getSubstitutionMap(ArrayRef<Substitution> args,
-                          SubstitutionMap &subMap) const;
+  SubstitutionMap getSubstitutionMap(SubstitutionList args) const;
 
   /// Build an interface type substitution map from a type substitution function
   /// and conformance lookup function.
@@ -193,6 +189,11 @@ public:
   
   /// Canonicalize the components of a generic signature.
   CanGenericSignature getCanonicalSignature() const;
+
+  /// Create a new generic environment that provides fresh contextual types
+  /// (archetypes) that correspond to the interface types in this generic
+  /// signature.
+  GenericEnvironment *createGenericEnvironment(ModuleDecl &mod);
 
   /// Uniquing for the ASTContext.
   void Profile(llvm::FoldingSetNodeID &ID) {

@@ -251,7 +251,7 @@ void ConformanceCollector::scanType(Type type) {
   });
 }
 
-void ConformanceCollector::scanSubsts(ArrayRef<Substitution> substs) {
+void ConformanceCollector::scanSubsts(SubstitutionList substs) {
   for (const Substitution &subst : substs) {
     scanConformances(subst.getConformances());
     scanType(subst.getReplacement());

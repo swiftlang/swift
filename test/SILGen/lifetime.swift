@@ -400,8 +400,10 @@ class Foo<T> {
 
     x = bar()
     // CHECK: function_ref @_T08lifetime3barSiyF : $@convention(thin) () -> Int
-    // CHECK: [[THIS_X:%[0-9]+]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.x
+    // CHECK: [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
+    // CHECK: [[THIS_X:%[0-9]+]] = ref_element_addr [[BORROWED_THIS]] : {{.*}}, #Foo.x
     // CHECK: assign {{.*}} to [[THIS_X]]
+    // CHECK: end_borrow [[BORROWED_THIS]] from [[THIS]]
 
     z = Foo<T>.makeT()
     // CHECK: [[FOOMETA:%[0-9]+]] = metatype $@thick Foo<T>.Type
@@ -409,7 +411,10 @@ class Foo<T> {
     // CHECK: ref_element_addr
 
     // -- cleanup this lvalue and return this
-    // CHECK: return [[THIS]]
+    // CHECK: [[THIS_RESULT:%.*]] = copy_value [[THIS]]
+    // -- TODO: This copy should be unnecessary.
+    // CHECK: destroy_value [[THIS]]
+    // CHECK: return [[THIS_RESULT]]
 
   // -- allocating entry point
   // CHECK-LABEL: sil hidden @_T08lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
@@ -431,11 +436,13 @@ class Foo<T> {
     // CHECK:   [[THIS:%[0-9]+]] = mark_uninitialized [rootself] [[THISIN]]
 
     // -- First we initialize #Foo.y.
-    // CHECK:   [[THIS_Y:%.*]] = ref_element_addr [[THIS]] : $Foo<T>, #Foo.y
+    // CHECK:   [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
+    // CHECK:   [[THIS_Y:%.*]] = ref_element_addr [[BORROWED_THIS]] : $Foo<T>, #Foo.y
     // CHECK:   [[THIS_Y_1:%.*]] = tuple_element_addr [[THIS_Y]] : $*(Int, Ref), 0
     // CHECK:   assign {{.*}} to [[THIS_Y_1]] : $*Int
     // CHECK:   [[THIS_Y_2:%.*]] = tuple_element_addr [[THIS_Y]] : $*(Int, Ref), 1
     // CHECK:   assign {{.*}} to [[THIS_Y_2]] : $*Ref
+    // CHECK:   end_borrow [[BORROWED_THIS]] from [[THIS]]
 
     // -- Then we create a box that we will use to perform a copy_addr into #Foo.x a bit later.
     // CHECK:   [[CHIADDR:%[0-9]+]] = alloc_box ${ var Int }, var, name "chi"
@@ -443,13 +450,17 @@ class Foo<T> {
     // CHECK:   store [[CHI]] to [trivial] [[PCHI]]
 
     // -- Then we initialize #Foo.z
-    // CHECK:   [[THIS_Z:%.*]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.z
+    // CHECK:   [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
+    // CHECK:   [[THIS_Z:%.*]] = ref_element_addr [[BORROWED_THIS]] : {{.*}}, #Foo.z
     // CHECK:   copy_addr [take] {{.*}} to [[THIS_Z]]
+    // CHECK:   end_borrow [[BORROWED_THIS]] from [[THIS]]
 
     // -- Then initialize #Foo.x using the earlier stored value of CHI to THIS_Z.
     x = chi
-    // CHECK:   [[THIS_X:%[0-9]+]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.x
+    // CHECK:   [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
+    // CHECK:   [[THIS_X:%[0-9]+]] = ref_element_addr [[BORROWED_THIS]] : {{.*}}, #Foo.x
     // CHECK:   copy_addr [[PCHI]] to [[THIS_X]]
+    // CHECK:   end_borrow [[BORROWED_THIS]] from [[THIS]]
 
     // -- cleanup chi
     // CHECK: destroy_value [[CHIADDR]]

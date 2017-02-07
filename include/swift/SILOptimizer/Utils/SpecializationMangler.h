@@ -65,13 +65,13 @@ protected:
 // The mangler for specialized generic functions.
 class GenericSpecializationMangler : public SpecializationMangler {
 
-  ArrayRef<Substitution> Subs;
+  SubstitutionList Subs;
   bool isReAbstracted;
 
 public:
 
   GenericSpecializationMangler(SILFunction *F,
-                               ArrayRef<Substitution> Subs,
+                               SubstitutionList Subs,
                                IsFragile_t Fragile,
                                bool isReAbstracted)
     : SpecializationMangler(SpecializationPass::GenericSpecializer, Fragile, F),

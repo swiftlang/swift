@@ -191,6 +191,11 @@ std::string NewMangling::selectMangling(const std::string &Old,
 
   NodePointer NewNode = demangleSymbolAsNode(New);
 
+  if (!NewNode && StringRef(New).startswith("s:")) {
+    std::string demangleStr = MANGLING_PREFIX_STR + New.substr(2);
+    NewNode = demangleSymbolAsNode(demangleStr);
+  }
+
 #ifndef NDEBUG
 #ifdef CHECK_MANGLING_AGAINST_OLD
 
@@ -204,11 +209,6 @@ std::string NewMangling::selectMangling(const std::string &Old,
       (!NewNode || treeContains(NewNode, Demangle::Node::Kind::Suffix))) {
     llvm::errs() << "Can't demangle " << New << '\n';
     assert(false);
-  }
-
-  if (!NewNode && StringRef(New).startswith("s:")) {
-    std::string demangleStr = MANGLING_PREFIX_STR + New.substr(2);
-    NewNode = demangleSymbolAsNode(demangleStr);
   }
 
   if (OldNode && !treeContains(OldNode, Demangle::Node::Kind::Suffix)) {

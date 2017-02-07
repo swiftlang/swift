@@ -106,19 +106,10 @@ struct ArchetypeBuilder::Implementation {
   /// The nested types that have been renamed.
   SmallVector<PotentialArchetype *, 4> RenamedNestedTypes;
 
-  /// Potential archetypes for which we are currently performing
-  /// substitutions of their superclasses. Used to detect recursion in
-  /// superclass substitutions.
-  llvm::DenseSet<std::pair<GenericEnvironment *,
-                           ArchetypeBuilder::PotentialArchetype *>>
-    SuperclassSubs;
-
-  /// Potential archetypes for which we are currently performing
-  /// substitutions of their concrete types. Used to detect recursion in
-  /// concrete type substitutions.
-  llvm::DenseSet<std::pair<GenericEnvironment *,
-                           ArchetypeBuilder::PotentialArchetype *>>
-    ConcreteSubs;
+#ifndef NDEBUG
+  /// Whether we've already finalized the builder.
+  bool finalized = false;
+#endif
 };
 
 ArchetypeBuilder::PotentialArchetype::~PotentialArchetype() {
@@ -670,55 +661,15 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 
   // Return a concrete type or archetype we've already resolved.
   if (Type concreteType = representative->getConcreteType()) {
-    // If the concrete type doesn't involve type parameters, just return it.
-    if (!concreteType->hasTypeParameter())
-      return concreteType;
-
     // Otherwise, substitute in the archetypes in the environment.
-
-    // If we're already substituting into the concrete type, mark this
-    // potential archetype as having a recursive concrete type.
-    if (representative->RecursiveConcreteType ||
-        !builder.Impl->ConcreteSubs.insert({genericEnv, representative})
-          .second) {
-      // Complain about the recursion, if we haven't done so already.
-      if (!representative->RecursiveConcreteType) {
-        ctx.Diags.diagnose(representative->ConcreteTypeSource->getLoc(),
-                           diag::recursive_same_type_constraint,
-                           getDependentType(genericParams,
-                                            /*allowUnresolved=*/true),
-                           concreteType);
-
-        representative->RecursiveConcreteType = true;
-      }
-
+    // If this has a recursive type, return an error type.
+    if (representative->RecursiveConcreteType) {
       return ErrorType::get(getDependentType(genericParams,
                                              /*allowUnresolved=*/true));
     }
 
-    SWIFT_DEFER {
-      builder.Impl->ConcreteSubs.erase({genericEnv, representative});
-    };
-
     return genericEnv->mapTypeIntoContext(concreteType,
                                           builder.getLookupConformanceFn());
-  }
-
-  // Check that we haven't referenced this type while substituting into the
-  // superclass.
-  if (!representative->RecursiveSuperclassType &&
-      representative->getSuperclass() &&
-      builder.Impl->SuperclassSubs.count({genericEnv, representative})
-        > 0) {
-    if (representative->SuperclassSource->getLoc().isValid()) {
-      ctx.Diags.diagnose(representative->SuperclassSource->getLoc(),
-                         diag::recursive_superclass_constraint,
-                         representative->getSuperclass());
-    }
-
-    representative->RecursiveSuperclassType = true;
-    return ErrorType::get(getDependentType(genericParams,
-                                           /*allowUnresolved=*/true));
   }
 
   // Local function to check whether we have a generic parameter that has
@@ -790,17 +741,18 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
   // type parameters, substitute them.
   Type superclass = representative->getSuperclass();
   if (superclass && superclass->hasTypeParameter()) {
-    (void)builder.Impl->SuperclassSubs.insert({genericEnv, representative});
-    SWIFT_DEFER {
-      builder.Impl->SuperclassSubs.erase({genericEnv, representative});
-    };
-    superclass = genericEnv->mapTypeIntoContext(superclass,
-                                                builder.getLookupConformanceFn());
+    if (representative->RecursiveSuperclassType) {
+      superclass = ErrorType::get(superclass);
+    } else {
+      superclass = genericEnv->mapTypeIntoContext(
+                                              superclass,
+                                              builder.getLookupConformanceFn());
 
-    // We might have recursively recorded the archetype; if so, return early.
-    // FIXME: This should be detectable before we end up building archetypes.
-    if (auto result = getAlreadyRecoveredGenericParam())
-      return result;
+      // We might have recursively recorded the archetype; if so, return early.
+      // FIXME: This should be detectable before we end up building archetypes.
+      if (auto result = getAlreadyRecoveredGenericParam())
+        return result;
+    }
   }
 
   LayoutConstraint layout = representative->getLayout();
@@ -848,7 +800,9 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
     ParentArchetype->registerNestedType(getName(), arch);
   } else {
     // Create a top-level archetype.
-    arch = ArchetypeType::getNew(ctx, genericEnv, getName(), Protos,
+    Identifier name =
+      genericParams[getGenericParamKey().findIndexIn(genericParams)]->getName();
+    arch = ArchetypeType::getNew(ctx, genericEnv, name, Protos,
                                  superclass, layout);
 
     // Register the archetype with the generic environment.
@@ -1925,7 +1879,139 @@ static Identifier typoCorrectNestedType(
 }
 
 void
-ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
+ArchetypeBuilder::finalize(SourceLoc loc,
+                           ArrayRef<GenericTypeParamType *> genericParams,
+                           bool allowConcreteGenericParams) {
+  assert(!Impl->finalized && "Already finalized builder");
+#ifndef NDEBUG
+  Impl->finalized = true;
+#endif
+
+  // Local function (+ cache) describing the set of potential archetypes
+  // directly referenced by the concrete same-type constraint of the given
+  // potential archetype. Both the inputs and results are the representatives
+  // of their equivalence classes.
+  llvm::DenseMap<PotentialArchetype *,
+                 SmallPtrSet<PotentialArchetype *, 4>> concretePAs;
+  auto getConcreteReferencedPAs
+      = [&](PotentialArchetype *pa) -> SmallPtrSet<PotentialArchetype *, 4> {
+    assert(pa == pa->getRepresentative() && "Only use with representatives");
+    auto known = concretePAs.find(pa);
+    if (known != concretePAs.end())
+      return known->second;
+
+    SmallPtrSet<PotentialArchetype *, 4> referencedPAs;
+    if (!pa->isConcreteType() || !pa->getConcreteType()->hasTypeParameter())
+      return referencedPAs;
+
+    if (auto concreteType = pa->getConcreteType()) {
+      if (concreteType->hasTypeParameter()) {
+        concreteType.visit([&](Type type) {
+          if (type->isTypeParameter()) {
+            if (auto referencedPA = resolveArchetype(type)) {
+              referencedPAs.insert(referencedPA->getRepresentative());
+            }
+          }
+        });
+      }
+    }
+
+    concretePAs[pa] = referencedPAs;
+    return referencedPAs;
+  };
+
+  /// Check whether the given type references the archetype.
+  auto isRecursiveConcreteType = [&](PotentialArchetype *archetype,
+                                     bool isSuperclass) {
+    SmallPtrSet<PotentialArchetype *, 4> visited;
+    SmallVector<PotentialArchetype *, 4> stack;
+    stack.push_back(archetype);
+    visited.insert(archetype);
+
+    // Check whether the specific type introduces recursion.
+    auto checkTypeRecursion = [&](Type type) {
+      if (!type->hasTypeParameter()) return false;
+
+      return type.findIf([&](Type type) {
+        if (type->isTypeParameter()) {
+          if (auto referencedPA = resolveArchetype(type)) {
+            referencedPA = referencedPA->getRepresentative();
+            if (referencedPA == archetype) return true;
+
+            if (visited.insert(referencedPA).second)
+              stack.push_back(referencedPA);
+          }
+        }
+
+        return false;
+      });
+    };
+
+    while (!stack.empty()) {
+      auto pa = stack.back();
+      stack.pop_back();
+
+      // If we're checking superclasses, do so now.
+      if (isSuperclass) {
+        if (auto superclass = pa->getSuperclass()) {
+          if (checkTypeRecursion(superclass)) return true;
+        }
+      }
+
+      // Otherwise, look for the potential archetypes referenced by
+      // same-type constraints.
+      for (auto referencedPA : getConcreteReferencedPAs(pa)) {
+        // If we found a reference to the original archetype, it's recursive.
+        if (referencedPA == archetype) return true;
+
+        if (visited.insert(referencedPA).second)
+          stack.push_back(referencedPA);
+      }
+    }
+
+    return false;
+  };
+
+  // Check for recursive same-type bindings and superclass constraints.
+  visitPotentialArchetypes([&](PotentialArchetype *archetype) {
+    if (archetype != archetype->getRepresentative()) return;
+
+    // Check for recursive same-type bindings.
+    if (archetype->isConcreteType()) {
+      if (isRecursiveConcreteType(archetype, /*isSuperclass=*/false)) {
+        if (archetype->ConcreteTypeSource->getLoc().isValid())
+          Diags.diagnose(archetype->ConcreteTypeSource->getLoc(),
+                         diag::recursive_same_type_constraint,
+                         archetype->getDependentType(genericParams,
+                                                     /*allowUnresolved=*/true),
+                         archetype->getConcreteType());
+
+        archetype->RecursiveConcreteType = true;
+      }
+    }
+
+    // Check for recursive superclass bindings.
+    if (archetype->getSuperclass()) {
+      if (isRecursiveConcreteType(archetype, /*isSuperclass=*/true)) {
+        if (archetype->SuperclassSource->getLoc().isValid())
+          Diags.diagnose(archetype->SuperclassSource->getLoc(),
+                         diag::recursive_superclass_constraint,
+                         archetype->getDependentType(genericParams,
+                                                     /*allowUnresolved=*/true),
+                         archetype->getSuperclass());
+
+        archetype->RecursiveSuperclassType = true;
+      }
+    }
+  });
+
+  // Create anchors for all of the potential archetypes.
+  // FIXME: This is because we might be missing some from the equivalence
+  // classes. It is an egregious hack.
+  visitPotentialArchetypes([&](PotentialArchetype *archetype) {
+    (void)archetype->getArchetypeAnchor(*this);
+  });
+
   SmallPtrSet<PotentialArchetype *, 4> visited;
 
   // Check for generic parameters which have been made concrete or equated
@@ -2022,14 +2108,16 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
   }
 }
 
-bool ArchetypeBuilder::diagnoseRemainingRenames(SourceLoc loc) {
+bool ArchetypeBuilder::diagnoseRemainingRenames(
+                              SourceLoc loc,
+                              ArrayRef<GenericTypeParamType *> genericParams) {
   bool invalid = false;
 
   for (auto pa : Impl->RenamedNestedTypes) {
     if (pa->alreadyDiagnosedRename()) continue;
 
     Diags.diagnose(loc, diag::invalid_member_type_suggest,
-                   pa->getParent()->getDependentType(/*FIXME: */{ },
+                   pa->getParent()->getDependentType(genericParams,
                                                      /*allowUnresolved=*/true),
                    pa->getOriginalName(), pa->getName());
     invalid = true;
@@ -2177,13 +2265,6 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
                            PotentialArchetype *archetype,
                            ArchetypeBuilder::RequirementRHS constraint,
                            RequirementSource source)> f) {
-   // Create anchors for all of the potential archetypes.
-   // FIXME: This is because we might be missing some from the equivalence
-   // classes. It is an egregious hack.
-   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
-     (void)archetype->getArchetypeAnchor(*this);
-   });
-
   // Collect all archetypes.
   SmallVector<PotentialArchetype *, 8> archetypes;
   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
@@ -2434,6 +2515,8 @@ static void collectRequirements(ArchetypeBuilder &builder,
 }
 
 GenericSignature *ArchetypeBuilder::getGenericSignature() {
+  assert(Impl->finalized && "Must finalize builder first");
+
   // Collect the requirements placed on the generic parameter types.
   SmallVector<Requirement, 4> requirements;
   collectRequirements(*this, Impl->GenericParams, requirements);
@@ -2442,24 +2525,22 @@ GenericSignature *ArchetypeBuilder::getGenericSignature() {
   return sig;
 }
 
-GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
-                                                  GenericSignature *signature) {
-  // Create the generic environment, which will be lazily populated with
-  // archetypes.
-  auto genericEnv = GenericEnvironment::getIncomplete(signature, this);
+void ArchetypeBuilder::expandGenericEnvironment(GenericEnvironment *env) {
+
+  assert(Impl->finalized && "Must finalize builder first");
 
   // Force the creation of all of the archetypes.
   // FIXME: This isn't a well-formed notion with recursive protocol constraints.
+  auto signature = env->getGenericSignature();
   visitPotentialArchetypes([&](PotentialArchetype *pa) {
     if (auto archetype =
-          genericEnv->mapTypeIntoContext(
+            env->mapTypeIntoContext(
               pa->getDependentType(signature->getGenericParams(),
-                                   /*allowUnresolved=*/false),
-              getLookupConformanceFn())
-            ->getAs<ArchetypeType>())
+                                  /*allowUnresolved=*/false),
+             getLookupConformanceFn())
+          ->getAs<ArchetypeType>())
       (void)archetype->getAllNestedTypes();
   });
-  genericEnv->clearArchetypeBuilder();
 
 #ifndef NDEBUG
   // FIXME: This property should be maintained when there are errors, too.
@@ -2470,14 +2551,13 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
 
       auto depTy = pa->getDependentType(genericParams,
                                         /*allowUnresolved=*/false);
-      auto inContext = genericEnv->mapTypeIntoContext(depTy,
-                                                      getLookupConformanceFn());
+      auto inContext = env->mapTypeIntoContext(depTy, getLookupConformanceFn());
 
       auto repDepTy = pa->getRepresentative()->getDependentType(
                                                     genericParams,
                                                     /*allowUnresolved=*/false);
       auto repInContext =
-        genericEnv->mapTypeIntoContext(repDepTy, getLookupConformanceFn());
+        env->mapTypeIntoContext(repDepTy, getLookupConformanceFn());
       assert((inContext->isEqual(repInContext) ||
               inContext->hasError() ||
               repInContext->hasError()) &&
@@ -2485,6 +2565,20 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
     });
   }
 #endif
+}
+
+GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
+                                                  GenericSignature *signature) {
+  assert(Impl->finalized && "Must finalize builder first");
+
+  // Create the generic environment, which will be lazily populated with
+  // archetypes.
+  auto genericEnv = GenericEnvironment::getIncomplete(signature, this);
+
+  // Force the creation of all of the archetypes.
+  expandGenericEnvironment(genericEnv);
+  genericEnv->clearArchetypeBuilder();
+
 
   return genericEnv;
 }

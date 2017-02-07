@@ -2454,6 +2454,11 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
     if (!ctor)
       continue;
 
+    // Swift initializers added in extensions of Objective-C classes can never
+    // be overrides.
+    if (hasClangNode() && !ctor->hasClangNode())
+      return false;
+
     // Resolve this initializer, if needed.
     if (!ctor->hasInterfaceType())
       resolver->resolveDeclSignature(ctor);
@@ -3020,7 +3025,8 @@ GenericSignature *ProtocolDecl::getRequirementSignature() {
   ArchetypeBuilder builder(getASTContext(), LookUpConformanceInModule(module));
   builder.addGenericParameter(selfType);
   builder.addRequirement(requirement, source);
-
+  builder.finalize(SourceLoc(), { selfType });
+  
   return builder.getGenericSignature();
 }
 

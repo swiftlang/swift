@@ -7,6 +7,8 @@ import Builtin
 sil @use_native_object : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 sil @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 
+class C {}
+
 // CHECK-LABEL: sil @load : $@convention(thin) (@in Builtin.NativeObject, @in Builtin.Int32) -> () {
 // CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.NativeObject, [[ARG2:%[0-9]+]] : $*Builtin.Int32):
 // CHECK: [[LOAD2:%[0-9]+]] = load [[ARG1]] : $*Builtin.NativeObject
@@ -118,15 +120,17 @@ bb0(%0 : $@sil_unowned Builtin.NativeObject):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @unmanaged_retain_release_test : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK: bb0([[ARG:%.*]] : $Builtin.NativeObject):
-// CHECK: strong_retain [[ARG]] : $Builtin.NativeObject
-// CHECK: strong_release [[ARG]] : $Builtin.NativeObject
-// CHECK: strong_release [[ARG]] : $Builtin.NativeObject
+// CHECK-LABEL: sil @unmanaged_retain_release_test : $@convention(thin) (@owned Builtin.NativeObject, @owned C) -> () {
+// CHECK: bb0([[ARG1:%.*]] : $Builtin.NativeObject, [[ARG2:%.*]] : $C):
+// CHECK: strong_retain [[ARG1]] : $Builtin.NativeObject
+// CHECK: autorelease_value [[ARG2]] : $C
+// CHECK: strong_release [[ARG1]] : $Builtin.NativeObject
+// CHECK: strong_release [[ARG1]] : $Builtin.NativeObject
 // CHECK: } // end sil function 'unmanaged_retain_release_test'
-sil @unmanaged_retain_release_test : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+sil @unmanaged_retain_release_test : $@convention(thin) (@owned Builtin.NativeObject, @owned C) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $C):
   unmanaged_retain_value %0 : $Builtin.NativeObject
+  unmanaged_autorelease_value %1 : $C
   br bb1
 
 bb1:

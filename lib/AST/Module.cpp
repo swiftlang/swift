@@ -554,7 +554,7 @@ void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getDisplayDecls, (Results));
 }
 
-ArrayRef<Substitution>
+SubstitutionList
 TypeBase::gatherAllSubstitutions(ModuleDecl *module,
                                  LazyResolver *resolver,
                                  DeclContext *gpContext) {

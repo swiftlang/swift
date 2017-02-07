@@ -5,7 +5,21 @@ sil_stage canonical
 
 import Builtin
 
+//////////////////
+// Declarations //
+//////////////////
+
 sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
+class RefWithInt {
+  var value: Builtin.Int32
+
+  init()
+}
+
+///////////
+// Tests //
+///////////
 
 // This checks if the dataflow verifier asserts when we have two consuming users
 // in the same block.
@@ -120,6 +134,20 @@ bb0(%0 : @owned $Builtin.NativeObject):
   %2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   destroy_value %0 : $Builtin.NativeObject
   end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: Function: 'ref_element_addr_requires_borrow'
+// CHECK: Have operand with incompatible ownership?!
+// CHECK: Value:   %0 = argument of bb0 : $RefWithInt
+// CHECK: BaseValue:    %0 = argument of bb0 : $RefWithInt
+// CHECK: User:   %1 = ref_element_addr %0 : $RefWithInt, #RefWithInt.value
+// CHECK: Conv: owned
+sil @ref_element_addr_requires_borrow : $@convention(thin) (@owned RefWithInt) -> () {
+bb0(%0 : @owned $RefWithInt):
+  %1 = ref_element_addr %0 : $RefWithInt, #RefWithInt.value
+  destroy_value %0 : $RefWithInt
   %9999 = tuple()
   return %9999 : $()
 }

@@ -792,14 +792,14 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
 }
 
 static bool hasUsefulRoleInSystemModule(SymbolRoleSet roles) {
-  return roles | (SymbolRoleSet)SymbolRole::Definition |
+  return roles & ((SymbolRoleSet)SymbolRole::Definition |
   (SymbolRoleSet)SymbolRole::Declaration |
   (SymbolRoleSet)SymbolRole::RelationChildOf |
   (SymbolRoleSet)SymbolRole::RelationBaseOf |
   (SymbolRoleSet)SymbolRole::RelationOverrideOf |
   (SymbolRoleSet)SymbolRole::RelationExtendedBy |
   (SymbolRoleSet)SymbolRole::RelationAccessorOf |
-  (SymbolRoleSet)SymbolRole::RelationIBTypeOf;
+  (SymbolRoleSet)SymbolRole::RelationIBTypeOf);
 }
 
 bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,

@@ -44,6 +44,11 @@ Type QueryTypeSubstitutionMap::operator()(SubstitutableType *type) const {
   return Type();
 }
 
+Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
+  auto key = cast<SubstitutableType>(type->getCanonicalType());
+  return subMap.lookupSubstitution(key);
+}
+
 bool TypeLoc::isError() const {
   assert(wasValidated() && "Type not yet validated");
   return getType()->hasError() || getType()->getCanonicalType()->hasError();
@@ -2829,9 +2834,12 @@ Type ProtocolCompositionType::get(const ASTContext &C,
 }
 
 FunctionType *
-GenericFunctionType::substGenericArgs(ArrayRef<Substitution> args) {
-  auto subs = getGenericSignature()->getSubstitutionMap(args);
+GenericFunctionType::substGenericArgs(SubstitutionList args) {
+  return substGenericArgs(getGenericSignature()->getSubstitutionMap(args));
+}
 
+FunctionType *
+GenericFunctionType::substGenericArgs(const SubstitutionMap &subs) {
   Type input = getInput().subst(subs);
   Type result = getResult().subst(subs);
   return FunctionType::get(input, result, getExtInfo());
@@ -3090,7 +3098,7 @@ static Type substType(Type derivedType,
 Type Type::subst(const SubstitutionMap &substitutions,
                  SubstOptions options) const {
   return substType(*this,
-                   QueryTypeSubstitutionMap{substitutions.getMap()},
+                   QuerySubstitutionMap{substitutions},
                    LookUpConformanceInSubstitutionMap(substitutions),
                    options);
 }
@@ -4011,7 +4019,7 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
 //
 
 void SILBoxType::Profile(llvm::FoldingSetNodeID &id, SILLayout *Layout,
-                         ArrayRef<Substitution> Args) {
+                         SubstitutionList Args) {
   id.AddPointer(Layout);
   for (auto &arg : Args) {
     id.AddPointer(arg.getReplacement().getPointer());
@@ -4021,7 +4029,7 @@ void SILBoxType::Profile(llvm::FoldingSetNodeID &id, SILLayout *Layout,
 }
 
 SILBoxType::SILBoxType(ASTContext &C,
-                       SILLayout *Layout, ArrayRef<Substitution> Args)
+                       SILLayout *Layout, SubstitutionList Args)
 : TypeBase(TypeKind::SILBox, &C,
            getRecursivePropertiesFromSubstitutions(Args)),
   Layout(Layout),
@@ -4041,7 +4049,7 @@ SILBoxType::SILBoxType(ASTContext &C,
 }
 
 RecursiveTypeProperties SILBoxType::
-getRecursivePropertiesFromSubstitutions(ArrayRef<Substitution> Params) {
+getRecursivePropertiesFromSubstitutions(SubstitutionList Params) {
   RecursiveTypeProperties props;
   for (auto &param : Params) {
     props |= param.getReplacement()->getRecursiveProperties();

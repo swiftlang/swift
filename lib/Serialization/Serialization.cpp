@@ -1407,7 +1407,7 @@ Serializer::writeConformances(ArrayRef<ProtocolConformance*> conformances,
 }
 
 void
-Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
+Serializer::writeSubstitutions(SubstitutionList substitutions,
                                const std::array<unsigned, 256> &abbrCodes,
                                GenericEnvironment *genericEnv) {
   using namespace decls_block;
@@ -3926,9 +3926,8 @@ static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
     Writer.write<uint32_t>(N.size());
     BlobStream << N;
   }
-  BlobStream.str();
   SmallVector<uint64_t, 8> Scratch;
-  GroupNames.emit(Scratch, Blob);
+  GroupNames.emit(Scratch, BlobStream.str());
 }
 
 static void writeDeclCommentTable(

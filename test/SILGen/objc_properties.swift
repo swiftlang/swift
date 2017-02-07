@@ -38,8 +38,10 @@ class A {
   // CHECK: bb0(%0 : $A, %1 : $Int, %2 : $A):
   // CHECK: [[SELF:%[0-9]+]] = mark_uninitialized [rootself] %2 : $A
   init(other : A, x : Int) {
-    // CHECK: [[SELF_A:%[0-9]+]] = ref_element_addr [[SELF]] : $A, #A.prop
+    // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+    // CHECK: [[SELF_A:%[0-9]+]] = ref_element_addr [[BORROWED_SELF]] : $A, #A.prop
     // CHECK: assign %1 to [[SELF_A]]
+    // CHECK: end_borrow [[BORROWED_SELF]] from [[SELF]]
     prop = x
 
     // CHECK: class_method

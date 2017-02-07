@@ -161,7 +161,7 @@ emitApplyWithRethrow(SILBuilder &Builder,
   Builder.createTryApply(Loc,
                          FuncRef,
                          SILType::getPrimitiveObjectType(CanSILFuncTy),
-                         ArrayRef<Substitution>(),
+                         SubstitutionList(),
                          CallArgs,
                          NormalBB,
                          ErrorBB);
@@ -174,7 +174,7 @@ emitApplyWithRethrow(SILBuilder &Builder,
     Builder.createBuiltin(Loc,
                           Builder.getASTContext().getIdentifier("willThrow"),
                           Builder.getModule().Types.getEmptyTupleType(),
-                          ArrayRef<Substitution>(),
+                          SubstitutionList(),
                           {Error});
 
     EmitCleanup(Builder, Loc);

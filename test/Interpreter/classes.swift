@@ -207,3 +207,29 @@ func makeOne<T : Makeable>(_: T.Type) -> T {
 }
 
 makeOne(Child.self).doSomething() // CHECK: Heaven!
+
+// https://bugs.swift.org/browse/SR-3840
+
+class BaseProperty {
+  var value: Int {
+    get { fatalError() }
+    set { fatalError() }
+  }
+
+  func increment() -> Self {
+    value += 1
+    return self
+  }
+}
+
+class DerivedProperty : BaseProperty {
+  override var value: Int {
+    get { return _value }
+    set { _value = newValue }
+  }
+
+  var _value: Int = 0
+}
+
+// CHECK: 1
+print(DerivedProperty().increment().value)

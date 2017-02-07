@@ -330,7 +330,7 @@ Type GenericEnvironment::getSugaredType(Type type) const {
   });
 }
 
-ArrayRef<Substitution>
+SubstitutionList
 GenericEnvironment::getForwardingSubstitutions() const {
   SmallVector<Substitution, 4> result;
   getGenericSignature()->getSubstitutions(QueryInterfaceTypeSubstitutions(this),
@@ -339,24 +339,64 @@ GenericEnvironment::getForwardingSubstitutions() const {
   return getGenericSignature()->getASTContext().AllocateCopy(result);
 }
 
-SubstitutionMap GenericEnvironment::
-getSubstitutionMap(ModuleDecl *mod,
-                   ArrayRef<Substitution> subs) const {
-  SubstitutionMap result;
-  getSubstitutionMap(mod, subs, result);
-  return result;
+void GenericEnvironment::populateParentMap(SubstitutionMap &subMap) const {
+  for (auto reqt : getGenericSignature()->getRequirements()) {
+    if (reqt.getKind() != RequirementKind::SameType)
+      continue;
+
+    auto first = reqt.getFirstType();
+    auto second = reqt.getSecondType();
+
+    auto archetype = first.subst(
+        QueryInterfaceTypeSubstitutions(this),
+        MakeAbstractConformanceForGenericType())
+      ->getAs<ArchetypeType>();
+    if (!archetype)
+      continue;
+
+#ifndef NDEBUG
+    auto secondArchetype = second.subst(
+        QueryInterfaceTypeSubstitutions(this),
+        MakeAbstractConformanceForGenericType())
+      ->getAs<ArchetypeType>();
+    assert(secondArchetype == archetype);
+#endif
+
+    if (auto *firstMemTy = first->getAs<DependentMemberType>()) {
+      auto parent = firstMemTy->getBase().subst(
+        QueryInterfaceTypeSubstitutions(this),
+        MakeAbstractConformanceForGenericType())
+          ->getAs<ArchetypeType>();
+      if (parent && archetype->getParent() != parent) {
+        subMap.addParent(CanType(archetype),
+                         CanType(parent),
+                         firstMemTy->getAssocType());
+      }
+    }
+
+    if (auto *secondMemTy = second->getAs<DependentMemberType>()) {
+      auto parent = secondMemTy->getBase().subst(
+        QueryInterfaceTypeSubstitutions(this),
+        MakeAbstractConformanceForGenericType())
+          ->getAs<ArchetypeType>();
+      if (parent && archetype->getParent() != parent) {
+        subMap.addParent(CanType(archetype),
+                         CanType(parent),
+                         secondMemTy->getAssocType());
+      }
+    }
+  }
 }
 
-void GenericEnvironment::
-getSubstitutionMap(ModuleDecl *mod,
-                   ArrayRef<Substitution> subs,
-                   SubstitutionMap &result) const {
+SubstitutionMap GenericEnvironment::
+getSubstitutionMap(SubstitutionList subs) const {
+  SubstitutionMap result;
+
   for (auto depTy : getGenericSignature()->getAllDependentTypes()) {
 
     // Map the interface type to a context type.
     auto contextTy = depTy.subst(QueryInterfaceTypeSubstitutions(this),
-                                 LookUpConformanceInModule(mod),
-                                 SubstOptions());
+                                 MakeAbstractConformanceForGenericType());
 
     auto sub = subs.front();
     subs = subs.slice(1);
@@ -372,42 +412,47 @@ getSubstitutionMap(ModuleDecl *mod,
     assert(contextTy->hasError());
   }
 
-  for (auto reqt : getGenericSignature()->getRequirements()) {
-    if (reqt.getKind() != RequirementKind::SameType)
-      continue;
-
-    auto first = reqt.getFirstType();
-    auto second = reqt.getSecondType();
-
-    auto archetype = mapTypeIntoContext(mod, first)->getAs<ArchetypeType>();
-    if (!archetype)
-      continue;
-
-#ifndef NDEBUG
-    auto secondArchetype = mapTypeIntoContext(mod, second)->getAs<ArchetypeType>();
-    assert(secondArchetype == archetype);
-#endif
-
-    if (auto *firstMemTy = first->getAs<DependentMemberType>()) {
-      auto parent = mapTypeIntoContext(mod, firstMemTy->getBase())
-          ->getAs<ArchetypeType>();
-      if (parent && archetype->getParent() != parent) {
-        result.addParent(CanType(archetype),
-                         CanType(parent),
-                         firstMemTy->getAssocType());
-      }
-    }
-
-    if (auto *secondMemTy = second->getAs<DependentMemberType>()) {
-      auto parent = mapTypeIntoContext(mod, secondMemTy->getBase())
-          ->getAs<ArchetypeType>();
-      if (parent && archetype->getParent() != parent) {
-        result.addParent(CanType(archetype),
-                         CanType(parent),
-                         secondMemTy->getAssocType());
-      }
-    }
-  }
-
   assert(subs.empty() && "did not use all substitutions?!");
+
+  populateParentMap(result);
+  return result;
+}
+
+SubstitutionMap
+GenericEnvironment::
+getSubstitutionMap(TypeSubstitutionFn subs,
+                   GenericSignature::LookupConformanceFn lookupConformance) const {
+  SubstitutionMap subMap;
+
+  getGenericSignature()->enumeratePairedRequirements(
+    [&](Type depTy, ArrayRef<Requirement> reqs) -> bool {
+
+      // Map the interface type to a context type.
+      auto contextTy = depTy.subst(QueryInterfaceTypeSubstitutions(this),
+                                   MakeAbstractConformanceForGenericType());
+
+      // Compute the replacement type.
+      Type currentReplacement = contextTy.subst(subs, lookupConformance,
+                                                SubstFlags::UseErrorType);
+      if (auto archetypeTy = contextTy->getAs<ArchetypeType>()) {
+        subMap.addSubstitution(CanArchetypeType(archetypeTy),
+                               currentReplacement);
+
+        // Collect the conformances.
+        for (auto req: reqs) {
+          assert(req.getKind() == RequirementKind::Conformance);
+          auto protoType = req.getSecondType()->castTo<ProtocolType>();
+          auto conformance = lookupConformance(CanArchetypeType(archetypeTy),
+                                               currentReplacement,
+                                               protoType);
+          if (conformance)
+            subMap.addConformance(CanArchetypeType(archetypeTy), *conformance);
+        }
+      }
+
+      return false;
+    });
+
+  populateParentMap(subMap);
+  return subMap;
 }

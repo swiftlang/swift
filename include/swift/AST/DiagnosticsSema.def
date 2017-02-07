@@ -1575,7 +1575,7 @@ ERROR(recursive_requirement_reference,none,
 ERROR(recursive_same_type_constraint,none,
       "same-type constraint %0 == %1 is recursive", (Type, Type))
 ERROR(recursive_superclass_constraint,none,
-      "superclass constraint %0 is recursive", (Type))
+      "superclass constraint %0 : %1 is recursive", (Type, Type))
 ERROR(requires_same_type_conflict,none,
       "generic parameter %0 cannot be equal to both %1 and %2",
       (StringRef, Type, Type))

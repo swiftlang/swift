@@ -814,6 +814,20 @@ static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
                              storage->getSetter());
   storage->setMaterializeForSetFunc(materializeForSet);
 
+  // Make sure we record the override.
+  //
+  // FIXME: Instead, we should just not call checkOverrides() on
+  // storage until all accessors are in place.
+  if (auto *baseASD = storage->getOverriddenDecl()) {
+    // If the base storage has a private setter, we're not overriding
+    // materializeForSet either.
+    auto *baseMFS = baseASD->getMaterializeForSetFunc();
+    if (baseMFS != nullptr &&
+        baseASD->isSetterAccessibleFrom(storage->getDeclContext())) {
+      materializeForSet->setOverriddenDecl(baseMFS);
+    }
+  }
+
   return materializeForSet;
 }
 
@@ -1122,8 +1136,8 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
                                Type SelfTy,
                                Type StorageTy,
                                NormalProtocolConformance *BehaviorConformance,
-                               ArrayRef<Substitution> SelfInterfaceSubs,
-                               ArrayRef<Substitution> SelfContextSubs) {
+                               SubstitutionList SelfInterfaceSubs,
+                               SubstitutionList SelfContextSubs) {
   assert(BehaviorStorage);
   assert((bool)DefaultInitStorage != (bool)ParamInitStorage);
 
@@ -1261,8 +1275,8 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
 void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                                  FuncDecl *BehaviorParameter,
                                  NormalProtocolConformance *BehaviorConformance,
-                                 ArrayRef<Substitution> SelfInterfaceSubs,
-                                 ArrayRef<Substitution> SelfContextSubs) {
+                                 SubstitutionList SelfInterfaceSubs,
+                                 SubstitutionList SelfContextSubs) {
   // Create a method to witness the requirement.
   auto DC = VD->getDeclContext();
   SmallString<64> NameBuf = VD->getName().str();
@@ -1397,8 +1411,8 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
 void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
                                        VarDecl *ValueImpl,
                                        Type valueTy,
-                                       ArrayRef<Substitution> SelfInterfaceSubs,
-                                       ArrayRef<Substitution> SelfContextSubs) {
+                                       SubstitutionList SelfInterfaceSubs,
+                                       SubstitutionList SelfContextSubs) {
   auto selfTy = SelfContextSubs[0].getReplacement();
   auto selfIfaceTy = SelfInterfaceSubs[0].getReplacement();
 

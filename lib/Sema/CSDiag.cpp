@@ -7876,7 +7876,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     // Fall through to produce diagnostics.
   }
 
-  if (getExpressionTooComplex()) {
+  if (getExpressionTooComplex(viable)) {
     TC.diagnose(expr->getLoc(), diag::expression_too_complex).
       highlight(expr->getSourceRange());
     return true;

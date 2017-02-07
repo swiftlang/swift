@@ -1,4 +1,8 @@
-// RUN: %target-swift-frontend -typecheck %s -module-name themodule -enable-source-import -I %S/../decl/enum -sdk "" -verify -show-diagnostics-after-fatal
+// RUN: %target-swift-frontend -typecheck %s -module-name themodule -enable-source-import -I %S/../decl/enum -sdk "" -verify -show-diagnostics-after-fatal -verify-ignore-unknown
+
+// -verify-ignore-unknown is for
+// <unknown>:0: error: unexpected note produced: did you forget to set an SDK using -sdk or SDKROOT?
+// <unknown>:0: error: unexpected note produced: use "xcrun swiftc" to select the default macOS SDK installed with Xcode
 
 import Swift
 import nonexistentimport  // expected-error {{no such module 'nonexistentimport'}}

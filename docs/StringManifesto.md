@@ -129,7 +129,7 @@ parameters. Among other things, this means:
    as case sensitivity based on whether the operation is localized.
 4. Removing correctness traps like `localizedCaseInsensitiveCompare` (see
     guidance in the
-    [Internationalization and Localization Guide](https://developer.apple.com/library/content/documentation/MacOSX/Conceptual/BPInternational/InternationalizingYourCode/InternationalizingYourCode.html).
+    [Internationalization and Localization Guide](https://developer.apple.com/library/content/documentation/MacOSX/Conceptual/BPInternational/InternationalizingYourCode/InternationalizingYourCode.html)).
 
 Along with appropriate documentation updates, these changes will make localized
 operations more teachable, comprehensible, and approachable, thereby lowering a

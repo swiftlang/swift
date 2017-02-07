@@ -119,7 +119,7 @@ public:
   ///
   /// \param reqToSyntheticEnvMap The mapping from the interface types of the
   /// requirement into the interface types of the synthetic environment.
-  Witness(ValueDecl *decl, ArrayRef<Substitution> substitutions,
+  Witness(ValueDecl *decl, SubstitutionList substitutions,
           GenericEnvironment *syntheticEnv,
           SubstitutionMap reqToSyntheticEnvMap);
 
@@ -154,7 +154,7 @@ public:
   ///
   /// The substitutions are substitutions for the witness, providing interface
   /// types from the synthetic environment.
-  ArrayRef<Substitution> getSubstitutions() const {
+  SubstitutionList getSubstitutions() const {
     return getDeclRef().getSubstitutions();
   }
 

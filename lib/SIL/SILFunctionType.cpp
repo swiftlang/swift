@@ -2127,23 +2127,12 @@ namespace {
   class SILTypeSubstituter :
       public CanTypeVisitor<SILTypeSubstituter, CanType> {
     SILModule &TheSILModule;
-    // Order dependency - Context must initialize before Subst and Conformances
-    Optional<std::pair<QueryTypeSubstitutionMap,
-                       LookUpConformanceInSubstitutionMap>> Context;
     TypeSubstitutionFn Subst;
     LookupConformanceFn Conformances;
 
     ASTContext &getASTContext() { return TheSILModule.getASTContext(); }
 
   public:
-    SILTypeSubstituter(SILModule &silModule, const SubstitutionMap &subs)
-      : TheSILModule(silModule),
-        Context({QueryTypeSubstitutionMap{subs.getMap()},
-                 LookUpConformanceInSubstitutionMap(subs)}),
-        Subst(Context->first),
-        Conformances(Context->second)
-    {}
-
     SILTypeSubstituter(SILModule &silModule,
                        TypeSubstitutionFn Subst,
                        LookupConformanceFn Conformances)
@@ -2264,16 +2253,26 @@ namespace {
   };
 } // end anonymous namespace
 
-SILType SILType::subst(SILModule &silModule, const SubstitutionMap &subs) const{
-  SILTypeSubstituter STST(silModule, subs);
+SILType SILType::subst(SILModule &silModule,
+                       TypeSubstitutionFn subs,
+                       LookupConformanceFn conformances) const {
+  SILTypeSubstituter STST(silModule, subs, conformances);
   return STST.subst(*this);
+}
+
+SILType SILType::subst(SILModule &silModule, const SubstitutionMap &subs) const{
+  return subst(silModule,
+               QuerySubstitutionMap{subs},
+               LookUpConformanceInSubstitutionMap(subs));
 }
 
 CanSILFunctionType SILType::substFuncType(SILModule &silModule,
                                           const SubstitutionMap &subs,
                                           CanSILFunctionType SrcTy,
                                           bool dropGenerics) {
-  SILTypeSubstituter STST(silModule, subs);
+  auto subFn = QuerySubstitutionMap{subs};
+  auto lookupFn = LookUpConformanceInSubstitutionMap(subs);
+  SILTypeSubstituter STST(silModule, subFn, lookupFn);
   return STST.visitSILFunctionType(SrcTy, dropGenerics);
 }
 
@@ -2282,18 +2281,31 @@ CanSILFunctionType SILType::substFuncType(SILModule &silModule,
 /// type, except using the original conventions.
 CanSILFunctionType
 SILFunctionType::substGenericArgs(SILModule &silModule,
-                                  ArrayRef<Substitution> subs) {
+                                  SubstitutionList subs) {
+  if (subs.empty()) {
+    assert(!isPolymorphic() && "no args for polymorphic substitution");
+    return CanSILFunctionType(this);
+  }
+
+  auto subMap = GenericSig->getSubstitutionMap(subs);
+  return substGenericArgs(silModule, subMap);
+}
+
+/// Apply a substitution to this polymorphic SILFunctionType so that
+/// it has the form of the normal SILFunctionType for the substituted
+/// type, except using the original conventions.
+CanSILFunctionType
+SILFunctionType::substGenericArgs(SILModule &silModule,
+                                  const SubstitutionMap &subs) {
   if (subs.empty()) {
     assert(!isPolymorphic() && "no args for polymorphic substitution");
     return CanSILFunctionType(this);
   }
 
   assert(isPolymorphic());
-  auto map = GenericSig->getSubstitutionMap(subs);
-  SILTypeSubstituter substituter(silModule, map);
-
-  return substituter.visitSILFunctionType(CanSILFunctionType(this),
-                                          /*dropGenerics*/ true);
+  return substGenericArgs(silModule,
+                          QuerySubstitutionMap{subs},
+                          LookUpConformanceInSubstitutionMap(subs));
 }
 
 CanSILFunctionType

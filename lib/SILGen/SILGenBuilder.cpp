@@ -73,7 +73,7 @@ MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
 
 ApplyInst *SILGenBuilder::createApply(SILLocation Loc, SILValue Fn,
                                       SILType SubstFnTy, SILType Result,
-                                      ArrayRef<Substitution> Subs,
+                                      SubstitutionList Subs,
                                       ArrayRef<SILValue> Args) {
   getSILGenModule().useConformancesFromSubstitutions(Subs);
   return SILBuilder::createApply(Loc, Fn, SubstFnTy, Result, Subs, Args, false);
@@ -81,7 +81,7 @@ ApplyInst *SILGenBuilder::createApply(SILLocation Loc, SILValue Fn,
 
 TryApplyInst *SILGenBuilder::createTryApply(SILLocation loc, SILValue Fn,
                                             SILType substFnTy,
-                                            ArrayRef<Substitution> subs,
+                                            SubstitutionList subs,
                                             ArrayRef<SILValue> args,
                                             SILBasicBlock *normalBB,
                                             SILBasicBlock *errorBB) {
@@ -92,7 +92,7 @@ TryApplyInst *SILGenBuilder::createTryApply(SILLocation loc, SILValue Fn,
 
 PartialApplyInst *SILGenBuilder::createPartialApply(
     SILLocation Loc, SILValue Fn, SILType SubstFnTy,
-    ArrayRef<Substitution> Subs, ArrayRef<SILValue> Args, SILType ClosureTy) {
+    SubstitutionList Subs, ArrayRef<SILValue> Args, SILType ClosureTy) {
   getSILGenModule().useConformancesFromSubstitutions(Subs);
   return SILBuilder::createPartialApply(Loc, Fn, SubstFnTy, Subs, Args,
                                         ClosureTy);
@@ -100,7 +100,7 @@ PartialApplyInst *SILGenBuilder::createPartialApply(
 
 BuiltinInst *SILGenBuilder::createBuiltin(SILLocation Loc, Identifier Name,
                                           SILType ResultTy,
-                                          ArrayRef<Substitution> Subs,
+                                          SubstitutionList Subs,
                                           ArrayRef<SILValue> Args) {
   getSILGenModule().useConformancesFromSubstitutions(Subs);
   return SILBuilder::createBuiltin(Loc, Name, ResultTy, Subs, Args);

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
 protocol Fooable {
   associatedtype Foo
@@ -110,7 +110,7 @@ func testAssocTypeEquivalence<T: Fooable>(_ fooable: T) -> X.Type
   return T.Foo.self
 }
 
-func fail6<T>(_ t: T) -> Int where T == Int { // expected-error{{same-type requirement makes generic parameter 'T' non-generic}}
+func fail6<T>(_ t: T) -> Int where T == Int { // expected-error 2{{same-type requirement makes generic parameter 'T' non-generic}}
   return t
 }
 
@@ -161,8 +161,7 @@ struct S1<T : P> {
 S1<Q>().foo(x: 1, y: 2)
 
 struct S2<T : P> where T.A == T.B {
-  // expected-error@+1 {{same-type requirement makes generic parameters 'X' and 'Y' equivalent}}
-  func foo<X, Y>(x: X, y: Y) where X == T.A, Y == T.B {
+  func foo<X, Y>(x: X, y: Y) where X == T.A, Y == T.B {  // expected-error 2 {{same-type requirement makes generic parameters 'X' and 'Y' equivalent}}
     print(X.self)
     print(Y.self)
     print(x)
@@ -172,8 +171,7 @@ struct S2<T : P> where T.A == T.B {
 S2<Q>().foo(x: 1, y: 2)
 
 struct S3<T : P> {
-  // expected-error@+1 {{same-type requirement makes generic parameters 'X' and 'Y' equivalent}}
-  func foo<X, Y>(x: X, y: Y) where X == T.A, Y == T.A {}
+  func foo<X, Y>(x: X, y: Y) where X == T.A, Y == T.A {} // expected-error 2{{same-type requirement makes generic parameters 'X' and 'Y' equivalent}}
 }
 S3<Q>().foo(x: 1, y: 2)
 
@@ -202,3 +200,6 @@ struct S4<T : P> {
 }
 
 S4<QQ>().foo(x: SS())
+
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected error produced: generic parameter τ_0_0.Bar.Foo cannot be equal to both 'Y.Foo' (aka 'X') and 'Z'

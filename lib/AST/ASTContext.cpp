@@ -261,7 +261,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<ProtocolType> ProtocolTypes;
 
     llvm::DenseMap<std::pair<TypeBase *, DeclContext *>,
-                   ArrayRef<Substitution>>
+                   SubstitutionList>
       BoundGenericSubstitutions;
 
     /// The set of normal protocol conformances.
@@ -1098,7 +1098,7 @@ static AllocationArena getArena(RecursiveTypeProperties properties) {
                         : AllocationArena::Permanent;
 }
 
-Optional<ArrayRef<Substitution>>
+Optional<SubstitutionList>
 ASTContext::createTrivialSubstitutions(BoundGenericType *BGT,
                                        DeclContext *gpContext) const {
   assert(gpContext && "No generic parameter context");
@@ -1113,7 +1113,7 @@ ASTContext::createTrivialSubstitutions(BoundGenericType *BGT,
   return Substitutions;
 }
 
-Optional<ArrayRef<Substitution>>
+Optional<SubstitutionList>
 ASTContext::getSubstitutions(TypeBase *type,
                              DeclContext *gpContext) const {
   assert(gpContext && "Missing generic parameter context");
@@ -1135,7 +1135,7 @@ ASTContext::getSubstitutions(TypeBase *type,
 
 void ASTContext::setSubstitutions(TypeBase* type,
                                   DeclContext *gpContext,
-                                  ArrayRef<Substitution> Subs) const {
+                                  SubstitutionList Subs) const {
   auto arena = getArena(type->getRecursiveProperties());
   auto &boundGenericSubstitutions
     = Impl.getArena(arena).BoundGenericSubstitutions;
@@ -1254,6 +1254,8 @@ ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
   // Create a new archetype builder with the given signature.
   auto builder = new ArchetypeBuilder(*this, LookUpConformanceInModule(mod));
   builder->addGenericSignature(sig);
+  builder->finalize(SourceLoc(), sig->getGenericParams(),
+                    /*allowConcreteGenericParams=*/true);
 
   // Store this archetype builder (no generic environment yet).
   Impl.ArchetypeBuilders[{sig, mod}] =
@@ -1263,13 +1265,14 @@ ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
 }
 
 GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
-                                                    ArchetypeBuilder *builder) {
+                                                    ArchetypeBuilder *builder,
+                                                    ModuleDecl &module) {
   auto known = Impl.CanonicalGenericEnvironments.find(builder);
   if (known != Impl.CanonicalGenericEnvironments.end())
     return known->second;
 
   auto sig = builder->getGenericSignature();
-  auto env = builder->getGenericEnvironment(sig);
+  auto env = sig->createGenericEnvironment(module);
   Impl.CanonicalGenericEnvironments[builder] = env;
   return env;
 }
@@ -1428,7 +1431,7 @@ ASTContext::getConformance(Type conformingType,
 SpecializedProtocolConformance *
 ASTContext::getSpecializedConformance(Type type,
                                       ProtocolConformance *generic,
-                                      ArrayRef<Substitution> substitutions) {
+                                      SubstitutionList substitutions) {
   llvm::FoldingSetNodeID id;
   SpecializedProtocolConformance::Profile(id, type, generic);
 
@@ -1587,6 +1590,7 @@ size_t ASTContext::getSolverMemory() const {
   
   if (Impl.CurrentConstraintSolverArena) {
     Size += Impl.CurrentConstraintSolverArena->getTotalMemory();
+    Size += Impl.CurrentConstraintSolverArena->Allocator.getBytesAllocated();
   }
   
   return Size;
@@ -4025,7 +4029,7 @@ SILLayout *SILLayout::get(ASTContext &C,
 
 CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
-                              ArrayRef<Substitution> Args) {
+                              SubstitutionList Args) {
   llvm::FoldingSetNodeID id;
   Profile(id, Layout, Args);
   
