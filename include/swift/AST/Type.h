@@ -125,6 +125,20 @@ public:
              ProtocolType *conformedProtocol) const;
 };
 
+/// Functor class suitable for use as a \c LookupConformanceFn that fetches
+/// conformances from a generic signature.
+class LookUpConformanceInSignature {
+  const GenericSignature &Sig;
+public:
+  LookUpConformanceInSignature(const GenericSignature &Sig)
+    : Sig(Sig) {}
+  
+  Optional<ProtocolConformanceRef>
+  operator()(CanType dependentType,
+             Type conformingReplacementType,
+             ProtocolType *conformedProtocol) const;
+};
+  
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
   /// If a type cannot be produced because some member type is
