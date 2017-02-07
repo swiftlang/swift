@@ -1040,6 +1040,9 @@ ERROR(anon_closure_arg_not_in_closure,none,
 ERROR(anon_closure_arg_in_closure_with_args,none,
       "anonymous closure arguments cannot be used inside a closure that has "
       "explicit arguments", ())
+ERROR(anon_closure_arg_in_closure_with_args_typo,none,
+      "anonymous closure arguments cannot be used inside a closure that has "
+      "explicit arguments; did you mean '%0'?", (StringRef))
 ERROR(expected_closure_parameter_name,none,
       "expected the name of a closure parameter", ())
 ERROR(expected_capture_specifier,none,

@@ -2447,12 +2447,23 @@ Expr *Parser::parseExprAnonClosureArg() {
   // generate the anonymous variables we need.
   auto closure = dyn_cast_or_null<ClosureExpr>(
       dyn_cast<AbstractClosureExpr>(CurDeclContext));
-  if (!closure || closure->getParameters()) {
-    // FIXME: specialize diagnostic when there were closure parameters.
-    // We can be fairly smart here.
-    diagnose(Loc, closure ? diag::anon_closure_arg_in_closure_with_args
-                          : diag::anon_closure_arg_not_in_closure);
+  if (!closure) {
+    diagnose(Loc, diag::anon_closure_arg_not_in_closure);
     return new (Context) ErrorExpr(Loc);
+  }
+  // When the closure already has explicit parameters, offer their names as
+  // replacements.
+  if (auto *params = closure->getParameters()) {
+    if (ArgNo < params->size() && params->get(ArgNo)->hasName()) {
+      auto paramName = params->get(ArgNo)->getNameStr();
+      diagnose(Loc, diag::anon_closure_arg_in_closure_with_args_typo, paramName)
+        .fixItReplace(Loc, paramName);
+      return new (Context) DeclRefExpr(params->get(ArgNo), DeclNameLoc(Loc),
+                                       /*Implicit=*/false);
+    } else {
+      diagnose(Loc, diag::anon_closure_arg_in_closure_with_args);
+      return new (Context) ErrorExpr(Loc);
+    }
   }
 
   auto leftBraceLoc = AnonClosureVars.back().first;
