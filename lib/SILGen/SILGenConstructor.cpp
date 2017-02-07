@@ -502,9 +502,9 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   ManagedValue initVal;
   SILType initTy;
 
-  ArrayRef<Substitution> subs;
+  SubstitutionList subs;
   // Call the initializer.
-  ArrayRef<Substitution> forwardingSubs;
+  SubstitutionList forwardingSubs;
   if (auto *genericEnv = ctor->getGenericEnvironmentOfContext())
     forwardingSubs = genericEnv->getForwardingSubstitutions();
   std::tie(initVal, initTy, subs)
@@ -895,7 +895,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         FullExpr scope(Cleanups, entry.getPattern());
 
         // Get the substitutions for the constructor context.
-        ArrayRef<Substitution> subs;
+        SubstitutionList subs;
         auto *genericEnv = dc->getGenericEnvironmentOfContext();
 
         DeclContext *typeDC = dc;

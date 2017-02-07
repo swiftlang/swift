@@ -30,7 +30,7 @@
 
 using namespace swift;
 
-Witness::Witness(ValueDecl *decl, ArrayRef<Substitution> substitutions,
+Witness::Witness(ValueDecl *decl, SubstitutionList substitutions,
                  GenericEnvironment *syntheticEnv,
                  SubstitutionMap reqToSynthesizedEnvMap) {
   auto &ctx = decl->getASTContext();
@@ -351,7 +351,7 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
 SpecializedProtocolConformance::SpecializedProtocolConformance(
     Type conformingType,
     ProtocolConformance *genericConformance,
-    ArrayRef<Substitution> substitutions)
+    SubstitutionList substitutions)
   : ProtocolConformance(ProtocolConformanceKind::Specialized, conformingType,
                         // FIXME: interface type should be passed in.
                         // assumes specialized conformance is always fully

@@ -701,7 +701,7 @@ namespace {
     AccessorBasedComponent(PathComponent::KindTy kind,
                            AbstractStorageDecl *decl,
                            bool isSuper, bool isDirectAccessorUse,
-                           ArrayRef<Substitution> substitutions,
+                           SubstitutionList substitutions,
                            CanType baseFormalType,
                            LValueTypeData typeData,
                            Expr *subscriptIndexExpr,
@@ -760,7 +760,7 @@ namespace {
 
      GetterSetterComponent(AbstractStorageDecl *decl,
                            bool isSuper, bool isDirectAccessorUse,
-                           ArrayRef<Substitution> substitutions,
+                           SubstitutionList substitutions,
                            CanType baseFormalType,
                            LValueTypeData typeData,
                            Expr *subscriptIndexExpr = nullptr,
@@ -1205,7 +1205,7 @@ namespace {
   public:
      AddressorComponent(AbstractStorageDecl *decl,
                         bool isSuper, bool isDirectAccessorUse,
-                        ArrayRef<Substitution> substitutions,
+                        SubstitutionList substitutions,
                         CanType baseFormalType, LValueTypeData typeData,
                         SILType substFieldType,
                         Expr *subscriptIndexExpr = nullptr,
@@ -1453,7 +1453,7 @@ LValue LValue::forAddress(ManagedValue address,
 
 void LValue::addMemberComponent(SILGenFunction &gen, SILLocation loc,
                                 AbstractStorageDecl *storage,
-                                ArrayRef<Substitution> subs,
+                                SubstitutionList subs,
                                 bool isSuper,
                                 AccessKind accessKind,
                                 AccessSemantics accessSemantics,
@@ -1594,9 +1594,9 @@ LValue SILGenLValue::visitExpr(Expr *e, AccessKind accessKind) {
   llvm_unreachable("unimplemented lvalue expr");
 }
 
-ArrayRef<Substitution>
+SubstitutionList
 SILGenModule::getNonMemberVarDeclSubstitutions(VarDecl *var) {
-  ArrayRef<Substitution> substitutions;
+  SubstitutionList substitutions;
   auto *dc = var->getDeclContext();
   if (auto *genericEnv = dc->getGenericEnvironmentOfContext())
     substitutions = genericEnv->getForwardingSubstitutions();
@@ -1802,7 +1802,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
 
 void LValue::addMemberVarComponent(SILGenFunction &gen, SILLocation loc,
                                    VarDecl *var,
-                                   ArrayRef<Substitution> subs,
+                                   SubstitutionList subs,
                                    bool isSuper,
                                    AccessKind accessKind,
                                    AccessSemantics accessSemantics,
@@ -1903,7 +1903,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
 
 void LValue::addMemberSubscriptComponent(SILGenFunction &gen, SILLocation loc,
                                          SubscriptDecl *decl,
-                                         ArrayRef<Substitution> subs,
+                                         SubstitutionList subs,
                                          bool isSuper,
                                          AccessKind accessKind,
                                          AccessSemantics accessSemantics,
@@ -2035,7 +2035,7 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
   SILGenLValue sgl(*this);
   LValue lv;
 
-  ArrayRef<Substitution> subs =
+  SubstitutionList subs =
       base.getType().gatherAllSubstitutions(SGM.M);
 
   LValueTypeData baseTypeData = getValueTypeData(baseFormalType,

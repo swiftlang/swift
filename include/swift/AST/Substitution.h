@@ -67,8 +67,6 @@ private:
   friend class ProtocolConformance;
 };
 
-void dump(const ArrayRef<Substitution> &subs);
-
 } // end namespace swift
 
 #endif

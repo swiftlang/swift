@@ -202,7 +202,7 @@ ASTContext &GenericSignature::getASTContext() const {
 }
 
 SubstitutionMap
-GenericSignature::getSubstitutionMap(ArrayRef<Substitution> subs) const {
+GenericSignature::getSubstitutionMap(SubstitutionList subs) const {
   SubstitutionMap result;
   getSubstitutionMap(subs, result);
   return result;
@@ -339,7 +339,7 @@ static void populateParentMap(const GenericSignature *sig,
 }
 
 void
-GenericSignature::getSubstitutionMap(ArrayRef<Substitution> subs,
+GenericSignature::getSubstitutionMap(SubstitutionList subs,
                                      SubstitutionMap &result) const {
   // An empty parameter list gives an empty map.
   if (subs.empty())

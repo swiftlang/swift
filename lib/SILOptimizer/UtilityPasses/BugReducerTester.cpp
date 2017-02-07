@@ -146,7 +146,7 @@ class BugReducerTester : public SILFunctionTransform {
         SILBuilder B(Apply->getIterator());
         B.createApply(Loc, B.createFunctionRef(Loc, RuntimeCrasherFunc),
                       RuntimeCrasherFunc->getLoweredType(),
-                      M.Types.getEmptyTupleType(), ArrayRef<Substitution>(),
+                      M.Types.getEmptyTupleType(), SubstitutionList(),
                       ArrayRef<SILValue>(), false /*NoThrow*/);
 
         Apply->replaceAllUsesWith(SILUndef::get(Apply->getType(), M));

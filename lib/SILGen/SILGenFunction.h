@@ -559,7 +559,7 @@ public:
                            CanAnyFunctionType reqtSubstTy,
                            SILDeclRef requirement,
                            SILDeclRef witness,
-                           ArrayRef<Substitution> witnessSubs,
+                           SubstitutionList witnessSubs,
                            IsFreeFunctionWitness_t isFree);
   
   /// Convert a block to a native function with a thunk.
@@ -1009,7 +1009,7 @@ public:
                                    ManagedValue base,
                                    CanType baseFormalType,
                                    bool isSuper, VarDecl *property,
-                                   ArrayRef<Substitution> substitutions,
+                                   SubstitutionList substitutions,
                                    AccessSemantics semantics, Type propTy,
                                    SGFContext C,
                                    bool isGuaranteedValid = false);
@@ -1025,7 +1025,7 @@ public:
   ManagedValue emitClosureValue(SILLocation loc,
                                 SILDeclRef function,
                                 CanType expectedType,
-                                ArrayRef<Substitution> subs);
+                                SubstitutionList subs);
   
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
@@ -1034,7 +1034,7 @@ public:
   SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl,
                               bool isDirectAccessorUse);  
   RValue emitGetAccessor(SILLocation loc, SILDeclRef getter,
-                         ArrayRef<Substitution> substitutions,
+                         SubstitutionList substitutions,
                          ArgumentSource &&optionalSelfValue,
                          bool isSuper, bool isDirectAccessorUse,
                          RValue &&optionalSubscripts, SGFContext C);
@@ -1042,7 +1042,7 @@ public:
   SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl,
                               bool isDirectAccessorUse);  
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
-                       ArrayRef<Substitution> substitutions,
+                       SubstitutionList substitutions,
                        ArgumentSource &&optionalSelfValue,
                        bool isSuper, bool isDirectAccessorUse,
                        RValue &&optionalSubscripts, RValue &&value);
@@ -1051,7 +1051,7 @@ public:
                                          bool isDirectAccessorUse);  
   MaterializedLValue
   emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
-                                ArrayRef<Substitution> substitutions,
+                                SubstitutionList substitutions,
                                 ArgumentSource &&optionalSelfValue,
                                 bool isSuper, bool isDirectAccessorUse,
                                 RValue &&optionalSubscripts,
@@ -1063,7 +1063,7 @@ public:
                                        GenericEnvironment *genericEnv,
                                        FuncDecl *requirement,
                                        FuncDecl *witness,
-                                       ArrayRef<Substitution> witnessSubs);
+                                       SubstitutionList witnessSubs);
   void emitMaterializeForSet(FuncDecl *decl);
 
   SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
@@ -1071,7 +1071,7 @@ public:
                                  bool isDirectAccessorUse);
   std::pair<ManagedValue,ManagedValue>
   emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
-                        ArrayRef<Substitution> substitutions,
+                        SubstitutionList substitutions,
                         ArgumentSource &&optionalSelfValue,
                         bool isSuper, bool isDirectAccessorUse,
                         RValue &&optionalSubscripts,
@@ -1155,11 +1155,11 @@ public:
   /// Emit a reference to a method from within another method of the type, and
   /// gather all the substitutions necessary to invoke it, without
   /// dynamic dispatch.
-  std::tuple<ManagedValue, SILType, ArrayRef<Substitution>>
+  std::tuple<ManagedValue, SILType, SubstitutionList>
   emitSiblingMethodRef(SILLocation loc,
                        SILValue selfValue,
                        SILDeclRef methodConstant,
-                       ArrayRef<Substitution> innerSubstitutions);
+                       SubstitutionList innerSubstitutions);
   
   SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
   
@@ -1187,7 +1187,7 @@ public:
   /// formal type.
   RValue emitApply(SILLocation loc,
                    ManagedValue fn,
-                   ArrayRef<Substitution> subs,
+                   SubstitutionList subs,
                    ArrayRef<ManagedValue> args,
                    CanSILFunctionType substFnType,
                    AbstractionPattern origResultType,
@@ -1207,7 +1207,7 @@ public:
   RValue emitApplyOfStoredPropertyInitializer(
       SILLocation loc,
       const PatternBindingEntry &entry,
-      ArrayRef<Substitution> subs,
+      SubstitutionList subs,
       CanType resultType,
       AbstractionPattern origResultType,
       SGFContext C);
@@ -1225,13 +1225,13 @@ public:
 
   RValue emitApplyOfLibraryIntrinsic(SILLocation loc,
                                      FuncDecl *fn,
-                                     ArrayRef<Substitution> subs,
+                                     SubstitutionList subs,
                                      ArrayRef<ManagedValue> args,
                                      SGFContext ctx);
 
   SILValue emitApplyWithRethrow(SILLocation loc, SILValue fn,
                                 SILType substFnType,
-                                ArrayRef<Substitution> subs,
+                                SubstitutionList subs,
                                 ArrayRef<SILValue> args);
 
   /// Emit a literal that applies the various initializers.
@@ -1579,7 +1579,7 @@ public:
   
   /// Return forwarding substitutions for the archetypes in the current
   /// function.
-  ArrayRef<Substitution> getForwardingSubstitutions();
+  SubstitutionList getForwardingSubstitutions();
   
   /// Get the _Pointer protocol used for pointer argument operations.
   ProtocolDecl *getPointerProtocol();

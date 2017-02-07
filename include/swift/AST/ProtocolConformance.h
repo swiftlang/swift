@@ -535,7 +535,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   /// The substitutions applied to the generic conformance to produce this
   /// conformance.
-  ArrayRef<Substitution> GenericSubstitutions;
+  SubstitutionList GenericSubstitutions;
 
   /// The mapping from associated type requirements to their substitutions.
   ///
@@ -547,7 +547,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   SpecializedProtocolConformance(Type conformingType,
                                  ProtocolConformance *genericConformance,
-                                 ArrayRef<Substitution> substitutions);
+                                 SubstitutionList substitutions);
 
 public:
   /// Get the generic conformance from which this conformance was derived,
@@ -558,7 +558,7 @@ public:
 
   /// Get the substitutions used to produce this specialized conformance from
   /// the generic conformance.
-  ArrayRef<Substitution> getGenericSubstitutions() const {
+  SubstitutionList getGenericSubstitutions() const {
     return GenericSubstitutions;
   }
 

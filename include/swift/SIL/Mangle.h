@@ -135,7 +135,7 @@ class GenericSpecializationMangler :
 
   friend class SpecializationMangler<GenericSpecializationMangler>;
 
-  ArrayRef<Substitution> Subs;
+  SubstitutionList Subs;
 
 public:
 
@@ -145,7 +145,7 @@ public:
   };
 
   GenericSpecializationMangler(Mangle::Mangler &M, SILFunction *F,
-                               ArrayRef<Substitution> Subs,
+                               SubstitutionList Subs,
                                IsFragile_t Fragile,
                                ReAbstractionMode isReAbstracted = ReAbstracted)
     : SpecializationMangler(isReAbstracted == ReAbstracted ?

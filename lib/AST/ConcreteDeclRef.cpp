@@ -25,7 +25,7 @@ using namespace swift;
 ConcreteDeclRef::SpecializedDeclRef *
 ConcreteDeclRef::SpecializedDeclRef::create(
                                        ASTContext &ctx, ValueDecl *decl,
-                                       ArrayRef<Substitution> substitutions) {
+                                       SubstitutionList substitutions) {
   size_t size = totalSizeToAlloc<Substitution>(substitutions.size());
   void *memory = ctx.Allocate(size, alignof(SpecializedDeclRef));
   return new (memory) SpecializedDeclRef(decl, substitutions);

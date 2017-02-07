@@ -233,12 +233,12 @@ public:
   /// with contextual types instead of interface types.
   SubstitutionMap
   getSubstitutionMap(ModuleDecl *mod,
-                     ArrayRef<Substitution> subs) const;
+                     SubstitutionList subs) const;
 
   /// Same as above, but updates an existing map.
   void
   getSubstitutionMap(ModuleDecl *mod,
-                     ArrayRef<Substitution> subs,
+                     SubstitutionList subs,
                      SubstitutionMap &subMap) const;
 
   /// Build a contextual type substitution map from a type substitution function
@@ -248,7 +248,7 @@ public:
                      TypeSubstitutionFn subs,
                      LookupConformanceFn lookupConformance) const;
 
-  ArrayRef<Substitution> getForwardingSubstitutions() const;
+  SubstitutionList getForwardingSubstitutions() const;
 
   void dump() const;
 };

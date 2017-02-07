@@ -434,7 +434,7 @@ public:
   ///
   /// Only call this with function types!
   SILType substGenericArgs(SILModule &M,
-                           ArrayRef<Substitution> Subs) const;
+                           SubstitutionList Subs) const;
 
   SILType subst(SILModule &silModule,
                 TypeSubstitutionFn subs,
@@ -444,7 +444,7 @@ public:
 
   /// If this is a specialized generic type, return all substitutions used to
   /// generate it.
-  ArrayRef<Substitution> gatherAllSubstitutions(SILModule &M);
+  SubstitutionList gatherAllSubstitutions(SILModule &M);
 
   /// Return true if this type references a "ref" type that has a single pointer
   /// representation. Class existentials do not always qualify.

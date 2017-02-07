@@ -388,7 +388,7 @@ public:
   /// Add a member component to the access path of this lvalue.
   void addMemberComponent(SILGenFunction &gen, SILLocation loc,
                           AbstractStorageDecl *storage,
-                          ArrayRef<Substitution> subs,
+                          SubstitutionList subs,
                           bool isSuper,
                           AccessKind accessKind,
                           AccessSemantics accessSemantics,
@@ -398,7 +398,7 @@ public:
 
   void addMemberVarComponent(SILGenFunction &gen, SILLocation loc,
                              VarDecl *var,
-                             ArrayRef<Substitution> subs,
+                             SubstitutionList subs,
                              bool isSuper,
                              AccessKind accessKind,
                              AccessSemantics accessSemantics,
@@ -407,7 +407,7 @@ public:
 
   void addMemberSubscriptComponent(SILGenFunction &gen, SILLocation loc,
                                    SubscriptDecl *subscript,
-                                   ArrayRef<Substitution> subs,
+                                   SubstitutionList subs,
                                    bool isSuper,
                                    AccessKind accessKind,
                                    AccessSemantics accessSemantics,

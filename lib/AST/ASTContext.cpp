@@ -261,7 +261,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<ProtocolType> ProtocolTypes;
 
     llvm::DenseMap<std::pair<TypeBase *, DeclContext *>,
-                   ArrayRef<Substitution>>
+                   SubstitutionList>
       BoundGenericSubstitutions;
 
     /// The set of normal protocol conformances.
@@ -1098,7 +1098,7 @@ static AllocationArena getArena(RecursiveTypeProperties properties) {
                         : AllocationArena::Permanent;
 }
 
-Optional<ArrayRef<Substitution>>
+Optional<SubstitutionList>
 ASTContext::createTrivialSubstitutions(BoundGenericType *BGT,
                                        DeclContext *gpContext) const {
   assert(gpContext && "No generic parameter context");
@@ -1113,7 +1113,7 @@ ASTContext::createTrivialSubstitutions(BoundGenericType *BGT,
   return Substitutions;
 }
 
-Optional<ArrayRef<Substitution>>
+Optional<SubstitutionList>
 ASTContext::getSubstitutions(TypeBase *type,
                              DeclContext *gpContext) const {
   assert(gpContext && "Missing generic parameter context");
@@ -1135,7 +1135,7 @@ ASTContext::getSubstitutions(TypeBase *type,
 
 void ASTContext::setSubstitutions(TypeBase* type,
                                   DeclContext *gpContext,
-                                  ArrayRef<Substitution> Subs) const {
+                                  SubstitutionList Subs) const {
   auto arena = getArena(type->getRecursiveProperties());
   auto &boundGenericSubstitutions
     = Impl.getArena(arena).BoundGenericSubstitutions;
@@ -1430,7 +1430,7 @@ ASTContext::getConformance(Type conformingType,
 SpecializedProtocolConformance *
 ASTContext::getSpecializedConformance(Type type,
                                       ProtocolConformance *generic,
-                                      ArrayRef<Substitution> substitutions) {
+                                      SubstitutionList substitutions) {
   llvm::FoldingSetNodeID id;
   SpecializedProtocolConformance::Profile(id, type, generic);
 
@@ -4028,7 +4028,7 @@ SILLayout *SILLayout::get(ASTContext &C,
 
 CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
-                              ArrayRef<Substitution> Args) {
+                              SubstitutionList Args) {
   llvm::FoldingSetNodeID id;
   Profile(id, Layout, Args);
   

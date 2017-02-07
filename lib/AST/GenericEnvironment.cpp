@@ -330,7 +330,7 @@ Type GenericEnvironment::getSugaredType(Type type) const {
   });
 }
 
-ArrayRef<Substitution>
+SubstitutionList
 GenericEnvironment::getForwardingSubstitutions() const {
   SmallVector<Substitution, 4> result;
   getGenericSignature()->getSubstitutions(QueryInterfaceTypeSubstitutions(this),
@@ -341,7 +341,7 @@ GenericEnvironment::getForwardingSubstitutions() const {
 
 SubstitutionMap GenericEnvironment::
 getSubstitutionMap(ModuleDecl *mod,
-                   ArrayRef<Substitution> subs) const {
+                   SubstitutionList subs) const {
   SubstitutionMap result;
   getSubstitutionMap(mod, subs, result);
   return result;
@@ -392,7 +392,7 @@ static void populateParentMap(ModuleDecl *mod,
 
 void GenericEnvironment::
 getSubstitutionMap(ModuleDecl *mod,
-                   ArrayRef<Substitution> subs,
+                   SubstitutionList subs,
                    SubstitutionMap &result) const {
   for (auto depTy : getGenericSignature()->getAllDependentTypes()) {
 

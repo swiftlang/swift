@@ -1122,8 +1122,8 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
                                Type SelfTy,
                                Type StorageTy,
                                NormalProtocolConformance *BehaviorConformance,
-                               ArrayRef<Substitution> SelfInterfaceSubs,
-                               ArrayRef<Substitution> SelfContextSubs) {
+                               SubstitutionList SelfInterfaceSubs,
+                               SubstitutionList SelfContextSubs) {
   assert(BehaviorStorage);
   assert((bool)DefaultInitStorage != (bool)ParamInitStorage);
 
@@ -1261,8 +1261,8 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
 void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                                  FuncDecl *BehaviorParameter,
                                  NormalProtocolConformance *BehaviorConformance,
-                                 ArrayRef<Substitution> SelfInterfaceSubs,
-                                 ArrayRef<Substitution> SelfContextSubs) {
+                                 SubstitutionList SelfInterfaceSubs,
+                                 SubstitutionList SelfContextSubs) {
   // Create a method to witness the requirement.
   auto DC = VD->getDeclContext();
   SmallString<64> NameBuf = VD->getName().str();
@@ -1397,8 +1397,8 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
 void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
                                        VarDecl *ValueImpl,
                                        Type valueTy,
-                                       ArrayRef<Substitution> SelfInterfaceSubs,
-                                       ArrayRef<Substitution> SelfContextSubs) {
+                                       SubstitutionList SelfInterfaceSubs,
+                                       SubstitutionList SelfContextSubs) {
   auto selfTy = SelfContextSubs[0].getReplacement();
   auto selfIfaceTy = SelfInterfaceSubs[0].getReplacement();
 
