@@ -62,13 +62,13 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
   auto witnessFnTy = witnessRef->getType();
 
   // Compute the substitutions.
-  ArrayRef<Substitution> witnessSubstitutions = witness.getSubstitutions();
-  ArrayRef<Substitution> typeSubstitutions =
+  SubstitutionList witnessSubstitutions = witness.getSubstitutions();
+  SubstitutionList typeSubstitutions =
       swiftValueType->gatherAllSubstitutions(gen.SGM.SwiftModule, nullptr);
 
   // FIXME: Witness substitutions get dropped via serialization, so we end up
   // trying to reconstitute them here.
-  ArrayRef<Substitution> substitutions;
+  SubstitutionList substitutions;
   SmallVector<Substitution, 4> substitutionsBuf;
   if (typeSubstitutions.empty()) {
     substitutions = witnessSubstitutions;
@@ -80,8 +80,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
     GenericEnvironment *witnessEnv = witness.getSyntheticEnvironment();
 
     SubstitutionMap typeSubMap = witnessEnv
-      ->getSubstitutionMap(gen.SGM.SwiftModule,
-                           typeSubstitutions);
+      ->getSubstitutionMap(typeSubstitutions);
     for (auto sub : witnessSubstitutions) {
       substitutionsBuf.push_back(sub.subst(gen.SGM.SwiftModule, typeSubMap));
     }
@@ -142,7 +141,7 @@ emitBridgeObjectiveCToNative(SILGenFunction &gen,
   auto witnessFnTy = witnessRef->getType().castTo<SILFunctionType>();
 
   Type swiftValueType = conformance->getType();
-  ArrayRef<Substitution> substitutions =
+  SubstitutionList substitutions =
       swiftValueType->gatherAllSubstitutions(
           gen.SGM.SwiftModule, nullptr);
 
@@ -373,7 +372,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
 
   CanGenericSignature genericSig;
   GenericEnvironment *genericEnv = nullptr;
-  ArrayRef<Substitution> subs;
+  SubstitutionList subs;
   if (fnTy->hasArchetype() || blockTy->hasArchetype()) {
     genericSig = F.getLoweredFunctionType()->getGenericSignature();
     genericEnv = F.getGenericEnvironment();
@@ -1129,7 +1128,7 @@ getThunkedForeignFunctionRef(SILGenFunction &gen,
                              SILLocation loc,
                              SILDeclRef foreign,
                              ArrayRef<ManagedValue> args,
-                             ArrayRef<Substitution> subs,
+                             SubstitutionList subs,
                              const SILConstantInfo &foreignCI) {
   assert(!foreign.isCurried
          && "should not thunk calling convention when curried");

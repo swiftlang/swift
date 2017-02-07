@@ -642,7 +642,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
                                               SILDeclRef method,
                                               CanSILFunctionType origFnType,
                                               CanSILFunctionType substFnType,
-                                              ArrayRef<Substitution> subs,
+                                              SubstitutionList subs,
                                               ObjCMessageKind kind) {
   assert((method.kind == SILDeclRef::Kind::Initializer
           || method.kind == SILDeclRef::Kind::Allocator
@@ -881,7 +881,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   CallEmission emission
     = prepareObjCMethodRootCall(subIGF, method.getMethod(),
                                 origMethodType, origMethodType,
-                                ArrayRef<Substitution>{},
+                                SubstitutionList{},
                                 method.getMessageKind());
   
   Explosion args;

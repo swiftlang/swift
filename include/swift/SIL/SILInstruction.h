@@ -1030,7 +1030,7 @@ class ApplyInstBase<Impl, Base, false> : public Base {
 protected:
   template <class... As>
   ApplyInstBase(ValueKind kind, SILDebugLocation DebugLoc, SILValue callee,
-                SILType substCalleeType, ArrayRef<Substitution> substitutions,
+                SILType substCalleeType, SubstitutionList substitutions,
                 ArrayRef<SILValue> args,
                 ArrayRef<SILValue> TypeDependentOperands,
                 As... baseArgs)
@@ -1045,7 +1045,7 @@ protected:
   }
 
   static void *allocate(SILFunction &F,
-                        ArrayRef<Substitution> substitutions,
+                        SubstitutionList substitutions,
                         ArrayRef<SILValue> TypeDependentOperands,
                         ArrayRef<SILValue> args) {
     return allocateApplyInst(
@@ -1115,7 +1115,7 @@ public:
     return {getSubstitutionsStorage(), NumSubstitutions};
   }
 
-  ArrayRef<Substitution> getSubstitutions() const {
+  SubstitutionList getSubstitutions() const {
     return {getSubstitutionsStorage(), NumSubstitutions};
   }
 
@@ -1284,14 +1284,14 @@ class ApplyInst : public ApplyInstBase<ApplyInst, SILInstruction> {
 
   ApplyInst(SILDebugLocation DebugLoc, SILValue Callee,
             SILType SubstCalleeType, SILType ReturnType,
-            ArrayRef<Substitution> Substitutions,
+            SubstitutionList Substitutions,
             ArrayRef<SILValue> Args,
             ArrayRef<SILValue> TypeDependentOperands,
             bool isNonThrowing);
 
   static ApplyInst *create(SILDebugLocation DebugLoc, SILValue Callee,
                            SILType SubstCalleeType, SILType ReturnType,
-                           ArrayRef<Substitution> Substitutions,
+                           SubstitutionList Substitutions,
                            ArrayRef<SILValue> Args, bool isNonThrowing,
                            SILFunction &F,
                            SILOpenedArchetypesState &OpenedArchetypes);
@@ -1316,14 +1316,14 @@ class PartialApplyInst
 
   PartialApplyInst(SILDebugLocation DebugLoc, SILValue Callee,
                    SILType SubstCalleeType,
-                   ArrayRef<Substitution> Substitutions,
+                   SubstitutionList Substitutions,
                    ArrayRef<SILValue> Args,
                    ArrayRef<SILValue> TypeDependentOperands,
                    SILType ClosureType);
 
   static PartialApplyInst *create(SILDebugLocation DebugLoc, SILValue Callee,
                                   SILType SubstCalleeType,
-                                  ArrayRef<Substitution> Substitutions,
+                                  SubstitutionList Substitutions,
                                   ArrayRef<SILValue> Args, SILType ClosureType,
                                   SILFunction &F,
                                   SILOpenedArchetypesState &OpenedArchetypes);
@@ -1414,11 +1414,11 @@ class BuiltinInst : public SILInstruction {
   }
 
   BuiltinInst(SILDebugLocation DebugLoc, Identifier Name, SILType ReturnType,
-              ArrayRef<Substitution> Substitutions, ArrayRef<SILValue> Args);
+              SubstitutionList Substitutions, ArrayRef<SILValue> Args);
 
   static BuiltinInst *create(SILDebugLocation DebugLoc, Identifier Name,
                              SILType ReturnType,
-                             ArrayRef<Substitution> Substitutions,
+                             SubstitutionList Substitutions,
                              ArrayRef<SILValue> Args, SILFunction &F);
 
 public:
@@ -1461,7 +1461,7 @@ public:
   }
 
   /// Return the type parameters to the builtin.
-  ArrayRef<Substitution> getSubstitutions() const {
+  SubstitutionList getSubstitutions() const {
     return {getSubstitutionsStorage(), NumSubstitutions};
   }
   /// Return the type parameters to the builtin.
@@ -1951,20 +1951,20 @@ class MarkUninitializedBehaviorInst final : public SILInstruction,
   
   MarkUninitializedBehaviorInst(SILDebugLocation DebugLoc,
                                 SILValue InitStorage,
-                                ArrayRef<Substitution> InitStorageSubs,
+                                SubstitutionList InitStorageSubs,
                                 SILValue Storage,
                                 SILValue Setter,
-                                ArrayRef<Substitution> SetterSubs,
+                                SubstitutionList SetterSubs,
                                 SILValue Self,
                                 SILType Ty);
   
   static MarkUninitializedBehaviorInst *create(SILModule &M,
                                          SILDebugLocation DebugLoc,
                                          SILValue InitStorage,
-                                         ArrayRef<Substitution> InitStorageSubs,
+                                         SubstitutionList InitStorageSubs,
                                          SILValue Storage,
                                          SILValue Setter,
-                                         ArrayRef<Substitution> SetterSubs,
+                                         SubstitutionList SetterSubs,
                                          SILValue Self,
                                          SILType Ty);
 
@@ -1972,7 +1972,7 @@ public:
   SILValue getInitStorageFunc() const {
     return Operands[InitStorageFunc].get();
   }
-  ArrayRef<Substitution> getInitStorageSubstitutions() const {
+  SubstitutionList getInitStorageSubstitutions() const {
     return {getTrailingObjects<Substitution>(), NumInitStorageSubstitutions};
   }
   SILValue getStorage() const {
@@ -1982,7 +1982,7 @@ public:
   SILValue getSetterFunc() const {
     return Operands[SetterFunc].get();
   }
-  ArrayRef<Substitution> getSetterSubstitutions() const {
+  SubstitutionList getSetterSubstitutions() const {
     return {getTrailingObjects<Substitution>() + NumInitStorageSubstitutions,
             NumSetterSubstitutions};
   }
@@ -4120,7 +4120,7 @@ class InitBlockStorageHeaderInst : public SILInstruction {
 
   InitBlockStorageHeaderInst(SILDebugLocation DebugLoc, SILValue BlockStorage,
                              SILValue InvokeFunction, SILType BlockType,
-                             ArrayRef<Substitution> Subs)
+                             SubstitutionList Subs)
       : SILInstruction(ValueKind::InitBlockStorageHeaderInst, DebugLoc,
                        BlockType),
         NumSubstitutions(Subs.size()),
@@ -4132,14 +4132,14 @@ class InitBlockStorageHeaderInst : public SILInstruction {
   static InitBlockStorageHeaderInst *create(SILFunction &F,
                               SILDebugLocation DebugLoc, SILValue BlockStorage,
                               SILValue InvokeFunction, SILType BlockType,
-                              ArrayRef<Substitution> Subs);
+                              SubstitutionList Subs);
 public:
   /// Get the block storage address to be initialized.
   SILValue getBlockStorage() const { return Operands[BlockStorage].get(); }
   /// Get the invoke function to form the block around.
   SILValue getInvokeFunction() const { return Operands[InvokeFunction].get(); }
 
-  ArrayRef<Substitution> getSubstitutions() const {
+  SubstitutionList getSubstitutions() const {
     return {getSubstitutionsStorage(), NumSubstitutions};
   }
 
@@ -5323,14 +5323,14 @@ class TryApplyInst
   friend SILBuilder;
 
   TryApplyInst(SILDebugLocation DebugLoc, SILValue callee,
-               SILType substCalleeType, ArrayRef<Substitution> substitutions,
+               SILType substCalleeType, SubstitutionList substitutions,
                ArrayRef<SILValue> args,
                ArrayRef<SILValue> TypeDependentOperands,
                SILBasicBlock *normalBB, SILBasicBlock *errorBB);
 
   static TryApplyInst *create(SILDebugLocation DebugLoc, SILValue callee,
                               SILType substCalleeType,
-                              ArrayRef<Substitution> substitutions,
+                              SubstitutionList substitutions,
                               ArrayRef<SILValue> args, SILBasicBlock *normalBB,
                               SILBasicBlock *errorBB, SILFunction &F,
                               SILOpenedArchetypesState &OpenedArchetypes);

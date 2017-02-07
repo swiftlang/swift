@@ -551,7 +551,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
     auto *ErrorArg =
         ErrorBlock->createPHIArgument(Error, ValueOwnershipKind::Owned);
-    Builder.createTryApply(Loc, FRI, LoweredType, ArrayRef<Substitution>(),
+    Builder.createTryApply(Loc, FRI, LoweredType, SubstitutionList(),
                            ThunkArgs, NormalBlock, ErrorBlock);
 
     Builder.setInsertionPoint(ErrorBlock);
@@ -559,7 +559,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     Builder.setInsertionPoint(NormalBlock);
   } else {
     ReturnValue = Builder.createApply(Loc, FRI, LoweredType, ResultType,
-                                      ArrayRef<Substitution>(), ThunkArgs,
+                                      SubstitutionList(), ThunkArgs,
                                       false);
   }
 

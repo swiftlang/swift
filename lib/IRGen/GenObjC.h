@@ -86,7 +86,7 @@ namespace irgen {
                                          SILDeclRef method,
                                          CanSILFunctionType origFnType,
                                          CanSILFunctionType substFnType,
-                                         ArrayRef<Substitution> subs,
+                                         SubstitutionList subs,
                                          ObjCMessageKind kind);
 
   void addObjCMethodCallImplicitArguments(IRGenFunction &IGF,

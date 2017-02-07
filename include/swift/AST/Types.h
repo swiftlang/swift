@@ -22,7 +22,7 @@
 #include "swift/AST/Ownership.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SILLayout.h"
-#include "swift/AST/Substitution.h"
+#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Identifier.h"
@@ -601,7 +601,7 @@ public:
   /// from its unspecialized type.
   ///
   /// \returns ASTContext-allocated substitutions.
-  ArrayRef<Substitution> gatherAllSubstitutions(
+  SubstitutionList gatherAllSubstitutions(
                            ModuleDecl *module,
                            LazyResolver *resolver,
                            DeclContext *gpContext = nullptr);
@@ -2625,7 +2625,7 @@ public:
                               
   /// Substitute the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
-  FunctionType *substGenericArgs(ArrayRef<Substitution> subs);
+  FunctionType *substGenericArgs(SubstitutionList subs);
 
   /// Substitute the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
@@ -3356,7 +3356,7 @@ public:
   }
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,
-                                      ArrayRef<Substitution> subs);
+                                      SubstitutionList subs);
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       const SubstitutionMap &subs);
   CanSILFunctionType substGenericArgs(SILModule &silModule,
@@ -3399,18 +3399,18 @@ class SILBoxType final : public TypeBase,
   unsigned NumGenericArgs;
 
   static RecursiveTypeProperties
-  getRecursivePropertiesFromSubstitutions(ArrayRef<Substitution> Args);
+  getRecursivePropertiesFromSubstitutions(SubstitutionList Args);
 
   SILBoxType(ASTContext &C,
-             SILLayout *Layout, ArrayRef<Substitution> Args);
+             SILLayout *Layout, SubstitutionList Args);
 
 public:
   static CanSILBoxType get(ASTContext &C,
                            SILLayout *Layout,
-                           ArrayRef<Substitution> Args);
+                           SubstitutionList Args);
 
   SILLayout *getLayout() const { return Layout; }
-  ArrayRef<Substitution> getGenericArgs() const {
+  SubstitutionList getGenericArgs() const {
     return llvm::makeArrayRef(getTrailingObjects<Substitution>(),
                               NumGenericArgs);
   }
@@ -3432,7 +3432,7 @@ public:
   /// Produce a profile of this box, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id,
                       SILLayout *Layout,
-                      ArrayRef<Substitution> Args);
+                      SubstitutionList Args);
   
   /// \brief Produce a profile of this box, for use in a folding set.
   void Profile(llvm::FoldingSetNodeID &id) {

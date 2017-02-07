@@ -200,7 +200,7 @@ public:
   ClosureCloner(SILFunction *Orig, IsFragile_t Fragile,
                 StringRef ClonedName,
                 SubstitutionMap &InterfaceSubs,
-                ArrayRef<Substitution> ApplySubs,
+                SubstitutionList ApplySubs,
                 IndicesSet &PromotableIndices);
 
   void populateCloned();
@@ -317,7 +317,7 @@ ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) {
 ClosureCloner::ClosureCloner(SILFunction *Orig, IsFragile_t Fragile,
                              StringRef ClonedName,
                              SubstitutionMap &InterfaceSubs,
-                             ArrayRef<Substitution> ApplySubs,
+                             SubstitutionList ApplySubs,
                              IndicesSet &PromotableIndices)
   : TypeSubstCloner<ClosureCloner>(
                            *initCloned(Orig, Fragile, ClonedName, InterfaceSubs,

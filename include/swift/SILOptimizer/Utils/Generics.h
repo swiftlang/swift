@@ -66,7 +66,7 @@ public:
   /// substitutions \p ParamSubs.
   /// If specialization is not possible getSpecializedType() will return an
   /// invalid type.
-  ReabstractionInfo(SILFunction *Orig, ArrayRef<Substitution> ParamSubs);
+  ReabstractionInfo(SILFunction *Orig, SubstitutionList ParamSubs);
 
   /// Returns true if the \p ParamIdx'th (non-result) formal parameter is
   /// converted from indirect to direct.
@@ -112,7 +112,7 @@ public:
 class GenericFuncSpecializer {
   SILModule &M;
   SILFunction *GenericFunc;
-  ArrayRef<Substitution> ParamSubs;
+  SubstitutionList ParamSubs;
   IsFragile_t Fragile;
   const ReabstractionInfo &ReInfo;
 
@@ -120,7 +120,7 @@ class GenericFuncSpecializer {
   std::string ClonedName;
 public:
   GenericFuncSpecializer(SILFunction *GenericFunc,
-                         ArrayRef<Substitution> ParamSubs,
+                         SubstitutionList ParamSubs,
                          IsFragile_t Fragile,
                          const ReabstractionInfo &ReInfo);
 

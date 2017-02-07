@@ -97,7 +97,7 @@ class ConformanceCollector {
   SILModule &M;
 
   void scanType(Type type);
-  void scanSubsts(ArrayRef<Substitution> substs);
+  void scanSubsts(SubstitutionList substs);
 
   template <typename T> void scanFuncParams(ArrayRef<T> OrigParams,
                                             ArrayRef<T> SubstParams) {

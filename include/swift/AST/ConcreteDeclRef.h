@@ -18,7 +18,7 @@
 #define SWIFT_AST_CONCRETEDECLREF_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/AST/Substitution.h"
+#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -48,7 +48,7 @@ class ConcreteDeclRef {
     /// The number of substitutions, which are tail allocated.
     unsigned NumSubstitutions;
 
-    SpecializedDeclRef(ValueDecl *decl, ArrayRef<Substitution> substitutions)
+    SpecializedDeclRef(ValueDecl *decl, SubstitutionList substitutions)
       : TheDecl(decl), NumSubstitutions(substitutions.size())
     {
       std::uninitialized_copy(substitutions.begin(), substitutions.end(),
@@ -60,13 +60,13 @@ class ConcreteDeclRef {
     ValueDecl *getDecl() const { return TheDecl; }
 
     /// Retrieve the substitutions.
-    ArrayRef<Substitution> getSubstitutions() const {
+    SubstitutionList getSubstitutions() const {
       return {getTrailingObjects<Substitution>(), NumSubstitutions};
     }
     
     /// Allocate a new specialized declaration reference.
     static SpecializedDeclRef *create(ASTContext &ctx, ValueDecl *decl,
-                                      ArrayRef<Substitution> substitutions);
+                                      SubstitutionList substitutions);
   };
 
   llvm::PointerUnion<ValueDecl *, SpecializedDeclRef *> Data;
@@ -93,7 +93,7 @@ public:
   /// given declaration. This array will be copied into the ASTContext by the
   /// constructor.
   ConcreteDeclRef(ASTContext &ctx, ValueDecl *decl,
-                  ArrayRef<Substitution> substitutions)
+                  SubstitutionList substitutions)
     : Data(SpecializedDeclRef::create(ctx, decl, substitutions)) { }
 
   /// Determine whether this declaration reference refers to anything.
@@ -117,7 +117,7 @@ public:
 
   /// For a specialized reference, return the set of substitutions applied to
   /// the declaration reference.
-  ArrayRef<Substitution> getSubstitutions() const {
+  SubstitutionList getSubstitutions() const {
     if (!isSpecialized())
       return { };
     

@@ -12,6 +12,7 @@
 //
 // This file implements the ConcreteDeclRef class, which provides a reference to
 // a declaration that is potentially specialized.
+//
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
@@ -25,7 +26,7 @@ using namespace swift;
 ConcreteDeclRef::SpecializedDeclRef *
 ConcreteDeclRef::SpecializedDeclRef::create(
                                        ASTContext &ctx, ValueDecl *decl,
-                                       ArrayRef<Substitution> substitutions) {
+                                       SubstitutionList substitutions) {
   size_t size = totalSizeToAlloc<Substitution>(substitutions.size());
   void *memory = ctx.Allocate(size, alignof(SpecializedDeclRef));
   return new (memory) SpecializedDeclRef(decl, substitutions);
@@ -44,11 +45,11 @@ ConcreteDeclRef::getOverriddenDecl(ASTContext &ctx,
 
   SmallVector<Substitution, 4> subs = {};
   if (baseSig) {
-    SubstitutionMap subMap;
+    Optional<SubstitutionMap> derivedSubMap;
     if (derivedSig)
-      derivedSig->getSubstitutionMap(getSubstitutions(), subMap);
-    subMap = SubstitutionMap::getOverrideSubstitutions(
-        baseDecl, derivedDecl, subMap, resolver);
+      derivedSubMap = derivedSig->getSubstitutionMap(getSubstitutions());
+    auto subMap = SubstitutionMap::getOverrideSubstitutions(
+        baseDecl, derivedDecl, derivedSubMap, resolver);
     baseSig->getSubstitutions(subMap, subs);
   }
   return ConcreteDeclRef(ctx, baseDecl, subs);

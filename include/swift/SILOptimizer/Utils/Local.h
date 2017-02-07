@@ -139,7 +139,7 @@ void replaceDeadApply(ApplySite Old, ValueBase *New);
 
 /// \brief Return true if the substitution list contains replacement types
 /// that are dependent on the type parameters of the caller.
-bool hasArchetypes(ArrayRef<Substitution> Subs);
+bool hasArchetypes(SubstitutionList Subs);
 
 /// \brief Return true if any call inside the given function may bind dynamic
 /// 'Self' to a generic argument of the callee.

@@ -2474,8 +2474,8 @@ buildThunkSignature(SILGenFunction &gen,
     auto genericSig = gen.F.getLoweredFunctionType()->getGenericSignature();
     genericEnv = gen.F.getGenericEnvironment();
     auto subsArray = gen.F.getForwardingSubstitutions();
-    genericSig->getSubstitutionMap(subsArray, interfaceSubs);
-    genericEnv->getSubstitutionMap(mod, subsArray, contextSubs);
+    interfaceSubs = genericSig->getSubstitutionMap(subsArray);
+    contextSubs = genericEnv->getSubstitutionMap(subsArray);
     return genericSig;
   }
 
@@ -2510,7 +2510,6 @@ buildThunkSignature(SILGenFunction &gen,
   // archetypes.
   if (auto *calleeGenericEnv = gen.F.getGenericEnvironment()) {
     contextSubs = calleeGenericEnv->getSubstitutionMap(
-      mod,
       [&](SubstitutableType *type) -> Type {
         auto depTy = calleeGenericEnv->mapTypeOutOfContext(type);
         return genericEnv->mapTypeIntoContext(mod, depTy);
@@ -2939,7 +2938,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
 
   auto fTy = implFn->getLoweredFunctionType();
   
-  ArrayRef<Substitution> subs;
+  SubstitutionList subs;
   if (auto *genericEnv = fd->getGenericEnvironment()) {
     F.setGenericEnvironment(genericEnv);
     subs = getForwardingSubstitutions();
@@ -3092,7 +3091,7 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
                                          CanAnyFunctionType reqtSubstTy,
                                          SILDeclRef requirement,
                                          SILDeclRef witness,
-                                         ArrayRef<Substitution> witnessSubs,
+                                         SubstitutionList witnessSubs,
                                          IsFreeFunctionWitness_t isFree) {
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?

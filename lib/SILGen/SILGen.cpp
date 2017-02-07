@@ -1252,7 +1252,7 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
 }
 
 void
-SILGenModule::useConformancesFromSubstitutions(ArrayRef<Substitution> subs) {
+SILGenModule::useConformancesFromSubstitutions(SubstitutionList subs) {
   for (auto &sub : subs) {
     for (auto conformance : sub.getConformances())
       useConformance(conformance);

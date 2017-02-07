@@ -130,7 +130,7 @@ namespace {
   };
 } // end anonymous namespace
 
-ArrayRef<Substitution> SILGenFunction::getForwardingSubstitutions() {
+SubstitutionList SILGenFunction::getForwardingSubstitutions() {
   return F.getForwardingSubstitutions();
 }
 
@@ -1752,7 +1752,7 @@ static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
                                          GenericEnvironment *genericEnv,
                                          SILDeclRef requirement,
                                          SILDeclRef witness,
-                                         ArrayRef<Substitution> witnessSubs) {
+                                         SubstitutionList witnessSubs) {
   if (auto witnessFn = dyn_cast<FuncDecl>(witness.getDecl())) {
     if (witnessFn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
       auto reqFn = cast<FuncDecl>(requirement.getDecl());
@@ -1794,7 +1794,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   auto reqtOrigTy
     = cast<GenericFunctionType>(requirementInfo.LoweredInterfaceType);
   CanAnyFunctionType reqtSubstTy;
-  ArrayRef<Substitution> witnessSubs;
+  SubstitutionList witnessSubs;
   if (witness.requiresSubstitution()) {
     genericEnv = witness.getSyntheticEnvironment();
     witnessSubs = witness.getSubstitutions();

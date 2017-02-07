@@ -53,7 +53,7 @@ namespace irgen {
                                       llvm::Value *fnContext,
                                       Explosion &args,
                                       ArrayRef<SILParameterInfo> argTypes,
-                                      ArrayRef<Substitution> subs,
+                                      SubstitutionList subs,
                                       CanSILFunctionType origType,
                                       CanSILFunctionType substType,
                                       CanSILFunctionType outType,

@@ -30,7 +30,7 @@
 
 using namespace swift;
 
-Witness::Witness(ValueDecl *decl, ArrayRef<Substitution> substitutions,
+Witness::Witness(ValueDecl *decl, SubstitutionList substitutions,
                  GenericEnvironment *syntheticEnv,
                  SubstitutionMap reqToSynthesizedEnvMap) {
   auto &ctx = decl->getASTContext();
@@ -351,7 +351,7 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
 SpecializedProtocolConformance::SpecializedProtocolConformance(
     Type conformingType,
     ProtocolConformance *genericConformance,
-    ArrayRef<Substitution> substitutions)
+    SubstitutionList substitutions)
   : ProtocolConformance(ProtocolConformanceKind::Specialized, conformingType,
                         // FIXME: interface type should be passed in.
                         // assumes specialized conformance is always fully
@@ -381,13 +381,10 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   }
 
   // Otherwise, perform substitutions to create this witness now.
-  auto conformingDC = getDeclContext();
-  auto conformingModule = conformingDC->getParentModule();
-
   auto *genericEnv = GenericConformance->getGenericEnvironment();
 
   auto substitutionMap =
-      genericEnv->getSubstitutionMap(conformingModule, GenericSubstitutions);
+      genericEnv->getSubstitutionMap(GenericSubstitutions);
 
   auto genericWitnessAndDecl
     = GenericConformance->getTypeWitnessSubstAndDecl(assocType, resolver);
@@ -406,6 +403,9 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
     TypeWitnesses[assocType] = genericWitnessAndDecl;
     return TypeWitnesses[assocType];
   }
+
+  auto conformingDC = getDeclContext();
+  auto conformingModule = conformingDC->getParentModule();
 
   // Gather the conformances for the type witness. These should never fail.
   // FIXME: We should just be able to use the SubstitutionMap from above,
@@ -542,7 +542,7 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
 
     auto *env = conformingDC->getGenericEnvironmentOfContext();
 
-    auto subMap = env->getSubstitutionMap(conformingModule, subs);
+    auto subMap = env->getSubstitutionMap(subs);
 
     auto r = inherited->subst(conformingModule, getType(),
                               QuerySubstitutionMap{subMap},

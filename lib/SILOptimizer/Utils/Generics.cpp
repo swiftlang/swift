@@ -50,7 +50,7 @@ static unsigned getBoundGenericDepth(Type t) {
 
 // Initialize SpecializedType iff the specialization is allowed.
 ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
-                                     ArrayRef<Substitution> ParamSubs) {
+                                     SubstitutionList ParamSubs) {
   if (!OrigF->shouldOptimize()) {
     DEBUG(llvm::dbgs() << "    Cannot specialize function " << OrigF->getName()
                        << " marked to be excluded from optimizations.\n");
@@ -179,7 +179,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
 // =============================================================================
 
 GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
-                                               ArrayRef<Substitution> ParamSubs,
+                                               SubstitutionList ParamSubs,
                                                IsFragile_t Fragile,
                                                const ReabstractionInfo &ReInfo)
     : M(GenericFunc->getModule()),

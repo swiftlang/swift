@@ -143,6 +143,8 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   };
   friend class QueryArchetypeToInterfaceSubstitutions;
 
+  void populateParentMap(SubstitutionMap &subMap) const;
+
 public:
   GenericSignature *getGenericSignature() const {
     return Signature;
@@ -232,23 +234,15 @@ public:
   /// This is just like GenericSignature::getSubstitutionMap(), except
   /// with contextual types instead of interface types.
   SubstitutionMap
-  getSubstitutionMap(ModuleDecl *mod,
-                     ArrayRef<Substitution> subs) const;
-
-  /// Same as above, but updates an existing map.
-  void
-  getSubstitutionMap(ModuleDecl *mod,
-                     ArrayRef<Substitution> subs,
-                     SubstitutionMap &subMap) const;
+  getSubstitutionMap(SubstitutionList subs) const;
 
   /// Build a contextual type substitution map from a type substitution function
   /// and conformance lookup function.
   SubstitutionMap
-  getSubstitutionMap(ModuleDecl *mod,
-                     TypeSubstitutionFn subs,
+  getSubstitutionMap(TypeSubstitutionFn subs,
                      LookupConformanceFn lookupConformance) const;
 
-  ArrayRef<Substitution> getForwardingSubstitutions() const;
+  SubstitutionList getForwardingSubstitutions() const;
 
   void dump() const;
 };
