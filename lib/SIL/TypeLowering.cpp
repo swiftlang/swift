@@ -1407,18 +1407,16 @@ static CanType getLoweredReferenceStorageType(TypeConverter &tc,
 
 CanSILFunctionType
 TypeConverter::getSILFunctionType(AbstractionPattern origType,
-                                  CanAnyFunctionType substType,
-                                  unsigned uncurryLevel) {
-  return getLoweredType(origType, substType, uncurryLevel)
+                                  CanFunctionType substType) {
+  return getLoweredType(origType, substType)
            .castTo<SILFunctionType>();
 }
 
 const TypeLowering &
 TypeConverter::getTypeLowering(AbstractionPattern origType,
-                               Type origSubstType,
-                               unsigned uncurryLevel) {
+                               Type origSubstType) {
   CanType substType = origSubstType->getCanonicalType();
-  auto key = getTypeKey(origType, substType, uncurryLevel);
+  auto key = getTypeKey(origType, substType);
   
   assert((!key.isDependent() || CurGenericContext)
          && "dependent type outside of generic context?!");
@@ -1433,8 +1431,8 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     CanType substObjectType = substType.getLValueOrInOutObjectType();
     AbstractionPattern origObjectType = origType.getLValueObjectType();
 
-    SILType loweredType = getLoweredType(origObjectType, substObjectType,
-                                         uncurryLevel).getAddressType();
+    SILType loweredType = getLoweredType(origObjectType, substObjectType)
+      .getAddressType();
 
     auto *theInfo = new (*this, key.isDependent())
       TrivialTypeLowering(loweredType);
@@ -1444,7 +1442,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 
   // Lower the type.
   CanType loweredSubstType =
-    getLoweredRValueType(origType, substType, uncurryLevel);
+    getLoweredRValueType(origType, substType);
 
   // If that didn't change the type and the key is cacheable, there's no
   // point in re-checking the table, so just construct a type lowering
@@ -1458,49 +1456,48 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   // that same result at this key if possible.
   AbstractionPattern origTypeForCaching =
     AbstractionPattern(CurGenericContext, loweredSubstType);
-  auto loweredKey = getTypeKey(origTypeForCaching, loweredSubstType, 0);
+  auto loweredKey = getTypeKey(origTypeForCaching, loweredSubstType);
 
   auto &lowering = getTypeLoweringForLoweredType(loweredKey);
   insert(key, &lowering);
   return lowering;
 }
 
+CanSILFunctionType TypeConverter::getSILFunctionType(
+    AbstractionPattern origType,
+    CanFunctionType substFnType,
+    unsigned uncurryLevel) {
+  // First, lower at the AST level by uncurrying and substituting
+  // bridged types.
+  auto substLoweredType =
+    getLoweredASTFunctionType(substFnType, 0, None);
+
+  AbstractionPattern origLoweredType = [&] {
+    if (origType.isExactType(substFnType)) {
+      return AbstractionPattern(origType.getGenericSignature(),
+                                substLoweredType);
+    } else if (origType.isTypeParameter()) {
+      return origType;
+    } else {
+      auto origFnType = cast<AnyFunctionType>(origType.getType());
+      return AbstractionPattern(origType.getGenericSignature(),
+                                getLoweredASTFunctionType(origFnType,
+                                                          0, None));
+    }
+  }();
+
+  return getNativeSILFunctionType(M, origLoweredType, substLoweredType);
+}
+
 CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
-                                            CanType substType,
-                                            unsigned uncurryLevel) {
+                                            CanType substType) {
   // AST function types are turned into SIL function types:
   //   - the type is uncurried as desired
   //   - types are turned into their unbridged equivalents, depending
   //     on the abstract CC
   //   - ownership conventions are deduced
-  if (auto substFnType = dyn_cast<AnyFunctionType>(substType)) {
-    // First, lower at the AST level by uncurrying and substituting
-    // bridged types.
-    auto substLoweredType =
-      getLoweredASTFunctionType(substFnType, uncurryLevel, None);    
-
-    AbstractionPattern origLoweredType = [&] {
-      if (origType.isExactType(substType)) {
-        return AbstractionPattern(origType.getGenericSignature(),
-                                  substLoweredType);
-      } else if (origType.isTypeParameter()) {
-        return origType;
-      } else {
-        auto origFnType = cast<AnyFunctionType>(origType.getType());
-        return AbstractionPattern(origType.getGenericSignature(),
-                                  getLoweredASTFunctionType(origFnType,
-                                                            uncurryLevel,
-                                                            None));
-      }
-    }();
-
-    CanType silFnType =
-      getNativeSILFunctionType(M, origLoweredType, substLoweredType);
-
-    return silFnType;
-  }
-
-  assert(uncurryLevel == 0);
+  if (auto substFnType = dyn_cast<FunctionType>(substType))
+    return getSILFunctionType(origType, substFnType, /*uncurryLevel=*/0);
 
   // Ignore dynamic self types.
   if (auto selfType = dyn_cast<DynamicSelfType>(substType)) {
@@ -1576,7 +1573,7 @@ CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
 const TypeLowering &TypeConverter::getTypeLowering(SILType type) {
   auto loweredType = type.getSwiftRValueType();
   auto key = getTypeKey(AbstractionPattern(getCurGenericContext(), loweredType),
-                        loweredType, 0);
+                        loweredType);
 
   return getTypeLoweringForLoweredType(key);
 }
