@@ -813,7 +813,8 @@ public:
   /// Retrieve or create the canonical generic environment of a canonical
   /// archetype builder.
   GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
-                                                     ArchetypeBuilder *builder);
+                                                     ArchetypeBuilder *builder,
+                                                     ModuleDecl &module);
 
   /// Retrieve the inherited name set for the given class.
   const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,

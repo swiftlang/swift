@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 
@@ -182,6 +183,15 @@ GenericSignature::getCanonicalSignature() const {
            CanonicalSignatureOrASTContext.get<GenericSignature*>());
 }
 
+GenericEnvironment *GenericSignature::createGenericEnvironment(
+                                                             ModuleDecl &mod) {
+  auto *builder = getArchetypeBuilder(mod);
+  auto env = GenericEnvironment::getIncomplete(this, builder);
+  builder->expandGenericEnvironment(env);
+  return env;
+}
+
+
 ASTContext &GenericSignature::getASTContext() const {
   // Canonical signatures store the ASTContext directly.
   if (auto ctx = CanonicalSignatureOrASTContext.dyn_cast<ASTContext *>())
@@ -302,6 +312,32 @@ bool GenericSignature::enumeratePairedRequirements(
   return enumerateGenericParamsUpToDependentType(CanType());
 }
 
+static void populateParentMap(const GenericSignature *sig,
+                              SubstitutionMap &subMap) {
+  for (auto reqt : sig->getRequirements()) {
+    if (reqt.getKind() != RequirementKind::SameType)
+      continue;
+
+    auto first = reqt.getFirstType();
+    auto second = reqt.getSecondType();
+
+    if (!first->isTypeParameter() || !second->isTypeParameter())
+      continue;
+
+    if (auto *firstMemTy = first->getAs<DependentMemberType>()) {
+      subMap.addParent(second->getCanonicalType(),
+                       firstMemTy->getBase()->getCanonicalType(),
+                       firstMemTy->getAssocType());
+    }
+
+    if (auto *secondMemTy = second->getAs<DependentMemberType>()) {
+      subMap.addParent(first->getCanonicalType(),
+                       secondMemTy->getBase()->getCanonicalType(),
+                       secondMemTy->getAssocType());
+    }
+  }
+}
+
 void
 GenericSignature::getSubstitutionMap(ArrayRef<Substitution> subs,
                                      SubstitutionMap &result) const {
@@ -321,30 +357,8 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> subs,
       result.addConformance(canTy, conformance);
   }
 
-  for (auto reqt : getRequirements()) {
-    if (reqt.getKind() != RequirementKind::SameType)
-      continue;
-
-    auto first = reqt.getFirstType();
-    auto second = reqt.getSecondType();
-
-    if (!first->isTypeParameter() || !second->isTypeParameter())
-      continue;
-
-    if (auto *firstMemTy = first->getAs<DependentMemberType>()) {
-      result.addParent(second->getCanonicalType(),
-                       firstMemTy->getBase()->getCanonicalType(),
-                       firstMemTy->getAssocType());
-    }
-
-    if (auto *secondMemTy = second->getAs<DependentMemberType>()) {
-      result.addParent(first->getCanonicalType(),
-                       secondMemTy->getBase()->getCanonicalType(),
-                       secondMemTy->getAssocType());
-    }
-  }
-
   assert(subs.empty() && "did not use all substitutions?!");
+  populateParentMap(this, result);
 }
 
 SubstitutionMap
@@ -377,29 +391,7 @@ getSubstitutionMap(TypeSubstitutionFn subs,
     return false;
   });
 
-  for (auto reqt : getRequirements()) {
-    if (reqt.getKind() != RequirementKind::SameType)
-      continue;
-
-    auto first = reqt.getFirstType();
-    auto second = reqt.getSecondType();
-
-    if (!first->isTypeParameter() || !second->isTypeParameter())
-      continue;
-
-    if (auto *firstMemTy = first->getAs<DependentMemberType>()) {
-      subMap.addParent(second->getCanonicalType(),
-                       firstMemTy->getBase()->getCanonicalType(),
-                       firstMemTy->getAssocType());
-    }
-
-    if (auto *secondMemTy = second->getAs<DependentMemberType>()) {
-      subMap.addParent(first->getCanonicalType(),
-                       secondMemTy->getBase()->getCanonicalType(),
-                       secondMemTy->getAssocType());
-    }
-  }
-
+  populateParentMap(this, subMap);
   return subMap;
 }
 
@@ -684,7 +676,8 @@ GenericEnvironment *CanGenericSignature::getGenericEnvironment(
                                                      ModuleDecl &module) const {
   // Archetype builders are stored on the ASTContext.
   return module.getASTContext().getOrCreateCanonicalGenericEnvironment(
-           module.getASTContext().getOrCreateArchetypeBuilder(*this, &module));
+           module.getASTContext().getOrCreateArchetypeBuilder(*this, &module),
+           module);
 }
 
 unsigned GenericParamKey::findIndexIn(
