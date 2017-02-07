@@ -1246,7 +1246,7 @@ static bool tryTypeVariableBindings(
   ++cs.solverState->NumTypeVariablesBound;
   
   // If we've already explored a lot of potential solutions, bail.
-  if (cs.getExpressionTooComplex())
+  if (cs.getExpressionTooComplex(solutions))
     return true;
 
   for (unsigned tryCount = 0; !anySolved && !bindings.empty(); ++tryCount) {
@@ -1951,7 +1951,7 @@ ConstraintSystem::solve(Expr *&expr,
   // had found at least one solution before deciding an expression was
   // "too complex". Maintain that behavior, but for Swift > 3 return
   // Unsolved in these cases.
-  auto tooComplex = getExpressionTooComplex() &&
+  auto tooComplex = getExpressionTooComplex(solutions) &&
     !getASTContext().isSwiftVersion3();
   auto unsolved = tooComplex || solutions.empty();
 
@@ -2413,7 +2413,7 @@ bool ConstraintSystem::solveSimplified(
       break;
     
     // If the expression was deemed "too complex", stop now and salvage.
-    if (getExpressionTooComplex())
+    if (getExpressionTooComplex(solutions))
       break;
 
     // Try to solve the system with this option in the disjunction.
@@ -2481,7 +2481,7 @@ bool ConstraintSystem::solveSimplified(
   // not allow our caller to continue as if we have been successful.
   // Maintain the broken behavior under Swift 3 mode though, to avoid
   // breaking code.
-  auto tooComplex = getExpressionTooComplex() &&
+  auto tooComplex = getExpressionTooComplex(solutions) &&
     !getASTContext().isSwiftVersion3();
 
   return tooComplex || !firstSolvedConstraint;
