@@ -1561,13 +1561,13 @@ ERROR(requires_no_same_type_archetype,none,
       ())
 ERROR(requires_generic_params_made_equal,none,
       "same-type requirement makes generic parameters %0 and %1 equivalent",
-      (Identifier, Identifier))
+      (Type, Type))
 ERROR(requires_generic_param_made_equal_to_concrete,none,
       "same-type requirement makes generic parameter %0 non-generic",
-      (Identifier))
+      (Type))
 ERROR(requires_superclass_conflict,none,
       "generic parameter %0 cannot be a subclass of both %1 and %2",
-      (Identifier, Type, Type))
+      (Type, Type, Type))
 ERROR(recursive_type_reference,none,
       "%0 %1 references itself", (DescriptiveDeclKind, Identifier))
 ERROR(recursive_requirement_reference,none,
@@ -1578,7 +1578,7 @@ ERROR(recursive_superclass_constraint,none,
       "superclass constraint %0 : %1 is recursive", (Type, Type))
 ERROR(requires_same_type_conflict,none,
       "generic parameter %0 cannot be equal to both %1 and %2",
-      (StringRef, Type, Type))
+      (Type, Type, Type))
 ERROR(requires_generic_param_same_type_does_not_conform,none,
       "same-type constraint type %0 does not conform to required protocol %1",
       (Type, Identifier))

@@ -57,7 +57,7 @@ class Fox : P1 {
 class Box<T : Fox> {
 // CHECK-LABEL: .unpack@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : Fox [explicit]
+// CHECK-NEXT:   τ_0_0 : Fox [explicit]
   func unpack(_ x: X1<T>) {}
 }
 
@@ -75,12 +75,12 @@ struct V<T : Canidae> {}
 
 // CHECK-LABEL: .inferSuperclassRequirement1@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : Canidae
+// CHECK-NEXT:   τ_0_0 : Canidae
 func inferSuperclassRequirement1<T : Carnivora>(_ v: V<T>) {}
 
 // CHECK-LABEL: .inferSuperclassRequirement2@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : Canidae
+// CHECK-NEXT:   τ_0_0 : Canidae
 func inferSuperclassRequirement2<T : Canidae>(_ v: U<T>) {}
 
 // ----------------------------------------------------------------------------
@@ -111,26 +111,26 @@ struct Model_P3_P4_Eq<T : P3, U : P4> where T.P3Assoc == U.P4Assoc {}
 
 // CHECK-LABEL: .inferSameType1@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : P3 [inferred @ {{.*}}:32]
-// CHECK-NEXT:   U : P4 [inferred @ {{.*}}:32]
-// CHECK-NEXT:   T[.P3].P3Assoc : P1 [redundant @ {{.*}}:18]
-// CHECK-NEXT:   T[.P3].P3Assoc : P2 [protocol @ {{.*}}:18]
+// CHECK-NEXT:   τ_0_0 : P3 [inferred @ {{.*}}:32]
+// CHECK-NEXT:   τ_0_1 : P4 [inferred @ {{.*}}:32]
+// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P1 [redundant @ {{.*}}:18]
+// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P2 [protocol @ {{.*}}:18]
 func inferSameType1<T, U>(_ x: Model_P3_P4_Eq<T, U>) { }
 
 // CHECK-LABEL: .inferSameType2@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : P3 [inferred]
-// CHECK-NEXT:   U : P4 [inferred]
-// CHECK-NEXT:   T[.P3].P3Assoc : P1 [redundant @ {{.*}}requirement_inference.swift:{{.*}}:18]
-// CHECK-NEXT:   T[.P3].P3Assoc : P2 [protocol @ {{.*}}requirement_inference.swift:{{.*}}:18]
-// CHECK-NEXT:   T[.P3].P3Assoc == U[.P4].P4Assoc [explicit]
+// CHECK-NEXT:   τ_0_0 : P3 [inferred]
+// CHECK-NEXT:   τ_0_1 : P4 [inferred]
+// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P1 [redundant @ {{.*}}requirement_inference.swift:{{.*}}:18]
+// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P2 [protocol @ {{.*}}requirement_inference.swift:{{.*}}:18]
+// CHECK-NEXT:   τ_0_0[.P3].P3Assoc == τ_0_1[.P4].P4Assoc [explicit]
 func inferSameType2<T : P3, U : P4>(_: T, _: U) where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc {}
 
 // CHECK-LABEL: .inferSameType3@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : PCommonAssoc1 [inferred]
-// CHECK-NEXT:   T : PCommonAssoc2 [inferred]
-// CHECK-NEXT:   T[.PCommonAssoc1].CommonAssoc : P1 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:68]
+// CHECK-NEXT:   τ_0_0 : PCommonAssoc1 [inferred]
+// CHECK-NEXT:   τ_0_0 : PCommonAssoc2 [inferred]
+// CHECK-NEXT:   τ_0_0[.PCommonAssoc1].CommonAssoc : P1 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:68]
 // CHECK-NEXT: Potential archetypes
 func inferSameType3<T : PCommonAssoc1>(_: T) where T.CommonAssoc : P1, T : PCommonAssoc2 {}
 
