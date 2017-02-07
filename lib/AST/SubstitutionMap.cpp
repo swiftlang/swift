@@ -10,7 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the SubstitutionMap class.
+// This file defines the SubstitutionMap class. A SubstitutionMap packages
+// together a set of replacement types and protocol conformances for
+// specializing generic types.
+//
+// SubstitutionMaps either have type parameters or archetypes as keys,
+// based on whether they were built from a GenericSignature or a
+// GenericEnvironment.
+//
+// To specialize a type, call Type::subst() with the right SubstitutionMap.
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,6 +30,36 @@
 #include "swift/AST/Types.h"
 
 using namespace swift;
+
+bool SubstitutionMap::hasArchetypes() const {
+  for (auto &entry : subMap)
+    if (entry.second->hasArchetype())
+      return true;
+  return false;
+}
+
+bool SubstitutionMap::hasDynamicSelf() const {
+  for (auto &entry : subMap)
+    if (entry.second->hasDynamicSelfType())
+      return true;
+  return false;
+}
+
+Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
+  auto known = subMap.find(type);
+  if (known != subMap.end() && known->second)
+    return known->second;
+
+  // Not known.
+  return Type();
+}
+
+void SubstitutionMap::
+addSubstitution(CanSubstitutableType type, Type replacement) {
+  auto result = subMap.insert(std::make_pair(type, replacement));
+  assert(result.second || result.first->second->isEqual(replacement));
+  (void) result;
+}
 
 template<typename T>
 Optional<T> SubstitutionMap::forEachParent(
@@ -167,13 +205,6 @@ SubstitutionMap::lookupConformance(
 }
 
 void SubstitutionMap::
-addSubstitution(CanSubstitutableType type, Type replacement) {
-  auto result = subMap.insert(std::make_pair(type, replacement));
-  assert(result.second || result.first->second->isEqual(replacement));
-  (void) result;
-}
-
-void SubstitutionMap::
 addConformance(CanType type, ProtocolConformanceRef conformance) {
   conformanceMap[type.getPointer()].push_back(conformance);
 }
@@ -189,6 +220,25 @@ void SubstitutionMap::
 addParent(CanType type, CanType parent, AssociatedTypeDecl *assocType) {
   assert(type && parent && assocType);
   parentMap[type.getPointer()].push_back(std::make_pair(parent, assocType));
+}
+
+SubstitutionMap
+SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
+                                          Type selfType,
+                                          ProtocolConformanceRef conformance) {
+  auto protocolSelfType = protocol->getSelfInterfaceType();
+  return protocol->getGenericSignature()->getSubstitutionMap(
+    [&](SubstitutableType *type) -> Type {
+      if (type->isEqual(protocolSelfType))
+        return selfType;
+    },
+    [&](CanType origType, Type replacementType, ProtocolType *protoType)
+      -> ProtocolConformanceRef {
+      if (origType->isEqual(protocolSelfType) &&
+          protoType->getDecl() == protocol)
+        return conformance;
+      llvm_unreachable("Should not get any other conformance queries here");
+    });
 }
 
 SubstitutionMap

@@ -436,6 +436,10 @@ public:
   SILType substGenericArgs(SILModule &M,
                            ArrayRef<Substitution> Subs) const;
 
+  SILType subst(SILModule &silModule,
+                TypeSubstitutionFn subs,
+                LookupConformanceFn conformances) const;
+
   SILType subst(SILModule &silModule, const SubstitutionMap &subs) const;
 
   /// If this is a specialized generic type, return all substitutions used to

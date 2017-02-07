@@ -74,14 +74,12 @@ public:
                 CanType type, ProtocolDecl *proto,
                 llvm::SmallPtrSetImpl<CanType> *visitedParents = nullptr) const;
 
-  const llvm::DenseMap<SubstitutableType *, Type> &getMap() const {
-    return subMap;
-  }
-
   /// Retrieve the conformances for the given type.
   ArrayRef<ProtocolConformanceRef> getConformances(CanType type) const;
 
   void addSubstitution(CanSubstitutableType type, Type replacement);
+
+  Type lookupSubstitution(CanSubstitutableType type) const;
 
   void addConformance(CanType type, ProtocolConformanceRef conformance);
 
@@ -91,6 +89,18 @@ public:
   bool empty() const {
     return subMap.empty();
   }
+
+  /// Query whether any replacement types in the map contain archetypes.
+  bool hasArchetypes() const;
+
+  /// Query whether any replacement type sin the map contain dynamic Self.
+  bool hasDynamicSelf() const;
+
+  /// Create a substitution map for a protocol conformance.
+  static SubstitutionMap
+  getProtocolSubstitutions(ProtocolDecl *protocol,
+                           Type selfType,
+                           ProtocolConformanceRef conformance);
 
   /// Given that 'derivedDecl' is an override of 'baseDecl' in a subclass,
   /// and 'derivedSubs' is a set of substitutions written in terms of the

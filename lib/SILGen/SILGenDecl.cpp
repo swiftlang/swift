@@ -1818,25 +1818,22 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     genericEnv = witnessRef.getDecl()->getInnermostDeclContext()
                    ->getGenericEnvironmentOfContext();
 
-    auto selfTy = cast<GenericTypeParamType>(
-                    conformance->getProtocol()->getSelfInterfaceType()
-                                                          ->getCanonicalType());
-
     Type concreteTy = conformance->getInterfaceType();
-
-    SubstitutionMap reqtSubs;
-    reqtSubs.addSubstitution(selfTy, concreteTy);
 
     // FIXME: conformance substitutions should be in terms of interface types
     auto concreteSubs = concreteTy->gatherAllSubstitutions(M.getSwiftModule(),
                                                            nullptr, nullptr);
     auto specialized = conformance;
-    ASTContext &ctx = getASTContext();
-    if (conformance->getGenericSignature())
+    if (conformance->getGenericSignature()) {
+      ASTContext &ctx = getASTContext();
       specialized = ctx.getSpecializedConformance(concreteTy, conformance,
                                                   concreteSubs);
+    }
 
-    reqtSubs.addConformance(selfTy, ProtocolConformanceRef(specialized));
+    auto reqtSubs = SubstitutionMap::getProtocolSubstitutions(
+        conformance->getProtocol(),
+        concreteTy,
+        ProtocolConformanceRef(specialized));
 
     auto input = reqtOrigTy->getInput().subst(reqtSubs)->getCanonicalType();
     auto result = reqtOrigTy->getResult().subst(reqtSubs)->getCanonicalType();

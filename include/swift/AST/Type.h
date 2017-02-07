@@ -71,6 +71,14 @@ struct QueryTypeSubstitutionMap {
   Type operator()(SubstitutableType *type) const;
 };
 
+/// A function object suitable for use as a \c TypeSubstitutionFn that
+/// queries an underlying \c SubstitutionMap.
+struct QuerySubstitutionMap {
+  const SubstitutionMap &subMap;
+
+  Type operator()(SubstitutableType *type) const;
+};
+
 /// Function used to resolve conformances.
 using GenericFunction = auto(CanType dependentType,
   Type conformingReplacementType,

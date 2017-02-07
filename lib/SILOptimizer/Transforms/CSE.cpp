@@ -599,7 +599,8 @@ namespace {
 /// archetypes. Replace such types by performing type substitutions
 /// according to the provided type substitution map.
 static void updateBasicBlockArgTypes(SILBasicBlock *BB,
-                                     const SubstitutionMap &TypeSubstMap) {
+                                     ArchetypeType *OldOpenedArchetype,
+                                     ArchetypeType *NewOpenedArchetype) {
   // Check types of all BB arguments.
   for (auto *Arg : BB->getPHIArguments()) {
     if (!Arg->getType().getSwiftRValueType()->hasOpenedExistential())
@@ -607,7 +608,14 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
     // Type of this BB argument uses an opened existential.
     // Try to apply substitutions to it and if it produces a different type,
     // use this type as new type of the BB argument.
-    auto NewArgType = Arg->getType().subst(BB->getModule(), TypeSubstMap);
+    auto OldArgType = Arg->getType();
+    auto NewArgType = OldArgType.subst(BB->getModule(),
+                                       [&](SubstitutableType *type) -> Type {
+                                         if (type == OldOpenedArchetype)
+                                           return NewOpenedArchetype;
+                                         return type;
+                                       },
+                                       MakeAbstractConformanceForGenericType());
     if (NewArgType == Arg->getType())
       continue;
     // Replace the type of this BB argument. The type of a BBArg
@@ -644,9 +652,7 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
   llvm::SmallSetVector<SILInstruction *, 16> Candidates;
   auto OldOpenedArchetype = getOpenedArchetypeOf(Inst);
   auto NewOpenedArchetype = getOpenedArchetypeOf(dyn_cast<SILInstruction>(V));
-  SubstitutionMap TypeSubstMap;
-  TypeSubstMap.addSubstitution(CanArchetypeType(OldOpenedArchetype),
-                               NewOpenedArchetype);
+
   // Collect all candidates that may contain opened archetypes
   // that need to be replaced.
   for (auto Use : Inst->getUses()) {
@@ -671,7 +677,9 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
       if (Successor->args_empty())
         continue;
       // If a BB has any arguments, update their types if necessary.
-      updateBasicBlockArgTypes(Successor, TypeSubstMap);
+      updateBasicBlockArgTypes(Successor,
+                               OldOpenedArchetype,
+                               NewOpenedArchetype);
     }
   }
   // Now process candidates.
