@@ -157,7 +157,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   // If this potential archetype was renamed due to typo correction,
   // complain and fix it.
   if (nestedPA->wasRenamed()) {
-    auto newName = nestedPA->getName();
+    auto newName = nestedPA->getNestedName();
     TC.diagnose(ref->getIdLoc(), diag::invalid_member_type_suggest,
                 baseTy, ref->getIdentifier(), newName)
       .fixItReplace(ref->getIdLoc(), newName.str());
