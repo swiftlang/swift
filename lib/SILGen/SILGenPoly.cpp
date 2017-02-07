@@ -2499,7 +2499,8 @@ buildThunkSignature(SILGenFunction &gen,
   RequirementSource source(RequirementSource::Explicit, SourceLoc());
   builder.addRequirement(newRequirement, source);
 
-  builder.finalize(SourceLoc(), /*allowConcreteGenericParams=*/true);
+  builder.finalize(SourceLoc(), {newGenericParam},
+                   /*allowConcreteGenericParams=*/true);
   GenericSignature *genericSig = builder.getGenericSignature();
   genericEnv = genericSig->createGenericEnvironment(*mod);
 

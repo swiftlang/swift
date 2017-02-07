@@ -7080,15 +7080,19 @@ GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
     GenericParamList *genericParams, DeclContext *dc) {
   ArchetypeBuilder builder(SwiftContext,
                            LookUpConformanceInModule(dc->getParentModule()));
-  for (auto param : *genericParams)
+  SmallVector<GenericTypeParamType *, 4> allGenericParams;
+  for (auto param : *genericParams) {
     builder.addGenericParameter(param);
+    allGenericParams.push_back(
+      param->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
+  }
   for (auto param : *genericParams) {
     bool result = builder.addGenericParameterRequirements(param);
     assert(!result);
     (void) result;
   }
   // TODO: any need to infer requirements?
-  builder.finalize(genericParams->getSourceRange().Start);
+  builder.finalize(genericParams->getSourceRange().Start, allGenericParams);
 
   return builder.getGenericSignature()->createGenericEnvironment(
                                                        *dc->getParentModule());

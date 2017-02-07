@@ -486,7 +486,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     invalid = true;
 
   // Finalize the generic requirements.
-  (void)builder.finalize(func->getLoc());
+  (void)builder.finalize(func->getLoc(), allGenericParams);
 
   // The archetype builder now has all of the requirements, although there might
   // still be errors that have not yet been diagnosed. Revert the generic
@@ -758,6 +758,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
 
   // Finalize the generic requirements.
   (void)builder.finalize(genericParams->getSourceRange().Start,
+                         allGenericParams,
                          allowConcreteGenericParams);
 
   // The archetype builder now has all of the requirements, although there might
