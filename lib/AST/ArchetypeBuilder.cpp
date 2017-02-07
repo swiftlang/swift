@@ -2538,19 +2538,3 @@ void ArchetypeBuilder::expandGenericEnvironment(GenericEnvironment *env) {
 #endif
 }
 
-GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
-                                                  GenericSignature *signature) {
-  assert(Impl->finalized && "Must finalize builder first");
-
-  // Create the generic environment, which will be lazily populated with
-  // archetypes.
-  auto genericEnv = GenericEnvironment::getIncomplete(signature, this);
-
-  // Force the creation of all of the archetypes.
-  expandGenericEnvironment(genericEnv);
-  genericEnv->clearArchetypeBuilder();
-
-
-  return genericEnv;
-}
-

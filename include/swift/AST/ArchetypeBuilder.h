@@ -258,11 +258,6 @@ public:
   /// \brief Build the generic signature.
   GenericSignature *getGenericSignature();
 
-  /// \brief Build the generic environment.
-  LLVM_ATTRIBUTE_DEPRECATED(
-    GenericEnvironment *getGenericEnvironment(GenericSignature *signature),
-    "use GenericSignature::createGenericEnvironment()");
-
   /// Infer requirements from the given type, recursively.
   ///
   /// This routine infers requirements from a type that occurs within the
