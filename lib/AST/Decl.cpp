@@ -2452,6 +2452,11 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
     if (!ctor)
       continue;
 
+    // Swift initializers added in extensions of Objective-C classes can never
+    // be overrides.
+    if (hasClangNode() && !ctor->hasClangNode())
+      return false;
+
     // Resolve this initializer, if needed.
     if (!ctor->hasInterfaceType())
       resolver->resolveDeclSignature(ctor);
