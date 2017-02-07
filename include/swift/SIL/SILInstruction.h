@@ -1119,16 +1119,6 @@ public:
     return {getSubstitutionsStorage(), NumSubstitutions};
   }
 
-  ArrayRef<Substitution> getSubstitutionsWithoutSelfSubstitution() const {
-    assert(getNumArguments() && "Should only be called when Callee has "
-           "at least a self parameter.");
-    assert(hasSubstitutions() && "Should only be called when Callee has "
-           "substitutions.");
-    if (getSubstCalleeType()->hasSelfParam())
-      return getSubstitutions().slice(1);
-    return getSubstitutions();
-  }
-
   /// The arguments passed to this instruction.
   MutableArrayRef<Operand> getArgumentOperands() {
     return Operands.getDynamicAsArray().slice(0, getNumCallArguments());
@@ -1257,22 +1247,6 @@ public:
     if (SubstCallee->getNumAllResults() != 1)
       return None;
     return SubstCallee->getSingleResult();
-  }
-
-  Substitution getSelfSubstitution() const {
-    assert(getNumArguments() && "Should only be called when Callee has "
-           "at least a self parameter.");
-    assert(hasSubstitutions() && "Should only be called when Callee has "
-           "substitutions.");
-    return getSubstitutions()[0];
-  }
-
-  ArrayRef<Substitution> getSubstitutionsWithoutSelfSubstitution() const {
-    assert(getNumArguments() && "Should only be called when Callee has "
-           "at least a self parameter.");
-    assert(hasSubstitutions() && "Should only be called when Callee has "
-           "substitutions.");
-    return getSubstitutions().slice(1);
   }
 
   bool hasIndirectResults() const {
@@ -5484,19 +5458,6 @@ public:
   /// The substitutions used to bind the generic arguments of this function.
   MutableArrayRef<Substitution> getSubstitutions() const {
     FOREACH_IMPL_RETURN(getSubstitutions());
-  }
-
-  ArrayRef<Substitution> getSubstitutionsWithoutSelfSubstitution() const {
-    switch (Inst->getKind()) {
-    case ValueKind::ApplyInst:
-      return cast<ApplyInst>(Inst)->getSubstitutionsWithoutSelfSubstitution();
-    case ValueKind::TryApplyInst:
-      return cast<TryApplyInst>(Inst)->getSubstitutionsWithoutSelfSubstitution();
-    case ValueKind::PartialApplyInst:
-      return cast<PartialApplyInst>(Inst)->getSubstitutionsWithoutSelfSubstitution();
-    default:
-      llvm_unreachable("not implemented for this instruction!");
-    }
   }
 
   /// The arguments passed to this instruction.
