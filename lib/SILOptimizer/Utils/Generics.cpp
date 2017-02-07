@@ -294,16 +294,35 @@ GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
       ReInfo(ReInfo) {
 
   assert(GenericFunc->isDefinition() && "Expected definition to specialize!");
+  auto FnTy = ReInfo.getSpecializedType();
 
-  Mangle::Mangler Mangler;
-  GenericSpecializationMangler OldGenericMangler(Mangler, GenericFunc,
-                                              ParamSubs, Fragile);
-  OldGenericMangler.mangle();
-  std::string Old = Mangler.finalize();
+  std::string Old;
 
-  NewMangling::GenericSpecializationMangler NewGenericMangler(GenericFunc,
-                          ParamSubs, Fragile, /*isReAbstracted*/ true);
-  std::string New = NewGenericMangler.mangle();
+  if (ReInfo.isPartialSpecialization()) {
+    Mangle::Mangler Mangler;
+    PartialSpecializationMangler OldGenericMangler(Mangler, GenericFunc, FnTy,
+                                                   Fragile);
+    OldGenericMangler.mangle();
+    Old = Mangler.finalize();
+  } else {
+    Mangle::Mangler Mangler;
+    GenericSpecializationMangler OldGenericMangler(Mangler, GenericFunc,
+                                                   ParamSubs, Fragile);
+    OldGenericMangler.mangle();
+    Old = Mangler.finalize();
+  }
+
+  std::string New;
+  if (ReInfo.isPartialSpecialization()) {
+    NewMangling::PartialSpecializationMangler NewGenericMangler(
+        GenericFunc, FnTy, Fragile, /*isReAbstracted*/ true);
+    New = NewGenericMangler.mangle();
+  } else {
+    NewMangling::GenericSpecializationMangler NewGenericMangler(
+        GenericFunc, ParamSubs, Fragile, /*isReAbstracted*/ true);
+    New = NewGenericMangler.mangle();
+  }
+
   ClonedName = NewMangling::selectMangling(Old, New);
 
   DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');
