@@ -114,6 +114,8 @@ public:
 
   NodePointer demangleTopLevel();
 
+  NodePointer demangleType();
+
 private:
 
   void addSubstitution(NodePointer Nd) {
@@ -165,6 +167,8 @@ private:
   NodePointer createWithPoppedType(Node::Kind kind) {
     return createWithChild(kind, popNode(Node::Kind::Type));
   }
+
+  void parseAndPushNodes();
 
   NodePointer changeKind(NodePointer Node, Node::Kind NewKind);
 
