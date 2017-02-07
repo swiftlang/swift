@@ -236,11 +236,6 @@ public:
   SubstitutionMap
   getSubstitutionMap(SubstitutionList subs) const;
 
-  /// Same as above, but updates an existing map.
-  void
-  getSubstitutionMap(SubstitutionList subs,
-                     SubstitutionMap &subMap) const;
-
   /// Build a contextual type substitution map from a type substitution function
   /// and conformance lookup function.
   SubstitutionMap

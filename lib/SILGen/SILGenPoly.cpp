@@ -2474,8 +2474,8 @@ buildThunkSignature(SILGenFunction &gen,
     auto genericSig = gen.F.getLoweredFunctionType()->getGenericSignature();
     genericEnv = gen.F.getGenericEnvironment();
     auto subsArray = gen.F.getForwardingSubstitutions();
-    genericSig->getSubstitutionMap(subsArray, interfaceSubs);
-    genericEnv->getSubstitutionMap(subsArray, contextSubs);
+    interfaceSubs = genericSig->getSubstitutionMap(subsArray);
+    contextSubs = genericEnv->getSubstitutionMap(subsArray);
     return genericSig;
   }
 

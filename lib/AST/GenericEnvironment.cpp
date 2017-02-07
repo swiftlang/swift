@@ -339,13 +339,6 @@ GenericEnvironment::getForwardingSubstitutions() const {
   return getGenericSignature()->getASTContext().AllocateCopy(result);
 }
 
-SubstitutionMap GenericEnvironment::
-getSubstitutionMap(SubstitutionList subs) const {
-  SubstitutionMap result;
-  getSubstitutionMap(subs, result);
-  return result;
-}
-
 void GenericEnvironment::populateParentMap(SubstitutionMap &subMap) const {
   for (auto reqt : getGenericSignature()->getRequirements()) {
     if (reqt.getKind() != RequirementKind::SameType)
@@ -395,9 +388,10 @@ void GenericEnvironment::populateParentMap(SubstitutionMap &subMap) const {
   }
 }
 
-void GenericEnvironment::
-getSubstitutionMap(SubstitutionList subs,
-                   SubstitutionMap &result) const {
+SubstitutionMap GenericEnvironment::
+getSubstitutionMap(SubstitutionList subs) const {
+  SubstitutionMap result;
+
   for (auto depTy : getGenericSignature()->getAllDependentTypes()) {
 
     // Map the interface type to a context type.
@@ -421,6 +415,7 @@ getSubstitutionMap(SubstitutionList subs,
   assert(subs.empty() && "did not use all substitutions?!");
 
   populateParentMap(result);
+  return result;
 }
 
 SubstitutionMap
