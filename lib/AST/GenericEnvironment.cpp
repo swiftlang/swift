@@ -340,36 +340,39 @@ GenericEnvironment::getForwardingSubstitutions() const {
 }
 
 SubstitutionMap GenericEnvironment::
-getSubstitutionMap(ModuleDecl *mod,
-                   SubstitutionList subs) const {
+getSubstitutionMap(SubstitutionList subs) const {
   SubstitutionMap result;
-  getSubstitutionMap(mod, subs, result);
+  getSubstitutionMap(subs, result);
   return result;
 }
 
-static void populateParentMap(ModuleDecl *mod,
-                              const GenericEnvironment *env,
-                              SubstitutionMap &subMap) {
-  for (auto reqt : env->getGenericSignature()->getRequirements()) {
+void GenericEnvironment::populateParentMap(SubstitutionMap &subMap) const {
+  for (auto reqt : getGenericSignature()->getRequirements()) {
     if (reqt.getKind() != RequirementKind::SameType)
       continue;
 
     auto first = reqt.getFirstType();
     auto second = reqt.getSecondType();
 
-    auto archetype = env->mapTypeIntoContext(mod, first)
+    auto archetype = first.subst(
+        QueryInterfaceTypeSubstitutions(this),
+        MakeAbstractConformanceForGenericType())
       ->getAs<ArchetypeType>();
     if (!archetype)
       continue;
 
 #ifndef NDEBUG
-    auto secondArchetype = env->mapTypeIntoContext(mod, second)
+    auto secondArchetype = second.subst(
+        QueryInterfaceTypeSubstitutions(this),
+        MakeAbstractConformanceForGenericType())
       ->getAs<ArchetypeType>();
     assert(secondArchetype == archetype);
 #endif
 
     if (auto *firstMemTy = first->getAs<DependentMemberType>()) {
-      auto parent = env->mapTypeIntoContext(mod, firstMemTy->getBase())
+      auto parent = firstMemTy->getBase().subst(
+        QueryInterfaceTypeSubstitutions(this),
+        MakeAbstractConformanceForGenericType())
           ->getAs<ArchetypeType>();
       if (parent && archetype->getParent() != parent) {
         subMap.addParent(CanType(archetype),
@@ -379,7 +382,9 @@ static void populateParentMap(ModuleDecl *mod,
     }
 
     if (auto *secondMemTy = second->getAs<DependentMemberType>()) {
-      auto parent = env->mapTypeIntoContext(mod, secondMemTy->getBase())
+      auto parent = secondMemTy->getBase().subst(
+        QueryInterfaceTypeSubstitutions(this),
+        MakeAbstractConformanceForGenericType())
           ->getAs<ArchetypeType>();
       if (parent && archetype->getParent() != parent) {
         subMap.addParent(CanType(archetype),
@@ -391,15 +396,13 @@ static void populateParentMap(ModuleDecl *mod,
 }
 
 void GenericEnvironment::
-getSubstitutionMap(ModuleDecl *mod,
-                   SubstitutionList subs,
+getSubstitutionMap(SubstitutionList subs,
                    SubstitutionMap &result) const {
   for (auto depTy : getGenericSignature()->getAllDependentTypes()) {
 
     // Map the interface type to a context type.
     auto contextTy = depTy.subst(QueryInterfaceTypeSubstitutions(this),
-                                 LookUpConformanceInModule(mod),
-                                 SubstOptions());
+                                 MakeAbstractConformanceForGenericType());
 
     auto sub = subs.front();
     subs = subs.slice(1);
@@ -417,13 +420,12 @@ getSubstitutionMap(ModuleDecl *mod,
 
   assert(subs.empty() && "did not use all substitutions?!");
 
-  populateParentMap(mod, this, result);
+  populateParentMap(result);
 }
 
 SubstitutionMap
 GenericEnvironment::
-getSubstitutionMap(ModuleDecl *mod,
-                   TypeSubstitutionFn subs,
+getSubstitutionMap(TypeSubstitutionFn subs,
                    GenericSignature::LookupConformanceFn lookupConformance) const {
   SubstitutionMap subMap;
 
@@ -432,8 +434,7 @@ getSubstitutionMap(ModuleDecl *mod,
 
       // Map the interface type to a context type.
       auto contextTy = depTy.subst(QueryInterfaceTypeSubstitutions(this),
-                                   LookUpConformanceInModule(mod),
-                                   SubstOptions());
+                                   MakeAbstractConformanceForGenericType());
 
       // Compute the replacement type.
       Type currentReplacement = contextTy.subst(subs, lookupConformance,
@@ -457,6 +458,6 @@ getSubstitutionMap(ModuleDecl *mod,
       return false;
     });
 
-  populateParentMap(mod, this, subMap);
+  populateParentMap(subMap);
   return subMap;
 }

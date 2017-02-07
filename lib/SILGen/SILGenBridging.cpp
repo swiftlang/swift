@@ -80,8 +80,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
     GenericEnvironment *witnessEnv = witness.getSyntheticEnvironment();
 
     SubstitutionMap typeSubMap = witnessEnv
-      ->getSubstitutionMap(gen.SGM.SwiftModule,
-                           typeSubstitutions);
+      ->getSubstitutionMap(typeSubstitutions);
     for (auto sub : witnessSubstitutions) {
       substitutionsBuf.push_back(sub.subst(gen.SGM.SwiftModule, typeSubMap));
     }
