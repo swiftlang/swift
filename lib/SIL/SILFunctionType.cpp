@@ -2296,6 +2296,24 @@ SILFunctionType::substGenericArgs(SILModule &silModule,
                                           /*dropGenerics*/ true);
 }
 
+/// Apply a substitution to this polymorphic SILFunctionType so that
+/// it has the form of the normal SILFunctionType for the substituted
+/// type, except using the original conventions.
+CanSILFunctionType
+SILFunctionType::substGenericArgs(SILModule &silModule,
+                                  const SubstitutionMap &subs) {
+  if (subs.empty()) {
+    assert(!isPolymorphic() && "no args for polymorphic substitution");
+    return CanSILFunctionType(this);
+  }
+
+  assert(isPolymorphic());
+  SILTypeSubstituter substituter(silModule, subs);
+
+  return substituter.visitSILFunctionType(CanSILFunctionType(this),
+                                          /*dropGenerics*/ true);
+}
+
 CanSILFunctionType
 SILFunctionType::substGenericArgs(SILModule &silModule,
                                   TypeSubstitutionFn subs,

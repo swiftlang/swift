@@ -2830,8 +2830,11 @@ Type ProtocolCompositionType::get(const ASTContext &C,
 
 FunctionType *
 GenericFunctionType::substGenericArgs(ArrayRef<Substitution> args) {
-  auto subs = getGenericSignature()->getSubstitutionMap(args);
+  return substGenericArgs(getGenericSignature()->getSubstitutionMap(args));
+}
 
+FunctionType *
+GenericFunctionType::substGenericArgs(const SubstitutionMap &subs) {
   Type input = getInput().subst(subs);
   Type result = getResult().subst(subs);
   return FunctionType::get(input, result, getExtInfo());

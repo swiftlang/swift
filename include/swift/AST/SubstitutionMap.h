@@ -112,6 +112,22 @@ public:
                            Optional<SubstitutionMap> derivedSubs,
                            LazyResolver *resolver);
 
+  /// Combine two substitution maps as follows.
+  ///
+  /// The result is written in terms of the generic parameters of 'baseSig'.
+  ///
+  /// Generic parameters with a depth less than 'baseDepth' come from
+  /// 'baseSubs'.
+  ///
+  /// Generic parameters with a depth greater than 'baseDepth' come from
+  /// 'origSubs', but are looked up starting with a depth of 'origDepth'.
+  static SubstitutionMap
+  combineSubstitutionMaps(const SubstitutionMap &baseSubMap,
+                          const SubstitutionMap &origSubMap,
+                          unsigned baseDepth,
+                          unsigned origDepth,
+                          GenericSignature *baseSig);
+
   /// Dump the contents of this substitution map for debugging purposes.
   void dump(llvm::raw_ostream &out) const;
 

@@ -2625,10 +2625,12 @@ public:
                               
   /// Substitute the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
-  ///
-  /// The order of Substitutions must match the order of generic parameters.
   FunctionType *substGenericArgs(ArrayRef<Substitution> subs);
-  
+
+  /// Substitute the given generic arguments into this generic
+  /// function type and return the resulting non-generic type.
+  FunctionType *substGenericArgs(const SubstitutionMap &subs);
+
   /// Substitute the given generic arguments into this generic
   /// function type using the given substitution and conformance lookup
   /// callbacks.
@@ -3355,6 +3357,8 @@ public:
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       ArrayRef<Substitution> subs);
+  CanSILFunctionType substGenericArgs(SILModule &silModule,
+                                      const SubstitutionMap &subs);
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       TypeSubstitutionFn subs,
                                       LookupConformanceFn conformances);

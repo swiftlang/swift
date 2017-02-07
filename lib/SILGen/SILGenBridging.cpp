@@ -645,15 +645,20 @@ ManagedValue
 SILGenFunction::emitBlockToFunc(SILLocation loc,
                                 ManagedValue block,
                                 CanSILFunctionType funcTy) {
-  CanSILFunctionType substFnTy;
-
   // Declare the thunk.
   auto blockTy = block.getType().castTo<SILFunctionType>();
 
   SubstitutionMap contextSubs, interfaceSubs;
   GenericEnvironment *genericEnv = nullptr;
-  auto thunkTy = buildThunkType(block, funcTy, substFnTy, genericEnv,
-                                contextSubs, interfaceSubs);
+
+  // These two are not used here -- but really, bridging thunks
+  // should be emitted using the formal AST type, not the lowered
+  // type
+  CanType inputSubstType, outputSubstType;
+
+  auto thunkTy = buildThunkType(blockTy, funcTy,
+                                inputSubstType, outputSubstType,
+                                genericEnv, interfaceSubs);
 
   auto thunk = SGM.getOrCreateReabstractionThunk(genericEnv,
                                                  thunkTy,
@@ -669,9 +674,14 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
     buildBlockToFuncThunkBody(thunkSGF, loc, blockTy, funcTy);
   }
 
+  CanSILFunctionType substFnTy = thunkTy;
+
   SmallVector<Substitution, 4> subs;
-  if (auto genericSig = thunkTy->getGenericSignature())
+  if (auto genericSig = thunkTy->getGenericSignature()) {
     genericSig->getSubstitutions(interfaceSubs, subs);
+    substFnTy = thunkTy->substGenericArgs(F.getModule(),
+                                          interfaceSubs);
+  }
 
   // Create it in the current function.
   auto thunkValue = B.createFunctionRef(loc, thunk);
