@@ -56,14 +56,14 @@ func test3<T: Fooable, U: Fooable>(_ t: T, u: U) -> (X, X)
 func fail1<
   T: Fooable, U: Fooable
 >(_ t: T, u: U) -> (X, Y)
-  where T.Foo == X, U.Foo == Y, T.Foo == U.Foo { // expected-error{{generic parameter T.Foo cannot be equal to both 'X' and 'Y'}}
+  where T.Foo == X, U.Foo == Y, T.Foo == U.Foo { // expected-error{{generic parameter 'T.Foo' cannot be equal to both 'X' and 'Y'}}
   return (t.foo, u.foo)
 }
 
 func fail2<
   T: Fooable, U: Fooable
 >(_ t: T, u: U) -> (X, Y)
-  where T.Foo == U.Foo, T.Foo == X, U.Foo == Y { // expected-error{{generic parameter T.Foo cannot be equal to both 'X' and 'Y'}}
+  where T.Foo == U.Foo, T.Foo == X, U.Foo == Y { // expected-error{{generic parameter 'T.Foo' cannot be equal to both 'X' and 'Y'}}
   return (t.foo, u.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Y'}}
 }
 
@@ -91,7 +91,7 @@ func test7<T: Barrable>(_ t: T) -> (Y, X) where T.Bar == Y, T.Bar.Foo == X {
 func fail4<T: Barrable>(_ t: T) -> (Y, Z)
   where
   T.Bar == Y,
-  T.Bar.Foo == Z { // expected-error{{generic parameter T.Bar.Foo cannot be equal to both 'Y.Foo' (aka 'X') and 'Z'}}
+  T.Bar.Foo == Z { // expected-error{{generic parameter 'T.Bar.Foo' cannot be equal to both 'Y.Foo' (aka 'X') and 'Z'}}
   return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Z'}}
 }
 
@@ -99,11 +99,11 @@ func fail4<T: Barrable>(_ t: T) -> (Y, Z)
 func fail5<T: Barrable>(_ t: T) -> (Y, Z)
   where
   T.Bar.Foo == Z,
-  T.Bar == Y { // expected-error 2{{generic parameter T.Bar.Foo cannot be equal to both 'Z' and 'Y.Foo' (aka 'X')}}
+  T.Bar == Y { // expected-error 2{{generic parameter 'T.Bar.Foo' cannot be equal to both 'Z' and 'Y.Foo' (aka 'X')}}
   return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Z'}}
 }
 
-func test8<T: Fooable>(_ t: T) where T.Foo == X, T.Foo == Y {} // expected-error{{generic parameter T.Foo cannot be equal to both 'X' and 'Y'}}
+func test8<T: Fooable>(_ t: T) where T.Foo == X, T.Foo == Y {} // expected-error{{generic parameter 'T.Foo' cannot be equal to both 'X' and 'Y'}}
 
 func testAssocTypeEquivalence<T: Fooable>(_ fooable: T) -> X.Type
   where T.Foo == X {
