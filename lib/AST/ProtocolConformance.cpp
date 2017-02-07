@@ -545,7 +545,7 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
     auto subMap = env->getSubstitutionMap(conformingModule, subs);
 
     auto r = inherited->subst(conformingModule, getType(),
-                              QueryTypeSubstitutionMap{subMap.getMap()},
+                              QuerySubstitutionMap{subMap},
                               LookUpConformanceInSubstitutionMap(subMap));
     assert(getType()->isEqual(r->getType())
            && "substitution didn't produce conformance for same type?!");

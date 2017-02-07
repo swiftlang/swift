@@ -44,6 +44,11 @@ Type QueryTypeSubstitutionMap::operator()(SubstitutableType *type) const {
   return Type();
 }
 
+Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
+  auto key = cast<SubstitutableType>(type->getCanonicalType());
+  return subMap.lookupSubstitution(key);
+}
+
 bool TypeLoc::isError() const {
   assert(wasValidated() && "Type not yet validated");
   return getType()->hasError() || getType()->getCanonicalType()->hasError();
@@ -3093,7 +3098,7 @@ static Type substType(Type derivedType,
 Type Type::subst(const SubstitutionMap &substitutions,
                  SubstOptions options) const {
   return substType(*this,
-                   QueryTypeSubstitutionMap{substitutions.getMap()},
+                   QuerySubstitutionMap{substitutions},
                    LookUpConformanceInSubstitutionMap(substitutions),
                    options);
 }
