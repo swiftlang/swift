@@ -119,6 +119,11 @@ struct ArchetypeBuilder::Implementation {
   llvm::DenseSet<std::pair<GenericEnvironment *,
                            ArchetypeBuilder::PotentialArchetype *>>
     ConcreteSubs;
+
+#ifndef NDEBUG
+  /// Whether we've already finalized the builder.
+  bool finalized = false;
+#endif
 };
 
 ArchetypeBuilder::PotentialArchetype::~PotentialArchetype() {
@@ -848,7 +853,9 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
     ParentArchetype->registerNestedType(getName(), arch);
   } else {
     // Create a top-level archetype.
-    arch = ArchetypeType::getNew(ctx, genericEnv, getName(), Protos,
+    Identifier name =
+      genericParams[getGenericParamKey().findIndexIn(genericParams)]->getName();
+    arch = ArchetypeType::getNew(ctx, genericEnv, name, Protos,
                                  superclass, layout);
 
     // Register the archetype with the generic environment.
@@ -1926,6 +1933,18 @@ static Identifier typoCorrectNestedType(
 
 void
 ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
+  assert(!Impl->finalized && "Already finalized builder");
+#ifndef NDEBUG
+  Impl->finalized = true;
+#endif
+
+  // Create anchors for all of the potential archetypes.
+  // FIXME: This is because we might be missing some from the equivalence
+  // classes. It is an egregious hack.
+  visitPotentialArchetypes([&](PotentialArchetype *archetype) {
+    (void)archetype->getArchetypeAnchor(*this);
+  });
+
   SmallPtrSet<PotentialArchetype *, 4> visited;
 
   // Check for generic parameters which have been made concrete or equated
@@ -2022,14 +2041,16 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
   }
 }
 
-bool ArchetypeBuilder::diagnoseRemainingRenames(SourceLoc loc) {
+bool ArchetypeBuilder::diagnoseRemainingRenames(
+                              SourceLoc loc,
+                              ArrayRef<GenericTypeParamType *> genericParams) {
   bool invalid = false;
 
   for (auto pa : Impl->RenamedNestedTypes) {
     if (pa->alreadyDiagnosedRename()) continue;
 
     Diags.diagnose(loc, diag::invalid_member_type_suggest,
-                   pa->getParent()->getDependentType(/*FIXME: */{ },
+                   pa->getParent()->getDependentType(genericParams,
                                                      /*allowUnresolved=*/true),
                    pa->getOriginalName(), pa->getName());
     invalid = true;
@@ -2177,13 +2198,6 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
                            PotentialArchetype *archetype,
                            ArchetypeBuilder::RequirementRHS constraint,
                            RequirementSource source)> f) {
-   // Create anchors for all of the potential archetypes.
-   // FIXME: This is because we might be missing some from the equivalence
-   // classes. It is an egregious hack.
-   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
-     (void)archetype->getArchetypeAnchor(*this);
-   });
-
   // Collect all archetypes.
   SmallVector<PotentialArchetype *, 8> archetypes;
   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
@@ -2434,6 +2448,8 @@ static void collectRequirements(ArchetypeBuilder &builder,
 }
 
 GenericSignature *ArchetypeBuilder::getGenericSignature() {
+  assert(Impl->finalized && "Must finalize builder first");
+
   // Collect the requirements placed on the generic parameter types.
   SmallVector<Requirement, 4> requirements;
   collectRequirements(*this, Impl->GenericParams, requirements);
@@ -2442,24 +2458,22 @@ GenericSignature *ArchetypeBuilder::getGenericSignature() {
   return sig;
 }
 
-GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
-                                                  GenericSignature *signature) {
-  // Create the generic environment, which will be lazily populated with
-  // archetypes.
-  auto genericEnv = GenericEnvironment::getIncomplete(signature, this);
+void ArchetypeBuilder::expandGenericEnvironment(GenericEnvironment *env) {
+
+  assert(Impl->finalized && "Must finalize builder first");
 
   // Force the creation of all of the archetypes.
   // FIXME: This isn't a well-formed notion with recursive protocol constraints.
+  auto signature = env->getGenericSignature();
   visitPotentialArchetypes([&](PotentialArchetype *pa) {
     if (auto archetype =
-          genericEnv->mapTypeIntoContext(
+            env->mapTypeIntoContext(
               pa->getDependentType(signature->getGenericParams(),
-                                   /*allowUnresolved=*/false),
-              getLookupConformanceFn())
-            ->getAs<ArchetypeType>())
+                                  /*allowUnresolved=*/false),
+             getLookupConformanceFn())
+          ->getAs<ArchetypeType>())
       (void)archetype->getAllNestedTypes();
   });
-  genericEnv->clearArchetypeBuilder();
 
 #ifndef NDEBUG
   // FIXME: This property should be maintained when there are errors, too.
@@ -2470,14 +2484,13 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
 
       auto depTy = pa->getDependentType(genericParams,
                                         /*allowUnresolved=*/false);
-      auto inContext = genericEnv->mapTypeIntoContext(depTy,
-                                                      getLookupConformanceFn());
+      auto inContext = env->mapTypeIntoContext(depTy, getLookupConformanceFn());
 
       auto repDepTy = pa->getRepresentative()->getDependentType(
                                                     genericParams,
                                                     /*allowUnresolved=*/false);
       auto repInContext =
-        genericEnv->mapTypeIntoContext(repDepTy, getLookupConformanceFn());
+        env->mapTypeIntoContext(repDepTy, getLookupConformanceFn());
       assert((inContext->isEqual(repInContext) ||
               inContext->hasError() ||
               repInContext->hasError()) &&
@@ -2485,6 +2498,20 @@ GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
     });
   }
 #endif
+}
+
+GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
+                                                  GenericSignature *signature) {
+  assert(Impl->finalized && "Must finalize builder first");
+
+  // Create the generic environment, which will be lazily populated with
+  // archetypes.
+  auto genericEnv = GenericEnvironment::getIncomplete(signature, this);
+
+  // Force the creation of all of the archetypes.
+  expandGenericEnvironment(genericEnv);
+  genericEnv->clearArchetypeBuilder();
+
 
   return genericEnv;
 }

@@ -1254,6 +1254,7 @@ ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
   // Create a new archetype builder with the given signature.
   auto builder = new ArchetypeBuilder(*this, LookUpConformanceInModule(mod));
   builder->addGenericSignature(sig);
+  builder->finalize(SourceLoc(), /*allowConcreteGenericParams=*/true);
 
   // Store this archetype builder (no generic environment yet).
   Impl.ArchetypeBuilders[{sig, mod}] =
@@ -1263,13 +1264,14 @@ ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
 }
 
 GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
-                                                    ArchetypeBuilder *builder) {
+                                                    ArchetypeBuilder *builder,
+                                                    ModuleDecl &module) {
   auto known = Impl.CanonicalGenericEnvironments.find(builder);
   if (known != Impl.CanonicalGenericEnvironments.end())
     return known->second;
 
   auto sig = builder->getGenericSignature();
-  auto env = builder->getGenericEnvironment(sig);
+  auto env = sig->createGenericEnvironment(module);
   Impl.CanonicalGenericEnvironments[builder] = env;
   return env;
 }
