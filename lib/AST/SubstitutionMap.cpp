@@ -226,3 +226,37 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
 
   return subMap;
 }
+
+SubstitutionMap
+SubstitutionMap::combineSubstitutionMaps(const SubstitutionMap &baseSubMap,
+                                         const SubstitutionMap &origSubMap,
+                                         unsigned baseDepth,
+                                         unsigned origDepth,
+                                         GenericSignature *baseSig) {
+  auto replaceGenericParameter = [&](Type type) -> Type {
+    if (auto gp = type->getAs<GenericTypeParamType>()) {
+      if (gp->getDepth() < baseDepth) return Type();
+      return GenericTypeParamType::get(gp->getDepth() + origDepth - baseDepth,
+                                       gp->getIndex(),
+                                       baseSig->getASTContext());
+    }
+
+    return type;
+  };
+
+  return baseSig->getSubstitutionMap(
+    [&](SubstitutableType *type) {
+      auto replacement = replaceGenericParameter(type);
+      if (replacement)
+        return Type(replacement).subst(origSubMap);
+      return Type(type).subst(baseSubMap);
+    },
+    [&](CanType type, Type substType, ProtocolType *conformedProtocol) {
+      auto replacement = type.transform(replaceGenericParameter);
+      if (replacement)
+        return origSubMap.lookupConformance(replacement->getCanonicalType(),
+                                            conformedProtocol->getDecl());
+      return baseSubMap.lookupConformance(type,
+                                          conformedProtocol->getDecl());
+    });
+}
