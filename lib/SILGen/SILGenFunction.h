@@ -306,12 +306,8 @@ public:
   CleanupManager Cleanups;
 
   /// The stack of pending writebacks.
-  std::vector<LValueWriteback> *WritebackStack = 0;
+  std::unique_ptr<std::vector<LValueWriteback>> WritebackStack;
   std::vector<LValueWriteback> &getWritebackStack();
-
-  /// freeWritebackStack - Just deletes WritebackStack.  Out of line to avoid
-  /// having to put the definition of LValueWriteback in this header.
-  void freeWritebackStack();
 
   /// VarLoc - representation of an emitted local variable or constant.  There
   /// are three scenarios here:

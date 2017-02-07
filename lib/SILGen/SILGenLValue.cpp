@@ -105,15 +105,9 @@ namespace {
 
 std::vector<LValueWriteback> &SILGenFunction::getWritebackStack() {
   if (!WritebackStack)
-    WritebackStack = new std::vector<LValueWriteback>();
+    WritebackStack.reset(new std::vector<LValueWriteback>());
 
   return *WritebackStack;
-}
-
-void SILGenFunction::freeWritebackStack() {
-  assert((!WritebackStack || WritebackStack->empty()) &&
-         "entries remaining on writeback stack at end of function!");
-  delete WritebackStack;
 }
 
 /// Push a writeback onto the current LValueWriteback stack.
