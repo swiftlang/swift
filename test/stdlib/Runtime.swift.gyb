@@ -349,12 +349,14 @@ class SomeSubclass : SomeClass {}
 protocol SomeProtocol {}
 class SomeConformingClass : SomeProtocol {}
 class SomeConformingSubclass : SomeConformingClass {}
+class UnicodeCläss {}
 
 Runtime.test("typeByName") {
   expectTrue(_typeByName("a.SomeClass") == SomeClass.self)
   expectTrue(_typeByName("a.SomeSubclass") == SomeSubclass.self)
   // name lookup will be via protocol conformance table
   expectTrue(_typeByName("a.SomeConformingClass") == SomeConformingClass.self)
+  expectTrue(_typeByName("a.UnicodeCläss") == UnicodeCläss.self)
 }
 
 Runtime.test("demangleName") {

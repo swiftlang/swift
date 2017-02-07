@@ -272,11 +272,6 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   return finalize();
 }
 
-std::string ASTMangler::mangleTypeAsUSR(Type type) {
-  appendType(type);
-  return finalize();
-}
-
 std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {
   appendContext(type);
   return finalize();
