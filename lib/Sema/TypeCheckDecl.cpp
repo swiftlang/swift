@@ -4831,7 +4831,7 @@ public:
 
       // Assign archetypes.
       builder.finalize(FD->getLoc(), sig->getGenericParams());
-      auto *env = builder.getGenericEnvironment(sig);
+      auto *env = sig->createGenericEnvironment(*FD->getModuleContext());
       FD->setGenericEnvironment(env);
     } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
       (void)TC.validateGenericFuncSignature(FD);
@@ -6468,7 +6468,7 @@ public:
 
       // Assign archetypes.
       builder.finalize(CD->getLoc(), sig->getGenericParams());
-      auto *env = builder.getGenericEnvironment(sig);
+      auto *env = sig->createGenericEnvironment(*CD->getModuleContext());
       CD->setGenericEnvironment(env);
     } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
       (void)TC.validateGenericFuncSignature(CD);

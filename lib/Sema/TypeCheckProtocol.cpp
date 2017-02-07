@@ -1160,7 +1160,8 @@ RequirementEnvironment::RequirementEnvironment(
 
   // Produce the generic signature and environment.
   syntheticSignature = builder.getGenericSignature();
-  syntheticEnvironment = builder.getGenericEnvironment(syntheticSignature);
+  syntheticEnvironment = syntheticSignature->createGenericEnvironment(
+                                             *conformanceDC->getParentModule());
 }
 
 static RequirementMatch

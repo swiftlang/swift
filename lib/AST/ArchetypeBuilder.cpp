@@ -1623,10 +1623,7 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
     PotentialArchetype *pa = resolveArchetype(req.getFirstType());
     if (!pa) return;
 
-    bool invalid = addLayoutRequirement(pa, req.getLayoutConstraint(), source);
-    assert(!invalid && "Re-introducing invalid requirement");
-    (void)invalid;
-
+    (void)addLayoutRequirement(pa, req.getLayoutConstraint(), source);
     return;
   }
 
@@ -1635,15 +1632,11 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
     if (!pa) return;
 
     SmallVector<ProtocolDecl *, 4> conformsTo;
-    bool existential = req.getSecondType()->isExistentialType(conformsTo);
-    assert(existential && "Re-introducing invalid requirement");
-    (void)existential;
+    (void)req.getSecondType()->isExistentialType(conformsTo);
 
     // Add each of the protocols.
     for (auto proto : conformsTo) {
-      bool invalid = addConformanceRequirement(pa, proto, source);
-      assert(!invalid && "Re-introducing invalid requirement");
-      (void)invalid;
+      (void)addConformanceRequirement(pa, proto, source);
     }
 
     return;
