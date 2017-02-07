@@ -3025,7 +3025,7 @@ GenericSignature *ProtocolDecl::getRequirementSignature() {
   ArchetypeBuilder builder(getASTContext(), LookUpConformanceInModule(module));
   builder.addGenericParameter(selfType);
   builder.addRequirement(requirement, source);
-  builder.finalize(SourceLoc());
+  builder.finalize(SourceLoc(), { selfType });
   
   return builder.getGenericSignature();
 }
