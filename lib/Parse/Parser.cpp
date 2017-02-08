@@ -549,6 +549,11 @@ Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
   }
 }
 
+void Parser::StructureMarkerRAII::diagnoseOverflow() {
+  auto Loc = P.StructureMarkers.back().Loc;
+  P.diagnose(Loc, diag::structure_overflow, MaxDepth);
+}
+
 //===----------------------------------------------------------------------===//
 // Primitive Parsing
 //===----------------------------------------------------------------------===//

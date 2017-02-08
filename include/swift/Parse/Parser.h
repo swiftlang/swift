@@ -165,6 +165,12 @@ public:
 
   /// \brief The location of the previous token.
   SourceLoc PreviousLoc;
+
+  /// Stop parsing immediately.
+  void cutOffParsing() {
+    // Cut off parsing by acting as if we reached the end-of-file.
+    Tok.setKind(tok::eof);
+  }
   
   /// A RAII object for temporarily changing CurDeclContext.
   class ContextChange {
@@ -255,11 +261,22 @@ public:
   class StructureMarkerRAII {
     Parser &P;
 
+    /// Max nesting level
+    // TODO: customizable.
+    enum { MaxDepth = 256 };
+
+    void diagnoseOverflow();
+
   public:
     StructureMarkerRAII(Parser &parser, SourceLoc loc,
                                StructureMarkerKind kind)
       : P(parser) {
       P.StructureMarkers.push_back({loc, kind, None});
+
+      if (P.StructureMarkers.size() >= MaxDepth) {
+        diagnoseOverflow();
+        P.cutOffParsing();
+      }
     }
 
     StructureMarkerRAII(Parser &parser, const Token &tok);
