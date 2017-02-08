@@ -397,6 +397,25 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     // Only function types may be generic.
     auto brackets = generics->getSourceRange();
     diagnose(brackets.Start, diag::generic_non_function);
+    GenericsScope.reset();
+
+    // Forget any generic parameters we saw in the type.
+    class EraseTypeParamWalker : public ASTWalker {
+    public:
+      bool walkToTypeReprPre(TypeRepr *T) override {
+        if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
+          if (auto decl = ident->getBoundDecl()) {
+            if (isa<GenericTypeParamDecl>(decl))
+              ident->overwriteIdentifier(decl->getName());
+          }
+        }
+        return true;
+      }
+
+    } walker;
+
+    if (tyR)
+      tyR->walk(walker);
   }
 
   return makeParserResult(applyAttributeToType(tyR, inoutLoc, attrs));

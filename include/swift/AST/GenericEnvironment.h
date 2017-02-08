@@ -115,7 +115,6 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   friend class ArchetypeBuilder;
   
   ArchetypeBuilder *getArchetypeBuilder() const { return Builder; }
-  void clearArchetypeBuilder() { Builder = nullptr; }
 
   /// Query function suitable for use as a \c TypeSubstitutionFn that queries
   /// the mapping of interface types to archetypes.

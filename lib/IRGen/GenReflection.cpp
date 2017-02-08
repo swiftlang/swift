@@ -786,7 +786,6 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
   llvm::raw_svector_ostream OS(SectionName);
   switch (IGM.TargetInfo.OutputObjectFormat) {
   case llvm::Triple::UnknownObjectFormat:
-  case llvm::Triple::Wasm:
     llvm_unreachable("unknown object format");
   case llvm::Triple::COFF:
     assert(FourCC.size() <= 4 &&
@@ -800,6 +799,9 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
     assert(LongName.size() <= 7 &&
            "Mach-O section name length must be <= 16 characters");
     OS << "__TEXT,__swift3_" << LongName << ", regular, no_dead_strip";
+    break;
+  case llvm::Triple::Wasm:
+    llvm_unreachable("web assembly object format is not supported.");
     break;
   }
   return OS.str();

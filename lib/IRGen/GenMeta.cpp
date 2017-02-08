@@ -2022,7 +2022,6 @@ llvm::Value *IRGenFunction::emitTypeLayoutRef(SILType type) {
 void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::UnknownObjectFormat:
-  case llvm::Triple::Wasm:
     llvm_unreachable("unknown object format");
   case llvm::Triple::MachO:
     var->setSection("__TEXT,__const");
@@ -2032,6 +2031,9 @@ void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
     break;
   case llvm::Triple::COFF:
     var->setSection(".rdata");
+    break;
+  case llvm::Triple::Wasm:
+    llvm_unreachable("web assembly object format is not supported.");
     break;
   }
 }
