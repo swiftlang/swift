@@ -1248,8 +1248,21 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 
       bool hadTypeError = TC.typeCheckExpression(SubExpr, DC, TypeLoc(),
                                                  CTP_Unused, options);
-      if (isDiscarded && !hadTypeError)
+
+      // If a closure expression is unused, the user might have intended
+      // to write "do { ... }".
+      auto *CE = dyn_cast<ClosureExpr>(SubExpr);
+      if (CE || isa<CaptureListExpr>(SubExpr)) {
+        TC.diagnose(SubExpr->getLoc(), diag::expression_unused_closure);
+        
+        if (CE && CE->hasAnonymousClosureVars() &&
+            CE->getParameters()->size() == 0) {
+          TC.diagnose(CE->getStartLoc(), diag::brace_stmt_suggest_do)
+            .fixItInsert(CE->getStartLoc(), "do ");
+        }
+      } else if (isDiscarded && !hadTypeError)
         TC.checkIgnoredExpr(SubExpr);
+
       elem = SubExpr;
       continue;
     }

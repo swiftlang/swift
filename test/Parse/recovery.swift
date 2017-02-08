@@ -44,15 +44,15 @@ func test(a: BadAttributes) -> () { // expected-note * {{did you mean 'test'?}}
 //===--- Recovery for braced blocks.
 
 func braceStmt1() {
-  { braceStmt1(); } // expected-error {{braced block of statements is an unused closure}} expected-error {{expression resolves to an unused function}}
+  { braceStmt1(); } // expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}} {{3-3=do }}
 }
 
 func braceStmt2() {
-  { () in braceStmt2(); } // expected-error {{expression resolves to an unused function}}
+  { () in braceStmt2(); } // expected-error {{closure expression is unused}}
 }
 
 func braceStmt3() {
-  { // expected-error {{braced block of statements is an unused closure}}
+  {  // expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}} {{3-3=do }}
     undefinedIdentifier {} // expected-error {{use of unresolved identifier 'undefinedIdentifier'}}
   }
 }
@@ -88,14 +88,14 @@ func missingControllingExprInIf() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-warning {{boolean literal is unused}}
+  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}} {{15-15=do }} expected-warning {{boolean literal is unused}}
   }
 
-  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error 2 {{consecutive statements on a line must be separated by ';'}} expected-error {{expression resolves to an unused function}} expected-warning {{boolean literal is unused}}
+  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error 2 {{consecutive statements on a line must be separated by ';'}} expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}} {{17-17=do }} expected-warning {{boolean literal is unused}}
   }
 
   // <rdar://problem/18940198>
-  if { { } } // expected-error{{missing condition in an 'if' statement}} expected-error{{braced block of statements is an unused closure}} expected-error {{expression resolves to an unused function}}
+  if { { } } // expected-error{{missing condition in an 'if' statement}} expected-error{{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}} {{8-8=do }}
 }
 
 func missingControllingExprInWhile() {
@@ -110,20 +110,20 @@ func missingControllingExprInWhile() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-warning {{boolean literal is unused}}
+  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}} {{18-18=do }} expected-warning {{boolean literal is unused}}
   }
 
-  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error 2 {{consecutive statements on a line must be separated by ';'}} expected-error {{expression resolves to an unused function}} expected-warning {{boolean literal is unused}}
+  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error 2 {{consecutive statements on a line must be separated by ';'}} expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}} {{20-20=do }} expected-warning {{boolean literal is unused}}
   }
 
   // <rdar://problem/18940198>
-  while { { } } // expected-error{{missing condition in a 'while' statement}} expected-error{{braced block of statements is an unused closure}} expected-error {{expression resolves to an unused function}}
+  while { { } } // expected-error{{missing condition in a 'while' statement}} expected-error{{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}} {{11-11=do }}
 }
 
 func missingControllingExprInRepeatWhile() {
   repeat {
   } while // expected-error {{missing condition in a 'while' statement}}
-  { // expected-error {{braced block of statements is an unused closure}} expected-error {{expression resolves to an unused function}}
+  { // expected-error{{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}} {{3-3=do }}
     missingControllingExprInRepeatWhile();
   }
 
@@ -219,11 +219,11 @@ func missingControllingExprInSwitch() {
     case _: return
   }
 
-  switch { 42 } { // expected-error {{expected expression in 'switch' statement}} expected-error{{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error{{consecutive statements on a line must be separated by ';'}} {{16-16=;}} expected-error{{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}}
+  switch { 42 } { // expected-error {{expected expression in 'switch' statement}} expected-error{{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error{{consecutive statements on a line must be separated by ';'}} {{16-16=;}} expected-error{{closure expression is unused}} expected-note{{did you mean to use a 'do' statement?}} {{17-17=do }}
     case _: return // expected-error{{'case' label can only appear inside a 'switch' statement}}
   }
 
-  switch { 42 }() { // expected-error {{expected expression in 'switch' statement}} expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error {{braced block of statements is an unused closure}} expected-error 2 {{consecutive statements on a line must be separated by ';'}} expected-error {{expression resolves to an unused function}}
+  switch { 42 }() { // expected-error {{expected expression in 'switch' statement}} expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error 2 {{consecutive statements on a line must be separated by ';'}} expected-error{{closure expression is unused}} expected-note{{did you mean to use a 'do' statement?}} {{19-19=do }}
     case _: return // expected-error{{'case' label can only appear inside a 'switch' statement}}
   }
 }

@@ -2645,13 +2645,21 @@ ParserResult<Expr> Parser::parseTrailingClosure(SourceRange calleeRange) {
   if (closure.isNull())
     return makeParserError();
 
-  // Track the original end location of the expression we're trailing so
-  // we can warn about excess newlines.
-  auto origLineCol = SourceMgr.getLineAndColumn(calleeRange.End);
-  auto braceLineCol = SourceMgr.getLineAndColumn(braceLoc);
-  if (((int)braceLineCol.first - (int)origLineCol.first) > 1) {
-    diagnose(braceLoc, diag::trailing_closure_excess_newlines);
-    diagnose(calleeRange.Start, diag::trailing_closure_call_here);
+  // Warn if the trailing closure is separated from its callee by more than
+  // one line. A single-line separation is acceptable for a trailing closure
+  // call, and will be diagnosed later only if the call fails to typecheck.
+  auto origLine = SourceMgr.getLineNumber(calleeRange.End);
+  auto braceLine = SourceMgr.getLineNumber(braceLoc);
+  if (braceLine > origLine + 1) {
+    diagnose(braceLoc, diag::trailing_closure_after_newlines);
+    diagnose(calleeRange.Start, diag::trailing_closure_callee_here);
+    
+    auto *CE = dyn_cast<ClosureExpr>(closure.get());
+    if (CE && CE->hasAnonymousClosureVars() &&
+        CE->getParameters()->size() == 0) {
+      diagnose(braceLoc, diag::brace_stmt_suggest_do)
+        .fixItInsert(braceLoc, "do ");
+    }
   }
 
   return closure;
