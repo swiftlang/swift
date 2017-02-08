@@ -157,7 +157,10 @@ public struct DateInterval : ReferenceConvertible, Comparable, Hashable {
     public var hashValue: Int {
         var buf: (UInt, UInt) = (UInt(start.timeIntervalSinceReferenceDate), UInt(end.timeIntervalSinceReferenceDate))
         return withUnsafeMutablePointer(to: &buf) {
-            return Int(bitPattern: CFHashBytes(unsafeBitCast($0, to: UnsafeMutablePointer<UInt8>.self), CFIndex(MemoryLayout<UInt>.size * 2)))
+            let size = MemoryLayout<UInt>.size * 2
+            return $0.withMemoryRebound(to: UInt8.self, capacity: size) {
+                Int(bitPattern: CFHashBytes($0, CFIndex(size)))
+            }
         }
     }
     
