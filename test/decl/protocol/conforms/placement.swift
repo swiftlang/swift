@@ -127,10 +127,10 @@ class SynthesizedSubClass3 : SynthesizedClass1, AnyObjectRefinement { }
 class SynthesizedSubClass4 : SynthesizedClass2 { }
 extension SynthesizedSubClass4 : AnyObjectRefinement { }
 
-enum SynthesizedEnum1 : Int, RawRepresentable { case none = 0 } // expected-error{{redundant conformance of 'SynthesizedEnum1' to protocol 'RawRepresentable'}} expected-note{{'SynthesizedEnum1' declares raw type 'Int', which implies RawRepresentable}}
+enum SynthesizedEnum1 : Int, RawRepresentable { case none = 0 }
 
-enum SynthesizedEnum2 : Int { case none = 0 } // expected-note {{'SynthesizedEnum2' declares raw type 'Int', which implies RawRepresentable}}
-extension SynthesizedEnum2 : RawRepresentable { } // expected-error{{redundant conformance of 'SynthesizedEnum2' to protocol 'RawRepresentable'}}
+enum SynthesizedEnum2 : Int { case none = 0 }
+extension SynthesizedEnum2 : RawRepresentable { }
 
 
 // ===========================================================================
@@ -182,7 +182,7 @@ extension MFSynthesizedSubClass3 : AnyObjectRefinement { }
 
 class MFSynthesizedSubClass4 : MFSynthesizedClass2 { }
 
-extension MFSynthesizedEnum1 : RawRepresentable { } // expected-error{{redundant conformance of 'MFSynthesizedEnum1' to protocol 'RawRepresentable'}}
+extension MFSynthesizedEnum1 : RawRepresentable { }
 
 enum MFSynthesizedEnum2 : Int { case none = 0 }
 
