@@ -231,9 +231,6 @@ ERROR(cannot_call_with_params, none,
 NOTE(pointer_init_to_type,none,
       "Pointer conversion restricted: use '.assumingMemoryBound(to:)' or '.bindMemory(to:capacity:)' to view memory as a type.", ())
 
-ERROR(expected_do_in_statement,none,
-      "expected 'do' keyword to designate a block of statements", ())
-
 ERROR(cannot_call_non_function_value,none,
       "cannot call value of non-function type %0", (Type))
 
@@ -2590,6 +2587,8 @@ WARNING(guard_always_succeeds,none,
         "'guard' condition is always true, body is unreachable", ())
 
 
+ERROR(expression_unused_closure,none,
+      "closure expression is unused", ())
 ERROR(expression_unused_function,none,
       "expression resolves to an unused function", ())
 ERROR(expression_unused_lvalue,none,
