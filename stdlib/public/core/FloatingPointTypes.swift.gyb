@@ -772,7 +772,7 @@ extension ${Self} : Hashable {
   }
 }
 
-extension ${Self} : Arithmetic {
+extension ${Self} {
   /// The magnitude of this value.
   ///
   /// For any value `x`, `x.magnitude.sign` is `.plus`. If `x` is not NaN,
