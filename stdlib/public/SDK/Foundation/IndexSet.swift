@@ -956,7 +956,7 @@ private final class _MutablePairHandle<ImmutableType : NSObject, MutableType : N
             return try whatToDo(i)
         case .Mutable(let m):
             // TODO: It should be possible to reflect the constraint that MutableType is a subtype of ImmutableType in the generics for the class, but I haven't figured out how yet. For now, cheat and unsafe bit cast.
-            return try whatToDo(unsafeBitCast(m, to: ImmutableType.self))
+            return try whatToDo(unsafeDowncast(m, to: ImmutableType.self))
         }
     }
     
@@ -966,7 +966,7 @@ private final class _MutablePairHandle<ImmutableType : NSObject, MutableType : N
             return i
         case .Mutable(let m):
             // TODO: It should be possible to reflect the constraint that MutableType is a subtype of ImmutableType in the generics for the class, but I haven't figured out how yet. For now, cheat and unsafe bit cast.
-            return unsafeBitCast(m, to: ImmutableType.self)
+            return unsafeDowncast(m, to: ImmutableType.self)
         }
     }
 }
