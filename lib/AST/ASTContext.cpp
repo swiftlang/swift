@@ -3848,7 +3848,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
 
     // Find the Objective-C class type we bridge to.
     if (conformance->isConcrete()) {
-      return ProtocolConformance::getTypeWitnessByName(
+      return ProtocolConformanceRef::getTypeWitnessByName(
                type, *conformance, Id_ObjectiveCType,
                getLazyResolver());
     } else {

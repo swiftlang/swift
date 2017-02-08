@@ -225,7 +225,7 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
     auto conformance = foreignRepresentation.second;
     assert(conformance && "Missing conformance?");
     Type bridgedTy =
-      ProtocolConformance::getTypeWitnessByName(
+      ProtocolConformanceRef::getTypeWitnessByName(
         t, ProtocolConformanceRef(conformance),
         M.getASTContext().Id_ObjectiveCType,
         nullptr);
