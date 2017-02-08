@@ -231,9 +231,6 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
       FnTy->getOptionalErrorResult(), M.getASTContext());
 
   // This is an interface type. It should not have any archetypes.
-  if (NewFnTy->hasArchetype()) {
-    NewFnTy->dump();
-  }
   assert(!NewFnTy->hasArchetype());
   return NewFnTy;
 }
@@ -320,13 +317,10 @@ checkSpecializationRequirements(ArrayRef<Requirement> Requirements) {
       auto FirstType = Req.getFirstType();
       auto SecondType = Req.getSecondType();
       assert(FirstType && SecondType);
-
-      bool isFirstTypeNonConcrete =
-          FirstType->hasArchetype() || FirstType->hasTypeParameter();
-      bool isSecondTypeNonConcrete =
-          SecondType->hasArchetype() || SecondType->hasTypeParameter();
+      assert(!FirstType->hasArchetype());
+      assert(!SecondType->hasArchetype());
       // Only one of the types should be concrete.
-      assert((isFirstTypeNonConcrete ^ isSecondTypeNonConcrete) &&
+      assert(FirstType->hasTypeParameter() != SecondType->hasTypeParameter() &&
              "Only concrete type same-type requirements are supported by "
              "generic specialization");
       continue;
@@ -372,7 +366,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
 
   for (auto &Req : Requirements) {
     if (Req.getKind() == RequirementKind::SameType) {
-      auto CallerArchetype = dyn_cast<SubstitutableType>(
+      auto CallerArchetype = cast<SubstitutableType>(
           OrigGenericEnv->mapTypeIntoContext(Req.getFirstType())
               ->getCanonicalType());
       // Remember that a given generic parameter is mapped
@@ -398,7 +392,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
     // Remember how the original contextual type is represented in
     // the specialized function.
     if (Req.getKind() == RequirementKind::Layout) {
-      auto CallerArchetype = dyn_cast<SubstitutableType>(
+      auto CallerArchetype = cast<SubstitutableType>(
           OrigGenericEnv->mapTypeIntoContext(Req.getFirstType())
               ->getCanonicalType());
 
@@ -417,7 +411,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
   // the caller archetypes to their interface types or the corresponding
   // archetypes in the specialized function.
   for (auto GP : SpecializedGenericSig->getGenericParams()) {
-    auto CallerArchetype = dyn_cast<SubstitutableType>(
+    auto CallerArchetype = cast<SubstitutableType>(
         OrigGenericEnv->mapTypeIntoContext(GP)->getCanonicalType());
     if (CallerArchetypeToInterfaceMap.lookupSubstitution(CallerArchetype))
       continue;
@@ -437,6 +431,8 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
   SmallVector<Substitution, 4> ClonerSubsList;
   SmallVector<Substitution, 4> CallerSubsList;
   SmallVector<Substitution, 4> InterfaceCallerSubsList;
+  // FIXME: Clean up the module conformance lookup currently used by subst()
+  // calls. They should not directly use module conformance lookup here.
   for (auto Sub : ForwardingSubs) {
     auto ClonerSub = Sub.subst(
         SM, QuerySubstitutionMap{ClonerArchetypeToConcreteMap},
