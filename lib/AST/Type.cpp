@@ -22,6 +22,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/APFloat.h"
