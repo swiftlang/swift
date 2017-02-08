@@ -2051,8 +2051,7 @@ public struct Dictionary<Key : Hashable, Value> :
   // Collection conformance
   //
 
-  /// A Boolean value that indicates whether the dictionary is empty. (read
-  /// only)
+  /// A Boolean value that indicates whether the dictionary is empty.
   ///
   /// Dictionaries are empty when created with an initializer or an empty
   /// dictionary literal.
