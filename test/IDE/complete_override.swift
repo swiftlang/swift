@@ -78,6 +78,12 @@
 // RUN: %FileCheck %s -check-prefix=CLASS_PEI_PE < %t.txt
 // RUN: %FileCheck %s -check-prefix=WITH_PEI < %t.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_PA -code-completion-keywords=false > %t.txt
+// RUN: %FileCheck %s -check-prefix=PROTOCOL_PA < %t.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_PA_EXT -code-completion-keywords=false > %t.txt
+// RUN: %FileCheck %s -check-prefix=PROTOCOL_PA_EXT < %t.txt
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL -code-completion-keywords=false > %t.txt
 // RUN: %FileCheck %s -check-prefix=NESTED_NOMINAL < %t.txt
 
@@ -361,6 +367,24 @@ class TestClass_PEI_PE : ProtocolEImpl, ProtocolE {
   #^CLASS_PEI_PE^#
 }
 // CLASS_PEI_PE: Begin completions, 4 items
+
+protocol TestProtocol_PA : ProtocolA {
+  #^PROTOCOL_PA^#
+}
+// PROTOCOL_PA: found code completion token
+// PROTOCOL_PA-NOT: Begin completions
+
+extension TestProtocol_PA {
+  #^PROTOCOL_PA_EXT^#
+}
+
+// PROTOCOL_PA_EXT: Begin completions
+// PROTOCOL_PA_EXT-DAG: Decl[Constructor]/Super:            init(fromProtocolA: Int) {|}; name=init(fromProtocolA: Int)
+// PROTOCOL_PA_EXT-DAG: Decl[InstanceMethod]/Super:         func protoAFunc() {|}; name=protoAFunc()
+// PROTOCOL_PA_EXT-DAG: Decl[InstanceMethod]/Super:         func protoAFuncOptional() {|}; name=protoAFuncOptional()
+// PROTOCOL_PA_EXT-DAG: Decl[InstanceVar]/Super:            var protoAVarRW: Int; name=protoAVarRW: Int
+// PROTOCOL_PA_EXT-DAG: Decl[InstanceVar]/Super:            var protoAVarRO: Int; name=protoAVarRO: Int
+// PROTOCOL_PA_EXT: End completions
 
 class OuterNominal : ProtocolA {
   class Inner {
