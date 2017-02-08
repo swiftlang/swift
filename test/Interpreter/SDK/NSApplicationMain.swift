@@ -1,4 +1,4 @@
-// RUN: %target-build-swift -parse %s
+// RUN: %target-build-swift -typecheck %s
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 

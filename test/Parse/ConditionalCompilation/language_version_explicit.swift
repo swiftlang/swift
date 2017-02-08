@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 #if swift(>=4)
   let w = 1

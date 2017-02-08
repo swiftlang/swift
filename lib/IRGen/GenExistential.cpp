@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -17,8 +17,9 @@
 #include "GenExistential.h"
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Types.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
@@ -116,7 +117,7 @@ namespace {
       return IGF.Builder.CreateLoad(projectMetadataRef(IGF, addr));
     }
   };
-}
+} // end anonymous namespace
 
 
 /// Given the address of an existential object, destroy it.
@@ -293,7 +294,7 @@ public:
   }
 
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                      SILType T) const {
+                      SILType T) const override {
     auto objPtrTy = dest.getAddress()->getType();
     auto fn = getAssignExistentialsFunction(IGF.IGM, objPtrTy, getLayout());
     auto call = IGF.Builder.CreateCall(
@@ -316,7 +317,7 @@ public:
 
   void initializeWithCopy(IRGenFunction &IGF,
                           Address dest, Address src,
-                          SILType T) const {
+                          SILType T) const override {
     llvm::Value *metadata = copyType(IGF, dest, src);
 
     auto layout = getLayout();
@@ -332,7 +333,7 @@ public:
 
   void initializeWithTake(IRGenFunction &IGF,
                           Address dest, Address src,
-                          SILType T) const {
+                          SILType T) const override {
     llvm::Value *metadata = copyType(IGF, dest, src);
 
     auto layout = getLayout();
@@ -346,7 +347,7 @@ public:
                                              srcBuffer);
   }
 
-  void destroy(IRGenFunction &IGF, Address addr, SILType T) const {
+  void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
     emitDestroyExistential(IGF, addr, getLayout());
   }
 };
@@ -668,7 +669,7 @@ public:
 
   using super::getNumStoredProtocols;
 
-  unsigned getExplosionSize() const final override {
+  unsigned getExplosionSize() const final {
     return 1 + getNumStoredProtocols();
   }
 
@@ -741,7 +742,7 @@ public:
   /// Given an existential object, returns the payload value.
   llvm::Value *getValue(IRGenFunction &IGF, Explosion &container) const {
     llvm::Value *instance = container.claimNext();
-    container.claim(getNumStoredProtocols());
+    (void)container.claim(getNumStoredProtocols());
     return instance;
   }
 
@@ -806,7 +807,7 @@ public:
     asDerived().emitValueRelease(IGF, value, atomicity);
 
     // Throw out the witness table pointers.
-    src.claim(getNumStoredProtocols());
+    (void)src.claim(getNumStoredProtocols());
   }
 
   void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
@@ -815,7 +816,7 @@ public:
     asDerived().emitValueFixLifetime(IGF, value);
 
     // Throw out the witness table pointers.
-    src.claim(getNumStoredProtocols());
+    (void)src.claim(getNumStoredProtocols());
   }
 
   void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
@@ -1067,34 +1068,34 @@ public:
   void strongRetain(IRGenFunction &IGF, Explosion &e,
                     Atomicity atomicity) const override {
     IGF.emitStrongRetain(e.claimNext(), Refcounting, atomicity);
-    e.claim(getNumStoredProtocols());
+    (void)e.claim(getNumStoredProtocols());
   }
 
   void strongRelease(IRGenFunction &IGF, Explosion &e,
                      Atomicity atomicity) const override {
     IGF.emitStrongRelease(e.claimNext(), Refcounting, atomicity);
-    e.claim(getNumStoredProtocols());
+    (void)e.claim(getNumStoredProtocols());
   }
 
   void strongRetainUnowned(IRGenFunction &IGF, Explosion &e) const override {
     IGF.emitStrongRetainUnowned(e.claimNext(), Refcounting);
-    e.claim(getNumStoredProtocols());
+    (void)e.claim(getNumStoredProtocols());
   }
 
   void strongRetainUnownedRelease(IRGenFunction &IGF,
                                   Explosion &e) const override {
     IGF.emitStrongRetainAndUnownedRelease(e.claimNext(), Refcounting);
-    e.claim(getNumStoredProtocols());
+    (void)e.claim(getNumStoredProtocols());
   }
 
   void unownedRetain(IRGenFunction &IGF, Explosion &e) const override {
     IGF.emitUnownedRetain(e.claimNext(), Refcounting);
-    e.claim(getNumStoredProtocols());
+    (void)e.claim(getNumStoredProtocols());
   }
 
   void unownedRelease(IRGenFunction &IGF, Explosion &e) const override {
     IGF.emitUnownedRelease(e.claimNext(), Refcounting);
-    e.claim(getNumStoredProtocols());
+    (void)e.claim(getNumStoredProtocols());
   }
 
   void unownedLoadStrong(IRGenFunction &IGF, Address existential,
@@ -1882,7 +1883,8 @@ void irgen::emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
     emitProjectBufferCall(IGF, metadata, buffer);
   llvm::Value *dynamicType =
     IGF.Builder.CreateCall(IGF.IGM.getGetDynamicTypeFn(),
-                           {object, metadata});
+                           {object, metadata,
+                            llvm::ConstantInt::get(IGF.IGM.Int1Ty, 1)});
   out.add(dynamicType);
 
   // Get the witness tables.
@@ -1918,7 +1920,8 @@ void irgen::emitMetatypeOfBoxedExistential(IRGenFunction &IGF, Explosion &value,
 
   auto dynamicType =
     IGF.Builder.CreateCall(IGF.IGM.getGetDynamicTypeFn(),
-                           {projectedPtr, metadata});
+                           {projectedPtr, metadata,
+                            llvm::ConstantInt::get(IGF.IGM.Int1Ty, 1)});
 
   auto witnessAddr = IGF.Builder.CreateStructGEP(outAddr, 2,
                                                  2 * IGF.IGM.getPointerSize());

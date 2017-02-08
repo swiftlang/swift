@@ -108,7 +108,7 @@ entry(%f : $@callee_owned (Builtin.Word) -> (), %x : $Builtin.Word):
 
 sil @objc_partial_apply : $@convention(thin) ObjCClass -> @callee_owned Int -> () {
 entry(%c : $ObjCClass):
-  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.method!1.foreign : (ObjCClass) -> (Int) -> () , $@convention(objc_method) (Int, ObjCClass) -> ()
+  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.method!1.foreign : (ObjCClass) -> (Int) -> (), $@convention(objc_method) (Int, ObjCClass) -> ()
   %p = partial_apply %m(%c) : $@convention(objc_method) (Int, ObjCClass) -> ()
   return %p : $@callee_owned Int -> ()
 }
@@ -129,7 +129,7 @@ entry(%c : $ObjCClass):
 // CHECK:  [[VAL:%.*]] = load double, double* [[ORIGINXVAL]]
 sil @objc_partial_apply_indirect_sil_argument : $@convention(thin) ObjCClass -> @callee_owned NSRect -> () {
 entry(%c : $ObjCClass):
-  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.method2!1.foreign : (ObjCClass) -> (NSRect) -> () , $@convention(objc_method) (NSRect, ObjCClass) -> ()
+  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.method2!1.foreign : (ObjCClass) -> (NSRect) -> (), $@convention(objc_method) (NSRect, ObjCClass) -> ()
   %p = partial_apply %m(%c) : $@convention(objc_method) (NSRect, ObjCClass) -> ()
   return %p : $@callee_owned NSRect -> ()
 }
@@ -153,7 +153,7 @@ entry(%c : $ObjCClass):
 
 sil @objc_partial_apply_consumes_self : $@convention(thin) ObjCClass -> @callee_owned () -> @owned ObjCClass {
 entry(%c : $ObjCClass):
-  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.fakeInitFamily!1.foreign : (ObjCClass) -> () -> ObjCClass , $@convention(objc_method) (@owned ObjCClass) -> @owned ObjCClass
+  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.fakeInitFamily!1.foreign : (ObjCClass) -> () -> ObjCClass, $@convention(objc_method) (@owned ObjCClass) -> @owned ObjCClass
   %p = partial_apply %m(%c) : $@convention(objc_method) (@owned ObjCClass) -> @owned ObjCClass
   return %p : $@callee_owned () -> @owned ObjCClass
 }
@@ -552,17 +552,17 @@ bb0(%0 : $Base):
  return %5 : $()
 }
 
-sil public_external @partial_empty_box : $@convention(thin) (@owned @box (), @inout ()) -> ()
+sil public_external @partial_empty_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout ()) -> ()
 
 // CHECK-LABEL: define{{( protected)?}} void @empty_box()
 sil @empty_box : $@convention(thin) () -> () {
 entry:
   // CHECK: store %swift.refcounted* null
   // CHECK: store %swift.opaque* undef
-  %b = alloc_box $@box ()
-  %ba = project_box %b : $@box (), 0
-  %f = function_ref @partial_empty_box : $@convention(thin) (@owned @box (), @inout ()) -> ()
-  %g = partial_apply %f(%b, %ba) : $@convention(thin) (@owned @box (), @inout ()) -> ()
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <()>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <()>, 0
+  %f = function_ref @partial_empty_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout ()) -> ()
+  %g = partial_apply %f(%b, %ba) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout ()) -> ()
   return undef : $()
 }
 

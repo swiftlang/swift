@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -118,6 +118,7 @@ public struct _MagicMirrorData {
   }
 }
 
+@_versioned
 struct _OpaqueMirror : _Mirror {
   let data: _MagicMirrorData
 
@@ -147,6 +148,7 @@ func _getTupleCount(_: _MagicMirrorData) -> Int
 @_silgen_name("swift_TupleMirror_subscript")
 func _getTupleChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
+@_versioned
 internal struct _TupleMirror : _Mirror {
   let data: _MagicMirrorData
 
@@ -170,6 +172,7 @@ func _getStructCount(_: _MagicMirrorData) -> Int
 @_silgen_name("swift_StructMirror_subscript")
 func _getStructChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
+@_versioned
 struct _StructMirror : _Mirror {
   let data: _MagicMirrorData
 
@@ -200,6 +203,7 @@ func _getEnumChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 func _swift_EnumMirror_caseName(
     _ data: _MagicMirrorData) -> UnsafePointer<CChar>
 
+@_versioned
 struct _EnumMirror : _Mirror {
   let data: _MagicMirrorData
 
@@ -282,6 +286,7 @@ func _getClassPlaygroundQuickLook(_ object: AnyObject) -> PlaygroundQuickLook? {
 
 #endif
 
+@_versioned
 struct _ClassMirror : _Mirror {
   let data: _MagicMirrorData
 
@@ -310,6 +315,7 @@ struct _ClassMirror : _Mirror {
   var disposition: _MirrorDisposition { return .`class` }
 }
 
+@_versioned
 struct _ClassSuperMirror : _Mirror {
   let data: _MagicMirrorData
 
@@ -333,6 +339,7 @@ struct _ClassSuperMirror : _Mirror {
   var disposition: _MirrorDisposition { return .`class` }
 }
 
+@_versioned
 struct _MetatypeMirror : _Mirror {
   let data: _MagicMirrorData
 

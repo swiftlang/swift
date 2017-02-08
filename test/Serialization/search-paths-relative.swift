@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t/Frameworks/has_alias.framework/Modules/has_alias.swiftmodule/%target-swiftmodule-name %S/Inputs/alias.swift -module-name has_alias
 
 // RUN: cd %t/secret && %target-swiftc_driver -emit-module -o %t/has_xref.swiftmodule -I . -F ../Frameworks -parse-as-library %S/Inputs/has_xref.swift %S/../Inputs/empty.swift -Xfrontend -serialize-debugging-options -Xcc -DDUMMY
-// RUN: %target-swift-frontend %s -parse -I %t
+// RUN: %target-swift-frontend %s -typecheck -I %t
 
 // Check the actual serialized search paths.
 // RUN: llvm-bcanalyzer -dump %t/has_xref.swiftmodule > %t/has_xref.swiftmodule.txt

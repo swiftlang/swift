@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
 func subclassFloatLiteral() -> Bar {
   let x: Bar = 1.0
   return x
 }
-// CHECK-LABEL: sil hidden @_TF13required_init20subclassFloatLiteralFT_CS_3Bar
+// CHECK-LABEL: sil hidden @_T013required_init20subclassFloatLiteralAA3BarCyF
 // CHECK:         class_method {{%.*}} : $@thick Foo.Type, #Foo.init!allocator.1
 
 class Foo: ExpressibleByFloatLiteral {
@@ -18,9 +18,9 @@ class Bar: Foo {
 }
 
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK:         #Foo.init!allocator.1: _TFC13required_init3FooC
-// CHECK:         #Foo.init!initializer.1: _TFC13required_init3Fooc
+// CHECK:         #Foo.init!allocator.1: {{.*}} : _T013required_init3FooC{{[_0-9a-zA-Z]*}}fC
+// CHECK:         #Foo.init!initializer.1: {{.*}} : _T013required_init3FooC{{[_0-9a-zA-Z]*}}fc
 
 // CHECK-LABEL: sil_vtable Bar {
-// CHECK:         #Foo.init!allocator.1: _TFC13required_init3BarC
-// CHECK:         #Foo.init!initializer.1: _TFC13required_init3Barc
+// CHECK:         #Foo.init!allocator.1: {{.*}} : _T013required_init3BarC{{[_0-9a-zA-Z]*}}fC
+// CHECK:         #Foo.init!initializer.1: {{.*}} : _T013required_init3BarC{{[_0-9a-zA-Z]*}}fc

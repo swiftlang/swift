@@ -8,7 +8,7 @@
 // FIXME: END -enable-source-import hackaround
 //
 // This file should not have any syntax or type checker errors.
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse -verify %s -F %S/Inputs/mock-sdk -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -typecheck -verify %s -F %S/Inputs/mock-sdk -disable-objc-attr-requires-foundation-module
 //
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -skip-deinit=false -print-ast-typechecked -source-filename %s -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=false -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
@@ -585,7 +585,7 @@ struct d0200_EscapedIdentifiers {
   }
 // PASS_COMMON-NEXT: {{^}}  enum `enum` {{{$}}
 // PASS_COMMON-NEXT: {{^}}    case `case`{{$}}
-// PASS_COMMON-NEXT: {{^}}    infix static func ==(a: d0200_EscapedIdentifiers.`enum`, b: d0200_EscapedIdentifiers.`enum`) -> Bool
+// PASS_COMMON-NEXT: {{^}}    static func ==(a: d0200_EscapedIdentifiers.`enum`, b: d0200_EscapedIdentifiers.`enum`) -> Bool
 // PASS_COMMON-NEXT: {{^}}    var hashValue: Int { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
@@ -1007,7 +1007,7 @@ enum d2000_EnumDecl1 {
 // PASS_COMMON: {{^}}enum d2000_EnumDecl1 {{{$}}
 // PASS_COMMON-NEXT: {{^}}  case ED1_First{{$}}
 // PASS_COMMON-NEXT: {{^}}  case ED1_Second{{$}}
-// PASS_COMMON-NEXT: {{^}}  infix static func ==(a: d2000_EnumDecl1, b: d2000_EnumDecl1) -> Bool
+// PASS_COMMON-NEXT: {{^}}  static func ==(a: d2000_EnumDecl1, b: d2000_EnumDecl1) -> Bool
 // PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 

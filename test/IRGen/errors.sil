@@ -14,8 +14,8 @@ entry:
   unreachable
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @throws(%swift.refcounted*, %swift.error**) {{.*}} {
-sil @throws : $@convention(thin) () -> @error Error {
+// CHECK-LABEL: define{{( protected)?}} void @does_throw(%swift.refcounted*, %swift.error**) {{.*}} {
+sil @does_throw : $@convention(thin) () -> @error Error {
   // CHECK: [[T0:%.*]] = call %swift.error* @create_error()
   %0 = function_ref @create_error : $@convention(thin) () -> @owned Error
   %1 = apply %0() : $@convention(thin) () -> @owned Error

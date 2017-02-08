@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -43,7 +43,7 @@ struct TypeTransformContext {
   explicit TypeTransformContext(Type T);
   explicit TypeTransformContext(NominalTypeDecl* NTD);
 
-  Type getTypeBase() const;
+  Type getBaseType() const;
   NominalTypeDecl *getNominal() const;
 
   bool isPrintingSynthesizedExtension() const;
@@ -185,10 +185,6 @@ struct PrintOptions {
   /// \brief Print Swift.Array and Swift.Optional with sugared syntax
   /// ([] and ?), even if there are no sugar type nodes.
   bool SynthesizeSugarOnTypes = false;
-
-  /// \brief Print a dynamic Self type as its underlying type, rather than
-  /// the keyword `Self`.
-  bool StripDynamicSelf = false;
 
   /// \brief If true, the printer will explode a pattern like this:
   /// \code
@@ -344,6 +340,8 @@ struct PrintOptions {
   /// \brief The information for converting archetypes to specialized types.
   llvm::Optional<TypeTransformContext> TransformContext;
 
+  bool PrintAsMember = false;
+
   /// \brief If this is not \c nullptr then functions (including accessors and
   /// constructors) will be printed with a body that is determined by this
   /// function.
@@ -407,15 +405,11 @@ struct PrintOptions {
 
   static PrintOptions printTypeInterface(Type T);
 
-  void setArchetypeSelfTransform(Type T);
+  void setBaseType(Type T);
 
-  void setArchetypeSelfTransformForQuickHelp(Type T);
+  void initForSynthesizedExtension(NominalTypeDecl *D);
 
-  void setArchetypeAndDynamicSelfTransform(Type T);
-
-  void initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D);
-
-  void clearArchetypeTransformerForSynthesizedExtensions();
+  void clearSynthesizedExtension();
 
   /// Retrieve the print options that are suitable to print the testable interface.
   static PrintOptions printTestableInterface() {
@@ -458,6 +452,12 @@ struct PrintOptions {
     result.PrintForSIL = true;
     result.PrintInSILBody = true;
     result.PreferTypeRepr = false;
+    return result;
+  }
+
+  static PrintOptions printQualifiedSILType() {
+    PrintOptions result = PrintOptions::printSIL();
+    result.FullyQualifiedTypesIfAmbiguous = true;
     return result;
   }
 

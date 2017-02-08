@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -import-objc-header %S/Inputs/macros_redef.h -parse %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -import-objc-header %S/Inputs/macros_redef.h -typecheck %s
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -import-objc-header %S/Inputs/macros_redef.h -DCONFLICT -parse -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -import-objc-header %S/Inputs/macros_redef.h -DCONFLICT -typecheck -verify %s
 
 import MacrosRedefA
 import MacrosRedefB

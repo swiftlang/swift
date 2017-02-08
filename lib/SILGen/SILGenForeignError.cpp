@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -32,7 +32,7 @@ namespace {
                                  CanType bridgedError) const = 0;
     virtual void emitRelease(SILGenFunction &gen, SILLocation loc) const = 0;
   };
-}
+} // end anonymous namespace
 
 /// Emit a store of a native error to the foreign-error slot.
 static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
@@ -57,7 +57,8 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
 
     // If we have the slot, emit a store to it.
     gen.B.emitBlock(hasSlotBB);
-    SILValue slot = hasSlotBB->createBBArg(errorPtrObjectTy);
+    SILValue slot = hasSlotBB->createPHIArgument(errorPtrObjectTy,
+                                                 ValueOwnershipKind::Owned);
     emitStoreToForeignErrorSlot(gen, loc, slot, errorSrc);
     gen.B.createBranch(loc, contBB);
 
@@ -168,7 +169,7 @@ namespace {
     void emitRelease(SILGenFunction &gen, SILLocation loc) const override {
     }
   };
-}
+} // end anonymous namespace
 
 /// Given that we are throwing a native error, turn it into a bridged
 /// error, dispose of it in the correct way, and create the appropriate
@@ -276,7 +277,7 @@ void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
     // If we are not provided with an errorSlot value, then we are passed the
     // unwrapped optional error as the argument of the errorBB. This value is
     // passed at +1 meaning that we still need to create a cleanup for errorV.
-    errorV = errorBB->getBBArg(0);
+    errorV = errorBB->getArgument(0);
   }
 
   ManagedValue error = emitManagedRValueWithCleanup(errorV);
@@ -383,7 +384,8 @@ emitResultIsNilErrorCheck(SILGenFunction &gen, SILLocation loc,
   // In the continuation block, take ownership of the now non-optional
   // result value.
   gen.B.emitBlock(contBB);
-  SILValue objectResult = contBB->createBBArg(resultObjectType);
+  SILValue objectResult =
+      contBB->createPHIArgument(resultObjectType, ValueOwnershipKind::Owned);
   return gen.emitManagedRValueWithCleanup(objectResult);
 }
 
@@ -401,7 +403,8 @@ emitErrorIsNonNilErrorCheck(SILGenFunction &gen, SILLocation loc,
 
   // Switch on the optional error.
   SILBasicBlock *errorBB = gen.createBasicBlock(FunctionSection::Postmatter);
-  errorBB->createBBArg(optionalError->getType().unwrapAnyOptionalType());
+  errorBB->createPHIArgument(optionalError->getType().unwrapAnyOptionalType(),
+                             ValueOwnershipKind::Owned);
   SILBasicBlock *contBB = gen.createBasicBlock();
   gen.B.createSwitchEnum(loc, optionalError, /*default*/ nullptr,
                          { { ctx.getOptionalSomeDecl(), errorBB },

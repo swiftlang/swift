@@ -55,8 +55,8 @@ struct Box<T> {
 }
 
 // CHECK-LABEL: sil hidden @_TFV10extensions3BoxCfT1tx_GS0_x_ : $@convention(method) <T> (@in T, @thin Box<T>.Type) -> @out Box<T>
-// CHECK:      [[SELF_BOX:%.*]] = alloc_box $@box Box<T>
-// CHECK-NEXT: [[SELF_ADDR:%.*]] = project_box [[SELF_BOX]] : $@box Box<T>
+// CHECK:      [[SELF_BOX:%.*]] = alloc_box $<τ_0_0> { var Box<τ_0_0> } <T>
+// CHECK-NEXT: [[SELF_ADDR:%.*]] = project_box [[SELF_BOX]] : $<τ_0_0> { var Box<τ_0_0> } <T>
 // CHECK:      [[SELF_PTR:%.*]] = mark_uninitialized [rootself] [[SELF_ADDR]] : $*Box<T>
 // CHECK:      [[INIT:%.*]] = function_ref @_TIvV10extensions3Box1tGSqx_i : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
 // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $Optional<T>
@@ -73,7 +73,7 @@ struct Box<T> {
 // CHECK-NEXT: dealloc_stack [[RESULT]] : $*Optional<T>
 // CHECK-NEXT: copy_addr [[SELF_PTR]] to [initialization] %0 : $*Box<T>
 // CHECK-NEXT: destroy_addr %1 : $*T
-// CHECK-NEXT: destroy_value [[SELF_BOX]] : $@box Box<T>
+// CHECK-NEXT: destroy_value [[SELF_BOX]] : $<τ_0_0> { var Box<τ_0_0> } <T>
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: return [[RESULT]] : $()
 

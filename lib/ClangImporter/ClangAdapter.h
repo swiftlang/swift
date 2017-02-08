@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -23,6 +23,8 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "clang/Basic/Specifiers.h"
+
+#include "ImportName.h"
 
 namespace clang {
 class ASTContext;
@@ -77,7 +79,7 @@ OmissionTypeName getClangTypeNameForOmission(clang::ASTContext &ctx,
 
 /// Find the swift_newtype attribute on the given typedef, if present.
 clang::SwiftNewtypeAttr *getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
-                                             bool useSwift2Name);
+                                             ImportNameVersion version);
 
 /// Retrieve a bit vector containing the non-null argument
 /// annotations for the given declaration.
@@ -92,7 +94,7 @@ bool isNSNotificationGlobal(const clang::NamedDecl *);
 // swift_newtype), return it, otherwise null
 clang::TypedefNameDecl *findSwiftNewtype(const clang::NamedDecl *decl,
                                          clang::Sema &clangSema,
-                                         bool useSwift2Name);
+                                         ImportNameVersion version);
 
 /// Whether the passed type is NSString *
 bool isNSString(const clang::Type *);
@@ -139,11 +141,15 @@ bool isUnavailableInSwift(const clang::Decl *decl, const PlatformAvailability &,
 
 /// Determine the optionality of the given Clang parameter.
 ///
+/// \param swiftLanguageVersion What version of Swift we're using, which affects
+/// how optionality is inferred.
+///
 /// \param param The Clang parameter.
 ///
 /// \param knownNonNull Whether a function- or method-level "nonnull" attribute
 /// applies to this parameter.
-OptionalTypeKind getParamOptionality(const clang::ParmVarDecl *param,
+OptionalTypeKind getParamOptionality(version::Version swiftLanguageVersion,
+                                     const clang::ParmVarDecl *param,
                                      bool knownNonNull);
 }
 }

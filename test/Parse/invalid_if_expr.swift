@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func unbalanced_question(a: Bool, b: Bool, c: Bool, d: Bool) {
   (a ? b) // expected-error{{expected ':' after '? ...' in ternary}}

@@ -142,14 +142,14 @@ bb0:
 // CHECK-NOT: unchecked_ref_cast
 sil @removeTriviallyDeadInstructions : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
-  %1 = alloc_box $@box B
-  %1a = project_box %1 : $@box B, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <B>, 0
   %2 = store %0 to %1a : $*B
   %3 = load %1a : $*B
   %4 = strong_retain %3 : $B
   %5 = unchecked_ref_cast %3 : $B to $Builtin.NativeObject
   %7 = strong_release %3 : $B
-  %8 = strong_release %1 : $@box B
+  %8 = strong_release %1 : $<τ_0_0> { var τ_0_0 } <B>
   %9 = function_ref @exit : $@convention(thin) () -> Never // ret.exit : () -> ()
   %10 = apply %9() : $@convention(thin) () -> Never
   unreachable
@@ -440,8 +440,8 @@ enum U {
 // CHECK-NEXT: tuple ({{%[0-9]+}} : $U, {{%[0-9]+}} : $U, [[INVALID_CASE]] : $U)
 // CHECK-NEXT: return
 //
-// release_value  of an  enum without  any payload  or with  a trivial
-// typed payload  is a  no-op. Leave  enums with  non-trivial payloads
+// release_value of an enum without any payload or with a trivial
+// typed payload is a no-op. Leave enums with non-trivial payloads
 // alone.
 //
 // rdar://15568314
@@ -1318,6 +1318,48 @@ bb0(%0 : $Builtin.RawPointer, %1: $Builtin.Int64):
   return %11 : $Int32
 }
 
+// CHECK-LABEL: sil @max_int_ult : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
+// CHECK-NOT: builtin "cmp_ult_Int32"
+// CHECK: integer_literal $Builtin.Int1, 0
+sil @max_int_ult : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  %minint = integer_literal $Builtin.Int32, -1
+  %cmp = builtin "cmp_ult_Int32"(%minint : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %cmp, bb1, bb2
+
+bb1:
+  %badret = integer_literal $Builtin.Int32, 0
+  br bb3(%badret : $Builtin.Int32)
+
+bb2:
+  %goodret = integer_literal $Builtin.Int32, 1
+  br bb3(%goodret : $Builtin.Int32)
+
+bb3(%ret : $Builtin.Int32):
+  return %ret : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @max_int_ule : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
+// CHECK: builtin "cmp_ule_Int32"
+// CHECK-NOT: integer_literal $Builtin.Int1, 0
+sil @max_int_ule : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  %minint = integer_literal $Builtin.Int32, -1
+  %cmp = builtin "cmp_ule_Int32"(%minint : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %cmp, bb1, bb2
+
+bb1:
+  %badret = integer_literal $Builtin.Int32, 0
+  br bb3(%badret : $Builtin.Int32)
+
+bb2:
+  %goodret = integer_literal $Builtin.Int32, 1
+  br bb3(%goodret : $Builtin.Int32)
+
+bb3(%ret : $Builtin.Int32):
+  return %ret : $Builtin.Int32
+}
+
 // CHECK-LABEL: sil @trunc_of_zext : $@convention(thin) (Builtin.Int16) -> Builtin.Int32
 // CHECK-NOT: builtin "zextOrBitCast_Int16_Int64"
 // CHECK-NOT: builtin "truncOrBitCast_Int64_Int32"
@@ -1716,14 +1758,68 @@ struct MyError : Error {
 sil @unknown : $@convention(thin) () -> ()
 sil [readonly] @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error Error)
 
+sil [readonly] @readonly_owned : $@convention(thin) (@owned B) -> @owned B
+sil @returns_param : $@convention(thin) (@owned B) -> @owned B
+
+
+// CHECK-LABEL: sil @delete_readonly_insert_release_after_arc_uses_simple
+// CHECK:      apply
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: return
+sil @delete_readonly_insert_release_after_arc_uses_simple : $@convention(thin) (@owned B) -> @owned B {
+bb0(%0 : $B):
+  %fu = function_ref @returns_param : $@convention(thin) (@owned B) -> @owned B
+  %ru = apply %fu(%0) : $@convention(thin) (@owned B) -> @owned B
+  %f = function_ref @readonly_owned : $@convention(thin) (@owned B) -> @owned B
+  %r = apply %f(%0) : $@convention(thin) (@owned B) -> @owned B
+  strong_retain %ru : $B // This is actually %0
+  strong_release %r : $B
+  return %0 : $B
+}
+
+// CHECK-LABEL: sil @delete_readonly_insert_release_after_arc_uses_multibb
+// CHECK:        apply
+// CHECK-NEXT:   cond_br
+// CHECK:      bb1:
+// CHECK-NEXT:   strong_retain
+// CHECK-NEXT:   strong_release
+// CHECK:      bb2:
+// CHECK-NEXT:   strong_retain
+// CHECK-NEXT:   strong_release
+// CHECK:      bb3:
+// CHECK-NEXT:   return
+sil @delete_readonly_insert_release_after_arc_uses_multibb : $@convention(thin) (@owned B) -> @owned B {
+bb0(%0 : $B):
+  %fu = function_ref @returns_param : $@convention(thin) (@owned B) -> @owned B
+  %ru = apply %fu(%0) : $@convention(thin) (@owned B) -> @owned B
+  %f = function_ref @readonly_owned : $@convention(thin) (@owned B) -> @owned B
+  %r = apply %f(%0) : $@convention(thin) (@owned B) -> @owned B
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %ru : $B // This is actually %0
+  strong_release %r : $B
+  br bb3
+
+bb2:
+  strong_retain %ru : $B // This is actually %0
+  strong_release %r : $B
+  br bb3
+
+bb3:
+  return %0 : $B
+}
+
 //CHECK-LABEL: sil @test_delete_readonly_try_apply
 //CHECK:      bb0(%0 : $ZZZ):
-//CHECK-NEXT:   strong_release %0
 //CHECK-NEXT:   [[IL:%[0-9]+]] = integer_literal $Builtin.Int1, 0
 //CHECK-NEXT:   cond_br [[IL]], bb1, bb2
 //CHECK:      bb1:
+//CHECK-NEXT:   strong_release %0
 //CHECK-NEXT:   br bb3
 //CHECK:      bb2:
+//CHECK-NEXT:   strong_release %0
 //CHECK-NEXT:   br bb3
 //CHECK:      bb3:
 //CHECK:        return
@@ -3059,7 +3155,7 @@ final class XXX : BBB {
 // upcast.
 // CHECK-LABEL: sil @silcombine_dont_generate_wrong_upcasts_during_devirt
 // CHECK-NOT: upcast
-// CHECK: witness_method $XXX, #PPP.foo!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
+// CHECK: witness_method $XXX, #PPP.foo!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
 // CHECK-NOT: upcast
 // CHECK: return
 sil @silcombine_dont_generate_wrong_upcasts_during_devirt: $@convention(thin) (@owned BBB) -> () {

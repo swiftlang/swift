@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -86,16 +86,16 @@ public func checkSequence<
   _ = sequence._preprocessingPass { () -> Void in
     var count = 0
     for _ in sequence { count += 1 }
-    let buf = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
-    let end = sequence._copyContents(initializing: buf)
-    expectTrue(end == buf + count, "_copyContents returned the wrong value")
-    var j = expected.startIndex
-    for i in 0..<(end - buf) {
-      expectTrue(sameValue(expected[j], buf[i]))
-      j = expected.index(after: j)
-    }
-    buf.deinitialize(count: end - buf)
-    buf.deallocate(capacity: count)
+    let ptr = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
+    let buf = UnsafeMutableBufferPointer(start: ptr, count: count)
+    var (remainders,writtenUpTo) = sequence._copyContents(initializing: buf)
+    expectTrue(remainders.next() == nil, 
+      "_copyContents returned unwritten elements")
+    expectTrue(writtenUpTo == buf.endIndex, 
+      "_copyContents failed to use entire buffer")
+    expectEqualSequence(expected, buf, ${trace}, sameValue: sameValue)
+    ptr.deinitialize(count: count)
+    ptr.deallocate(capacity: count)
   }
 
   // Test `_copyToContiguousArray()` if we can do so

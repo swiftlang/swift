@@ -2,16 +2,17 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "capture-prop"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILCloner.h"
@@ -46,7 +47,7 @@ protected:
                                       SILFunction *SubstF);
   void rewritePartialApply(PartialApplyInst *PAI, SILFunction *SpecialF);
 };
-} // namespace
+} // end anonymous namespace
 
 static LiteralInst *getConstant(SILValue V) {
   if (auto I = dyn_cast<ThinToThickFunctionInst>(V))
@@ -71,16 +72,21 @@ static std::string getClonedName(PartialApplyInst *PAI, IsFragile_t Fragile,
                                  SILFunction *F) {
 
   Mangle::Mangler M;
-  auto P = SpecializationPass::CapturePropagation;
-  FunctionSignatureSpecializationMangler Mangler(P, M, Fragile, F);
+  auto P = Demangle::SpecializationPass::CapturePropagation;
+  FunctionSignatureSpecializationMangler OldMangler(P, M, Fragile, F);
+  NewMangling::FunctionSignatureSpecializationMangler NewMangler(P, Fragile, F);
 
   // We know that all arguments are literal insts.
-  auto Args = PAI->getArguments();
-  for (unsigned i : indices(Args))
-    Mangler.setArgumentConstantProp(i, getConstant(Args[i]));
-  Mangler.mangle();
-
-  return M.finalize();
+  unsigned argIdx = ApplySite(PAI).getCalleeArgIndexOfFirstAppliedArg();
+  for (auto arg : PAI->getArguments()) {
+    OldMangler.setArgumentConstantProp(argIdx, getConstant(arg));
+    NewMangler.setArgumentConstantProp(argIdx, getConstant(arg));
+    ++argIdx;
+  }
+  OldMangler.mangle();
+  std::string Old = M.finalize();
+  std::string New = NewMangler.mangle();
+  return NewMangling::selectMangling(Old, New);
 }
 
 namespace {
@@ -130,7 +136,7 @@ protected:
 
   void cloneConstValue(SILValue Const);
 };
-} // namespace
+} // end anonymous namespace
 
 /// Clone a constant value. Recursively walk the operand chain through cast
 /// instructions to ensure that all dependents are cloned. Note that the
@@ -161,28 +167,27 @@ void CapturePropagationCloner::cloneBlocks(
   OperandValueArrayRef PartialApplyArgs) {
 
   SILFunction &CloneF = getBuilder().getFunction();
-  SILModule &M = CloneF.getModule();
 
   // Create the entry basic block with the function arguments.
   SILBasicBlock *OrigEntryBB = &*OrigF->begin();
-  SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(&CloneF);
-  CanSILFunctionType CloneFTy = CloneF.getLoweredFunctionType();
+  SILBasicBlock *ClonedEntryBB = CloneF.createBasicBlock();
+  auto cloneConv = CloneF.getConventions();
 
   // Only clone the arguments that remain in the new function type. The trailing
   // arguments are now propagated through the partial apply.
   assert(!IsCloningConstant && "incorrect mode");
   unsigned ParamIdx = 0;
-  for (unsigned NewParamEnd = CloneFTy->getNumSILArguments();
+  for (unsigned NewParamEnd = cloneConv.getNumSILArguments();
        ParamIdx != NewParamEnd; ++ParamIdx) {
 
-    SILArgument *Arg = OrigEntryBB->getBBArg(ParamIdx);
+    SILArgument *Arg = OrigEntryBB->getArgument(ParamIdx);
 
-    SILValue MappedValue = new (M)
-        SILArgument(ClonedEntryBB, remapType(Arg->getType()), Arg->getDecl());
+    SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
+        remapType(Arg->getType()), Arg->getDecl());
     ValueMap.insert(std::make_pair(Arg, MappedValue));
   }
-  assert(OrigEntryBB->bbarg_size() - ParamIdx == PartialApplyArgs.size()
-         && "unexpected number of partial apply arguments");
+  assert(OrigEntryBB->args_size() - ParamIdx == PartialApplyArgs.size() &&
+         "unexpected number of partial apply arguments");
 
   // Replace the rest of the old arguments with constants.
   BBMap.insert(std::make_pair(OrigEntryBB, ClonedEntryBB));
@@ -196,7 +201,7 @@ void CapturePropagationCloner::cloneBlocks(
 
     // The PartialApplyArg from the caller is now mapped to its cloned
     // instruction.  Also map the original argument to the cloned instruction.
-    SILArgument *InArg = OrigEntryBB->getBBArg(ParamIdx);
+    SILArgument *InArg = OrigEntryBB->getArgument(ParamIdx);
     ValueMap.insert(std::make_pair(InArg, remapValue(PartialApplyArg)));
     ++ParamIdx;
   }
@@ -245,11 +250,10 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
       OrigF->isTransparent(), Fragile, OrigF->isThunk(),
       OrigF->getClassVisibility(), OrigF->getInlineStrategy(),
       OrigF->getEffectsKind(),
-      /*InsertBefore*/ OrigF, OrigF->getDebugScope(), OrigF->getDeclContext());
+      /*InsertBefore*/ OrigF, OrigF->getDebugScope());
   if (OrigF->hasUnqualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();
   }
-  NewF->setDeclCtx(OrigF->getDeclContext());
   DEBUG(llvm::dbgs() << "  Specialize callee as ";
         NewF->printName(llvm::dbgs()); llvm::dbgs() << " " << NewFTy << "\n");
 
@@ -276,7 +280,7 @@ void CapturePropagation::rewritePartialApply(PartialApplyInst *OrigPAI,
 /// TODO: Check for other profitable constant propagation, like builtin compare.
 static bool isProfitable(SILFunction *Callee) {
   SILBasicBlock *EntryBB = &*Callee->begin();
-  for (auto *Arg : EntryBB->getBBArgs()) {
+  for (auto *Arg : EntryBB->getArguments()) {
     for (auto *Operand : Arg->getUses()) {
       if (auto *AI = dyn_cast<ApplyInst>(Operand->getUser())) {
         if (AI->getCallee() == Operand->get())
@@ -293,7 +297,7 @@ static bool onlyContainsReturnOrThrowOfArg(SILBasicBlock *BB) {
   for (SILInstruction &I : *BB) {
     if (isa<ReturnInst>(&I) || isa<ThrowInst>(&I)) {
       SILValue RetVal = I.getOperand(0);
-      if (BB->getNumBBArg() == 1 && RetVal == BB->getBBArg(0))
+      if (BB->getNumArguments() == 1 && RetVal == BB->getArgument(0))
         return true;
       return false;
     }
@@ -308,7 +312,7 @@ static bool onlyContainsReturnOrThrowOfArg(SILBasicBlock *BB) {
 static SILFunction *getSpecializedWithDeadParams(SILFunction *Orig,
                                                  int numDeadParams) {
   SILBasicBlock &EntryBB = *Orig->begin();
-  unsigned NumArgs = EntryBB.getNumBBArg();
+  unsigned NumArgs = EntryBB.getNumArguments();
   SILModule &M = Orig->getModule();
   
   // Check if all dead parameters have trivial types. We don't support non-
@@ -316,7 +320,7 @@ static SILFunction *getSpecializedWithDeadParams(SILFunction *Orig,
   // those parameters (as a replacement for the removed partial_apply).
   // TODO: maybe we can skip this restriction when we have semantic ARC.
   for (unsigned Idx = NumArgs - numDeadParams; Idx < NumArgs; ++Idx) {
-    SILType ArgTy = EntryBB.getBBArg(Idx)->getType();
+    SILType ArgTy = EntryBB.getArgument(Idx)->getType();
     if (!ArgTy.isTrivial(M))
       return nullptr;
   }
@@ -342,11 +346,11 @@ static SILFunction *getSpecializedWithDeadParams(SILFunction *Orig,
 
       // Check if parameters are passes 1-to-1
       unsigned NumArgs = FAS.getNumArguments();
-      if (EntryBB.getNumBBArg() - numDeadParams != NumArgs)
+      if (EntryBB.getNumArguments() - numDeadParams != NumArgs)
         return nullptr;
 
       for (unsigned Idx = 0; Idx < NumArgs; ++Idx) {
-        if (FAS.getArgument(Idx) != (ValueBase *)EntryBB.getBBArg(Idx))
+        if (FAS.getArgument(Idx) != (ValueBase *)EntryBB.getArgument(Idx))
           return nullptr;
       }
 

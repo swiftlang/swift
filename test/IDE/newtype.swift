@@ -3,7 +3,7 @@
 // RUN: %build-clang-importer-objc-overlays
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=Newtype > %t.printed.A.txt
 // RUN: %FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
-// RUN: %target-parse-verify-swift -sdk %clang-importer-sdk -I %S/Inputs/custom-modules -I %t
+// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -I %S/Inputs/custom-modules -I %t -verify-ignore-unknown
 // REQUIRES: objc_interop
 
 // PRINT-LABEL: struct ErrorDomain : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable, _ObjectiveCBridgeable {
@@ -180,3 +180,6 @@ func testFixit() {
 	let _ = NSMyContextName
 	  // expected-error@-1{{'NSMyContextName' has been renamed to 'NSSomeContext.Name.myContextName'}} {{10-25=NSSomeContext.Name.myContextName}}
 }
+
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected note produced: 'NSMyContextName' was obsoleted in Swift 3

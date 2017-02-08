@@ -33,7 +33,7 @@ bb0(%0 : $Foo):
   %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> ()
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
   %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
   strong_release %5 : $Foo
   %16 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
@@ -59,7 +59,7 @@ bb0(%0 : $Foo):
   %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> ()
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
   %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
   %16 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
   strong_release %5 : $Foo
@@ -85,7 +85,7 @@ bb0(%0 : $Foo):
   %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> ()
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
   %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
   %16 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
   release_value %4 : $(Foo, Builtin.Int8)
@@ -111,7 +111,7 @@ bb0(%0 : $Foo):
   %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> ()
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
   %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
   %16 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
   release_value %0 : $Foo
@@ -135,7 +135,7 @@ bb0(%0 : $Foo):
   %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> ()
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
   %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
   strong_release %5 : $Foo
   %16 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
@@ -160,7 +160,7 @@ bb0(%0 : $Foo):
   %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> ()
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
   %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
   %16 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
   %17 = tuple ()
@@ -187,7 +187,7 @@ bb0(%0 : $Foo, %1: $Foo):
   %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> ()
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
   %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
   strong_release %5 : $Foo
   strong_release %1 : $Foo
@@ -213,7 +213,7 @@ bb0(%0 : $Foo, %1 : $Builtin.Int1):
   %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> ()
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
   %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
   strong_release %5 : $Foo
   %16 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
@@ -237,7 +237,7 @@ bb0(%0 : $Foo, %1 : $Builtin.Int1):
   %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> ()
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
   %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
   strong_release %5 : $Foo
   cond_fail %1 : $Builtin.Int1
@@ -285,7 +285,7 @@ bb2:
   return %17 : $()
 
 bb3:
-  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> ()
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
   %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
   br bb2
 }
@@ -315,7 +315,7 @@ bb2:
   return %17 : $()
 
 bb3:
-  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> ()
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
   %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
   br bb2
 }
@@ -338,7 +338,7 @@ bb0(%0 : $Foo):
   %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> ()
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
   %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
   strong_release %5 : $Foo
   debug_value %5 : $Foo
@@ -397,7 +397,7 @@ bb0(%0 : $Foo, %1: $Builtin.Int32):
   %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> ()
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
   %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
   strong_release %5 : $Foo
   %21 = struct $MyInt(%1 : $Builtin.Int32)
@@ -421,7 +421,7 @@ bb0(%0 : $Foo, %1: $*Builtin.Int32, %2: $Builtin.Int32):
   %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> ()
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
   %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
   strong_release %5 : $Foo
   %16 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
@@ -442,7 +442,7 @@ bb0(%0 : $Foo, %1: $*Builtin.Int32, %2: $Builtin.Int32):
   %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> () , $@convention(method) (@guaranteed Foo) -> ()
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
   %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
   strong_release %5 : $Foo
   store %2 to %1 : $*Builtin.Int32
@@ -472,7 +472,7 @@ bb0(%0 : $Foo, %1: $Builtin.Int32):
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
   %7 = upcast %5 : $Foo to $Base
-  %19 = class_method %7 : $Base, #Base.beep!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+  %19 = class_method %7 : $Base, #Base.beep!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
   %20 = apply %19(%7) : $@convention(method) (@guaranteed Base) -> ()
   strong_release %7 : $Base
   %21 = struct $MyInt(%1 : $Builtin.Int32)
@@ -505,7 +505,7 @@ bb0(%0 : $AnyObject, %1: $Builtin.Int32):
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
   %7 = upcast %5 : $Foo to $Base
-  %19 = class_method %7 : $Base, #Base.beep!1 : (Base) -> () -> () , $@convention(method) (@guaranteed Base) -> ()
+  %19 = class_method %7 : $Base, #Base.beep!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
   %20 = apply %19(%7) : $@convention(method) (@guaranteed Base) -> ()
   strong_release %7 : $Base
   %21 = struct $MyInt(%1 : $Builtin.Int32)

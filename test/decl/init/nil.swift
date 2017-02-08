@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 var a: Int = nil
 // expected-error@-1 {{nil cannot initialize specified type 'Int'}} 

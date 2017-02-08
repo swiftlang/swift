@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,6 +21,7 @@
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
+#include "swift/Runtime/Unreachable.h"
 
 #include <iostream>
 
@@ -29,12 +30,6 @@
 #else
   #define DEBUG(expr)
 #endif
-
-[[noreturn]]
-static void unreachable(const char *Message) {
-  std::cerr << "fatal error: " << Message << "\n";
-  std::abort();
-}
 
 namespace swift {
 namespace reflection {
@@ -191,11 +186,11 @@ public:
     }
     }
 
-    unreachable("Bad TypeInfo kind");
+    swift_runtime_unreachable("Bad TypeInfo kind");
   }
 };
 
-}
+} // end anonymous namespace
 
 void TypeInfo::dump(std::ostream &OS, unsigned Indent) const {
   PrintTypeInfo(OS, Indent).print(*this);
@@ -895,7 +890,7 @@ public:
     // NoPayloadEnumImplStrategy
     if (PayloadCases.empty()) {
       Kind = RecordKind::NoPayloadEnum;
-      Size += getNumTagBytes(/*payloadSize=*/0,
+      Size += getNumTagBytes(/*size=*/0,
                              NoPayloadCases,
                              /*payloadCases=*/0);
 
@@ -1047,6 +1042,8 @@ public:
       DEBUG(std::cerr << "Invalid field descriptor: "; TR->dump());
       return nullptr;
     }
+
+    swift_runtime_unreachable("Unhandled FieldDescriptorKind in switch.");
   }
 
   const TypeInfo *visitNominalTypeRef(const NominalTypeRef *N) {
@@ -1076,6 +1073,8 @@ public:
     case FunctionMetadataConvention::CFunctionPointer:
       return TC.getTypeInfo(TC.getThinFunctionTypeRef());
     }
+
+    swift_runtime_unreachable("Unhandled FunctionMetadataConvention in switch.");
   }
 
   const TypeInfo *visitProtocolTypeRef(const ProtocolTypeRef *P) {
@@ -1102,6 +1101,8 @@ public:
     case MetatypeRepresentation::Thick:
       return TC.getTypeInfo(TC.getAnyMetatypeTypeRef());
     }
+
+    swift_runtime_unreachable("Unhandled MetatypeRepresentation in switch.");
   }
 
   const TypeInfo *
@@ -1251,8 +1252,7 @@ const TypeInfo *TypeConverter::getTypeInfo(const TypeRef *TR) {
 }
 
 const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
-                                                        unsigned start,
-                                                        unsigned align) {
+                                                        unsigned start) {
   const FieldDescriptor *FD = getBuilder().getFieldTypeInfo(TR);
   if (FD == nullptr) {
     DEBUG(std::cerr << "No field descriptor: "; TR->dump());
@@ -1284,7 +1284,9 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
     DEBUG(std::cerr << "Invalid field descriptor: "; TR->dump());
     return nullptr;
   }
+
+  swift_runtime_unreachable("Unhandled FieldDescriptorKind in switch.");
 }
 
-}  // namespace reflection
-}  // namespace swift
+} // namespace reflection
+} // namespace swift

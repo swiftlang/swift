@@ -2,10 +2,10 @@
 
 // RUN: rm -rf %t && mkdir -p %t
 
-// RUN: %target-swift-frontend -emit-dependencies-path - -parse %S/../Inputs/empty\ file.swift | %FileCheck -check-prefix=CHECK-BASIC %s
-// RUN: %target-swift-frontend -emit-reference-dependencies-path - -parse -primary-file %S/../Inputs/empty\ file.swift | %FileCheck -check-prefix=CHECK-BASIC-YAML %s
+// RUN: %target-swift-frontend -emit-dependencies-path - -typecheck %S/../Inputs/empty\ file.swift | %FileCheck -check-prefix=CHECK-BASIC %s
+// RUN: %target-swift-frontend -emit-reference-dependencies-path - -typecheck -primary-file %S/../Inputs/empty\ file.swift | %FileCheck -check-prefix=CHECK-BASIC-YAML %s
 
-// RUN: %target-swift-frontend -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -parse -primary-file %S/../Inputs/empty\ file.swift
+// RUN: %target-swift-frontend -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -typecheck -primary-file %S/../Inputs/empty\ file.swift
 // RUN: %FileCheck -check-prefix=CHECK-BASIC %s < %t.d
 // RUN: %FileCheck -check-prefix=CHECK-BASIC-YAML %s < %t.swiftdeps
 
@@ -20,7 +20,7 @@
 // CHECK-BASIC-YAML-NOT: {{:$}}
 
 
-// RUN: %target-swift-frontend -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -parse %S/../Inputs/empty\ file.swift 2>&1 | %FileCheck -check-prefix=NO-PRIMARY-FILE %s
+// RUN: %target-swift-frontend -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -typecheck %S/../Inputs/empty\ file.swift 2>&1 | %FileCheck -check-prefix=NO-PRIMARY-FILE %s
 
 // NO-PRIMARY-FILE: warning: ignoring -emit-reference-dependencies (requires -primary-file)
 
@@ -38,8 +38,8 @@
 // CHECK-MULTIPLE-OUTPUTS: Swift.swiftmodule
 // CHECK-MULTIPLE-OUTPUTS-NOT: :
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -parse %s | %FileCheck -check-prefix=CHECK-IMPORT %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-reference-dependencies-path - -parse -primary-file %s | %FileCheck -check-prefix=CHECK-IMPORT-YAML %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -typecheck %s | %FileCheck -check-prefix=CHECK-IMPORT %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-reference-dependencies-path - -typecheck -primary-file %s | %FileCheck -check-prefix=CHECK-IMPORT-YAML %s
 
 // CHECK-IMPORT-LABEL: - :
 // CHECK-IMPORT: dependencies.swift
@@ -66,8 +66,8 @@
 // CHECK-IMPORT-YAML-NOT: {{^-}}
 // CHECK-IMPORT-YAML-NOT: {{:$}}
 
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -DERROR -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -parse %s | %FileCheck -check-prefix=CHECK-IMPORT %s
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -DERROR -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-reference-dependencies-path - -parse -primary-file %s | %FileCheck -check-prefix=CHECK-IMPORT-YAML %s
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -DERROR -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -typecheck %s | %FileCheck -check-prefix=CHECK-IMPORT %s
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -DERROR -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-reference-dependencies-path - -typecheck -primary-file %s | %FileCheck -check-prefix=CHECK-IMPORT-YAML %s
 
 
 import Foundation

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -86,16 +86,18 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         case timeZone
     }
     
-    /// Returns the user's current calendar. This calendar does not track changes that the user makes to their preferences.
+    /// Returns the user's current calendar.
+    ///
+    /// This calendar does not track changes that the user makes to their preferences.
     public static var current : Calendar {
         return Calendar(adoptingReference: __NSCalendarCurrent(), autoupdating: false)
     }
     
-    /// A Calendar that tracks changes to user's preferred calendar identifier.
+    /// A Calendar that tracks changes to user's preferred calendar.
     ///
-    /// If mutated, this calendar will no longer autoupdate.
+    /// If mutated, this calendar will no longer track the user's preferred calendar.
     ///
-    /// - note: The autoupdating Calendar will only compare equal to another autoupdating calendar.
+    /// - note: The autoupdating Calendar will only compare equal to another autoupdating Calendar.
     public static var autoupdatingCurrent : Calendar {
         return Calendar(adoptingReference: __NSCalendarAutoupdating(), autoupdating: true)
     }
@@ -413,7 +415,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.range(of: Calendar._toCalendarUnit([component]), start: &nsDate, interval: &ti, for: date) }) {
-            start = nsDate as! Date
+            start = nsDate! as Date
             interval = ti
             return true
         } else {
@@ -691,7 +693,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.range(ofWeekendStart: &nsDate, interval: &ti, containing: date) }) {
-            start = nsDate as! Date
+            start = nsDate! as Date
             interval = ti
             return true
         } else {
@@ -708,7 +710,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.range(ofWeekendStart: &nsDate, interval: &ti, containing: date) }) {
-            return DateInterval(start: nsDate as! Date, duration: ti)
+            return DateInterval(start: nsDate! as Date, duration: ti)
         } else {
             return nil
         }
@@ -732,7 +734,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.nextWeekendStart(&nsDate, interval: &ti, options: direction == .backward ? [.searchBackwards] : [], after: date) }) {
-            start = nsDate as! Date
+            start = nsDate! as Date
             interval = ti
             return true
         } else {
@@ -755,7 +757,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         var ti : TimeInterval = 0
         if _handle.map({ $0.nextWeekendStart(&nsDate, interval: &ti, options: direction == .backward ? [.searchBackwards] : [], after: date) }) {
             /// WARNING: searching backwards is totally broken! 26643365
-            return DateInterval(start: nsDate as! Date, duration: ti)
+            return DateInterval(start: nsDate! as Date, duration: ti)
         } else {
             return nil
         }
@@ -1075,9 +1077,9 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
 
 extension Calendar : CustomDebugStringConvertible, CustomStringConvertible, CustomReflectable {
     private var _kindDescription : String {
-        if (self == Calendar.autoupdatingCurrent) {
+        if self == Calendar.autoupdatingCurrent {
             return "autoupdatingCurrent"
-        } else if (self == Calendar.current) {
+        } else if self == Calendar.current {
             return "current"
         } else {
             return "fixed"
@@ -1093,13 +1095,14 @@ extension Calendar : CustomDebugStringConvertible, CustomStringConvertible, Cust
     }
     
     public var customMirror : Mirror {
-        var c: [(label: String?, value: Any)] = []
-        c.append((label: "identifier", value: identifier))
-        c.append((label: "kind", value: _kindDescription))
-        c.append((label: "locale", value: locale))
-        c.append((label: "timeZone", value: timeZone))
-        c.append((label: "firstWeekday", value: firstWeekday))
-        c.append((label: "minimumDaysInFirstWeek", value: minimumDaysInFirstWeek))
+        let c: [(label: String?, value: Any)] = [
+          ("identifier", identifier),
+          ("kind", _kindDescription),
+          ("locale", locale as Any),
+          ("timeZone", timeZone),
+          ("firstWeekday", firstWeekday),
+          ("minimumDaysInFirstWeek", minimumDaysInFirstWeek),
+        ]
         return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
     }
 }

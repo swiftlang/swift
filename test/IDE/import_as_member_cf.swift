@@ -23,7 +23,7 @@
 // PRINTC-NEXT:   /*not inherited*/ init(powerSupply power: CCPowerSupply)
 // PRINTC-NEXT: }
 
-// RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules
 
 import ImportAsMember.C
 

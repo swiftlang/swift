@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 
@@ -50,7 +50,7 @@ func testNonInstanceTypeFactoryMethod(_ s: String) {
 }
 
 func testUseOfFactoryMethod(_ queen: Bee) {
-  _ = Hive.withQueen(queen) // expected-error{{'withQueen' is unavailable: use object construction 'Hive(queen:)'}}
+  _ = Hive.hiveWithQueen(queen) // expected-error{{'hiveWithQueen' is unavailable: use object construction 'Hive(queen:)'}}
 }
 
 func testNonsplittableFactoryMethod() {
@@ -62,3 +62,6 @@ func testFactoryMethodWithKeywordArgument() {
   let prot = NSCoding.self
   _ = NSXPCInterface(with: prot) // not "protocol:"
 }
+
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected note produced: 'hiveWithQueen' has been explicitly marked unavailable here

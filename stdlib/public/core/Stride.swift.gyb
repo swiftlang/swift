@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,7 +24,7 @@
 /// Conforming types are notionally continuous, one-dimensional
 /// values that can be offset and measured.
 public protocol ${Self} : ${Conformance} {
-  /// A type that can represent the distance between two values of `Self`.
+  /// A type that represents the distance between two values of `Self`.
   associatedtype Stride : SignedNumber
 
   /// Returns a stride `x` such that `self.advanced(by: x)` approximates
@@ -62,29 +62,56 @@ public func == <T : Strideable>(x: T, y: T) -> Bool {
   return x.distance(to: y) == 0
 }
 
-public func + <T : Strideable>(lhs: T, rhs: T.Stride) -> T {
+% for Base in ['Strideable', 'SignedInteger']:
+%   deprecated = Base == 'SignedInteger'
+%   # FIXME: technically the deprecation version is incorrect and should be 3.1
+%   #        instead but due to <rdar://problem/29884401> it does not work as
+%   #        expected.
+%   DeprecationVersion = '3.0'
+
+%   if deprecated:
+@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type addition is deprecated. Please use explicit type conversion.")
+%   end
+public func + <T : ${Base}>(lhs: T, rhs: T.Stride) -> T {
   return lhs.advanced(by: rhs)
 }
 
-public func + <T : Strideable>(lhs: T.Stride, rhs: T) -> T {
+%   if deprecated:
+@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type addition is deprecated. Please use explicit type conversion.")
+%   end
+public func + <T : ${Base}>(lhs: T.Stride, rhs: T) -> T {
   return rhs.advanced(by: lhs)
 }
 
-public func - <T : Strideable>(lhs: T, rhs: T.Stride) -> T {
+%   if deprecated:
+@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type subtraction is deprecated. Please use explicit type conversion.")
+%   end
+public func - <T : ${Base}>(lhs: T, rhs: T.Stride) -> T {
   return lhs.advanced(by: -rhs)
 }
 
-public func - <T : Strideable>(lhs: T, rhs: T) -> T.Stride {
+%   if deprecated:
+@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type subtraction is deprecated. Please use explicit type conversion.")
+%   end
+public func - <T : ${Base}>(lhs: T, rhs: T) -> T.Stride {
   return rhs.distance(to: lhs)
 }
 
-public func += <T : Strideable>(lhs: inout T, rhs: T.Stride) {
+%   if deprecated:
+@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type addition is deprecated. Please use explicit type conversion.")
+%   end
+public func += <T : ${Base}>(lhs: inout T, rhs: T.Stride) {
   lhs = lhs.advanced(by: rhs)
 }
 
-public func -= <T : Strideable>(lhs: inout T, rhs: T.Stride) {
+%   if deprecated:
+@available(swift, deprecated: ${DeprecationVersion}, obsoleted: 4.0, message: "Mixed-type subtraction is deprecated. Please use explicit type conversion.")
+%   end
+public func -= <T : ${Base}>(lhs: inout T, rhs: T.Stride) {
   lhs = lhs.advanced(by: -rhs)
 }
+
+% end
 
 //===--- Deliberately-ambiguous operators for UnsignedIntegerTypes --------===//
 // The UnsignedIntegerTypes all have a signed Stride type.  Without these     //

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // REQUIRES: objc_interop
 
@@ -25,6 +25,8 @@ class ObjC : Root {
 }
 
 class DerivesObjC : ObjC { }
+
+class Unrelated : Root { }
 
 struct BridgedToObjC : Hashable, _ObjectiveCBridgeable {
   func _bridgeToObjectiveC() -> ObjC {
@@ -75,36 +77,33 @@ func testForcedDowncastBridge() {
 
   _ = setR as! Set<BridgedToObjC>
   _ = setO as Set<BridgedToObjC>
-  _ = setD as! Set<BridgedToObjC> // expected-error {{'ObjC' is not a subtype of 'DerivesObjC'}}
-  // expected-note @-1 {{in cast from type 'Set<DerivesObjC>' to 'Set<BridgedToObjC>'}}
+  _ = setD as! Set<BridgedToObjC> // expected-warning{{forced cast from 'Set<DerivesObjC>' to 'Set<BridgedToObjC>' always succeeds; did you mean to use 'as'?}}
 
-  // TODO: the diagnostic for the below two examples should indicate that 'as'
-  // should be used instead of 'as!'
-  _ = setB as! Set<Root> // expected-error {{'Root' is not a subtype of 'BridgedToObjC'}}
-  // expected-note @-1 {{in cast from type 'Set<BridgedToObjC>' to 'Set<Root>'}}
-  _ = setB as! Set<ObjC> // expected-error {{'ObjC' is not a subtype of 'BridgedToObjC'}}
-  // expected-note @-1 {{in cast from type 'Set<BridgedToObjC>' to 'Set<ObjC>'}}
-  _ = setB as! Set<DerivesObjC> // expected-error {{'DerivesObjC' is not a subtype of 'BridgedToObjC'}}
-  // expected-note @-1 {{in cast from type 'Set<BridgedToObjC>' to 'Set<DerivesObjC>'}}
+  _ = setB as! Set<Root> // expected-warning{{forced cast from 'Set<BridgedToObjC>' to 'Set<Root>' always succeeds; did you mean to use 'as'?}}
+  _ = setB as! Set<ObjC> // expected-warning{{forced cast from 'Set<BridgedToObjC>' to 'Set<ObjC>' always succeeds; did you mean to use 'as'?}}
+  _ = setB as! Set<DerivesObjC>
 }
 
 func testConditionalDowncastBridge() {
-  var setR = Set<Root>()
-  var setO = Set<ObjC>()
-  var setD = Set<DerivesObjC>()
-  var setB = Set<BridgedToObjC>()
+  let setR = Set<Root>()
+  let setO = Set<ObjC>()
+  let setD = Set<DerivesObjC>()
+  let setB = Set<BridgedToObjC>()
 
-  if let s = setR as? Set<BridgedToObjC> { }
+  if let s = setR as? Set<BridgedToObjC> { _ = s }
   let s1 = setO as Set<BridgedToObjC>
-  if let s = setD as? Set<BridgedToObjC> { } // expected-error {{'ObjC' is not a subtype of 'DerivesObjC'}}
-  // expected-note @-1 {{in cast from type 'Set<DerivesObjC>' to 'Set<BridgedToObjC>'}}
+  if let s = setD as? Set<BridgedToObjC> { _ = s } // expected-warning {{conditional cast from 'Set<DerivesObjC>' to 'Set<BridgedToObjC>' always succeeds}}
 
-  if let s = setB as? Set<Root> { } // expected-error {{'Root' is not a subtype of 'BridgedToObjC'}}
-  // expected-note @-1 {{in cast from type 'Set<BridgedToObjC>' to 'Set<Root>'}}
-  if let s = setB as? Set<ObjC> { } // expected-error {{'ObjC' is not a subtype of 'BridgedToObjC'}}
-  // expected-note @-1 {{in cast from type 'Set<BridgedToObjC>' to 'Set<ObjC>'}}
-  if let s = setB as? Set<DerivesObjC> { } // expected-error {{'DerivesObjC' is not a subtype of 'BridgedToObjC'}}
-  // expected-note @-1 {{in cast from type 'Set<BridgedToObjC>' to 'Set<DerivesObjC>'}}
+  if let s = setB as? Set<Root> { _ = s } // expected-warning{{conditional cast from 'Set<BridgedToObjC>' to 'Set<Root>' always succeeds}}
+  if let s = setB as? Set<ObjC> { _ = s } // expected-warning{{conditional cast from 'Set<BridgedToObjC>' to 'Set<ObjC>' always succeeds}}
+  if let s = setB as? Set<DerivesObjC> { _ = s }
+  if let s = setB as? Set<Unrelated> { _ = s } // expected-warning {{cast from 'Set<BridgedToObjC>' to unrelated type 'Set<Unrelated>' always fails}}
+
+  _ = setR
+  _ = setO
+  _ = setD
+  _ = setB
+  _ = s1
 }
 
 

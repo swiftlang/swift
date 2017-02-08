@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,10 +25,14 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
   // If we have any direct results, receive them via BB arguments.
   // But callers can disable this by passing a null result type.
   if (resultType) {
-    NeedsReturn = (F.getLoweredFunctionType()->getNumAllResults() != 0);
-    for (auto directResult : F.getLoweredFunctionType()->getDirectResults()) {
-      SILType resultType = F.mapTypeIntoContext(directResult.getSILType());
-      new (F.getModule()) SILArgument(epilogBB, resultType);
+    auto fnConv = F.getConventions();
+    // Set NeedsReturn for indirect or direct results. This ensures that SILGen
+    // emits unreachable if there is no source level return.
+    NeedsReturn = (fnConv.funcTy->getNumResults() != 0);
+    for (auto directResult : fnConv.getDirectSILResults()) {
+      SILType resultType =
+          F.mapTypeIntoContext(fnConv.getSILType(directResult));
+      epilogBB->createPHIArgument(resultType, ValueOwnershipKind::Owned);
     }
   }
 
@@ -42,7 +46,7 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
 void SILGenFunction::prepareRethrowEpilog(CleanupLocation cleanupLoc) {
   auto exnType = SILType::getExceptionType(getASTContext());
   SILBasicBlock *rethrowBB = createBasicBlock(FunctionSection::Postmatter);
-  new (F.getModule()) SILArgument(rethrowBB, exnType);
+  rethrowBB->createPHIArgument(exnType, ValueOwnershipKind::Owned);
   ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc);
 }
 
@@ -100,13 +104,13 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     // Steal the branch argument as the return value if present.
     SILBasicBlock *pred = *epilogBB->pred_begin();
     BranchInst *predBranch = cast<BranchInst>(pred->getTerminator());
-    assert(predBranch->getArgs().size() == epilogBB->bbarg_size() &&
+    assert(predBranch->getArgs().size() == epilogBB->args_size() &&
            "epilog predecessor arguments does not match block params");
 
     for (auto index : indices(predBranch->getArgs())) {
       SILValue result = predBranch->getArgs()[index];
       directResults.push_back(result);
-      epilogBB->getBBArg(index)->replaceAllUsesWith(result);
+      epilogBB->getArgument(index)->replaceAllUsesWith(result);
     }
 
     // If we are optimizing, we should use the return location from the single,
@@ -135,7 +139,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
 
     // Emit the epilog into the epilog bb. Its arguments are the
     // direct results.
-    directResults.append(epilogBB->bbarg_begin(), epilogBB->bbarg_end());
+    directResults.append(epilogBB->args_begin(), epilogBB->args_end());
 
     // If we are falling through from the current block, the return is implicit.
     B.emitBlock(epilogBB, ImplicitReturnFromTopLevel);
@@ -162,8 +166,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
   // block.
   SILValue returnValue;
   if (!directResults.empty()) {
-    assert(directResults.size()
-             == F.getLoweredFunctionType()->getNumDirectResults());
+    assert(directResults.size() == F.getConventions().getNumDirectSILResults());
     returnValue = buildReturnValue(*this, TopLevel, directResults);
   }
 
@@ -221,7 +224,7 @@ void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
   }
 
   SILLocation throwLoc = topLevel;
-  SILValue exn = rethrowBB->bbarg_begin()[0];
+  SILValue exn = rethrowBB->args_begin()[0];
   bool reposition = true;
 
   // If the rethrow destination has a single branch predecessor,

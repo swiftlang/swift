@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 // REQUIRES: CPU=i386_or_x86_64
 // REQUIRES: objc_interop
@@ -14,37 +14,37 @@ class X {
 }
 sil_vtable X {}
 
-sil @_TFC14dynamic_lookup1XD : $@convention(method) (X) -> ()
+sil @_T014dynamic_lookup1XCfD : $@convention(method) (X) -> ()
 
 // [objc] t.X.f (t.X)() -> ()
-sil @_TToFC14dynamic_lookup1X1ffT_T_ : $@convention(objc_method) (X) -> () {
+sil @_T014dynamic_lookup1XC1fyyFTo : $@convention(objc_method) (X) -> () {
 bb0(%0 : $X):
   %3 = tuple ()
   return %3 : $()
 }
 
 // [objc] X.g (ObjectiveC.X.Type)() -> ()
-sil @_TToZFC14dynamic_lookup1X1gfT_T_ : $@convention(thin) (@thick X.Type) -> () {
+sil @_T014dynamic_lookup1XC1gyyFZTo : $@convention(thin) (@thick X.Type) -> () {
 bb0(%0 : $@thick X.Type):
   %14 = tuple ()                                  // user: %15
   return %14 : $()
 }
 
-sil @_TToFC14dynamic_lookup1Xg9subscriptFSiSi : $@convention(objc_method) (Int, X) -> Int {
+sil @_T014dynamic_lookup1XC9subscriptSiSicfgTo : $@convention(objc_method) (Int, X) -> Int {
 bb0(%0 : $Int, %1 : $X):
-  %4 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
+  %4 = function_ref @_T0Si33_convertFromBuiltinIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
   %5 = metatype $@thin Int.Type
   %6 = integer_literal $Builtin.Int64, 5
   %7 = apply %4(%6, %5) : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %9
   return %7 : $Int
 }
 
-sil @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int
+sil @_T0Si33_convertFromBuiltinIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int
 
 // [objc] dynamic_lookup.X.value.getter : Swift.Int
-sil @_TToFC14dynamic_lookup1Xg5valueSi : $@convention(objc_method) (X) -> Int {
+sil @_T014dynamic_lookup1XC5valueSifgTo : $@convention(objc_method) (X) -> Int {
 bb0(%0 : $X):
-  %4 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
+  %4 = function_ref @_T0Si33_convertFromBuiltinIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
   %5 = metatype $@thin Int.Type
   %6 = integer_literal $Builtin.Int64, 5
   %7 = apply %4(%6, %5) : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %9
@@ -54,10 +54,10 @@ bb0(%0 : $X):
 // CHECK: define{{( protected)?}} void @dynamic_lookup_br(%objc_object*)
 sil @dynamic_lookup_br : $@convention(thin) (AnyObject) -> () {
 bb0(%0 : $AnyObject):
-  %1 = alloc_box $@box AnyObject
-  %1a = project_box %1 : $@box AnyObject, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
   store %0 to %1a : $*AnyObject
-  %3 = alloc_box $@box Optional<() -> ()>
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<() -> ()>>
   %4 = load %1a : $*AnyObject
   strong_retain %4 : $AnyObject
   %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
@@ -103,8 +103,8 @@ bb3:
 
 sil @_T1t23dynamic_lookup_propertyFT1xPSo13AnyObject__T_ : $@convention(thin) (AnyObject) -> () {
   bb0(%0 : $AnyObject):
-  %1 = alloc_box $@box AnyObject
-  %1a = project_box %1 : $@box AnyObject, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
   store %0 to %1a : $*AnyObject
   %6 = load %1a : $*AnyObject                // users: %24, %8, %7
   strong_retain %6 : $AnyObject
@@ -126,10 +126,10 @@ bb3:
 // CHECK-LABEL: define{{( protected)?}} void @_T1t16opt_to_subscriptFT3objPSo13AnyObject_1iSi_T_(%objc_object*, {{(i32|i64)}})
 sil @_T1t16opt_to_subscriptFT3objPSo13AnyObject_1iSi_T_ : $@convention(thin) (AnyObject, Int) -> () {
 bb0(%0 : $AnyObject, %1 : $Int):
-  %2 = alloc_box $@box AnyObject
-  %2a = project_box %2 : $@box AnyObject, 0
-  %3 = alloc_box $@box Int
-  %3a = project_box %3 : $@box Int, 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   store %0 to %2a : $*AnyObject
   store %1 to %3a : $*Int
   %8 = load %2a : $*AnyObject

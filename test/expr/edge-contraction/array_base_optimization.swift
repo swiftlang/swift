@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 var fa2: Array<Double> = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 print("six has the value [\(fa2[0]), \(fa2[1]), \(fa2[2]), \(fa2[3]), \(fa2[4]), \(fa2[5])]")

@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-module -emit-module-doc -o %t %s -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/enums.swiftmodule -parse -emit-objc-header-path %t/enums.h -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/enums.swiftmodule -typecheck -emit-objc-header-path %t/enums.h -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/enums.h
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/enums.h
 // RUN: %check-in-clang %t/enums.h
@@ -18,9 +18,9 @@ import Foundation
 // CHECK-LABEL: enum ObjcEnumNamed : NSInteger;
 
 // CHECK-LABEL: @interface AnEnumMethod
-// CHECK-NEXT: - (enum NegativeValues)takeAndReturnEnum:(enum FooComments)foo;
+// CHECK-NEXT: - (enum NegativeValues)takeAndReturnEnum:(enum FooComments)foo SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (void)acceptPlainEnum:(enum NSMalformedEnumMissingTypedef)_;
-// CHECK-NEXT: - (enum ObjcEnumNamed)takeAndReturnRenamedEnum:(enum ObjcEnumNamed)foo;
+// CHECK-NEXT: - (enum ObjcEnumNamed)takeAndReturnRenamedEnum:(enum ObjcEnumNamed)foo SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (void)acceptTopLevelImportedWithA:(enum TopLevelRaw)a b:(TopLevelEnum)b c:(TopLevelOptions)c d:(TopLevelTypedef)d e:(TopLevelAnon)e;
 // CHECK-NEXT: - (void)acceptMemberImportedWithA:(enum MemberRaw)a b:(enum MemberEnum)b c:(MemberOptions)c d:(enum MemberTypedef)d e:(MemberAnon)e ee:(MemberAnon2)ee;
 // CHECK: @end
@@ -74,14 +74,9 @@ import Foundation
   func methodNotExportedToObjC() {}
 }
 
-// CHECK: /**
-// CHECK-NEXT: Foo: A feer, a female feer.
-// CHECK-NEXT: */
-
+// CHECK: /// Foo: A feer, a female feer.
 // CHECK-NEXT: typedef SWIFT_ENUM(NSInteger, FooComments) {
-// CHECK: /**
-// CHECK-NEXT: Zim: A zeer, a female zeer.
-// CHECK: */
+// CHECK: /// Zim: A zeer, a female zeer.
 // CHECK-NEXT:   FooCommentsZim = 0,
 // CHECK-NEXT:   FooCommentsZang = 1,
 // CHECK-NEXT:   FooCommentsZung = 2,
@@ -132,7 +127,7 @@ import Foundation
 
 // CHECK-NOT: enum {{[A-Z]+}}
 // CHECK-LABEL: @interface ZEnumMethod
-// CHECK-NEXT: - (enum NegativeValues)takeAndReturnEnum:(enum FooComments)foo;
+// CHECK-NEXT: - (enum NegativeValues)takeAndReturnEnum:(enum FooComments)foo SWIFT_WARN_UNUSED_RESULT;
 // CHECK: @end
 @objc class ZEnumMethod {
   @objc func takeAndReturnEnum(_ foo: FooComments) -> NegativeValues {

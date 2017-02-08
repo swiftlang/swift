@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
 func fizzbuzz(i: Int) -> String {
   return i % 3 == 0
@@ -29,13 +29,13 @@ struct B : AddressOnly {}
 
 func consumeAddressOnly(_: AddressOnly) {}
 
-// CHECK: sil hidden @_TF7if_expr19addr_only_ternary_1
+// CHECK: sil hidden @_T07if_expr19addr_only_ternary_1{{[_0-9a-zA-Z]*}}F
 func addr_only_ternary_1(x: Bool) -> AddressOnly {
   // CHECK: bb0([[RET:%.*]] : $*AddressOnly, {{.*}}):
-  // CHECK: [[a:%[0-9]+]] = alloc_box $@box AddressOnly, var, name "a"
+  // CHECK: [[a:%[0-9]+]] = alloc_box ${ var AddressOnly }, var, name "a"
   // CHECK: [[PBa:%.*]] = project_box [[a]]
   var a : AddressOnly = A()
-  // CHECK: [[b:%[0-9]+]] = alloc_box $@box AddressOnly, var, name "b"
+  // CHECK: [[b:%[0-9]+]] = alloc_box ${ var AddressOnly }, var, name "b"
   // CHECK: [[PBb:%.*]] = project_box [[b]]
   var b : AddressOnly = B()
 

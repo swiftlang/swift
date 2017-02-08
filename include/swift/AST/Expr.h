@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -25,6 +25,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Availability.h"
+#include "swift/Basic/Compiler.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace llvm {
@@ -62,10 +63,12 @@ enum class ExprKind : uint8_t {
 #include "swift/AST/ExprNodes.def"
 };
   
-/// Discriminates the different kinds of checked cast supported.
+/// Discriminates certain kinds of checked cast that have specialized diagnostic
+/// and/or code generation peephole behavior.
 ///
-/// This enumeration should not exist. Only the collection downcast kinds are
-/// currently significant. Please don't add new kinds.
+/// This enumeration should not have any semantic effect on the behavior of a
+/// well-typed program, since the runtime can perform all casts that are
+/// statically accepted.
 enum class CheckedCastKind : unsigned {
   /// The kind has not been determined yet.
   Unresolved,
@@ -75,7 +78,7 @@ enum class CheckedCastKind : unsigned {
 
   /// The requested cast is an implicit conversion, so this is a coercion.
   Coercion = First_Resolved,
-  /// A non-value-changing checked cast.
+  /// A checked cast with no known specific behavior.
   ValueCast,
   // A downcast from an array type to another array type.
   ArrayDowncast,
@@ -83,11 +86,17 @@ enum class CheckedCastKind : unsigned {
   DictionaryDowncast,
   // A downcast from a set type to another set type.
   SetDowncast,
-  /// A downcast from an object of class or Objective-C existential
-  /// type to its bridged value type.
-  BridgeFromObjectiveC,
+  /// A bridging conversion that always succeeds.
+  BridgingCoercion,
+  /// A bridging conversion that may fail, because there are multiple Swift
+  /// value types that bridge to the same Cocoa object type.
+  ///
+  /// This kind is only used for Swift 3 compatibility diagnostics and is
+  /// treated the same as 'BridgingCoercion' otherwise. In Swift 4 or later,
+  /// any conversions with this kind show up as ValueCasts.
+  Swift3BridgingDowncast,
 
-  Last_CheckedCastKind = BridgeFromObjectiveC,
+  Last_CheckedCastKind = Swift3BridgingDowncast,
 };
 
 enum class AccessSemantics : unsigned char {
@@ -539,13 +548,18 @@ public:
   ///
   /// This distinguishes static references to types, like Int, from metatype
   /// values, "someTy: Any.Type".
-  bool isTypeReference() const;
+  bool isTypeReference(llvm::function_ref<Type(const Expr *)> getType =
+                           [](const Expr *E) -> Type {
+    return E->getType();
+  }) const;
 
   /// Determine whether this expression refers to a statically-derived metatype.
   ///
   /// This implies `isTypeReference`, but also requires that the referenced type
   /// is not an archetype or dependent type.
-  bool isStaticallyDerivedMetatype() const;
+  bool isStaticallyDerivedMetatype(
+      llvm::function_ref<Type(const Expr *)> getType =
+          [](const Expr *E) -> Type { return E->getType(); }) const;
 
   /// isImplicit - Determines whether this expression was implicitly-generated,
   /// rather than explicitly written in the AST.
@@ -576,6 +590,10 @@ public:
   /// \param allowOverwrite - true if it's okay if an expression already
   ///   has an access kind
   void propagateLValueAccessKind(AccessKind accessKind,
+                                 llvm::function_ref<Type(Expr *)> getType
+                                   = [](Expr *E) -> Type {
+                                     return E->getType();
+                                 },
                                  bool allowOverwrite = false);
 
   /// Retrieves the declaration that is being referenced by this
@@ -653,15 +671,14 @@ class TrailingCallArguments
   }
 
   size_t numTrailingObjects(
-      typename TrailingObjects::template OverloadToken<Identifier>) const {
+      SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(Identifier)) const {
     return asDerived().getNumArguments();
   }
 
   size_t numTrailingObjects(
-      typename TrailingObjects::template OverloadToken<SourceLoc>) const {
-    return asDerived().hasArgumentLabelLocs()
-             ? asDerived().getNumArguments()
-             : 0;
+      SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(SourceLoc)) const {
+    return asDerived().hasArgumentLabelLocs() ? asDerived().getNumArguments()
+                                              : 0;
   }
 
   /// Retrieve the buffer containing the argument labels.
@@ -749,10 +766,6 @@ public:
       Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
       Range(Range) {}
 
-  CodeCompletionExpr(CharSourceRange Range, Type Ty = Type()) :
-      Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
-      Range(SourceRange(Range.getStart(), Range.getEnd())) {}
-
   SourceRange getSourceRange() const { return Range; }
 
   static bool classof(const Expr *E) {
@@ -766,8 +779,10 @@ public:
   LiteralExpr(ExprKind Kind, bool Implicit) : Expr(Kind, Implicit) {}
   
   // Make an exact copy of this one AST node.
-  LiteralExpr *shallowClone(ASTContext &Ctx) const;
-  
+  LiteralExpr *
+  shallowClone(ASTContext &Ctx,
+               llvm::function_ref<Type(const Expr *)> getType) const;
+
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_LiteralExpr &&
            E->getKind() <= ExprKind::Last_LiteralExpr;
@@ -1140,8 +1155,9 @@ public:
   ///
   /// Note: prefer to use the second entry point, which separates out
   /// arguments/labels/etc.
-  static ObjectLiteralExpr *create(ASTContext &ctx, SourceLoc poundLoc,
-                                   LiteralKind kind, Expr *arg, bool implicit);
+  static ObjectLiteralExpr *
+  create(ASTContext &ctx, SourceLoc poundLoc, LiteralKind kind, Expr *arg,
+         bool implicit, llvm::function_ref<Type(const Expr *)> getType);
 
   /// Create a new object literal expression.
   static ObjectLiteralExpr *create(ASTContext &ctx, SourceLoc poundLoc,
@@ -1325,8 +1341,13 @@ public:
 
   // The type of a TypeExpr is always a metatype type.  Return the instance
   // type, ErrorType if an error, or null if not set yet.
-  Type getInstanceType() const;
-  
+  Type getInstanceType(llvm::function_ref<bool(const Expr *)> hasType =
+                           [](const Expr *E) -> bool { return !!E->getType(); },
+                       llvm::function_ref<Type(const Expr *)> getType =
+                           [](const Expr *E) -> Type {
+                         return E->getType();
+                       }) const;
+
   // Create an implicit TypeExpr, which has no location information.
   static TypeExpr *createImplicit(Type Ty, ASTContext &C) {
     return new (C) TypeExpr(Ty);
@@ -1692,9 +1713,11 @@ public:
   ///
   /// Note: do not create new callers to this entry point; use the entry point
   /// that takes separate index arguments.
-  static DynamicSubscriptExpr *create(ASTContext &ctx, Expr *base, Expr *index,
-                                      ConcreteDeclRef decl,
-                                      bool implicit);
+  static DynamicSubscriptExpr *
+  create(ASTContext &ctx, Expr *base, Expr *index, ConcreteDeclRef decl,
+         bool implicit,
+         llvm::function_ref<Type(const Expr *)> getType =
+             [](const Expr *E) -> Type { return E->getType(); });
 
   /// Create a new dynamic subscript.
   static DynamicSubscriptExpr *create(ASTContext &ctx, Expr *base,
@@ -2241,11 +2264,12 @@ public:
   ///
   /// Note: do not create new callers to this entry point; use the entry point
   /// that takes separate index arguments.
-  static SubscriptExpr *create(ASTContext &ctx, Expr *base, Expr *index,
-                               ConcreteDeclRef decl = ConcreteDeclRef(),
-                               bool implicit = false,
-                               AccessSemantics semantics
-                                 = AccessSemantics::Ordinary);
+  static SubscriptExpr *
+  create(ASTContext &ctx, Expr *base, Expr *index,
+         ConcreteDeclRef decl = ConcreteDeclRef(), bool implicit = false,
+         AccessSemantics semantics = AccessSemantics::Ordinary,
+         llvm::function_ref<Type(const Expr *)> getType =
+             [](const Expr *E) -> Type { return E->getType(); });
 
   /// Create a new subscript.
   static SubscriptExpr *create(ASTContext &ctx, Expr *base,
@@ -2523,6 +2547,69 @@ public:
   }
 };
 
+/// \brief An expression that grants temporary escapability to a nonescaping
+/// closure value.
+///
+/// This expression is formed by the type checker when a call to the
+/// `withoutActuallyEscaping` declaration is made.
+class MakeTemporarilyEscapableExpr : public Expr {
+  Expr *NonescapingClosureValue;
+  OpaqueValueExpr *EscapingClosureValue;
+  Expr *SubExpr;
+  SourceLoc NameLoc, LParenLoc, RParenLoc;
+
+public:
+  MakeTemporarilyEscapableExpr(SourceLoc NameLoc,
+                               SourceLoc LParenLoc,
+                               Expr *NonescapingClosureValue,
+                               Expr *SubExpr,
+                               SourceLoc RParenLoc,
+                               OpaqueValueExpr *OpaqueValueForEscapingClosure,
+                               bool implicit = false)
+    : Expr(ExprKind::MakeTemporarilyEscapable, implicit, Type()),
+      NonescapingClosureValue(NonescapingClosureValue),
+      EscapingClosureValue(OpaqueValueForEscapingClosure),
+      SubExpr(SubExpr),
+      NameLoc(NameLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc)
+  {}
+  
+  SourceLoc getStartLoc() const {
+    return NameLoc;
+  }
+  SourceLoc getEndLoc() const {
+    return RParenLoc;
+  }
+  
+  SourceLoc getLoc() const {
+    return NameLoc;
+  }
+  
+  /// Retrieve the opaque value representing the escapable copy of the
+  /// closure.
+  OpaqueValueExpr *getOpaqueValue() const { return EscapingClosureValue; }
+  
+  /// Retrieve the nonescaping closure expression.
+  Expr *getNonescapingClosureValue() const {
+    return NonescapingClosureValue;
+  }
+  void setNonescapingClosureValue(Expr *e) {
+    NonescapingClosureValue = e;
+  }
+  
+  /// Retrieve the subexpression that has access to the escapable copy of the
+  /// closure.
+  Expr *getSubExpr() const {
+    return SubExpr;
+  }
+  void setSubExpr(Expr *e) {
+    SubExpr = e;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::MakeTemporarilyEscapable;
+  }
+};
+
 /// \brief An expression that opens up a value of protocol or protocol
 /// composition type and gives a name to its dynamic type.
 ///
@@ -2538,8 +2625,9 @@ class OpenExistentialExpr : public Expr {
 public:
   OpenExistentialExpr(Expr *existentialValue,
                       OpaqueValueExpr *opaqueValue,
-                      Expr *subExpr)
-    : Expr(ExprKind::OpenExistential, /*Implicit=*/ true, subExpr->getType()),
+                      Expr *subExpr,
+                      Type subExprTy)
+    : Expr(ExprKind::OpenExistential, /*Implicit=*/ true, subExprTy),
       ExistentialValue(existentialValue), OpaqueValue(opaqueValue), 
       SubExpr(subExpr) { }
 
@@ -3665,11 +3753,12 @@ public:
   /// Create a new call expression.
   ///
   /// Note: prefer to use the entry points that separate out the arguments.
-  static CallExpr *create(ASTContext &ctx, Expr *fn, Expr *arg,
-                          ArrayRef<Identifier> argLabels,
-                          ArrayRef<SourceLoc> argLabelLocs,
-                          bool hasTrailingClosure,
-                          bool implicit, Type type = Type());
+  static CallExpr *
+  create(ASTContext &ctx, Expr *fn, Expr *arg, ArrayRef<Identifier> argLabels,
+         ArrayRef<SourceLoc> argLabelLocs, bool hasTrailingClosure,
+         bool implicit, Type type = Type(),
+         llvm::function_ref<Type(const Expr *)> getType =
+             [](const Expr *E) -> Type { return E->getType(); });
 
   /// Create a new implicit call expression without any source-location
   /// information.
@@ -3678,11 +3767,13 @@ public:
   /// \param args The call arguments, not including a trailing closure (if any).
   /// \param argLabels The argument labels, whose size must equal args.size(),
   /// or which must be empty.
-  static CallExpr *createImplicit(ASTContext &ctx, Expr *fn,
-                                  ArrayRef<Expr *> args,
-                                  ArrayRef<Identifier> argLabels) {
+  static CallExpr *
+  createImplicit(ASTContext &ctx, Expr *fn, ArrayRef<Expr *> args,
+                 ArrayRef<Identifier> argLabels,
+                 llvm::function_ref<Type(const Expr *)> getType =
+                     [](const Expr *E) -> Type { return E->getType(); }) {
     return create(ctx, fn, SourceLoc(), args, argLabels, { }, SourceLoc(),
-                  /*trailingClosure=*/nullptr, /*implicit=*/true);
+                  /*trailingClosure=*/nullptr, /*implicit=*/true, getType);
   }
 
   /// Create a new call expression.
@@ -3694,14 +3785,12 @@ public:
   /// \param argLabelLocs The locations of the argument labels, whose size must
   /// equal args.size() or which must be empty.
   /// \param trailingClosure The trailing closure, if any.
-  static CallExpr *create(ASTContext &ctx, Expr *fn,
-                          SourceLoc lParenLoc,
-                          ArrayRef<Expr *> args,
-                          ArrayRef<Identifier> argLabels,
-                          ArrayRef<SourceLoc> argLabelLocs,
-                          SourceLoc rParenLoc,
-                          Expr *trailingClosure,
-                          bool implicit);
+  static CallExpr *
+  create(ASTContext &ctx, Expr *fn, SourceLoc lParenLoc, ArrayRef<Expr *> args,
+         ArrayRef<Identifier> argLabels, ArrayRef<SourceLoc> argLabelLocs,
+         SourceLoc rParenLoc, Expr *trailingClosure, bool implicit,
+         llvm::function_ref<Type(const Expr *)> getType =
+             [](const Expr *E) -> Type { return E->getType(); });
 
   SourceLoc getStartLoc() const {
     SourceLoc fnLoc = getFn()->getStartLoc();
@@ -3872,8 +3961,8 @@ class DotSyntaxBaseIgnoredExpr : public Expr {
   SourceLoc DotLoc;
   Expr *RHS;
 public:
-  DotSyntaxBaseIgnoredExpr(Expr *LHS, SourceLoc DotLoc, Expr *RHS)
-    : Expr(ExprKind::DotSyntaxBaseIgnored, /*Implicit=*/false, RHS->getType()),
+  DotSyntaxBaseIgnoredExpr(Expr *LHS, SourceLoc DotLoc, Expr *RHS, Type rhsTy)
+    : Expr(ExprKind::DotSyntaxBaseIgnored, /*Implicit=*/false, rhsTy),
       LHS(LHS), DotLoc(DotLoc), RHS(RHS) {
   }
   
@@ -4245,7 +4334,13 @@ public:
   
   SourceLoc getEqualLoc() const { return EqualLoc; }
   
-  SourceLoc getLoc() const { return EqualLoc; }
+  SourceLoc getLoc() const {
+    SourceLoc loc = EqualLoc;
+    if (loc.isValid()) {
+      return loc;
+    }
+    return getStartLoc();
+  }
   SourceLoc getStartLoc() const {
     if (!isFolded()) return EqualLoc;
     return ( Dest->getStartLoc().isValid()
@@ -4370,6 +4465,8 @@ public:
     case ObjCSelectorKind::Setter:
       return true;
     }
+
+    llvm_unreachable("Unhandled ObjcSelectorKind in switch.");
   }
 
   /// Whether this selector references a method.

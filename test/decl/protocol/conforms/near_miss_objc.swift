@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Test "near misses" where a member of a class or extension thereof
 // nearly matches an optional requirement, but does not exactly match.

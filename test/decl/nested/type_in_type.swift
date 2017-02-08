@@ -1,30 +1,30 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct OuterNonGeneric {
   struct MidNonGeneric {
     struct InnerNonGeneric {}
-    struct InnerGeneric<A> {} // expected-error{{generic type 'InnerGeneric' cannot be nested in type 'MidNonGeneric'}}
+    struct InnerGeneric<A> {}
   }
 
-  struct MidGeneric<B> { // expected-error{{generic type 'MidGeneric' cannot be nested in type 'OuterNonGeneric'}}
-    struct InnerNonGeneric {} // expected-error{{type 'InnerNonGeneric' cannot be nested in generic type 'MidGeneric'}}
-    struct InnerGeneric<C> {} // expected-error{{generic type 'InnerGeneric' cannot be nested in type 'MidGeneric'}}
+  struct MidGeneric<B> {
+    struct InnerNonGeneric {}
+    struct InnerGeneric<C> {}
 
     func flock(_ b: B) {}
   }
 }
 
 struct OuterGeneric<D> {
-  struct MidNonGeneric { // expected-error{{type 'MidNonGeneric' cannot be nested in generic type 'OuterGeneric'}}
-    struct InnerNonGeneric {} // expected-error{{type 'InnerNonGeneric' cannot be nested in generic type 'MidNonGeneric'}}
-    struct InnerGeneric<E> {} // expected-error{{generic type 'InnerGeneric' cannot be nested in type 'MidNonGeneric'}}
+  struct MidNonGeneric {
+    struct InnerNonGeneric {}
+    struct InnerGeneric<E> {}
 
     func roost(_ d: D) {}
   }
 
-  struct MidGeneric<F> { // expected-error{{generic type 'MidGeneric' cannot be nested in type 'OuterGeneric'}}
-    struct InnerNonGeneric {} // expected-error{{type 'InnerNonGeneric' cannot be nested in generic type 'MidGeneric'}}
-    struct InnerGeneric<G> {} // expected-error{{generic type 'InnerGeneric' cannot be nested in type 'MidGeneric'}}
+  struct MidGeneric<F> {
+    struct InnerNonGeneric {}
+    struct InnerGeneric<G> {}
 
     func nest(_ d: D, f: F) {}
   }
@@ -58,7 +58,7 @@ class OuterNonGenericClass {
     }
   }
 
-  class InnerGenericClass<U> : OuterNonGenericClass { // expected-error {{generic type 'InnerGenericClass' cannot be nested in type 'OuterNonGenericClass'}}
+  class InnerGenericClass<U> : OuterNonGenericClass {
     override init() {
       super.init()
     }
@@ -66,49 +66,54 @@ class OuterNonGenericClass {
 }
 
 class OuterGenericClass<T> {
-  enum InnerNonGeneric { // expected-error {{type 'InnerNonGeneric' cannot be nested in generic type 'OuterGenericClass'}}
+  enum InnerNonGeneric {
     case Baz
     case Zab
   }
 
-  class InnerNonGenericBase { // expected-error {{type 'InnerNonGenericBase' cannot be nested in generic type 'OuterGenericClass'}}
+  class InnerNonGenericBase {
     init() {}
   }
 
-  class InnerNonGenericClass1 : InnerNonGenericBase { // expected-error {{type 'InnerNonGenericClass1' cannot be nested in generic type 'OuterGenericClass'}}
+  class InnerNonGenericClass1 : InnerNonGenericBase {
     override init() {
       super.init()
     }
   }
 
-  class InnerNonGenericClass2 : OuterGenericClass { // expected-error {{type 'InnerNonGenericClass2' cannot be nested in generic type 'OuterGenericClass'}}
+  class InnerNonGenericClass2 : OuterGenericClass {
     override init() {
       super.init()
     }
   }
 
-  class InnerNonGenericClass3 : OuterGenericClass<Int> { // expected-error {{type 'InnerNonGenericClass3' cannot be nested in generic type 'OuterGenericClass'}}
+  class InnerNonGenericClass3 : OuterGenericClass<Int> {
     override init() {
       super.init()
     }
   }
 
-  class InnerNonGenericClass4 : OuterGenericClass<T> { // expected-error {{type 'InnerNonGenericClass4' cannot be nested in generic type 'OuterGenericClass'}}
+  class InnerNonGenericClass4 : OuterGenericClass<T> {
     override init() {
       super.init()
     }
   }
 
-  class InnerGenericClass<U> : OuterGenericClass<U> { // expected-error {{type 'InnerGenericClass' cannot be nested in type 'OuterGenericClass'}}
+  class InnerGenericClass<U> : OuterGenericClass<U> {
     override init() {
       super.init()
     }
+  }
+
+  class Middle {
+    class Inner1<T> {}
+    class Inner2<T> : Middle where T: Inner1<Int> {}
   }
 }
 
 // <rdar://problem/12895793>
 struct AnyStream<T : Sequence> {
-  struct StreamRange<S : IteratorProtocol> { // expected-error{{generic type 'StreamRange' cannot be nested in type 'AnyStream'}}
+  struct StreamRange<S : IteratorProtocol> {
     var index : Int
     var elements : S
 
@@ -128,7 +133,7 @@ struct AnyStream<T : Sequence> {
   // Conform to the enumerable protocol.
   typealias Elements = StreamRange<T.Iterator>
   func getElements() -> Elements {
-    return Elements(index: 0, elements: input.makeIterator()) // expected-error {{'AnyStream<T>.StreamRange<T.Iterator>' cannot be constructed because it has no accessible initializers}}
+    return Elements(index: 0, elements: input.makeIterator())
   }
 }
 
@@ -177,9 +182,9 @@ extension Bar {
 class X6<T> {
   let d: D<T>
   init(_ value: T) {
-    d = D(value) // expected-error{{'<<error type>>' cannot be constructed because it has no accessible initializers}}
+    d = D(value)
   }
-  class D<T2> { // expected-error{{generic type 'D' cannot be nested in type 'X6'}}
+  class D<T2> {
     init(_ value: T2) {}
   }
 }
@@ -193,17 +198,17 @@ struct GS<T> {
     return gs
   }
 
-  struct Nested { // expected-error{{cannot be nested in generic type}}
+  struct Nested {
     func ff() -> GS {
       let gs = GS()
       return gs
     }
   }
 
-  struct NestedGeneric<U> { // expected-note{{generic type 'NestedGeneric' declared here}} // expected-error{{generic type 'NestedGeneric' cannot be nested in type 'GS'}}
+  struct NestedGeneric<U> { // expected-note{{generic type 'NestedGeneric' declared here}}
     func fff() -> (GS, NestedGeneric) {
       let gs = GS()
-      let ns = NestedGeneric() // expected-error {{'GS<T>.NestedGeneric<U>' cannot be constructed because it has no accessible initializers}}
+      let ns = NestedGeneric()
       return (gs, ns)
     }
   }
@@ -227,12 +232,12 @@ struct HasNested<T> {
   init<U>(_ t: T, _ u: U) {}
   func f<U>(_ t: T, u: U) -> (T, U) {}
 
-  struct InnerGeneric<U> { // expected-error{{generic type 'InnerGeneric' cannot be nested in type 'HasNested'}}
+  struct InnerGeneric<U> {
     init() {}
     func g<V>(_ t: T, u: U, v: V) -> (T, U, V) {}
   }
 
-  struct Inner { // expected-error{{type 'Inner' cannot be nested in generic type 'HasNested'}}
+  struct Inner {
     init (_ x: T) {}
     func identity(_ x: T) -> T { return x }
   }
@@ -245,7 +250,7 @@ func useNested(_ ii: Int, hni: HasNested<Int>,
   typealias InnerI = HasNested<Int>.Inner
   var innerI = InnerI(5)
   typealias InnerF = HasNested<Float>.Inner
-  var innerF : InnerF = innerI
+  var innerF : InnerF = innerI // expected-error{{cannot convert value of type 'InnerI' (aka 'HasNested<Int>.Inner') to specified type 'InnerF' (aka 'HasNested<Float>.Inner')}}
 
   _ = innerI.identity(i)
   i = innerI.identity(i)
@@ -265,7 +270,7 @@ func useNested(_ ii: Int, hni: HasNested<Int>,
   var ids = xis.g(1, u: "Hello", v: 3.14159)
   ids = (2, "world", 2.71828)
 
-  xis = xfs
+  xis = xfs // expected-error{{cannot assign value of type 'HasNested<Float>.InnerGeneric<String>' to type 'HasNested<Int>.InnerGeneric<String>'}}
 }
 
 // Extensions of nested generic types
@@ -297,4 +302,52 @@ typealias OuterGenericMidGeneric<T> = OuterGeneric<T>.MidGeneric
 
 extension OuterGenericMidGeneric {
 
+}
+
+class BaseClass {
+  struct T {}
+
+  func m1() -> T {}
+  func m2() -> BaseClass.T {}
+  func m3() -> DerivedClass.T {}
+}
+
+func f1() -> DerivedClass.T {
+  return BaseClass.T()
+}
+
+func f2() -> BaseClass.T {
+  return DerivedClass.T()
+}
+
+func f3() -> DerivedClass.T {
+  return DerivedClass.T()
+}
+
+class DerivedClass : BaseClass {
+  override func m1() -> DerivedClass.T {
+    return f2()
+  }
+
+  override func m2() -> BaseClass.T {
+    return f3()
+  }
+
+  override func m3() -> T {
+    return f2()
+  }
+}
+
+// https://bugs.swift.org/browse/SR-3847: Resolve members in inner types.
+// This first extension isn't necessary; we could have put 'originalValue' in
+// the original declaration.
+extension OuterNonGenericClass.InnerNonGenericBase {
+  static let originalValue = 0
+}
+// Each of these two cases used to crash.
+extension OuterNonGenericClass.InnerNonGenericBase {
+  static let propUsingMember = originalValue
+}
+extension OuterNonGenericClass.InnerNonGenericClass1 {
+  static let anotherPropUsingMember = originalValue
 }

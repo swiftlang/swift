@@ -1,5 +1,5 @@
-// RUN: %target-parse-verify-swift -parse-as-library
-// RUN: %target-parse-verify-swift -parse-as-library -enable-astscope-lookup
+// RUN: %target-typecheck-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library -enable-astscope-lookup
 
 let x = 42 // expected-note{{did you mean 'x'?}}
 x + x; // expected-error {{expressions are not allowed at the top level}} expected-warning {{result of operator '+' is unused}}

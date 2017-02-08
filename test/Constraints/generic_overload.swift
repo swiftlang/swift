@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 protocol P1 { associatedtype Assoc }
 protocol P2 : P1 { associatedtype Assoc }

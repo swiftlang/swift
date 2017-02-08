@@ -1,0 +1,107 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: rm -rfv %t
+// RUN: mkdir %t
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name boxes
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name boxes
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name boxes | %FileCheck %s
+
+sil_stage canonical
+
+import Swift
+
+protocol P {}
+struct F {}
+struct G: P {}
+struct Q: P {}
+
+// TODO: Transform boxes by transforming their arguments, not as single-field,
+// so that they work as parameters in generic SIL functions.
+// CHECK-LABEL: sil hidden @box_type_parsing : $@convention(thin) (
+sil hidden @box_type_parsing : $@convention(thin) (
+  // CHECK: <τ_0_0> { var τ_0_0 } <F>,
+  <B>{ var B }<F>,
+  // CHECK: <τ_0_0 where τ_0_0 : P> { let τ_0_0 } <G>,
+  <C: P>{ let C }<G>,
+  // CHECK: <τ_0_0 where τ_0_0 : P> { var τ_0_0 } <Q>,
+  <D: P>{ var D }<Q>,
+  // CHECK: { let Int },
+  { let Int },
+  // CHECK: { var Int, let String },
+  { var Int, let String },
+  // CHECK: { },
+  {},
+  // CHECK: <τ_0_0, τ_0_1, τ_0_2> { var τ_0_0, let τ_0_2 } <Int, String, Optional<Double>>
+  <X, Y, Z>{ var X, let Z }<Int, String, Optional<Double>>
+// CHECK: ) -> ()
+) -> () {
+entry(%0 : $<E>{ var E }<F>, %1 : $<F: P>{ let F }<G>, %2 : $<G: P>{ var G }<Q>, %3 : ${ let Int }, %4 : ${ var Int, let String }, %5 : ${}, %6 : $<XX, YY, ZZ>{ var XX, let ZZ }<Int, String, Optional<Double>>):
+  unreachable
+}
+
+// CHECK-LABEL: sil hidden @box_type_parsing_in_generic_function : $@convention(thin) <F, G where G : P> (
+sil hidden @box_type_parsing_in_generic_function : $@convention(thin) <F, G: P> (
+  // CHECK: <τ_0_0> { var τ_0_0 } <F>,
+  <B>{ var B }<F>,
+  // CHECK: <τ_0_0 where τ_0_0 : P> { let τ_0_0 } <G>,
+  <C: P>{ let C }<G>,
+  // CHECK: <τ_0_0 where τ_0_0 : P> { var τ_0_0 } <Q>,
+  <D: P>{ var D }<Q>,
+  // CHECK: { let Int },
+  { let Int },
+  // CHECK: { var Int, let String },
+  { var Int, let String },
+  // CHECK: { },
+  {},
+  // CHECK: <τ_0_0, τ_0_1, τ_0_2> { var τ_0_0, let τ_0_2 } <Int, String, Optional<Double>>
+  <X, Y, Z>{ var X, let Z }<Int, String, Optional<Double>>
+// CHECK: ) -> ()
+) -> () {
+entry(%0 : $<E>{ var E }<F>, %1 : $<F: P>{ let F }<G>, %2 : $<G: P>{ var G }<Q>, %3 : ${ let Int }, %4 : ${ var Int, let String }, %5 : ${}, %6 : $<XX, YY, ZZ>{ var XX, let ZZ }<Int, String, Optional<Double>>):
+  unreachable
+}
+
+// CHECK-LABEL: sil hidden @same_generic_param_name_in_multiple_box_signatures : $@convention(thin) (
+sil hidden @same_generic_param_name_in_multiple_box_signatures : $@convention(thin) (
+  // CHECK: <τ_0_0> { var τ_0_0 } <Int>,
+  <A> { var A } <Int>,
+  // CHECK: <τ_0_0> { var τ_0_0 } <String>
+  <A> { var A } <String>
+// CHECK: ) -> ()
+) -> () {
+entry(%0 : $<A> { var A } <Int>, %1 : $<A> { var A } <String>):
+  unreachable
+}
+
+// CHECK-LABEL: sil hidden @same_generic_param_name_in_outer_scope : $@convention(thin) <A> (
+sil hidden @same_generic_param_name_in_outer_scope : $@convention(thin) <A> (
+  // CHECK: <τ_0_0> { var τ_0_0 } <A>
+  <A> { var A } <A>
+// CHECK: ) -> ()
+) -> () {
+entry(%0 : $<B> { var B } <A>):
+  unreachable
+}
+
+// CHECK-LABEL: sil hidden @box_ownership : $@convention(thin) (@owned { var Int }, @guaranteed <τ_0_0> { let τ_0_0 } <Int>) -> ()
+sil hidden @box_ownership : $@convention(thin) (@owned { var Int }, @guaranteed <T> { let T } <Int>) -> () {
+entry(%0 : ${ var Int }, %1 : $<T> { let T } <Int>):
+  unreachable
+}
+
+// CHECK-LABEL: sil hidden @address_of_box
+sil hidden @address_of_box : $@convention(thin) (@in { var Int }, @in <T> { let T } <Int>) -> () {
+// CHECK: %0 : $*{ var Int }, %1 : $*<τ_0_0> { let τ_0_0 } <Int>
+entry(%0 : $*{ var Int }, %1 : $*<T> { let T } <Int>):
+  unreachable
+}
+
+sil @serialize_all : $@convention(thin) () -> () {
+entry:
+  %0 = function_ref @box_type_parsing : $@convention(thin) (<B>{ var B }<F>, <C: P>{ let C }<G>, <D: P>{ var D }<Q>, { let Int }, { var Int, let String }, {}, <X, Y, Z>{ var X, let Z }<Int, String, Optional<Double>>) -> ()
+  %1 = function_ref @box_type_parsing_in_generic_function : $@convention(thin) <F, G: P> (<B>{ var B }<F>, <C: P>{ let C }<G>, <D: P>{ var D }<Q>, { let Int }, { var Int, let String }, {}, <X, Y, Z>{ var X, let Z }<Int, String, Optional<Double>>) -> ()
+  %2 = function_ref @same_generic_param_name_in_multiple_box_signatures : $@convention(thin) (<A> { var A } <Int>, <A> { var A } <String>) -> ()
+  %3 = function_ref @same_generic_param_name_in_outer_scope : $@convention(thin) <A> (<A> { var A } <A>) -> ()
+  %4 = function_ref @box_ownership : $@convention(thin) (@owned { var Int }, @guaranteed <T> { let T } <Int>) -> ()
+  %5 = function_ref @address_of_box : $@convention(thin) (@in { var Int }, @in <T> { let T } <Int>) -> ()
+  unreachable
+}

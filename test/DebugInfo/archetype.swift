@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s -emit-ir -g -o - | %FileCheck %s
 
 protocol IntegerArithmetic {
   static func uncheckedSubtract(_ lhs: Self, rhs: Self) -> (Self, Bool)
@@ -10,7 +10,7 @@ protocol RandomAccessIndex : IntegerArithmetic {
 }
 
 // archetype.ExistentialTuple <A : RandomAccessIndex, B>(x : A, y : A) -> B
-// CHECK: !DISubprogram(name: "ExistentialTuple", linkageName: "_TF9archetype16ExistentialTuple
+// CHECK: !DISubprogram(name: "ExistentialTuple", linkageName: "_T09archetype16ExistentialTuple
 // CHECK-SAME:          line: [[@LINE+2]]
 // CHECK-SAME:          isDefinition: true
 func ExistentialTuple<T: RandomAccessIndex>(_ x: T, y: T) -> T.Distance {
@@ -22,5 +22,5 @@ func ExistentialTuple<T: RandomAccessIndex>(_ x: T, y: T) -> T.Distance {
   return _overflowChecked((tmp.0, tmp.1))
 }
 // CHECK: ![[TT]] = !DICompositeType(tag: DW_TAG_structure_type,
-// CHECK-SAME:                       name: "_TtTQQq_F9archetype16ExistentialTuple
+// CHECK-SAME:                       name: "_T09archetype16ExistentialTuple8Distance
 

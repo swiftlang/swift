@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -85,18 +85,22 @@ public protocol _IndexableBase {
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
+  ///
+  /// - Complexity: O(1)
   subscript(position: Index) -> _Element { get }
 
   // WORKAROUND: rdar://25214066
-  /// A sequence that can represent a contiguous subrange of the collection's
+  // FIXME(ABI)#178 (Type checker)
+  /// A sequence that represents a contiguous subrange of the collection's
   /// elements.
   associatedtype SubSequence
 
   /// Accesses the subsequence bounded by the given range.
   ///
   /// - Parameter bounds: A range of the collection's indices. The upper and
-  ///   lower bounds of the `bounds` range must be valid indices of the
-  ///   collection.
+  ///   lower bounds of the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get }
   
   /// Performs a range check in O(1), or a no-op when a range check is not
@@ -144,6 +148,10 @@ public protocol _IndexableBase {
 
   /// Returns the position immediately after the given index.
   ///
+  /// The successor of an index must be well defined. For an index `i` into a
+  /// collection `c`, calling `c.index(after: i)` returns the same index every
+  /// time.
+  ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
@@ -153,6 +161,8 @@ public protocol _IndexableBase {
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
+  ///
+  /// - SeeAlso: `index(after:)`
   func formIndex(after i: inout Index)
 }
 
@@ -164,7 +174,7 @@ public protocol _IndexableBase {
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
 public typealias Indexable = _Indexable
 public protocol _Indexable : _IndexableBase {
-  /// A type used to represent the number of steps between two indices, where
+  /// A type that represents the number of steps between two indices, where
   /// one value is reachable from the other.
   ///
   /// In Swift, *reachability* refers to the ability to produce one value from
@@ -181,8 +191,8 @@ public protocol _Indexable : _IndexableBase {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -221,9 +231,9 @@ public protocol _Indexable : _IndexableBase {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection, unless the index passed as
-  /// `limit` prevents offsetting beyond those bounds.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection, unless the index passed as `limit` prevents offsetting
+  /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -246,8 +256,8 @@ public protocol _Indexable : _IndexableBase {
 
   /// Offsets the given index by the specified distance.
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -263,14 +273,17 @@ public protocol _Indexable : _IndexableBase {
   /// Offsets the given index by the specified distance, or so that it equals
   /// the given limiting index.
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection, unless the index passed as
-  /// `limit` prevents offsetting beyond those bounds.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection, unless the index passed as `limit` prevents offsetting
+  /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
   ///   - n: The distance to offset `i`. `n` must not be negative unless the
   ///     collection conforms to the `BidirectionalCollection` protocol.
+  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
+  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
+  ///     limit that is greater than `i` has no effect.
   /// - Returns: `true` if `i` has been offset by exactly `n` steps without
   ///   going beyond `limit`; otherwise, `false`. When the return value is
   ///   `false`, the value of `i` is equal to `limit`.
@@ -375,7 +388,7 @@ public struct IndexingIterator<
   /// exists.
   ///
   /// Repeatedly calling this method returns all the elements of the underlying
-  /// sequence in order.  As soon as the sequence has run out of elements, all
+  /// sequence in order. As soon as the sequence has run out of elements, all
   /// subsequent calls return `nil`.
   ///
   /// This example shows how an iterator can be used explicitly to emulate a
@@ -470,6 +483,88 @@ public struct IndexingIterator<
 ///     print(text.characters.first)
 ///     // Prints "Optional("B")"
 ///
+/// Accessing Slices of a Collection
+/// ================================
+///
+/// You can access a slice of a collection through its ranged subscript or by
+/// calling methods like `prefix(_:)` or `suffix(from:)`. A slice of a
+/// collection can contain zero or more of the original collection's elements
+/// and shares the the original collection's semantics.
+///
+/// The following example, creates a `firstWord` constant by using the
+/// `prefix(_:)` method to get a slice of the `text` string's `characters`
+/// view.
+///
+///     let firstWord = text.characters.prefix(7)
+///     print(String(firstWord))
+///     // Prints "Buffalo"
+///
+/// You can retrieve the same slice using other methods, such as finding the
+/// terminating index, and then using the `prefix(upTo:)` method, which takes
+/// an index as its parameter, or by using the view's ranged subscript.
+///
+///     if let firstSpace = text.characters.index(of: " ") {
+///         print(text.characters.prefix(upTo: firstSpace))
+///         // Prints "Buffalo"
+///
+///         let start = text.characters.startIndex
+///         print(text.characters[start..<firstSpace])
+///         // Prints "Buffalo"
+///     }
+///
+/// The retrieved slice of `text.characters` is equivalent in each of these
+/// cases.
+///
+/// Slices Share Indices
+/// --------------------
+///
+/// A collection and its slices share the same indices. An element of a
+/// collection is located under the same index in a slice as in the base
+/// collection, as long as neither the collection nor the slice has been
+/// mutated since the slice was created.
+///
+/// For example, suppose you have an array holding the number of absences from
+/// each class during a session.
+///
+///     var absences = [0, 2, 0, 4, 0, 3, 1, 0]
+///
+/// You're tasked with finding the day with the most absences in the second
+/// half of the session. To find the index of the day in question, follow
+/// these steps:
+///
+/// 1) Create a slice of the `absences` array that holds the second half of the
+///    days.
+/// 2) Use the `max(by:)` method to determine the index of the day with the
+///    most absences.
+/// 3) Print the result using the index found in step 2 on the original
+///    `absences` array.
+///
+/// Here's an implementation of those steps:
+///
+///     let secondHalf = absences.suffix(absences.count / 2)
+///     if let i = secondHalf.indices.max(by: { secondHalf[$0] < secondHalf[$1] }) {
+///         print("Highest second-half absences: \(absences[i])")
+///     }
+///     // Prints "Highest second-half absences: 3"
+///
+/// Slice Inherit Collection Semantics
+/// ----------------------------------
+///
+/// A slice inherits the value or reference semantics of its base collection.
+/// That is, when working with a slice of a mutable
+/// collection that has value semantics, such as an array, mutating the
+/// original collection triggers a copy of that collection, and does not
+/// affect the contents of the slice.
+///
+/// For example, if you update the last element of the `absences` array from
+/// `0` to `2`, the `secondHalf` slice is unchanged.
+///
+///     absences[7] = 2
+///     print(absences)
+///     // Prints "[0, 2, 0, 4, 0, 3, 1, 2]"
+///     print(secondHalf)
+///     // Prints "[0, 3, 1, 0]"
+///
 /// Traversing a Collection
 /// =======================
 ///
@@ -536,7 +631,7 @@ public struct IndexingIterator<
 /// count the number of contained elements, accessing its `count` property is
 /// an O(*n*) operation.
 public protocol Collection : _Indexable, Sequence {
-  /// A type that can represent the number of steps between a pair of
+  /// A type that represents the number of steps between a pair of
   /// indices.
   associatedtype IndexDistance : SignedInteger = Int
 
@@ -544,11 +639,11 @@ public protocol Collection : _Indexable, Sequence {
   /// encapsulates its iteration state.
   ///
   /// By default, a collection conforms to the `Sequence` protocol by
-  /// supplying a `IndexingIterator` as its associated `Iterator`
+  /// supplying `IndexingIterator` as its associated `Iterator`
   /// type.
   associatedtype Iterator : IteratorProtocol = IndexingIterator<Self>
 
-  // FIXME: Needed here so that the `Iterator` is properly deduced from
+  // FIXME(ABI)#179 (Type checker): Needed here so that the `Iterator` is properly deduced from
   // a custom `makeIterator()` function.  Otherwise we get an
   // `IndexingIterator`. <rdar://problem/21539115>
   /// Returns an iterator over the elements of the collection.
@@ -593,6 +688,8 @@ public protocol Collection : _Indexable, Sequence {
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
+  ///
+  /// - Complexity: O(1)
   subscript(position: Index) -> Iterator.Element { get }
 
   /// Accesses a contiguous subrange of the collection's elements.
@@ -616,9 +713,11 @@ public protocol Collection : _Indexable, Sequence {
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get }
 
-  /// A type that can represent the indices that are valid for subscripting the
+  /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
   associatedtype Indices : _Indexable, Sequence = DefaultIndices<Self>
 
@@ -635,10 +734,10 @@ public protocol Collection : _Indexable, Sequence {
   /// order.
   ///
   /// A collection's `indices` property can hold a strong reference to the
-  /// collection itself, causing the collection to be non-uniquely referenced.
+  /// collection itself, causing the collection to be nonuniquely referenced.
   /// If you mutate the collection while iterating over its indices, a strong
-  /// reference can cause an unexpected copy of the collection. To avoid the
-  /// unexpected copy, use the `index(after:)` method starting with
+  /// reference can result in an unexpected copy of the collection. To avoid
+  /// the unexpected copy, use the `index(after:)` method starting with
   /// `startIndex` to produce indices instead.
   ///
   ///     var c = MyFancyCollection([10, 20, 30, 40, 50])
@@ -748,6 +847,11 @@ public protocol Collection : _Indexable, Sequence {
 
   /// The number of elements in the collection.
   ///
+  /// To check whether a collection is empty, use its `isEmpty` property
+  /// instead of comparing `count` to zero. Unless the collection guarantees
+  /// random-access performance, calculating `count` can be an O(*n*)
+  /// operation.
+  ///
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
   ///   of the collection.
@@ -783,8 +887,8 @@ public protocol Collection : _Indexable, Sequence {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -823,9 +927,9 @@ public protocol Collection : _Indexable, Sequence {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection, unless the index passed as
-  /// `limit` prevents offsetting beyond those bounds.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection, unless the index passed as `limit` prevents offsetting
+  /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -922,8 +1026,8 @@ extension _Indexable {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -964,9 +1068,9 @@ extension _Indexable {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection, unless the index passed as
-  /// `limit` prevents offsetting beyond those bounds.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection, unless the index passed as `limit` prevents offsetting
+  /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -991,8 +1095,8 @@ extension _Indexable {
 
   /// Offsets the given index by the specified distance.
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -1010,14 +1114,17 @@ extension _Indexable {
   /// Offsets the given index by the specified distance, or so that it equals
   /// the given limiting index.
   ///
-  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
-  /// before the `startIndex` of this collection, unless the index passed as
-  /// `limit` prevents offsetting beyond those bounds.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection, unless the index passed as `limit` prevents offsetting
+  /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
   ///   - n: The distance to offset `i`. `n` must not be negative unless the
   ///     collection conforms to the `BidirectionalCollection` protocol.
+  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
+  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
+  ///     limit that is greater than `i` has no effect.
   /// - Returns: `true` if `i` has been offset by exactly `n` steps without
   ///   going beyond `limit`; otherwise, `false`. When the return value is
   ///   `false`, the value of `i` is equal to `limit`.
@@ -1133,6 +1240,8 @@ extension Collection where SubSequence == Slice<Self> {
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
     return Slice(base: self, bounds: bounds)
@@ -1215,6 +1324,11 @@ extension Collection {
   }
 
   /// The number of elements in the collection.
+  ///
+  /// To check whether a collection is empty, use its `isEmpty` property
+  /// instead of comparing `count` to zero. Unless the collection guarantees
+  /// random-access performance, calculating `count` can be an O(*n*)
+  /// operation.
   ///
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length

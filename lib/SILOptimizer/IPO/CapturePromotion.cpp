@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -44,6 +44,7 @@
 
 #define DEBUG_TYPE "sil-capture-promotion"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/TypeSubstCloner.h"
@@ -82,7 +83,7 @@ public:
     uint64_t *Bits;
     unsigned NumBitWords; // Words per row.
 
-    ReachingBlockMatrix(): Bits(0), NumBitWords(0) {}
+    ReachingBlockMatrix() : Bits(nullptr), NumBitWords(0) {}
 
     bool empty() const { return !Bits; }
   };
@@ -96,7 +97,7 @@ public:
   }
   static void deallocateMatrix(ReachingBlockMatrix &M) {
     delete [] M.Bits;
-    M.Bits = 0;
+    M.Bits = nullptr;
     M.NumBitWords = 0;
   }
   static ReachingBlockSet allocateSet(unsigned NumBlocks) {
@@ -107,7 +108,7 @@ public:
   }
   static void deallocateSet(ReachingBlockSet &S) {
     delete [] S.Bits;
-    S.Bits = 0;
+    S.Bits = nullptr;
     S.NumBitWords = 0;
   }
 
@@ -116,7 +117,7 @@ private:
   unsigned NumBitWords;
 
 public:
-  ReachingBlockSet(): Bits(0), NumBitWords(0) {}
+  ReachingBlockSet() : Bits(nullptr), NumBitWords(0) {}
 
   ReachingBlockSet(unsigned BlockID, ReachingBlockMatrix &M)
     : Bits(&M.Bits[BlockID * M.NumBitWords]),
@@ -124,12 +125,16 @@ public:
 
   bool test(unsigned ID) const {
     assert(ID / BITWORD_SIZE < NumBitWords && "block ID out-of-bounds");
-    return Bits[ID / BITWORD_SIZE] & (1L << (ID % BITWORD_SIZE));
+    unsigned int modulus = ID % BITWORD_SIZE;
+    long shifted = 1L << modulus;
+    return Bits[ID / BITWORD_SIZE] & shifted;
   }
 
   void set(unsigned ID) {
+    unsigned int modulus = ID % BITWORD_SIZE;
+    long shifted = 1L << modulus;
     assert(ID / BITWORD_SIZE < NumBitWords && "block ID out-of-bounds");
-    Bits[ID / BITWORD_SIZE] |= 1L << (ID % BITWORD_SIZE);
+    Bits[ID / BITWORD_SIZE] |= shifted;
   }
 
   ReachingBlockSet &operator|=(const ReachingBlockSet &RHS) {
@@ -181,7 +186,7 @@ private:
   void compute();
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 
 namespace {
@@ -195,7 +200,7 @@ public:
   ClosureCloner(SILFunction *Orig, IsFragile_t Fragile,
                 StringRef ClonedName,
                 SubstitutionMap &InterfaceSubs,
-                ArrayRef<Substitution> ApplySubs,
+                SubstitutionList ApplySubs,
                 IndicesSet &PromotableIndices);
 
   void populateCloned();
@@ -230,7 +235,7 @@ private:
   llvm::DenseMap<SILArgument*, SILValue> BoxArgumentMap;
   llvm::DenseMap<ProjectBoxInst*, SILValue> ProjectBoxArgumentMap;
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 /// \brief Compute ReachabilityInfo so that it can answer queries about
 /// whether a given basic block in a function is reachable from another basic
@@ -312,7 +317,7 @@ ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) {
 ClosureCloner::ClosureCloner(SILFunction *Orig, IsFragile_t Fragile,
                              StringRef ClonedName,
                              SubstitutionMap &InterfaceSubs,
-                             ArrayRef<Substitution> ApplySubs,
+                             SubstitutionList ApplySubs,
                              IndicesSet &PromotableIndices)
   : TypeSubstCloner<ClosureCloner>(
                            *initCloned(Orig, Fragile, ClonedName, InterfaceSubs,
@@ -333,9 +338,8 @@ static void
 computeNewArgInterfaceTypes(SILFunction *F,
                             IndicesSet &PromotableIndices,
                             SmallVectorImpl<SILParameterInfo> &OutTys) {
-  auto FunctionTy = F->getLoweredFunctionType();
-  auto Parameters = FunctionTy->getParameters();
-  auto NumIndirectResults = FunctionTy->getNumIndirectResults();
+  auto fnConv = F->getConventions();
+  auto Parameters = fnConv.funcTy->getParameters();
 
   DEBUG(llvm::dbgs() << "Preparing New Args!\n");
 
@@ -346,7 +350,7 @@ computeNewArgInterfaceTypes(SILFunction *F,
     // The PromotableIndices index is expressed as the argument index (num
     // indirect result + param index). Add back the num indirect results to get
     // the arg index when working with PromotableIndices.
-    unsigned ArgIndex = Index + NumIndirectResults;
+    unsigned ArgIndex = Index + fnConv.getSILArgIndexOfFirstParam();
 
     DEBUG(llvm::dbgs() << "Index: " << Index << "; PromotableIndices: "
           << (PromotableIndices.count(ArgIndex)?"yes":"no")
@@ -359,12 +363,16 @@ computeNewArgInterfaceTypes(SILFunction *F,
     
     // Perform the proper conversions and then add it to the new parameter list
     // for the type.
-    assert(!isIndirectParameter(param.getConvention()));
-    auto paramBoxedTy = param.getSILType().castTo<SILBoxType>()
-      ->getBoxedAddressType();
+    assert(!param.isFormalIndirect());
+    auto paramTy = param.getSILStorageType();
+    auto paramBoxTy = paramTy.castTo<SILBoxType>();
+    assert(paramBoxTy->getLayout()->getFields().size() == 1
+           && "promoting compound box not implemented yet");
+    auto paramBoxedTy = paramBoxTy->getFieldType(F->getModule(), 0);
     auto &paramTL = F->getModule().Types.getTypeLowering(paramBoxedTy);
+
     ParameterConvention convention;
-    if (paramTL.isPassedIndirectly()) {
+    if (paramTL.isFormallyPassedIndirectly()) {
       convention = ParameterConvention::Indirect_In;
     } else if (paramTL.isTrivial()) {
       convention = ParameterConvention::Direct_Unowned;
@@ -380,26 +388,23 @@ static std::string getSpecializedName(SILFunction *F,
                                       IsFragile_t Fragile,
                                       IndicesSet &PromotableIndices) {
   Mangle::Mangler M;
-  auto P = SpecializationPass::CapturePromotion;
-  FunctionSignatureSpecializationMangler FSSM(P, M, Fragile, F);
-  CanSILFunctionType FTy = F->getLoweredFunctionType();
+  auto P = Demangle::SpecializationPass::CapturePromotion;
+  FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
+  NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
+  auto fnConv = F->getConventions();
 
-  ArrayRef<SILParameterInfo> Parameters = FTy->getParameters();
-  auto NumIndirectResults = FTy->getNumIndirectResults();
-
-  for (unsigned Index : indices(Parameters)) {
-    // The PromotableIndices index is expressed as the argument index (num
-    // indirect result + param index). Add back the num indirect results to get
-    // the arg index when working with PromotableIndices.
-    unsigned ArgIndex = Index + NumIndirectResults;
-    if (!PromotableIndices.count(ArgIndex))
+  for (unsigned argIdx = 0, endIdx = fnConv.getNumSILArguments();
+       argIdx < endIdx; ++argIdx) {
+    if (!PromotableIndices.count(argIdx))
       continue;
-    FSSM.setArgumentBoxToValue(Index);
+    OldFSSM.setArgumentBoxToValue(argIdx);
+    NewFSSM.setArgumentBoxToValue(argIdx);
   }
 
-  FSSM.mangle();
-
-  return M.finalize();
+  OldFSSM.mangle();
+  std::string Old = M.finalize();
+  std::string New = NewFSSM.mangle();
+  return NewMangling::selectMangling(Old, New);
 }
 
 /// \brief Create the function corresponding to the clone of the original
@@ -422,20 +427,16 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
   SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
   computeNewArgInterfaceTypes(Orig, PromotableIndices, ClonedInterfaceArgTys);
 
-  Module *SM = M.getSwiftModule();
   SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
 
   // Create the thin function type for the cloned closure.
-  auto ClonedTy =
-    SILFunctionType::get(OrigFTI->getGenericSignature(),
-                         OrigFTI->getExtInfo(),
-                         OrigFTI->getCalleeConvention(),
-                         ClonedInterfaceArgTys,
-                         OrigFTI->getAllResults(),
-                         OrigFTI->getOptionalErrorResult(),
-                         M.getASTContext());
+  auto ClonedTy = SILFunctionType::get(
+      OrigFTI->getGenericSignature(), OrigFTI->getExtInfo(),
+      OrigFTI->getCalleeConvention(), ClonedInterfaceArgTys,
+      OrigFTI->getResults(), OrigFTI->getOptionalErrorResult(),
+      M.getASTContext());
 
-  auto SubstTy = SILType::substFuncType(M, SM, InterfaceSubs.getMap(), ClonedTy,
+  auto SubstTy = SILType::substFuncType(M, InterfaceSubs, ClonedTy,
                                         /* dropGenerics = */ false);
   
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
@@ -454,7 +455,6 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
   if (Orig->hasUnqualifiedOwnership()) {
     Fn->setUnqualifiedOwnership();
   }
-  Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;
 }
 
@@ -463,20 +463,21 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
 void
 ClosureCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
-  SILModule &M = Cloned->getModule();
 
   // Create arguments for the entry block
   SILBasicBlock *OrigEntryBB = &*Orig->begin();
-  SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
+  SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   unsigned ArgNo = 0;
-  auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
+  auto I = OrigEntryBB->args_begin(), E = OrigEntryBB->args_end();
   while (I != E) {
     if (PromotableIndices.count(ArgNo)) {
       // Handle the case of a promoted capture argument.
-      auto BoxedTy = (*I)->getType().castTo<SILBoxType>()->getBoxedAddressType()
-        .getObjectType();
+      auto BoxTy = (*I)->getType().castTo<SILBoxType>();
+      assert(BoxTy->getLayout()->getFields().size() == 1
+             && "promoting compound box not implemented");
+      auto BoxedTy = BoxTy->getFieldType(Cloned->getModule(),0).getObjectType();
       SILValue MappedValue =
-        new (M) SILArgument(ClonedEntryBB, BoxedTy, (*I)->getDecl());
+          ClonedEntryBB->createFunctionArgument(BoxedTy, (*I)->getDecl());
       BoxArgumentMap.insert(std::make_pair(*I, MappedValue));
       
       // Track the projections of the box.
@@ -487,8 +488,8 @@ ClosureCloner::populateCloned() {
       }
     } else {
       // Otherwise, create a new argument which copies the original argument
-      SILValue MappedValue =
-        new (M) SILArgument(ClonedEntryBB, (*I)->getType(), (*I)->getDecl());
+      SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
+          (*I)->getType(), (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
     }
     ++ArgNo;
@@ -610,7 +611,7 @@ ClosureCloner::visitLoadInst(LoadInst *Inst) {
 static SILArgument *getBoxFromIndex(SILFunction *F, unsigned Index) {
   assert(F->isDefinition() && "Expected definition not external declaration!");
   auto &Entry = F->front();
-  return Entry.getBBArg(Index);
+  return Entry.getArgument(Index);
 }
 
 /// \brief Given a partial_apply instruction and the argument index into its
@@ -705,9 +706,9 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
   // indirect return, but counts as a possible mutation in both cases.
   if (auto *AI = dyn_cast<ApplyInst>(U)) {
     auto argIndex = O->getOperandNumber()-1;
-    auto convention =
-      AI->getSubstCalleeType()->getSILArgumentConvention(argIndex);
-    if (isIndirectConvention(convention)) {
+    SILFunctionConventions substConv(AI->getSubstCalleeType(), AI->getModule());
+    auto convention = substConv.getSILArgumentConvention(argIndex);
+    if (convention.isIndirectConvention()) {
       Mutations.push_back(AI);
       return true;
     }
@@ -725,13 +726,13 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
   return false;
 }
 
-static bool signatureHasDependentTypes(SILFunctionType &CalleeTy) {
-  for (auto Result : CalleeTy.getAllResults())
-    if (Result.getType()->hasTypeParameter())
-      return true;
+static bool signatureHasDependentTypes(SILFunction *Callee) {
+  SILFunctionConventions conventions = Callee->getConventions();
+  if (conventions.getSILResultType().hasTypeParameter())
+    return true;
 
-  for (auto ParamTy : CalleeTy.getParameterSILTypes())
-    if (ParamTy.hasTypeParameter())
+  for (auto Param : conventions.funcTy->getParameters())
+    if (conventions.getSILType(Param).hasTypeParameter())
       return true;
 
   return false;
@@ -758,20 +759,19 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       if (IM.count(PAI))
         return false;
 
-      auto Callee = PAI->getCallee();
-      auto CalleeTy = Callee->getType().castTo<SILFunctionType>();
-
       // Bail if the signature has any dependent types as we do not
       // currently support these.
-      if (signatureHasDependentTypes(*CalleeTy))
+      if (signatureHasDependentTypes(PAI->getCalleeFunction()))
         return false;
 
+      SILModule &M = PAI->getModule();
       auto closureType = PAI->getType().castTo<SILFunctionType>();
+      SILFunctionConventions closureConv(closureType, M);
 
       // Calculate the index into the closure's argument list of the captured
       // box pointer (the captured address is always the immediately following
       // index so is not stored separately);
-      unsigned Index = OpNo - 1 + closureType->getNumSILArguments();
+      unsigned Index = OpNo - 1 + closureConv.getNumSILArguments();
 
       auto *Fn = PAI->getReferencedFunction();
       if (!Fn || !Fn->isDefinition())
@@ -782,9 +782,10 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       // For now, return false is the address argument is an address-only type,
       // since we currently handle loadable types only.
       // TODO: handle address-only types
-      SILModule &M = PAI->getModule();
-      if (BoxArg->getType().castTo<SILBoxType>()->getBoxedAddressType()
-            .isAddressOnly(M))
+      auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
+      assert(BoxTy->getLayout()->getFields().size() == 1
+             && "promoting compound box not implemented yet");
+      if (BoxTy->getFieldType(M, 0).isAddressOnly(M))
         return false;
 
       // Verify that this closure is known not to mutate the captured value; if
@@ -917,12 +918,13 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   // Populate the argument list for a new partial_apply instruction, taking into
   // consideration any captures.
   auto CalleeFunctionTy = PAI->getCallee()->getType().castTo<SILFunctionType>();
+  SILFunctionConventions calleeConv(CalleeFunctionTy, M);
   auto CalleePInfo = CalleeFunctionTy->getParameters();
-  unsigned FirstIndex =
-      PAI->getType().castTo<SILFunctionType>()->getNumSILArguments();
+  SILFunctionConventions paConv(PAI->getType().castTo<SILFunctionType>(), M);
+  unsigned FirstIndex = paConv.getNumSILArguments();
   unsigned OpNo = 1, OpCount = PAI->getNumOperands();
   SmallVector<SILValue, 16> Args;
-  auto NumIndirectResults = CalleeFunctionTy->getNumIndirectResults();
+  auto NumIndirectResults = calleeConv.getNumIndirectSILResults();
   while (OpNo != OpCount) {
     unsigned Index = OpNo - 1 + FirstIndex;
     if (PromotableIndices.count(Index)) {
@@ -930,8 +932,8 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
       AllocBoxInst *ABI = cast<AllocBoxInst>(BoxValue);
 
       SILParameterInfo CPInfo = CalleePInfo[Index - NumIndirectResults];
-      assert(CPInfo.getSILType() == BoxValue->getType() &&
-             "SILType of parameter info does not match type of parameter");
+      assert(calleeConv.getSILType(CPInfo) == BoxValue->getType()
+             && "SILType of parameter info does not match type of parameter");
       // Cleanup the captured argument.
       releasePartialApplyCapturedArg(B, PAI->getLoc(), BoxValue,
                                      CPInfo);

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -109,14 +109,10 @@ getNode(ValueBase *V, EscapeAnalysis *EA, bool createIfNeeded) {
   
   CGNode * &Node = Values2Nodes[V];
   if (!Node) {
-    if (SILArgument *Arg = dyn_cast<SILArgument>(V)) {
-      if (Arg->isFunctionArg()) {
-        Node = allocNode(V, NodeType::Argument);
-        if (!isSummaryGraph)
-          Node->mergeEscapeState(EscapeState::Arguments);
-      } else {
-        Node = allocNode(V, NodeType::Value);
-      }
+    if (isa<SILFunctionArgument>(V)) {
+      Node = allocNode(V, NodeType::Argument);
+      if (!isSummaryGraph)
+        Node->mergeEscapeState(EscapeState::Arguments);
     } else {
       Node = allocNode(V, NodeType::Value);
     }
@@ -386,7 +382,7 @@ void EscapeAnalysis::ConnectionGraph::propagateEscapeStates() {
 void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
   // First scan the whole function and add relevant instructions as use-points.
   for (auto &BB : *F) {
-    for (SILArgument *BBArg : BB.getBBArgs()) {
+    for (SILArgument *BBArg : BB.getArguments()) {
       /// In addition to releasing instructions (see below) we also add block
       /// arguments as use points. In case of loops, block arguments can
       /// "extend" the liferange of a reference in upward direction.
@@ -732,7 +728,6 @@ namespace llvm {
   /// GraphTraits specialization so the CGForDotView can be
   /// iterable by generic graph iterators.
   template <> struct GraphTraits<CGForDotView::Node *> {
-    typedef CGForDotView::Node NodeType;
     typedef CGForDotView::child_iterator ChildIteratorType;
     typedef CGForDotView::Node *NodeRef;
 
@@ -752,11 +747,13 @@ namespace llvm {
 
     static NodeRef getEntryNode(GraphType F) { return nullptr; }
 
-    typedef CGForDotView::iterator nodes_iterator;
+    typedef pointer_iterator<CGForDotView::iterator> nodes_iterator;
     static nodes_iterator nodes_begin(GraphType OCG) {
-      return OCG->Nodes.begin();
+      return nodes_iterator(OCG->Nodes.begin());
     }
-    static nodes_iterator nodes_end(GraphType OCG) { return OCG->Nodes.end(); }
+    static nodes_iterator nodes_end(GraphType OCG) {
+      return nodes_iterator(OCG->Nodes.end());
+    }
     static unsigned size(GraphType CG) { return CG->Nodes.size(); }
   };
 
@@ -789,9 +786,11 @@ namespace llvm {
         case CGForDotView::PointsTo: return "";
         case CGForDotView::Deferred: return "color=\"gray\"";
       }
+
+      llvm_unreachable("Unhandled CGForDotView in switch.");
     }
   };
-} // end llvm namespace
+} // namespace llvm
 
 #endif
 
@@ -823,6 +822,8 @@ const char *EscapeAnalysis::CGNode::getTypeStr() const {
     case NodeType::Argument:   return "Arg";
     case NodeType::Return:     return "Ret";
   }
+
+  llvm_unreachable("Unhandled NodeType in switch.");
 }
 
 void EscapeAnalysis::ConnectionGraph::dump() const {
@@ -989,7 +990,7 @@ static bool linkBBArgs(SILBasicBlock *BB) {
     return false;
   // We don't need to link to the try_apply's normal result argument, because
   // we handle it separately in setAllEscaping() and mergeCalleeGraph().
-  if (SILBasicBlock *SinglePred = BB->getSinglePredecessor()) {
+  if (SILBasicBlock *SinglePred = BB->getSinglePredecessorBlock()) {
     auto *TAI = dyn_cast<TryApplyInst>(SinglePred->getTerminator());
     if (TAI && BB == TAI->getNormalBB())
       return false;
@@ -1022,7 +1023,7 @@ static bool isOrContainsReference(SILType Ty, SILModule *Mod) {
   }
   if (auto En = Ty.getEnumOrBoundGenericEnum()) {
     for (auto *ElemDecl : En->getAllElements()) {
-      if (ElemDecl->hasArgumentType() &&
+      if (ElemDecl->getArgumentInterfaceType() &&
           isOrContainsReference(Ty.getEnumElementType(ElemDecl, *Mod), Mod))
         return true;
     }
@@ -1083,7 +1084,7 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
 
     // Create defer-edges from the block arguments to it's values in the
     // predecessor's terminator instructions.
-    for (SILArgument *BBArg : BB.getBBArgs()) {
+    for (SILArgument *BBArg : BB.getArguments()) {
       CGNode *ArgNode = ConGraph->getNode(BBArg, this);
       if (!ArgNode)
         continue;
@@ -1156,14 +1157,13 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
     // The object is local, but we cannot determine its type.
     return false;
   }
-  // If Ty is a an optional, its deallocation is equivalent to the deallocation
+  // If Ty is an optional, its deallocation is equivalent to the deallocation
   // of its payload.
   // TODO: Generalize it. Destructor of an aggregate type is equivalent to calling
   // destructors for its components.
   while (Ty.getSwiftRValueType()->getAnyOptionalObjectType())
     Ty = M.Types.getLoweredType(Ty.getSwiftRValueType()
-                                    ->getAnyOptionalObjectType()
-                                    .getCanonicalTypeOrNull());
+                                  .getAnyOptionalObjectType());
   auto Class = Ty.getSwiftRValueType().getClassOrBoundGenericClass();
   if (!Class || !Class->hasDestructor())
     return false;
@@ -1268,12 +1268,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         break;
     }
 
-    if (FAS.getReferencedFunction() &&
-        FAS.getReferencedFunction()->hasSemanticsAttr(
-            "self_no_escaping_closure") &&
-        ((FAS.hasIndirectResults() && FAS.getNumArguments() == 3) ||
-         (!FAS.hasIndirectResults() && FAS.getNumArguments() == 2)) &&
-        FAS.hasSelfArgument()) {
+    if (FAS.getReferencedFunction()
+        && FAS.getReferencedFunction()->hasSemanticsAttr(
+               "self_no_escaping_closure")
+        && ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3)
+            || (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 2))
+        && FAS.hasSelfArgument()) {
       // The programmer has guaranteed that the closure will not capture the
       // self pointer passed to it or anything that is transitively reachable
       // from the pointer.
@@ -1283,12 +1283,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       return;
     }
 
-    if (FAS.getReferencedFunction() &&
-        FAS.getReferencedFunction()->hasSemanticsAttr(
-            "pair_no_escaping_closure") &&
-        ((FAS.hasIndirectResults() && FAS.getNumArguments() == 4) ||
-         (!FAS.hasIndirectResults() && FAS.getNumArguments() == 3)) &&
-        FAS.hasSelfArgument()) {
+    if (FAS.getReferencedFunction()
+        && FAS.getReferencedFunction()->hasSemanticsAttr(
+               "pair_no_escaping_closure")
+        && ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 4)
+            || (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3))
+        && FAS.hasSelfArgument()) {
       // The programmer has guaranteed that the closure will not capture the
       // self pointer passed to it or anything that is transitively reachable
       // from the pointer.
@@ -1591,8 +1591,8 @@ bool EscapeAnalysis::deinitIsKnownToNotCapture(SILValue V) {
 void EscapeAnalysis::setAllEscaping(SILInstruction *I,
                                     ConnectionGraph *ConGraph) {
   if (auto *TAI = dyn_cast<TryApplyInst>(I)) {
-    setEscapesGlobal(ConGraph, TAI->getNormalBB()->getBBArg(0));
-    setEscapesGlobal(ConGraph, TAI->getErrorBB()->getBBArg(0));
+    setEscapesGlobal(ConGraph, TAI->getNormalBB()->getArgument(0));
+    setEscapesGlobal(ConGraph, TAI->getErrorBB()->getArgument(0));
   }
   // Even if the instruction does not write memory we conservatively set all
   // operands to escaping, because they may "escape" to the result value in
@@ -1740,7 +1740,7 @@ bool EscapeAnalysis::mergeCalleeGraph(SILInstruction *AS,
   if (CGNode *RetNd = CalleeGraph->getReturnNodeOrNull()) {
     ValueBase *CallerReturnVal = nullptr;
     if (auto *TAI = dyn_cast<TryApplyInst>(AS)) {
-      CallerReturnVal = TAI->getNormalBB()->getBBArg(0);
+      CallerReturnVal = TAI->getNormalBB()->getArgument(0);
     } else {
       CallerReturnVal = AS;
     }

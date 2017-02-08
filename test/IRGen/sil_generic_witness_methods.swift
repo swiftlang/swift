@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -13,7 +13,7 @@ protocol P {
 
 struct S {}
 
-// CHECK-LABEL: define hidden void @_TF27sil_generic_witness_methods12call_methods{{.*}}(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U, i8** %T.P)
+// CHECK-LABEL: define hidden void @_T027sil_generic_witness_methods05call_D0{{[_0-9a-zA-Z]*}}F(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U, i8** %T.P)
 func call_methods<T: P, U>(_ x: T, y: S, z: U) {
   // CHECK: [[STATIC_METHOD_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.P, i32 1
   // CHECK: [[STATIC_METHOD_PTR:%.*]] = load i8*, i8** [[STATIC_METHOD_ADDR]], align 8
@@ -28,7 +28,7 @@ func call_methods<T: P, U>(_ x: T, y: S, z: U) {
   // CHECK: [[GENERIC_METHOD_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.P, i32 2
   // CHECK: [[GENERIC_METHOD_PTR:%.*]] = load i8*, i8** [[GENERIC_METHOD_ADDR]], align 8
   // CHECK: [[GENERIC_METHOD:%.*]] = bitcast i8* [[GENERIC_METHOD_PTR]] to void (%swift.opaque*, %swift.type*, %swift.opaque*, %swift.type*, i8**)*
-  // CHECK: call void [[GENERIC_METHOD]](%swift.opaque* noalias nocapture {{.*}}, %swift.type* {{.*}} @_TMfV27sil_generic_witness_methods1S, {{.*}} %swift.opaque* {{.*}}, %swift.type* %T, i8** %T.P)
+  // CHECK: call void [[GENERIC_METHOD]](%swift.opaque* noalias nocapture {{.*}}, %swift.type* {{.*}} @_T027sil_generic_witness_methods1SVMf, {{.*}} %swift.opaque* {{.*}}, %swift.type* %T, i8** %T.P)
   x.generic_method(y)
   // CHECK: [[GENERIC_METHOD_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.P, i32 2
   // CHECK: [[GENERIC_METHOD_PTR:%.*]] = load i8*, i8** [[GENERIC_METHOD_ADDR]], align 8
@@ -37,7 +37,7 @@ func call_methods<T: P, U>(_ x: T, y: S, z: U) {
   x.generic_method(z)
 }
 
-// CHECK-LABEL: define hidden void @_TF27sil_generic_witness_methods24call_existential_methods{{.*}}(%P27sil_generic_witness_methods1P_* noalias nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define hidden void @_T027sil_generic_witness_methods017call_existential_D0{{[_0-9a-zA-Z]*}}F(%P27sil_generic_witness_methods1P_* noalias nocapture dereferenceable({{.*}}))
 func call_existential_methods(_ x: P, y: S) {
   // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %P27sil_generic_witness_methods1P_, %P27sil_generic_witness_methods1P_* [[X:%0]], i32 0, i32 1
   // CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]], align 8
@@ -55,6 +55,6 @@ func call_existential_methods(_ x: P, y: S) {
   // CHECK: [[GENERIC_METHOD_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[WTABLE]], i32 2
   // CHECK: [[GENERIC_METHOD_PTR:%.*]] = load i8*, i8** [[GENERIC_METHOD_ADDR]], align 8
   // CHECK: [[GENERIC_METHOD:%.*]] = bitcast i8* [[GENERIC_METHOD_PTR]] to void (%swift.opaque*, %swift.type*, %swift.opaque*, %swift.type*, i8**)*
-  // CHECK: call void [[GENERIC_METHOD]](%swift.opaque* noalias nocapture {{.*}}, %swift.type* {{.*}} @_TMfV27sil_generic_witness_methods1S, {{.*}} %swift.opaque* noalias nocapture {{%.*}}, %swift.type* [[METADATA]], i8** [[WTABLE]])
+  // CHECK: call void [[GENERIC_METHOD]](%swift.opaque* noalias nocapture {{.*}}, %swift.type* {{.*}} @_T027sil_generic_witness_methods1SVMf, {{.*}} %swift.opaque* noalias nocapture {{%.*}}, %swift.type* [[METADATA]], i8** [[WTABLE]])
   x.generic_method(y)
 }

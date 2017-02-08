@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 protocol P {
   associatedtype SomeType
@@ -204,7 +204,7 @@ func validateSaveButton(_ text: String) {
 // <rdar://problem/20201968> QoI: poor diagnostic when calling a class method via a metatype
 class r20201968C {
   func blah() {
-    r20201968C.blah()  // expected-error {{use of instance member 'blah' on type 'r20201968C'; did you mean to use a value of type 'r20201968C' instead?}}
+    r20201968C.blah()  // expected-error {{instance member 'blah' cannot be used on type 'r20201968C'; did you mean to use a value of this type instead?}}
   }
 }
 
@@ -363,12 +363,12 @@ c.method2(1.0)(2.0) // expected-error {{cannot convert value of type 'Double' to
 CurriedClass.method1(c)()
 _ = CurriedClass.method1(c)
 CurriedClass.method1(c)(1)         // expected-error {{argument passed to call that takes no arguments}}
-CurriedClass.method1(2.0)(1)       // expected-error {{use of instance member 'method1' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
+CurriedClass.method1(2.0)(1)       // expected-error {{instance member 'method1' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
 
 CurriedClass.method2(c)(32)(b: 1) // expected-error{{extraneous argument label 'b:' in call}}
 _ = CurriedClass.method2(c)
 _ = CurriedClass.method2(c)(32)
-_ = CurriedClass.method2(1,2)      // expected-error {{use of instance member 'method2' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
+_ = CurriedClass.method2(1,2)      // expected-error {{instance member 'method2' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
 CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method2(c)(1)(1.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{extraneous argument label 'c:'}}
@@ -377,7 +377,7 @@ CurriedClass.method3(c)(32, b: 1)
 _ = CurriedClass.method3(c)
 _ = CurriedClass.method3(c)(1, 2)        // expected-error {{missing argument label 'b:' in call}} {{32-32=b: }}
 _ = CurriedClass.method3(c)(1, b: 2)(32) // expected-error {{cannot call value of non-function type '()'}}
-_ = CurriedClass.method3(1, 2)           // expected-error {{use of instance member 'method3' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
+_ = CurriedClass.method3(1, 2)           // expected-error {{instance member 'method3' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
 CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method3(c)(1)               // expected-error {{missing argument for parameter 'b' in call}}
 
@@ -400,11 +400,11 @@ extension CurriedClass {
 }
 
 // <rdar://problem/23718816> QoI: "Extra argument" error when accidentally currying a method
-CurriedClass.m1(2, b: 42)   // expected-error {{use of instance member 'm1' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
+CurriedClass.m1(2, b: 42)   // expected-error {{instance member 'm1' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
 
 
 // <rdar://problem/22108559> QoI: Confusing error message when calling an instance method as a class method
-CurriedClass.m2(12)  // expected-error {{use of instance member 'm2' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
+CurriedClass.m2(12)  // expected-error {{instance member 'm2' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
 
 
 
@@ -829,9 +829,13 @@ func foo1255_2() -> Int {
 
 // SR-2505: "Call arguments did not match up" assertion
 
+// Here we're simulating the busted Swift 3 behavior -- see
+// test/Constraints/diagnostics_swift4.swift for the correct
+// behavior.
+
 func sr_2505(_ a: Any) {} // expected-note {{}}
 sr_2505()          // expected-error {{missing argument for parameter #1 in call}}
-sr_2505(a: 1)      // expected-error {{extraneous argument label 'a:' in call}}
+sr_2505(a: 1)      // FIXME: emit a warning saying this becomes an error in Swift 4
 sr_2505(1, 2)      // expected-error {{extra argument in call}}
 sr_2505(a: 1, 2)   // expected-error {{extra argument in call}}
 
@@ -851,7 +855,8 @@ extension C_2505 {
 class C2_2505: P_2505 {
 }
 
-let c_2505 = C_2505(arg: [C2_2505()]) // expected-error {{argument labels '(arg:)' do not match any available overloads}} expected-note {{overloads for 'C_2505' exist}}
+// FIXME: emit a warning saying this becomes an error in Swift 4
+let c_2505 = C_2505(arg: [C2_2505()])
 
 // Diagnostic message for initialization with binary operations as right side
 let foo1255_3: String = 1 + 2 + 3 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
@@ -905,3 +910,18 @@ let _ = SR_2164<Int, Bool>(a: 0)    // Ok
 let _ = SR_2164<Int, Bool>(b: true) // Ok
 SR_2164<Int, Bool, Float>(a: 0) // expected-error {{generic type 'SR_2164' specialized with too many type parameters (got 3, but expected 2)}}
 SR_2164<Int, Bool, Float>(b: 0) // expected-error {{generic type 'SR_2164' specialized with too many type parameters (got 3, but expected 2)}}
+
+// <rdar://problem/29850459> Swift compiler misreports type error in ternary expression
+
+let r29850459_flag = true
+let r29850459_a: Int = 0
+let r29850459_b: Int = 1
+func r29850459() -> Bool { return false }
+let _ = (r29850459_flag ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
+// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+let _ = ({ true }() ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
+// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+let _ = (r29850459() ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
+// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+let _ = ((r29850459_flag || r29850459()) ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
+// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}

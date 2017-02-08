@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime
 
 import Swift
 
@@ -40,7 +40,7 @@ struct SomeError: Error {
 // CHECK-LABEL: define{{( protected)?}} %swift.error* @alloc_boxed_existential_concrete
 sil @alloc_boxed_existential_concrete : $@convention(thin) (@owned SomeError) -> @owned Error {
 entry(%x : $SomeError):
-  // CHECK: [[BOX_PAIR:%.*]] = call { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* {{.*}} @_TMfV17boxed_existential9SomeError, {{.*}}, i8** {{%.*|@_TWPV17boxed_existential9SomeErrors5ErrorS_}}, %swift.opaque* null, i1 false)
+  // CHECK: [[BOX_PAIR:%.*]] = call { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* {{.*}} @_T017boxed_existential9SomeErrorVMf, {{.*}}, i8** {{%.*|@_T017boxed_existential9SomeErrorVs0D0AAWP}}, %swift.opaque* null, i1 false)
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 0
   // CHECK: [[OPAQUE_ADDR:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 1
   // CHECK: [[ADDR:%.*]] = bitcast %swift.opaque* [[OPAQUE_ADDR]] to %V17boxed_existential9SomeError*
@@ -57,6 +57,19 @@ entry(%b : $Error):
   // CHECK: call void @swift_deallocError(%swift.error* %0, %swift.type* %T)
   dealloc_existential_box %b : $Error, $T
   return undef : $()
+}
+
+struct Str : Error { }
+
+// CHECK-LABEL: define{{( protected)?}} void @alloc_deallc_box_with_concrete_type
+sil @alloc_deallc_box_with_concrete_type : $@convention(thin) () -> () {
+bb0:
+  // CHECK: call {{.*}} @swift_allocError
+  %b = alloc_existential_box $Error, $Str
+  // CHECK: call void @swift_deallocError
+  dealloc_existential_box %b : $Error, $Str
+  %r = tuple ()
+  return %r : $()
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{i[0-9]+}} @project_boxed_existential(%swift.error*)
@@ -107,7 +120,7 @@ entry(%b : $Error):
   // CHECK: [[ADDR:%.*]] = load {{.*}} [[OUT_ADDR]]
   // CHECK: [[OUT_TYPE:%.*]] = getelementptr inbounds {{.*}} [[OUT]], i32 0, i32 1
   // CHECK: [[TYPE:%.*]] = load {{.*}} [[OUT_TYPE]]
-  // CHECK: [[DYNAMIC_TYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* [[ADDR]], %swift.type* [[TYPE]])
+  // CHECK: [[DYNAMIC_TYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* [[ADDR]], %swift.type* [[TYPE]], i1 true)
   // CHECK: [[OUT_WITNESS:%.*]] = getelementptr inbounds {{.*}} [[OUT]], i32 0, i32 2
   // CHECK: [[WITNESS:%.*]] = load {{.*}} [[OUT_WITNESS]]
   %m = existential_metatype $@thick Error.Type, %b : $Error

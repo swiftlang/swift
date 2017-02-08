@@ -16,7 +16,7 @@
 // PRINT-CLASS-NEXT:   }
 // PRINT-CLASS-NEXT: }
 
-// RUN: %target-parse-verify-swift -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules
 // REQUIRES: objc_interop
 
 import Foundation

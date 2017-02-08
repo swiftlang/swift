@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,6 +19,13 @@
 ///   Id, and the name of its base class (in the SILValue hierarchy) is Parent.
 #ifndef VALUE
 #define VALUE(Id, Parent)
+#endif
+
+/// ARGUMENT(Id, Parent)
+///   The expression enumerator value is a ValueKind. The node's class name is
+///   Id and the name of its base class (in the SILValue hierarchy) is Parent.
+#ifndef ARGUMENT
+#define ARGUMENT(Id, Parent) VALUE(Id, Parent)
 #endif
 
 /// INST(Id, Parent, TextualName, MemBehavior, MayRelease)
@@ -46,9 +53,8 @@
       INST(Id, Parent, TextualName, MemBehavior, MayRelease)
 #endif
 
-/// An abstract instruction is an abstract base class in the hierarchy;
-/// it is never a most-derived type, and it does not have an enumerator in
-/// ValueKind.
+/// An abstract value base is an abstract base class in the hierarchy; it is
+/// never a most-derived type, and it does not have an enumerator in ValueKind.
 ///
 /// Most metaprograms do not care about abstract expressions, so the default
 /// is to ignore them.
@@ -62,7 +68,11 @@
 #define VALUE_RANGE(Id, First, Last)
 #endif
 
-VALUE(SILArgument, ValueBase)
+ABSTRACT_VALUE(SILArgument, ValueBase)
+  ARGUMENT(SILPHIArgument, SILArgument)
+  ARGUMENT(SILFunctionArgument, SILArgument)
+  VALUE_RANGE(SILArgument, SILPHIArgument, SILFunctionArgument)
+
 VALUE(SILUndef, ValueBase)
 
 // Please keep the order of instructions consistent with the order of their
@@ -95,10 +105,13 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Accessing memory
   INST(LoadInst, SILInstruction, load, MayRead, DoesNotRelease)
   INST(LoadBorrowInst, SILInstruction, load_borrow, MayRead, DoesNotRelease)
+  INST(BeginBorrowInst, SILInstruction, begin_borrow, MayHaveSideEffects, DoesNotRelease)
   INST(EndBorrowInst, SILInstruction, end_borrow, MayHaveSideEffects, DoesNotRelease)
+  INST(EndBorrowArgumentInst, SILInstruction, end_borrow_argument, MayHaveSideEffects, DoesNotRelease)
   INST(LoadUnownedInst, SILInstruction, load_unowned, MayRead, DoesNotRelease)
   INST(LoadWeakInst, SILInstruction, load_weak, MayRead, DoesNotRelease)
   INST(StoreInst, SILInstruction, store, MayWrite, DoesNotRelease)
+  INST(StoreBorrowInst, SILInstruction, store_borrow, MayWrite, DoesNotRelease)
   INST(AssignInst, SILInstruction, assign, MayWrite, DoesNotRelease)
   INST(MarkUninitializedInst, SILInstruction, mark_uninitialized, None, DoesNotRelease)
   INST(MarkUninitializedBehaviorInst, SILInstruction, mark_uninitialized_behavior, None, DoesNotRelease)
@@ -146,6 +159,10 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(MarkDependenceInst, SILInstruction, mark_dependence, None, DoesNotRelease)
   INST(CopyBlockInst, SILInstruction, copy_block, MayHaveSideEffects, DoesNotRelease)
   INST(CopyValueInst, SILInstruction, copy_value, MayHaveSideEffects, DoesNotRelease)
+  INST(UnmanagedRetainValueInst, RefCountingInst, unmanaged_retain_value, MayHaveSideEffects, DoesNotRelease)
+  INST(UnmanagedReleaseValueInst, RefCountingInst, unmanaged_release_value, MayHaveSideEffects, MayRelease)
+  INST(UnmanagedAutoreleaseValueInst, RefCountingInst, unmanaged_autorelease_value, MayHaveSideEffects, DoesNotRelease)
+  INST(CopyUnownedValueInst, SILInstruction, copy_unowned_value, MayHaveSideEffects, DoesNotRelease)
   INST(DestroyValueInst, SILInstruction, destroy_value, MayHaveSideEffects, MayRelease)
 
   // IsUnique does not actually write to memory but should be modeled
@@ -182,7 +199,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Metatypes
   INST(MetatypeInst, SILInstruction, metatype, None, DoesNotRelease)
   INST(ValueMetatypeInst, SILInstruction, value_metatype, None, DoesNotRelease)
-  INST(ExistentialMetatypeInst, SILInstruction, existential_metatype, None, DoesNotRelease)
+  INST(ExistentialMetatypeInst, SILInstruction, existential_metatype, MayRead, DoesNotRelease)
   INST(ObjCProtocolInst, SILInstruction, objc_protocol, None, DoesNotRelease)
 
   // Aggregate Types
@@ -282,4 +299,5 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 #undef ABSTRACT_VALUE
 #undef TERMINATOR
 #undef INST
+#undef ARGUMENT
 #undef VALUE

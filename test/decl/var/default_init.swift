@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -parse-as-library %s -verify
+// RUN: %target-swift-frontend -typecheck -parse-as-library %s -verify
 
 // Default initialization of variables.
 

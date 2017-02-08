@@ -4,7 +4,7 @@
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=NewtypeObjC > %t.printed.NewtypeObjC.txt
 // RUN: %FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.NewtypeObjC.txt
-// RUN: %target-parse-verify-swift -sdk %clang-importer-sdk -I %S/Inputs/custom-modules -I %t %s
+// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -I %S/Inputs/custom-modules -I %t %s
 
 // REQUIRES: objc_interop
 

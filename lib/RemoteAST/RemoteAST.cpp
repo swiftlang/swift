@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangImporter.h"
 
 // TODO: Develop a proper interface for this.
@@ -474,14 +475,14 @@ private:
     }
   };
 };
-}
+} // end anonymous namespace
 
 NominalTypeDecl *
 RemoteASTTypeBuilder::createNominalTypeDecl(const Demangle::NodePointer &node) {
   auto DC = findDeclContext(node);
   if (!DC) {
     return fail<NominalTypeDecl*>(Failure::CouldNotResolveTypeDecl,
-                                  Demangle::mangleNode(node));
+                              Demangle::mangleNode(node, useNewMangling(node)));
   }
 
   auto decl = dyn_cast<NominalTypeDecl>(DC);
@@ -545,7 +546,7 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
       if (!module) return nullptr;
 
       // Look up the local type by its mangling.
-      auto mangledName = Demangle::mangleNode(node);
+      auto mangledName = Demangle::mangleNode(node, useNewMangling(node));
       auto decl = module->lookupLocalType(mangledName);
       if (!decl) return nullptr;
 
@@ -699,6 +700,11 @@ protected:
     return getBuilder().getFailureAsResult<T>(Failure::Unknown);
   }
 
+  template <class T, class KindTy, class... ArgTys>
+  Result<T> fail(KindTy kind, ArgTys &&...args) {
+    return Result<T>::emplaceFailure(kind, std::forward<ArgTys>(args)...);
+  }
+
 private:
   virtual RemoteASTTypeBuilder &getBuilder() = 0;
   virtual MemoryReader &getReader() = 0;
@@ -714,11 +720,6 @@ private:
   IRGenContext *getIRGen() {
     if (!IRGen) IRGen = createIRGenContext();
     return IRGen.get();
-  }
-
-  template <class T, class KindTy, class... ArgTys>
-  Result<T> fail(KindTy kind, ArgTys &&...args) {
-    return Result<T>::emplaceFailure(kind, std::forward<ArgTys>(args)...);
   }
 
   Result<uint64_t>

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -114,7 +114,7 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
     Cases.push_back(SEAI->getCase(i));
 
   Builder.setCurrentDebugScope(SEAI->getDebugScope());
-  SILBasicBlock *Default = SEAI->hasDefault() ? SEAI->getDefaultBB() : 0;
+  SILBasicBlock *Default = SEAI->hasDefault() ? SEAI->getDefaultBB() : nullptr;
   LoadInst *EnumVal = Builder.createLoad(SEAI->getLoc(), SEAI->getOperand(),
                                          LoadOwnershipQualifier::Unqualified);
   Builder.createSwitchEnum(SEAI->getLoc(), EnumVal, Default, Cases);
@@ -758,7 +758,9 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
       SILBasicBlock *DefaultBB = nullptr;
 
       if (SEI->hasDefault()) {
-        auto *IL = B.createIntegerLiteral(SEI->getLoc(), IntTy, APInt(32, SEI->getNumCases(), false));
+        auto *IL = B.createIntegerLiteral(
+          SEI->getLoc(), IntTy,
+          APInt(32, static_cast<uint64_t>(SEI->getNumCases()), false));
         DefaultValue = SILValue(IL);
         DefaultBB = SEI->getDefaultBB();
       }
@@ -775,7 +777,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
 
   // If the enum does not have a payload create the enum/store since we don't
   // need to worry about payloads.
-  if (!IEAI->getElement()->hasArgumentType()) {
+  if (!IEAI->getElement()->getArgumentInterfaceType()) {
     EnumInst *E =
       Builder.createEnum(IEAI->getLoc(), SILValue(), IEAI->getElement(),
                           IEAI->getOperand()->getType().getObjectType());
@@ -861,8 +863,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
         return nullptr;
       }
 
-      for (llvm::iplist<SILInstruction>::reverse_iterator InsIt(
-               CurrIns->getIterator());
+      for (auto InsIt = ++CurrIns->getIterator().getReverse();
            InsIt != CurrBB->rend(); ++InsIt) {
         SILInstruction *Ins = &*InsIt;
         if (Ins == DataAddrInst) {
@@ -879,7 +880,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
       }
 
       // Go to predecessors and do all that again
-      for (SILBasicBlock *Pred : CurrBB->getPreds()) {
+      for (SILBasicBlock *Pred : CurrBB->getPredecessorBlocks()) {
         // If it's already in the set, then we've already queued and/or
         // processed the predecessors.
         if (Preds.insert(Pred).second) {
@@ -925,8 +926,8 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     // Found an apply that initializes the enum. We can optimize this by
     // localizing the initialization to an alloc_stack and loading from it.
     DataAddrInst = dyn_cast<InitEnumDataAddrInst>(Opd.get());
-    if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand() &&
-        ArgIdx < AI->getSubstCalleeType()->getNumIndirectResults()) {
+    if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand()
+        && ArgIdx < AI->getSubstCalleeConv().getNumIndirectSILResults()) {
       EnumInitOperand = &Opd;
       break;
     }
@@ -1081,10 +1082,10 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
     // the transformation, as SIL in canonical form may
     // only have critical edges that are originating from cond_br
     // instructions.
-    if (!CBI->getTrueBB()->getSinglePredecessor())
+    if (!CBI->getTrueBB()->getSinglePredecessorBlock())
       return nullptr;
 
-    if (!CBI->getFalseBB()->getSinglePredecessor())
+    if (!CBI->getFalseBB()->getSinglePredecessorBlock())
       return nullptr;
 
     SILBasicBlock *DefaultBB = nullptr;
@@ -1278,7 +1279,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     // alloc_ref_dynamic %T : $X.Type, $X
     // ->
     // alloc_ref $X
-    auto *PredBB = ARDI->getParent()->getSinglePredecessor();
+    auto *PredBB = ARDI->getParent()->getSinglePredecessorBlock();
     if (!PredBB)
       return nullptr;
     auto *CCBI = dyn_cast<CheckedCastBranchInst>(PredBB->getTerminator());

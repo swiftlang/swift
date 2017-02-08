@@ -1,0 +1,66 @@
+// RUN: %target-sil-nm -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
+// RUN: %target-sil-nm -demangle -assume-parsing-unqualified-ownership-sil %s | %FileCheck -check-prefix=DEMANGLE %s
+// RUN: rm -rfv %t
+// RUN: mkdir %t
+// RUN: %target-sil-opt -module-name main -assume-parsing-unqualified-ownership-sil -emit-sib -o %t/out.sib %s
+// RUN: %target-sil-nm -module-name main -assume-parsing-unqualified-ownership-sil %t/out.sib | %FileCheck %s
+// RUN: %target-sil-nm -module-name main -demangle -assume-parsing-unqualified-ownership-sil %t/out.sib | %FileCheck -check-prefix=DEMANGLE %s
+
+import Builtin
+
+public class C {
+  deinit
+  init()
+}
+
+struct ConformingGenericStruct<T> : ResilientProtocol {
+  func defaultA()
+}
+
+public protocol ResilientProtocol {
+  func defaultA()
+}
+
+// CHECK: F c_deinit
+sil @c_deinit : $@convention(method) (@owned C) -> () {
+bb0(%0 : $C):
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK: F defaultA
+sil @defaultA : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
+bb0(%0 : $*Self):
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK: F f1
+sil @f1 : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple()
+  return %0 : $()
+}
+
+// CHECK: F globalinit
+sil @globalinit : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple()
+  return %0 : $()
+}
+
+// CHECK: G global_var
+sil_global [fragile] @global_var : $Builtin.Int32, @globalinit : $@convention(thin) () -> ()
+
+// CHECK: W _TWPurGV4main23ConformingGenericStructx_S_17ResilientProtocolS_
+// DEMANGLE: W protocol witness table for <A> main.ConformingGenericStruct<A> : main.ResilientProtocol in main
+sil_witness_table <T> ConformingGenericStruct<T> : ResilientProtocol module protocol_resilience {
+  method #ResilientProtocol.defaultA!1: @defaultA
+}
+
+// CHECK: V C
+sil_vtable C {
+  #C.deinit!deallocator: c_deinit
+}
+
+

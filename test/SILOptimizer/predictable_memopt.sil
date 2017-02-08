@@ -7,16 +7,16 @@ import Swift
 // CHECK-LABEL: sil @simple_reg_promotion
 sil @simple_reg_promotion : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
-  %1 = alloc_box $@box Int
-  %1a = project_box %1 : $@box Int, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   store %0 to %1a : $*Int
-  %3 = alloc_box $@box Int
-  %3a = project_box %3 : $@box Int, 0
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %4 = load %1a : $*Int
   store %4 to %3a : $*Int
   %6 = load %3a : $*Int
-  strong_release %3 : $@box Int
-  strong_release %1 : $@box Int
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Int>
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <Int>
   return %6 : $Int
 
   // CHECK-NEXT: return %0 : $Int
@@ -26,8 +26,8 @@ bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
 // CHECK-LABEL: sil @tuple_reg_promotion
 sil @tuple_reg_promotion : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
-  %1 = alloc_box $@box (Int, Int)
-  %1a = project_box %1 : $@box (Int, Int), 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <(Int, Int)>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <(Int, Int)>, 0
 
   %a = tuple_element_addr %1a : $*(Int, Int), 0
   %b = tuple_element_addr %1a : $*(Int, Int), 1
@@ -37,7 +37,7 @@ bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
   %c = load %1a : $*(Int, Int)
   %d = tuple_extract %c : $(Int, Int), 0
 
-  strong_release %1 : $@box (Int, Int)
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <(Int, Int)>
 
   return %d : $Int
 
@@ -65,9 +65,9 @@ sil @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
 sil @used_by_inout : $@convention(thin) (Int) -> (Int, Int) {
 bb0(%0 : $Int):
   // This alloc_stack can't be removed since it is used by an inout call.
-  // CHECK: %1 = alloc_box $@box Int
-  %1 = alloc_box $@box Int
-  %1a = project_box %1 : $@box Int, 0
+  // CHECK: %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %2 = store %0 to %1a : $*Int
 
   // This load should be eliminated.
@@ -82,7 +82,7 @@ bb0(%0 : $Int):
   // This should use the incoming argument to the function.
   // CHECK: tuple ({{.*}} : $Int, {{.*}} : $Int)
   %8 = tuple (%3 : $Int, %7 : $Int)
-  strong_release %1 : $@box Int
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <Int>
   %11 = return %8 : $(Int, Int)
 }
 
@@ -98,22 +98,22 @@ sil @returns_generic_struct : $@convention(thin) () -> @out AddressOnlyStruct
 
 
 sil @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-sil @closure0 : $@convention(thin) (@owned @box Int) -> ()
+sil @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
 
 
 // CHECK-LABEL: sil @closure_test2
 sil @closure_test2 : $@convention(thin) (Int) -> Int {
 bb0(%1 : $Int):
-  %0 = alloc_box $@box Int
-  %0a = project_box %0 : $@box Int, 0
+  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   store %1 to %0a : $*Int  // CHECK: store
 
   %5 = function_ref @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-  %6 = function_ref @closure0 : $@convention(thin) (@owned @box Int) -> ()
-  strong_retain %0 : $@box Int
-  %8 = partial_apply %6(%0) : $@convention(thin) (@owned @box Int) -> ()
+  %6 = function_ref @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
+  strong_retain %0 : $<τ_0_0> { var τ_0_0 } <Int>
+  %8 = partial_apply %6(%0) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
   %9 = apply %5(%8) : $@convention(thin) (@callee_owned () -> ()) -> ()
-  strong_release %0 : $@box Int
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Int>
 
   store %1 to %0a : $*Int // CHECK: store
 
@@ -132,15 +132,15 @@ sil @getSomeClass : $@convention(thin) () -> @owned SomeClass
 // CHECK-LABEL: sil @assign_test_trivial
 sil @assign_test_trivial : $@convention(thin) (Int) -> Int {
 bb0(%0 : $Int):
-  %1 = alloc_box $@box Int
-  %1a = project_box %1 : $@box Int, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Int>, 0
 
   store %0 to %1a : $*Int
   store %0 to %1a : $*Int
   store %0 to %1a : $*Int
 
   %2 = load %1a : $*Int
-  strong_release %1 : $@box Int
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <Int>
 
   // Verify that the load got forwarded from an assign.
   return %2 : $Int                        // CHECK: return %0 : $Int
@@ -375,15 +375,44 @@ enum IndirectCase {
 sil @indirect_enum_box : $@convention(thin) (Int) -> IndirectCase {
 // CHECK: bb0([[X:%.*]] : $Int):
 entry(%x : $Int):
-  // CHECK: [[BOX:%.*]] = alloc_box $@box Int
-  %b = alloc_box $@box Int
+  // CHECK: [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   // CHECK: [[PB:%.*]] = project_box [[BOX]]
-  %ba = project_box %b : $@box Int, 0
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
   // CHECK: store [[X]] to [[PB]]
   store %x to %ba : $*Int
-  // CHECK: [[E:%.*]] = enum $IndirectCase, #IndirectCase.X!enumelt.1, [[BOX]] : $@box Int
-  %e = enum $IndirectCase, #IndirectCase.X!enumelt.1, %b : $@box Int
+  // CHECK: [[E:%.*]] = enum $IndirectCase, #IndirectCase.X!enumelt.1, [[BOX]] : $<τ_0_0> { var τ_0_0 } <Int>
+  %e = enum $IndirectCase, #IndirectCase.X!enumelt.1, %b : $<τ_0_0> { var τ_0_0 } <Int>
   // CHECK: return [[E]]
   return %e : $IndirectCase
+}
+
+sil @write_to_bool : $@convention(c) (UnsafeMutablePointer<Bool>) -> Int32
+
+// CHECK-LABEL: sil @escaping_address
+sil @escaping_address : $@convention(thin) () -> Bool {
+bb0:
+  // CHECK: [[A:%[0-9]+]] = alloc_stack
+  %a = alloc_stack $Bool
+  %f = function_ref @write_to_bool : $@convention(c) (UnsafeMutablePointer<Bool>) -> Int32
+  %a2p = address_to_pointer %a : $*Bool to $Builtin.RawPointer
+  %ump = struct $UnsafeMutablePointer<Bool> (%a2p : $Builtin.RawPointer)
+
+  %0 = integer_literal $Builtin.Int1, 0
+  %b0 = struct $Bool (%0 : $Builtin.Int1)
+  // CHECK: [[BV:%[0-9]+]] = struct_element_addr [[A]]
+  %bv = struct_element_addr %a : $*Bool, #Bool._value
+  store %b0 to %a : $*Bool
+
+  // CHECK: apply
+  %ap = apply %f(%ump) : $@convention(c) (UnsafeMutablePointer<Bool>) -> Int32
+
+  // CHECK: [[L:%[0-9]+]] = load [[BV]]
+  %l = load %bv : $*Builtin.Int1
+  // CHECK: [[R:%[0-9]+]] = struct $Bool ([[L]]
+  %r = struct $Bool (%l : $Builtin.Int1)
+  dealloc_stack %a : $*Bool
+  // CHECK: return [[R]]
+  return %r : $Bool
 }
 

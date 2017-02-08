@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -192,8 +192,8 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
 
-  internal func __copyContents(initializing ptr: UnsafeMutablePointer<Element>)
-    -> UnsafeMutablePointer<Element> {
+  internal func __copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
+    -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
     _abstract()
   }
 
@@ -387,9 +387,10 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
   internal override func __copyToContiguousArray() -> ContiguousArray<Element> {
     return _base._copyToContiguousArray()
   }
-  internal override func __copyContents(initializing ptr: UnsafeMutablePointer<Element>)
-    -> UnsafeMutablePointer<Element> {
-    return _base._copyContents(initializing: ptr)
+  internal override func __copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
+    -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
+    let (it,idx) = _base._copyContents(initializing: buf)
+    return (AnyIterator(it),idx)
   }
   internal override func _drop(
     while predicate: (Element) throws -> Bool
@@ -588,6 +589,8 @@ public struct AnySequence<Element> : Sequence {
     self.init(_ClosureBasedSequence(makeUnderlyingIterator))
   }
 
+  public typealias Iterator = AnyIterator<Element>
+
   internal init(_box: _AnySequenceBox<Element>) {
     self._box = _box
   }
@@ -602,7 +605,7 @@ extension Any${Kind} {
 %   else:
   /// Returns an iterator over the elements of this collection.
 %   end
-  public func makeIterator() -> AnyIterator<Element> {
+  public func makeIterator() -> Iterator {
     return _box._makeIterator()
   }
 
@@ -683,9 +686,10 @@ extension Any${Kind} {
     return self._box.__copyToContiguousArray()
   }
 
-  public func _copyContents(initializing ptr: UnsafeMutablePointer<Element>)
-    -> UnsafeMutablePointer<Element> {
-    return _box.__copyContents(initializing: ptr)
+  public func _copyContents(initializing buf: UnsafeMutableBufferPointer<Iterator.Element>)
+  -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
+    let (it,idx) = _box.__copyContents(initializing: buf)
+    return (AnyIterator(it),idx)
   }
 }
 % end
@@ -807,6 +811,8 @@ public struct ${Self}<Element>
 
 //  public typealias Indices
 //    = Default${Traversal.replace('Forward', '')}Indices<${Self}>
+
+  public typealias Iterator = AnyIterator<Element>
 
   internal init(_box: _${Self}Box<Element>) {
     self._box = _box
@@ -971,6 +977,12 @@ public struct ${Self}<Element>
 
   /// The number of elements.
   ///
+% if Traversal != 'RandomAccess':
+  /// To check whether a collection is empty, use its `isEmpty` property
+  /// instead of comparing `count` to zero. Calculating `count` can be an O(*n*)
+  /// operation.
+  ///
+% end
   /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(*n*)'}
   public var count: IntMax {
     return _box._count

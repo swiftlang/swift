@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -51,10 +51,6 @@ STATISTIC(TotalPublicExternalFuncs, "Number of public external funcs");
 STATISTIC(TotalHiddenExternalFuncs, "Number of hidden external funcs");
 STATISTIC(TotalPrivateExternalFuncs, "Number of private external funcs");
 STATISTIC(TotalSharedExternalFuncs, "Number of shared external funcs");
-
-// Specialization Statistics
-STATISTIC(TotalSpecializedInsts, "Number of instructions (of all types) in "
-          "specialized functions");
 
 // Individual instruction statistics
 #define INST(Id, Parent, TextualName, MemBehavior, ReleasingBehavior)          \
@@ -119,10 +115,6 @@ class InstCount : public SILFunctionTransform {
       TotalFuncs++;
     }
 
-    if (F->getName().count("_TTSg")) {
-      TotalSpecializedInsts += V.InstCount;
-    }
-
     switch (F->getLinkage()) {
     case SILLinkage::Public:
       ++TotalPublicFuncs;
@@ -151,8 +143,8 @@ class InstCount : public SILFunctionTransform {
     }
   }
 };
-} // end anonymous namespace
 
+} // end anonymous namespace
 
 SILTransform *swift::createInstCount() {
   return new InstCount();
@@ -160,6 +152,6 @@ SILTransform *swift::createInstCount() {
 
 void swift::performSILInstCount(SILModule *M) {
   SILPassManager PrinterPM(M);
-  PrinterPM.addInstCount();
-  PrinterPM.runOneIteration();
+  PrinterPM.executePassPipelinePlan(
+      SILPassPipelinePlan::getInstCountPassPipeline());
 }

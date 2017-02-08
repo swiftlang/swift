@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -62,6 +62,8 @@ static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep) {
   case SILFunctionTypeRepresentation::Block:
     return false;
   }
+
+  llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
 
 /// Returns true if F is a function which the pass know show to specialize
@@ -73,7 +75,7 @@ bool swift::canSpecializeFunction(SILFunction *F) {
     return false;
 
   // For now ignore functions with indirect results.
-  if (F->getLoweredFunctionType()->hasIndirectResults())
+  if (F->getConventions().hasIndirectSILResults())
     return false;
 
   // Do not specialize the signature of always inline functions. We

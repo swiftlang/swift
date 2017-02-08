@@ -38,7 +38,7 @@ bb0(%0 : $Y):
   debug_value %0 : $Y
   strong_retain %0 : $Y
   %3 = upcast %0 : $Y to $X
-  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int , $@convention(method) (@guaranteed X) -> Int
+  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
   br bb1
 
 bb1:
@@ -57,7 +57,7 @@ bb0(%0 : $Y):
   debug_value %0 : $Y
   strong_retain %0 : $Y
   %3 = upcast %0 : $Y to $X
-  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int , $@convention(method) (@guaranteed X) -> Int
+  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
   cond_br undef, bb1, bb2
 
 bb1:
@@ -86,7 +86,7 @@ bb0(%0 : $Y):
   debug_value %0 : $Y
   strong_retain %0 : $Y
   %3 = upcast %0 : $Y to $X
-  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int , $@convention(method) (@guaranteed X) -> Int
+  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
   cond_br undef, bb1, bb2
 
 bb1:
@@ -115,7 +115,7 @@ bb0(%0 : $Y):
   debug_value %0 : $Y
   strong_retain %0 : $Y
   %3 = upcast %0 : $Y to $X
-  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int , $@convention(method) (@guaranteed X) -> Int
+  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
   br bb1
 
 bb1:
@@ -144,7 +144,7 @@ bb0(%0 : $Y):
   debug_value %0 : $Y
   strong_retain %0 : $Y
   %3 = upcast %0 : $Y to $X
-  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int , $@convention(method) (@guaranteed X) -> Int
+  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
   br bb1
 
 // This is a loop!
@@ -167,7 +167,7 @@ bb2:
 sil @sink_nested_loop : $@convention(thin) (@owned Y) -> Int {
 bb0(%0 : $Y):
   %3 = upcast %0 : $Y to $X
-  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int , $@convention(method) (@guaranteed X) -> Int
+  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int
   br bb1
 
 bb1:

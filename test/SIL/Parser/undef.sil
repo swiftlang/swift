@@ -33,8 +33,8 @@ bb0:
   alloc_ref_dynamic undef : $@thick C.Type, $C
   // CHECK: alloc_value_buffer $() in undef : $*Builtin.UnsafeValueBuffer
   alloc_value_buffer $() in undef : $*Builtin.UnsafeValueBuffer
-  // CHECK: dealloc_box undef : $@box ()
-  dealloc_box undef : $@box ()
+  // CHECK: dealloc_box undef : $<τ_0_0> { var τ_0_0 } <()>
+  dealloc_box undef : $<τ_0_0> { var τ_0_0 } <()>
   // CHECK: dealloc_ref undef : $C
   dealloc_ref undef : $C
   // CHECK: dealloc_partial_ref undef : $D, undef : $@thick C.Type
@@ -101,10 +101,10 @@ bb0:
 
   // Dynamic dispatch
 
-  // CHECK: class_method undef : $C, #C.fn!1 : (C) -> () -> () , $@convention(method) (@guaranteed C) -> ()
-  class_method undef : $C, #C.fn!1 : (C) -> () -> () , $@convention(method) (@guaranteed C) -> ()
-  // CHECK: super_method undef : $D, #C.fn!1 : (C) -> () -> () , $@convention(method) (@guaranteed C) -> ()
-  super_method undef : $D, #C.fn!1 : (C) -> () -> () , $@convention(method) (@guaranteed C) -> ()
+  // CHECK: class_method undef : $C, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
+  class_method undef : $C, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
+  // CHECK: super_method undef : $D, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
+  super_method undef : $D, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
   // CHECK: dynamic_method undef : $C, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
   dynamic_method undef : $C, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
 
@@ -182,8 +182,8 @@ bb0:
   init_existential_ref undef : $D : $D, $ClassP
   // CHECK: open_existential_ref undef : $ClassP to $@opened("01234567-89AB-CDEF-0123-000000000001") ClassP
   open_existential_ref undef : $ClassP to $@opened("01234567-89AB-CDEF-0123-000000000001") ClassP
-  // CHECK: init_existential_metatype undef : $@thick C.Type, $@thick P.Type
-  init_existential_metatype undef : $@thick C.Type, $@thick P.Type
+  // CHECK: init_existential_metatype undef : $@thick D.Type, $@thick P.Type
+  init_existential_metatype undef : $@thick D.Type, $@thick P.Type
   // CHECK: open_existential_metatype undef : $@thick P.Type to $@thick (@opened("01234567-89AB-CDEF-0123-000000000002") P).Type
   open_existential_metatype undef : $@thick P.Type to $@thick (@opened("01234567-89AB-CDEF-0123-000000000002") P).Type
   // CHECK: open_existential_box undef : $Error to $*@opened("01234567-89AB-CDEF-0123-000000000003") Error

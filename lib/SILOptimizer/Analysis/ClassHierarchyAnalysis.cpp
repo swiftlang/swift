@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -30,7 +30,7 @@ public:
     :ProtocolImplementationsCache(ProtocolImplementationsCache) {
   }
 
-  virtual bool walkToDeclPre(Decl *D) {
+  bool walkToDeclPre(Decl *D) override {
     auto *NTD = dyn_cast<NominalTypeDecl>(D);
     if (!NTD)
       return true;
@@ -45,7 +45,7 @@ public:
     return true;
   }
 };
-}
+} // end anonymous namespace
 
 void ClassHierarchyAnalysis::init() {
   // Process all types implementing protocols.

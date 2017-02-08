@@ -2,16 +2,18 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // RUN: rm -rf %t && mkdir -p %t && %gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
 // RUN: %line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out -Onone
 // RUN: %line-directive %t/out.swift -- %target-run %t/a.out
+
+// REQUIRES: executable_test
 
 import Swift
 import StdlibUnittest
@@ -678,7 +680,7 @@ extension LazyCollectionProtocol
 
 extension Collection {
     /// Returns the index of the first element in the collection
-    /// that doesn't match the predicate.
+    /// that matches the predicate.
     ///
     /// The collection must already be partitioned according to the
     /// predicate, as if `self.partition(by: predicate)` had already

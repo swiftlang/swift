@@ -1,4 +1,0 @@
-// RUN: not --crash %target-sil-opt %s
-// REQUIRES: asserts
-import Swift
-func d<T{enum a:T

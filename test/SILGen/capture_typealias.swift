@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -parse-stdlib -emit-silgen %s | %FileCheck %s
 
 typealias Int = Builtin.Int64
 
@@ -8,8 +8,8 @@ func call(f: () -> Int) -> Int {
   return f()
 }
 
-// CHECK: sil hidden @_TF17capture_typealias3fooFT_T_ : $@convention(thin) () -> () {
-// CHECK: function_ref [[CLOSURE:@_TFF17capture_typealias3fooFT_T_U_FT_Bi64_]]
+// CHECK: sil hidden @_T017capture_typealias3fooyyF : $@convention(thin) () -> () {
+// CHECK: function_ref [[CLOSURE:@_T017capture_typealias3fooyyFBi64_ycfU_]]
 func foo() {
   typealias X = Int
 
@@ -19,4 +19,4 @@ func foo() {
   }
 }
 
-// CHECK: sil shared @_TFF17capture_typealias3fooFT_T_U_FT_Bi64_ : $@convention(thin) () -> Builtin.Int64 {
+// CHECK: sil shared @_T017capture_typealias3fooyyFBi64_ycfU_ : $@convention(thin) () -> Builtin.Int64 {

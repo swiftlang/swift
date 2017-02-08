@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -38,7 +38,7 @@ internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
 %   Self = floatName(bits)
 
 % if bits == 80:
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if (!os(Windows) || CYGWIN) && (arch(i386) || arch(x86_64))
 % end
 
 //===--- Parsing ----------------------------------------------------------===//
@@ -116,9 +116,9 @@ extension ${Self} : LosslessStringConvertible {
   /// Passing any other format or any additional characters as `text` results
   /// in `nil`. For example, the following conversions result in `nil`:
   ///
-  ///     Double(" 5.0")      // Includes whitespace
-  ///     Double("±2.0")      // Invalid character
-  ///     Double("0x1.25e4")  // Incorrect exponent format
+  ///     ${Self}(" 5.0")      // Includes whitespace
+  ///     ${Self}("±2.0")      // Invalid character
+  ///     ${Self}("0x1.25e4")  // Incorrect exponent format
   ///
   /// - Parameter text: The input string to convert to a `${Self}` instance. If
   ///   `text` has invalid characters or is in an invalid format, the result

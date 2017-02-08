@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -37,9 +37,9 @@ var x = seq ~> split
 // Indirect return
 //
 
-// CHECK-LABEL: define internal { i8*, %swift.refcounted* } @_TPA__TF21partial_apply_generic5split{{.*}}(%V21partial_apply_generic5Spoon* noalias nocapture, %swift.refcounted*)
+// CHECK-LABEL: define internal { i8*, %swift.refcounted* } @_T021partial_apply_generic5split{{[_0-9a-zA-Z]*}}FTA(%V21partial_apply_generic5Spoon* noalias nocapture, %swift.refcounted*)
 // CHECK:         [[REABSTRACT:%.*]] = bitcast %V21partial_apply_generic5Spoon* %0 to %swift.opaque*
-// CHECK:         tail call { i8*, %swift.refcounted* } @_TF21partial_apply_generic5split{{.*}}(%swift.opaque* noalias nocapture [[REABSTRACT]],
+// CHECK:         tail call { i8*, %swift.refcounted* } @_T021partial_apply_generic5split{{[_0-9a-zA-Z]*}}F(%swift.opaque* noalias nocapture [[REABSTRACT]],
 
 struct HugeStruct { var a, b, c, d: Int }
 struct S {
@@ -48,9 +48,9 @@ struct S {
 
 let s = S()
 var y = s.hugeStructReturn
-// CHECK-LABEL: define internal void @_TPA__TFV21partial_apply_generic1S16hugeStructReturnfVS_10HugeStructS1_(%V21partial_apply_generic10HugeStruct* noalias nocapture sret, %V21partial_apply_generic10HugeStruct* noalias nocapture dereferenceable(32), %swift.refcounted*) #0 {
+// CHECK-LABEL: define internal void @_T021partial_apply_generic1SV16hugeStructReturnAA04HugeE0VAFFTA(%V21partial_apply_generic10HugeStruct* noalias nocapture sret, %V21partial_apply_generic10HugeStruct* noalias nocapture dereferenceable(32), %swift.refcounted*) #0 {
 // CHECK: entry:
-// CHECK:   tail call void @_TFV21partial_apply_generic1S16hugeStructReturnfVS_10HugeStructS1_(%V21partial_apply_generic10HugeStruct* noalias nocapture sret %0, %V21partial_apply_generic10HugeStruct* noalias nocapture dereferenceable(32) %1) #0
+// CHECK:   tail call void @_T021partial_apply_generic1SV16hugeStructReturnAA04HugeE0VAFF(%V21partial_apply_generic10HugeStruct* noalias nocapture sret %0, %V21partial_apply_generic10HugeStruct* noalias nocapture dereferenceable(32) %1) #0
 // CHECK:   ret void
 // CHECK: }
 

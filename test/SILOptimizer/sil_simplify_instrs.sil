@@ -118,6 +118,17 @@ bb0(%x : $Builtin.Int64):
 // CHECK: return %0 : $Builtin.Int64
 }
 
+// Simplify zext((x)) -> x with same type
+sil @fold_zext_n_to_n : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+  %trunc = builtin "zextOrBitCast_Int64_Int64"(%x : $Builtin.Int64) : $Builtin.Int64
+  return %trunc : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_zext_n_to_n
+// CHECK-NOT: builtin
+// CHECK: return %0 : $Builtin.Int64
+}
+
 class IntClass {
   @sil_stored var value: Builtin.Int32 { get set }
   init(value: Builtin.Int32)

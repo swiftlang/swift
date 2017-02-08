@@ -1,0 +1,43 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: rm -rfv %t
+// RUN: mkdir %t
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name unmanaged
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name unmanaged
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name unmanaged | %FileCheck %s
+
+import Swift
+import Builtin
+
+class C {}
+
+// CHECK-LABEL: sil @retain_release : $@convention(thin) (@sil_unmanaged Optional<C>) -> () {
+// CHECK: bb0([[ARG:%.*]] : $@sil_unmanaged Optional<C>):
+// CHECK: [[REF:%.*]] = unmanaged_to_ref [[ARG]] : $@sil_unmanaged Optional<C> to $Optional<C>
+// CHECK: unmanaged_retain_value [[REF]]
+// CHECK: unmanaged_autorelease_value [[REF]]
+// CHECK: unmanaged_release_value [[REF]]
+sil @retain_release : $@convention(thin) (@sil_unmanaged Optional<C>) -> () {
+bb0(%0 : $@sil_unmanaged Optional<C>):
+  %1 = unmanaged_to_ref %0 : $@sil_unmanaged Optional<C> to $Optional<C>
+  unmanaged_retain_value %1 : $Optional<C>
+  unmanaged_autorelease_value %1 : $Optional<C>
+  unmanaged_release_value %1 : $Optional<C>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @test : $@convention(thin) <U where U : AnyObject> (@inout Optional<U>) -> () {
+// CHECK: bb0([[ARG:%.*]] : $*Optional<U>):
+// CHECK: [[LOADED_ARG:%.*]] = load [copy] [[ARG]]
+// CHECK: [[UNMANGED_LOADED_ARG:%.*]] = ref_to_unmanaged [[LOADED_ARG]] : $Optional<U> to $@sil_unmanaged Optional<U>
+// CHECK: {{%.*}} = unmanaged_to_ref [[UNMANGED_LOADED_ARG]] : $@sil_unmanaged Optional<U> to $Optional<U>
+// CHECK: destroy_value [[LOADED_ARG]]
+sil @test : $@convention(thin) <U where U : AnyObject> (@inout Optional<U>) -> () {
+bb0(%0 : $*Optional<U>):
+  %1 = load [copy] %0 : $*Optional<U>
+  %2 = ref_to_unmanaged %1 : $Optional<U> to $@sil_unmanaged Optional<U>
+  %3 = unmanaged_to_ref %2 : $@sil_unmanaged Optional<U> to $Optional<U>
+  destroy_value %1 : $Optional<U>
+  %9999 = tuple ()
+  return %9999 : $()
+}

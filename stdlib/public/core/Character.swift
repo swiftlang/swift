@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -106,7 +106,7 @@ public struct Character :
 
   /// Creates a character with the specified value.
   ///
-  /// Don't call this initializer directly. It is used by the compiler when you
+  /// Do not call this initializer directly. It is used by the compiler when you
   /// use a string literal to initialize a `Character` instance. For example:
   ///
   ///     let snowflake: Character = "❄︎"
@@ -125,21 +125,43 @@ public struct Character :
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) {
-    self = Character(
-      String(
-        _builtinExtendedGraphemeClusterLiteral: start,
-        utf8CodeUnitCount: utf8CodeUnitCount,
-        isASCII: isASCII))
+    // Most character literals are going to be fewer than eight UTF-8 code
+    // units; for those, build the small character representation directly.
+    let maxCodeUnitCount = MemoryLayout<UInt64>.size
+    if _fastPath(Int(utf8CodeUnitCount) <= maxCodeUnitCount) {
+      var buffer: UInt64 = ~0
+      _memcpy(
+        dest: UnsafeMutableRawPointer(Builtin.addressof(&buffer)),
+        src: UnsafeMutableRawPointer(start),
+        size: UInt(utf8CodeUnitCount))
+      // Copying the bytes directly from the literal into an integer assumes
+      // little endianness, so convert the copied data into host endianness.
+      let utf8Chunk = UInt64(littleEndian: buffer)
+      let bits = maxCodeUnitCount &* 8 &- 1
+      // Verify that the highest bit isn't set so that we can truncate it to
+      // 63 bits.
+      if _fastPath(utf8Chunk & (1 << numericCast(bits)) != 0) {
+        _representation = .small(Builtin.trunc_Int64_Int63(utf8Chunk._value))
+        return
+      }
+    }
+    // For anything that doesn't fit in 63 bits, build the large
+    // representation.
+    self = Character(_largeRepresentationString: String(
+      _builtinExtendedGraphemeClusterLiteral: start,
+      utf8CodeUnitCount: utf8CodeUnitCount,
+      isASCII: isASCII))
   }
 
   /// Creates a character with the specified value.
   ///
-  /// Don't call this initializer directly. It is used by the compiler when you
-  /// use a string literal to initialize a `Character` instance. For example:
+  /// Do not call this initializer directly. It is used by the compiler when
+  /// you use a string literal to initialize a `Character` instance. For
+  /// example:
   ///
   ///     let oBreve: Character = "o\u{306}"
   ///     print(oBreve)
-  ///     // Prints "ŏ"
+  ///     // Prints "ŏ"
   ///
   /// The assignment to the `oBreve` constant calls this initializer behind the
   /// scenes.
@@ -182,15 +204,21 @@ public struct Character :
       _representation = .small(Builtin.trunc_Int64_Int63(initialUTF8._value))
     }
     else {
-      if let native = s._core.nativeBuffer,
-         native.start == s._core._baseAddress {
-        _representation = .large(native._storage)
-        return
-      }
-      var nativeString = ""
-      nativeString.append(s)
-      _representation = .large(nativeString._core.nativeBuffer!._storage)
+      self = Character(_largeRepresentationString: s)
     }
+  }
+
+  /// Creates a Character from a String that is already known to require the
+  /// large representation.
+  internal init(_largeRepresentationString s: String) {
+    if let native = s._core.nativeBuffer,
+       native.start == s._core._baseAddress! {
+      _representation = .large(native._storage)
+      return
+    }
+    var nativeString = ""
+    nativeString.append(s)
+    _representation = .large(nativeString._core.nativeBuffer!._storage)
   }
 
   /// Returns the index of the lowest byte that is 0xFF, or 8 if

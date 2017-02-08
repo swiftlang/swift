@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -41,8 +41,7 @@ Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   // just return undef.
   if (ti.isKnownEmpty(ResilienceExpansion::Minimal)) {
     if (DebugInfo && var->getDecl()) {
-      DebugTypeInfo DbgTy(var->getDecl(), var->getLoweredType().getSwiftType(),
-                          Int8Ty, Size(0), Alignment(1));
+      auto DbgTy = DebugTypeInfo::getGlobal(var, Int8Ty, Size(0), Alignment(1));
       DebugInfo->emitGlobalVariableDeclaration(
           nullptr, var->getDecl()->getName().str(), "", DbgTy,
           var->getLinkage() != SILLinkage::Public, SILLocation(var->getDecl()));
@@ -63,30 +62,31 @@ Address IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   return addr;
 }
 
-ContainedAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
-                                              const Twine &name) const {
+StackAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
+                                          bool isEntryBlock,
+                                          const Twine &name) const {
   // If the type is known to be empty, don't actually allocate anything.
   if (isKnownEmpty(ResilienceExpansion::Maximal)) {
     auto addr = getUndefAddress();
-    return { addr, addr };
+    return { addr };
   }
 
   Address alloca =
     IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
   IGF.Builder.CreateLifetimeStart(alloca, getFixedSize());
   
-  return { alloca, alloca };
+  return { alloca };
 }
 
-void FixedTypeInfo::destroyStack(IRGenFunction &IGF, Address addr,
+void FixedTypeInfo::destroyStack(IRGenFunction &IGF, StackAddress addr,
                                  SILType T) const {
-  destroy(IGF, addr, T);
+  destroy(IGF, addr.getAddress(), T);
   FixedTypeInfo::deallocateStack(IGF, addr, T);
 }
 
-void FixedTypeInfo::deallocateStack(IRGenFunction &IGF, Address addr,
+void FixedTypeInfo::deallocateStack(IRGenFunction &IGF, StackAddress addr,
                                     SILType T) const {
   if (isKnownEmpty(ResilienceExpansion::Maximal))
     return;
-  IGF.Builder.CreateLifetimeEnd(addr, getFixedSize());
+  IGF.Builder.CreateLifetimeEnd(addr.getAddress(), getFixedSize());
 }

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -81,7 +81,7 @@ namespace {
       return { S->getStartLoc(), S->getEndLoc() };
     }
   };
-}
+} // end anonymous namespace
 
 template <class T> static SourceRange getSourceRangeImpl(const T *S) {
   static_assert(isOverriddenFromStmt(&T::getSourceRange) ||
@@ -317,6 +317,8 @@ SourceRange StmtConditionElement::getSourceRange() const {
       return SourceRange();
     }
   }
+
+  llvm_unreachable("Unhandled StmtConditionElement in switch.");
 }
 
 SourceLoc StmtConditionElement::getStartLoc() const {
@@ -328,6 +330,8 @@ SourceLoc StmtConditionElement::getStartLoc() const {
   case StmtConditionElement::CK_PatternBinding:
     return getSourceRange().Start;
   }
+
+  llvm_unreachable("Unhandled StmtConditionElement in switch.");
 }
 
 SourceLoc StmtConditionElement::getEndLoc() const {
@@ -339,6 +343,8 @@ SourceLoc StmtConditionElement::getEndLoc() const {
   case StmtConditionElement::CK_PatternBinding:
     return getSourceRange().End;
   }
+
+  llvm_unreachable("Unhandled StmtConditionElement in switch.");
 }
 
 static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {

@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -parse -verify -primary-file %t/main.swift %S/Inputs/enum_equatable_hashable_other.swift
+// RUN: %target-swift-frontend -typecheck -verify -primary-file %t/main.swift %S/Inputs/enum_equatable_hashable_other.swift -verify-ignore-unknown
 
 enum Foo {
   case A, B
@@ -126,3 +126,10 @@ public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note{{non-mat
 
 // No explicit conformance and cannot be derived
 extension Complex : Hashable {} // expected-error 2 {{does not conform}}
+
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'
+// <unknown>:0: error: unexpected note produced: candidate has non-matching type '(Foo, Foo) -> Bool'
+// <unknown>:0: error: unexpected note produced: candidate has non-matching type '<T> (Generic<T>, Generic<T>) -> Bool'
+// <unknown>:0: error: unexpected note produced: candidate has non-matching type '(InvalidCustomHashable, InvalidCustomHashable) -> Bool'
+// <unknown>:0: error: unexpected note produced: candidate has non-matching type '(EnumToUseBeforeDeclaration, EnumToUseBeforeDeclaration) -> Bool'

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct IntList : ExpressibleByArrayLiteral {
   typealias Element = Int
@@ -107,7 +107,8 @@ func longArray() {
 
 // <rdar://problem/25563498> Type checker crash assigning array literal to type conforming to _ArrayProtocol
 func rdar25563498<T : ExpressibleByArrayLiteral>(t: T) {
-  var x: T = [1] // expected-error {{contextual type 'T' cannot be used with array literal}}
+  var x: T = [1] // expected-error {{cannot convert value of type '[Int]' to specified type 'T'}}
+  // expected-warning@-1{{variable 'x' was never used; consider replacing with '_' or removing it}}
 }
 
 func rdar25563498_ok<T : ExpressibleByArrayLiteral>(t: T) -> T
@@ -172,3 +173,64 @@ func testOptionSetLike(b: Bool) {
   let _: OptionSetLike = [ b ? [] : OptionSetLike.option, OptionSetLike.option]
   let _: OptionSetLike = [ b ? [] : .option, .option]
 }
+
+// Join of class metatypes - <rdar://problem/30233451>
+
+class Company<T> {
+  init(routes: [() -> T]) { }
+}
+
+class Person { }
+
+class Employee: Person { }
+
+class Manager: Person { }
+
+let router = Company(
+  routes: [
+    { () -> Employee.Type in
+      _ = ()
+      return Employee.self
+    },
+
+    { () -> Manager.Type in
+      _ = ()
+      return Manager.self
+    }
+  ]
+)
+
+// Same as above but with existentials
+
+protocol Fruit {}
+
+protocol Tomato : Fruit {}
+
+struct Chicken : Tomato {}
+
+protocol Pear : Fruit {}
+
+struct Beef : Pear {}
+
+let router = Company(
+  routes: [
+    // FIXME: implement join() for existentials
+    // expected-error@+1 {{cannot convert value of type '() -> Tomato.Type' to expected element type '() -> _'}}
+    { () -> Tomato.Type in
+      _ = ()
+      return Chicken.self
+    },
+
+    { () -> Pear.Type in
+      _ = ()
+      return Beef.self
+    }
+  ]
+)
+
+// Infer [[Int]] for SR3786aa.
+// FIXME: As noted in SR-3786, this was the behavior in Swift 3, but
+//        it seems like the wrong choice and is less by design than by
+//        accident.
+let SR3786a: [Int] = [1, 2, 3]
+let SR3786aa = [SR3786a.reversed(), SR3786a]

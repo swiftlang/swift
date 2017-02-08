@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -D FOO -D BAR
+// RUN: %target-typecheck-verify-swift -D FOO -D BAR
 
 class A {}
 

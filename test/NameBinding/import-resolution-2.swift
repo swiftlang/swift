@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/aeiou.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/asdf.swift
 // RUN: %target-swift-frontend -emit-module -o %t -I %t %S/Inputs/letters.swift
-// RUN: %target-swift-frontend -parse %s -I %t -sdk "" -verify
+// RUN: %target-swift-frontend -typecheck %s -I %t -sdk "" -verify
 
 import letters
 import aeiou

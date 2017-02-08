@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -125,18 +125,17 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
                              SILBasicBlock *&FalseBB,
                              SILBasicBlock *&ContBB) {
   SILBasicBlock *StartBB = B.getInsertionBB();
-  SILModule &Module = StartBB->getModule();
   
   // Start by splitting the current block.
-  ContBB = StartBB->splitBasicBlock(B.getInsertionPoint());
-  
+  ContBB = StartBB->split(B.getInsertionPoint());
+
   // Create the true block if requested.
   SILBasicBlock *TrueDest;
   if (!createTrueBB) {
     TrueDest = ContBB;
     TrueBB = nullptr;
   } else {
-    TrueDest = new (Module) SILBasicBlock(StartBB->getParent());
+    TrueDest = StartBB->getParent()->createBasicBlock();
     B.moveBlockTo(TrueDest, ContBB);
     B.setInsertionPoint(TrueDest);
     B.createBranch(Loc, ContBB);
@@ -149,7 +148,7 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
     FalseDest = ContBB;
     FalseBB = nullptr;
   } else {
-    FalseDest = new (Module) SILBasicBlock(StartBB->getParent());
+    FalseDest = StartBB->getParent()->createBasicBlock();
     B.moveBlockTo(FalseDest, ContBB);
     B.setInsertionPoint(FalseDest);
     B.createBranch(Loc, ContBB);
@@ -175,7 +174,7 @@ namespace {
     Yes,
     Partial
   };
-}
+} // end anonymous namespace
 
 /// This implements the lattice merge operation for 2 optional DIKinds.
 static Optional<DIKind> mergeKinds(Optional<DIKind> OK1, Optional<DIKind> OK2) {
@@ -322,7 +321,7 @@ namespace {
     AS.dump(OS);
     return OS;
   }
-}
+} // end anonymous namespace
 
 
 namespace {
@@ -1224,7 +1223,7 @@ static bool isFailableInitReturnUseOfEnum(EnumInst *EI) {
   auto *BI = dyn_cast<BranchInst>(EI->use_begin()->getUser());
   if (!BI || BI->getNumArgs() != 1) return false;
 
-  auto *TargetArg = BI->getDestBB()->getBBArg(0);
+  auto *TargetArg = BI->getDestBB()->getArgument(0);
   if (!TargetArg->hasOneUse()) return false;
   return isa<ReturnInst>(TargetArg->use_begin()->getUser());
 }
@@ -1459,7 +1458,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
         // Otherwise, there are multiple paths to the epilog block, scan its
         // predecessors to see if there are any where the value is unavailable.
         // If so, we can use its location information for more precision.
-        for (auto pred : LI->getParent()->getPreds()) {
+        for (auto pred : LI->getParent()->getPredecessorBlocks()) {
           auto *TI = pred->getTerminator();
           // Check if this is an early return with uninitialized members.
           if (TI->getLoc().getKind() == SILLocation::ReturnKind &&
@@ -1810,9 +1809,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     
     // dealloc_box the self box if necessary.
     if (ABI) {
-      auto DB = B.createDeallocBox(Loc,
-                                   ABI->getElementType(),
-                                   ABI);
+      auto DB = B.createDeallocBox(Loc, ABI);
       Releases.push_back(DB);
     }
   }
@@ -2336,13 +2333,13 @@ computePredsLiveOut(SILBasicBlock *BB) {
   // Collect blocks for which we have to calculate the out-availability.
   // These are the paths from blocks with known out-availability to the BB.
   WorkListType WorkList;
-  for (auto Pred : BB->getPreds()) {
+  for (auto Pred : BB->getPredecessorBlocks()) {
     putIntoWorkList(Pred, WorkList);
   }
   size_t idx = 0;
   while (idx < WorkList.size()) {
     SILBasicBlock *WorkBB = WorkList[idx++];
-    for (auto Pred : WorkBB->getPreds()) {
+    for (auto Pred : WorkBB->getPredecessorBlocks()) {
       putIntoWorkList(Pred, WorkList);
     }
   }
@@ -2366,7 +2363,7 @@ computePredsLiveOut(SILBasicBlock *BB) {
       LiveOutBlockState &BBState = getBlockInfo(WorkBB);
 
       // Merge from the predecessor blocks.
-      for (auto Pred : WorkBB->getPreds()) {
+      for (auto Pred : WorkBB->getPredecessorBlocks()) {
         changed |= BBState.mergeFromPred(getBlockInfo(Pred));
       }
       DEBUG(llvm::dbgs() << "      Block " << WorkBB->getDebugID() << " out: "
@@ -2383,8 +2380,8 @@ computePredsLiveOut(SILBasicBlock *BB) {
 void LifetimeChecker::
 getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result) {
   computePredsLiveOut(BB);
-  
-  for (auto Pred : BB->getPreds()) {
+
+  for (auto *Pred : BB->getPredecessorBlocks()) {
     // If self was consumed in a predecessor P, don't look at availability
     // at all, because there's no point in making things more conditional
     // than they are. If we enter the current block through P, the self value
@@ -2402,8 +2399,8 @@ getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result) {
 void LifetimeChecker::
 getOutSelfConsumed(SILBasicBlock *BB, Optional<DIKind> &Result) {
   computePredsLiveOut(BB);
-  
-  for (auto Pred : BB->getPreds())
+
+  for (auto *Pred : BB->getPredecessorBlocks())
     Result = mergeKinds(Result, getBlockInfo(Pred).OutSelfConsumed);
 }
 
@@ -2618,7 +2615,8 @@ static bool processMemoryObject(SILInstruction *I) {
   SmallVector<SILInstruction*, 4> Releases;
 
   // Walk the use list of the pointer, collecting them into the Uses array.
-  collectDIElementUsesFrom(MemInfo, Uses, FailableInits, Releases, false);
+  collectDIElementUsesFrom(MemInfo, Uses, FailableInits, Releases, false,
+                           /*TreatAddressToPointerAsInout*/ true);
 
   LifetimeChecker(MemInfo, Uses, FailableInits, Releases).doIt();
   return true;

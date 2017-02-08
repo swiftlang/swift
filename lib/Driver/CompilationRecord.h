@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -44,6 +44,9 @@ inline static StringRef getName(TopLevelKey Key) {
   case TopLevelKey::BuildTime: return "build_time";
   case TopLevelKey::Inputs: return "inputs";
   }
+
+  // Work around MSVC warning: not all control paths return a value
+  llvm_unreachable("All switch cases are covered");
 }
 
 /// \returns The string identifier used to represent the given status in a
@@ -64,6 +67,9 @@ getIdentifierForInputInfoStatus(CompileJobAction::InputInfo::Status Status) {
   case CompileJobAction::InputInfo::NeedsNonCascadingBuild:
     return "!private";
   }
+
+  // Work around MSVC warning: not all control paths return a value
+  llvm_unreachable("All switch cases are covered");
 }
 
 /// \returns The status corresponding to the string identifier used in a

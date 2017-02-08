@@ -15,7 +15,7 @@ if(HAVE_UNICODE_LIBEDIT)
   add_sourcekit_executable(sourcekitd-repl
     sourcekitd-repl.cpp
     DEPENDS ${SOURCEKITD_REPL_DEPEND} edit
-    LLVM_COMPONENT_DEPENDS support
+    LLVM_COMPONENT_DEPENDS support coverage lto
   )
 
   if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")

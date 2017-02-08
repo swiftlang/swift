@@ -2,11 +2,11 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See http://swift.org/LICENSE.txt for license information
-# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 # ----------------------------------------------------------------------------
 """
@@ -51,6 +51,7 @@ _register("distcc", "distcc")
 _register("distcc_pump", "distcc-pump", "pump")
 _register("llvm_profdata", "llvm-profdata")
 _register("llvm_cov", "llvm-cov")
+_register("lipo", "lipo")
 
 
 class Darwin(Toolchain):
@@ -137,10 +138,14 @@ class Linux(GenericUnix):
 
 class FreeBSD(GenericUnix):
     def __init__(self):
+        # For testing toolchain initializer on non-FreeBSD systems
+        sys = platform.system()
+        if sys != 'FreeBSD':
+            suffixes = ['']
         # See: https://github.com/apple/swift/pull/169
         # Building Swift from source requires a recent version of the Clang
         # compiler with C++14 support.
-        if self._release_date and self._release_date >= 1100000:
+        elif self._release_date and self._release_date >= 1100000:
             suffixes = ['']
         else:
             suffixes = ['38', '37', '36', '35']

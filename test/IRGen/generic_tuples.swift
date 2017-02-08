@@ -14,26 +14,25 @@ func dup<T>(_ x: T) -> (T, T) { var x = x; return (x,x) }
 // CHECK:    define hidden void @_TF14generic_tuples3dup{{.*}}(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 // CHECK:    entry:
 //   Allocate a local variable for 'x'.
-// CHECK-NEXT: [[XBUF:%.*]] = alloca [[BUFFER:.*]], align 8
-// CHECK-NEXT: [[XBUFLIFE:%.*]] = bitcast {{.*}} [[XBUF]]
-// CHECK-NEXT: call void @llvm.lifetime.start({{.*}} [[XBUFLIFE]])
-// CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
-// CHECK-NEXT: [[T_VALUE:%.*]] = load i8**, i8*** [[T1]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE]]
-// CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]], align 8
-// CHECK-NEXT: [[INITIALIZE_BUFFER_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[BUFFER]]*, [[OPAQUE]]*, [[TYPE]]*)*
-// CHECK-NEXT: [[X:%.*]] = call [[OPAQUE]]* [[INITIALIZE_BUFFER_FN]]([[BUFFER]]* [[XBUF]], [[OPAQUE]]* {{.*}}, [[TYPE]]* %T)
+// CHECK: [[TYPE_ADDR:%.*]] = bitcast %swift.type* %T to i8***
+// CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_ADDR]], i64 -1
+// CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+// CHECK: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 17
+// CHECK: [[SIZE_WITNESS:%.*]] = load i8*, i8** [[SIZE_WITNESS_ADDR]]
+// CHECK: [[SIZE:%.*]] = ptrtoint i8* [[SIZE_WITNESS]]
+// CHECK: [[X_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
+// CHECK: [[X_TMP:%.*]] = bitcast i8* [[X_ALLOCA]] to %swift.opaque*
+// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 6
+// CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]], align 8
+// CHECK-NEXT: [[INITIALIZE_WITH_COPY:%.*]] = bitcast i8* [[WITNESS]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
+// CHECK-NEXT: [[X:%.*]] = call [[OPAQUE]]* [[INITIALIZE_WITH_COPY]]([[OPAQUE]]* [[X_TMP]], [[OPAQUE]]* {{.*}}, [[TYPE]]* %T)
 //   Copy 'x' into the first result.
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE]], i32 6
-// CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]], align 8
-// CHECK-NEXT: [[COPY_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
-// CHECK-NEXT: call [[OPAQUE]]* [[COPY_FN]]([[OPAQUE]]* %0, [[OPAQUE]]* [[X]], [[TYPE]]* %T)
+// CHECK-NEXT: call [[OPAQUE]]* [[INITIALIZE_WITH_COPY]]([[OPAQUE]]* %0, [[OPAQUE]]* [[X_TMP]], [[TYPE]]* %T)
 //   Copy 'x' into the second element.
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE]], i32 9
-// CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]], align 8
-// CHECK-NEXT: [[TAKE_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
-// CHECK-NEXT: call [[OPAQUE]]* [[TAKE_FN]]([[OPAQUE]]* %1, [[OPAQUE]]* [[X]], [[TYPE]]* %T)
+// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
+// CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]], align 8
+// CHECK-NEXT: [[TAKE_FN:%.*]] = bitcast i8* [[WITNESS]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
+// CHECK-NEXT: call [[OPAQUE]]* [[TAKE_FN]]([[OPAQUE]]* %1, [[OPAQUE]]* [[X_TMP]], [[TYPE]]* %T)
 
 struct S {}
 

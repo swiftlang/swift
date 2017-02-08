@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -115,7 +115,7 @@ TEST(SourceLoc, AssignExpr) {
                                               /*implicit*/false);
   EXPECT_EQ(start, invalidSource->getStartLoc());
   EXPECT_EQ(SourceLoc(), invalidSource->getEqualLoc());
-  EXPECT_EQ(SourceLoc(), invalidSource->getLoc());
+  EXPECT_EQ(start, invalidSource->getLoc()); // If the equal loc is invalid, but start is valid, point at the start
   EXPECT_EQ(start.getAdvancedLoc(3), invalidSource->getEndLoc());
   EXPECT_EQ(SourceRange(start, start.getAdvancedLoc(3)),
             invalidSource->getSourceRange());
@@ -124,7 +124,7 @@ TEST(SourceLoc, AssignExpr) {
                                             /*implicit*/false);
   EXPECT_EQ(start.getAdvancedLoc(8), invalidDest->getStartLoc());
   EXPECT_EQ(SourceLoc(), invalidDest->getEqualLoc());
-  EXPECT_EQ(SourceLoc(), invalidDest->getLoc());
+  EXPECT_EQ(start.getAdvancedLoc(8), invalidDest->getLoc()); // If the equal loc is invalid, but start is valid, point at the start
   EXPECT_EQ(start.getAdvancedLoc(11), invalidDest->getEndLoc());
   EXPECT_EQ(SourceRange(start.getAdvancedLoc(8), start.getAdvancedLoc(11)),
             invalidDest->getSourceRange());
@@ -151,7 +151,9 @@ TEST(SourceLoc, StmtConditionElement) {
                         .addMemBufferCopy("if let x = Optional.some(1) { }");
   SourceLoc start = C.Ctx.SourceMgr.getLocForBufferStart(bufferID);
   
-  auto vardecl = new (C.Ctx) VarDecl( false, true, start.getAdvancedLoc(7)
+  auto vardecl = new (C.Ctx) VarDecl(/*IsStatic*/false, /*IsLet*/true,
+                                     /*IsCaptureList*/false,
+                                     start.getAdvancedLoc(7)
                                     , C.Ctx.getIdentifier("x")
                                     , Type()
                                     , nullptr);

@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not --crash %target-swift-frontend %s -typecheck
 // REQUIRES: asserts
 
 var str = "Hello"

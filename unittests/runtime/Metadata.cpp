@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -291,7 +291,7 @@ TEST(MetadataTest, getGenericMetadata) {
 }
 
 FullMetadata<ClassMetadata> MetadataTest2 = {
-  { { nullptr }, { &_TWVBo } },
+  { { nullptr }, { &VALUE_WITNESS_SYM(Bo) } },
   { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1,
     ClassFlags(), nullptr, 0, 0, 0, 0, 0 }
 };
@@ -299,7 +299,7 @@ FullMetadata<ClassMetadata> MetadataTest2 = {
 TEST(MetadataTest, getMetatypeMetadata) {
   auto inst1 = RaceTest_ExpectEqual<const MetatypeMetadata *>(
     [&]() -> const MetatypeMetadata * {
-      auto inst = swift_getMetatypeMetadata(&_TMBi64_.base);
+      auto inst = swift_getMetatypeMetadata(&METADATA_SYM(Bi64_).base);
 
       EXPECT_EQ(sizeof(void*), inst->getValueWitnesses()->size);
       return inst;
@@ -307,7 +307,7 @@ TEST(MetadataTest, getMetatypeMetadata) {
 
   auto inst2 = RaceTest_ExpectEqual<const MetatypeMetadata *>(
     [&]() -> const MetatypeMetadata * {
-      auto inst = swift_getMetatypeMetadata(&_TMBi32_.base);
+      auto inst = swift_getMetatypeMetadata(&METADATA_SYM(Bi32_).base);
 
       EXPECT_EQ(sizeof(void*), inst->getValueWitnesses()->size);
       return inst;
@@ -336,8 +336,8 @@ TEST(MetadataTest, getMetatypeMetadata) {
     });
 
   // After all this, the instance type fields should still be valid.
-  ASSERT_EQ(&_TMBi64_.base, inst1->InstanceType);
-  ASSERT_EQ(&_TMBi32_.base, inst2->InstanceType);
+  ASSERT_EQ(&METADATA_SYM(Bi64_).base, inst1->InstanceType);
+  ASSERT_EQ(&METADATA_SYM(Bi32_).base, inst2->InstanceType);
   ASSERT_EQ(&MetadataTest2, inst3->InstanceType);
   ASSERT_EQ(inst3, inst4->InstanceType);
   ASSERT_EQ(inst1, inst5->InstanceType);
@@ -505,9 +505,9 @@ TEST(MetadataTest, getExistentialMetadata) {
   
   const ValueWitnessTable *ExpectedErrorValueWitnesses;
 #if SWIFT_OBJC_INTEROP
-  ExpectedErrorValueWitnesses = &_TWVBO;
+  ExpectedErrorValueWitnesses = &VALUE_WITNESS_SYM(BO);
 #else
-  ExpectedErrorValueWitnesses = &_TWVBo;
+  ExpectedErrorValueWitnesses = &VALUE_WITNESS_SYM(Bo);
 #endif
 
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
@@ -545,7 +545,7 @@ struct {
   FullMetadata<ClassMetadata> Metadata;
 } SuperclassWithPrefix = {
   { &Global1, &Global3, &Global2, &Global3 },
-  { { { &destroySuperclass }, { &_TWVBo } },
+  { { { &destroySuperclass }, { &VALUE_WITNESS_SYM(Bo) } },
     { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), nullptr,
       0, 0, 0, sizeof(SuperclassWithPrefix),
       sizeof(SuperclassWithPrefix.Prefix) + sizeof(HeapMetadataHeader) } }
@@ -577,7 +577,7 @@ struct {
     sizeof(HeapMetadataHeader), // address point
     {} // private data
   },
-  { { { &destroySubclass }, { &_TWVBo } },
+  { { { &destroySubclass }, { &VALUE_WITNESS_SYM(Bo) } },
     { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), nullptr,
       0, 0, 0,
       sizeof(GenericSubclass.Pattern) + sizeof(GenericSubclass.Suffix),
@@ -604,7 +604,7 @@ TEST(MetadataTest, getGenericMetadata_SuperclassWithUnexpectedPrefix) {
 
       // Assert that we copied the shared prefix data from the subclass.
       EXPECT_EQ((void*) &destroySubclass, fields[-2]);
-      EXPECT_EQ(&_TWVBo, fields[-1]);
+      EXPECT_EQ(&VALUE_WITNESS_SYM(Bo), fields[-1]);
 
       // Assert that we set the superclass field.
       EXPECT_EQ(SuperclassWithPrefix_AddressPoint, fields[1]);
@@ -741,7 +741,7 @@ static const void *DeallocatedBuffer = nullptr;
 
 namespace swift {
   void installCommonValueWitnesses(ValueWitnessTable *vwtable);
-}
+} // namespace swift
 
 
 TEST(MetadataTest, installCommonValueWitnesses_pod_indirect) {

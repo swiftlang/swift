@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend -parse-sil -emit-sib -parse-as-library -parse-stdlib -module-name SemanticsAttr -o %t/SemanticsAttr.sib %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %t/SemanticsAttr.sib -o - -sil-sort-output | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %t/SemanticsAttr.sib -o - -emit-sorted-sil | %FileCheck %s
 
 sil_stage canonical
 

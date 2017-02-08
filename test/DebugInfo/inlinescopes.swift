@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: echo "public var x = Int64()" \
-// RUN:   | %target-swift-frontend -module-name FooBar -emit-module -o %t -
-// RUN: %target-swift-frontend %s -O -I %t -emit-ir -g -o %t.ll
+// RUN:   | %target-swift-frontend -Xllvm -new-mangling-for-tests -module-name FooBar -emit-module -o %t -
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -O -I %t -emit-ir -g -o %t.ll
 // RUN: %FileCheck %s < %t.ll
 // RUN: %FileCheck %s -check-prefix=TRANSPARENT-CHECK < %t.ll
 
@@ -34,4 +34,4 @@ let y = inlined(x)
 use(y)
 
 // Check if the inlined and removed function still has the correct linkage name.
-// CHECK-DAG: !DISubprogram(name: "inlined", linkageName: "_TF4main7inlinedFVs5Int64S0_"
+// CHECK-DAG: !DISubprogram(name: "inlined", linkageName: "_T04main7inlineds5Int64VADF"

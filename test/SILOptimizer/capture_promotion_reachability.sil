@@ -27,12 +27,12 @@ func test_reachability_1(b: Builtin.Int1, x: Builtin.Int64, y: Builtin.Int64) {
 // CHECK-LABEL: sil @test_reachability_1
 sil @test_reachability_1 : $@convention(thin) (Builtin.Int1, Builtin.Int64, Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
-  %3 = alloc_box $@box Builtin.Int1
-  %3a = project_box %3 : $@box Builtin.Int1, 0
-  %4 = alloc_box $@box Builtin.Int64
-  %4a = project_box %4 : $@box Builtin.Int64, 0
-  %5 = alloc_box $@box Builtin.Int64
-  %5a = project_box %5 : $@box Builtin.Int64, 0
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int1>, 0
+  %4 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
+  %5 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  %5a = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   store %0 to %3a : $*Builtin.Int1
   store %1 to %4a : $*Builtin.Int64
   store %2 to %5a : $*Builtin.Int64
@@ -45,52 +45,52 @@ bb1:
   br bb2
 
 bb2:
-  %14 = alloc_box $@box @callee_owned () -> Builtin.Int64
-  %14a = project_box %14 : $@box @callee_owned () -> Builtin.Int64, 0
+  %14 = alloc_box $<τ_0_0> { var τ_0_0 } <@callee_owned () -> Builtin.Int64>
+  %14a = project_box %14 : $<τ_0_0> { var τ_0_0 } <@callee_owned () -> Builtin.Int64>, 0
   // CHECK: [[CLOSURE0_PROMOTE0:%.*]] = function_ref @_TTSf2i__closure0 :
-  %15 = function_ref @closure0 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
-  strong_retain %4 : $@box Builtin.Int64
+  %15 = function_ref @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
+  strong_retain %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   // CHECK: partial_apply [[CLOSURE0_PROMOTE0]]({{%.*}})
-  %17 = partial_apply %15(%4) : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
+  %17 = partial_apply %15(%4) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
   store %17 to %14a : $*@callee_owned () -> Builtin.Int64
   %19 = load %3a : $*Builtin.Int1
   cond_br %19, bb3, bb4
 
 bb3:
   // CHECK: [[CLOSURE1_PROMOTE0:%.*]] = function_ref @_TTSf2i__closure1 :
-  %21 = function_ref @closure1 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
-  strong_retain %4 : $@box Builtin.Int64
+  %21 = function_ref @closure1 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
+  strong_retain %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   // CHECK: partial_apply [[CLOSURE1_PROMOTE0]]({{%.*}})
-  %23 = partial_apply %21(%4) : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
+  %23 = partial_apply %21(%4) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
   assign %23 to %14a : $*@callee_owned () -> Builtin.Int64
   br bb4
 
 bb4:
-  strong_release %14 : $@box @callee_owned () -> Builtin.Int64
-  strong_release %5 : $@box Builtin.Int64
-  strong_release %4 : $@box Builtin.Int64
-  strong_release %3 : $@box Builtin.Int1
+  strong_release %14 : $<τ_0_0> { var τ_0_0 } <@callee_owned () -> Builtin.Int64>
+  strong_release %5 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  strong_release %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
   %30 = tuple ()
   return %30 : $()
 }
 
 // closure0
-sil private @closure0 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $@box Builtin.Int64):
-  %1 = project_box %0 : $@box Builtin.Int64, 0
+sil private @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
+  %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
-  strong_release %0 : $@box Builtin.Int64
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   return %3 : $Builtin.Int64
 }
 
 // closure1
-sil private @closure1 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $@box Builtin.Int64):
-  %1 = project_box %0 : $@box Builtin.Int64, 0
+sil private @closure1 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
+  %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
-  strong_release %0 : $@box Builtin.Int64
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   return %3 : $Builtin.Int64
 }
 
@@ -109,22 +109,22 @@ func test_reachability_2(b: Builtin.Int1, x: Builtin.Int64, y: Builtin.Int64) {
 // CHECK-LABEL: sil @test_reachability_2
 sil @test_reachability_2 : $@convention(thin) (Builtin.Int1, Builtin.Int64, Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
-  %3 = alloc_box $@box Builtin.Int1
-  %3a = project_box %3 : $@box Builtin.Int1, 0
-  %4 = alloc_box $@box Builtin.Int64
-  %4a = project_box %4 : $@box Builtin.Int64, 0
-  %5 = alloc_box $@box Builtin.Int64
-  %5a = project_box %5 : $@box Builtin.Int64, 0
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int1>, 0
+  %4 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
+  %5 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  %5a = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   store %0 to %3a : $*Builtin.Int1
   store %1 to %4a : $*Builtin.Int64
   store %2 to %5a : $*Builtin.Int64
-  %9 = alloc_box $@box @callee_owned () -> Builtin.Int64
-  %9a = project_box %9 : $@box @callee_owned () -> Builtin.Int64, 0
+  %9 = alloc_box $<τ_0_0> { var τ_0_0 } <@callee_owned () -> Builtin.Int64>
+  %9a = project_box %9 : $<τ_0_0> { var τ_0_0 } <@callee_owned () -> Builtin.Int64>, 0
   // CHECK: [[CLOSURE2:%.*]] = function_ref @closure2 :
-  %10 = function_ref @closure2 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
-  strong_retain %4 : $@box Builtin.Int64
+  %10 = function_ref @closure2 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
+  strong_retain %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   // CHECK: partial_apply [[CLOSURE2]]({{%.*}})
-  %12 = partial_apply %10(%4) : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
+  %12 = partial_apply %10(%4) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
   store %12 to %9a : $*@callee_owned () -> Builtin.Int64
   %14 = load %3a : $*Builtin.Int1
   cond_br %14, bb1, bb2
@@ -140,39 +140,39 @@ bb2:
 
 bb3:
   // CHECK: [[CLOSURE3_PROMOTE0:%.*]] = function_ref @_TTSf2i__closure3 :
-  %21 = function_ref @closure3 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
-  strong_retain %4 : $@box Builtin.Int64
+  %21 = function_ref @closure3 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
+  strong_retain %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   // CHECK: partial_apply [[CLOSURE3_PROMOTE0]]({{%.*}})
-  %23 = partial_apply %21(%4) : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
+  %23 = partial_apply %21(%4) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
   assign %23 to %9a : $*@callee_owned () -> Builtin.Int64
   br bb4
 
 bb4:
-  strong_release %9 : $@box @callee_owned () -> Builtin.Int64
-  strong_release %5 : $@box Builtin.Int64
-  strong_release %4 : $@box Builtin.Int64
-  strong_release %3 : $@box Builtin.Int1
+  strong_release %9 : $<τ_0_0> { var τ_0_0 } <@callee_owned () -> Builtin.Int64>
+  strong_release %5 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  strong_release %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
   %30 = tuple ()
   return %30 : $()
 }
 
 // closure2
-sil private @closure2 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $@box Builtin.Int64):
-  %1 = project_box %0 : $@box Builtin.Int64, 0
+sil private @closure2 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
+  %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
-  strong_release %0 : $@box Builtin.Int64
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   return %3 : $Builtin.Int64
 }
 
 // closure3
-sil private @closure3 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $@box Builtin.Int64):
-  %1 = project_box %0 : $@box Builtin.Int64, 0
+sil private @closure3 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
+  %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
-  strong_release %0 : $@box Builtin.Int64
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   return %3 : $Builtin.Int64
 }
 
@@ -191,32 +191,32 @@ func test_reachability_3(b: Builtin.Int1, x: Builtin.Int64, y: Builtin.Int64) {
 // CHECK-LABEL: sil @test_reachability_3
 sil @test_reachability_3 : $@convention(thin) (Builtin.Int1, Builtin.Int64, Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
-  %3 = alloc_box $@box Builtin.Int1
-  %3a = project_box %3 : $@box Builtin.Int1, 0
-  %4 = alloc_box $@box Builtin.Int64
-  %4a = project_box %4 : $@box Builtin.Int64, 0
-  %5 = alloc_box $@box Builtin.Int64
-  %5a = project_box %5 : $@box Builtin.Int64, 0
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int1>, 0
+  %4 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
+  %5 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  %5a = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   store %0 to %3a : $*Builtin.Int1
   store %1 to %4a : $*Builtin.Int64
   store %2 to %5a : $*Builtin.Int64
-  %9 = alloc_box $@box @callee_owned () -> Builtin.Int64
-  %9a = project_box %9 : $@box @callee_owned () -> Builtin.Int64, 0
+  %9 = alloc_box $<τ_0_0> { var τ_0_0 } <@callee_owned () -> Builtin.Int64>
+  %9a = project_box %9 : $<τ_0_0> { var τ_0_0 } <@callee_owned () -> Builtin.Int64>, 0
   // CHECK: [[CLOSURE4:%.*]] = function_ref @closure4 :
-  %10 = function_ref @closure4 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
-  strong_retain %4 : $@box Builtin.Int64
+  %10 = function_ref @closure4 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
+  strong_retain %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   // CHECK: partial_apply [[CLOSURE4]]({{%.*}})
-  %12 = partial_apply %10(%4) : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
+  %12 = partial_apply %10(%4) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
   store %12 to %9a : $*@callee_owned () -> Builtin.Int64
   %14 = load %3a : $*Builtin.Int1
   cond_br %14, bb1, bb2
 
 bb1:
   // CHECK: [[CLOSURE5:%.*]] = function_ref @closure5 :
-  %16 = function_ref @closure5 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
-  strong_retain %4 : $@box Builtin.Int64
+  %16 = function_ref @closure5 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
+  strong_retain %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   // CHECK: partial_apply [[CLOSURE5]]({{%.*}})
-  %18 = partial_apply %16(%4) : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
+  %18 = partial_apply %16(%4) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
   assign %18 to %9a : $*@callee_owned () -> Builtin.Int64
   br bb2
 
@@ -230,31 +230,31 @@ bb3:
   br bb4
 
 bb4:
-  strong_release %9 : $@box @callee_owned () -> Builtin.Int64
-  strong_release %5 : $@box Builtin.Int64
-  strong_release %4 : $@box Builtin.Int64
-  strong_release %3 : $@box Builtin.Int1
+  strong_release %9 : $<τ_0_0> { var τ_0_0 } <@callee_owned () -> Builtin.Int64>
+  strong_release %5 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  strong_release %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
   %30 = tuple ()
   return %30 : $()
 }
 
 // closure4
-sil private @closure4 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $@box Builtin.Int64):
-  %1 = project_box %0 : $@box Builtin.Int64, 0
+sil private @closure4 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
+  %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
-  strong_release %0 : $@box Builtin.Int64
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   return %3 : $Builtin.Int64
 }
 
 // closure5
-sil private @closure5 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $@box Builtin.Int64):
-  %1 = project_box %0 : $@box Builtin.Int64, 0
+sil private @closure5 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
+  %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
-  strong_release %0 : $@box Builtin.Int64
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   return %3 : $Builtin.Int64
 }
 
@@ -271,22 +271,22 @@ func test_reachability_4(b: Builtin.Int1, x: Builtin.Int64, y: Builtin.Int64) {
 // CHECK-LABEL: sil @test_reachability_4
 sil @test_reachability_4 : $@convention(thin) (Builtin.Int1, Builtin.Int64, Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
-  %3 = alloc_box $@box Builtin.Int1
-  %3a = project_box %3 : $@box Builtin.Int1, 0
-  %4 = alloc_box $@box Builtin.Int64
-  %4a = project_box %4 : $@box Builtin.Int64, 0
-  %5 = alloc_box $@box Builtin.Int64
-  %5a = project_box %5 : $@box Builtin.Int64, 0
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int1>, 0
+  %4 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
+  %5 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  %5a = project_box %5 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   store %0 to %3a : $*Builtin.Int1
   store %1 to %4a : $*Builtin.Int64
   store %2 to %5a : $*Builtin.Int64
-  %9 = alloc_box $@box @callee_owned () -> Builtin.Int64
-  %9a = project_box %9 : $@box @callee_owned () -> Builtin.Int64, 0
+  %9 = alloc_box $<τ_0_0> { var τ_0_0 } <@callee_owned () -> Builtin.Int64>
+  %9a = project_box %9 : $<τ_0_0> { var τ_0_0 } <@callee_owned () -> Builtin.Int64>, 0
   // CHECK: [[CLOSURE6:%.*]] = function_ref @closure6 :
-  %10 = function_ref @closure6 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
-  strong_retain %4 : $@box Builtin.Int64
+  %10 = function_ref @closure6 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
+  strong_retain %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   // CHECK: partial_apply [[CLOSURE6]]({{%.*}})
-  %12 = partial_apply %10(%4) : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
+  %12 = partial_apply %10(%4) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
   store %12 to %9a : $*@callee_owned () -> Builtin.Int64
   br bb1
 
@@ -298,38 +298,38 @@ bb2:
   %17 = load %5a : $*Builtin.Int64
   assign %17 to %4a : $*Builtin.Int64
   // CHECK: [[CLOSURE7:%.*]] = function_ref @closure7 :
-  %19 = function_ref @closure7 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
-  strong_retain %4 : $@box Builtin.Int64
+  %19 = function_ref @closure7 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
+  strong_retain %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   // CHECK: partial_apply [[CLOSURE7]]({{%.*}})
-  %21 = partial_apply %19(%4) : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64
+  %21 = partial_apply %19(%4) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64
   assign %21 to %9a : $*@callee_owned () -> Builtin.Int64
   br bb1
 
 bb3:
-  strong_release %9 : $@box @callee_owned () -> Builtin.Int64
-  strong_release %5 : $@box Builtin.Int64
-  strong_release %4 : $@box Builtin.Int64
-  strong_release %3 : $@box Builtin.Int1
+  strong_release %9 : $<τ_0_0> { var τ_0_0 } <@callee_owned () -> Builtin.Int64>
+  strong_release %5 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  strong_release %4 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
   %28 = tuple ()
   return %28 : $()
 }
 
 // closure6
-sil private @closure6 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $@box Builtin.Int64):
-  %1 = project_box %0 : $@box Builtin.Int64, 0
+sil private @closure6 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
+  %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
-  strong_release %0 : $@box Builtin.Int64
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   return %3 : $Builtin.Int64
 }
 
 // closure7
-sil private @closure7 : $@convention(thin) (@owned @box Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $@box Builtin.Int64):
-  %1 = project_box %0 : $@box Builtin.Int64, 0
+sil private @closure7 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
+  %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   %2 = tuple ()
   %3 = load %1 : $*Builtin.Int64
-  strong_release %0 : $@box Builtin.Int64
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   return %3 : $Builtin.Int64
 }

@@ -635,7 +635,7 @@ bb1:
 // CHECK-NOT: strong_retain
   %17 = load %0 : $*Test
   strong_retain %17 : $Test
-  %19 = class_method %17 : $Test, #Test.testing!1 : (Test) -> () -> UInt64 , $@convention(method) (@guaranteed Test) -> UInt64
+  %19 = class_method %17 : $Test, #Test.testing!1 : (Test) -> () -> UInt64, $@convention(method) (@guaranteed Test) -> UInt64
   %20 = load %7 : $*UInt64
   checked_cast_br [exact] %17 : $Test to $Test, bb3, bb4
 bb2:
@@ -1358,7 +1358,7 @@ bb4(%10 : $X):                                    // Preds: bb1
   br bb2                                          // id: %12
 
 bb5:                                              // Preds: bb1
-  %13 = class_method %3 : $X, #X.ping!1 : (X) -> () -> () , $@convention(method) (@guaranteed X) -> () // user: %14
+  %13 = class_method %3 : $X, #X.ping!1 : (X) -> () -> (), $@convention(method) (@guaranteed X) -> () // user: %14
   %14 = apply %13(%3) : $@convention(method) (@guaranteed X) -> ()
   strong_release %3 : $X                          // id: %15
   br bb2                                          // id: %16
@@ -1384,7 +1384,7 @@ bb0(%0 : $X):
 bb1(%3 : $Y):                                     // Preds: bb0
   debug_value %3 : $Y, let, name "z" // id: %4
   %5 = upcast %3 : $Y to $X                       // users: %6, %7, %21, %23
-  %6 = class_method %5 : $X, #X.ping!1 : (X) -> () -> () , $@convention(method) (@guaranteed X) -> () // users: %21, %23
+  %6 = class_method %5 : $X, #X.ping!1 : (X) -> () -> (), $@convention(method) (@guaranteed X) -> () // users: %21, %23
   checked_cast_br [exact] %5 : $X to $Y, bb5, bb6 // id: %7
 
 bb2:                                              // Preds: bb5 bb6

@@ -1,6 +1,6 @@
-// RUN: %target-parse-verify-swift
-// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module | %FileCheck %s
-// RUN: not %target-swift-frontend -parse -dump-ast -disable-objc-attr-requires-foundation-module %s 2> %t.dump
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 4
+// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module -swift-version 4 | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck -dump-ast -disable-objc-attr-requires-foundation-module %s -swift-version 4 2> %t.dump
 // RUN: %FileCheck -check-prefix CHECK-DUMP %s < %t.dump
 // REQUIRES: objc_interop
 
@@ -383,22 +383,22 @@ func genericContext1<T>(_: T) {
 
 class GenericContext2<T> {
   @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{3-9=}}
-  class subject_inGenericContext {} // expected-error{{nested in generic type}}
+  class subject_inGenericContext {}
 
   @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{3-9=}}
-  class subject_inGenericContext2 : Class_ObjC1 {} // expected-error{{nested in generic type}}
+  class subject_inGenericContext2 : Class_ObjC1 {}
 
   @objc
   func f() {} // no-error
 }
 
 class GenericContext3<T> {
-  class MoreNested { // expected-error{{nested in generic type}}
+  class MoreNested {
     @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute because they are not directly visible from Objective-C}} {{5-11=}}
-    class subject_inGenericContext {} // expected-error{{nested in generic type}}
+    class subject_inGenericContext {}
 
     @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{5-11=}}
-    class subject_inGenericContext2 : Class_ObjC1 {} // expected-error{{nested in generic type}}
+    class subject_inGenericContext2 : Class_ObjC1 {}
 
     @objc
     func f() {} // no-error
@@ -545,6 +545,12 @@ class subject_subscriptInvalid8 {
     // expected-note@-1{{protocol 'Protocol_Class1' is not '@objc'}}
     get { return 0 }
   }
+}
+
+class subject_propertyInvalid1 {
+  @objc
+  let plainStruct = PlainStruct() // expected-error {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+  // expected-note@-1{{Swift structs cannot be represented in Objective-C}}
 }
 
 //===--- Tests for @objc inference.
@@ -1493,6 +1499,14 @@ class infer_instanceVar2<
   @objc func func_GP_Unconstrained_(a: GP_Unconstrained) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
+
+  @objc func func_GP_Unconstrained_() -> GP_Unconstrained {}
+  // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
+
+  @objc func func_GP_Class_ObjC__() -> GP_Class_ObjC {}
+  // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 }
 
 class infer_instanceVar3 : Class_ObjC1 {
@@ -1750,12 +1764,15 @@ enum BadEnum1: Int { case X }
 
 @objc
 enum BadEnum2: Int {
-  @objc(X:)   // expected-error{{'@objc' enum case must have a simple name}}{{10-11=}}
+  @objc(X:)   // expected-error{{'@objc' enum element must have a simple name}}{{10-11=}}
   case X
 }
 
 class BadClass2 {
-  @objc(badprop:foo:wibble:) // expected-error{{'@objc' property must have a simple name}}{{16-28=}}
+  @objc(realDealloc) // expected-error{{'@objc' deinitializer cannot have a name}}
+  deinit { }
+
+  @objc(badprop:foo:wibble:) // expected-error{{'@objc' var must have a simple name}}{{16-28=}}
   var badprop: Int = 5
 
   @objc(foo) // expected-error{{'@objc' subscript cannot have a name; did you mean to put the name on the getter or setter?}}
@@ -1893,12 +1910,14 @@ class Load1 {
   class func load() { }
   class func alloc() {}
   class func allocWithZone(_: Int) {}
+  class func initialize() {}
 }
 
 @objc class Load2 {
   class func load() { } // expected-error{{method 'load()' defines Objective-C class method 'load', which is not permitted by Swift}}
   class func alloc() {} // expected-error{{method 'alloc()' defines Objective-C class method 'alloc', which is not permitted by Swift}}
   class func allocWithZone(_: Int) {} // expected-error{{method 'allocWithZone' defines Objective-C class method 'allocWithZone:', which is not permitted by Swift}}
+  class func initialize() {} // expected-error{{method 'initialize()' defines Objective-C class method 'initialize', which is not permitted by Swift}}
 }
 
 @objc class Load3 {
@@ -1909,6 +1928,7 @@ class Load1 {
 
   @objc(alloc) class var prop: Int { return 0 } // expected-error{{getter for 'prop' defines Objective-C class method 'alloc', which is not permitted by Swift}}
   @objc(allocWithZone:) class func fooWithZone(_: Int) {} // expected-error{{method 'fooWithZone' defines Objective-C class method 'allocWithZone:', which is not permitted by Swift}}
+  @objc(initialize) class func barnitialize() {} // expected-error{{method 'barnitialize()' defines Objective-C class method 'initialize', which is not permitted by Swift}}
 }
 
 // Members of protocol extensions cannot be @objc
@@ -2138,6 +2158,11 @@ func ==(lhs: ObjC_Class1, rhs: ObjC_Class1) -> Bool {
   static func +(lhs: Self, rhs: Self) -> Self // expected-error {{@objc protocols may not have operator requirements}}
 }
 
+class AdoptsOperatorInProtocol : OperatorInProtocol {
+  static func +(lhs: AdoptsOperatorInProtocol, rhs: AdoptsOperatorInProtocol) -> Self {}
+  // expected-error@-1 {{operator methods cannot be declared @objc}}
+}
+
 //===--- @objc inference for witnesses
 
 @objc protocol InferFromProtocol {
@@ -2194,4 +2219,8 @@ class SubclassInfersFromProtocol2 : SuperclassImplementsProtocol {
 extension SubclassInfersFromProtocol2 {
   // CHECK: {{^}} @objc dynamic func method1(value: Int)
   func method1(value: Int) { }
+}
+
+@objc class NeverReturningMethod {
+  @objc func doesNotReturn() -> Never {}
 }

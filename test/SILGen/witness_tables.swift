@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module > %t.sil
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module > %t.sil
 // RUN: %FileCheck -check-prefix=TABLE -check-prefix=TABLE-ALL %s < %t.sil
 // RUN: %FileCheck -check-prefix=SYMBOL %s < %t.sil
 
-// RUN: %target-swift-frontend -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-testing > %t.testable.sil
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-testing > %t.testable.sil
 // RUN: %FileCheck -check-prefix=TABLE-TESTABLE -check-prefix=TABLE-ALL %s < %t.testable.sil
 // RUN: %FileCheck -check-prefix=SYMBOL-TESTABLE %s < %t.testable.sil
 
@@ -62,10 +62,10 @@ struct ConformingAssoc : AssocReqt {
 }
 // TABLE-LABEL: sil_witness_table hidden ConformingAssoc: AssocReqt module witness_tables {
 // TABLE-TESTABLE-LABEL: sil_witness_table [fragile] ConformingAssoc: AssocReqt module witness_tables {
-// TABLE-ALL-NEXT:    method #AssocReqt.requiredMethod!1: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethod{{.*}}
+// TABLE-ALL-NEXT:    method #AssocReqt.requiredMethod!1: {{.*}} : @_T014witness_tables15ConformingAssocVAA0D4ReqtAaaDP14requiredMethod{{[_0-9a-zA-Z]*}}FTW
 // TABLE-ALL-NEXT:  }
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethod{{.*}} : $@convention(witness_method) (@in_guaranteed ConformingAssoc) -> ()
-// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethod{{.*}} : $@convention(witness_method) (@in_guaranteed ConformingAssoc) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables15ConformingAssocVAA0D4ReqtAaaDP14requiredMethod{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (@in_guaranteed ConformingAssoc) -> ()
+// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_T014witness_tables15ConformingAssocVAA0D4ReqtAaaDP14requiredMethod{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (@in_guaranteed ConformingAssoc) -> ()
 
 struct ConformingStruct : AnyProtocol {
   typealias AssocType = SomeAssoc
@@ -83,22 +83,22 @@ func <~>(x: ConformingStruct, y: ConformingStruct) {}
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
-// TABLE-NEXT:    method #AnyProtocol.method!1: @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_FS1_6method{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.generic!1: @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_FS1_7generic{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_FS1_16assocTypesMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_ZFS1_12staticMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_ZFS1_oi3ltg{{.*}}
+// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables16ConformingStructVAA11AnyProtocolAaaDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables16ConformingStructVAA11AnyProtocolAaaDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @_T014witness_tables16ConformingStructVAA11AnyProtocolAaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @_T014witness_tables16ConformingStructVAA11AnyProtocolAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @_T014witness_tables16ConformingStructVAA11AnyProtocolAaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_FS1_6method{{.*}} : $@convention(witness_method) (Arg, @in ConformingStruct, @in_guaranteed ConformingStruct) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_FS1_7generic{{.*}}: ArchetypeReqt> (@in τ_0_0, @in ConformingStruct, @in_guaranteed ConformingStruct) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_FS1_16assocTypesMethod{{.*}} : $@convention(witness_method) (@in SomeAssoc, @in ConformingAssoc, @in_guaranteed ConformingStruct) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_ZFS1_12staticMethod{{.*}} : $@convention(witness_method) (@in ConformingStruct, @thick ConformingStruct.Type) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_ZFS1_oi3ltg{{.*}} : $@convention(witness_method) (@in ConformingStruct, @in ConformingStruct, @thick ConformingStruct.Type) -> ()
-// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_FS1_6method{{.*}} : $@convention(witness_method) (Arg, @in ConformingStruct, @in_guaranteed ConformingStruct) -> ()
-// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_FS1_7generic{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : ArchetypeReqt> (@in τ_0_0, @in ConformingStruct, @in_guaranteed ConformingStruct) -> ()
-// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_FS1_16assocTypesMethod{{.*}} : $@convention(witness_method) (@in SomeAssoc, @in ConformingAssoc, @in_guaranteed ConformingStruct) -> ()
-// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_ZFS1_12staticMethod{{.*}} : $@convention(witness_method) (@in ConformingStruct, @thick ConformingStruct.Type) -> ()
-// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_TTWV14witness_tables16ConformingStructS_11AnyProtocolS_ZFS1_oi3ltg{{.*}} : $@convention(witness_method) (@in ConformingStruct, @in ConformingStruct, @thick ConformingStruct.Type) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables16ConformingStructVAA11AnyProtocolAaaDP6method{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (Arg, @in ConformingStruct, @in_guaranteed ConformingStruct) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables16ConformingStructVAA11AnyProtocolAaaDP7generic{{[_0-9a-zA-Z]*}}FTW {{.*}}: ArchetypeReqt> (@in τ_0_0, @in ConformingStruct, @in_guaranteed ConformingStruct) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables16ConformingStructVAA11AnyProtocolAaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (@in SomeAssoc, @in ConformingAssoc, @in_guaranteed ConformingStruct) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables16ConformingStructVAA11AnyProtocolAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW : $@convention(witness_method) (@in ConformingStruct, @thick ConformingStruct.Type) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables16ConformingStructVAA11AnyProtocolAaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW : $@convention(witness_method) (@in ConformingStruct, @in ConformingStruct, @thick ConformingStruct.Type) -> ()
+// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_T014witness_tables16ConformingStructVAA11AnyProtocolAaaDP6method{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (Arg, @in ConformingStruct, @in_guaranteed ConformingStruct) -> ()
+// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_T014witness_tables16ConformingStructVAA11AnyProtocolAaaDP7generic{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : ArchetypeReqt> (@in τ_0_0, @in ConformingStruct, @in_guaranteed ConformingStruct) -> ()
+// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_T014witness_tables16ConformingStructVAA11AnyProtocolAaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (@in SomeAssoc, @in ConformingAssoc, @in_guaranteed ConformingStruct) -> ()
+// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_T014witness_tables16ConformingStructVAA11AnyProtocolAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW : $@convention(witness_method) (@in ConformingStruct, @thick ConformingStruct.Type) -> ()
+// SYMBOL-TESTABLE:      sil [transparent] [thunk] @_T014witness_tables16ConformingStructVAA11AnyProtocolAaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW : $@convention(witness_method) (@in ConformingStruct, @in ConformingStruct, @thick ConformingStruct.Type) -> ()
 
 protocol AddressOnly {}
 
@@ -120,17 +120,17 @@ func <~>(x: ConformingAddressOnlyStruct, y: ConformingAddressOnlyStruct) {}
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
-// TABLE-NEXT:    method #AnyProtocol.method!1: @_TTWV14witness_tables27ConformingAddressOnlyStructS_11AnyProtocolS_FS1_6method{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.generic!1: @_TTWV14witness_tables27ConformingAddressOnlyStructS_11AnyProtocolS_FS1_7generic{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: @_TTWV14witness_tables27ConformingAddressOnlyStructS_11AnyProtocolS_FS1_16assocTypesMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: @_TTWV14witness_tables27ConformingAddressOnlyStructS_11AnyProtocolS_ZFS1_12staticMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: @_TTWV14witness_tables27ConformingAddressOnlyStructS_11AnyProtocolS_ZFS1_oi3ltg{{.*}}
+// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolAaaDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolAaaDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @_T014witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolAaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @_T014witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @_T014witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolAaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables27ConformingAddressOnlyStructS_11AnyProtocolS_FS1_6method{{.*}} : $@convention(witness_method) (Arg, @in ConformingAddressOnlyStruct, @in_guaranteed ConformingAddressOnlyStruct) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables27ConformingAddressOnlyStructS_11AnyProtocolS_FS1_7generic{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : ArchetypeReqt> (@in τ_0_0, @in ConformingAddressOnlyStruct, @in_guaranteed ConformingAddressOnlyStruct) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables27ConformingAddressOnlyStructS_11AnyProtocolS_FS1_16assocTypesMethod{{.*}} : $@convention(witness_method) (@in SomeAssoc, @in ConformingAssoc, @in_guaranteed ConformingAddressOnlyStruct) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables27ConformingAddressOnlyStructS_11AnyProtocolS_ZFS1_12staticMethod{{.*}} : $@convention(witness_method) (@in ConformingAddressOnlyStruct, @thick ConformingAddressOnlyStruct.Type) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables27ConformingAddressOnlyStructS_11AnyProtocolS_ZFS1_oi3ltg{{.*}} : $@convention(witness_method) (@in ConformingAddressOnlyStruct, @in ConformingAddressOnlyStruct, @thick ConformingAddressOnlyStruct.Type) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolAaaDP6method{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (Arg, @in ConformingAddressOnlyStruct, @in_guaranteed ConformingAddressOnlyStruct) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolAaaDP7generic{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : ArchetypeReqt> (@in τ_0_0, @in ConformingAddressOnlyStruct, @in_guaranteed ConformingAddressOnlyStruct) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolAaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (@in SomeAssoc, @in ConformingAssoc, @in_guaranteed ConformingAddressOnlyStruct) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW : $@convention(witness_method) (@in ConformingAddressOnlyStruct, @thick ConformingAddressOnlyStruct.Type) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables27ConformingAddressOnlyStructVAA11AnyProtocolAaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW : $@convention(witness_method) (@in ConformingAddressOnlyStruct, @in ConformingAddressOnlyStruct, @thick ConformingAddressOnlyStruct.Type) -> ()
 
 class ConformingClass : AnyProtocol {
   typealias AssocType = SomeAssoc
@@ -148,17 +148,17 @@ func <~>(x: ConformingClass, y: ConformingClass) {}
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
-// TABLE-NEXT:    method #AnyProtocol.method!1: @_TTWC14witness_tables15ConformingClassS_11AnyProtocolS_FS1_6method{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.generic!1: @_TTWC14witness_tables15ConformingClassS_11AnyProtocolS_FS1_7generic{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: @_TTWC14witness_tables15ConformingClassS_11AnyProtocolS_FS1_16assocTypesMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: @_TTWC14witness_tables15ConformingClassS_11AnyProtocolS_ZFS1_12staticMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: @_TTWC14witness_tables15ConformingClassS_11AnyProtocolS_ZFS1_oi3ltg{{.*}}
+// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables15ConformingClassCAA11AnyProtocolAaaDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables15ConformingClassCAA11AnyProtocolAaaDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @_T014witness_tables15ConformingClassCAA11AnyProtocolAaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @_T014witness_tables15ConformingClassCAA11AnyProtocolAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @_T014witness_tables15ConformingClassCAA11AnyProtocolAaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWC14witness_tables15ConformingClassS_11AnyProtocolS_FS1_6method{{.*}} : $@convention(witness_method) (Arg, @in ConformingClass, @in_guaranteed ConformingClass) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWC14witness_tables15ConformingClassS_11AnyProtocolS_FS1_7generic{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : ArchetypeReqt> (@in τ_0_0, @in ConformingClass, @in_guaranteed ConformingClass) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWC14witness_tables15ConformingClassS_11AnyProtocolS_FS1_16assocTypesMethod{{.*}} : $@convention(witness_method) (@in SomeAssoc, @in ConformingAssoc, @in_guaranteed ConformingClass) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWC14witness_tables15ConformingClassS_11AnyProtocolS_ZFS1_12staticMethod{{.*}} : $@convention(witness_method) (@in ConformingClass, @thick ConformingClass.Type) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWC14witness_tables15ConformingClassS_11AnyProtocolS_ZFS1_oi3ltg{{.*}} : $@convention(witness_method) (@in ConformingClass, @in ConformingClass, @thick ConformingClass.Type) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables15ConformingClassCAA11AnyProtocolAaaDP6method{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (Arg, @in ConformingClass, @in_guaranteed ConformingClass) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables15ConformingClassCAA11AnyProtocolAaaDP7generic{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : ArchetypeReqt> (@in τ_0_0, @in ConformingClass, @in_guaranteed ConformingClass) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables15ConformingClassCAA11AnyProtocolAaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (@in SomeAssoc, @in ConformingAssoc, @in_guaranteed ConformingClass) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables15ConformingClassCAA11AnyProtocolAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW : $@convention(witness_method) (@in ConformingClass, @thick ConformingClass.Type) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables15ConformingClassCAA11AnyProtocolAaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW : $@convention(witness_method) (@in ConformingClass, @in ConformingClass, @thick ConformingClass.Type) -> ()
 
 struct ConformsByExtension {}
 extension ConformsByExtension : AnyProtocol {
@@ -177,17 +177,17 @@ func <~>(x: ConformsByExtension, y: ConformsByExtension) {}
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
-// TABLE-NEXT:    method #AnyProtocol.method!1: @_TTWV14witness_tables19ConformsByExtensionS_11AnyProtocolS_FS1_6method{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.generic!1: @_TTWV14witness_tables19ConformsByExtensionS_11AnyProtocolS_FS1_7generic{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: @_TTWV14witness_tables19ConformsByExtensionS_11AnyProtocolS_FS1_16assocTypesMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: @_TTWV14witness_tables19ConformsByExtensionS_11AnyProtocolS_ZFS1_12staticMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: @_TTWV14witness_tables19ConformsByExtensionS_11AnyProtocolS_ZFS1_oi3ltg{{.*}}
+// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables19ConformsByExtensionVAA11AnyProtocolAaaDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables19ConformsByExtensionVAA11AnyProtocolAaaDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @_T014witness_tables19ConformsByExtensionVAA11AnyProtocolAaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @_T014witness_tables19ConformsByExtensionVAA11AnyProtocolAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @_T014witness_tables19ConformsByExtensionVAA11AnyProtocolAaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables19ConformsByExtensionS_11AnyProtocolS_FS1_6method{{.*}} : $@convention(witness_method) (Arg, @in ConformsByExtension, @in_guaranteed ConformsByExtension) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables19ConformsByExtensionS_11AnyProtocolS_FS1_7generic{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : ArchetypeReqt> (@in τ_0_0, @in ConformsByExtension, @in_guaranteed ConformsByExtension) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables19ConformsByExtensionS_11AnyProtocolS_FS1_16assocTypesMethod{{.*}} : $@convention(witness_method) (@in SomeAssoc, @in ConformingAssoc, @in_guaranteed ConformsByExtension) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables19ConformsByExtensionS_11AnyProtocolS_ZFS1_12staticMethod{{.*}} : $@convention(witness_method) (@in ConformsByExtension, @thick ConformsByExtension.Type) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables19ConformsByExtensionS_11AnyProtocolS_ZFS1_oi3ltg{{.*}} : $@convention(witness_method) (@in ConformsByExtension, @in ConformsByExtension, @thick ConformsByExtension.Type) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables19ConformsByExtensionVAA11AnyProtocolAaaDP6method{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (Arg, @in ConformsByExtension, @in_guaranteed ConformsByExtension) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables19ConformsByExtensionVAA11AnyProtocolAaaDP7generic{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : ArchetypeReqt> (@in τ_0_0, @in ConformsByExtension, @in_guaranteed ConformsByExtension) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables19ConformsByExtensionVAA11AnyProtocolAaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (@in SomeAssoc, @in ConformingAssoc, @in_guaranteed ConformsByExtension) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables19ConformsByExtensionVAA11AnyProtocolAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW : $@convention(witness_method) (@in ConformsByExtension, @thick ConformsByExtension.Type) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables19ConformsByExtensionVAA11AnyProtocolAaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW : $@convention(witness_method) (@in ConformsByExtension, @in ConformsByExtension, @thick ConformsByExtension.Type) -> ()
 
 extension OtherModuleStruct : AnyProtocol {
   typealias AssocType = SomeAssoc
@@ -205,17 +205,17 @@ func <~>(x: OtherModuleStruct, y: OtherModuleStruct) {}
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
-// TABLE-NEXT:    method #AnyProtocol.method!1: @_TTWV16witness_tables_b17OtherModuleStruct14witness_tables11AnyProtocolS1_FS2_6method{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.generic!1: @_TTWV16witness_tables_b17OtherModuleStruct14witness_tables11AnyProtocolS1_FS2_7generic{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: @_TTWV16witness_tables_b17OtherModuleStruct14witness_tables11AnyProtocolS1_FS2_16assocTypesMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: @_TTWV16witness_tables_b17OtherModuleStruct14witness_tables11AnyProtocolS1_ZFS2_12staticMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: @_TTWV16witness_tables_b17OtherModuleStruct14witness_tables11AnyProtocolS1_ZFS2_oi3ltg{{.*}}
+// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T016witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolAddEP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T016witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolAddEP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @_T016witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolAddEP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @_T016witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolAddEP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @_T016witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolAddEP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV16witness_tables_b17OtherModuleStruct14witness_tables11AnyProtocolS1_FS2_6method{{.*}} : $@convention(witness_method) (Arg, @in OtherModuleStruct, @in_guaranteed OtherModuleStruct) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV16witness_tables_b17OtherModuleStruct14witness_tables11AnyProtocolS1_FS2_7generic{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : ArchetypeReqt> (@in τ_0_0, @in OtherModuleStruct, @in_guaranteed OtherModuleStruct) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV16witness_tables_b17OtherModuleStruct14witness_tables11AnyProtocolS1_FS2_16assocTypesMethod{{.*}} : $@convention(witness_method) (@in SomeAssoc, @in ConformingAssoc, @in_guaranteed OtherModuleStruct) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV16witness_tables_b17OtherModuleStruct14witness_tables11AnyProtocolS1_ZFS2_12staticMethod{{.*}} : $@convention(witness_method) (@in OtherModuleStruct, @thick OtherModuleStruct.Type) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV16witness_tables_b17OtherModuleStruct14witness_tables11AnyProtocolS1_ZFS2_oi3ltg{{.*}} : $@convention(witness_method) (@in OtherModuleStruct, @in OtherModuleStruct, @thick OtherModuleStruct.Type) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T016witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolAddEP6method{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (Arg, @in OtherModuleStruct, @in_guaranteed OtherModuleStruct) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T016witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolAddEP7generic{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : ArchetypeReqt> (@in τ_0_0, @in OtherModuleStruct, @in_guaranteed OtherModuleStruct) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T016witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolAddEP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (@in SomeAssoc, @in ConformingAssoc, @in_guaranteed OtherModuleStruct) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T016witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolAddEP12staticMethod{{[_0-9a-zA-Z]*}}FZTW : $@convention(witness_method) (@in OtherModuleStruct, @thick OtherModuleStruct.Type) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T016witness_tables_b17OtherModuleStructV0a1_B011AnyProtocolAddEP3ltgoi{{[_0-9a-zA-Z]*}}FZTW : $@convention(witness_method) (@in OtherModuleStruct, @in OtherModuleStruct, @thick OtherModuleStruct.Type) -> ()
 
 protocol OtherProtocol {}
 
@@ -235,17 +235,17 @@ func <~> <P: OtherProtocol>(x: P, y: P) {}
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
-// TABLE-NEXT:    method #AnyProtocol.method!1: @_TTWV14witness_tables32ConformsWithMoreGenericWitnessesS_11AnyProtocolS_FS1_6method{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.generic!1: @_TTWV14witness_tables32ConformsWithMoreGenericWitnessesS_11AnyProtocolS_FS1_7generic{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: @_TTWV14witness_tables32ConformsWithMoreGenericWitnessesS_11AnyProtocolS_FS1_16assocTypesMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: @_TTWV14witness_tables32ConformsWithMoreGenericWitnessesS_11AnyProtocolS_ZFS1_12staticMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: @_TTWV14witness_tables32ConformsWithMoreGenericWitnessesS_11AnyProtocolS_ZFS1_oi3ltg{{.*}}
+// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolAaaDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolAaaDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @_T014witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolAaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @_T014witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @_T014witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolAaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables32ConformsWithMoreGenericWitnessesS_11AnyProtocolS_FS1_6method{{.*}} : $@convention(witness_method) (Arg, @in ConformsWithMoreGenericWitnesses, @in_guaranteed ConformsWithMoreGenericWitnesses) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables32ConformsWithMoreGenericWitnessesS_11AnyProtocolS_FS1_7generic{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : ArchetypeReqt> (@in τ_0_0, @in ConformsWithMoreGenericWitnesses, @in_guaranteed ConformsWithMoreGenericWitnesses) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables32ConformsWithMoreGenericWitnessesS_11AnyProtocolS_FS1_16assocTypesMethod{{.*}} : $@convention(witness_method) (@in SomeAssoc, @in ConformingAssoc, @in_guaranteed ConformsWithMoreGenericWitnesses) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables32ConformsWithMoreGenericWitnessesS_11AnyProtocolS_ZFS1_12staticMethod{{.*}} : $@convention(witness_method) (@in ConformsWithMoreGenericWitnesses, @thick ConformsWithMoreGenericWitnesses.Type) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWV14witness_tables32ConformsWithMoreGenericWitnessesS_11AnyProtocolS_ZFS1_oi3ltg{{.*}} : $@convention(witness_method) (@in ConformsWithMoreGenericWitnesses, @in ConformsWithMoreGenericWitnesses, @thick ConformsWithMoreGenericWitnesses.Type) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolAaaDP6method{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (Arg, @in ConformsWithMoreGenericWitnesses, @in_guaranteed ConformsWithMoreGenericWitnesses) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolAaaDP7generic{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : ArchetypeReqt> (@in τ_0_0, @in ConformsWithMoreGenericWitnesses, @in_guaranteed ConformsWithMoreGenericWitnesses) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolAaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (@in SomeAssoc, @in ConformingAssoc, @in_guaranteed ConformsWithMoreGenericWitnesses) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW : $@convention(witness_method) (@in ConformsWithMoreGenericWitnesses, @thick ConformsWithMoreGenericWitnesses.Type) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables32ConformsWithMoreGenericWitnessesVAA11AnyProtocolAaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW : $@convention(witness_method) (@in ConformsWithMoreGenericWitnesses, @in ConformsWithMoreGenericWitnesses, @thick ConformsWithMoreGenericWitnesses.Type) -> ()
 
 class ConformingClassToClassProtocol : ClassProtocol {
   typealias AssocType = SomeAssoc
@@ -264,17 +264,17 @@ func <~>(x: ConformingClassToClassProtocol,
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
-// TABLE-NEXT:    method #ClassProtocol.method!1: @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_FS1_6method{{.*}}
-// TABLE-NEXT:    method #ClassProtocol.generic!1: @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_FS1_7generic{{.*}}
-// TABLE-NEXT:    method #ClassProtocol.assocTypesMethod!1: @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_FS1_16assocTypesMethod{{.*}}
-// TABLE-NEXT:    method #ClassProtocol.staticMethod!1: @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_ZFS1_12staticMethod{{.*}}
-// TABLE-NEXT:    method #ClassProtocol."<~>"!1: @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_ZFS1_oi3ltg{{.*}}
+// TABLE-NEXT:    method #ClassProtocol.method!1: {{.*}} : @_T014witness_tables017ConformingClassToD8ProtocolCAA0dF0AaaDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #ClassProtocol.generic!1: {{.*}} : @_T014witness_tables017ConformingClassToD8ProtocolCAA0dF0AaaDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #ClassProtocol.assocTypesMethod!1: {{.*}} : @_T014witness_tables017ConformingClassToD8ProtocolCAA0dF0AaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #ClassProtocol.staticMethod!1: {{.*}} : @_T014witness_tables017ConformingClassToD8ProtocolCAA0dF0AaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #ClassProtocol."<~>"!1: {{.*}} : @_T014witness_tables017ConformingClassToD8ProtocolCAA0dF0AaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
-// SYMBOL:  sil hidden [transparent] [thunk] @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_FS1_6method{{.*}} : $@convention(witness_method) (Arg, @owned ConformingClassToClassProtocol, @guaranteed ConformingClassToClassProtocol) -> ()
-// SYMBOL:  sil hidden [transparent] [thunk] @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_FS1_7generic{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : ArchetypeReqt> (@in τ_0_0, @owned ConformingClassToClassProtocol, @guaranteed ConformingClassToClassProtocol) -> ()
-// SYMBOL:  sil hidden [transparent] [thunk] @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_FS1_16assocTypesMethod{{.*}} : $@convention(witness_method) (@in SomeAssoc, @in ConformingAssoc, @guaranteed ConformingClassToClassProtocol) -> ()
-// SYMBOL:  sil hidden [transparent] [thunk] @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_ZFS1_12staticMethod{{.*}} : $@convention(witness_method) (@owned ConformingClassToClassProtocol, @thick ConformingClassToClassProtocol.Type) -> ()
-// SYMBOL:  sil hidden [transparent] [thunk] @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_ZFS1_oi3ltg{{.*}} : $@convention(witness_method) (@owned ConformingClassToClassProtocol, @owned ConformingClassToClassProtocol, @thick ConformingClassToClassProtocol.Type) -> ()
+// SYMBOL:  sil hidden [transparent] [thunk] @_T014witness_tables017ConformingClassToD8ProtocolCAA0dF0AaaDP6method{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (Arg, @owned ConformingClassToClassProtocol, @guaranteed ConformingClassToClassProtocol) -> ()
+// SYMBOL:  sil hidden [transparent] [thunk] @_T014witness_tables017ConformingClassToD8ProtocolCAA0dF0AaaDP7generic{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : ArchetypeReqt> (@in τ_0_0, @owned ConformingClassToClassProtocol, @guaranteed ConformingClassToClassProtocol) -> ()
+// SYMBOL:  sil hidden [transparent] [thunk] @_T014witness_tables017ConformingClassToD8ProtocolCAA0dF0AaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (@in SomeAssoc, @in ConformingAssoc, @guaranteed ConformingClassToClassProtocol) -> ()
+// SYMBOL:  sil hidden [transparent] [thunk] @_T014witness_tables017ConformingClassToD8ProtocolCAA0dF0AaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW : $@convention(witness_method) (@owned ConformingClassToClassProtocol, @thick ConformingClassToClassProtocol.Type) -> ()
+// SYMBOL:  sil hidden [transparent] [thunk] @_T014witness_tables017ConformingClassToD8ProtocolCAA0dF0AaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW : $@convention(witness_method) (@owned ConformingClassToClassProtocol, @owned ConformingClassToClassProtocol, @thick ConformingClassToClassProtocol.Type) -> ()
 
 class ConformingClassToObjCProtocol : ObjCProtocol {
   @objc func method(x x: ObjCClass) {}
@@ -298,11 +298,11 @@ func <~> <R: AssocReqt>(x: ConformingGeneric<R>, y: ConformingGeneric<R>) {}
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: R
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): dependent
-// TABLE-NEXT:    method #AnyProtocol.method!1: @_TTWuRx14witness_tables9AssocReqtrGVS_17ConformingGenericx_S_11AnyProtocolS_FS2_6method{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.generic!1: @_TTWuRx14witness_tables9AssocReqtrGVS_17ConformingGenericx_S_11AnyProtocolS_FS2_7generic{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: @_TTWuRx14witness_tables9AssocReqtrGVS_17ConformingGenericx_S_11AnyProtocolS_FS2_16assocTypesMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: @_TTWuRx14witness_tables9AssocReqtrGVS_17ConformingGenericx_S_11AnyProtocolS_ZFS2_12staticMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: @_TTWuRx14witness_tables9AssocReqtrGVS_17ConformingGenericx_S_11AnyProtocolS_ZFS2_oi3ltg{{.*}}
+// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolAaA9AssocReqtRzlAaDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolAaA9AssocReqtRzlAaDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolAaA9AssocReqtRzlAaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolAaA9AssocReqtRzlAaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @_T014witness_tables17ConformingGenericVyxGAA11AnyProtocolAaA9AssocReqtRzlAaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 
 protocol AnotherProtocol {}
@@ -325,11 +325,11 @@ func <~> <AA: AnotherProtocol, BB: AnotherProtocol>(x: AA, y: BB) {}
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: S
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): dependent
-// TABLE-NEXT:    method #AnyProtocol.method!1: @_TTWuRx14witness_tables9AssocReqtrGVS_41ConformingGenericWithMoreGenericWitnessesx_S_11AnyProtocolS_FS2_6method{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.generic!1: @_TTWuRx14witness_tables9AssocReqtrGVS_41ConformingGenericWithMoreGenericWitnessesx_S_11AnyProtocolS_FS2_7generic{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: @_TTWuRx14witness_tables9AssocReqtrGVS_41ConformingGenericWithMoreGenericWitnessesx_S_11AnyProtocolS_FS2_16assocTypesMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: @_TTWuRx14witness_tables9AssocReqtrGVS_41ConformingGenericWithMoreGenericWitnessesx_S_11AnyProtocolS_ZFS2_12staticMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: @_TTWuRx14witness_tables9AssocReqtrGVS_41ConformingGenericWithMoreGenericWitnessesx_S_11AnyProtocolS_ZFS2_oi3ltg{{.*}}
+// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolAaA9AssocReqtRzlAaDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolAaA9AssocReqtRzlAaDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolAaA9AssocReqtRzlAaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolAaA9AssocReqtRzlAaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @_T014witness_tables025ConformingGenericWithMoreD9WitnessesVyxGAA11AnyProtocolAaA9AssocReqtRzlAaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 
 protocol InheritedProtocol1 : AnyProtocol {
@@ -360,17 +360,17 @@ struct InheritedConformance : InheritedProtocol1 {
 func <~>(x: InheritedConformance, y: InheritedConformance) {}
 // TABLE-LABEL: sil_witness_table hidden InheritedConformance: InheritedProtocol1 module witness_tables {
 // TABLE-NEXT:    base_protocol AnyProtocol: InheritedConformance: AnyProtocol module witness_tables
-// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: @_TTWV14witness_tables20InheritedConformanceS_18InheritedProtocol1S_FS1_15inheritedMethod{{.*}}
+// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: {{.*}} : @_T014witness_tables20InheritedConformanceVAA0C9Protocol1AaaDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
 // TABLE-NEXT:  }
 // TABLE-LABEL: sil_witness_table hidden InheritedConformance: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
-// TABLE-NEXT:    method #AnyProtocol.method!1: @_TTWV14witness_tables20InheritedConformanceS_11AnyProtocolS_FS1_6method{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.generic!1: @_TTWV14witness_tables20InheritedConformanceS_11AnyProtocolS_FS1_7generic{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: @_TTWV14witness_tables20InheritedConformanceS_11AnyProtocolS_FS1_16assocTypesMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: @_TTWV14witness_tables20InheritedConformanceS_11AnyProtocolS_ZFS1_12staticMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: @_TTWV14witness_tables20InheritedConformanceS_11AnyProtocolS_ZFS1_oi3ltg{{.*}}
+// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables20InheritedConformanceVAA11AnyProtocolAaaDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables20InheritedConformanceVAA11AnyProtocolAaaDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @_T014witness_tables20InheritedConformanceVAA11AnyProtocolAaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @_T014witness_tables20InheritedConformanceVAA11AnyProtocolAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @_T014witness_tables20InheritedConformanceVAA11AnyProtocolAaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 
 struct RedundantInheritedConformance : InheritedProtocol1, AnyProtocol {
@@ -389,17 +389,17 @@ struct RedundantInheritedConformance : InheritedProtocol1, AnyProtocol {
 func <~>(x: RedundantInheritedConformance, y: RedundantInheritedConformance) {}
 // TABLE-LABEL: sil_witness_table hidden RedundantInheritedConformance: InheritedProtocol1 module witness_tables {
 // TABLE-NEXT:    base_protocol AnyProtocol: RedundantInheritedConformance: AnyProtocol module witness_tables
-// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: @_TTWV14witness_tables29RedundantInheritedConformanceS_18InheritedProtocol1S_FS1_15inheritedMethod{{.*}}
+// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: {{.*}} : @_T014witness_tables29RedundantInheritedConformanceVAA0D9Protocol1AaaDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
 // TABLE-NEXT:  }
 // TABLE-LABEL: sil_witness_table hidden RedundantInheritedConformance: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
-// TABLE-NEXT:    method #AnyProtocol.method!1: @_TTWV14witness_tables29RedundantInheritedConformanceS_11AnyProtocolS_FS1_6method{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.generic!1: @_TTWV14witness_tables29RedundantInheritedConformanceS_11AnyProtocolS_FS1_7generic{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: @_TTWV14witness_tables29RedundantInheritedConformanceS_11AnyProtocolS_FS1_16assocTypesMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: @_TTWV14witness_tables29RedundantInheritedConformanceS_11AnyProtocolS_ZFS1_12staticMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: @_TTWV14witness_tables29RedundantInheritedConformanceS_11AnyProtocolS_ZFS1_oi3ltg{{.*}}
+// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables29RedundantInheritedConformanceVAA11AnyProtocolAaaDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables29RedundantInheritedConformanceVAA11AnyProtocolAaaDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @_T014witness_tables29RedundantInheritedConformanceVAA11AnyProtocolAaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @_T014witness_tables29RedundantInheritedConformanceVAA11AnyProtocolAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @_T014witness_tables29RedundantInheritedConformanceVAA11AnyProtocolAaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 
 struct DiamondInheritedConformance : InheritedProtocol1, InheritedProtocol2 {
@@ -418,21 +418,21 @@ struct DiamondInheritedConformance : InheritedProtocol1, InheritedProtocol2 {
 func <~>(x: DiamondInheritedConformance, y: DiamondInheritedConformance) {}
 // TABLE-LABEL: sil_witness_table hidden DiamondInheritedConformance: InheritedProtocol1 module witness_tables {
 // TABLE-NEXT:    base_protocol AnyProtocol: DiamondInheritedConformance: AnyProtocol module witness_tables
-// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: @_TTWV14witness_tables27DiamondInheritedConformanceS_18InheritedProtocol1S_FS1_15inheritedMethod{{.*}}
+// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: {{.*}} : @_T014witness_tables27DiamondInheritedConformanceVAA0D9Protocol1AaaDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
 // TABLE-NEXT:  }
 // TABLE-LABEL: sil_witness_table hidden DiamondInheritedConformance: InheritedProtocol2 module witness_tables {
 // TABLE-NEXT:    base_protocol AnyProtocol: DiamondInheritedConformance: AnyProtocol module witness_tables
-// TABLE-NEXT:    method #InheritedProtocol2.inheritedMethod!1: @_TTWV14witness_tables27DiamondInheritedConformanceS_18InheritedProtocol2S_FS1_15inheritedMethod{{.*}}
+// TABLE-NEXT:    method #InheritedProtocol2.inheritedMethod!1: {{.*}} : @_T014witness_tables27DiamondInheritedConformanceVAA0D9Protocol2AaaDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
 // TABLE-NEXT:  }
 // TABLE-LABEL: sil_witness_table hidden DiamondInheritedConformance: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
-// TABLE-NEXT:    method #AnyProtocol.method!1: @_TTWV14witness_tables27DiamondInheritedConformanceS_11AnyProtocolS_FS1_6method{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.generic!1: @_TTWV14witness_tables27DiamondInheritedConformanceS_11AnyProtocolS_FS1_7generic{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: @_TTWV14witness_tables27DiamondInheritedConformanceS_11AnyProtocolS_FS1_16assocTypesMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: @_TTWV14witness_tables27DiamondInheritedConformanceS_11AnyProtocolS_ZFS1_12staticMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: @_TTWV14witness_tables27DiamondInheritedConformanceS_11AnyProtocolS_ZFS1_oi3ltg{{.*}}
+// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables27DiamondInheritedConformanceVAA11AnyProtocolAaaDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables27DiamondInheritedConformanceVAA11AnyProtocolAaaDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @_T014witness_tables27DiamondInheritedConformanceVAA11AnyProtocolAaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @_T014witness_tables27DiamondInheritedConformanceVAA11AnyProtocolAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @_T014witness_tables27DiamondInheritedConformanceVAA11AnyProtocolAaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 
 class ClassInheritedConformance : InheritedClassProtocol {
@@ -451,24 +451,24 @@ class ClassInheritedConformance : InheritedClassProtocol {
 func <~>(x: ClassInheritedConformance, y: ClassInheritedConformance) {}
 // TABLE-LABEL: sil_witness_table hidden ClassInheritedConformance: InheritedClassProtocol module witness_tables {
 // TABLE-NEXT:    base_protocol AnyProtocol: ClassInheritedConformance: AnyProtocol module witness_tables
-// TABLE-NEXT:    method #InheritedClassProtocol.inheritedMethod!1: @_TTWC14witness_tables25ClassInheritedConformanceS_22InheritedClassProtocolS_FS1_15inheritedMethod{{.*}}
+// TABLE-NEXT:    method #InheritedClassProtocol.inheritedMethod!1: {{.*}} : @_T014witness_tables25ClassInheritedConformanceCAA0dC8ProtocolAaaDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
 // TABLE-NEXT:  }
 // TABLE-LABEL: sil_witness_table hidden ClassInheritedConformance: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
 // TABLE-NEXT:    associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
-// TABLE-NEXT:    method #AnyProtocol.method!1: @_TTWC14witness_tables25ClassInheritedConformanceS_11AnyProtocolS_FS1_6method{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.generic!1: @_TTWC14witness_tables25ClassInheritedConformanceS_11AnyProtocolS_FS1_7generic{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: @_TTWC14witness_tables25ClassInheritedConformanceS_11AnyProtocolS_FS1_16assocTypesMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: @_TTWC14witness_tables25ClassInheritedConformanceS_11AnyProtocolS_ZFS1_12staticMethod{{.*}}
-// TABLE-NEXT:    method #AnyProtocol."<~>"!1: @_TTWC14witness_tables25ClassInheritedConformanceS_11AnyProtocolS_ZFS1_oi3ltg{{.*}}
+// TABLE-NEXT:    method #AnyProtocol.method!1: {{.*}} : @_T014witness_tables25ClassInheritedConformanceCAA11AnyProtocolAaaDP6method{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.generic!1: {{.*}} : @_T014witness_tables25ClassInheritedConformanceCAA11AnyProtocolAaaDP7generic{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: {{.*}} : @_T014witness_tables25ClassInheritedConformanceCAA11AnyProtocolAaaDP16assocTypesMethod{{[_0-9a-zA-Z]*}}FTW
+// TABLE-NEXT:    method #AnyProtocol.staticMethod!1: {{.*}} : @_T014witness_tables25ClassInheritedConformanceCAA11AnyProtocolAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW
+// TABLE-NEXT:    method #AnyProtocol."<~>"!1: {{.*}} : @_T014witness_tables25ClassInheritedConformanceCAA11AnyProtocolAaaDP3ltgoi{{[_0-9a-zA-Z]*}}FZTW
 // TABLE-NEXT:  }
 // -- Witnesses have the 'self' abstraction level of their protocol.
 //    AnyProtocol has no class bound, so its witnesses treat Self as opaque.
 //    InheritedClassProtocol has a class bound, so its witnesses treat Self as
 //    a reference value.
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWC14witness_tables25ClassInheritedConformanceS_22InheritedClassProtocolS_FS1_15inheritedMethod{{.*}} : $@convention(witness_method) (@guaranteed ClassInheritedConformance) -> ()
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWC14witness_tables25ClassInheritedConformanceS_11AnyProtocolS_FS1_6method{{.*}} : $@convention(witness_method) (Arg, @in ClassInheritedConformance, @in_guaranteed ClassInheritedConformance) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables25ClassInheritedConformanceCAA0dC8ProtocolAaaDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (@guaranteed ClassInheritedConformance) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_T014witness_tables25ClassInheritedConformanceCAA11AnyProtocolAaaDP6method{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (Arg, @in ClassInheritedConformance, @in_guaranteed ClassInheritedConformance) -> ()
 
 struct GenericAssocType<T> : AssocReqt {
   func requiredMethod() {}
@@ -504,7 +504,7 @@ class ConformsInheritedFromObjC : InheritedFromObjC {
   func inheritedMethod() {}
 }
 // TABLE-LABEL: sil_witness_table hidden ConformsInheritedFromObjC: InheritedFromObjC module witness_tables {
-// TABLE-NEXT:    method #InheritedFromObjC.inheritedMethod!1: @_TTWC14witness_tables25ConformsInheritedFromObjCS_17InheritedFromObjCS_FS1_15inheritedMethod{{.*}}
+// TABLE-NEXT:    method #InheritedFromObjC.inheritedMethod!1: {{.*}} : @_T014witness_tables25ConformsInheritedFromObjCCAA0deF1CAaaDP15inheritedMethod{{[_0-9a-zA-Z]*}}FTW
 // TABLE-NEXT:  }
 
 protocol ObjCAssoc {
@@ -523,25 +523,25 @@ protocol Initializer {
 }
 
 // TABLE-LABEL: sil_witness_table hidden HasInitializerStruct: Initializer module witness_tables {
-// TABLE-NEXT:  method #Initializer.init!allocator.1: @_TTWV14witness_tables20HasInitializerStructS_11InitializerS_FS1_C{{.*}}
+// TABLE-NEXT:  method #Initializer.init!allocator.1: {{.*}} : @_T014witness_tables20HasInitializerStructVAA0D0AaaDP{{[_0-9a-zA-Z]*}}fCTW
 // TABLE-NEXT: }
-// SYMBOL: sil hidden [transparent] [thunk] @_TTWV14witness_tables20HasInitializerStructS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (Arg, @thick HasInitializerStruct.Type) -> @out HasInitializerStruct
+// SYMBOL: sil hidden [transparent] [thunk] @_T014witness_tables20HasInitializerStructVAA0D0AaaDP{{[_0-9a-zA-Z]*}}fCTW : $@convention(witness_method) (Arg, @thick HasInitializerStruct.Type) -> @out HasInitializerStruct
 struct HasInitializerStruct : Initializer { 
   init(arg: Arg) { }
 }
 
 // TABLE-LABEL: sil_witness_table hidden HasInitializerClass: Initializer module witness_tables {
-// TABLE-NEXT:  method #Initializer.init!allocator.1: @_TTWC14witness_tables19HasInitializerClassS_11InitializerS_FS1_C{{.*}}
+// TABLE-NEXT:  method #Initializer.init!allocator.1: {{.*}} : @_T014witness_tables19HasInitializerClassCAA0D0AaaDP{{[_0-9a-zA-Z]*}}fCTW
 // TABLE-NEXT: }
-// SYMBOL: sil hidden [transparent] [thunk] @_TTWC14witness_tables19HasInitializerClassS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (Arg, @thick HasInitializerClass.Type) -> @out HasInitializerClass
+// SYMBOL: sil hidden [transparent] [thunk] @_T014witness_tables19HasInitializerClassCAA0D0AaaDP{{[_0-9a-zA-Z]*}}fCTW : $@convention(witness_method) (Arg, @thick HasInitializerClass.Type) -> @out HasInitializerClass
 class HasInitializerClass : Initializer {
   required init(arg: Arg) { }
 }
 
 // TABLE-LABEL: sil_witness_table hidden HasInitializerEnum: Initializer module witness_tables {
-// TABLE-NEXT:  method #Initializer.init!allocator.1: @_TTWO14witness_tables18HasInitializerEnumS_11InitializerS_FS1_C{{.*}}
+// TABLE-NEXT:  method #Initializer.init!allocator.1: {{.*}} : @_T014witness_tables18HasInitializerEnumOAA0D0AaaDP{{[_0-9a-zA-Z]*}}fCTW
 // TABLE-NEXT: }
-// SYMBOL: sil hidden [transparent] [thunk] @_TTWO14witness_tables18HasInitializerEnumS_11InitializerS_FS1_C{{.*}} : $@convention(witness_method) (Arg, @thick HasInitializerEnum.Type) -> @out HasInitializerEnum
+// SYMBOL: sil hidden [transparent] [thunk] @_T014witness_tables18HasInitializerEnumOAA0D0AaaDP{{[_0-9a-zA-Z]*}}fCTW : $@convention(witness_method) (Arg, @thick HasInitializerEnum.Type) -> @out HasInitializerEnum
 enum HasInitializerEnum : Initializer {
   case A
 

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // CHECK PARSING
 private // expected-note {{modifier already specified here}}
@@ -120,6 +120,7 @@ public struct Properties {
   }
   private(set) let constant = 42 // expected-error {{'private(set)' modifier cannot be applied to read-only properties}} {{3-16=}}
   public(set) var defaultVis = 0 // expected-error {{internal property cannot have a public setter}}
+  open(set) var defaultVis2 = 0 // expected-error {{internal property cannot have an open setter}}
 
   public(set) subscript(a a: Int) -> Int { // expected-error {{internal subscript cannot have a public setter}}
     get { return 0 }
@@ -143,6 +144,10 @@ public struct Properties {
 
 private extension Properties {
   public(set) var extProp: Int { // expected-error {{private property cannot have a public setter}}
+    get { return 42 }
+    set { }
+  }
+  open(set) var extProp2: Int { // expected-error {{private property cannot have an open setter}}
     get { return 42 }
     set { }
   }
@@ -184,12 +189,14 @@ private extension PublicProto where Assoc == PrivateStruct {}
 
 extension PublicProto where Assoc == InternalStruct {
   public func foo() {} // expected-error {{cannot declare a public instance method in an extension with internal requirements}} {{3-9=internal}}
+  open func bar() {} // expected-error {{cannot declare an open instance method in an extension with internal requirements}} {{3-7=internal}}
 }
 extension InternalProto {
   public func foo() {} // no effect, but no warning
 }
 extension InternalProto where Assoc == PublicStruct {
   public func foo() {} // expected-error {{cannot declare a public instance method in an extension with internal requirements}} {{3-9=internal}}
+  open func bar() {} // expected-error {{cannot declare an open instance method in an extension with internal requirements}} {{3-7=internal}}
 }
 
 public struct GenericStruct<Param> {}

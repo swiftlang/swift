@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -29,7 +29,7 @@ namespace {
     raw_ostream &Underlying;
   public:
     explicit ColoredStream(raw_ostream &underlying) : Underlying(underlying) {}
-    ~ColoredStream() { flush(); }
+    ~ColoredStream() override { flush(); }
 
     raw_ostream &changeColor(Colors color, bool bold = false,
                              bool bg = false) override {
@@ -117,7 +117,7 @@ SourceManager::GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
   // location to pull out the source line.
   SmallVector<std::pair<unsigned, unsigned>, 4> ColRanges;
   std::pair<unsigned, unsigned> LineAndCol;
-  const char *BufferID = "<unknown>";
+  StringRef BufferID = "<unknown>";
   std::string LineStr;
 
   if (Loc.isValid()) {

@@ -21,8 +21,8 @@ future, ``public`` may be used for both API and SPI, at which point we may
 design additional annotations to distinguish the two.
 
 By default, most entities in a source file have ``internal`` access.
-This optimizes for the most common case—a single-target application
-project—while not accidentally revealing entities to clients of a framework
+This optimizes for the most common case--a single-target application
+project--while not accidentally revealing entities to clients of a framework
 module.
 
 .. warning:: This document has not yet been updated for SE-0117, which adds the

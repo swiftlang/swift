@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 infix operator +++
 
@@ -404,4 +404,42 @@ func testFixItNested() {
 // rdar://problem/26845038
 func occursCheck26845038(a: [Int]) {
   _ = Array(a)[0]
+}
+
+// rdar://problem/29633747
+extension Array where Element: Hashable {
+    public func trimmed(_ elements: [Element]) -> SubSequence {
+        return []
+    }
+}
+
+func rdar29633747(characters: String.CharacterView) {
+  let _ = Array(characters).trimmed(["("])
+}
+
+// Null pointer dereference in noteArchetypeSource()
+class GenericClass<A> {}
+// expected-note@-1 {{'A' declared as parameter to type 'GenericClass'}}
+
+func genericFunc<T>(t: T) {
+  _ = [T: GenericClass] // expected-error {{generic parameter 'A' could not be inferred}}
+  // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+  // expected-error@-2 2 {{type 'T' does not conform to protocol 'Hashable'}}
+}
+
+struct SR_3525<T> {}
+func sr3525_arg_int(_: inout SR_3525<Int>) {}
+func sr3525_arg_gen<T>(_: inout SR_3525<T>) {}
+func sr3525_1(t: SR_3525<Int>) {
+  let _ = sr3525_arg_int(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
+}
+func sr3525_2(t: SR_3525<Int>) {
+  let _ = sr3525_arg_gen(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
+}
+func sr3525_3<T>(t: SR_3525<T>) {
+  let _ = sr3525_arg_gen(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
+}
+
+class testStdlibType {
+  let _: Array // expected-error {{reference to generic type 'Array' requires arguments in <...>}} {{15-15=<Any>}}
 }

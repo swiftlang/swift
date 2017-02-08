@@ -2,11 +2,11 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See http://swift.org/LICENSE.txt for license information
-# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 # ----------------------------------------------------------------------------
 
 import argparse
@@ -56,7 +56,7 @@ class SwiftTestCase(unittest.TestCase):
             benchmark_num_onone_iterations=3,
             benchmark_num_o_iterations=3,
             enable_sil_ownership=False,
-            compilation_db=False)
+            force_optimized_typechecker=False)
 
         # Setup shell
         shell.dry_run = True
@@ -83,7 +83,10 @@ class SwiftTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        self.assertEqual(swift.cmake_options, [])
+        self.assertEqual(set(swift.cmake_options), set([
+                         '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
+                         '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE',
+                         '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE']))
 
     def test_swift_runtime_tsan(self):
         self.args.enable_tsan_runtime = True
@@ -92,8 +95,11 @@ class SwiftTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        self.assertEqual(swift.cmake_options,
-                         ['-DSWIFT_RUNTIME_USE_SANITIZERS=Thread'])
+        self.assertEqual(set(swift.cmake_options),
+                         set(['-DSWIFT_RUNTIME_USE_SANITIZERS=Thread',
+                              '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
+                              '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE',
+                              '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE']))
 
     def test_swift_compiler_vendor_flags(self):
         self.args.compiler_vendor = "none"
@@ -229,7 +235,7 @@ class SwiftTestCase(unittest.TestCase):
         self.assertEqual(
             ['-DSWIFT_BENCHMARK_NUM_ONONE_ITERATIONS=3',
              '-DSWIFT_BENCHMARK_NUM_O_ITERATIONS=3'],
-            swift.cmake_options)
+            [x for x in swift.cmake_options if 'SWIFT_BENCHMARK_NUM' in x])
 
         self.args.benchmark_num_onone_iterations = 20
         swift = Swift(
@@ -240,7 +246,7 @@ class SwiftTestCase(unittest.TestCase):
         self.assertEqual(
             ['-DSWIFT_BENCHMARK_NUM_ONONE_ITERATIONS=20',
              '-DSWIFT_BENCHMARK_NUM_O_ITERATIONS=3'],
-            swift.cmake_options)
+            [x for x in swift.cmake_options if 'SWIFT_BENCHMARK_NUM' in x])
         self.args.benchmark_num_onone_iterations = 3
 
         self.args.benchmark_num_o_iterations = 30
@@ -252,7 +258,7 @@ class SwiftTestCase(unittest.TestCase):
         self.assertEqual(
             ['-DSWIFT_BENCHMARK_NUM_ONONE_ITERATIONS=3',
              '-DSWIFT_BENCHMARK_NUM_O_ITERATIONS=30'],
-            swift.cmake_options)
+            [x for x in swift.cmake_options if 'SWIFT_BENCHMARK_NUM' in x])
         self.args.benchmark_num_onone_iterations = 3
 
         self.args.benchmark_num_onone_iterations = 10
@@ -265,7 +271,7 @@ class SwiftTestCase(unittest.TestCase):
         self.assertEqual(
             ['-DSWIFT_BENCHMARK_NUM_ONONE_ITERATIONS=10',
              '-DSWIFT_BENCHMARK_NUM_O_ITERATIONS=25'],
-            swift.cmake_options)
+            [x for x in swift.cmake_options if 'SWIFT_BENCHMARK_NUM' in x])
 
     def test_sil_ownership_flags(self):
         self.args.enable_sil_ownership = True
@@ -276,15 +282,17 @@ class SwiftTestCase(unittest.TestCase):
             build_dir='/path/to/build')
         self.assertEqual(
             ['-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=TRUE'],
-            swift.cmake_options)
+            [x for x in swift.cmake_options
+             if 'SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP' in x])
 
-    def test_compilation_db_flags(self):
-        self.args.compilation_db = True
+    def test_force_optimized_typechecker_flags(self):
+        self.args.force_optimized_typechecker = True
         swift = Swift(
             args=self.args,
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
         self.assertEqual(
-            ['-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE'],
-            swift.cmake_options)
+            ['-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=TRUE'],
+            [x for x in swift.cmake_options
+             if 'SWIFT_FORCE_OPTIMIZED_TYPECHECKER' in x])

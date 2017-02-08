@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -75,7 +75,7 @@ public:
   CompilerInvocation Invocation;
   PrintingDiagnosticConsumer DiagConsumer;
   CompilerInstance Instance;
-  Module *Mod = nullptr;
+  ModuleDecl *Mod = nullptr;
   SourceTextInfo Info;
   // This is the non-typechecked AST for the generated interface source.
   CompilerInstance TextCI;
@@ -90,7 +90,7 @@ typedef SwiftInterfaceGenContext::Implementation::TextReference TextReference;
 typedef SwiftInterfaceGenContext::Implementation::TextDecl TextDecl;
 typedef SwiftInterfaceGenContext::Implementation::SourceTextInfo SourceTextInfo;
 
-static Module *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
+static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
   SmallVector<std::pair<Identifier, SourceLoc>, 4>
       AccessPath;
   while (!ModuleName.empty()) {
@@ -101,7 +101,7 @@ static Module *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
   return Ctx.getModule(AccessPath);
 }
 
-static Module *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
+static ModuleDecl *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
   return Ctx.getModule(std::make_pair(ModuleName, SourceLoc()));
 }
 
@@ -281,7 +281,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx,
                                    std::string &ErrMsg,
                                    bool SynthesizedExtensions,
                                    Optional<StringRef> InterestedUSR) {
-  Module *&Mod = Impl.Mod;
+  ModuleDecl *&Mod = Impl.Mod;
   SourceTextInfo &Info = Impl.Info;
 
   if (ModuleName.empty()) {

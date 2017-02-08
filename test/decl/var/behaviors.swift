@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -enable-experimental-property-behaviors -module-name Main
+// RUN: %target-typecheck-verify-swift -enable-experimental-property-behaviors -module-name Main
 // REQUIRES: property_behavior_value_substitution
 
 protocol behavior {

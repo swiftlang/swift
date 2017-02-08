@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -target x86_64-apple-macosx10.51 -parse %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -target x86_64-apple-macosx10.51 -typecheck %s -verify -verify-ignore-unknown
 
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
@@ -84,7 +84,7 @@ func testNonInstanceTypeFactoryMethod(_ s: String) {
 }
 
 func testUseOfFactoryMethod(_ queen: Bee) {
-  _ = Hive.withQueen(queen) // expected-error{{'withQueen' is unavailable: use object construction 'Hive(queen:)'}}
+  _ = Hive.hiveWithQueen(queen) // expected-error{{'hiveWithQueen' is unavailable: use object construction 'Hive(queen:)'}}
 }
 
 func testNonsplittableFactoryMethod() {
@@ -97,16 +97,23 @@ func testFactoryMethodBlacklist() {
 
 func test17261609() {
   _ = NSDecimalNumber(mantissa:1, exponent:1, isNegative:true)
-  _ = NSDecimalNumber.withMantissa(1, exponent:1, isNegative:true) // expected-error{{'withMantissa(_:exponent:isNegative:)' is unavailable: use object construction 'NSDecimalNumber(mantissa:exponent:isNegative:)'}}
+  _ = NSDecimalNumber.decimalNumberWithMantissa(1, exponent:1, isNegative:true) // expected-error{{'decimalNumberWithMantissa(_:exponent:isNegative:)' is unavailable: use object construction 'NSDecimalNumber(mantissa:exponent:isNegative:)'}}
 }
 
 func testURL() {
   let url = NSURL(string: "http://www.llvm.org")!
-  _ = NSURL.withString("http://www.llvm.org") // expected-error{{'withString' is unavailable: use object construction 'NSURL(string:)'}}
+  _ = NSURL.URLWithString("http://www.llvm.org") // expected-error{{'URLWithString' is unavailable: use object construction 'NSURL(string:)'}}
 
   NSURLRequest(string: "http://www.llvm.org") // expected-warning{{unused}}
   NSURLRequest(url: url as URL) // expected-warning{{unused}}
 
-  _ = NSURLRequest.withString("http://www.llvm.org") // expected-error{{'withString' is unavailable: use object construction 'NSURLRequest(string:)'}}
-  _ = NSURLRequest.withURL(url as URL) // expected-error{{'withURL' is unavailable: use object construction 'NSURLRequest(url:)'}}
+  _ = NSURLRequest.requestWithString("http://www.llvm.org") // expected-error{{'requestWithString' is unavailable: use object construction 'NSURLRequest(string:)'}}
+  _ = NSURLRequest.URLRequestWithURL(url as URL) // expected-error{{'URLRequestWithURL' is unavailable: use object construction 'NSURLRequest(url:)'}}
 }
+
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected note produced: 'hiveWithQueen' has been explicitly marked unavailable here
+// <unknown>:0: error: unexpected note produced: 'decimalNumberWithMantissa(_:exponent:isNegative:)' has been explicitly marked unavailable here
+// <unknown>:0: error: unexpected note produced: 'URLWithString' has been explicitly marked unavailable here
+// <unknown>:0: error: unexpected note produced: 'requestWithString' has been explicitly marked unavailable here
+// <unknown>:0: error: unexpected note produced: 'URLRequestWithURL' has been explicitly marked unavailable here

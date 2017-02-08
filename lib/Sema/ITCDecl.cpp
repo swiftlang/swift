@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -36,7 +36,9 @@ decomposeInheritedClauseDecl(
     inheritanceClause = typeDecl->getInherited();
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
       dc = nominal;
-      options |= TR_GenericSignature | TR_InheritanceClause;
+      options |= (TR_GenericSignature |
+                  TR_InheritanceClause |
+                  TR_AllowUnavailableProtocol);
     } else {
       dc = typeDecl->getDeclContext();
 
@@ -62,7 +64,9 @@ decomposeInheritedClauseDecl(
     auto ext = decl.get<ExtensionDecl *>();
     inheritanceClause = ext->getInherited();
     dc = ext;
-    options |= TR_GenericSignature | TR_InheritanceClause;
+    options |= (TR_GenericSignature |
+                TR_InheritanceClause |
+                TR_AllowUnavailableProtocol);
   }
 
   return std::make_tuple(options, dc, inheritanceClause);
@@ -103,10 +107,15 @@ void IterativeTypeChecker::processResolveInheritedClauseEntry(
 
   // Validate the type of this inherited clause entry.
   // FIXME: Recursion into existing type checker.
-  PartialGenericTypeToArchetypeResolver resolver;
-  if (TC.validateType(*inherited, dc, options, &resolver)) {
+  GenericTypeToArchetypeResolver resolver(dc);
+  if (TC.validateType(*inherited, dc, options, &resolver,
+                      &unsatisfiedDependency)) {
     inherited->setInvalidType(getASTContext());
   }
+
+  auto type = inherited->getType();
+  if (!type.isNull())
+    inherited->setType(dc->mapTypeOutOfContext(type));
 }
 
 bool IterativeTypeChecker::breakCycleForResolveInheritedClauseEntry(
@@ -279,49 +288,70 @@ bool IterativeTypeChecker::breakCycleForInheritedProtocols(
 // Resolve a type declaration
 //===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
-  if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-    // If the underlying type was validated, we're done.
-    return typeAliasDecl->getUnderlyingTypeLoc().wasValidated();
-  }
+  auto *dc = typeDecl->getDeclContext();
 
-  if (auto typeParam = dyn_cast<AbstractTypeParamDecl>(typeDecl)) {
-    // FIXME: Deal with these.
-    return typeParam->getDeclContext()->isValidGenericContext();
-  }
-
-  // Module types are always fully resolved.
-  if (isa<ModuleDecl>(typeDecl))
+  if (typeDecl->hasInterfaceType())
     return true;
 
-  // Nominal types.
-  auto nominal = cast<NominalTypeDecl>(typeDecl);
-  return nominal->hasType();
+  if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+    if (typeAliasDecl->getDeclContext()->isModuleScopeContext() &&
+        typeAliasDecl->getGenericParams() == nullptr) {
+      return typeAliasDecl->hasInterfaceType();
+    }
+  }
+
+  // If this request can *never* be satisfied due to recursion,
+  // return success and fail elsewhere.
+  if (typeDecl->isBeingValidated())
+    return true;
+
+  while (dc) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+      if (nominal->isBeingValidated())
+        return true;
+      if (nominal->hasInterfaceType())
+        return false;
+    } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+      if (ext->isBeingValidated())
+        return true;
+      if (ext->validated())
+        return false;
+    } else {
+      break;
+    }
+    dc = dc->getParent();
+  }
+
+  // Ok, we can try calling validateDecl().
+  return false;
 }
 
 void IterativeTypeChecker::processResolveTypeDecl(
        TypeDecl *typeDecl,
        UnsatisfiedDependency unsatisfiedDependency) {
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-    if (typeAliasDecl->getDeclContext()->isModuleScopeContext()) {
-      // FIXME: This is silly.
-      if (!typeAliasDecl->hasType())
-        typeAliasDecl->computeType();
-      
+    if (typeAliasDecl->getDeclContext()->isModuleScopeContext() &&
+        typeAliasDecl->getGenericParams() == nullptr) {
+      typeAliasDecl->setHasCompletedValidation();
+
       TypeResolutionOptions options;
-      options |= TR_GlobalTypeAlias;
       if (typeAliasDecl->getFormalAccess() <= Accessibility::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
 
       // Note: recursion into old type checker is okay when passing in an
       // unsatisfied-dependency callback.
-      if (TC.validateType(typeAliasDecl->getUnderlyingTypeLoc(),
-                          typeAliasDecl->getDeclContext(),
-                          options, nullptr, &unsatisfiedDependency)) {
+      GenericTypeToArchetypeResolver resolver(typeAliasDecl);
+      if (TC.validateType(typeAliasDecl->getUnderlyingTypeLoc(), typeAliasDecl,
+                          options, &resolver, &unsatisfiedDependency)) {
         typeAliasDecl->setInvalid();
-        typeAliasDecl->overwriteType(ErrorType::get(getASTContext()));
         typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
       }
-      
+
+      if (typeAliasDecl->getUnderlyingTypeLoc().wasValidated()) {
+        typeAliasDecl->setUnderlyingType(
+            typeAliasDecl->getUnderlyingTypeLoc().getType());
+      }
+
       return;
     }
 
@@ -335,7 +365,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
 bool IterativeTypeChecker::breakCycleForResolveTypeDecl(TypeDecl *typeDecl) {
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
     typeAliasDecl->setInvalid();
-    typeAliasDecl->overwriteType(ErrorType::get(getASTContext()));
+    typeAliasDecl->setInterfaceType(ErrorType::get(getASTContext()));
     typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
     return true;
   }

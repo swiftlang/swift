@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 // SR-1661: Dollar was accidentally allowed as an identifier in Swift 3.
 // SE-0144: Reject this behavior in the future.
@@ -53,4 +53,11 @@ func escapedDollarStruct() {
 func escapedDollarFunc() {
   func `$`(`$`: Int) {} // no error
   `$`(`$`: 25) // no error
+}
+
+func escapedDollarAnd() {
+  // FIXME: Bad diagnostics.
+  `$0` = 1 // expected-error {{expected expression}}
+  `$$` = 2 // expected-error {{expected numeric value following '$'}}
+  `$abc` = 3 // expected-error {{expected numeric value following '$'}}
 }

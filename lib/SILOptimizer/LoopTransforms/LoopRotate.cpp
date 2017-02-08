@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -101,12 +101,10 @@ static void mapOperands(SILInstruction *I,
   }
 }
 
-static void
-updateSSAForUseOfInst(SILSSAUpdater &Updater,
-                      SmallVectorImpl<SILArgument*> &InsertedPHIs,
-                      const llvm::DenseMap<ValueBase *, SILValue> &ValueMap,
-                      SILBasicBlock *Header, SILBasicBlock *EntryCheckBlock,
-                      ValueBase *Inst) {
+static void updateSSAForUseOfInst(
+    SILSSAUpdater &Updater, SmallVectorImpl<SILPHIArgument *> &InsertedPHIs,
+    const llvm::DenseMap<ValueBase *, SILValue> &ValueMap,
+    SILBasicBlock *Header, SILBasicBlock *EntryCheckBlock, ValueBase *Inst) {
   if (Inst->use_empty())
     return;
 
@@ -149,7 +147,7 @@ updateSSAForUseOfInst(SILSSAUpdater &Updater,
       Updater.RewriteUse(*Use);
     }
     // Canonicalize inserted phis to avoid extra BB Args.
-    for (SILArgument *Arg : InsertedPHIs) {
+    for (SILPHIArgument *Arg : InsertedPHIs) {
       if (SILInstruction *Inst = replaceBBArgWithCast(Arg)) {
         Arg->replaceAllUsesWith(Inst);
         // DCE+SimplifyCFG runs as a post-pass cleanup.
@@ -165,11 +163,11 @@ static void
 rewriteNewLoopEntryCheckBlock(SILBasicBlock *Header,
                               SILBasicBlock *EntryCheckBlock,
                         const llvm::DenseMap<ValueBase *, SILValue> &ValueMap) {
-  SmallVector<SILArgument*, 4> InsertedPHIs;
+  SmallVector<SILPHIArgument *, 4> InsertedPHIs;
   SILSSAUpdater Updater(&InsertedPHIs);
 
   // Fix PHIs (incoming arguments).
-  for (auto *Inst: Header->getBBArgs())
+  for (auto *Inst : Header->getArguments())
     updateSSAForUseOfInst(Updater, InsertedPHIs, ValueMap, Header,
                           EntryCheckBlock, Inst);
 
@@ -233,10 +231,11 @@ static bool isSingleBlockLoop(SILLoop *L) {
   if (BackEdge == Header)
     BackEdge = Blocks[0];
 
-  if (!BackEdge->getSingleSuccessor())
+  if (!BackEdge->getSingleSuccessorBlock())
     return false;
 
-  assert(BackEdge->getSingleSuccessor() == Header && "Loop not well formed");
+  assert(BackEdge->getSingleSuccessorBlock() == Header &&
+         "Loop not well formed");
 
   // Check whether the back-edge block is just a split-edge.
   return ++BackEdge->begin() == BackEdge->end();
@@ -315,7 +314,7 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   // We don't want to rotate such that we merge two headers of separate loops
   // into one. This can be turned into an assert again once we have guaranteed
   // preheader insertions.
-  if (!NewHeader->getSinglePredecessor() && Header != Latch)
+  if (!NewHeader->getSinglePredecessorBlock() && Header != Latch)
     return false;
 
   // Now that we know we can perform the rotation - move the instructions that
@@ -331,7 +330,7 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
 
   // The original 'phi' argument values are just the values coming from the
   // preheader edge.
-  ArrayRef<SILArgument *> PHIs = Header->getBBArgs();
+  ArrayRef<SILArgument *> PHIs = Header->getArguments();
   OperandValueArrayRef PreheaderArgs =
       cast<BranchInst>(Preheader->getTerminator())->getArgs();
   assert(PHIs.size() == PreheaderArgs.size() &&

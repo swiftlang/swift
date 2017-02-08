@@ -67,7 +67,7 @@ bb0(%0 : $*C):
   // CHECK-NOT: load
   %1 = load %0 : $*C
   // CHECK-NOT: class_method
-  %3 = class_method %1 : $C, #C.foo!1 : (C) -> () -> Builtin.Int1 , $@convention(method) (@guaranteed C) -> Builtin.Int1
+  %3 = class_method %1 : $C, #C.foo!1 : (C) -> () -> Builtin.Int1, $@convention(method) (@guaranteed C) -> Builtin.Int1
   // CHECK-NOT: apply
   %4 = apply %3(%1) : $@convention(method) (@guaranteed C) -> Builtin.Int1
   // CHECK: [[ONE:%.*]] = integer_literal $Builtin.Int1, -1

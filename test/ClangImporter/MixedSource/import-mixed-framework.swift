@@ -3,10 +3,10 @@
 // RUN: cp -r %S/Inputs/mixed-framework/Mixed.framework %t
 
 // Don't crash if a generated header is present but the swiftmodule is missing.
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -F %t -parse %s
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -F %t -typecheck %s
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t/Mixed.framework/Modules/Mixed.swiftmodule/%target-swiftmodule-name %S/Inputs/mixed-framework/Mixed.swift -import-underlying-module -F %t -module-name Mixed -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -F %t -parse %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -F %t -typecheck %s -verify -verify-ignore-unknown
 
 // XFAIL: linux
 
@@ -35,3 +35,6 @@ func testAnyObject(_ obj: AnyObject) {
   obj.protoMethod()
   _ = obj.protoProperty
 }
+
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected note produced: 'SwiftClassWithCustomName' was obsoleted in Swift 3

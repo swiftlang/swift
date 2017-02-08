@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -enable-throw-without-try -debugger-support
+// RUN: %target-typecheck-verify-swift -enable-throw-without-try -debugger-support
 
 func foo() throws -> Int { return 0 }
 

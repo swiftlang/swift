@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -114,7 +114,7 @@ public:
   /// (If empty, this implies no SDK.)
   std::string SDKPath;
 
-  enum SanitizerKind SelectedSanitizer;
+  SanitizerKind SelectedSanitizer;
 };
 
 class Driver {
@@ -154,13 +154,6 @@ private:
 
   /// Indicates whether the driver should check that the input files exist.
   bool CheckInputFilesExist = true;
-
-  /// \brief Cache of all the ToolChains in use by the driver.
-  ///
-  /// This maps from the string representation of a triple to a ToolChain
-  /// created targeting that triple. The driver owns all the ToolChain objects
-  /// stored in it, and will clean them up when torn down.
-  mutable llvm::StringMap<ToolChain *> ToolChains;
 
 public:
   Driver(StringRef DriverExecutable, StringRef Name,
@@ -295,8 +288,6 @@ public:
   void printHelp(bool ShowHidden) const;
 
 private:
-  const ToolChain *getToolChain(const llvm::opt::ArgList &Args) const;
-
   /// Parse the driver kind.
   ///
   /// \param Args The arguments passed to the driver (excluding the path to the

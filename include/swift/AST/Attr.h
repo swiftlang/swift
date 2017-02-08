@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -28,6 +28,7 @@
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKind.h"
+#include "swift/AST/Requirement.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -40,6 +41,8 @@ class ASTContext;
 struct PrintOptions;
 class Decl;
 class ClassDecl;
+class GenericFunctionType;
+class TrailingWhereClause;
 struct TypeLoc;
 
 /// TypeAttributes - These are attributes that may be applied to types.
@@ -310,7 +313,8 @@ public:
 
   /// Prints this attribute (if applicable), returning `true` if anything was
   /// printed.
-  bool printImpl(ASTPrinter &Printer, const PrintOptions &Options) const;
+  bool printImpl(ASTPrinter &Printer, const PrintOptions &Options,
+                 const Decl *D = nullptr) const;
 
 public:
   DeclAttrKind getKind() const {
@@ -340,10 +344,11 @@ public:
   }
 
   /// Print the attribute to the provided ASTPrinter.
-  void print(ASTPrinter &Printer, const PrintOptions &Options) const;
+  void print(ASTPrinter &Printer, const PrintOptions &Options,
+             const Decl *D = nullptr) const;
 
   /// Print the attribute to the provided stream.
-  void print(llvm::raw_ostream &OS) const;
+  void print(llvm::raw_ostream &OS, const Decl *D = nullptr) const;
 
   /// Returns true if this attribute can appear on the specified decl.  This is
   /// controlled by the flags in Attr.def.
@@ -584,15 +589,18 @@ public:
                    PlatformKind Platform,
                    StringRef Message, StringRef Rename,
                    const clang::VersionTuple &Introduced,
+                   SourceRange IntroducedRange,
                    const clang::VersionTuple &Deprecated,
+                   SourceRange DeprecatedRange,
                    const clang::VersionTuple &Obsoleted,
+                   SourceRange ObsoletedRange,
                    PlatformAgnosticAvailabilityKind PlatformAgnostic,
                    bool Implicit)
     : DeclAttribute(DAK_Available, AtLoc, Range, Implicit),
       Message(Message), Rename(Rename),
-      INIT_VER_TUPLE(Introduced),
-      INIT_VER_TUPLE(Deprecated),
-      INIT_VER_TUPLE(Obsoleted),
+      INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
+      INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
+      INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange),
       PlatformAgnostic(PlatformAgnostic),
       Platform(Platform)
   {}
@@ -613,11 +621,20 @@ public:
   /// Indicates when the symbol was introduced.
   const Optional<clang::VersionTuple> Introduced;
 
+  /// Indicates where the Introduced version was specified.
+  const SourceRange IntroducedRange;
+
   /// Indicates when the symbol was deprecated.
   const Optional<clang::VersionTuple> Deprecated;
 
+  /// Indicates where the Deprecated version was specified.
+  const SourceRange DeprecatedRange;
+
   /// Indicates when the symbol was obsoleted.
   const Optional<clang::VersionTuple> Obsoleted;
+
+  /// Indicates where the Obsoleted version was specified.
+  const SourceRange ObsoletedRange;
 
   /// Indicates if the declaration has platform-agnostic availability.
   const PlatformAgnosticAvailabilityKind PlatformAgnostic;
@@ -1027,27 +1044,66 @@ public:
 /// The @_specialize attribute, which forces specialization on the specified
 /// type list.
 class SpecializeAttr : public DeclAttribute {
-  unsigned numTypes;
-  ConcreteDeclRef specializedDecl;
+public:
+  enum class SpecializationKind {
+    Full,
+    Partial
+  };
 
-  TypeLoc *getTypeLocData() {
-    return reinterpret_cast<TypeLoc *>(this + 1);
+private:
+  unsigned numRequirements;
+  TrailingWhereClause *trailingWhereClause;
+  SpecializationKind kind;
+  bool exported;
+
+  Requirement *getRequirementsData() {
+    return reinterpret_cast<Requirement *>(this+1);
   }
 
   SpecializeAttr(SourceLoc atLoc, SourceRange Range,
-                 ArrayRef<TypeLoc> typeLocs);
+                 TrailingWhereClause *clause, bool exported,
+                 SpecializationKind kind);
+
+  SpecializeAttr(SourceLoc atLoc, SourceRange Range,
+                 ArrayRef<Requirement> requirements,
+                 bool exported,
+                 SpecializationKind kind);
 
 public:
   static SpecializeAttr *create(ASTContext &Ctx, SourceLoc atLoc,
-                                SourceRange Range, ArrayRef<TypeLoc> typeLocs);
+                                SourceRange Range, TrailingWhereClause *clause,
+                                bool exported, SpecializationKind kind);
 
-  ArrayRef<TypeLoc> getTypeLocs() const;
+  static SpecializeAttr *create(ASTContext &Ctx, SourceLoc atLoc,
+                                SourceRange Range,
+                                ArrayRef<Requirement> requirement,
+                                bool exported, SpecializationKind kind);
 
-  MutableArrayRef<TypeLoc> getTypeLocs();
+  TrailingWhereClause *getTrailingWhereClause() const;
 
-  ConcreteDeclRef getConcreteDecl() const { return specializedDecl; }
+  ArrayRef<Requirement> getRequirements() const;
 
-  void setConcreteDecl(ConcreteDeclRef ref) { specializedDecl = ref; }
+  MutableArrayRef<Requirement> getRequirements() {
+    return { getRequirementsData(), numRequirements };
+  }
+
+  void setRequirements(ASTContext &Ctx, ArrayRef<Requirement> requirements);
+
+  bool isExported() const {
+    return exported;
+  }
+
+  SpecializationKind getSpecializationKind() const {
+    return kind;
+  }
+
+  bool isFullSpecialization() const {
+    return kind == SpecializationKind::Full;
+  }
+
+  bool isPartialSpecialization() const {
+    return kind == SpecializationKind::Partial;
+  }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Specialize;
@@ -1101,8 +1157,9 @@ public:
   /// a declaration is deprecated on all deployment targets, or null otherwise.
   const AvailableAttr *getDeprecated(const ASTContext &ctx) const;
 
-  void dump() const;
-  void print(ASTPrinter &Printer, const PrintOptions &Options) const;
+  void dump(const Decl *D = nullptr) const;
+  void print(ASTPrinter &Printer, const PrintOptions &Options,
+             const Decl *D = nullptr) const;
 
   template <typename T, typename DERIVED>
   class iterator_base : public std::iterator<std::forward_iterator_tag, T *> {

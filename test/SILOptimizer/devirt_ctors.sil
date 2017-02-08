@@ -34,9 +34,9 @@ bb0:
   // function_ref main.ABC.init (main.ABC.Type)(y : Swift.Int64) -> main.ABC
   %3 = function_ref @_TFC4main3ABCcfMS0_FT1ySi_S0_ : $@convention(method) (Int64, @owned ABC) -> @owned ABC // user: %4
   %4 = apply %3(%1, %2) : $@convention(method) (Int64, @owned ABC) -> @owned ABC // users: %7, %6, %5, %10, %9, %8, %11
-  %6 = class_method %4 : $ABC, #ABC.member!1 : (ABC) -> () -> () , $@convention(method) (@guaranteed ABC) -> () // user: %7
+  %6 = class_method %4 : $ABC, #ABC.member!1 : (ABC) -> () -> (), $@convention(method) (@guaranteed ABC) -> () // user: %7
   %7 = apply %6(%4) : $@convention(method) (@guaranteed ABC) -> ()
-  %9 = class_method %4 : $ABC, #ABC.member2!1 : (ABC) -> () -> () , $@convention(method) (@guaranteed ABC) -> () // user: %10
+  %9 = class_method %4 : $ABC, #ABC.member2!1 : (ABC) -> () -> (), $@convention(method) (@guaranteed ABC) -> () // user: %10
   %10 = apply %9(%4) : $@convention(method) (@guaranteed ABC) -> ()
   strong_release %4 : $ABC                        // id: %11
   %12 = tuple ()                                  // user: %13

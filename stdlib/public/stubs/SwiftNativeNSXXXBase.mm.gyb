@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -30,6 +30,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/Config.h"
+
+#if SWIFT_OBJC_INTEROP
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
 #include <objc/NSObject.h>
@@ -93,7 +96,7 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 % end
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" bool
+bool
 swift_stdlib_NSObject_isEqual(NSObject *NS_RELEASES_ARGUMENT lhs,
                               NSObject *NS_RELEASES_ARGUMENT rhs) {
   bool Result = (lhs == rhs) || [lhs isEqual:rhs];
@@ -103,7 +106,7 @@ swift_stdlib_NSObject_isEqual(NSObject *NS_RELEASES_ARGUMENT lhs,
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" int32_t swift_stdlib_compareNSStringDeterministicUnicodeCollation(
+int32_t swift_stdlib_compareNSStringDeterministicUnicodeCollation(
     NSString *NS_RELEASES_ARGUMENT lhs, NSString *NS_RELEASES_ARGUMENT rhs) {
   // 'kCFCompareNonliteral' actually means "normalize to NFD".
   int Result = CFStringCompare((__bridge CFStringRef)lhs,
@@ -114,7 +117,7 @@ extern "C" int32_t swift_stdlib_compareNSStringDeterministicUnicodeCollation(
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" int32_t
+int32_t
 swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr(void *Lhs,
                                                              void *Rhs) {
   NSString *lhs = (NSString *)Lhs;
@@ -127,7 +130,7 @@ swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr(void *Lhs,
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" size_t
+size_t
 swift_stdlib_NSStringHashValue(NSString *NS_RELEASES_ARGUMENT str,
                                bool isASCII) {
   size_t Result =
@@ -138,7 +141,7 @@ swift_stdlib_NSStringHashValue(NSString *NS_RELEASES_ARGUMENT str,
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" size_t
+size_t
 swift_stdlib_NSStringHashValuePointer(void *opaque, bool isASCII) {
   NSString *str = (NSString *)opaque;
   return isASCII ? str.hash : str.decomposedStringWithCanonicalMapping.hash;
@@ -146,8 +149,8 @@ swift_stdlib_NSStringHashValuePointer(void *opaque, bool isASCII) {
 
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" bool swift_stdlib_NSStringHasPrefixNFD(NSString *theString,
-                                                  NSString *prefix) {
+bool swift_stdlib_NSStringHasPrefixNFD(NSString *theString,
+                                       NSString *prefix) {
   auto Length = CFStringGetLength((__bridge CFStringRef)theString);
   int Result = CFStringFindWithOptions(
       (__bridge CFStringRef)theString, (__bridge CFStringRef)prefix,
@@ -159,8 +162,8 @@ extern "C" bool swift_stdlib_NSStringHasPrefixNFD(NSString *theString,
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" bool swift_stdlib_NSStringHasPrefixNFDPointer(void *theString,
-                                                         void *prefix) {
+bool swift_stdlib_NSStringHasPrefixNFDPointer(void *theString,
+                                              void *prefix) {
   auto Length = CFStringGetLength((__bridge CFStringRef)theString);
   int Result = CFStringFindWithOptions(
       (__bridge CFStringRef)theString, (__bridge CFStringRef)prefix,
@@ -170,7 +173,7 @@ extern "C" bool swift_stdlib_NSStringHasPrefixNFDPointer(void *theString,
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" bool
+bool
 swift_stdlib_NSStringHasSuffixNFD(NSString *NS_RELEASES_ARGUMENT theString,
                                   NSString *NS_RELEASES_ARGUMENT suffix) {
   auto Length = CFStringGetLength((__bridge CFStringRef)theString);
@@ -184,8 +187,8 @@ swift_stdlib_NSStringHasSuffixNFD(NSString *NS_RELEASES_ARGUMENT theString,
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" bool swift_stdlib_NSStringHasSuffixNFDPointer(void *theString,
-                                                         void *suffix) {
+bool swift_stdlib_NSStringHasSuffixNFDPointer(void *theString,
+                                              void *suffix) {
   auto Length = CFStringGetLength((__bridge CFStringRef)theString);
   int Result = CFStringFindWithOptions(
       (__bridge CFStringRef)theString, (__bridge CFStringRef)suffix,
@@ -195,7 +198,7 @@ extern "C" bool swift_stdlib_NSStringHasSuffixNFDPointer(void *theString,
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" NS_RETURNS_RETAINED NSString *
+NS_RETURNS_RETAINED NSString *
 swift_stdlib_NSStringLowercaseString(NSString *NS_RELEASES_ARGUMENT str) {
   NSString *Result = objc_retain(str.lowercaseString);
   swift_unknownRelease(str);
@@ -203,7 +206,7 @@ swift_stdlib_NSStringLowercaseString(NSString *NS_RELEASES_ARGUMENT str) {
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" NS_RETURNS_RETAINED NSString *
+NS_RETURNS_RETAINED NSString *
 swift_stdlib_NSStringUppercaseString(NSString *NS_RELEASES_ARGUMENT str) {
   NSString *Result = objc_retain(str.uppercaseString);
   swift_unknownRelease(str);
@@ -211,11 +214,12 @@ swift_stdlib_NSStringUppercaseString(NSString *NS_RELEASES_ARGUMENT str) {
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" void swift_stdlib_CFSetGetValues(NSSet *NS_RELEASES_ARGUMENT set,
+void swift_stdlib_CFSetGetValues(NSSet *NS_RELEASES_ARGUMENT set,
                                             const void **values) {
   CFSetGetValues((__bridge CFSetRef)set, values);
   swift_unknownRelease(set);
 }
+#endif
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

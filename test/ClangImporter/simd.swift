@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name main -parse -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name main -typecheck -verify %s
 
 import c_simd
 import simd

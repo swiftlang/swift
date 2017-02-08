@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module -o %t %S/Inputs/objc_protocols_Bas.swift
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -new-mangling-for-tests -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -11,8 +11,8 @@ import objc_protocols_Bas
 
 // -- Protocol "Frungible" inherits only objc protocols and should have no
 //    out-of-line inherited witnesses in its witness table.
-// CHECK: [[ZIM_FRUNGIBLE_WITNESS:@_TWPC14objc_protocols3ZimS_9FrungibleS_]] = hidden constant [1 x i8*] [
-// CHECK:    i8* bitcast (void (%C14objc_protocols3Zim*, %swift.type*, i8**)* @_TTWC14objc_protocols3ZimS_9FrungibleS_FS1_6frungefT_T_ to i8*)
+// CHECK: [[ZIM_FRUNGIBLE_WITNESS:@_T014objc_protocols3ZimCAA9FrungibleAAWP]] = hidden constant [1 x i8*] [
+// CHECK:    i8* bitcast (void (%C14objc_protocols3Zim*, %swift.type*, i8**)* @_T014objc_protocols3ZimCAA9FrungibleAaaDP6frungeyyFTW to i8*)
 // CHECK: ]
 
 protocol Ansible {
@@ -28,9 +28,9 @@ class Foo : NSRuncing, NSFunging, Ansible {
 // CHECK: @_INSTANCE_METHODS__TtC14objc_protocols3Foo = private constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 3,
 // CHECK:   [3 x { i8*, i8*, i8* }] [
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC:@[0-9]+]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFC14objc_protocols3Foo5runcefT_T_ to i8*) },
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFC14objc_protocols3Foo5fungefT_T_ to i8*) },
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFC14objc_protocols3Foo3foofT_T_ to i8*)
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC:@[0-9]+]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_T014objc_protocols3FooC5runceyyFTo to i8*) },
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_T014objc_protocols3FooC5fungeyyFTo to i8*) },
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_T014objc_protocols3FooC3fooyyFTo to i8*)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
@@ -53,9 +53,9 @@ extension Bar : NSRuncing, NSFunging {
 // CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC14objc_protocols3Bar_$_objc_protocols" = private constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 3,
 // CHECK:   [3 x { i8*, i8*, i8* }] [
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFC14objc_protocols3Bar5runcefT_T_ to i8*) },
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFC14objc_protocols3Bar5fungefT_T_ to i8*) },
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFC14objc_protocols3Bar3foofT_T_ to i8*) }
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_T014objc_protocols3BarC5runceyyFTo to i8*) },
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_T014objc_protocols3BarC5fungeyyFTo to i8*) },
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_T014objc_protocols3BarC3fooyyFTo to i8*) }
 // CHECK:   ]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
@@ -69,7 +69,7 @@ extension Bas : NSRuncing {
 // CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC18objc_protocols_Bas3Bas_$_objc_protocols" = private constant { i32, i32, [1 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 1,
 // CHECK;   [1 x { i8*, i8*, i8* }] [
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas3foofT_T_ to i8*) }
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_T018objc_protocols_Bas0C0C0a1_B0E3fooyyFTo to i8*) }
 // CHECK:   ]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
@@ -89,9 +89,9 @@ class Zim : Frungible {
 // CHECK: @_INSTANCE_METHODS__TtC14objc_protocols3Zim = private constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 3,
 // CHECK:   [3 x { i8*, i8*, i8* }] [
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFC14objc_protocols3Zim5runcefT_T_ to i8*) },
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFC14objc_protocols3Zim5fungefT_T_ to i8*) },
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFC14objc_protocols3Zim3foofT_T_ to i8*) }
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_T014objc_protocols3ZimC5runceyyFTo to i8*) },
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_T014objc_protocols3ZimC5fungeyyFTo to i8*) },
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_T014objc_protocols3ZimC3fooyyFTo to i8*) }
 // CHECK:   ]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
@@ -109,20 +109,20 @@ extension Zang : Frungible {
 // CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC18objc_protocols_Bas4Zang_$_objc_protocols" = private constant { i32, i32, [2 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 2,
 // CHECK:   [2 x { i8*, i8*, i8* }] [
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFE14objc_protocolsC18objc_protocols_Bas4Zang5runcefT_T_ to i8*) },
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_TToFE14objc_protocolsC18objc_protocols_Bas4Zang3foofT_T_ to i8*) }
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_T018objc_protocols_Bas4ZangC0a1_B0E5runceyyFTo to i8*) },
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast (void (i8*, i8*)* @_T018objc_protocols_Bas4ZangC0a1_B0E3fooyyFTo to i8*) }
 // CHECK:   ]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
 // -- Force generation of witness for Zim.
-// CHECK: define hidden { %objc_object*, i8** } @_TF14objc_protocols22mixed_heritage_erasure{{.*}}
+// CHECK: define hidden { %objc_object*, i8** } @_T014objc_protocols22mixed_heritage_erasure{{[_0-9a-zA-Z]*}}F
 func mixed_heritage_erasure(_ x: Zim) -> Frungible {
   return x
   // CHECK: [[T0:%.*]] = insertvalue { %objc_object*, i8** } undef, %objc_object* {{%.*}}, 0
   // CHECK: insertvalue { %objc_object*, i8** } [[T0]], i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* [[ZIM_FRUNGIBLE_WITNESS]], i32 0, i32 0), 1
 }
 
-// CHECK-LABEL: define hidden void @_TF14objc_protocols12objc_generic{{.*}}(%objc_object*, %swift.type* %T) {{.*}} {
+// CHECK-LABEL: define hidden void @_T014objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F(%objc_object*, %swift.type* %T) {{.*}} {
 func objc_generic<T : NSRuncing>(_ x: T) {
   x.runce()
   // CHECK: [[SELECTOR:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
@@ -130,13 +130,13 @@ func objc_generic<T : NSRuncing>(_ x: T) {
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[SELECTOR]])
 }
 
-// CHECK-LABEL: define hidden void @_TF14objc_protocols17call_objc_generic{{.*}}(%objc_object*, %swift.type* %T) {{.*}} {
-// CHECK:         call void @_TF14objc_protocols12objc_generic{{.*}}(%objc_object* %0, %swift.type* %T)
+// CHECK-LABEL: define hidden void @_T014objc_protocols05call_A8_generic{{[_0-9a-zA-Z]*}}F(%objc_object*, %swift.type* %T) {{.*}} {
+// CHECK:         call void @_T014objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F(%objc_object* %0, %swift.type* %T)
 func call_objc_generic<T : NSRuncing>(_ x: T) {
   objc_generic(x)
 }
 
-// CHECK-LABEL: define hidden void @_TF14objc_protocols13objc_protocol{{.*}}(%objc_object*) {{.*}} {
+// CHECK-LABEL: define hidden void @_T014objc_protocols0A9_protocol{{[_0-9a-zA-Z]*}}F(%objc_object*) {{.*}} {
 func objc_protocol(_ x: NSRuncing) {
   x.runce()
   // CHECK: [[SELECTOR:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
@@ -144,14 +144,14 @@ func objc_protocol(_ x: NSRuncing) {
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[SELECTOR]])
 }
 
-// CHECK: define hidden %objc_object* @_TF14objc_protocols12objc_erasure{{.*}}(%CSo7NSSpoon*) {{.*}} {
+// CHECK: define hidden %objc_object* @_T014objc_protocols0A8_erasure{{[_0-9a-zA-Z]*}}F(%CSo7NSSpoon*) {{.*}} {
 func objc_erasure(_ x: NSSpoon) -> NSRuncing {
   return x
   // CHECK: [[RES:%.*]] = bitcast %CSo7NSSpoon* {{%.*}} to %objc_object*
   // CHECK: ret %objc_object* [[RES]]
 }
 
-// CHECK: define hidden void @_TF14objc_protocols25objc_protocol_composition{{.*}}(%objc_object*)
+// CHECK: define hidden void @_T014objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F(%objc_object*)
 func objc_protocol_composition(_ x: NSRuncing & NSFunging) {
   x.runce()
   // CHECK: [[RUNCE:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
@@ -162,7 +162,7 @@ func objc_protocol_composition(_ x: NSRuncing & NSFunging) {
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[FUNGE]])
 }
 
-// CHECK: define hidden void @_TF14objc_protocols31objc_swift_protocol_composition{{.*}}(%objc_object*, i8**)
+// CHECK: define hidden void @_T014objc_protocols0A27_swift_protocol_composition{{[_0-9a-zA-Z]*}}F(%objc_object*, i8**)
 func objc_swift_protocol_composition
 (_ x: NSRuncing & Ansible & NSFunging) {
   x.runce()

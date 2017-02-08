@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -verify %s
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 class A1 {
   func foo1() {}

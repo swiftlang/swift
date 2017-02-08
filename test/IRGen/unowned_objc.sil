@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // XFAIL: linux
@@ -149,7 +149,7 @@ bb0(%p : $P, %q : $P):
 // Value witnesses for A:
 
 //   destroyBuffer
-// CHECK:    define linkonce_odr hidden void @_TwXXV12unowned_objc1A([[BUFFER:\[24 x i8\]]]* [[ARG:%.*]], [[TYPE]]*
+// CHECK:    define linkonce_odr hidden void @_T012unowned_objc1AVwXX([[BUFFER:\[24 x i8\]]]* [[ARG:%.*]], [[TYPE]]*
 // CHECK:      [[T0:%.*]] = bitcast [[BUFFER]]* [[ARG]] to [[A]]*
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], [[A]]* [[T0]], i32 0, i32 0
 // CHECK-NEXT: [[T1C:%.*]] = bitcast %swift.unowned* [[T1]] to [[C]]*
@@ -158,7 +158,7 @@ bb0(%p : $P, %q : $P):
 // CHECK-NEXT: ret void
 
 //   initializeBufferWithCopyOfBuffer
-// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwCPV12unowned_objc1A([[BUFFER]]* [[DESTBUF:%.*]], [[BUFFER]]* [[SRCBUF:%.*]], [[TYPE]]*
+// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_T012unowned_objc1AVwCP([[BUFFER]]* [[DESTBUF:%.*]], [[BUFFER]]* [[SRCBUF:%.*]], [[TYPE]]*
 // CHECK:      [[DEST:%.*]] = bitcast [[BUFFER]]* [[DESTBUF]] to [[A]]*
 // CHECK-NEXT: [[SRC:%.*]] = bitcast [[BUFFER]]* [[SRCBUF]] to [[A]]*
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
@@ -172,7 +172,7 @@ bb0(%p : $P, %q : $P):
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
 //   destroy
-// CHECK:    define linkonce_odr hidden void @_TwxxV12unowned_objc1A([[OPAQUE]]* [[ARG:%.*]], [[TYPE]]*
+// CHECK:    define linkonce_odr hidden void @_T012unowned_objc1AVwxx([[OPAQUE]]* [[ARG:%.*]], [[TYPE]]*
 // CHECK:      [[T0:%.*]] = bitcast [[OPAQUE]]* [[ARG]] to [[A]]*
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], [[A]]* [[T0]], i32 0, i32 0
 // CHECK-NEXT: [[T1C:%.*]] = bitcast %swift.unowned* [[T1]] to [[C]]*
@@ -181,7 +181,7 @@ bb0(%p : $P, %q : $P):
 // CHECK-NEXT: ret void
 
 //   initializeBufferWithCopy
-// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwCpV12unowned_objc1A([[BUFFER]]* [[DESTBUF:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
+// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_T012unowned_objc1AVwCp([[BUFFER]]* [[DESTBUF:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
 // CHECK:      [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
 // CHECK-NEXT: [[DEST:%.*]] = bitcast [[BUFFER]]* [[DESTBUF]] to [[A]]*
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
@@ -195,7 +195,7 @@ bb0(%p : $P, %q : $P):
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
 //   initializeWithCopy
-// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwcpV12unowned_objc1A([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
+// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_T012unowned_objc1AVwcp([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
 // CHECK:      [[DEST:%.*]] = bitcast [[OPAQUE]]* [[DEST_OPQ]] to [[A]]*
 // CHECK-NEXT: [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
@@ -209,7 +209,7 @@ bb0(%p : $P, %q : $P):
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
 //   assignWithCopy
-// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwcaV12unowned_objc1A([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
+// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_T012unowned_objc1AVwca([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
 // CHECK:      [[DEST:%.*]] = bitcast [[OPAQUE]]* [[DEST_OPQ]] to [[A]]*
 // CHECK-NEXT: [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
 // CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
@@ -225,7 +225,7 @@ bb0(%p : $P, %q : $P):
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
 //   assignWithTake
-// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwtaV12unowned_objc1A([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
+// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_T012unowned_objc1AVwta([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
 // CHECK:      [[DEST:%.*]] = bitcast [[OPAQUE]]* [[DEST_OPQ]] to [[A]]*
 // CHECK-NEXT: [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
 // CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0

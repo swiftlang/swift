@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -50,6 +50,8 @@ public:
   PrettyStackTraceSILFunction(const char *action, SILFunction *F)
     : TheFn(F), Action(action) {}
   virtual void print(llvm::raw_ostream &OS) const;
+protected:
+  void printFunctionInfo(llvm::raw_ostream &out) const;
 };
 
 } // end namespace swift

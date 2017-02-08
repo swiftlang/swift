@@ -2,11 +2,11 @@
 ;
 ; This source file is part of the Swift.org open source project
 ;
-; Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+; Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 ; Licensed under Apache License v2.0 with Runtime Library Exception
 ;
-; See http://swift.org/LICENSE.txt for license information
-; See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+; See https://swift.org/LICENSE.txt for license information
+; See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 ;
 ;===----------------------------------------------------------------------===;
 
@@ -241,7 +241,6 @@ generic-parameter-list? ( `.' identifier generic-parameter-list?
 )*, returning t if the initial identifier was found and nil otherwise."
   (when (swift-skip-identifier)
     (swift-skip-generic-parameter-list)
-    (swift-skip-re "\\?+")
     (when (swift-skip-re "\\.")
       (swift-skip-simple-type-name))
     t))
@@ -264,9 +263,10 @@ one is present, returning t if so and nil otherwise"
            (setq found t)))
 
           ;; followed by "->"
-          (prog1 (swift-skip-re "throws\\|rethrows\\|->")
-            (swift-skip-re "->") ;; accounts for the throws/rethrows cases on the previous line
-            (swift-skip-comments-and-space))))
+         (prog2 (swift-skip-re "\\?+")
+             (swift-skip-re "throws\\|rethrows\\|->")
+           (swift-skip-re "->") ;; accounts for the throws/rethrows cases on the previous line
+           (swift-skip-comments-and-space))))
     found))
 
 (defun swift-skip-constraint ()
@@ -326,8 +326,9 @@ Use `M-x hs-show-all' to show them again."
                     (swift-skip-comments-and-space)
                     (equal (char-after) ?\())
                   ;; parse the parameter list and any return type
-                  (swift-skip-type-name)
-                  (swift-skip-where-clause)))))
+                  (prog1
+                    (swift-skip-type-name)
+                    (swift-skip-where-clause))))))
              (swift-skip-re "{"))
           (hs-hide-block :reposition-at-end))))))
 
@@ -442,7 +443,7 @@ current buffer.
 Set to 'swift-syntax-check-single-file to ignore other files in the current directory.")
 (put 'swift-syntax-check-fn 'safe-local-variable 'functionp)
 
-(defvar-local swift-syntax-check-args '("-parse")
+(defvar-local swift-syntax-check-args '("-typecheck")
   "List of arguments to be passed to swiftc for syntax checking.
 Elements of this list that are strings are inserted literally
 into the command line.  Elements that are S-expressions are
@@ -458,7 +459,7 @@ that variable you should set this one to nil.")
 
 (defun swift-syntax-check-single-file (swiftc temp-file)
   "Return a flymake command-line list for syntax-checking the current buffer in isolation"
-  `(,swiftc ("-parse" ,temp-file)))
+  `(,swiftc ("-typecheck" ,temp-file)))
 
 (defun swift-syntax-check-directory (swiftc temp-file)
   "Return a flymake command-line list for syntax-checking the
@@ -469,7 +470,7 @@ directory."
       (when (and (string-equal "swift" (file-name-extension x))
                  (not (file-equal-p x (buffer-file-name))))
         (setq sources (cons x sources))))
-    `(,swiftc ("-parse" ,temp-file ,@sources))))
+    `(,swiftc ("-typecheck" ,temp-file ,@sources))))
 
 (defun flymake-swift-init ()
   (let* ((temp-file

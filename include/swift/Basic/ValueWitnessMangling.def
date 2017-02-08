@@ -1,0 +1,39 @@
+//===-- ValueWitnessMangling.def - VW Mangling Metaprogramming --*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+/// VALUE_WITNESS(MANGLING, NAME)
+///   The 2-character MANGLING for a value witness NAME.
+
+VALUE_WITNESS(al, AllocateBuffer)
+VALUE_WITNESS(ca, AssignWithCopy)
+VALUE_WITNESS(ta, AssignWithTake)
+VALUE_WITNESS(de, DeallocateBuffer)
+VALUE_WITNESS(xx, Destroy)
+VALUE_WITNESS(XX, DestroyBuffer)
+VALUE_WITNESS(Xx, DestroyArray)
+VALUE_WITNESS(CP, InitializeBufferWithCopyOfBuffer)
+VALUE_WITNESS(Cp, InitializeBufferWithCopy)
+VALUE_WITNESS(cp, InitializeWithCopy)
+VALUE_WITNESS(Tk, InitializeBufferWithTake)
+VALUE_WITNESS(tk, InitializeWithTake)
+VALUE_WITNESS(pr, ProjectBuffer)
+VALUE_WITNESS(TK, InitializeBufferWithTakeOfBuffer)
+VALUE_WITNESS(Cc, InitializeArrayWithCopy)
+VALUE_WITNESS(Tt, InitializeArrayWithTakeFrontToBack)
+VALUE_WITNESS(tT, InitializeArrayWithTakeBackToFront)
+VALUE_WITNESS(xs, StoreExtraInhabitant)
+VALUE_WITNESS(xg, GetExtraInhabitantIndex)
+VALUE_WITNESS(ug, GetEnumTag)
+VALUE_WITNESS(up, DestructiveProjectEnumData)
+VALUE_WITNESS(ui, DestructiveInjectEnumTag)
+
+#undef VALUE_WITNESS

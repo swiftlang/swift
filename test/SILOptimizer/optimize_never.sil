@@ -176,7 +176,7 @@ bb0(%0 : $*T):
 // CHECK: function_ref @_TF14optimize_never10transform1urFxVs5Int32
 // CHECK: apply
 // CHECK-NOT: checked_cast_br
-// CHECK: class_method {{%.*}} : $C, #C.foo!1 : (C) -> () -> Int32 , $@convention(method) (@guaranteed C) -> Int32
+// CHECK: class_method {{%.*}} : $C, #C.foo!1 : (C) -> () -> Int32, $@convention(method) (@guaranteed C) -> Int32
 // CHECK: apply
 // CHECK: return
 sil [_semantics "optimize.sil.never"] @_TF14optimize_never4foo1urFTxCS_1C_Vs5Int32 : $@convention(thin) <T> (@in T, @owned C) -> Int32 {
@@ -185,7 +185,7 @@ bb0(%0 : $*T, %1 : $C):
   %5 = alloc_stack $T
   copy_addr %0 to [initialization] %5 : $*T
   %7 = apply %4<T>(%5) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
-  %8 = class_method %1 : $C, #C.foo!1 : (C) -> () -> Int32 , $@convention(method) (@guaranteed C) -> Int32
+  %8 = class_method %1 : $C, #C.foo!1 : (C) -> () -> Int32, $@convention(method) (@guaranteed C) -> Int32
   %9 = apply %8(%1) : $@convention(method) (@guaranteed C) -> Int32
   %10 = struct_extract %7 : $Int32, #Int32._value
   %11 = struct_extract %9 : $Int32, #Int32._value
@@ -241,14 +241,14 @@ bb0(%0 : $Int32):
 // CHECK: function_ref @_TF14optimize_never10transform2FVs5Int32S0_
 // CHECK: apply
 // CHECK-NOT: checked_cast_br
-// CHECK: class_method {{%.*}} : $C, #C.foo!1 : (C) -> () -> Int32 , $@convention(method) (@guaranteed C) -> Int32
+// CHECK: class_method {{%.*}} : $C, #C.foo!1 : (C) -> () -> Int32, $@convention(method) (@guaranteed C) -> Int32
 // CHECK: apply
 // CHECK: return
 sil [_semantics "optimize.sil.never"] @_TF14optimize_never4foo2FTVs5Int32CS_1C_S0_ : $@convention(thin) (Int32, @owned C) -> Int32 {
 bb0(%0 : $Int32, %1 : $C):
   %4 = function_ref @_TF14optimize_never10transform2FVs5Int32S0_ : $@convention(thin) (Int32) -> Int32
   %5 = apply %4(%0) : $@convention(thin) (Int32) -> Int32
-  %6 = class_method %1 : $C, #C.foo!1 : (C) -> () -> Int32 , $@convention(method) (@guaranteed C) -> Int32
+  %6 = class_method %1 : $C, #C.foo!1 : (C) -> () -> Int32, $@convention(method) (@guaranteed C) -> Int32
   %7 = apply %6(%1) : $@convention(method) (@guaranteed C) -> Int32
   %8 = struct_extract %5 : $Int32, #Int32._value
   %9 = struct_extract %7 : $Int32, #Int32._value
@@ -301,7 +301,7 @@ bb0(%0 : $*T, %1 : $C):
   %5 = alloc_stack $T
   copy_addr %0 to [initialization] %5 : $*T
   %7 = apply %4<T>(%5) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
-  %8 = class_method %1 : $C, #C.foo!1 : (C) -> () -> Int32 , $@convention(method) (@guaranteed C) -> Int32
+  %8 = class_method %1 : $C, #C.foo!1 : (C) -> () -> Int32, $@convention(method) (@guaranteed C) -> Int32
   %9 = apply %8(%1) : $@convention(method) (@guaranteed C) -> Int32
   %10 = struct_extract %7 : $Int32, #Int32._value
   %11 = struct_extract %9 : $Int32, #Int32._value
@@ -353,7 +353,7 @@ sil @_TF14optimize_never4foo4FTVs5Int32CS_1C_S0_ : $@convention(thin) (Int32, @o
 bb0(%0 : $Int32, %1 : $C):
   %4 = function_ref @_TF14optimize_never10transform4FVs5Int32S0_ : $@convention(thin) (Int32) -> Int32
   %5 = apply %4(%0) : $@convention(thin) (Int32) -> Int32
-  %6 = class_method %1 : $C, #C.foo!1 : (C) -> () -> Int32 , $@convention(method) (@guaranteed C) -> Int32
+  %6 = class_method %1 : $C, #C.foo!1 : (C) -> () -> Int32, $@convention(method) (@guaranteed C) -> Int32
   %7 = apply %6(%1) : $@convention(method) (@guaranteed C) -> Int32
   %8 = struct_extract %5 : $Int32, #Int32._value
   %9 = struct_extract %7 : $Int32, #Int32._value
@@ -461,7 +461,7 @@ bb0(%0 : $Base):
 // CHECK: }
 sil @_TF14optimize_never23testDoNotDevirtDerived1FT1oCS_4Base_Vs5Int32 : $@convention(thin) (@owned Base) -> Int32 {
 bb0(%0 : $Base):
-  %2 = class_method %0 : $Base, #Base.boo!1 : (Base) -> () -> Int32 , $@convention(method) (@guaranteed Base) -> Int32
+  %2 = class_method %0 : $Base, #Base.boo!1 : (Base) -> () -> Int32, $@convention(method) (@guaranteed Base) -> Int32
   %3 = apply %2(%0) : $@convention(method) (@guaranteed Base) -> Int32
   strong_release %0 : $Base
   return %3 : $Int32

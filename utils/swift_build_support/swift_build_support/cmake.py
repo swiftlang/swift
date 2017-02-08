@@ -2,11 +2,11 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See http://swift.org/LICENSE.txt for license information
-# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 # ----------------------------------------------------------------------------
 #
@@ -118,6 +118,8 @@ class CMake(object):
             define("LLVM_VERSION_PATCH:STRING", patch)
 
         if args.build_ninja and args.cmake_generator == 'Ninja':
+            define('CMAKE_MAKE_PROGRAM', toolchain.ninja)
+        elif args.cmake_generator == 'Ninja' and toolchain.ninja is not None:
             define('CMAKE_MAKE_PROGRAM', toolchain.ninja)
 
         return options

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 func canonical_empty_protocol() -> Any {
   return 1
@@ -123,8 +123,8 @@ func testConversion() {
 }
 
 // Test the parser's splitting of >= into > and =.
-var x : protocol<P5>= 17 // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{9-22=P5=}}
-var y : protocol<P5, P7>= 17 // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{9-26=P5 & P7=}}
+var x : protocol<P5>= 17 // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{9-22=P5=}} expected-error {{'=' must have consistent whitespace on both sides}}
+var y : protocol<P5, P7>= 17 // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{9-26=P5 & P7=}} expected-error {{'=' must have consistent whitespace on both sides}}
 var z : protocol<P5, P7>?=17 // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{9-27=(P5 & P7)?=}}
 
 typealias A1 = protocol<> // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}} {{16-26=Any}}

@@ -59,9 +59,13 @@ public struct Selector : ExpressibleByStringLiteral {
   public init (stringLiteral value: String) {
     self = sel_registerName(value)
   }
+
+  public var hashValue: Int {
+    return ptr.hashValue
+  }
 }
 
-extension Selector : Equatable {}
+extension Selector : Equatable, Hashable {}
 
 public func ==(lhs: Selector, rhs: Selector) -> Bool {
   return sel_isEqual(lhs, rhs)

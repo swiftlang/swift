@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -151,7 +151,7 @@ namespace {
       }
     }
   };
-}
+} // end anonymous namespace
 
 static size_t deepHash(Node *node) {
   DeepHasher hasher;
@@ -249,7 +249,6 @@ namespace {
       unreachable("bad demangling tree node");
     }
 
-    NodePointer getUnspecialized(Node *node);
     void mangleGenericArgs(Node *node, EntityContext &ctx);
     void mangleAnyNominalType(Node *node, EntityContext &ctx);
 
@@ -303,7 +302,7 @@ namespace {
     void mangleDependentGenericParamIndex(Node *node);
     void mangleConstrainedType(Node *node);
   };
-}
+} // end anonymous namespace
 
 #define NODE(ID)
 #define CONTEXT_NODE(ID)                        \
@@ -320,13 +319,13 @@ void Remangler::resetSubstitutions() {
   Substitutions.clear();
 }
 
-bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
-  auto isInSwiftModule = [](Node *node) -> bool {
-    auto context = node->begin()->get();
-    return (context->getKind() == Node::Kind::Module &&
-            context->getText() == STDLIB_NAME);
-  };
+static bool isInSwiftModule(Node *node) {
+  auto context = node->begin()->get();
+  return (context->getKind() == Node::Kind::Module &&
+          context->getText() == STDLIB_NAME);
+};
 
+bool Demangle::mangleStandardSubstitution(Node *node, DemanglerPrinter &Out) {
   // Look for known substitutions.
   switch (node->getKind()) {
 #define SUCCESS_IF_IS(VALUE, EXPECTED, SUBSTITUTION)            \
@@ -378,6 +377,12 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
 #undef SUCCESS_IF_TEXT_IS
 #undef SUCCESS_IF_IS
   }
+  return false;
+}
+
+bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
+  if (Demangle::mangleStandardSubstitution(node, Out))
+    return true;
 
   // Go ahead and initialize the substitution entry.
   entry.TheNode = node;
@@ -455,6 +460,15 @@ void Remangler::mangleGenericSpecializationNotReAbstracted(Node *node) {
   // Start another mangled name.
   Out << "__T";
 }
+
+void Remangler::mangleGenericPartialSpecialization(Node *node) {
+  unreachable("todo");
+}
+
+void Remangler::mangleGenericPartialSpecializationNotReAbstracted(Node *node) {
+  unreachable("todo");
+}
+
 void Remangler::mangleGenericSpecializationParam(Node *node) {
   // Should be a type followed by a series of protocol conformances.
   mangleChildNodes(node);
@@ -653,33 +667,13 @@ void Remangler::mangleDirectness(Node *node) {
 }
 
 void Remangler::mangleValueWitness(Node *node) {
-  auto getString = [](ValueWitnessKind kind) -> StringRef {
-    switch (kind) {
-    case ValueWitnessKind::AllocateBuffer: return "al";
-    case ValueWitnessKind::AssignWithCopy: return "ca";
-    case ValueWitnessKind::AssignWithTake: return "ta";
-    case ValueWitnessKind::DeallocateBuffer: return "de";
-    case ValueWitnessKind::Destroy: return "xx";
-    case ValueWitnessKind::DestroyBuffer: return "XX";
-    case ValueWitnessKind::InitializeBufferWithCopyOfBuffer: return "CP";
-    case ValueWitnessKind::InitializeBufferWithCopy: return "Cp";
-    case ValueWitnessKind::InitializeWithCopy: return "cp";
-    case ValueWitnessKind::InitializeBufferWithTake: return "Tk";
-    case ValueWitnessKind::InitializeWithTake: return "tk";
-    case ValueWitnessKind::ProjectBuffer: return "pr";
-    case ValueWitnessKind::InitializeBufferWithTakeOfBuffer: return "TK";
-    case ValueWitnessKind::DestroyArray: return "Xx";
-    case ValueWitnessKind::InitializeArrayWithCopy: return "Cc";
-    case ValueWitnessKind::InitializeArrayWithTakeFrontToBack: return "Tt";
-    case ValueWitnessKind::InitializeArrayWithTakeBackToFront: return "tT";
-    case ValueWitnessKind::StoreExtraInhabitant: return "xs";
-    case ValueWitnessKind::GetExtraInhabitantIndex: return "xg";
-    case ValueWitnessKind::GetEnumTag: return "ug";
-    case ValueWitnessKind::DestructiveProjectEnumData: return "up";
-    }
-    unreachable("bad value witness kind");
-  };
-  Out << 'w' << getString(ValueWitnessKind(node->getIndex()));
+  const char *Code = nullptr;
+  switch (ValueWitnessKind(node->getIndex())) {
+#define VALUE_WITNESS(MANGLING, NAME) \
+    case ValueWitnessKind::NAME: Code = #MANGLING; break;
+#include "swift/Basic/ValueWitnessMangling.def"
+  }
+  Out << 'w' << Code;
   mangleSingleChildNode(node); // type
 }
 
@@ -1346,6 +1340,26 @@ void Remangler::mangleDependentGenericSameTypeRequirement(Node *node) {
   mangle(node->getChild(1).get());
 }
 
+void Remangler::mangleDependentGenericLayoutRequirement(Node *node) {
+  mangleConstrainedType(node->getChild(0).get());
+  Out << 'l';
+  auto id =  node->getChild(1)->getText();
+  auto size = -1;
+  if (node->getNumChildren() > 2) {
+    size = node->getChild(2)->getIndex();
+  }
+  int alignment = -1;
+  if (node->getNumChildren() > 3) {
+    alignment = node->getChild(3)->getIndex();
+  }
+  Out << id;
+  if (size >= 0)
+    Out << size;
+  if (alignment >= 0) {
+    Out << "_" << alignment;
+  }
+}
+
 void Remangler::mangleConstrainedType(Node *node) {
   if (node->getFirstChild()->getKind()
         == Node::Kind::DependentGenericParamType) {
@@ -1372,18 +1386,6 @@ void Remangler::mangleAssociatedType(Node *node) {
   } else {
     Out << '_';
   }
-}
-
-void Remangler::mangleArchetypeRef(Node *node) {
-  Node::IndexType relativeDepth = node->getChild(0)->getIndex();
-  Node::IndexType index = node->getChild(1)->getIndex();
-
-  Out << 'Q';
-  if (relativeDepth != 0) {
-    Out << 'd';
-    mangleIndex(relativeDepth - 1);
-  }
-  mangleIndex(index);
 }
 
 void Remangler::mangleQualifiedArchetype(Node *node) {
@@ -1516,7 +1518,7 @@ void Remangler::mangleProtocolWithoutPrefix(Node *node) {
   mangleNominalType(node, '\0', ctx);
 }
 
-static bool isSpecialized(Node *node) {
+bool Demangle::isSpecialized(Node *node) {
   switch (node->getKind()) {
   case Node::Kind::BoundGenericStructure:
   case Node::Kind::BoundGenericEnum:
@@ -1538,7 +1540,7 @@ static bool isSpecialized(Node *node) {
   }
 }
 
-NodePointer Remangler::getUnspecialized(Node *node) {
+NodePointer Demangle::getUnspecialized(Node *node) {
   switch (node->getKind()) {
   case Node::Kind::Structure:
   case Node::Kind::Enum:
@@ -1665,6 +1667,105 @@ void Remangler::mangleBoundGenericEnum(Node *node) {
 void Remangler::mangleTypeList(Node *node) {
   mangleChildNodes(node); // all types
   Out << '_';
+}
+
+void Remangler::mangleReflectionMetadataBuiltinDescriptor(Node *node) {
+  Out << "MRb";
+}
+
+void Remangler::mangleReflectionMetadataFieldDescriptor(Node *node) {
+  Out << "MRf";
+}
+
+void Remangler::mangleReflectionMetadataAssocTypeDescriptor(Node *node) {
+  Out << "MRa";
+}
+
+void Remangler::mangleReflectionMetadataSuperclassDescriptor(Node *node) {
+  Out << "MRc";
+}
+
+void Remangler::mangleGenericTypeParamDecl(Node *node) {
+  unreachable("todo");
+}
+
+void Remangler::mangleCurryThunk(Node *node, EntityContext &ctx) {
+  Out << "<curry-thunk>";
+}
+
+void Remangler::mangleEmptyList(Node *node) {
+  Out << "<empty>";
+}
+
+void Remangler::mangleFirstElementMarker(Node *node) {
+  Out << "<first>";
+}
+
+void Remangler::mangleVariadicMarker(Node *node) {
+  Out << "<vararg>";
+}
+
+void Remangler::mangleOutlinedCopy(Node *node) {
+  Out << "Wy";
+  mangleChildNodes(node);
+}
+
+void Remangler::mangleOutlinedConsume(Node *node) {
+  Out << "We";
+  mangleChildNodes(node);
+}
+
+void Remangler::mangleSILBoxTypeWithLayout(Node *node) {
+  assert(node->getKind() == Node::Kind::SILBoxTypeWithLayout);
+  assert(node->getNumChildren() == 1 || node->getNumChildren() == 3);
+  Out << "XB";
+  auto layout = node->getChild(0);
+  assert(layout->getKind() == Node::Kind::SILBoxLayout);
+  NodePointer signature, genericArgs;
+  if (node->getNumChildren() == 3) {
+    signature = node->getChild(1);
+    assert(signature->getKind() == Node::Kind::DependentGenericSignature);
+    genericArgs = node->getChild(2);
+    assert(genericArgs->getKind() == Node::Kind::TypeList);
+    
+    Out << 'G';
+    mangleDependentGenericSignature(signature.get());
+  }
+  mangleSILBoxLayout(layout.get());
+  if (genericArgs) {
+    for (unsigned i = 0; i < genericArgs->getNumChildren(); ++i) {
+      auto type = genericArgs->getChild(i);
+      assert(genericArgs->getKind() == Node::Kind::Type);
+      mangleType(type.get());
+    }
+    Out << '_';  
+  }
+}
+
+void Remangler::mangleSILBoxLayout(Node *node) {
+  assert(node->getKind() == Node::Kind::SILBoxLayout);
+  for (unsigned i = 0; i < node->getNumChildren(); ++i) {
+    auto field = node->getChild(i);
+    assert(node->getKind() == Node::Kind::SILBoxImmutableField
+           || node->getKind() == Node::Kind::SILBoxMutableField);
+    mangle(node->getChild(i).get());
+    
+  }
+  Out << '_';
+}
+
+void Remangler::mangleSILBoxMutableField(Node *node) {
+  Out << 'm';
+  assert(node->getNumChildren() == 1
+         && node->getChild(0)->getKind() == Node::Kind::Type);
+  mangleType(node->getChild(0).get());
+}
+
+void Remangler::mangleSILBoxImmutableField(Node *node) {
+  Out << 'i';
+  assert(node->getNumChildren() == 1
+         && node->getChild(0)->getKind() == Node::Kind::Type);
+  mangleType(node->getChild(0).get());
 }
 
 /// The top-level interface to the remangler.

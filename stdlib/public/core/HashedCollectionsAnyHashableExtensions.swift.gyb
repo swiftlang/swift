@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -14,37 +14,12 @@
 // Convenience APIs for Set<AnyHashable>
 //===----------------------------------------------------------------------===//
 
-// FIXME(ABI)#36 (Overload resolution): remove these trampolines when extensions below can be
-// properly expressed in the language.
-extension Set {
-  @inline(__always)
-  internal mutating func _concreteElement_insert(
-    _ newMember: Element
-  ) -> (inserted: Bool, memberAfterInsert: Element) {
-    return insert(newMember)
-  }
-
-  @inline(__always)
-  internal mutating func _concreteElement_update(
-    with newMember: Element
-  ) -> Element? {
-    return update(with: newMember)
-  }
-
-  @inline(__always)
-  internal mutating func _concreteElement_remove(
-    _ member: Element
-  ) -> Element? {
-    return remove(member)
-  }
-}
-
 extension Set where Element == AnyHashable {
   public mutating func insert<ConcreteElement : Hashable>(
     _ newMember: ConcreteElement
   ) -> (inserted: Bool, memberAfterInsert: ConcreteElement) {
     let (inserted, memberAfterInsert) =
-      _concreteElement_insert(AnyHashable(newMember))
+      insert(AnyHashable(newMember))
     return (
       inserted: inserted,
       memberAfterInsert: memberAfterInsert.base as! ConcreteElement)
@@ -54,7 +29,7 @@ extension Set where Element == AnyHashable {
   public mutating func update<ConcreteElement : Hashable>(
     with newMember: ConcreteElement
   ) -> ConcreteElement? {
-    return _concreteElement_update(with: AnyHashable(newMember))
+    return update(with: AnyHashable(newMember))
       .map { $0.base as! ConcreteElement }
   }
 
@@ -62,7 +37,7 @@ extension Set where Element == AnyHashable {
   public mutating func remove<ConcreteElement : Hashable>(
     _ member: ConcreteElement
   ) -> ConcreteElement? {
-    return _concreteElement_remove(AnyHashable(member))
+    return remove(AnyHashable(member))
       .map { $0.base as! ConcreteElement }
   }
 }
@@ -71,42 +46,15 @@ extension Set where Element == AnyHashable {
 // Convenience APIs for Dictionary<AnyHashable, *>
 //===----------------------------------------------------------------------===//
 
-// FIXME(ABI)#38 (Overload resolution): remove these trampolines when extensions below can be
-// properly expressed in the language.
-extension Dictionary {
-  internal subscript(_concreteKey key: Key) -> Value? {
-    @inline(__always)
-    get {
-      return self[key]
-    }
-    @inline(__always)
-    set(newValue) {
-      self[key] = newValue
-    }
-  }
-
-  @inline(__always)
-  internal mutating func _concreteKey_updateValue(
-    _ value: Value, forKey key: Key
-  ) -> Value? {
-    return updateValue(value, forKey: key)
-  }
-
-  @inline(__always)
-  internal mutating func _concreteKey_removeValue(forKey key: Key) -> Value? {
-    return removeValue(forKey: key)
-  }
-}
-
 extension Dictionary where Key == AnyHashable {
   public subscript(_ key: _Hashable) -> Value? {
     // FIXME(ABI)#40 (Generic subscripts): replace this API with a
     // generic subscript.
     get {
-      return self[_concreteKey: key._toAnyHashable()]
+      return self[key._toAnyHashable()]
     }
     set {
-      self[_concreteKey: key._toAnyHashable()] = newValue
+      self[key._toAnyHashable()] = newValue
     }
   }
 
@@ -114,14 +62,14 @@ extension Dictionary where Key == AnyHashable {
   public mutating func updateValue<ConcreteKey : Hashable>(
     _ value: Value, forKey key: ConcreteKey
   ) -> Value? {
-    return _concreteKey_updateValue(value, forKey: AnyHashable(key))
+    return updateValue(value, forKey: AnyHashable(key))
   }
 
   @discardableResult
   public mutating func removeValue<ConcreteKey : Hashable>(
     forKey key: ConcreteKey
   ) -> Value? {
-    return _concreteKey_removeValue(forKey: AnyHashable(key))
+    return removeValue(forKey: AnyHashable(key))
   }
 }
 

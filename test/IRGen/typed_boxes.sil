@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 sil_stage canonical
 
 import Builtin
@@ -8,15 +8,15 @@ import Builtin
 sil @pod_box_8_8_a : $@convention(thin) () -> () {
 entry:
   // CHECK: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[POD_8_8_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD:i[0-9]+]] 24, [[WORD]] 7)
-  %a = alloc_box $@box Builtin.Int64
+  %a = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   // CHECK-32: [[BOX_RAW:%.*]] = bitcast %swift.refcounted* [[BOX]] to [[POD_8_8_LAYOUT:<\{ %swift.refcounted, \[4 x i8\], \[8 x i8\] \}>]]*
   // CHECK-32: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_8_8_LAYOUT]], [[POD_8_8_LAYOUT]]* [[BOX_RAW]], i32 0, i32 2
   // CHECK-64: [[BOX_RAW:%.*]] = bitcast %swift.refcounted* [[BOX]] to [[POD_8_8_LAYOUT:<\{ %swift.refcounted, \[8 x i8\] \}>]]*
   // CHECK-64: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_8_8_LAYOUT]], [[POD_8_8_LAYOUT]]* [[BOX_RAW]], i32 0, i32 1
   // CHECK: [[BOX_DATA_1:%.*]] = bitcast [8 x i8]* [[BOX_DATA]] to i64*
-  %b = project_box %a : $@box Builtin.Int64, 0
+  %b = project_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   // CHECK: call void @swift_rt_swift_deallocObject(%swift.refcounted* [[BOX]], [[WORD]] 24, [[WORD]] 7)
-  dealloc_box %a : $@box Builtin.Int64
+  dealloc_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>
   return undef : $()
 }
 
@@ -24,15 +24,15 @@ entry:
 sil @pod_box_8_8_b : $@convention(thin) () -> () {
 entry:
   // CHECK: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[POD_8_8_METADATA]], {{.*}} [[WORD]] 24, [[WORD]] 7)
-  %a = alloc_box $@box Builtin.FPIEEE64
+  %a = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>
   // CHECK-32: [[BOX_RAW:%.*]] = bitcast %swift.refcounted* [[BOX]] to [[POD_8_8_LAYOUT:<\{ %swift.refcounted, \[4 x i8\], \[8 x i8\] \}>]]*
   // CHECK-32: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_8_8_LAYOUT]], [[POD_8_8_LAYOUT]]* [[BOX_RAW]], i32 0, i32 2
   // CHECK-64: [[BOX_RAW:%.*]] = bitcast %swift.refcounted* [[BOX]] to [[POD_8_8_LAYOUT:<\{ %swift.refcounted, \[8 x i8\] \}>]]*
   // CHECK-64: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_8_8_LAYOUT]], [[POD_8_8_LAYOUT]]* [[BOX_RAW]], i32 0, i32 1
   // CHECK: [[BOX_DATA_1:%.*]] = bitcast [8 x i8]* [[BOX_DATA]] to double*
-  %b = project_box %a : $@box Builtin.FPIEEE64, 0
+  %b = project_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>, 0
   // CHECK: call void @swift_rt_swift_deallocObject(%swift.refcounted* [[BOX]], [[WORD]] 24, [[WORD]] 7)
-  dealloc_box %a : $@box Builtin.FPIEEE64
+  dealloc_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.FPIEEE64>
   return undef : $()
 }
 
@@ -45,14 +45,14 @@ struct OverAligned {
 sil @pod_box_32_32 : $@convention(thin) () -> () {
 entry:
   // CHECK: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[POD_32_32_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 64, [[WORD]] 31)
-  %a = alloc_box $@box OverAligned
+  %a = alloc_box $<τ_0_0> { var τ_0_0 } <OverAligned>
   // CHECK-32: [[BOX_RAW:%.*]] = bitcast %swift.refcounted* [[BOX]] to [[POD_32_32_LAYOUT:<\{ %swift.refcounted, \[20 x i8\], \[32 x i8\] \}>]]*
   // CHECK-64: [[BOX_RAW:%.*]] = bitcast %swift.refcounted* [[BOX]] to [[POD_32_32_LAYOUT:<\{ %swift.refcounted, \[16 x i8\], \[32 x i8\] \}>]]*
   // CHECK: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_32_32_LAYOUT]], [[POD_32_32_LAYOUT]]* [[BOX_RAW]], i32 0, i32 2
   // CHECK: [[BOX_DATA_1:%.*]] = bitcast [32 x i8]* [[BOX_DATA]] to %V11typed_boxes11OverAligned*
-  %b = project_box %a : $@box OverAligned, 0
+  %b = project_box %a : $<τ_0_0> { var τ_0_0 } <OverAligned>, 0
   // CHECK: call void @swift_rt_swift_deallocObject(%swift.refcounted* [[BOX]], [[WORD]] 64, [[WORD]] 31)
-  dealloc_box %a : $@box OverAligned
+  dealloc_box %a : $<τ_0_0> { var τ_0_0 } <OverAligned>
   return undef : $()
 }
 
@@ -67,10 +67,10 @@ sil @rc_box_a : $@convention(thin) () -> () {
 entry:
   // CHECK-32: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[NATIVE_RC_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 16, [[WORD]] 3)
   // CHECK-64: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[NATIVE_RC_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 24, [[WORD]] 7)
-  %a = alloc_box $@box C
+  %a = alloc_box $<τ_0_0> { var τ_0_0 } <C>
   // CHECK: bitcast %swift.refcounted** {{%.*}} to %C11typed_boxes1C**
-  %b = project_box %a : $@box C, 0
-  dealloc_box %a : $@box C
+  %b = project_box %a : $<τ_0_0> { var τ_0_0 } <C>, 0
+  dealloc_box %a : $<τ_0_0> { var τ_0_0 } <C>
   return undef : $()
 }
 
@@ -80,10 +80,10 @@ entry:
   // TODO: Should reuse metadata
   // CHECK-32: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[NATIVE_RC_METADATA]], {{.*}} [[WORD]] 16, [[WORD]] 3)
   // CHECK-64: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[NATIVE_RC_METADATA]], {{.*}} [[WORD]] 24, [[WORD]] 7)
-  %a = alloc_box $@box D
+  %a = alloc_box $<τ_0_0> { var τ_0_0 } <D>
   // CHECK: bitcast %swift.refcounted** {{%.*}} to %C11typed_boxes1D**
-  %b = project_box %a : $@box D, 0
-  dealloc_box %a : $@box D
+  %b = project_box %a : $<τ_0_0> { var τ_0_0 } <D>, 0
+  dealloc_box %a : $<τ_0_0> { var τ_0_0 } <D>
   return undef : $()
 }
 
@@ -92,9 +92,9 @@ sil @unknown_rc_box : $@convention(thin) () -> () {
 entry:
   // CHECK-32: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[UNKNOWN_RC_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 16, [[WORD]] 3)
   // CHECK-64: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}} [[UNKNOWN_RC_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 24, [[WORD]] 7)
-  %a = alloc_box $@box Builtin.UnknownObject
-  %b = project_box %a : $@box Builtin.UnknownObject, 0
-  dealloc_box %a : $@box Builtin.UnknownObject
+  %a = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>
+  %b = project_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
+  dealloc_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>
   return undef : $()
 }
 
@@ -106,9 +106,9 @@ struct Fixed {
 
 sil @fixed_box : $@convention(thin) () -> () {
 entry:
-  %a = alloc_box $@box Fixed
-  %b = project_box %a : $@box Fixed, 0
-  dealloc_box %a : $@box Fixed
+  %a = alloc_box $<τ_0_0> { var τ_0_0 } <Fixed>
+  %b = project_box %a : $<τ_0_0> { var τ_0_0 } <Fixed>, 0
+  dealloc_box %a : $<τ_0_0> { var τ_0_0 } <Fixed>
   return undef : $()
 }
 
@@ -124,18 +124,18 @@ sil @take_t : $@convention(thin) <T> (@in T) -> ()
 // CHECK-LABEL: define{{( protected)?}} void @dyn_box_a
 sil @dyn_box_a : $@convention(thin) <T> () -> () {
 entry:
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @_TMaV11typed_boxes3Dyn(%swift.type* %T)
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @_T011typed_boxes3DynVMa(%swift.type* %T)
   // CHECK: [[ALLOC:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METADATA]])
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 0
   // CHECK: [[PTR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 1
-  %a = alloc_box $@box Dyn<T>
+  %a = alloc_box $<τ_0_0> { var τ_0_0 } <Dyn<T>>
   // CHECK: [[CAST_PTR:%.*]] = bitcast %swift.opaque* [[PTR]] to %V11typed_boxes3Dyn*
-  %b = project_box %a : $@box Dyn<T>, 0
+  %b = project_box %a : $<τ_0_0> { var τ_0_0 } <Dyn<T>>, 0
   %f = function_ref @take_dyn : $@convention(thin) <T> (@in Dyn<T>) -> ()
   // CHECK: call void @take_dyn(%V11typed_boxes3Dyn* {{[^,]*}} [[CAST_PTR]], {{.*}})
   %t = apply %f<T>(%b) : $@convention(thin) <T> (@in Dyn<T>) -> ()
   // CHECK: call void @swift_deallocBox(%swift.refcounted* [[BOX]])
-  dealloc_box %a : $@box Dyn<T>
+  dealloc_box %a : $<τ_0_0> { var τ_0_0 } <Dyn<T>>
   return undef : $()
 }
 
@@ -145,25 +145,25 @@ entry:
   // CHECK: [[ALLOC:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* %T)
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 0
   // CHECK: [[PTR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 1
-  %a = alloc_box $@box T
-  %b = project_box %a : $@box T, 0
+  %a = alloc_box $<τ_0_0> { var τ_0_0 } <T>
+  %b = project_box %a : $<τ_0_0> { var τ_0_0 } <T>, 0
   %f = function_ref @take_t : $@convention(thin) <T> (@in T) -> ()
   // CHECK: call void @take_t(%swift.opaque* {{[^,]*}} [[PTR]], {{.*}})
   %t = apply %f<T>(%b) : $@convention(thin) <T> (@in T) -> ()
   // CHECK: call void @swift_deallocBox(%swift.refcounted* [[BOX]])
-  dealloc_box %a : $@box T
+  dealloc_box %a : $<τ_0_0> { var τ_0_0 } <T>
   return undef : $()
 }
 
 // CHECK-LABEL: define{{( protected)?}} i64 @proj_box
-sil @proj_box : $@convention(thin) (@box Builtin.Int64) -> Builtin.Int64 {
-entry(%0 : $@box Builtin.Int64):
+sil @proj_box : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+entry(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
   // CHECK-32: [[BOX_RAW:%.*]] = bitcast %swift.refcounted* %0 to [[POD_8_8_LAYOUT:<\{ %swift.refcounted, \[4 x i8\], \[8 x i8\] \}>]]*
   // CHECK-32: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_8_8_LAYOUT]], [[POD_8_8_LAYOUT]]* [[BOX_RAW]], i32 0, i32 2
   // CHECK-64: [[BOX_RAW:%.*]] = bitcast %swift.refcounted* %0 to [[POD_8_8_LAYOUT:<\{ %swift.refcounted, \[8 x i8\] \}>]]*
   // CHECK-64: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_8_8_LAYOUT]], [[POD_8_8_LAYOUT]]* [[BOX_RAW]], i32 0, i32 1
   // CHECK: [[BOX_DATA_1:%.*]] = bitcast [8 x i8]* [[BOX_DATA]] to i64*
-  %p = project_box %0 : $@box Builtin.Int64, 0
+  %p = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   // CHECK: [[R:%.*]] = load i64, i64* [[BOX_DATA_1]]
   %l = load %p : $*Builtin.Int64
   // CHECK: ret i64 [[R]]
@@ -171,11 +171,11 @@ entry(%0 : $@box Builtin.Int64):
 }
 
 // CHECK-LABEL: define{{( protected)?}} void @dyn_proj_box_a
-sil @dyn_proj_box_a : $@convention(thin) <T> (@box Dyn<T>) -> () {
-entry(%0 : $@box Dyn<T>):
+sil @dyn_proj_box_a : $@convention(thin) <T> (<τ_0_0> { var τ_0_0 } <Dyn<T>>) -> () {
+entry(%0 : $<τ_0_0> { var τ_0_0 } <Dyn<T>>):
   // CHECK: [[PTR:%.*]] = call %swift.opaque* @swift_projectBox(%swift.refcounted* %0)
   // CHECK: [[BOX_DATA_1:%.*]] = bitcast %swift.opaque* [[PTR]] to %V11typed_boxes3Dyn*
-  %p = project_box %0 : $@box Dyn<T>, 0
+  %p = project_box %0 : $<τ_0_0> { var τ_0_0 } <Dyn<T>>, 0
   %f = function_ref @take_dyn : $@convention(thin) <T> (@in Dyn<T>) -> ()
   // CHECK: call void @take_dyn(%V11typed_boxes3Dyn* {{[^,]*}} [[BOX_DATA_1]], {{.*}})
   %t = apply %f<T>(%p) : $@convention(thin) <T> (@in Dyn<T>) -> ()
@@ -184,10 +184,10 @@ entry(%0 : $@box Dyn<T>):
 
 
 // CHECK-LABEL: define{{( protected)?}} void @dyn_proj_box_b
-sil @dyn_proj_box_b : $@convention(thin) <T> (@box T) -> () {
-entry(%0 : $@box T):
+sil @dyn_proj_box_b : $@convention(thin) <T> (<τ_0_0> { var τ_0_0 } <T>) -> () {
+entry(%0 : $<τ_0_0> { var τ_0_0 } <T>):
   // CHECK: [[PTR:%.*]] = call %swift.opaque* @swift_projectBox(%swift.refcounted* %0)
-  %p = project_box %0 : $@box T, 0
+  %p = project_box %0 : $<τ_0_0> { var τ_0_0 } <T>, 0
   %f = function_ref @take_t : $@convention(thin) <T> (@in T) -> ()
   // CHECK: call void @take_t(%swift.opaque* {{[^,]*}} [[PTR]], {{.*}})
   %t = apply %f<T>(%p) : $@convention(thin) <T> (@in T) -> ()

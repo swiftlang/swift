@@ -1,4 +1,24 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
+
+// Test constraint simplification of chains of binary operators.
+// <https://bugs.swift.org/browse/SR-1122>
+do {
+  let a: String? = "a"
+  let b: String? = "b"
+  let c: String? = "c"
+  let _: String? = a! + b! + c!
+
+  let x: Double = 1
+  _ = x + x + x
+
+  let sr3483: Double? = 1
+  _ = sr3483! + sr3483! + sr3483!
+
+  let sr2636: [String: Double] = ["pizza": 10.99, "ice cream": 4.99, "salad": 7.99]
+  _ = sr2636["pizza"]!
+  _ = sr2636["pizza"]! + sr2636["salad"]!
+  _ = sr2636["pizza"]! + sr2636["salad"]! + sr2636["ice cream"]!
+}
 
 // Use operators defined within a type.
 struct S0 {
@@ -112,3 +132,9 @@ extension P3 {
 }
 
 struct S3 : P3, Equatable { }
+
+// rdar://problem/30220565
+func shrinkTooFar(_ : Double, closure : ()->()) {}
+func testShrinkTooFar() {
+  shrinkTooFar(0*0*0) {}
+}

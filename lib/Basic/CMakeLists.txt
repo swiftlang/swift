@@ -3,6 +3,9 @@
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(UUID_INCLUDE "")
   set(UUID_LIBRARIES "")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(UUID_INCLUDE "")
+  set(UUID_LIBRARIES "ole32.lib")
 else()
   find_package(UUID REQUIRED)
   set(UUID_INCLUDE "-I${UUID_INCLUDE_DIRS}")
@@ -31,10 +34,10 @@ set(get_svn_script "${LLVM_MAIN_SRC_DIR}/cmake/modules/GetSVN.cmake")
 
 function(generate_revision_inc revision_inc_var name dir)
   find_first_existing_vc_file(dep_file "${dir}")
+  # Create custom target to generate the VC revision include.
+  set(revision_inc "${CMAKE_CURRENT_BINARY_DIR}/${name}Revision.inc")
+  string(TOUPPER ${name} upper_name)
   if(DEFINED dep_file)
-    # Create custom target to generate the VC revision include.
-    set(revision_inc "${CMAKE_CURRENT_BINARY_DIR}/${name}Revision.inc")
-    string(TOUPPER ${name} upper_name)
     add_custom_command(OUTPUT "${revision_inc}"
       DEPENDS "${dep_file}" "${get_svn_script}"
       COMMAND
@@ -42,13 +45,16 @@ function(generate_revision_inc revision_inc_var name dir)
                        "-DFIRST_NAME=${upper_name}"
                        "-DHEADER_FILE=${revision_inc}"
                        -P "${get_svn_script}")
-
-    # Mark the generated header as being generated.
-    set_source_files_properties("${revision_inc}"
-      PROPERTIES GENERATED TRUE
-                 HEADER_FILE_ONLY TRUE)
-    set(${revision_inc_var} ${revision_inc} PARENT_SCOPE)
+  else()
+    # Generate an empty Revision.inc file if we are not using git or SVN.
+    file(WRITE "${revision_inc}" "")
   endif()
+
+  # Mark the generated header as being generated.
+  set_source_files_properties("${revision_inc}"
+    PROPERTIES GENERATED TRUE
+               HEADER_FILE_ONLY TRUE)
+  set(${revision_inc_var} ${revision_inc} PARENT_SCOPE)
 endfunction()
 
 generate_revision_inc(llvm_revision_inc LLVM "${LLVM_MAIN_SRC_DIR}")
@@ -62,14 +68,18 @@ add_swift_library(swiftBasic STATIC
   Cache.cpp
   ClusteredBitVector.cpp
   Demangle.cpp
+  Demangler.cpp
   DemangleWrappers.cpp
   DiagnosticConsumer.cpp
   DiverseStack.cpp
+  Edit.cpp
   EditorPlaceholder.cpp
   FileSystem.cpp
   JSONSerialization.cpp
   LangOptions.cpp
   LLVMContext.cpp
+  Mangler.cpp
+  ManglingUtils.cpp
   Platform.cpp
   PrefixMap.cpp
   PrettyStackTrace.cpp
@@ -79,6 +89,7 @@ add_swift_library(swiftBasic STATIC
   PunycodeUTF8.cpp
   QuotedString.cpp
   Remangle.cpp
+  Remangler.cpp
   SourceLoc.cpp
   StringExtras.cpp
   TaskQueue.cpp

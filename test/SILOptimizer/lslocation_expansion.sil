@@ -92,8 +92,8 @@ sil @stack_store : $@convention(thin) () -> () {
 // CHECK-NEXT: [[RET0:%.+]] = alloc_box
 sil @store_after_store : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
-  %1 = alloc_box $@box B
-  %1a = project_box %1 : $@box B, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <B>, 0
   %2 = store %0 to %1a : $*B
   %3 = store %0 to %1a : $*B
   %4 = tuple()

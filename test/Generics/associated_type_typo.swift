@@ -1,6 +1,6 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
-// RUN: not %target-swift-frontend -parse -debug-generic-signatures %s > %t.dump 2>&1 
+// RUN: not %target-swift-frontend -typecheck -debug-generic-signatures %s > %t.dump 2>&1 
 // RUN: %FileCheck -check-prefix CHECK-GENERIC %s < %t.dump
 
 protocol P1 {
@@ -37,13 +37,10 @@ func typoAssoc4<T : P2>(_: T) where T.Assocp2.assoc : P3 {}
 
 // CHECK-GENERIC-LABEL: .typoAssoc4@
 // CHECK-GENERIC-NEXT: Requirements:
-// CHECK-GENERIC-NEXT:   T : P2 [explicit
-// CHECK-GENERIC-NEXT:   T[.P2].AssocP2 : P1 [protocol
-// CHECK-GENERIC-NEXT:   T[.P2].AssocP2 == T.AssocP2 [redundant]
-// CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc : P3 [explicit
-// CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc == T[.P2].AssocP2.Assoc [redundant]
-// CHECK-GENERIC-NEXT: Generic signature
-
+// CHECK-GENERIC-NEXT:   τ_0_0 : P2 [inferred]
+// CHECK-GENERIC-NEXT:   τ_0_0[.P2].AssocP2 : P1 [protocol
+// CHECK-GENERIC-NEXT:   τ_0_0[.P2].AssocP2[.P1].Assoc : P3 [explicit
+// CHECK-GENERIC-NEXT: Potential archetypes
 
 // <rdar://problem/19620340>
 
@@ -56,4 +53,24 @@ func typoFunc2<T : P1>(x: TypoType, y: T) { // expected-error{{use of undeclared
 }
 
 func typoFunc3<T : P1>(x: TypoType, y: (T.Assoc) -> ()) { // expected-error{{use of undeclared type 'TypoType'}}
+}
+
+// rdar://problem/29261689
+typealias Element_<S: Sequence> = S.Iterator.Element
+
+public protocol _Indexable1 {
+  associatedtype Slice
+}
+public protocol Indexable : _Indexable1 {
+  associatedtype Slice : _Indexable1
+}
+
+protocol Pattern {
+  associatedtype Element : Equatable
+
+  // FIXME: This works for all of the wrong reasons, but it is correct that
+  // it works.
+  func matched<C: Indexable>(atStartOf c: C)
+  where Element_<C> == Element
+  , Element_<C.Slice> == Element
 }

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -dump-ast %s 2>&1 | %FileCheck %s
 
-// CHECK: func_decl "clone()" type='(Self) -> () -> Self'
+// CHECK: func_decl "clone()" interface type='(Android) -> () -> Self'
 
 class Android {
   func clone() -> Self {

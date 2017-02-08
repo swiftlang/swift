@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -170,7 +170,7 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 public protocol FloatingPoint: Comparable, Arithmetic,
   SignedNumber, Strideable {
 
-  /// A type that can represent any written exponent.
+  /// A type that represents any written exponent.
   associatedtype Exponent: SignedInteger
 
   /// Creates a new value from the given sign, exponent, and significand.
@@ -370,25 +370,25 @@ public protocol FloatingPoint: Comparable, Arithmetic,
   //   tolerance for floating-point comparisons, because of the name. It is
   //   nearly always the wrong value to use for this purpose.
 
-  /// The unit in the last place of `self`.
+  /// The unit in the last place of this value.
   ///
-  /// This is the unit of the least significant digit in the significand of
-  /// `self`. For most numbers `x`, this is the difference between `x` and
-  /// the next greater (in magnitude) representable number. There are some
+  /// This is the unit of the least significant digit in this value's
+  /// significand. For most numbers `x`, this is the difference between `x`
+  /// and the next greater (in magnitude) representable number. There are some
   /// edge cases to be aware of:
   ///
-  /// - `greatestFiniteMagnitude.ulp` is a finite number, even though
-  ///   the next greater representable value is `infinity`.
-  /// - `x.ulp` is `NaN` if `x` is not a finite number.
+  /// - If `x` is not a finite number, then `x.ulp` is NaN.
   /// - If `x` is very small in magnitude, then `x.ulp` may be a subnormal
-  ///   number. On targets that do not support subnormals, `x.ulp` may be
-  ///   rounded to zero.
+  ///   number. If a type does not support subnormals, `x.ulp` may be rounded
+  ///   to zero.
+  /// - `greatestFiniteMagnitude.ulp` is a finite number, even though the next
+  ///   greater representable value is `infinity`.
   ///
   /// This quantity, or a related quantity, is sometimes called *epsilon* or
-  /// *machine epsilon.* Avoid that name because it has different meanings
-  /// in different languages, which can lead to confusion, and because it
-  /// suggests that it is a good tolerance to use for comparisons,
-  /// which it almost never is.
+  /// *machine epsilon.* Avoid that name because it has different meanings in
+  /// different languages, which can lead to confusion, and because it
+  /// suggests that it is a good tolerance to use for comparisons, which it
+  /// almost never is.
   var ulp: Self { get }
 
   /// The unit in the last place of 1.0.
@@ -425,7 +425,7 @@ public protocol FloatingPoint: Comparable, Arithmetic,
   ///     let x = -33.375
   ///     // x.sign == .minus
   ///
-  /// Don't use this property to check whether a floating point value is
+  /// Do not use this property to check whether a floating point value is
   /// negative. For a value `x`, the comparison `x.sign == .minus` is not
   /// necessarily the same as `x < 0`. In particular, `x.sign == .minus` if
   /// `x` is -0, and while `x < 0` is always `false` if `x` is NaN, `x.sign`
@@ -775,7 +775,7 @@ public protocol FloatingPoint: Comparable, Arithmetic,
   ///     // x1 == 8.625
   ///
   /// If this value and `other` are both finite numbers, the truncating
-  /// remainder has the same sign as `self` and is strictly smaller in
+  /// remainder has the same sign as this value and is strictly smaller in
   /// magnitude than `other`. The `truncatingRemainder(dividingBy:)` method
   /// is always exact.
   ///
@@ -811,7 +811,7 @@ public protocol FloatingPoint: Comparable, Arithmetic,
   ///     // x1 == 8.625
   ///
   /// If this value and `other` are both finite numbers, the truncating
-  /// remainder has the same sign as `self` and is strictly smaller in
+  /// remainder has the same sign as this value and is strictly smaller in
   /// magnitude than `other`. The `formTruncatingRemainder(dividingBy:)`
   /// method is always exact.
   ///
@@ -1541,10 +1541,10 @@ public func >= <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
 /// - SeeAlso: `FloatingPoint`
 public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
 
-  /// A type that can represent the encoded significand of a value.
+  /// A type that represents the encoded significand of a value.
   associatedtype RawSignificand: UnsignedInteger
 
-  /// A type that can represent the encoded exponent of a value.
+  /// A type that represents the encoded exponent of a value.
   associatedtype RawExponent: UnsignedInteger
 
   /// Creates a new instance from the specified sign and bit patterns.
@@ -1577,7 +1577,7 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   /// - Parameter value: A floating-point value.
   init(_ value: Double)
 
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if (!os(Windows) || CYGWIN) && (arch(i386) || arch(x86_64))
   /// Creates a new instance from the given value, rounded to the closest
   /// possible representation.
   ///

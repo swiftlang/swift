@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -verify %s
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 // REQUIRES: objc_interop
 
@@ -299,9 +299,14 @@ func rdar20029786(_ ns: NSString?) {
 // <rdar://problem/19813772> QoI: Using as! instead of as in this case produces really bad diagnostic
 func rdar19813772(_ nsma: NSMutableArray) {
   var a1 = nsma as! Array // expected-error{{generic parameter 'Element' could not be inferred in cast to 'Array<_>'}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{26-26=<Any>}}
-  // FIXME: The following diagnostic is misleading and should not happen: expected-warning@-1{{cast from 'NSMutableArray' to unrelated type 'Array<_>' always fails}}
   var a2 = nsma as! Array<AnyObject> // expected-warning{{forced cast from 'NSMutableArray' to 'Array<AnyObject>' always succeeds; did you mean to use 'as'?}} {{17-20=as}}
   var a3 = nsma as Array<AnyObject>
+}
+
+func rdar28856049(_ nsma: NSMutableArray) {
+  _ = nsma as? [BridgedClass]
+  _ = nsma as? [BridgedStruct]
+  _ = nsma as? [BridgedClassSub]
 }
 
 

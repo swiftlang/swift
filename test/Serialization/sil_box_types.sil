@@ -5,9 +5,23 @@
 
 import Builtin
 
-// CHECK-LABEL: sil @boxes : $@convention(thin) (@box Builtin.Int32, @box Builtin.Int32) -> () {
-sil @boxes : $@convention(thin) (@box Builtin.Int32, @box Builtin.Int32) -> () {
-// CHECK: bb0(%0 : $@box Builtin.Int32, %1 : $@box Builtin.Int32):
-entry(%0 : $@box Builtin.Int32, %1 : $@box Builtin.Int32):
+protocol P { }
+
+protocol Q {
+  associatedtype AT
+}
+
+// CHECK-LABEL: sil @boxes : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Builtin.Int32>, <τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> () {
+sil @boxes : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Builtin.Int32>, <τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> () {
+// CHECK: bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, %1 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
+entry(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, %1 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
+  return undef : $()
+}
+
+// CHECK-LABEL: @boxes_extra_reqs : $@convention(thin) <T where T : Q, T.AT : P> (@owned <τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T, T.AT>) -> ()
+sil @boxes_extra_reqs : $@convention(thin) <T where T : Q, T.AT : P> (@owned <τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T, T.AT>) -> () {
+// CHECK: bb0(%0 : $<τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T, T.AT>)
+bb0(%0 : $<τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T, T.AT>):
+  %1 = project_box %0 : $<τ_0_0 where τ_0_0 : Q, τ_0_0.AT : P> { var τ_0_0 } <T, T.AT>, 0
   return undef : $()
 }

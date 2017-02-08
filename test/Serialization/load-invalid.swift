@@ -2,16 +2,16 @@
 // RUN: mkdir -p %t
 
 // RUN: touch %t/new_module.swiftmodule
-// RUN: %target-swift-frontend %s -parse -I %t -verify -show-diagnostics-after-fatal
+// RUN: %target-swift-frontend %s -typecheck -I %t -verify -show-diagnostics-after-fatal
 
 // RUN: echo -n 'a' > %t/new_module.swiftmodule
-// RUN: %target-swift-frontend %s -parse -I %t -verify -show-diagnostics-after-fatal
+// RUN: %target-swift-frontend %s -typecheck -I %t -verify -show-diagnostics-after-fatal
 
 // RUN: echo -n 'abcd' > %t/new_module.swiftmodule
-// RUN: %target-swift-frontend %s -parse -I %t -verify -show-diagnostics-after-fatal
+// RUN: %target-swift-frontend %s -typecheck -I %t -verify -show-diagnostics-after-fatal
 
 // RUN: echo -n 'abcde' > %t/new_module.swiftmodule
-// RUN: %target-swift-frontend %s -parse -I %t -verify -show-diagnostics-after-fatal
+// RUN: %target-swift-frontend %s -typecheck -I %t -verify -show-diagnostics-after-fatal
 
 import new_module // expected-error{{malformed module file}}
 

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -18,6 +18,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/Config.h"
+
+#if SWIFT_OBJC_INTEROP
 #include "SwiftObject.h"
 #include "SwiftValue.h"
 #include "swift/Basic/Lazy.h"
@@ -29,10 +32,6 @@
 #include "SwiftHashableSupport.h"
 #include <objc/runtime.h>
 #include <Foundation/Foundation.h>
-
-#if !SWIFT_OBJC_INTEROP
-#error "This file should only be compiled when ObjC interop is enabled."
-#endif
 
 using namespace swift;
 using namespace swift::hashable_support;
@@ -380,6 +379,7 @@ static NSString *getValueDescription(_SwiftValue *self) {
 }
 
 @end
+#endif
 
 // TODO: We could pick specialized _SwiftValue subclasses for trivial types
 // or for types with known size and alignment characteristics. Probably

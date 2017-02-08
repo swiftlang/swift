@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -38,10 +38,12 @@ public struct StaticString
 
   /// Either a pointer to the start of UTF-8 data, represented as an integer,
   /// or an integer representation of a single Unicode scalar.
+  @_versioned
   internal var _startPtrOrData: Builtin.Word
 
   /// If `_startPtrOrData` is a pointer, contains the length of the UTF-8 data
   /// in bytes.
+  @_versioned
   internal var _utf8CodeUnitCount: Builtin.Word
 
   /// Extra flags:
@@ -51,6 +53,7 @@ public struct StaticString
   ///
   /// - bit 1: set to 1 if `_startPtrOrData` is a pointer and string data is
   ///   ASCII.
+  @_versioned
   internal var _flags: Builtin.Int8
 
   /// A pointer to the beginning of the string's UTF-8 encoded representation.
@@ -118,10 +121,14 @@ public struct StaticString
   /// This method works regardless of whether the static string stores a
   /// pointer or a single Unicode scalar value.
   ///
+  /// The pointer argument to `body` is valid only for the lifetime of the
+  /// closure. Do not escape it from the closure for later use.
+  ///
   /// - Parameter body: A closure that takes a buffer pointer to the static
   ///   string's UTF-8 code unit sequence as its sole argument. If the closure
   ///   has a return value, it is used as the return value of the
-  ///   `withUTF8Buffer(invoke:)` method.
+  ///   `withUTF8Buffer(invoke:)` method. The pointer argument is valid only
+  ///   for the duration of the closure's execution.
   /// - Returns: The return value of the `body` closure, if any.
   public func withUTF8Buffer<R>(
     _ body: (UnsafeBufferPointer<UInt8>) -> R) -> R {

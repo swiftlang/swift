@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -verify -primary-file %s %S/Inputs/enum_multi_file_helper.swift
+// RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/enum_multi_file_helper.swift
 
 var raw1: Int = Foo.a.rawValue
 var raw2: Bar.RawValue = 0

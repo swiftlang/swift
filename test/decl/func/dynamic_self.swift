@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // ----------------------------------------------------------------------------
 // DynamicSelf is only allowed on the return type of class and
@@ -301,5 +301,25 @@ func testOptionalSelf(_ y : Y) {
   // isn't coincidental.
   if let clone = y.cloneAsObjectSlice() {
     clone.operationThatOnlyExistsOnY() // expected-error {{value of type 'X' has no member 'operationThatOnlyExistsOnY'}}
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Conformance lookup on Self
+
+protocol Runcible {
+}
+
+extension Runcible {
+  func runce() {}
+}
+
+func wantsRuncible<T : Runcible>(_: T) {}
+
+class Runce : Runcible {
+  func getRunced() -> Self {
+    runce()
+    wantsRuncible(self)
+    return self
   }
 }

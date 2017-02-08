@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -14,7 +14,6 @@
 //  stored properties and enum cases for use with reflection.
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -28,6 +27,7 @@
 #include "GenEnum.h"
 #include "GenHeap.h"
 #include "GenProto.h"
+#include "GenType.h"
 #include "IRGenModule.h"
 #include "Linking.h"
 #include "LoadableTypeInfo.h"
@@ -205,7 +205,8 @@ protected:
 
   /// Add a 32-bit relative offset to a mangled typeref string
   /// in the typeref reflection section.
-  void addTypeRef(Module *ModuleContext, CanType type) {
+  void addTypeRef(ModuleDecl *ModuleContext, CanType type,
+                  CanGenericSignature Context = {}) {
     assert(type);
 
     // Generic parameters should be written in terms of interface types
@@ -216,7 +217,17 @@ protected:
                             /*usePunyCode*/ true,
                             /*OptimizeProtocolNames*/ false);
     mangler.setModuleContext(ModuleContext);
-    mangler.mangleType(type, 0);
+    
+    // TODO: As a compatibility hack, mangle single-field boxes with the legacy
+    // mangling in reflection metadata.
+    auto boxTy = dyn_cast<SILBoxType>(type);
+    if (boxTy && boxTy->getLayout()->getFields().size() == 1) {
+      GenericContextScope scope(IGM, Context);
+      mangler.mangleLegacyBoxType(
+        boxTy->getFieldLoweredType(IGM.getSILModule(), 0));
+    } else {
+      mangler.mangleType(type, 0);
+    }
     auto mangledName = IGM.getAddrOfStringForTypeRef(mangler.finalize());
     addRelativeAddress(mangledName);
   }
@@ -465,7 +476,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     addConstantInt32(0);
   }
 
-  void layout() {
+  void layout() override {
     PrettyStackTraceDecl DebugStack("emitting field type metadata", NTD);
     auto type = NTD->getDeclaredType()->getCanonicalType();
     addTypeRef(NTD->getModuleContext(), type);
@@ -531,7 +542,7 @@ public:
         nominalDecl->getDeclaredTypeInContext()->getCanonicalType()));
   }
 
-  void layout() {
+  void layout() override {
     addTypeRef(module, type);
 
     addConstantInt32(ti->getFixedSize().getValue());
@@ -557,6 +568,17 @@ void IRGenModule::emitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDec
   builder.emit();
 }
 
+bool IRGenModule::shouldEmitOpaqueTypeMetadataRecord(
+    const NominalTypeDecl *nominalDecl) {
+  if (nominalDecl->getAttrs().hasAttribute<AlignmentAttr>()) {
+    auto &ti = getTypeInfoForUnlowered(nominalDecl->getDeclaredTypeInContext());
+    if (isa<FixedTypeInfo>(ti))
+      return true;
+  }
+
+  return false;
+}
+
 /// Builds a constant LLVM struct describing the layout of a fixed-size
 /// SIL @box. These look like closure contexts, but without any necessary
 /// bindings or metadata sources, and only a single captured value.
@@ -566,7 +588,7 @@ public:
   BoxDescriptorBuilder(IRGenModule &IGM, CanType BoxedType)
     : ReflectionMetadataBuilder(IGM), BoxedType(BoxedType) {}
 
-  void layout() {
+  void layout() override {
     addConstantInt32(1);
     addConstantInt32(0); // Number of sources
     addConstantInt32(0); // Number of generic bindings
@@ -589,14 +611,14 @@ class CaptureDescriptorBuilder : public ReflectionMetadataBuilder {
   SILFunction &Caller;
   CanSILFunctionType OrigCalleeType;
   CanSILFunctionType SubstCalleeType;
-  ArrayRef<Substitution> Subs;
+  SubstitutionList Subs;
   const HeapLayout &Layout;
 public:
   CaptureDescriptorBuilder(IRGenModule &IGM,
                            SILFunction &Caller,
                            CanSILFunctionType OrigCalleeType,
                            CanSILFunctionType SubstCalleeType,
-                           ArrayRef<Substitution> Subs,
+                           SubstitutionList Subs,
                            const HeapLayout &Layout)
     : ReflectionMetadataBuilder(IGM),
       Caller(Caller), OrigCalleeType(OrigCalleeType),
@@ -727,7 +749,7 @@ public:
     return CaptureTypes;
   }
 
-  void layout() {
+  void layout() override {
     auto CaptureTypes = getCaptureTypes();
     auto MetadataSources = getMetadataSourceMap();
 
@@ -737,7 +759,8 @@ public:
 
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
-      addTypeRef(IGM.getSILModule().getSwiftModule(), CaptureType);
+      addTypeRef(IGM.getSILModule().getSwiftModule(), CaptureType,
+                 OrigCalleeType->getGenericSignature());
       addBuiltinTypeRefs(CaptureType);
     }
 
@@ -778,6 +801,9 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
     assert(LongName.size() <= 7 &&
            "Mach-O section name length must be <= 16 characters");
     OS << "__TEXT,__swift3_" << LongName << ", regular, no_dead_strip";
+    break;
+  case llvm::Triple::Wasm:
+    llvm_unreachable("web assembly object format is not supported.");
     break;
   }
   return OS.str();
@@ -854,7 +880,7 @@ llvm::Constant *
 IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
                                         CanSILFunctionType OrigCalleeType,
                                         CanSILFunctionType SubstCalleeType,
-                                        ArrayRef<Substitution> Subs,
+                                        SubstitutionList Subs,
                                         const HeapLayout &Layout) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
@@ -878,8 +904,8 @@ emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance) {
                                 const Substitution &Sub,
                                 const TypeDecl *TD) -> bool {
 
-    auto Subst = ArchetypeBuilder::mapTypeOutOfContext(
-      Conformance->getDeclContext(), Sub.getReplacement());
+    auto Subst = Conformance->getDeclContext()->mapTypeOutOfContext(
+        Sub.getReplacement());
 
     AssociatedTypes.push_back({
       AssocTy->getNameStr(),

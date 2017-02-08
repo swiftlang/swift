@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/OldAndNew.swiftmodule -module-name OldAndNew %S/Inputs/OldAndNew.swift 
-// RUN: not %target-swift-frontend -parse -I %t -swift-version 3 %s 2>&1 | %FileCheck -check-prefix THREE %s
-// RUN: not %target-swift-frontend -parse -I %t -swift-version 4 %s 2>&1 | %FileCheck -check-prefix FOUR %s
+// RUN: not %target-swift-frontend -typecheck -I %t -swift-version 3 %s 2>&1 | %FileCheck -check-prefix THREE %s
+// RUN: not %target-swift-frontend -typecheck -I %t -swift-version 4 %s 2>&1 | %FileCheck -check-prefix FOUR %s
 
 import OldAndNew
 

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -14,6 +14,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/Mangle.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
@@ -37,7 +38,7 @@ STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
 /// sorting, uniquing at the appropriate time. The reason why it makes sense to
 /// just use a sorted vector with std::count is because generally functions do
 /// not have that many arguments and even fewer promoted arguments.
-using ParamIndexList = llvm::SmallVector<unsigned, 8>;
+using ArgIndexList = llvm::SmallVector<unsigned, 8>;
 
 static SILInstruction* findUnexpectedBoxUse(SILValue Box,
                                             bool examinePartialApply,
@@ -53,7 +54,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
   // First populate a worklist of predecessors.
   llvm::SmallVector<SILBasicBlock*, 64> Worklist;
   for (auto *BB : LiveIn)
-    for (auto Pred : BB->getPreds())
+    for (auto Pred : BB->getPredecessorBlocks())
       Worklist.push_back(Pred);
 
   // Now propagate liveness backwards until we hit the alloc_box.
@@ -65,7 +66,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
     if (BB == DefBB || !LiveIn.insert(BB).second)
       continue;
 
-    for (auto Pred : BB->getPreds())
+    for (auto Pred : BB->getPredecessorBlocks())
       Worklist.push_back(Pred);
   }
 }
@@ -179,6 +180,7 @@ static bool useCaptured(Operand *UI) {
 }
 
 static bool partialApplyEscapes(SILValue V, bool examineApply) {
+  SILModuleConventions modConv(*V->getModule());
   for (auto UI : V->getUses()) {
     auto *User = UI->getUser();
 
@@ -193,8 +195,8 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
 
       // apply instructions do not capture the pointer when it is passed
       // indirectly
-      if (isIndirectConvention(
-            apply->getArgumentConvention(UI->getOperandNumber()-1)))
+      if (apply->getArgumentConvention(UI->getOperandNumber() - 1)
+              .isIndirectConvention())
         continue;
 
       // Optionally drill down into an apply to see if the operand is
@@ -211,7 +213,7 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
       auto params = partialApply->getSubstCalleeType()
         ->getParameters();
       params = params.slice(params.size() - args.size(), args.size());
-      if (params[UI->getOperandNumber()-1].isIndirect()) {
+      if (modConv.isSILIndirect(params[UI->getOperandNumber() - 1])) {
         if (partialApplyEscapes(partialApply, /*examineApply = */ true))
           return true;
         continue;
@@ -235,9 +237,9 @@ static FunctionRefInst *getDirectCallee(SILInstruction *Call) {
 }
 
 /// Given an operand of a direct apply or partial_apply of a function,
-/// return the index of the parameter used in the body of the function
+/// return the argument index of the parameter used in the body of the function
 /// to represent this operand.
-static size_t getParameterIndexForOperand(Operand *O) {
+static size_t getArgIndexForOperand(Operand *O) {
   assert(isa<ApplyInst>(O->getUser()) || isa<PartialApplyInst>(O->getUser()) &&
          "Expected apply or partial_apply!");
 
@@ -245,22 +247,22 @@ static size_t getParameterIndexForOperand(Operand *O) {
   assert(OperandIndex != 0 && "Operand cannot be the applied function!");
 
   // The applied function is the first operand.
-  auto ParamIndex = OperandIndex - 1;
+  auto ArgIndex = OperandIndex - ApplyInst::getArgumentOperandNumber();
 
   if (auto *Apply = dyn_cast<ApplyInst>(O->getUser())) {
-    assert(Apply->getSubstCalleeType()->getNumSILArguments() ==
-             Apply->getArguments().size() &&
-           "Expected all arguments to be supplied!");
+    assert(Apply->getSubstCalleeConv().getNumSILArguments()
+               == Apply->getArguments().size()
+           && "Expected all arguments to be supplied!");
     (void) Apply;
   } else {
     auto *PartialApply = cast<PartialApplyInst>(O->getUser());
-    auto FnType = PartialApply->getSubstCalleeType();
+    auto fnConv = PartialApply->getSubstCalleeConv();
     auto ArgCount = PartialApply->getArguments().size();
-    assert(ArgCount <= FnType->getParameters().size());
-    ParamIndex += (FnType->getNumSILArguments() - ArgCount);
+    assert(ArgCount <= fnConv.getNumParameters());
+    ArgIndex += (fnConv.getNumSILArguments() - ArgCount);
   }
 
-  return ParamIndex;
+  return ArgIndex;
 }
 
 /// Given an operand of a direct apply or partial_apply of a function,
@@ -270,9 +272,10 @@ static SILArgument *getParameterForOperand(SILFunction *F, Operand *O) {
   assert(F && !F->empty() && "Expected a function with a body!");
 
   auto &Entry = F->front();
-  size_t ParamIndex = getParameterIndexForOperand(O);
+  size_t ArgIndex = getArgIndexForOperand(O);
+  assert(ArgIndex >= F->getConventions().getSILArgIndexOfFirstParam());
 
-  return Entry.getBBArg(ParamIndex);
+  return Entry.getArgument(ArgIndex);
 }
 
 /// Return a pointer to the SILFunction called by Call if we can
@@ -406,8 +409,11 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
   auto &Entry = ABI->getFunction()->front();
   SILBuilder BuildAlloc(&Entry, Entry.begin());
   BuildAlloc.setCurrentDebugScope(ABI->getDebugScope());
-  auto *ASI = BuildAlloc.createAllocStack(ABI->getLoc(), ABI->getElementType(),
-                                          ABI->getVarInfo());
+  assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
+         && "rewriting multi-field box not implemented");
+  auto *ASI = BuildAlloc.createAllocStack(ABI->getLoc(),
+                          ABI->getBoxType()->getFieldType(ABI->getModule(), 0),
+                          ABI->getVarInfo());
 
   // Replace all uses of the address of the box's contained value with
   // the address of the stack location.
@@ -429,7 +435,10 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
       break;
     }
 
-  auto &Lowering = ABI->getModule().getTypeLowering(ABI->getElementType());
+  assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
+         && "promoting multi-field box not implemented");
+  auto &Lowering = ABI->getModule()
+    .getTypeLowering(ABI->getBoxType()->getFieldType(ABI->getModule(), 0));
   auto Loc = CleanupLocation::get(ABI->getLoc());
 
   // For non-trivial types, insert destroys for each final release-like
@@ -473,7 +482,7 @@ class PromotedParamCloner : public SILClonerWithScopes<PromotedParamCloner> {
   friend class SILCloner<PromotedParamCloner>;
 
   PromotedParamCloner(SILFunction *Orig, IsFragile_t Fragile,
-                      ParamIndexList &PromotedParamIndices,
+                      ArgIndexList &PromotedArgIndices,
                       llvm::StringRef ClonedName);
 
   void populateCloned();
@@ -481,65 +490,74 @@ class PromotedParamCloner : public SILClonerWithScopes<PromotedParamCloner> {
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
 
   private:
-  static SILFunction *initCloned(SILFunction *Orig, IsFragile_t Fragile,
-                                 ParamIndexList &PromotedParamIndices,
-                                 llvm::StringRef ClonedName);
+    static SILFunction *initCloned(SILFunction *Orig, IsFragile_t Fragile,
+                                   ArgIndexList &PromotedArgIndices,
+                                   llvm::StringRef ClonedName);
 
-  void visitStrongReleaseInst(StrongReleaseInst *Inst);
-  void visitStrongRetainInst(StrongRetainInst *Inst);
-  void visitProjectBoxInst(ProjectBoxInst *Inst);
+    void visitStrongReleaseInst(StrongReleaseInst *Inst);
+    void visitStrongRetainInst(StrongRetainInst *Inst);
+    void visitProjectBoxInst(ProjectBoxInst *Inst);
 
-  SILFunction *Orig;
-  ParamIndexList &PromotedParamIndices;
+    SILFunction *Orig;
+    ArgIndexList &PromotedArgIndices;
 
-  // The values in the original function that are promoted to stack
-  // references.
-  llvm::SmallSet<SILValue, 4> PromotedParameters;
+    // The values in the original function that are promoted to stack
+    // references.
+    llvm::SmallSet<SILValue, 4> PromotedParameters;
 };
-} // end anonymous namespace.
+} // end anonymous namespace
 
-PromotedParamCloner::PromotedParamCloner(SILFunction *Orig,
-                                 IsFragile_t Fragile,
-                                 ParamIndexList &PromotedParamIndices,
-                                 llvm::StringRef ClonedName)
-  : SILClonerWithScopes<PromotedParamCloner>(*initCloned(Orig, Fragile,
-                                                     PromotedParamIndices,
-                                                     ClonedName)),
-    Orig(Orig), PromotedParamIndices(PromotedParamIndices) {
+PromotedParamCloner::PromotedParamCloner(SILFunction *Orig, IsFragile_t Fragile,
+                                         ArgIndexList &PromotedArgIndices,
+                                         llvm::StringRef ClonedName)
+    : SILClonerWithScopes<PromotedParamCloner>(
+          *initCloned(Orig, Fragile, PromotedArgIndices, ClonedName)),
+      Orig(Orig), PromotedArgIndices(PromotedArgIndices) {
   assert(Orig->getDebugScope()->getParentFunction() !=
          getCloned()->getDebugScope()->getParentFunction());
 }
 
-static std::string getClonedName(SILFunction *F,
-                                 IsFragile_t Fragile,
-                                 ParamIndexList &PromotedParamIndices) {
+static std::string getClonedName(SILFunction *F, IsFragile_t Fragile,
+                                 ArgIndexList &PromotedArgIndices) {
   Mangle::Mangler M;
-  auto P = SpecializationPass::AllocBoxToStack;
-  FunctionSignatureSpecializationMangler FSSM(P, M, Fragile, F);
-  for (unsigned i : PromotedParamIndices)
-    FSSM.setArgumentBoxToStack(i);
-  FSSM.mangle();
-  return M.finalize();
+  auto P = Demangle::SpecializationPass::AllocBoxToStack;
+  FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
+  NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
+  for (unsigned i : PromotedArgIndices) {
+    OldFSSM.setArgumentBoxToStack(i);
+    NewFSSM.setArgumentBoxToStack(i);
+  }
+  OldFSSM.mangle();
+  std::string Old = M.finalize();
+  std::string New = NewFSSM.mangle();
+  return NewMangling::selectMangling(Old, New);
 }
 
 /// \brief Create the function corresponding to the clone of the
 /// original closure with the signature modified to reflect promoted
-/// parameters (which are specified by PromotedParamIndices).
-SILFunction*
-PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
-                            ParamIndexList &PromotedParamIndices,
-                            llvm::StringRef ClonedName) {
+/// parameters (which are specified by PromotedArgIndices).
+SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
+                                             IsFragile_t Fragile,
+                                             ArgIndexList &PromotedArgIndices,
+                                             llvm::StringRef ClonedName) {
   SILModule &M = Orig->getModule();
 
   SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
 
   // Generate a new parameter list with deleted parameters removed.
   SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
-  unsigned Index = OrigFTI->getNumIndirectResults();
+  unsigned Index = Orig->getConventions().getSILArgIndexOfFirstParam();
   for (auto &param : OrigFTI->getParameters()) {
-    if (count(PromotedParamIndices, Index)) {
-      auto paramTy = param.getType()->castTo<SILBoxType>()
-        ->getBoxedAddressType();
+    if (count(PromotedArgIndices, Index)) {
+      auto boxTy = param.getSILStorageType().castTo<SILBoxType>();
+      assert(boxTy->getLayout()->getFields().size() == 1
+             && "promoting compound box not implemented");
+      SILType paramTy;
+      {
+        Lowering::GenericContextScope scope(Orig->getModule().Types,
+                                            OrigFTI->getGenericSignature());
+        paramTy = boxTy->getFieldType(Orig->getModule(), 0);
+      }
       auto promotedParam = SILParameterInfo(paramTy.getSwiftRValueType(),
                                   ParameterConvention::Indirect_InoutAliasable);
       ClonedInterfaceArgTys.push_back(promotedParam);
@@ -551,14 +569,11 @@ PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
 
   // Create the new function type for the cloned function with some of
   // the parameters promoted.
-  auto ClonedTy =
-    SILFunctionType::get(OrigFTI->getGenericSignature(),
-                         OrigFTI->getExtInfo(),
-                         OrigFTI->getCalleeConvention(),
-                         ClonedInterfaceArgTys,
-                         OrigFTI->getAllResults(),
-                         OrigFTI->getOptionalErrorResult(),
-                         M.getASTContext());
+  auto ClonedTy = SILFunctionType::get(
+      OrigFTI->getGenericSignature(), OrigFTI->getExtInfo(),
+      OrigFTI->getCalleeConvention(), ClonedInterfaceArgTys,
+      OrigFTI->getResults(), OrigFTI->getOptionalErrorResult(),
+      M.getASTContext());
 
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
@@ -576,7 +591,6 @@ PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
   if (Orig->hasUnqualifiedOwnership()) {
     Fn->setUnqualifiedOwnership();
   }
-  Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;
 }
 
@@ -585,20 +599,21 @@ PromotedParamCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
 void
 PromotedParamCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
-  SILModule &M = Cloned->getModule();
 
   // Create arguments for the entry block
   SILBasicBlock *OrigEntryBB = &*Orig->begin();
-  SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
+  SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   unsigned ArgNo = 0;
-  auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
+  auto I = OrigEntryBB->args_begin(), E = OrigEntryBB->args_end();
   while (I != E) {
-    if (count(PromotedParamIndices, ArgNo)) {
+    if (count(PromotedArgIndices, ArgNo)) {
       // Create a new argument with the promoted type.
-      auto promotedTy = (*I)->getType().castTo<SILBoxType>()
-        ->getBoxedAddressType();
-      auto promotedArg = new (M)
-        SILArgument(ClonedEntryBB, promotedTy, (*I)->getDecl());
+      auto boxTy = (*I)->getType().castTo<SILBoxType>();
+      assert(boxTy->getLayout()->getFields().size() == 1
+             && "promoting multi-field boxes not implemented yet");
+      auto promotedTy = boxTy->getFieldType(Cloned->getModule(), 0);
+      auto *promotedArg =
+          ClonedEntryBB->createFunctionArgument(promotedTy, (*I)->getDecl());
       PromotedParameters.insert(*I);
       
       // Map any projections of the box to the promoted argument.
@@ -610,8 +625,8 @@ PromotedParamCloner::populateCloned() {
       
     } else {
       // Create a new argument which copies the original argument.
-      SILValue MappedValue =
-        new (M) SILArgument(ClonedEntryBB, (*I)->getType(), (*I)->getDecl());
+      SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
+          (*I)->getType(), (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
     }
     ++ArgNo;
@@ -669,8 +684,7 @@ PromotedParamCloner::visitProjectBoxInst(ProjectBoxInst *Inst) {
 /// references.
 static PartialApplyInst *
 specializePartialApply(PartialApplyInst *PartialApply,
-                       ParamIndexList &PromotedParamIndices,
-                       bool &CFGChanged) {
+                       ArgIndexList &PromotedArgIndices, bool &CFGChanged) {
   auto *FRI = cast<FunctionRefInst>(PartialApply->getCallee());
   assert(FRI && "Expected a direct partial_apply!");
   auto *F = FRI->getReferencedFunction();
@@ -680,7 +694,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
   if (PartialApply->getFunction()->isFragile() && F->isFragile())
     Fragile = IsFragile;
 
-  std::string ClonedName = getClonedName(F, Fragile, PromotedParamIndices);
+  std::string ClonedName = getClonedName(F, Fragile, PromotedArgIndices);
 
   auto &M = PartialApply->getModule();
 
@@ -690,7 +704,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
     ClonedFn = PrevFn;
   } else {
     // Clone the function the existing partial_apply references.
-    PromotedParamCloner Cloner(F, Fragile, PromotedParamIndices, ClonedName);
+    PromotedParamCloner Cloner(F, Fragile, PromotedArgIndices, ClonedName);
     Cloner.populateCloned();
     ClonedFn = Cloner.getCloned();
   }
@@ -702,8 +716,8 @@ specializePartialApply(PartialApplyInst *PartialApply,
 
   // Promote the arguments that need promotion.
   for (auto &O : PartialApply->getArgumentOperands()) {
-    auto ParamIndex = getParameterIndexForOperand(&O);
-    if (!count(PromotedParamIndices, ParamIndex)) {
+    auto ArgIndex = getArgIndexForOperand(&O);
+    if (!count(PromotedArgIndices, ArgIndex)) {
       Args.push_back(O.get());
       continue;
     }
@@ -761,9 +775,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
                                                    ClonedFn);
   CanSILFunctionType CanFnTy = ClonedFn->getLoweredFunctionType();
   auto const &Subs = PartialApply->getSubstitutions();
-  CanSILFunctionType SubstCalleeTy = CanFnTy->substGenericArgs(M,
-                                                             M.getSwiftModule(),
-                                                             Subs);
+  CanSILFunctionType SubstCalleeTy = CanFnTy->substGenericArgs(M, Subs);
   return Builder.createPartialApply(PartialApply->getLoc(), FunctionRef,
                                  SILType::getPrimitiveObjectType(SubstCalleeTy),
                                     PartialApply->getSubstitutions(), Args,
@@ -773,24 +785,24 @@ specializePartialApply(PartialApplyInst *PartialApply,
 static void
 rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &PromotedOperands,
                       bool &CFGChanged) {
-  llvm::DenseMap<PartialApplyInst *, ParamIndexList> IndexMap;
-  ParamIndexList Indices;
+  llvm::DenseMap<PartialApplyInst *, ArgIndexList> IndexMap;
+  ArgIndexList Indices;
 
   // Build a map from partial_apply to the indices of the operands
   // that will be promoted in our rewritten version.
   for (auto *O : PromotedOperands) {
-    auto ParamIndexNumber = getParameterIndexForOperand(O);
+    auto ArgIndexNumber = getArgIndexForOperand(O);
 
     Indices.clear();
-    Indices.push_back(ParamIndexNumber);
+    Indices.push_back(ArgIndexNumber);
 
     auto *PartialApply = cast<PartialApplyInst>(O->getUser());
-    llvm::DenseMap<PartialApplyInst *, ParamIndexList>::iterator It;
+    llvm::DenseMap<PartialApplyInst *, ArgIndexList>::iterator It;
     bool Inserted;
     std::tie(It, Inserted) = IndexMap.insert(std::make_pair(PartialApply,
                                                             Indices));
     if (!Inserted)
-      It->second.push_back(ParamIndexNumber);
+      It->second.push_back(ArgIndexNumber);
   }
 
   // Clone the referenced function of each partial_apply, removing the

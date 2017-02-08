@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,6 +15,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
@@ -42,7 +43,7 @@ static void collectApplyInst(SILFunction &F,
 /// of the corresponding pre-specialized function, if such a pre-specialization
 /// exists.
 class UsePrespecialized: public SILModuleTransform {
-  virtual ~UsePrespecialized() { }
+  ~UsePrespecialized() override { }
 
   void run() override {
     auto &M = *getModule();
@@ -83,7 +84,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     // available for it already and use this specialization
     // instead of the generic version.
 
-    ArrayRef<Substitution> Subs = AI.getSubstitutions();
+    SubstitutionList Subs = AI.getSubstitutions();
     if (Subs.empty())
       continue;
 
@@ -93,14 +94,9 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     if (!SpecType)
       continue;
 
-    // Bail if any generic types parameters of the concrete type
-    // are unbound.
-    if (SpecType->hasArchetype())
-      continue;
-
-    // Bail if any generic types parameters of the concrete type
-    // are unbound.
-    if (hasUnboundGenericTypes(Subs))
+    // Bail any callee generic type parameters are dependent on the generic
+    // parameters of the caller.
+    if (SpecType->hasArchetype() || hasArchetypes(Subs))
       continue;
 
     // Create a name of the specialization.
@@ -109,8 +105,14 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
       Mangle::Mangler Mangler;
       GenericSpecializationMangler GenericMangler(Mangler, ReferencedF, Subs,
                                                   ReferencedF->isFragile());
+      NewMangling::GenericSpecializationMangler NewGenericMangler(ReferencedF,
+                                              Subs, ReferencedF->isFragile(),
+                                              /*isReAbstracted*/ true);
       GenericMangler.mangle();
-      ClonedName = Mangler.finalize();
+      std::string Old = Mangler.finalize();
+      std::string New = NewGenericMangler.mangle();
+
+      ClonedName = NewMangling::selectMangling(Old, New);
     }
 
     SILFunction *NewF = nullptr;

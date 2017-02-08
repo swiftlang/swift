@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -11,10 +11,10 @@ class CustomDeallocator {
   }
 }
 
-// CHECK:    define hidden void @_TFC10deallocate17CustomDeallocatorD([[CD:%.*]]*
-// CHECK:      [[T0:%.*]] = call [[OBJECT:%.*]]* @_TFC10deallocate17CustomDeallocatord(
+// CHECK:    define hidden void @_T010deallocate17CustomDeallocatorCfD([[CD:%.*]]*
+// CHECK:      [[T0:%.*]] = call [[OBJECT:%.*]]* @_T010deallocate17CustomDeallocatorCfd(
 // CHECK-NEXT: [[T1:%.*]] = bitcast [[OBJECT]]* [[T0]] to [[CD]]*
-// CHECK-NEXT: [[T3:%.*]] = call { i64, i64 } @_TFC10deallocate17CustomDeallocator29__getInstanceSizeAndAlignMaskfT_TSiSi_([[CD]]* [[T1]])
+// CHECK-NEXT: [[T3:%.*]] = call { i64, i64 } @_T010deallocate17CustomDeallocatorC29__getInstanceSizeAndAlignMaskSi_SityF([[CD]]* [[T1]])
 // CHECK-NEXT: [[SIZE:%.*]] = extractvalue { i64, i64 } [[T3]], 0
 // CHECK-NEXT: [[ALIGNMASK:%.*]] = extractvalue { i64, i64 } [[T3]], 1
 // CHECK-NEXT: [[T4:%.*]] = bitcast [[CD]]* [[T1]] to [[OBJECT]]*

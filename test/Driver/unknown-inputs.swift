@@ -32,8 +32,8 @@
 // MODULE: 0: input
 // MODULE: 1: merge-module, {0}, swiftmodule
 
-// RUN: not %swiftc_driver -driver-print-actions -parse %t/empty 2>&1 | %FileCheck -check-prefix=ERROR %s
-// RUN: not %swiftc_driver -driver-print-actions -parse %t/empty.swiftmodule 2>&1 | %FileCheck -check-prefix=ERROR %s
-// RUN: not %swiftc_driver -driver-print-actions -parse %t/empty.o 2>&1 | %FileCheck -check-prefix=ERROR %s
-// RUN: not %swiftc_driver -driver-print-actions -parse %t/empty.h 2>&1 | %FileCheck -check-prefix=ERROR %s
+// RUN: not %swiftc_driver -driver-print-actions -typecheck %t/empty 2>&1 | %FileCheck -check-prefix=ERROR %s
+// RUN: not %swiftc_driver -driver-print-actions -typecheck %t/empty.swiftmodule 2>&1 | %FileCheck -check-prefix=ERROR %s
+// RUN: not %swiftc_driver -driver-print-actions -typecheck %t/empty.o 2>&1 | %FileCheck -check-prefix=ERROR %s
+// RUN: not %swiftc_driver -driver-print-actions -typecheck %t/empty.h 2>&1 | %FileCheck -check-prefix=ERROR %s
 // RUN: %swiftc_driver -driver-print-actions %t/empty.swift 2>&1 | %FileCheck -check-prefix=COMPILE %s

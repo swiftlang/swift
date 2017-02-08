@@ -95,7 +95,7 @@ bb0(%0 : $@thick Foo2.Type):
 sil hidden @_TF4test4mainFCS_3FooS0_ : $@convention(thin) (@owned Foo) -> @owned Foo {
 bb0(%0 : $Foo):
   debug_value %0 : $Foo                           // id: %1
-  %2 = class_method %0 : $Foo, #Foo.doSomething!1 : (Foo) -> () -> Foo , $@convention(method) (@guaranteed Foo) -> @owned Foo // user: %3
+  %2 = class_method %0 : $Foo, #Foo.doSomething!1 : (Foo) -> () -> Foo, $@convention(method) (@guaranteed Foo) -> @owned Foo // user: %3
   %3 = apply %2(%0) : $@convention(method) (@guaranteed Foo) -> @owned Foo // user: %5
   strong_release %0 : $Foo                        // id: %4
   return %3 : $Foo                                // id: %5

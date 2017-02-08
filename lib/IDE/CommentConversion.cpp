@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -451,6 +451,7 @@ class DoxygenConverter : public MarkupASTVisitor<DoxygenConverter> {
   llvm::raw_ostream &OS;
   unsigned Indent;
   unsigned IsFreshLine : 1;
+  unsigned IsEmptyComment : 1;
 
   void printIndent() {
     for (unsigned i = 0; i < Indent; ++i) {
@@ -458,25 +459,30 @@ class DoxygenConverter : public MarkupASTVisitor<DoxygenConverter> {
     }
   }
 
-  void indent() {
-    Indent += 2;
+  void indent(unsigned Amount = 2) {
+    Indent += Amount;
   }
 
-  void dedent() {
-    Indent -= 2;
+  void dedent(unsigned Amount = 2) {
+    Indent -= Amount;
   }
 
   void print(StringRef Str) {
     for (auto c : Str) {
       if (c == '\n') {
+        if (IsFreshLine && !IsEmptyComment)
+          OS << "///";
         IsFreshLine = true;
       } else {
+        if (IsFreshLine && !IsEmptyComment)
+          OS << "///";
         if (IsFreshLine) {
           printIndent();
           IsFreshLine = false;
         }
       }
       OS << c;
+      IsEmptyComment = false;
     }
   }
 
@@ -537,16 +543,21 @@ class DoxygenConverter : public MarkupASTVisitor<DoxygenConverter> {
   }
 
 public:
-  DoxygenConverter(llvm::raw_ostream &OS, unsigned Indent = 0)
-    : OS(OS), Indent(Indent), IsFreshLine(true) {
-    printIndent();
-    print("/**");
-    printNewline();
-    indent();
+  DoxygenConverter(llvm::raw_ostream &OS)
+    : OS(OS), Indent(1), IsFreshLine(true), IsEmptyComment(true) {
+    printOpeningComment();
   }
 
   void printNewline() {
     print("\n");
+  }
+
+  void printOpeningComment() {
+    OS << "///";
+  }
+
+  void printUncommentedNewline() {
+    OS << '\n';
   }
 
   void visitDocument(const Document *D) {
@@ -595,11 +606,9 @@ public:
   }
 
   void visitCode(const Code *C) {
-    print("\\code");
-    printNewline();
+    print("<code>");
     print(C->getLiteralContent());
-    printNewline();
-    print("\\endcode");
+    print("</code>");
   }
 
   void visitHTML(const HTML *H) {
@@ -730,10 +739,9 @@ public:
   }
 #include "swift/Markup/SimpleFields.def"
 
-  ~DoxygenConverter() {
-    dedent();
-    print("*/");
-    printNewline();
+  ~DoxygenConverter() override {
+    if (IsEmptyComment || !IsFreshLine)
+      printUncommentedNewline();
   }
 };
 

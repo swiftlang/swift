@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -57,7 +57,7 @@ public:
       : Requirement(Requirement), Witness(Witness) {}
 
     bool isValid() const {
-      return !Requirement.isNull();
+      return !Requirement.isNull() && Witness;
     }
 
     const SILDeclRef &getRequirement() const {
@@ -67,6 +67,12 @@ public:
     SILFunction *getWitness() const {
       assert(Witness != nullptr);
       return Witness;
+    }
+    void removeWitnessMethod() {
+      if (Witness) {
+        Witness->decrementRefCount();
+      }
+      Witness = nullptr;
     }
   };
  
@@ -131,6 +137,19 @@ public:
   /// Return the AST ProtocolDecl this default witness table is associated with.
   const ProtocolDecl *getProtocol() const { return Protocol; }
 
+  /// Clears methods in witness entries.
+  /// \p predicate Returns true if the passed entry should be set to null.
+  template <typename Predicate> void clearMethods_if(Predicate predicate) {
+    for (Entry &entry : Entries) {
+      if (!entry.isValid())
+        continue;
+      auto *MW = entry.getWitness();
+      if (MW && predicate(MW)) {
+        entry.removeWitnessMethod();
+      }
+    }
+  }
+
   /// Return the minimum witness table size, in words.
   ///
   /// This will not change if requirements with default implementations are
@@ -181,18 +200,7 @@ struct ilist_traits<::swift::SILDefaultWitnessTable> :
 public ilist_default_traits<::swift::SILDefaultWitnessTable> {
   typedef ::swift::SILDefaultWitnessTable SILDefaultWitnessTable;
 
-private:
-  mutable ilist_half_node<SILDefaultWitnessTable> Sentinel;
-
 public:
-  SILDefaultWitnessTable *createSentinel() const {
-    return static_cast<SILDefaultWitnessTable*>(&Sentinel);
-  }
-  void destroySentinel(SILDefaultWitnessTable *) const {}
-
-  SILDefaultWitnessTable *provideInitialHead() const { return createSentinel(); }
-  SILDefaultWitnessTable *ensureHead(SILDefaultWitnessTable*) const { return createSentinel(); }
-  static void noteHead(SILDefaultWitnessTable*, SILDefaultWitnessTable*) {}
   static void deleteNode(SILDefaultWitnessTable *WT) { WT->~SILDefaultWitnessTable(); }
   
 private:

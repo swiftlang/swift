@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 // REQUIRES: objc_interop
 
-// CHECK-LABEL: @_TMmC30swift_native_objc_runtime_base1C = hidden global %objc_class {
+// CHECK-LABEL: @_T030swift_native_objc_runtime_base1CCMm = hidden global %objc_class {
 // -- metaclass "isa" is root metaclass
 // CHECK:         %objc_class* @"OBJC_METACLASS_$_NSObject",
 // -- metaclass "super" is super metaclass

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -297,7 +297,7 @@ public:
   bool walkToDeclPost(Decl *D) override;
   bool walkToTypeReprPre(TypeRepr *T) override;
   std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override;
-  bool shouldWalkIntoFunctionGenericParams() override { return true; }
+  bool shouldWalkIntoGenericParams() override { return true; }
 
 private:
   static bool findUrlStartingLoc(StringRef Text, unsigned &Start,
@@ -1045,7 +1045,7 @@ public:
     return { true, E };
   }
 };
-}
+} // end anonymous namespace
 
 bool ModelASTWalker::annotateIfConfigConditionIdentifiers(Expr *Cond) {
   if (!Cond)

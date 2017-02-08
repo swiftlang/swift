@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -39,7 +39,9 @@ public struct Locale : Hashable, Equatable, ReferenceConvertible {
 
     /// Returns a locale which tracks the user's current preferences.
     ///
-    /// The autoupdatingCurrent locale will stop auto-updating if mutated. It only compares equal to itself.
+    /// If mutated, this Locale will no longer track the user's preferences.
+    ///
+    /// - note: The autoupdating Locale will only compare equal to another autoupdating Locale.
     public static var autoupdatingCurrent : Locale {
         return Locale(adoptingReference: __NSLocaleAutoupdating(), autoupdating: true)
     }
@@ -433,9 +435,9 @@ public struct Locale : Hashable, Equatable, ReferenceConvertible {
 
 extension Locale : CustomDebugStringConvertible, CustomStringConvertible, CustomReflectable {
     private var _kindDescription : String {
-        if (self == Locale.autoupdatingCurrent) {
+        if self == Locale.autoupdatingCurrent {
             return "autoupdatingCurrent"
-        } else if (self == Locale.current) {
+        } else if self == Locale.current {
             return "current"
         } else {
             return "fixed"

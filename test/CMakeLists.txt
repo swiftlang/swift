@@ -40,7 +40,8 @@ function(get_test_dependencies SDK result_var_name)
   endif()
 
   set(deps_binaries
-      swift swift-ide-test sil-opt swift-llvm-opt swift-demangle sil-extract
+      swift swift-ide-test sil-opt swift-llvm-opt swift-demangle
+      sil-func-extractor sil-llvm-gen sil-nm sil-passpipeline-dumper
       lldb-moduleimport-test swift-reflection-dump swift-remoteast-test
       swift-api-digester)
   if(NOT SWIFT_BUILT_STANDALONE)
@@ -249,6 +250,15 @@ if(PYTHONINTERP_FOUND)
         if(NOT SWIFT_BUILD_STDLIB)
           list(APPEND LIT_ARGS
               "--param" "test_sdk_overlay_dir=${SWIFTLIB_DIR}/${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+        endif()
+
+        execute_process(COMMAND
+            "${PYTHON_EXECUTABLE}" "-c" "import psutil"
+            RESULT_VARIABLE python_psutil_status
+            TIMEOUT 1 # second
+            ERROR_QUIET)
+        if(NOT python_psutil_status)
+          list(APPEND LIT_ARGS "--timeout=3000") # 50 minutes
         endif()
 
         list(APPEND LIT_ARGS "--xunit-xml-output=${SWIFT_TEST_RESULTS_DIR}/lit-tests.xml")

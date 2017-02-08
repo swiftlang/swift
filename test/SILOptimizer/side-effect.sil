@@ -176,8 +176,8 @@ bb0(%0 : $Int32):
   store %0 to %a : $*Int32
   %l1 = load %a : $*Int32
 
-  %b = alloc_box $@box Int32
-  %ba = project_box %b : $@box Int32, 0
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int32>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <Int32>, 0
   store %0 to %ba : $*Int32
   %l2 = load %ba : $*Int32
 
@@ -277,9 +277,9 @@ bb0(%0 : $Int32):
 
 // CHECK-LABEL: sil @test_project_box
 // CHECK: <func=,param0=r>
-sil @test_project_box : $@convention(thin) (@box Builtin.Int32) -> Builtin.Int32 {
-bb0(%0 : $@box Builtin.Int32):
-  %a = project_box %0 : $@box Builtin.Int32, 0
+sil @test_project_box : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> Builtin.Int32 {
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
+  %a = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
   %l = load %a : $*Builtin.Int32
   return %l : $Builtin.Int32
 }

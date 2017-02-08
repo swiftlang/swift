@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s
 //
 // REQUIRES: CPU=x86_64
 
@@ -17,10 +17,10 @@ sil_vtable TestClass {}
 
 // CHECK-LABEL: define{{( protected)?}} void @alloc_on_stack
 // CHECK:      %reference.raw = alloca i8, i32 28, align 8
-// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @_TMa[[C:[a-zA-Z0-9_]+]]()
+// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @_T0{{[a-zA-Z0-9_]+}}Ma()
 // CHECK-NEXT: [[O:%[0-9]+]] = bitcast i8* %reference.raw to %swift.refcounted*
 // CHECK-NEXT: %reference.new = call %swift.refcounted* @swift_initStackObject(%swift.type* [[M]], %swift.refcounted* [[O]])
-// CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C]]*
+// CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C:.*TestClass.*]]*
 // CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %[[C]]* [[R]] to i8*
 // CHECK-NEXT: call void @llvm.lifetime.end(i64 -1, i8* [[O2]])
 // CHECK-NEXT: ret void
@@ -34,9 +34,9 @@ bb0:
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_on_heap
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_TMa[[C:[a-zA-Z0-9_]+]]()
+// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_T0{{[a-zA-Z0-9_]+}}Ma()
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[M]], i64 28, i64 7) #5
-// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C]]*
+// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C:.*TestClass.*]]*
 // CHECK-NEXT:  ret %[[C]]* [[O2]]
 sil @alloc_on_heap : $@convention(thin) () -> @owned TestClass {
 bb0:
@@ -46,9 +46,9 @@ bb0:
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_3_on_heap
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_TMa[[C:[a-zA-Z0-9_]+]]()
+// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_T0{{[a-zA-Z0-9_]+}}CMa()
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[M]], i64 40, i64 7) #5
-// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C]]*
+// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C:.*TestClass.*]]*
 // CHECK-NEXT:  ret %[[C]]* [[O2]]
 sil @alloc_3_on_heap : $@convention(thin) () -> @owned TestClass {
 bb0:
@@ -60,11 +60,11 @@ bb0:
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_non_const_count
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_TMa[[C:[a-zA-Z0-9_]+]]()
+// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_T0{{[a-zA-Z0-9_]+}}Ma()
 // CHECK-NEXT: [[S:%[0-9]+]] = mul i64 4, %0
 // CHECK-NEXT: [[A:%[0-9]+]] = add i64 20, [[S]]
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[M]], i64 [[A]], i64 7) #5
-// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C]]*
+// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C:.*TestClass.*]]*
 // CHECK-NEXT:  ret %[[C]]* [[O2]]
 sil @alloc_non_const_count : $@convention(thin) (Builtin.Word) -> @owned TestClass {
 bb0(%c : $Builtin.Word):
@@ -73,7 +73,7 @@ bb0(%c : $Builtin.Word):
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_2_non_const_count
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_TMa[[C:[a-zA-Z0-9_]+]]()
+// CHECK:      [[M:%[0-9]+]] = call %swift.type* @_T0{{[a-zA-Z0-9_]+}}Ma()
 // CHECK-NEXT: [[S1:%[0-9]+]] = mul i64 1, %0
 // CHECK-NEXT: [[S2:%[0-9]+]] = add i64 17, [[S1]]
 // CHECK-NEXT: [[S3:%[0-9]+]] = add i64 [[S2]], 3
@@ -81,7 +81,7 @@ bb0(%c : $Builtin.Word):
 // CHECK-NEXT: [[S5:%[0-9]+]] = mul i64 4, %1
 // CHECK-NEXT: [[S6:%[0-9]+]] = add i64 [[S4]], [[S5]]
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[M]], i64 [[S6]], i64 7) #5
-// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C]]*
+// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C:.*TestClass.*]]*
 // CHECK-NEXT:  ret %[[C]]* [[O2]]
 sil @alloc_2_non_const_count : $@convention(thin) (Builtin.Word, Builtin.Word) -> @owned TestClass {
 bb0(%c1 : $Builtin.Word, %c2 : $Builtin.Word):
@@ -160,6 +160,25 @@ bb0(%0 : $TestClass, %1 : $@thick T.Type):
   return %p : $Builtin.RawPointer
 }
 
+struct Str<T> {
+  var t: T
+}
+
+// CHECK-LABEL: define{{( protected)?}} i8* @project_tail_generic_struct
+// CHECK:      [[S1:%[0-9]+]] = add i64 17, %flags.alignmentMask
+// CHECK-NEXT: [[S2:%[0-9]+]] = xor i64 %flags.alignmentMask, -1
+// CHECK-NEXT: [[S3:%[0-9]+]] = and i64 [[S1]], [[S2]]
+// CHECK-NEXT: [[S4:%[0-9]+]] = bitcast %{{.*}}* %0 to i8*
+// CHECK-NEXT: [[S5:%[0-9]+]] = getelementptr inbounds i8, i8* [[S4]], i64 [[S3]]
+// CHECK-NEXT: %tailaddr = bitcast i8* [[S5]] to %{{.*}}Str
+// CHECK: ret
+sil @project_tail_generic_struct : $@convention(thin) <T> (TestClass, @thick T.Type) -> Builtin.RawPointer {
+bb0(%0 : $TestClass, %1 : $@thick T.Type):
+  %a = ref_tail_addr %0 : $TestClass, $Str<T>
+  %p = address_to_pointer %a : $*Str<T> to $Builtin.RawPointer
+  return %p : $Builtin.RawPointer
+}
+
 // CHECK-LABEL: define{{( protected)?}} void @project_tail_index_byte_to_int
 // CHECK:      [[S1:%[0-9]+]] = bitcast i8* %0 to %Vs4Int8*
 // CHECK-NEXT: [[S2:%[0-9]+]] = getelementptr inbounds %Vs4Int8, %Vs4Int8* [[S1]], i64 2
@@ -177,6 +196,22 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Int32):
   store %1 to %a2 : $*Int32
   %r = tuple ()
   return %r : $()
+}
+
+// CHECK-LABEL: define{{( protected)?}} i8* @project_tail_index_generic_struct
+// CHECK: call %swift.type* @{{.*Str.*}}(%swift.type* %T)
+// CHECK: load
+// CHECK: and
+// CHECK: xor
+// CHECK: and
+// CHECK: ret
+sil @project_tail_index_generic_struct : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $@thick T.Type):
+  %a1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Int8
+  %c = integer_literal $Builtin.Word, 2
+  %a2 = tail_addr %a1 : $*Int8, %c : $Builtin.Word, $Str<T>
+  %p = address_to_pointer %a2 : $*Str<T> to $Builtin.RawPointer
+  return %p : $Builtin.RawPointer
 }
 
 // sizeof(EmptyClass) = 16 bytes

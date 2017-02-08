@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -420,7 +420,7 @@ public:
       } else if (auto *Seq = dyn_cast_or_null<SequenceExpr>(Cursor->getAsExpr())) {
         ArrayRef<Expr*> Elements = Seq->getElements();
         if (Elements.size() == 3 &&
-            Elements[1]->getKind() == ExprKind::Assign &&
+            isa<AssignExpr>(Elements[1]) &&
             SM.getLineAndColumn(Elements[2]->getEndLoc()).first == Line) {
               return false;
         }
@@ -576,16 +576,6 @@ class FormatWalker : public SourceEntityWalker {
       }
 
       if (auto AFD = dyn_cast_or_null<AbstractFunctionDecl>(Node.dyn_cast<Decl*>())) {
-
-        // Generic type params are siblings to align.
-        if (auto GPL = AFD->getGenericParams()) {
-          const auto Params = GPL->getParams();
-          for (unsigned I = 0, N = Params.size(); I < N; I++) {
-            addPair(Params[I]->getEndLoc(), FindAlignLoc(Params[I]->getStartLoc()),
-                    tok::comma);
-          }
-        }
-
         // Function parameters are siblings.
         for (auto P : AFD->getParameterLists()) {
           for (ParamDecl* param : *P) {

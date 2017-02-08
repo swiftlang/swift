@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // Intrinsic protocols shared with the compiler
@@ -194,10 +194,46 @@ public protocol _ExpressibleByBuiltinIntegerLiteral {
   init(_builtinIntegerLiteral value: _MaxBuiltinIntegerType)
 }
 
-/// Conforming types can be initialized with integer literals.
+/// A type that can be initialized with an integer literal.
+///
+/// The standard library integer and floating-point types, such as `Int` and
+/// `Double`, conform to the `ExpressibleByIntegerLiteral` protocol. You can
+/// initialize a variable or constant of any of these types by assigning an
+/// integer literal.
+///
+///     // Type inferred as 'Int'
+///     let cookieCount = 12
+///
+///     // An array of 'Int'
+///     let chipsPerCookie = [21, 22, 25, 23, 24, 19]
+///
+///     // A floating-point value initialized using an integer literal
+///     let redPercentage: Double = 1
+///     // redPercentage == 1.0
+///
+/// Conforming to ExpressibleByIntegerLiteral
+/// =========================================
+///
+/// To add `ExpressibleByIntegerLiteral` conformance to your custom type,
+/// implement the required initializer.
 public protocol ExpressibleByIntegerLiteral {
+  /// A type that represents an integer literal.
+  ///
+  /// The standard library integer and floating-point types are all valid types
+  /// for `IntegerLiteralType`.
   associatedtype IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral
-  /// Create an instance initialized to `value`.
+
+  /// Creates an instance initialized to the specified integer value.
+  ///
+  /// Do not call this initializer directly. Instead, initialize a variable or
+  /// constant using an integer literal. For example:
+  ///
+  ///     let x = 23
+  ///
+  /// In this example, the assignment to the `x` constant calls this integer
+  /// literal initializer behind the scenes.
+  ///
+  /// - Parameter value: The value to create.
   init(integerLiteral value: IntegerLiteralType)
 }
 
@@ -224,13 +260,23 @@ public protocol _ExpressibleByBuiltinFloatLiteral {
 /// To add `ExpressibleByFloatLiteral` conformance to your custom type,
 /// implement the required initializer.
 public protocol ExpressibleByFloatLiteral {
-  /// A type that can represent a floating-point literal.
+  /// A type that represents a floating-point literal.
   ///
   /// Valid types for `FloatLiteralType` are `Float`, `Double`, and `Float80`
   /// where available.
   associatedtype FloatLiteralType : _ExpressibleByBuiltinFloatLiteral
   
   /// Creates an instance initialized to the specified floating-point value.
+  ///
+  /// Do not call this initializer directly. Instead, initialize a variable or
+  /// constant using a floating-point literal. For example:
+  ///
+  ///     let x = 21.5
+  ///
+  /// In this example, the assignment to the `x` constant calls this
+  /// floating-point literal initializer behind the scenes.
+  ///
+  /// - Parameter value: The value to create.
   init(floatLiteral value: FloatLiteralType)
 }
 
@@ -249,7 +295,7 @@ public protocol _ExpressibleByBuiltinBooleanLiteral {
 /// implement the `init(booleanLiteral:)` initializer that creates an instance
 /// of your type with the given Boolean value.
 public protocol ExpressibleByBooleanLiteral {
-  /// A type that can represent a Boolean literal, such as `Bool`.
+  /// A type that represents a Boolean literal, such as `Bool`.
   associatedtype BooleanLiteralType : _ExpressibleByBuiltinBooleanLiteral
 
   /// Creates an instance initialized to the given Boolean value.
@@ -260,7 +306,7 @@ public protocol ExpressibleByBooleanLiteral {
   ///
   ///     let twasBrillig = true
   ///
-  /// In this example, the assignments to the `twasBrillig` constant calls this
+  /// In this example, the assignment to the `twasBrillig` constant calls this
   /// Boolean literal initializer behind the scenes.
   ///
   /// - Parameter value: The value of the new instance.
@@ -289,13 +335,15 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 /// To add `ExpressibleByUnicodeScalarLiteral` conformance to your custom type,
 /// implement the required initializer.
 public protocol ExpressibleByUnicodeScalarLiteral {
-  /// A type that can represent a Unicode scalar literal.
+  /// A type that represents a Unicode scalar literal.
   ///
   /// Valid types for `UnicodeScalarLiteralType` are `UnicodeScalar`,
   /// `String`, and `StaticString`.
   associatedtype UnicodeScalarLiteralType : _ExpressibleByBuiltinUnicodeScalarLiteral
 
   /// Creates an instance initialized to the given value.
+  ///
+  /// - Parameter value: The value of the new instance.
   init(unicodeScalarLiteral value: UnicodeScalarLiteralType)
 }
 
@@ -334,7 +382,7 @@ public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
 public protocol ExpressibleByExtendedGraphemeClusterLiteral
   : ExpressibleByUnicodeScalarLiteral {
 
-  /// A type that can represent an extended grapheme cluster literal.
+  /// A type that represents an extended grapheme cluster literal.
   ///
   /// Valid types for `ExtendedGraphemeClusterLiteralType` are `Character`,
   /// `String`, and `StaticString`.
@@ -342,6 +390,8 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral
     : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
   
   /// Creates an instance initialized to the given value.
+  ///
+  /// - Parameter value: The value of the new instance.
   init(extendedGraphemeClusterLiteral value: ExtendedGraphemeClusterLiteralType)
 }
 
@@ -380,12 +430,14 @@ public protocol ExpressibleByStringLiteral
   // FIXME: when we have default function implementations in protocols, provide
   // an implementation of init(extendedGraphemeClusterLiteral:).
   
-  /// A type that can represent a string literal.
+  /// A type that represents a string literal.
   ///
   /// Valid types for `StringLiteralType` are `String` and `StaticString`.
   associatedtype StringLiteralType : _ExpressibleByBuiltinStringLiteral
   
   /// Creates an instance initialized to the given string value.
+  ///
+  /// - Parameter value: The value of the new instance.
   init(stringLiteral value: StringLiteralType)
 }
 
@@ -652,21 +704,34 @@ public protocol _ExpressibleByStringInterpolation {
   init<T>(stringInterpolationSegment expr: T)
 }
 
-/// Conforming types can be initialized with color literals (e.g.
+/// A type that can be initialized using a color literal (e.g.
 /// `#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)`).
 public protocol _ExpressibleByColorLiteral {
+  /// Creates an instance initialized with the given properties of a color
+  /// literal.
+  ///
+  /// Do not call this initializer directly. Instead, initialize a variable or
+  /// constant using a color literal.
   init(colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float)
 }
 
-/// Conforming types can be initialized with image literals (e.g.
+/// A type that can be initialized using an image literal (e.g.
 /// `#imageLiteral(resourceName: "hi.png")`).
 public protocol _ExpressibleByImageLiteral {
+  /// Creates an instance initialized with the given resource name.
+  ///
+  /// Do not call this initializer directly. Instead, initialize a variable or
+  /// constant using an image literal.
   init(imageLiteralResourceName path: String)
 }
 
-/// Conforming types can be initialized with strings (e.g.
+/// A type that can be initialized using a file reference literal (e.g.
 /// `#fileLiteral(resourceName: "resource.txt")`).
 public protocol _ExpressibleByFileReferenceLiteral {
+  /// Creates an instance initialized with the given resource name.
+  ///
+  /// Do not call this initializer directly. Instead, initialize a variable or
+  /// constant using a file reference literal.
   init(fileReferenceLiteralResourceName path: String)
 }
 

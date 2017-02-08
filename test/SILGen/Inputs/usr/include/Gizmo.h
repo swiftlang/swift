@@ -65,6 +65,8 @@ typedef long NSInteger;
 + (Gizmo*)nonNilGizmo __attribute__((swift_name("nonNilGizmo()")));
 @property Gizmo* nonNilGizmoProperty;
 @property (unsafe_unretained) Gizmo* unownedNonNilGizmoProperty;
+
+@property id originalName __attribute__((swift_name("renamedProp")));
 @end
 
 @interface Guisemeau : Gizmo

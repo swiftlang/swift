@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -130,7 +130,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     // instead of shifting all members of the worklist towards the front. This
     // check makes sure that if we run into any such residual null pointers, we
     // skip them.
-    if (I == 0)
+    if (I == nullptr)
       continue;
 
     // Check to see if we can DCE the instruction.
@@ -254,7 +254,7 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
 // New to the worklist.
 SILInstruction *SILCombiner::insertNewInstBefore(SILInstruction *New,
                                                  SILInstruction &Old) {
-  assert(New && New->getParent() == 0 &&
+  assert(New && New->getParent() == nullptr &&
          "New instruction already inserted into a basic block!");
   SILBasicBlock *BB = Old.getParent();
   BB->insert(&Old, New);  // Insert inst
@@ -339,7 +339,7 @@ class SILCombine : public SILFunctionTransform {
     }
   }
   
-  virtual void handleDeleteNotification(ValueBase *I) override {
+  void handleDeleteNotification(ValueBase *I) override {
     // Linear searching the tracking list doesn't hurt because usually it only
     // contains a few elements.
     auto Iter = std::find(TrackingList.begin(), TrackingList.end(), I);
@@ -347,7 +347,7 @@ class SILCombine : public SILFunctionTransform {
       TrackingList.erase(Iter);      
   }
   
-  virtual bool needsNotifications() override { return true; }
+  bool needsNotifications() override { return true; }
 
   StringRef getName() override { return "SIL Combine"; }
 };

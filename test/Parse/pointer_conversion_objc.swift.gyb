@@ -1,13 +1,13 @@
 // RUN: rm -rf %t && mkdir -p %t
 
 // RUN: %gyb -DOPT_KIND=None %s -o %t/pointer_conversion.swift
-// RUN: %line-directive %t/pointer_conversion.swift -- %target-swift-frontend -parse -verify %t/pointer_conversion.swift
+// RUN: %line-directive %t/pointer_conversion.swift -- %target-swift-frontend -typecheck -verify %t/pointer_conversion.swift
 
 // RUN: %gyb -DOPT_KIND=Optional %s -o %t/pointer_conversion_opt.swift
-// RUN: %line-directive %t/pointer_conversion_opt.swift -- %target-swift-frontend -parse -verify %t/pointer_conversion_opt.swift
+// RUN: %line-directive %t/pointer_conversion_opt.swift -- %target-swift-frontend -typecheck -verify %t/pointer_conversion_opt.swift
 
 // RUN: %gyb -DOPT_KIND=ImplicitlyUnwrappedOptional %s -o %t/pointer_conversion_iuo.swift
-// RUN: %line-directive %t/pointer_conversion_iuo.swift -- %target-swift-frontend -parse -verify %t/pointer_conversion_iuo.swift
+// RUN: %line-directive %t/pointer_conversion_iuo.swift -- %target-swift-frontend -typecheck -verify %t/pointer_conversion_iuo.swift
 
 // REQUIRES: objc_interop
 

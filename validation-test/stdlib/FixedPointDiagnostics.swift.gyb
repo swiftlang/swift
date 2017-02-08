@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/main.swift
-// RUN: %line-directive %t/main.swift -- %target-swift-frontend -parse -verify %t/main.swift
+// RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify %t/main.swift
 
 func testUnaryMinusInUnsigned() {
   var a: UInt8 = -(1) // expected-error {{}} expected-note * {{}} expected-warning * {{}}

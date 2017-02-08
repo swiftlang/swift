@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -369,7 +369,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     /// Retrieve the value the pointer points to.
     @_transparent get {
       // We can do a strong load normally.
-      return unsafeBitCast(self, to: UnsafeMutablePointer<Pointee>.self).pointee
+      return UnsafePointer(self).pointee
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
@@ -469,15 +469,20 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
 }
 
 extension UnsafeMutableRawPointer {
-  /// Convert from `AutoreleasingUnsafeMutablePointer`.
+  /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
+  /// instance.
+  ///
+  /// - Parameter other: The pointer to convert.
   @_transparent
   public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
-  /// Convert other `AutoreleasingUnsafeMutablePointer`.
+  /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
+  /// instance.
   ///
-  /// Returns nil if `other` is nil.
+  /// - Parameter other: The pointer to convert. If `other` is `nil`, the
+  ///   result is `nil`.
   @_transparent
   public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -486,15 +491,20 @@ extension UnsafeMutableRawPointer {
 }
 
 extension UnsafeRawPointer {
-  /// Convert other `AutoreleasingUnsafeMutablePointer`.
+  /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
+  /// instance.
+  ///
+  /// - Parameter other: The pointer to convert.
   @_transparent
   public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
-  /// Convert other `AutoreleasingUnsafeMutablePointer`.
+  /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
+  /// instance.
   ///
-  /// Returns nil if `other` is nil.
+  /// - Parameter other: The pointer to convert. If `other` is `nil`, the
+  ///   result is `nil`.
   @_transparent
   public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -517,7 +527,6 @@ public func == <Pointee>(
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
-@_fixed_layout
 internal struct _CocoaFastEnumerationStackBuf {
   // Clang uses 16 pointers.  So do we.
   internal var _item0: UnsafeRawPointer?

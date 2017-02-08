@@ -3,7 +3,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/extensions.swiftmodule -parse -emit-objc-header-path %t/extensions.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/extensions.swiftmodule -typecheck -emit-objc-header-path %t/extensions.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/extensions.h
 // RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/extensions.h
 // RUN: %check-in-clang %t/extensions.h
@@ -106,7 +106,7 @@ extension NSObject {}
 // CHECK-LABEL: @interface NSString (SWIFT_EXTENSION(extensions))
 // CHECK-NEXT: - (void)test;
 // CHECK-NEXT: + (void)test2;
-// CHECK-NEXT: + (NSString * _Nullable)fromColor:(NSColor * _Nonnull)color;
+// CHECK-NEXT: + (NSString * _Nullable)fromColor:(NSColor * _Nonnull)color SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: @end
 extension NSString {
   func test() {}

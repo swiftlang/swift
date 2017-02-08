@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -34,7 +34,7 @@ static char **_swift_stdlib_ProcessOverrideUnsafeArgv = nullptr;
 static int _swift_stdlib_ProcessOverrideUnsafeArgc = 0;
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" void _swift_stdlib_overrideUnsafeArgvArgc(char **argv, int argc) {
+void _swift_stdlib_overrideUnsafeArgvArgc(char **argv, int argc) {
   _swift_stdlib_ProcessOverrideUnsafeArgv = argv;
   _swift_stdlib_ProcessOverrideUnsafeArgc = argc;
 }
@@ -46,7 +46,7 @@ extern "C" char ***_NSGetArgv(void);
 extern "C" int *_NSGetArgc(void);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
+char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
   if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
@@ -57,9 +57,9 @@ extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   *outArgLen = *_NSGetArgc();
   return *_NSGetArgv();
 }
-#elif defined(__linux__) || defined(__CYGWIN__) || defined(__FreeBSD__)
+#elif defined(__linux__) || defined(__CYGWIN__)
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
+char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
   if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
@@ -89,11 +89,11 @@ extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 
   return outBuf;
 }
-#elif defined (_MSC_VER)
+#elif defined (_WIN32)
 #include <stdlib.h>
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
+char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
   if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
@@ -104,9 +104,60 @@ extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   *outArgLen = __argc;
   return __argv;
 }
+#elif defined(__FreeBSD__)
+#include <errno.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/sysctl.h>
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
+  assert(outArgLen != nullptr);
+
+  if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
+    *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;
+    return _swift_stdlib_ProcessOverrideUnsafeArgv;
+  }
+
+  char *argPtr = nullptr; // or use ARG_MAX? 8192 is used in LLDB though..
+  int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ARGS, getpid() };
+  size_t argPtrSize = 0;
+  for (int i = 0; i < 3 && !argPtr; i++) { // give up after 3 tries
+    if (sysctl(mib, 4, nullptr, &argPtrSize, nullptr, 0) != -1) {
+      argPtr = (char *)malloc(argPtrSize);
+      if (sysctl(mib, 4, argPtr, &argPtrSize, nullptr, 0) == -1) {
+        free(argPtr);
+        argPtr = nullptr;
+        if (errno != ENOMEM)
+          break;
+      }
+    } else {
+      break;
+    }
+  }
+  if (!argPtr)
+    swift::fatalError(0, "fatal error: could not retrieve commandline "
+                         "arguments: sysctl: %s.\n", strerror(errno));
+
+  char *curPtr = argPtr;
+  char *endPtr = argPtr + argPtrSize;
+
+  std::vector<char *> argvec;
+  for (; curPtr < endPtr; curPtr += strlen(curPtr) + 1)
+    argvec.push_back(strdup(curPtr));
+  *outArgLen = argvec.size();
+  char **outBuf = (char **)calloc(argvec.size() + 1, sizeof(char *));
+  std::copy(argvec.begin(), argvec.end(), outBuf);
+  outBuf[argvec.size()] = nullptr;
+
+  free(argPtr);
+    
+  return outBuf;
+}
 #else // __ANDROID__; Add your favorite arch's command line arg grabber here.
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
+char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
     *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;
     return _swift_stdlib_ProcessOverrideUnsafeArgv;

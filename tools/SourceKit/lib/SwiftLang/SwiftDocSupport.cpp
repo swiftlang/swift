@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -34,7 +34,7 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
-static Module *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
+static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
   SmallVector<std::pair<Identifier, SourceLoc>, 4>
       AccessPath;
   while (!ModuleName.empty()) {
@@ -45,7 +45,7 @@ static Module *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
   return Ctx.getModule(AccessPath);
 }
 
-static Module *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
+static ModuleDecl *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
   return Ctx.getModule(std::make_pair(ModuleName, SourceLoc()));
 }
 
@@ -97,7 +97,9 @@ struct TextReference {
 };
 
 class AnnotatingPrinter : public StreamPrinter {
-  const NominalTypeDecl *SynthesizeTarget = nullptr;
+
+  std::pair<const ExtensionDecl *, const NominalTypeDecl *>
+    SynthesizedExtensionInfo = {nullptr, nullptr};
 
   typedef llvm::SmallDenseMap<ValueDecl*, ValueDecl*> DefaultImplementMap;
   llvm::SmallDenseMap<ProtocolDecl*, DefaultImplementMap> AllDefaultMaps;
@@ -122,7 +124,7 @@ class AnnotatingPrinter : public StreamPrinter {
   }
 
   void deinitDefaultMapToUse(const Decl*D) {
-    if (D->getKind() == DeclKind::Extension) {
+    if (isa<ExtensionDecl>(D)) {
       DefaultMapToUse = nullptr;
     }
   }
@@ -152,7 +154,7 @@ public:
   bool shouldContinuePre(const Decl *D, Optional<BracketOptions> Bracket) {
     assert(Bracket.hasValue());
     if (!Bracket.getValue().shouldOpenExtension(D) &&
-        D->getKind() == DeclKind::Extension)
+        isa<ExtensionDecl>(D))
       return false;
     return true;
   }
@@ -162,7 +164,7 @@ public:
     if (!Bracket.getValue().shouldCloseNominal(D) && dyn_cast<NominalTypeDecl>(D))
       return false;
     if (!Bracket.getValue().shouldCloseExtension(D) &&
-        D->getKind() == DeclKind::Extension)
+        isa<ExtensionDecl>(D))
       return false;
     return true;
   }
@@ -170,19 +172,20 @@ public:
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
                                     const NominalTypeDecl *NTD,
                                     Optional<BracketOptions> Bracket) override {
-    assert(!SynthesizeTarget);
-    SynthesizeTarget = NTD;
+    assert(!SynthesizedExtensionInfo.first);
+    SynthesizedExtensionInfo = {ED, NTD};
     if (!shouldContinuePre(ED, Bracket))
       return;
     unsigned StartOffset = OS.tell();
-    EntitiesStack.emplace_back(ED, SynthesizeTarget, nullptr, StartOffset, true);
+    EntitiesStack.emplace_back(ED, SynthesizedExtensionInfo.second, nullptr,
+                               StartOffset, true);
   }
 
   void printSynthesizedExtensionPost(const ExtensionDecl *ED,
                                      const NominalTypeDecl *NTD,
                                      Optional<BracketOptions> Bracket) override {
-    assert(SynthesizeTarget);
-    SynthesizeTarget = nullptr;
+    assert(SynthesizedExtensionInfo.first);
+    SynthesizedExtensionInfo = {nullptr, nullptr};
     if (!shouldContinuePost(ED, Bracket))
       return;
     TextEntity Entity = std::move(EntitiesStack.back());
@@ -199,8 +202,12 @@ public:
       return;
     unsigned StartOffset = OS.tell();
     initDefaultMapToUse(D);
-    EntitiesStack.emplace_back(D, SynthesizeTarget, getDefaultImplementation(D),
-                               StartOffset, false);
+    const NominalTypeDecl *SynthesizedTarget = nullptr;
+    // If D is declared in the extension, then the synthesized target is valid.
+    if (D->getDeclContext() == SynthesizedExtensionInfo.first)
+      SynthesizedTarget = SynthesizedExtensionInfo.second;
+    EntitiesStack.emplace_back(D, SynthesizedTarget,
+                               getDefaultImplementation(D), StartOffset, false);
   }
 
   void printDeclLoc(const Decl *D) override {
@@ -477,11 +484,11 @@ static void reportRelated(ASTContext &Ctx,
 
   } else if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
 
-    // If underlying type exists, report the inheritance and conformance of the
-    // underlying type.
-    auto Ty = TAD->getUnderlyingType();
-    if (Ty) {
-      if (auto NM = Ty->getCanonicalType()->getAnyNominal()) {
+    if (TAD->hasInterfaceType()) {
+      // If underlying type exists, report the inheritance and conformance of the
+      // underlying type.
+      auto Ty = TAD->getDeclaredInterfaceType();
+      if (auto NM = Ty->getAnyNominal()) {
         passInherits(NM->getInherited(), Consumer);
         passConforms(NM->getSatisfiedProtocolRequirements(/*Sorted=*/true),
                      Consumer);
@@ -759,7 +766,7 @@ static void addParameters(ArrayRef<Identifier> &ArgNames,
         TypeRange = InOutTyR->getBase()->getSourceRange();
       if (TypeRange.isInvalid())
         continue;
-      
+
       unsigned StartOffs = SM.getLocOffsetInBuffer(TypeRange.Start, BufferID);
       unsigned EndOffs =
         SM.getLocOffsetInBuffer(Lexer::getLocForEndOfToken(SM, TypeRange.End),
@@ -927,7 +934,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
   if (makeParserAST(ParseCI, IFaceInfo.Text))
     return true;
   addParameterEntities(ParseCI, IFaceInfo);
-  
+
   Consumer.handleSourceText(IFaceInfo.Text);
   reportDocEntities(Ctx, IFaceInfo.TopEntities, Consumer);
   reportSourceAnnotations(IFaceInfo, ParseCI, Consumer);
@@ -977,7 +984,8 @@ public:
   }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type Ty) override {
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type Ty,
+                          SemaReferenceKind Kind) override {
     unsigned StartOffset = getOffset(Range.getStart());
     References.emplace_back(D, StartOffset, Range.getByteLength(), Ty);
     return true;
@@ -986,7 +994,8 @@ public:
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override {
     // Treat both open and close brackets equally
-    return visitDeclReference(D, Range, nullptr, Type());
+    return visitDeclReference(D, Range, nullptr, nullptr, Type(),
+                              SemaReferenceKind::SubscriptRef);
   }
 
   bool isLocal(Decl *D) const {

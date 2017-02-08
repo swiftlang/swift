@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,6 +15,7 @@
 #include "swift/Strings.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/AST/GenericEnvironment.h"
 
@@ -49,7 +50,7 @@ static unsigned getBoundGenericDepth(Type t) {
 
 // Initialize SpecializedType iff the specialization is allowed.
 ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
-                                     ArrayRef<Substitution> ParamSubs) {
+                                     SubstitutionList ParamSubs) {
   if (!OrigF->shouldOptimize()) {
     DEBUG(llvm::dbgs() << "    Cannot specialize function " << OrigF->getName()
                        << " marked to be excluded from optimizations.\n");
@@ -62,7 +63,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
       ->getSubstitutionMap(ParamSubs);
 
   // We do not support partial specialization.
-  if (hasUnboundGenericTypes(InterfaceSubs.getMap())) {
+  if (InterfaceSubs.hasArchetypes()) {
     DEBUG(llvm::dbgs() <<
           "    Cannot specialize with unbound interface substitutions.\n");
     DEBUG(for (auto Sub : ParamSubs) {
@@ -70,7 +71,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
           });
     return;
   }
-  if (hasDynamicSelfTypes(InterfaceSubs.getMap())) {
+  if (InterfaceSubs.hasDynamicSelf()) {
     DEBUG(llvm::dbgs() << "    Cannot specialize with dynamic self.\n");
     return;
   }
@@ -88,23 +89,23 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
   }
 
   SILModule &M = OrigF->getModule();
-  Module *SM = M.getSwiftModule();
-
-  SubstitutedType = SILType::substFuncType(M, SM, InterfaceSubs.getMap(),
+  SubstitutedType = SILType::substFuncType(M, InterfaceSubs,
                                            OrigF->getLoweredFunctionType(),
                                            /*dropGenerics = */ true);
 
-  NumResults = SubstitutedType->getNumIndirectResults();
-  Conversions.resize(NumResults + SubstitutedType->getParameters().size());
-  if (SubstitutedType->getNumDirectResults() == 0) {
+  NumFormalIndirectResults = SubstitutedType->getNumIndirectFormalResults();
+  Conversions.resize(NumFormalIndirectResults
+                     + SubstitutedType->getParameters().size());
+  if (SubstitutedType->getNumDirectFormalResults() == 0) {
     // The original function has no direct result yet. Try to convert the first
     // indirect result to a direct result.
     // TODO: We could also convert multiple indirect results by returning a
     // tuple type and created tuple_extract instructions at the call site.
+    SILFunctionConventions substConv(SubstitutedType, M);
     unsigned IdxForResult = 0;
-    for (SILResultInfo RI : SubstitutedType->getIndirectResults()) {
-      assert(RI.isIndirect());
-      if (RI.getSILType().isLoadable(M) && !RI.getType()->isVoid()) {
+    for (SILResultInfo RI : SubstitutedType->getIndirectFormalResults()) {
+      assert(RI.isFormalIndirect());
+      if (substConv.getSILType(RI).isLoadable(M) && !RI.getType()->isVoid()) {
         Conversions.set(IdxForResult);
         break;
       }
@@ -112,10 +113,13 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
     }
   }
   // Try to convert indirect incoming parameters to direct parameters.
-  unsigned IdxForParam = NumResults;
+  // The Conversions index domain is
+  // [0..<NumFormalIndirectResults + NumParameters]. This is *not* the same as
+  // a SubstitutedType's SIL argument index.
+  unsigned IdxForParam = NumFormalIndirectResults;
   for (SILParameterInfo PI : SubstitutedType->getParameters()) {
-    if (PI.getSILType().isLoadable(M) &&
-        PI.getConvention() == ParameterConvention::Indirect_In) {
+    if (PI.getSILStorageType().isLoadable(M)
+        && PI.getConvention() == ParameterConvention::Indirect_In) {
       Conversions.set(IdxForParam);
     }
     ++IdxForParam;
@@ -130,12 +134,10 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   llvm::SmallVector<SILResultInfo, 8> SpecializedResults;
   llvm::SmallVector<SILParameterInfo, 8> SpecializedParams;
 
-  unsigned ResultIdx = 0;
-  for (SILResultInfo RI : SubstFTy->getAllResults()) {
-    if (RI.isDirect()) {
-      SpecializedResults.push_back(RI);
-    } else {
-      if (isResultConverted(ResultIdx++)) {
+  unsigned IndirectResultIdx = 0;
+  for (SILResultInfo RI : SubstFTy->getResults()) {
+    if (RI.isFormalIndirect()) {
+      if (isFormalResultConverted(IndirectResultIdx++)) {
         // Convert the indirect result to a direct result.
         SILType SILResTy = SILType::getPrimitiveObjectType(RI.getType());
         // Indirect results are passed as owned, so we also need to pass the
@@ -143,11 +145,11 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
         auto C = (SILResTy.isTrivial(M) ? ResultConvention::Unowned :
                   ResultConvention::Owned);
         SpecializedResults.push_back(SILResultInfo(RI.getType(), C));
-      } else {
-        // No conversion: re-use the original result info.
-        SpecializedResults.push_back(RI);
+        continue;
       }
     }
+    // No conversion: re-use the original, substituted result info.
+    SpecializedResults.push_back(RI);
   }
   unsigned ParamIdx = 0;
   for (SILParameterInfo PI : SubstFTy->getParameters()) {
@@ -160,7 +162,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
                 ParameterConvention::Direct_Owned);
       SpecializedParams.push_back(SILParameterInfo(PI.getType(), C));
     } else {
-      // No conversion: re-use the original parameter info.
+      // No conversion: re-use the original, substituted parameter info.
       SpecializedParams.push_back(PI);
     }
   }
@@ -177,7 +179,7 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
 // =============================================================================
 
 GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
-                                               ArrayRef<Substitution> ParamSubs,
+                                               SubstitutionList ParamSubs,
                                                IsFragile_t Fragile,
                                                const ReabstractionInfo &ReInfo)
     : M(GenericFunc->getModule()),
@@ -189,10 +191,15 @@ GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
   assert(GenericFunc->isDefinition() && "Expected definition to specialize!");
 
   Mangle::Mangler Mangler;
-  GenericSpecializationMangler GenericMangler(Mangler, GenericFunc,
+  GenericSpecializationMangler OldGenericMangler(Mangler, GenericFunc,
                                               ParamSubs, Fragile);
-  GenericMangler.mangle();
-  ClonedName = Mangler.finalize();
+  OldGenericMangler.mangle();
+  std::string Old = Mangler.finalize();
+
+  NewMangling::GenericSpecializationMangler NewGenericMangler(GenericFunc,
+                          ParamSubs, Fragile, /*isReAbstracted*/ true);
+  std::string New = NewGenericMangler.mangle();
+  ClonedName = NewMangling::selectMangling(Old, New);
 
   DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');
 }
@@ -260,42 +267,62 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
   SILLocation Loc = AI.getLoc();
   SmallVector<SILValue, 4> Arguments;
   SILValue StoreResultTo;
-  unsigned Idx = ReInfo.getIndexOfFirstArg(AI);
+  /// SIL function conventions for the original apply site with substitutions.
+  auto substConv = AI.getSubstCalleeConv();
+  unsigned ArgIdx = AI.getCalleeArgIndexOfFirstAppliedArg();
   for (auto &Op : AI.getArgumentOperands()) {
-    if (ReInfo.isArgConverted(Idx)) {
-      if (ReInfo.isResultIndex(Idx)) {
-        // The result is converted from indirect to direct. We need to insert
-        // a store later.
-        assert(!StoreResultTo);
-        StoreResultTo = Op.get();
+    auto handleConversion = [&]() {
+      // Rewriting SIL arguments is only for lowered addresses.
+      if (!substConv.useLoweredAddresses())
+        return false;
+
+      if (ArgIdx < substConv.getSILArgIndexOfFirstParam()) {
+        // Handle result arguments.
+        unsigned formalIdx =
+            substConv.getIndirectFormalResultIndexForSILArg(ArgIdx);
+        if (ReInfo.isFormalResultConverted(formalIdx)) {
+          // The result is converted from indirect to direct. We need to insert
+          // a store later.
+          assert(!StoreResultTo);
+          StoreResultTo = Op.get();
+          return true;
+        }
       } else {
-        // An argument is converted from indirect to direct. Instead of the
-        // address we pass the loaded value.
-        SILValue Val = Builder.createLoad(Loc, Op.get(),
-                                          LoadOwnershipQualifier::Unqualified);
-        Arguments.push_back(Val);
+        // Handle arguments for formal parameters.
+        unsigned paramIdx = ArgIdx - substConv.getSILArgIndexOfFirstParam();
+        if (ReInfo.isParamConverted(paramIdx)) {
+          // An argument is converted from indirect to direct. Instead of the
+          // address we pass the loaded value.
+          SILValue Val = Builder.createLoad(
+              Loc, Op.get(), LoadOwnershipQualifier::Unqualified);
+          Arguments.push_back(Val);
+          return true;
+        }
       }
-    } else {
+      return false;
+    };
+    if (!handleConversion())
       Arguments.push_back(Op.get());
-    }
-    ++Idx;
+
+    ++ArgIdx;
   }
 
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
     SILBasicBlock *ResultBB = TAI->getNormalBB();
-    assert(ResultBB->getSinglePredecessor() == TAI->getParent());
+    assert(ResultBB->getSinglePredecessorBlock() == TAI->getParent());
     auto *NewTAI =
       Builder.createTryApply(Loc, Callee, Callee->getType(), {},
                              Arguments, ResultBB, TAI->getErrorBB());
     if (StoreResultTo) {
+      assert(substConv.useLoweredAddresses());
       // The original normal result of the try_apply is an empty tuple.
-      assert(ResultBB->getNumBBArg() == 1);
+      assert(ResultBB->getNumArguments() == 1);
       Builder.setInsertionPoint(ResultBB->begin());
-      fixUsedVoidType(ResultBB->getBBArg(0), Loc, Builder);
+      fixUsedVoidType(ResultBB->getArgument(0), Loc, Builder);
 
-
-      SILArgument *Arg =
-        ResultBB->replaceBBArg(0, StoreResultTo->getType().getObjectType());
+      SILArgument *Arg = ResultBB->replacePHIArgument(
+          0, StoreResultTo->getType().getObjectType(),
+          ValueOwnershipKind::Owned);
       // Store the direct result to the original result address.
       Builder.createStore(Loc, Arg, StoreResultTo,
                           StoreOwnershipQualifier::Unqualified);
@@ -305,6 +332,7 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
   if (auto *A = dyn_cast<ApplyInst>(AI)) {
     auto *NewAI = Builder.createApply(Loc, Callee, Arguments, A->isNonThrowing());
     if (StoreResultTo) {
+      assert(substConv.useLoweredAddresses());
       // Store the direct result to the original result address.
       fixUsedVoidType(A, Loc, Builder);
       Builder.createStore(Loc, NewAI, StoreResultTo,
@@ -336,46 +364,64 @@ replaceWithSpecializedFunction(ApplySite AI, SILFunction *NewF,
   return replaceWithSpecializedCallee(AI, FRI, Builder, ReInfo);
 }
 
-/// Create a re-abstraction thunk for a partial_apply.
-/// This is needed in case we converted some parameters/results of the
-/// specialized function from indirect to direct but the result function of the
-/// partial_apply still needs them as indirect.
-/// We create a thunk which converts the direct parameters/results back to
-/// indirect ones.
-static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
-                                     PartialApplyInst *OrigPAI,
-                                     SILFunction *SpecializedFunc) {
-  SILFunction *OrigF = OrigPAI->getCalleeFunction();
-  SILModule &M = OrigF->getModule();
+namespace {
+class ReabstractionThunkGenerator {
+  SILFunction *OrigF;
+  SILModule &M;
+  SILFunction *SpecializedFunc;
+  const ReabstractionInfo &ReInfo;
+  PartialApplyInst *OrigPAI;
 
   IsFragile_t Fragile = IsNotFragile;
-  if (OrigF->isFragile() && OrigPAI->getFunction()->isFragile())
-    Fragile = IsFragile;
-
   std::string ThunkName;
-  {
-    Mangle::Mangler M;
-    GenericSpecializationMangler Mangler(M, OrigF,
-                              OrigPAI->getSubstitutions(), Fragile,
-                              GenericSpecializationMangler::NotReabstracted);
-    Mangler.mangle();
-    ThunkName = M.finalize();
+  RegularLocation Loc;
+  SmallVector<SILValue, 4> Arguments;
+
+public:
+  ReabstractionThunkGenerator(const ReabstractionInfo &ReInfo,
+                              PartialApplyInst *OrigPAI,
+                              SILFunction *SpecializedFunc)
+      : OrigF(OrigPAI->getCalleeFunction()), M(OrigF->getModule()),
+        SpecializedFunc(SpecializedFunc), ReInfo(ReInfo), OrigPAI(OrigPAI),
+        Loc(RegularLocation::getAutoGeneratedLocation()) {
+    if (OrigF->isFragile() && OrigPAI->getFunction()->isFragile())
+      Fragile = IsFragile;
+
+    {
+      Mangle::Mangler M;
+      GenericSpecializationMangler OldMangler(
+          M, OrigF, OrigPAI->getSubstitutions(), Fragile,
+          GenericSpecializationMangler::NotReabstracted);
+      OldMangler.mangle();
+      std::string Old = M.finalize();
+
+      NewMangling::GenericSpecializationMangler NewMangler(
+          OrigF, OrigPAI->getSubstitutions(), Fragile,
+          /*isReAbstracted*/ false);
+
+      std::string New = NewMangler.mangle();
+      ThunkName = NewMangling::selectMangling(Old, New);
+    }
   }
 
-  auto Loc = RegularLocation::getAutoGeneratedLocation();
+  SILFunction *createThunk();
+
+protected:
+  SILValue createReabstractionThunkApply(SILBuilder &Builder);
+  SILArgument *convertReabstractionThunkArguments(SILBuilder &Builder);
+};
+} // anonymous namespace
+
+SILFunction *ReabstractionThunkGenerator::createThunk() {
   SILFunction *Thunk =
       M.getOrCreateSharedFunction(Loc, ThunkName, ReInfo.getSubstitutedType(),
                                   IsBare, IsTransparent, Fragile, IsThunk);
-
   // Re-use an existing thunk.
   if (!Thunk->empty())
     return Thunk;
 
-  SILBasicBlock *EntryBB = new (M) SILBasicBlock(Thunk);
+  SILBasicBlock *EntryBB = Thunk->createBasicBlock();
   SILBuilder Builder(EntryBB);
-  SILBasicBlock *SpecEntryBB = &*SpecializedFunc->begin();
-  CanSILFunctionType SpecType = SpecializedFunc->getLoweredFunctionType();
-  SILArgument *ReturnValueAddr = nullptr;
 
   // If the original specialized function had unqualified ownership, set the
   // thunk to have unqualified ownership as well.
@@ -389,63 +435,138 @@ static SILFunction *createReabstractionThunk(const ReabstractionInfo &ReInfo,
     Thunk->setUnqualifiedOwnership();
   }
 
-  // Convert indirect to direct parameters/results.
-  SmallVector<SILValue, 4> Arguments;
-  auto SpecArgIter = SpecEntryBB->bbarg_begin();
-  for (unsigned Idx = 0; Idx < ReInfo.getNumArguments(); Idx++) {
-    if (ReInfo.isArgConverted(Idx)) {
-      if (ReInfo.isResultIndex(Idx)) {
-        // Store the result later.
-        SILType Ty = SpecType->getSILResult().getAddressType();
-        ReturnValueAddr = new (M) SILArgument(EntryBB, Ty);
-      } else {
-        // Instead of passing the address, pass the loaded value.
-        SILArgument *SpecArg = *SpecArgIter++;
-        SILType Ty = SpecArg->getType().getAddressType();
-        SILArgument *NewArg = new (M) SILArgument(EntryBB, Ty,
-                                                  SpecArg->getDecl());
-        auto *ArgVal = Builder.createLoad(Loc, NewArg,
-                                          LoadOwnershipQualifier::Unqualified);
-        Arguments.push_back(ArgVal);
-      }
-    } else {
-      // No change to the argument.
-      SILArgument *SpecArg = *SpecArgIter++;
-      SILArgument *NewArg = new (M) SILArgument(EntryBB, SpecArg->getType(),
-                                                SpecArg->getDecl());
+  if (!SILModuleConventions(M).useLoweredAddresses()) {
+    for (auto SpecArg : SpecializedFunc->getArguments()) {
+      SILArgument *NewArg = EntryBB->createFunctionArgument(SpecArg->getType(),
+                                                            SpecArg->getDecl());
       Arguments.push_back(NewArg);
     }
+    SILValue ReturnValue = createReabstractionThunkApply(Builder);
+    Builder.createReturn(Loc, ReturnValue);
+    return Thunk;
   }
+  // Handle lowered addresses.
+  SILArgument *ReturnValueAddr = convertReabstractionThunkArguments(Builder);
 
-  auto *FRI = Builder.createFunctionRef(Loc, SpecializedFunc);
-  SILValue ReturnValue;
-  if (SpecType->hasErrorResult()) {
-    // Create the logic for calling a throwing function.
-    SILBasicBlock *NormalBB = new (M) SILBasicBlock(Thunk);
-    SILBasicBlock *ErrorBB = new (M) SILBasicBlock(Thunk);
-    Builder.createTryApply(Loc, FRI, SpecializedFunc->getLoweredType(),
-                           {}, Arguments, NormalBB, ErrorBB);
-    auto *ErrorVal = new (M) SILArgument(ErrorBB,
-                                         SpecType->getErrorResult().getSILType());
-    Builder.setInsertionPoint(ErrorBB);
-    Builder.createThrow(Loc, ErrorVal);
-    ReturnValue = new (M) SILArgument(NormalBB, SpecType->getSILResult());
-    Builder.setInsertionPoint(NormalBB);
-  } else {
-    ReturnValue = Builder.createApply(Loc, FRI, SpecializedFunc->getLoweredType(),
-                                SpecType->getSILResult(), {}, Arguments, false);
-  }
+  SILValue ReturnValue = createReabstractionThunkApply(Builder);
+
   if (ReturnValueAddr) {
     // Need to store the direct results to the original indirect address.
     Builder.createStore(Loc, ReturnValue, ReturnValueAddr,
                         StoreOwnershipQualifier::Unqualified);
-    SILType VoidTy = OrigPAI->getSubstCalleeType()->getSILResult();
+    SILType VoidTy =
+        OrigPAI->getSubstCalleeType()->getDirectFormalResultsType();
     assert(VoidTy.isVoid());
-    ReturnValue = Builder.createTuple(Loc, VoidTy, { });
+    ReturnValue = Builder.createTuple(Loc, VoidTy, {});
   }
   Builder.createReturn(Loc, ReturnValue);
-
   return Thunk;
+}
+
+// Create a call to a reabstraction thunk. Return the call's direct result.
+SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
+    SILBuilder &Builder) {
+  SILFunction *Thunk = &Builder.getFunction();
+  auto *FRI = Builder.createFunctionRef(Loc, SpecializedFunc);
+  auto specConv = SpecializedFunc->getConventions();
+  if (!SpecializedFunc->getLoweredFunctionType()->hasErrorResult()) {
+    return Builder.createApply(Loc, FRI, SpecializedFunc->getLoweredType(),
+                               specConv.getSILResultType(), {}, Arguments,
+                               false);
+  }
+  // Create the logic for calling a throwing function.
+  SILBasicBlock *NormalBB = Thunk->createBasicBlock();
+  SILBasicBlock *ErrorBB = Thunk->createBasicBlock();
+  Builder.createTryApply(Loc, FRI, SpecializedFunc->getLoweredType(), {},
+                         Arguments, NormalBB, ErrorBB);
+  auto *ErrorVal = ErrorBB->createPHIArgument(specConv.getSILErrorType(),
+                                              ValueOwnershipKind::Owned);
+  Builder.setInsertionPoint(ErrorBB);
+  Builder.createThrow(Loc, ErrorVal);
+  SILValue ReturnValue = NormalBB->createPHIArgument(
+      specConv.getSILResultType(), ValueOwnershipKind::Owned);
+  Builder.setInsertionPoint(NormalBB);
+  return ReturnValue;
+}
+
+// Create SIL arguments for a reabstraction thunk with lowered addresses. This
+// may involve replacing indirect arguments with loads and stores. Return the
+// SILArgument for the address of an indirect result, or nullptr.
+//
+// FIXME: Remove this if we don't need to create reabstraction thunks after
+// address lowering.
+SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
+    SILBuilder &Builder) {
+  SILFunction *Thunk = &Builder.getFunction();
+  CanSILFunctionType SpecType = SpecializedFunc->getLoweredFunctionType();
+  CanSILFunctionType SubstType = ReInfo.getSubstitutedType();
+  auto specConv = SpecializedFunc->getConventions();
+  SILFunctionConventions substConv(SubstType, M);
+
+  assert(specConv.useLoweredAddresses());
+
+  // ReInfo.NumIndirectResults correponds to SubstTy's formal indirect
+  // results. SpecTy may have fewer formal indirect results.
+  assert(SubstType->getNumIndirectFormalResults()
+         >= SpecType->getNumIndirectFormalResults());
+
+  SILBasicBlock *EntryBB = Thunk->getEntryBlock();
+  SILArgument *ReturnValueAddr = nullptr;
+  auto SpecArgIter = SpecializedFunc->getArguments().begin();
+  auto cloneSpecializedArgument = [&]() {
+    // No change to the argument.
+    SILArgument *SpecArg = *SpecArgIter++;
+    SILArgument *NewArg =
+        EntryBB->createFunctionArgument(SpecArg->getType(), SpecArg->getDecl());
+    Arguments.push_back(NewArg);
+  };
+  // ReInfo.NumIndirectResults correponds to SubstTy's formal indirect
+  // results. SpecTy may have fewer formal indirect results.
+  assert(SubstType->getNumIndirectFormalResults()
+         >= SpecType->getNumIndirectFormalResults());
+  unsigned resultIdx = 0;
+  for (auto substRI : SubstType->getIndirectFormalResults()) {
+    if (ReInfo.isFormalResultConverted(resultIdx++)) {
+      // Convert an originally indirect to direct specialized result.
+      // Store the result later.
+      // FIXME: This only handles a single result! Partial specialization could
+      // induce some combination of direct and indirect results.
+      SILType ResultTy = substConv.getSILType(substRI);
+      assert(ResultTy.isAddress());
+      assert(!ReturnValueAddr);
+      ReturnValueAddr = EntryBB->createFunctionArgument(ResultTy);
+      continue;
+    }
+    // If the specialized result is already indirect, simply clone the indirect
+    // result argument.
+    assert((*SpecArgIter)->getType().isAddress());
+    cloneSpecializedArgument();
+  }
+  assert(SpecArgIter
+         == SpecializedFunc->getArgumentsWithoutIndirectResults().begin());
+  unsigned numParams = SpecType->getNumParameters();
+  assert(numParams == SubstType->getNumParameters());
+  for (unsigned paramIdx = 0; paramIdx < numParams; ++paramIdx) {
+    if (ReInfo.isParamConverted(paramIdx)) {
+      // Convert an originally indirect to direct specialized parameter.
+      assert(!specConv.isSILIndirect(SpecType->getParameters()[paramIdx]));
+      // Instead of passing the address, pass the loaded value.
+      SILType ParamTy =
+          substConv.getSILType(SubstType->getParameters()[paramIdx]);
+      assert(ParamTy.isAddress());
+      SILArgument *SpecArg = *SpecArgIter++;
+      SILArgument *NewArg =
+          EntryBB->createFunctionArgument(ParamTy, SpecArg->getDecl());
+      auto *ArgVal =
+          Builder.createLoad(Loc, NewArg, LoadOwnershipQualifier::Unqualified);
+      Arguments.push_back(ArgVal);
+      continue;
+    }
+    // Simply clone unconverted direct or indirect parameters.
+    cloneSpecializedArgument();
+  }
+  assert(SpecArgIter == SpecializedFunc->getArguments().end());
+  return ReturnValueAddr;
 }
 
 void swift::trySpecializeApplyOfGeneric(
@@ -551,7 +672,8 @@ void swift::trySpecializeApplyOfGeneric(
     // original function with indirect parameters/results.
     auto *PAI = cast<PartialApplyInst>(Apply.getInstruction());
     SILBuilderWithScope Builder(PAI);
-    SILFunction *Thunk = createReabstractionThunk(ReInfo, PAI, SpecializedF);
+    SILFunction *Thunk =
+        ReabstractionThunkGenerator(ReInfo, PAI, SpecializedF).createThunk();
     NewFunctions.push_back(Thunk);
     auto *FRI = Builder.createFunctionRef(PAI->getLoc(), Thunk);
     SmallVector<SILValue, 4> Arguments;
@@ -661,9 +783,11 @@ static const char *const WhitelistedSpecializations[] = {
     "CountableClosedRangeIterator",
     "IndexingIterator",
     "Collection",
+    "ReversedCollection",
     "MutableCollection",
     "BidirectionalCollection",
     "RandomAccessCollection",
+    "ReversedRandomAccessCollection",
     "RangeReplaceableCollection",
     "_allocateUninitializedArray",
     "UTF8",

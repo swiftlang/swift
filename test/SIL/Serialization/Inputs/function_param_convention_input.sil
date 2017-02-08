@@ -3,8 +3,8 @@ struct X {}
 
 // Make sure that we can deserialize an apply with various parameter calling
 // conventions.
-sil @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X, @deallocating X) -> @out X {
-bb0(%0 : $*X, %1 : $*X, %2 : $*X, %3 : $*X, %4 : $X, %5 : $X, %6 : $X, %7 : $X):
+sil @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X) -> @out X {
+bb0(%0 : $*X, %1 : $*X, %2 : $*X, %3 : $*X, %4 : $X, %5 : $X, %6 : $X):
   %9999 = tuple()
   return %9999 : $()
 }

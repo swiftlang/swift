@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -93,6 +93,13 @@ public:
   ClangImporter &operator=(ClangImporter &&) = delete;
 
   ~ClangImporter();
+
+  /// \brief Check whether the module with a given name can be imported without
+  /// importing it.
+  ///
+  /// Note that even if this check succeeds, errors may still occur if the
+  /// module is loaded in full.
+  virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) override;
 
   /// \brief Import a module with the given module path.
   ///
@@ -194,13 +201,16 @@ public:
   /// \param diagLoc A location to attach any diagnostics to if import fails.
   /// \param trackParsedSymbols If true, tracks decls and macros that were
   ///        parsed from the bridging header.
+  /// \param implicitImport If true, indicates that this import was implicit
+  ///        from a reference in a module file (deprecated behavior).
   ///
   /// \returns true if there was an error importing the header.
   ///
   /// \sa getImportedHeaderModule
   bool importBridgingHeader(StringRef header, ModuleDecl *adapter,
                             SourceLoc diagLoc = {},
-                            bool trackParsedSymbols = false);
+                            bool trackParsedSymbols = false,
+                            bool implicitImport = false);
 
   /// Returns the module that contains imports and declarations from all loaded
   /// Objective-C header files.
@@ -210,6 +220,14 @@ public:
 
   std::string getBridgingHeaderContents(StringRef headerPath, off_t &fileSize,
                                         time_t &fileModTime);
+
+  /// Makes a temporary replica of the ClangImporter's CompilerInstance, reads
+  /// an Objective-C header file into the replica and emits a PCH file of its
+  /// content. Delegates to clang for everything except construction of the
+  /// replica.
+  ///
+  /// \sa clang::GeneratePCHAction
+  bool emitBridgingPCH(StringRef headerPath, StringRef outputPCHPath);
 
   const clang::Module *getClangOwningModule(ClangNode Node) const;
   bool hasTypedef(const clang::Decl *typeDecl) const;
@@ -223,6 +241,7 @@ public:
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
   clang::Sema &getClangSema() const override;
+  const clang::CompilerInstance &getClangInstance() const override;
   clang::CodeGenOptions &getClangCodeGenOpts() const;
 
   std::string getClangModuleHash() const;

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func nonNamedFunc(_ x: Int) {} // expected-note * {{here}}
 nonNamedFunc() // expected-error {{missing argument for parameter #1 in call}} {{14-14=<#Int#>}}
@@ -65,6 +65,12 @@ func param2FuncNonNamed3(_ x: Int, _ y: String) {} // expected-note * {{here}}
 param2FuncNonNamed3(1) // expected-error {{missing argument for parameter #2 in call}} {{22-22=, <#String#>}}
 param2FuncNonNamed3("foo") // expected-error {{missing argument for parameter #2 in call}} {{26-26=, <#String#>}}
                            // FIXME: Bad diagnostic. Could this be #1?
+
+func unlabeledParamFollowingVariadic(_: Any..., _: Any, _: Any) {} // expected-warning {{a parameter following a variadic parameter requires a label}}; // expected-note {{here}}
+unlabeledParamFollowingVariadic(1, 1, 1) // expected-error {{missing argument for parameter #2 in call}} {{40-40=, <#Any#>}}
+
+func labeledParamFollowingVariadic(_: Any..., label: Any, _: Any) {}
+labeledParamFollowingVariadic(1, label: 1, 1)
 
 func param3Func(x: Int, y: Int, z: Int) {} // expected-note * {{here}}
 param3Func(x: 1, y: 1) // expected-error {{missing argument for parameter 'z' in call}} {{22-22=, z: <#Int#>}}

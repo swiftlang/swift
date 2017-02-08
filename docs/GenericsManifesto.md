@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The "Complete Generics" goal for Swift 3 has been fairly ill-defined thus fair, with just this short blurb in the list of goals:
+The "Complete Generics" goal for Swift 3 has been fairly ill-defined thus far, with just this short blurb in the list of goals:
 
 > *Complete generics*: Generics are used pervasively in a number of Swift libraries, especially the standard library. However, there are a number of generics features the standard library requires to fully realize its vision, including recursive protocol constraints, the ability to make a constrained extension conform to a new protocol (i.e., an array of Equatable elements is Equatable), and so on. Swift 3.0 should provide those generics features needed by the standard library, because they affect the standard library's ABI.
 
@@ -64,6 +64,8 @@ extension Array where Element == String {
 ```
 
 This is a highly-requested feature that fits into the existing syntax and semantics. Note that one could imagine introducing new syntax, e.g., extending `Array<String>`, which gets into new-feature territory: see the section on "Parameterized extensions".
+
+This feature is tracked by [SR-1009](https://bugs.swift.org/browse/SR-1009) and work has been completed. This feature is planned for release with Swift 3.1.
 
 
 ## Parameterizing other declarations
@@ -369,7 +371,7 @@ func apply<... Args, Result>(fn: (Args...) -> Result,    // function taking some
 
 ### Extensions of structural types
 
-Currently, only nominal types (classes, structs, enums, protocols) can be extended. One could imagine extending structural types—particularly tuple types—to allow them to, e.g., conform to protocols. For example, pulling together variadic generics, parameterized extensions, and conditional conformances, one could express "a tuple type is `Equatable` if all of its element types are `Equatable`":
+Currently, only nominal types (classes, structs, enums, protocols) can be extended. One could imagine extending structural types--particularly tuple types--to allow them to, e.g., conform to protocols. For example, pulling together variadic generics, parameterized extensions, and conditional conformances, one could express "a tuple type is `Equatable` if all of its element types are `Equatable`":
 
 ```Swift
 extension<...Elements : Equatable> (Elements...) : Equatable {   // extending the tuple type "(Elements...)" to be Equatable
@@ -450,7 +452,7 @@ The `where` clause of generic functions comes very early in the declaration, alt
 func containsAll<S: Sequence where Sequence.Iterator.Element == Element>(elements: S) -> Bool
 ```
 
-One could move the `where` clause to the end of the signature, so that the most important parts—name, generic parameter, parameters, result type—precede it:
+One could move the `where` clause to the end of the signature, so that the most important parts--name, generic parameter, parameters, result type--precede it:
 
 ```Swift
 func containsAll<S: Sequence>(elements: S) -> Bool
@@ -636,7 +638,7 @@ func foo(value: Any) {
 foo(X())
 ```
 
-Under what circumstances should it print "P"? If `foo()` is defined within the same module as the conformance of `X` to `P`? If the call is defined within the same module as the conformance of `X` to `P`? Never? Either of the first two answers requires significant complications in the dynamic casting infrastructure to take into account the module in which a particular dynamic cast occurred (the first option) or where an existential was formed (the second option), while the third answer breaks the link between the static and dynamic type systems—none of which is an acceptable result.
+Under what circumstances should it print "P"? If `foo()` is defined within the same module as the conformance of `X` to `P`? If the call is defined within the same module as the conformance of `X` to `P`? Never? Either of the first two answers requires significant complications in the dynamic casting infrastructure to take into account the module in which a particular dynamic cast occurred (the first option) or where an existential was formed (the second option), while the third answer breaks the link between the static and dynamic type systems--none of which is an acceptable result.
 
 ### Conditional conformances via protocol extensions
 

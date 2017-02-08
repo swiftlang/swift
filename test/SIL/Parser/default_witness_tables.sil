@@ -14,7 +14,7 @@ public protocol ResilientProtocol {
   func defaultE()
 }
 
-// CHECK-LABEL: sil @defaultC : $@convention(witness_method) <`Self` where `Self` : ResilientProtocol> (@in_guaranteed `Self`) -> ()
+// CHECK-LABEL: sil @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
 sil @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
   %result = tuple ()
@@ -22,7 +22,7 @@ bb0(%0 : $*Self):
 }
 
 
-// CHECK-LABEL: sil @defaultD : $@convention(witness_method) <`Self` where `Self` : ResilientProtocol> (@in_guaranteed `Self`) -> ()
+// CHECK-LABEL: sil @defaultD : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
 sil @defaultD : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
   %result = tuple ()
@@ -51,9 +51,9 @@ bb0(%0 : $*Self):
 // CHECK: no_default
 // CHECK: no_default
 // CHECK: no_default
-// CHECK: method #ResilientProtocol.defaultC!1: @defaultC
-// CHECK: method #ResilientProtocol.defaultD!1: @defaultD
-// CHECK: method #ResilientProtocol.defaultE!1: @defaultE
+// CHECK: method #ResilientProtocol.defaultC!1: {{.*}} : @defaultC
+// CHECK: method #ResilientProtocol.defaultD!1: {{.*}} : @defaultD
+// CHECK: method #ResilientProtocol.defaultE!1: {{.*}} : @defaultE
 // CHECK: }
 
 sil_default_witness_table ResilientProtocol {
@@ -68,7 +68,7 @@ sil_default_witness_table ResilientProtocol {
 
 
 // CHECK-LABEL: sil_default_witness_table hidden InternalProtocol {
-// CHECK: method #InternalProtocol.defaultF!1: @defaultF
+// CHECK: method #InternalProtocol.defaultF!1: {{.*}} : @defaultF
 // CHECK: }
 
 sil_default_witness_table hidden InternalProtocol {

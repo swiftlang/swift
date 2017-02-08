@@ -8,7 +8,7 @@
 // FIXME: END -enable-source-import hackaround
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -I %S/Inputs/custom-modules -o %t %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -parse-as-library %t/override.swiftmodule -parse -emit-objc-header-path %t/override.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -parse-as-library %t/override.swiftmodule -typecheck -emit-objc-header-path %t/override.h
 // RUN: %FileCheck %s < %t/override.h
 // RUN: %check-in-clang %t/override.h -I %S/Inputs/custom-modules -Wno-super-class-method-mismatch -Wno-overriding-method-mismatch
 // RUN: not %check-in-clang %t/override.h -Wno-super-class-method-mismatch -I %S/Inputs/custom-modules 2>&1 | %FileCheck -check-prefix=CLANG %s
@@ -23,14 +23,16 @@ import OverrideBase
 class A_Child : Base {
   // CHECK-NEXT: @property (nonatomic, readonly, getter=getProp) NSUInteger prop;
   override var prop: Int { return 0 }
-  // CHECK-NEXT: - (id _Nullable)objectAtIndexedSubscript:(NSUInteger)x;
+  // CHECK-NEXT: @property (nonatomic, readonly) NSInteger originalName;
+  override var renamedProp: Int { return 0 }
+  // CHECK-NEXT: - (id _Nullable)objectAtIndexedSubscript:(NSUInteger)x SWIFT_WARN_UNUSED_RESULT;
   override subscript(x: Int) -> Any? { return nil }
 
-  // CHECK-NEXT: - (NSUInteger)foo;
+  // CHECK-NEXT: - (NSUInteger)foo SWIFT_WARN_UNUSED_RESULT;
   override func foo() -> Int { return 0 }
-  // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)_;
+  // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)_ SWIFT_WARN_UNUSED_RESULT;
   override func foo(_: Int) -> Int { return 0 }
-  // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y;
+  // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y SWIFT_WARN_UNUSED_RESULT;
   override func foo(_ x: Int, y: Int) -> Int { return x + y }
   
   
@@ -47,14 +49,14 @@ class A_Child : Base {
 class A_Grandchild : A_Child {
   // CHECK-NEXT: @property (nonatomic, readonly, getter=getProp) NSUInteger prop;
   override var prop: Int { return 0 }
-  // CHECK-NEXT: - (id _Nullable)objectAtIndexedSubscript:(NSUInteger)x;
+  // CHECK-NEXT: - (id _Nullable)objectAtIndexedSubscript:(NSUInteger)x SWIFT_WARN_UNUSED_RESULT;
   override subscript(x: Int) -> Any? { return nil }
 
-  // CHECK-NEXT: - (NSUInteger)foo;
+  // CHECK-NEXT: - (NSUInteger)foo SWIFT_WARN_UNUSED_RESULT;
   override func foo() -> Int { return 0 }
-  // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)_;
+  // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)_ SWIFT_WARN_UNUSED_RESULT;
   override func foo(_: Int) -> Int { return 0 }
-  // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y;
+  // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y SWIFT_WARN_UNUSED_RESULT;
   override func foo(_ x: Int, y: Int) -> Int { return x + y }
 
   // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
@@ -73,18 +75,18 @@ class B_GrandchildViaEmpty : B_EmptyChild {
     set {}
   }
 
-  // CHECK-NEXT: - (id _Nullable)objectAtIndexedSubscript:(NSUInteger)x;
+  // CHECK-NEXT: - (id _Nullable)objectAtIndexedSubscript:(NSUInteger)x SWIFT_WARN_UNUSED_RESULT;
   // CHECK-NEXT: - (void)setObject:(id _Nullable)newValue atIndexedSubscript:(NSUInteger)x;
   override subscript(x: Int) -> Any? {
     get { return nil }
     set {}
   }
 
-  // CHECK-NEXT: - (NSUInteger)foo;
+  // CHECK-NEXT: - (NSUInteger)foo SWIFT_WARN_UNUSED_RESULT;
   override func foo() -> Int { return 0 }
-  // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)_;
+  // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)_ SWIFT_WARN_UNUSED_RESULT;
   override func foo(_: Int) -> Int { return 0 }
-  // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y;
+  // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y SWIFT_WARN_UNUSED_RESULT;
   override func foo(_ x: Int, y: Int) -> Int { return x + y }
 
   // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;

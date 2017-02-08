@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 // CHECK: sil_global hidden_external [[DSO:@__dso_handle]] : $Builtin.RawPointer
 
@@ -9,7 +9,7 @@
 // CHECK-NEXT: [[DSOPtrStruct:[0-9]+]] = struct $UnsafeRawPointer ([[DSOPtr]] : $Builtin.RawPointer)
 
 
-// CHECK-LABEL: sil hidden @_TIF10dso_handle14printDSOHandleFT3dsoSV_SVA_
+// CHECK-LABEL: sil hidden @_T010dso_handle14printDSOHandleSVSV0A0_tFfA_
 // CHECK: [[DSOAddr:%[0-9]+]] = global_addr [[DSO]] : $*Builtin.RawPointer
 // CHECK-NEXT: [[DSOPtr:%[0-9]+]] = address_to_pointer [[DSOAddr]] : $*Builtin.RawPointer to $Builtin.RawPointer
 // CHECK-NEXT: [[DSOPtrStruct:%[0-9]+]] = struct $UnsafeRawPointer ([[DSOPtr]] : $Builtin.RawPointer)

@@ -3,7 +3,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/blocks.swiftmodule -parse -emit-objc-header-path %t/blocks.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/blocks.swiftmodule -typecheck -emit-objc-header-path %t/blocks.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/blocks.h
 // RUN: %check-in-clang %t/blocks.h
 
@@ -22,7 +22,7 @@ typealias MyBlockWithNoescapeParam = (() -> ()) -> Int
 // CHECK-LABEL: @interface Callbacks
 @objc class Callbacks {
   
-  // CHECK-NEXT: - (void (^ _Nonnull)(void))voidBlocks:(void (^ _Nonnull)(void))input;
+  // CHECK-NEXT: - (void (^ _Nonnull)(void))voidBlocks:(void (^ _Nonnull)(void))input SWIFT_WARN_UNUSED_RESULT;
   func voidBlocks(_ input: @escaping () -> ()) -> () -> () {
     return input
   }
@@ -47,17 +47,17 @@ typealias MyBlockWithNoescapeParam = (() -> ()) -> Int
                  (Int32) -> (UInt32)) ->
                 ((Int8) -> (UInt8))) {}
 
-  // CHECK-NEXT: - (void (^ _Nullable)(NSObject * _Nonnull))returnsBlockWithInput;
+  // CHECK-NEXT: - (void (^ _Nullable)(NSObject * _Nonnull))returnsBlockWithInput SWIFT_WARN_UNUSED_RESULT;
   func returnsBlockWithInput() -> ((NSObject) -> ())? {
     return nil
   }
   
-  // CHECK-NEXT: - (void (^ _Nullable)(NSObject * _Nonnull))returnsBlockWithParenthesizedInput;
+  // CHECK-NEXT: - (void (^ _Nullable)(NSObject * _Nonnull))returnsBlockWithParenthesizedInput SWIFT_WARN_UNUSED_RESULT;
   func returnsBlockWithParenthesizedInput() -> ((NSObject) -> ())? {
     return nil
   }
   
-  // CHECK-NEXT: - (void (^ _Nullable)(NSObject * _Nonnull, NSObject * _Nonnull))returnsBlockWithTwoInputs;
+  // CHECK-NEXT: - (void (^ _Nullable)(NSObject * _Nonnull, NSObject * _Nonnull))returnsBlockWithTwoInputs SWIFT_WARN_UNUSED_RESULT;
   func returnsBlockWithTwoInputs() -> ((NSObject, NSObject) -> ())? {
     return nil
   }
@@ -74,7 +74,7 @@ typealias MyBlockWithNoescapeParam = (() -> ()) -> Int
   // CHECK-NEXT: - (void)blockTakesNamedBlock:(void (^ _Nonnull)(SWIFT_NOESCAPE void (^ _Nonnull)(void)))input;
   func blockTakesNamedBlock(_ input: @escaping (_ block: () -> ()) -> ()) {}
   
-  // CHECK-NEXT: - (void (^ _Nullable)(NSObject * _Nonnull))returnsBlockWithNamedInput;
+  // CHECK-NEXT: - (void (^ _Nullable)(NSObject * _Nonnull))returnsBlockWithNamedInput SWIFT_WARN_UNUSED_RESULT;
   func returnsBlockWithNamedInput() -> ((_ object: NSObject) -> ())? {
     return nil
   }
@@ -85,7 +85,7 @@ typealias MyBlockWithNoescapeParam = (() -> ()) -> Int
   // CHECK-NEXT: - (void)blockWithKeyword:(SWIFT_NOESCAPE NSInteger (^ _Nonnull)(NSInteger))_Nullable_;
   func blockWithKeyword(_ _Nullable: (_ `class`: Int) -> Int) {}
 
-  // CHECK-NEXT: - (NSInteger (* _Nonnull)(NSInteger))functionPointers:(NSInteger (* _Nonnull)(NSInteger))input;
+  // CHECK-NEXT: - (NSInteger (* _Nonnull)(NSInteger))functionPointers:(NSInteger (* _Nonnull)(NSInteger))input SWIFT_WARN_UNUSED_RESULT;
   func functionPointers(_ input: @escaping @convention(c) (Int) -> Int)
       -> @convention(c) (Int) -> Int {
     return input
@@ -110,13 +110,13 @@ typealias MyBlockWithNoescapeParam = (() -> ()) -> Int
   ) {
   }
   
-  // CHECK-NEXT: - (void (* _Nonnull)(SWIFT_NOESCAPE NSInteger (* _Nonnull)(NSInteger, NSInteger)))returnsFunctionPointerThatTakesFunctionPointer;
+  // CHECK-NEXT: - (void (* _Nonnull)(SWIFT_NOESCAPE NSInteger (* _Nonnull)(NSInteger, NSInteger)))returnsFunctionPointerThatTakesFunctionPointer SWIFT_WARN_UNUSED_RESULT;
   func returnsFunctionPointerThatTakesFunctionPointer() ->
     @convention(c) (_ comparator: @convention(c) (_ x: Int, _ y: Int) -> Int) -> Void {
     fatalError()
   }
 
-  // CHECK-NEXT: - (NSInteger (* _Nonnull)(NSInteger))functionPointersWithName:(NSInteger (* _Nonnull)(NSInteger))input;
+  // CHECK-NEXT: - (NSInteger (* _Nonnull)(NSInteger))functionPointersWithName:(NSInteger (* _Nonnull)(NSInteger))input SWIFT_WARN_UNUSED_RESULT;
   func functionPointersWithName(_ input: @escaping @convention(c) (_ value: Int) -> Int)
       -> @convention(c) (_ result: Int) -> Int {
     return input

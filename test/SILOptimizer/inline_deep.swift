@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O -emit-sil %s | %FileCheck %s
 
 class S<T> {
   @inline(__always) func l0(_ x: T) -> T { return x }
@@ -14,7 +14,7 @@ class S<T> {
 }
 
 
-// CHECK-LABEL: sil @_TF11inline_deep3topFT_Vs5Int32
+// CHECK-LABEL: sil @_T011inline_deep3tops5Int32VyF
 public func top() -> Int32 {
   // CHECK: bb0
   // CHECK: [[INTLIT:%.*]] = integer_literal $Builtin.Int32, 709

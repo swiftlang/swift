@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -81,8 +81,8 @@ FunctionSignatureSpecializationMangler::
 FunctionSignatureSpecializationMangler(SpecializationPass P, Mangler &M,
                                        IsFragile_t Fragile, SILFunction *F)
   : SpecializationMangler(SpecializationKind::FunctionSignature, P, M, Fragile, F) {
-  for (unsigned i = 0, e = F->getLoweredFunctionType()->getNumSILArguments();
-       i != e; ++i) {
+  for (unsigned i = 0, e = F->getConventions().getNumSILArguments(); i != e;
+       ++i) {
     (void)i;
     Args.push_back({ArgumentModifierIntBase(ArgumentModifier::Unmodified), nullptr});
   }

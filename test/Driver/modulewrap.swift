@@ -3,5 +3,5 @@
 // CHECK: bin/swift -frontend{{.*}}-emit-module-path [[MOD:.*\.swiftmodule]]
 // CHECK: bin/swift {{.*}}-emit-module [[MOD]]
 // CHECK-SAME:                                 -o [[MERGED:.*\.swiftmodule]]
-// CHECK: bin/swift -modulewrap [[MERGED]] -o [[OBJ:.*\.o]]
+// CHECK: bin/swift -modulewrap [[MERGED]] -target x86_64-unknown-linux-gnu -o [[OBJ:.*\.o]]
 // CHECK: bin/clang++{{.*}} [[OBJ]]

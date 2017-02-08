@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -412,7 +412,7 @@ namespace {
       assert(TheStruct.getStructOrBoundGenericStruct());
     }
     
-    llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) {
+    llvm::Value *getOffsetForIndex(IRGenFunction &IGF, unsigned index) override {
       // Get the field offset vector from the struct metadata.
       llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(TheStruct);
       Address fieldVector = emitAddressOfFieldOffsetVector(IGF,
@@ -782,7 +782,7 @@ private:
   }
 };
 
-}  // end anonymous namespace.
+} // end anonymous namespace
 
 /// A convenient macro for delegating an operation to all of the
 /// various struct implementations.
@@ -839,6 +839,12 @@ unsigned irgen::getPhysicalStructFieldIndex(IRGenModule &IGM, SILType baseType,
 void IRGenModule::emitStructDecl(StructDecl *st) {
   emitStructMetadata(*this, st);
   emitNestedTypeDecls(st->getMembers());
+
+  if (shouldEmitOpaqueTypeMetadataRecord(st)) {
+    emitOpaqueTypeMetadataRecord(st);
+    return;
+  }
+
   emitFieldMetadataRecord(st);
 }
 
@@ -855,7 +861,7 @@ namespace {
       setSubclassKind((unsigned) StructTypeInfoKind::ResilientStructTypeInfo);
     }
   };
-}
+} // end anonymous namespace
 
 const TypeInfo *TypeConverter::convertResilientStruct() {
   llvm::Type *storageType = IGM.OpaquePtrTy->getElementType();

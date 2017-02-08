@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 func takeClosure(_ a : () -> Int) {}
 
@@ -17,7 +17,7 @@ func test1(_ a : Int) -> Int {
 }
 
 // rdar://15716277
-// CHECK: @{{.*}}let_destructuring
+// CHECK: @{{.*}}_destructuring
 func let_destructuring() -> Int {
   let (a, b) = ((1,2), 5)
   return a.1+a.0+b
@@ -41,7 +41,7 @@ func test2() {
 
 // The closure just returns its value, which it captured directly.
 
-// CHECK: sil shared @_TFF9let_decls5test2FT_T_U_FT_Si : $@convention(thin) (Int) -> Int
+// CHECK: sil shared @_T09let_decls5test2yyFSiycfU_ : $@convention(thin) (Int) -> Int
 // CHECK: bb0(%0 : $Int):
 // CHECK:  return %0 : $Int
 
@@ -143,7 +143,7 @@ struct GetOnlySubscriptStruct {
 func testGetOnlySubscript(_ x : GetOnlySubscriptStruct, idx : Int) -> Int {
   return x[idx]
   
-  // CHECK: [[SUBFN:%[0-9]+]] = function_ref @{{.*}}g9subscript
+  // CHECK: [[SUBFN:%[0-9]+]] = function_ref @{{.*}}9subscript
   // CHECK-NEXT: [[CALL:%[0-9]+]] = apply [[SUBFN]](
   // CHECK: return [[CALL]]
 }
@@ -182,7 +182,7 @@ struct GenericTestStruct<T> {
 
 // CHECK-LABEL: sil hidden @{{.*}}pass_address_only_rvalue_result
 // CHECK: bb0(%0 : $*T,
-// CHECK: [[FN:%[0-9]+]] = function_ref @{{.*}}GenericTestStructg9subscript
+// CHECK: [[FN:%[0-9]+]] = function_ref @{{.*}}GenericTestStructV9subscript{{.*}}fg
 // CHECK: apply [[FN]]<T>(%0,
 
 
@@ -201,7 +201,7 @@ func produceNMSubscriptableRValue() -> NonMutableSubscriptable {}
 // CHECK: bb0(%0 : $Int):
 // CHECK: [[FR1:%[0-9]+]] = function_ref @{{.*}}produceNMSubscriptableRValue
 // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[FR1]]()
-// CHECK: [[GETFN:%[0-9]+]] = function_ref @_TFV9let_decls23NonMutableSubscriptableg9subscript
+// CHECK: [[GETFN:%[0-9]+]] = function_ref @_T09let_decls23NonMutableSubscriptableV9subscript{{[_0-9a-zA-Z]*}}fg
 // CHECK-NEXT: [[RES2:%[0-9]+]] = apply [[GETFN]](%0, [[RES]])
 // CHECK-NEXT: return [[RES2]]
 func test_nm_subscript_get(_ a : Int) -> Int {
@@ -212,7 +212,7 @@ func test_nm_subscript_get(_ a : Int) -> Int {
 // CHECK: bb0(%0 : $Int):
 // CHECK: [[FR1:%[0-9]+]] = function_ref @{{.*}}produceNMSubscriptableRValue
 // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[FR1]]()
-// CHECK: [[SETFN:%[0-9]+]] = function_ref @_TFV9let_decls23NonMutableSubscriptables9subscript
+// CHECK: [[SETFN:%[0-9]+]] = function_ref @_T09let_decls23NonMutableSubscriptableV9subscript{{[_0-9a-zA-Z]*}}fs
 // CHECK-NEXT: [[RES2:%[0-9]+]] = apply [[SETFN]](%0, %0, [[RES]])
 func test_nm_subscript_set(_ a : Int) {
   produceNMSubscriptableRValue()[a] = a
@@ -231,18 +231,18 @@ struct WeirdPropertyTest {
 // CHECK-LABEL: sil hidden @{{.*}}test_weird_property
 func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
   var v = v
-  // CHECK: [[VBOX:%[0-9]+]] = alloc_box $@box WeirdPropertyTest
+  // CHECK: [[VBOX:%[0-9]+]] = alloc_box ${ var WeirdPropertyTest }
   // CHECK: [[PB:%.*]] = project_box [[VBOX]]
   // CHECK: store %0 to [trivial] [[PB]]
 
   // The setter isn't mutating, so we need to load the box.
   // CHECK: [[VVAL:%[0-9]+]] = load [trivial] [[PB]]
-  // CHECK: [[SETFN:%[0-9]+]] = function_ref @_TFV9let_decls17WeirdPropertyTests1pSi
+  // CHECK: [[SETFN:%[0-9]+]] = function_ref @_T09let_decls17WeirdPropertyTestV1pSifs
   // CHECK: apply [[SETFN]](%1, [[VVAL]])
   v.p = i
   
   // The getter is mutating, so it takes the box address.
-  // CHECK: [[GETFN:%[0-9]+]] = function_ref @_TFV9let_decls17WeirdPropertyTestg1pSi
+  // CHECK: [[GETFN:%[0-9]+]] = function_ref @_T09let_decls17WeirdPropertyTestV1pSifg
   // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[GETFN]]([[PB]])
   // CHECK: return [[RES]]
   return v.p
@@ -267,7 +267,7 @@ struct StaticLetMember {
 // CHECK-LABEL: sil hidden @{{.*}}testStaticLetMember
 func testStaticLetMember() -> Int {
 
-  // CHECK: function_ref @{{.*}}StaticLetMemberau1xSi
+  // CHECK: function_ref @{{.*}}StaticLetMemberV1xSi
   // CHECK: load {{.*}} : $*Int
   // CHECK-NEXT: return
   return StaticLetMember.x
@@ -393,19 +393,20 @@ struct StructMemberTest {
   func testIntMemberLoad() -> Int {
     return i
   }
-  // CHECK-LABEL: sil hidden @{{.*}}testIntMemberLoad{{.*}} : $@convention(method) (@guaranteed StructMemberTest)
-  // CHECK: bb0(%0 : $StructMemberTest):
-  // CHECK:  debug_value %0 : $StructMemberTest, let, name "self"
-  // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.i
-  // CHECK-NOT:  destroy_value %0 : $StructMemberTest
-  // CHECK:  return %2 : $Int
+  // CHECK-LABEL: sil hidden @_T09let_decls16StructMemberTestV07testIntD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
+  // CHECK: bb0([[ARG:%.*]] : $StructMemberTest):
+  // CHECK:  debug_value [[ARG]] : $StructMemberTest, let, name "self"
+  // CHECK:  [[TRIVIAL_VALUE:%.*]] = struct_extract [[ARG]] : $StructMemberTest, #StructMemberTest.i
+  // CHECK-NOT:  destroy_value [[ARG]] : $StructMemberTest
+  // CHECK-NOT:  destroy_value [[BORROWED_ARG]] : $StructMemberTest
+  // CHECK:  return [[TRIVIAL_VALUE]] : $Int
 
   // Accessing the int member in s should not copy_value the whole struct.
   func testRecursiveIntMemberLoad() -> Int {
     return s.i
   }
-  // CHECK-LABEL: sil hidden @{{.*}}testRecursiveIntMemberLoad{{.*}} : $@convention(method) (@guaranteed StructMemberTest)
-  // CHECK: bb0(%0 : $StructMemberTest):
+  // CHECK-LABEL: sil hidden @_T09let_decls16StructMemberTestV016testRecursiveIntD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
+  // CHECK: bb0([[ARG:%.*]] : $StructMemberTest):
   // CHECK:  debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.s
   // CHECK:  %3 = struct_extract %2 : $AnotherStruct, #AnotherStruct.i
@@ -415,7 +416,7 @@ struct StructMemberTest {
   func testTupleMemberLoad() -> Int {
     return t.1.i
   }
-  // CHECK-LABEL: sil hidden @{{.*}}testTupleMemberLoad{{.*}} : $@convention(method) (@guaranteed StructMemberTest)
+  // CHECK-LABEL: sil hidden @_T09let_decls16StructMemberTestV09testTupleD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
   // CHECK: bb0(%0 : $StructMemberTest):
   // CHECK-NEXT:   debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK-NEXT:   [[T0:%.*]] = struct_extract %0 : $StructMemberTest, #StructMemberTest.t
@@ -433,7 +434,7 @@ struct GenericStruct<T> {
   func getA() -> T {
     return a
   }
-  // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getA{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> @out T
+  // CHECK-LABEL: sil hidden @{{.*}}GenericStructV4getA{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> @out T
   // CHECK: bb0(%0 : $*T, %1 : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr %1 : $*GenericStruct<T>, let, name "self"
   // CHECK-NEXT: %3 = struct_element_addr %1 : $*GenericStruct<T>, #GenericStruct.a
@@ -445,7 +446,7 @@ struct GenericStruct<T> {
     return b
   }
   
-  // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getB{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> Int
+  // CHECK-LABEL: sil hidden @{{.*}}GenericStructV4getB{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> Int
   // CHECK: bb0([[SELF_ADDR:%.*]] : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr [[SELF_ADDR]] : $*GenericStruct<T>, let, name "self"
   // CHECK-NEXT: [[PROJ_ADDR:%.*]] = struct_element_addr [[SELF_ADDR]] : $*GenericStruct<T>, #GenericStruct.b
@@ -462,12 +463,12 @@ struct LetPropertyStruct {
 
 // CHECK-LABEL: sil hidden @{{.*}}testLetPropertyAccessOnLValueBase
 // CHECK: bb0(%0 : $LetPropertyStruct):
-// CHECK:  [[ABOX:%[0-9]+]] = alloc_box $@box LetPropertyStruct
+// CHECK:  [[ABOX:%[0-9]+]] = alloc_box ${ var LetPropertyStruct }
 // CHECK:  [[A:%[0-9]+]] = project_box [[ABOX]]
 // CHECK:   store %0 to [trivial] [[A]] : $*LetPropertyStruct
 // CHECK:   [[STRUCT:%[0-9]+]] = load_borrow [[A]] : $*LetPropertyStruct
 // CHECK:   [[PROP:%[0-9]+]] = struct_extract [[STRUCT]] : $LetPropertyStruct, #LetPropertyStruct.lp
-// CHECK:   destroy_value [[ABOX]] : $@box LetPropertyStruct
+// CHECK:   destroy_value [[ABOX]] : ${ var LetPropertyStruct }
 // CHECK:   return [[PROP]] : $Int
 func testLetPropertyAccessOnLValueBase(_ a : LetPropertyStruct) -> Int {
   var a = a
@@ -477,10 +478,10 @@ func testLetPropertyAccessOnLValueBase(_ a : LetPropertyStruct) -> Int {
 
 var addressOnlyGetOnlyGlobalProperty : SimpleProtocol { get {} }
 
-// CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyGetOnlyGlobalProperty
+// CHECK-LABEL: sil hidden @_T09let_decls018testAddressOnlyGetE14GlobalPropertyAA14SimpleProtocol_pyF
 // CHECK: bb0(%0 : $*SimpleProtocol):
 // CHECK-NEXT:   // function_ref
-// CHECK-NEXT:  %1 = function_ref @{{.*}}addressOnlyGetOnlyGlobalProperty
+// CHECK-NEXT:  %1 = function_ref @_T09let_decls014addressOnlyGetD14GlobalPropertyAA14SimpleProtocol_pfg
 // CHECK-NEXT:  %2 = apply %1(%0) : $@convention(thin) () -> @out SimpleProtocol
 // CHECK-NEXT:  %3 = tuple ()
 // CHECK-NEXT:  return %3 : $()

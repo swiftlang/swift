@@ -84,6 +84,11 @@
       key.usr: "s:P11test_module5Prot3"
     },
     {
+      key.kind: source.lang.swift.decl.function.free,
+      key.name: "globalFunc()",
+      key.usr: "s:F11test_module10globalFuncFT_T_"
+    },
+    {
       key.kind: source.lang.swift.decl.class,
       key.name: "Empty",
       key.usr: "s:C11test_module5Empty"

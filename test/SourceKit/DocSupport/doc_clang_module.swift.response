@@ -306,8 +306,6 @@ class FooUnavailableMembers : FooClassBase {
 
     convenience init!(int i: Int32)
 
-    class func withInt(_ i: Int32) -> Self!
-
     func unavailable()
 
     func swiftUnavailable()
@@ -4452,494 +4450,450 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 6845,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 6851,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 6856,
-    key.length: 7
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 6864,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 6866,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 6866,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int32",
-    key.usr: "s:Vs5Int32",
-    key.offset: 6869,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.ref.class,
-    key.name: "FooUnavailableMembers",
-    key.usr: "c:objc(cs)FooUnavailableMembers",
-    key.offset: 6879,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 6890,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 6895,
+    key.offset: 6850,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 6914,
+    key.offset: 6869,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 6919,
+    key.offset: 6874,
     key.length: 16
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 6943,
+    key.offset: 6898,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 6948,
+    key.offset: 6903,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 6966,
+    key.offset: 6921,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 6971,
+    key.offset: 6926,
     key.length: 22
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7001,
+    key.offset: 6956,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7006,
+    key.offset: 6961,
     key.length: 22
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7036,
+    key.offset: 6991,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7041,
+    key.offset: 6996,
     key.length: 21
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7070,
+    key.offset: 7025,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7075,
+    key.offset: 7030,
     key.length: 23
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7106,
+    key.offset: 7061,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7111,
+    key.offset: 7066,
     key.length: 25
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7144,
+    key.offset: 7099,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7149,
+    key.offset: 7104,
     key.length: 25
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7182,
+    key.offset: 7137,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7187,
+    key.offset: 7142,
     key.length: 24
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7219,
+    key.offset: 7174,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7224,
+    key.offset: 7179,
     key.length: 26
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7258,
+    key.offset: 7213,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7263,
+    key.offset: 7218,
     key.length: 14
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 7238,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 7248,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 7253,
+    key.length: 14
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 7273,
+    key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 7283,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7293,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7298,
-    key.length: 14
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7318,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7328,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7333,
+    key.offset: 7288,
     key.length: 15
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7354,
+    key.offset: 7309,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7364,
+    key.offset: 7319,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7369,
+    key.offset: 7324,
     key.length: 14
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7389,
+    key.offset: 7344,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7396,
+    key.offset: 7351,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7402,
+    key.offset: 7357,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7416,
+    key.offset: 7371,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7421,
+    key.offset: 7376,
     key.length: 16
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 7438,
+    key.offset: 7393,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 7440,
+    key.offset: 7395,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.class,
     key.name: "FooCFType",
     key.usr: "c:Foo.h@T@FooCFTypeRef",
-    key.offset: 7443,
+    key.offset: 7398,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7455,
+    key.offset: 7410,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7460,
+    key.offset: 7415,
     key.length: 21
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 7484,
+    key.offset: 7439,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7495,
+    key.offset: 7450,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7500,
+    key.offset: 7455,
     key.length: 13
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7519,
+    key.offset: 7474,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7524,
+    key.offset: 7479,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7537,
+    key.offset: 7492,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7542,
+    key.offset: 7497,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 7554,
+    key.offset: 7509,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 7556,
+    key.offset: 7511,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7556,
+    key.offset: 7511,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
     key.usr: "s:Vs5Int32",
-    key.offset: 7559,
+    key.offset: 7514,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
     key.usr: "s:Vs5Int32",
-    key.offset: 7569,
+    key.offset: 7524,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7575,
+    key.offset: 7530,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7582,
+    key.offset: 7537,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "RawRepresentable",
     key.usr: "s:Ps16RawRepresentable",
-    key.offset: 7596,
+    key.offset: 7551,
     key.length: 16
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Equatable",
     key.usr: "s:Ps9Equatable",
-    key.offset: 7614,
+    key.offset: 7569,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7631,
+    key.offset: 7586,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 7636,
+    key.offset: 7591,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 7638,
+    key.offset: 7593,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7638,
+    key.offset: 7593,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
     key.usr: "s:Vs6UInt32",
-    key.offset: 7648,
+    key.offset: 7603,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7661,
+    key.offset: 7616,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 7666,
+    key.offset: 7621,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 7675,
+    key.offset: 7630,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7666,
+    key.offset: 7621,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7675,
-    key.length: 8
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "UInt32",
-    key.usr: "s:Vs6UInt32",
-    key.offset: 7685,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7698,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7702,
+    key.offset: 7630,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
     key.usr: "s:Vs6UInt32",
-    key.offset: 7712,
+    key.offset: 7640,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7721,
+    key.offset: 7653,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7725,
+    key.offset: 7657,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "UInt32",
+    key.usr: "s:Vs6UInt32",
+    key.offset: 7667,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 7676,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 7680,
     key.length: 12
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooSubEnum1",
     key.usr: "c:@E@FooSubEnum1",
-    key.offset: 7739,
+    key.offset: 7694,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7753,
+    key.offset: 7708,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7759,
+    key.offset: 7714,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7763,
+    key.offset: 7718,
     key.length: 12
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooSubEnum1",
     key.usr: "c:@E@FooSubEnum1",
-    key.offset: 7777,
+    key.offset: 7732,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7791,
+    key.offset: 7746,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 7797,
+    key.offset: 7752,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7801,
+    key.offset: 7756,
     key.length: 25
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 7828,
+    key.offset: 7783,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7834,
+    key.offset: 7789,
     key.length: 3
   }
 ]
@@ -5713,9 +5667,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "insert(_:)",
-        key.usr: "s:FesRxs9OptionSetxzwx7ElementrS_6insertFwxS0_T8insertedSb17memberAfterInsertwxS0__::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FesRxs9OptionSetxzwx7ElementrS_6insertFwxS0_T8insertedSb17memberAfterInsertwxS0__",
-        key.doc.full_as_xml: "<Function><Name>insert(_:)</Name><USR>s:FesRxs9OptionSetxzwx7ElementrS_6insertFwxS0_T8insertedSb17memberAfterInsertwxS0__</USR><Declaration>mutating func insert(_ newMember: Self) -&gt; (inserted: Bool, memberAfterInsert: Self)</Declaration><Abstract><Para>Adds the given element to the option set if it is not already a member.</Para></Abstract><Parameters><Parameter><Name>newMember</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The element to insert.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>(true, newMember)</codeVoice> if <codeVoice>newMember</codeVoice> was not contained in <codeVoice>self</codeVoice>. Otherwise, returns <codeVoice>(false, oldMember)</codeVoice>, where <codeVoice>oldMember</codeVoice> is the member of the set equal to <codeVoice>newMember</codeVoice>.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>.secondDay</codeVoice> shipping option is added to the <codeVoice>freeOptions</codeVoice> option set if <codeVoice>purchasePrice</codeVoice> is greater than 50.0. For the <codeVoice>ShippingOptions</codeVoice> declaration, see the <codeVoice>OptionSet</codeVoice> protocol discussion.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let purchasePrice = 87.55]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[var freeOptions: ShippingOptions = [.standard, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[if purchasePrice > 50 {]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[    freeOptions.insert(.secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[}]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(freeOptions.contains(.secondDay))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:FesRxs9OptionSetxzwx7ElementrS_6insertFwx7ElementT8insertedSb17memberAfterInsertwxS1__::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:FesRxs9OptionSetxzwx7ElementrS_6insertFwx7ElementT8insertedSb17memberAfterInsertwxS1__",
+        key.doc.full_as_xml: "<Function><Name>insert(_:)</Name><USR>s:FesRxs9OptionSetxzwx7ElementrS_6insertFwx7ElementT8insertedSb17memberAfterInsertwxS1__</USR><Declaration>mutating func insert(_ newMember: Self.Element) -&gt; (inserted: Bool, memberAfterInsert: Self.Element)</Declaration><Abstract><Para>Adds the given element to the option set if it is not already a member.</Para></Abstract><Parameters><Parameter><Name>newMember</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The element to insert.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>(true, newMember)</codeVoice> if <codeVoice>newMember</codeVoice> was not contained in <codeVoice>self</codeVoice>. Otherwise, returns <codeVoice>(false, oldMember)</codeVoice>, where <codeVoice>oldMember</codeVoice> is the member of the set equal to <codeVoice>newMember</codeVoice>.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>.secondDay</codeVoice> shipping option is added to the <codeVoice>freeOptions</codeVoice> option set if <codeVoice>purchasePrice</codeVoice> is greater than 50.0. For the <codeVoice>ShippingOptions</codeVoice> declaration, see the <codeVoice>OptionSet</codeVoice> protocol discussion.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let purchasePrice = 87.55]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[var freeOptions: ShippingOptions = [.standard, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[if purchasePrice > 50 {]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[    freeOptions.insert(.secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[}]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(freeOptions.contains(.secondDay))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 1962,
         key.length: 110,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@discardableResult</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>insert</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>newMember</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.argument_label>inserted</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>memberAfterInsert</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.instance>",
@@ -5732,9 +5686,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "remove(_:)",
-        key.usr: "s:FesRxs9OptionSetxzwx7ElementrS_6removeFwxS0_GSqwxS0__::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FesRxs9OptionSetxzwx7ElementrS_6removeFwxS0_GSqwxS0__",
-        key.doc.full_as_xml: "<Function><Name>remove(_:)</Name><USR>s:FesRxs9OptionSetxzwx7ElementrS_6removeFwxS0_GSqwxS0__</USR><Declaration>mutating func remove(_ member: Self) -&gt; Self?</Declaration><Abstract><Para>Removes the given element and all elements subsumed by it.</Para></Abstract><Parameters><Parameter><Name>member</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The element of the set to remove.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>The intersection of <codeVoice>[member]</codeVoice> and the set, if the intersection was nonempty; otherwise, <codeVoice>nil</codeVoice>.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>.priority</codeVoice> shipping option is removed from the <codeVoice>options</codeVoice> option set. Attempting to remove the same shipping option a second time results in <codeVoice>nil</codeVoice>, because <codeVoice>options</codeVoice> no longer contains <codeVoice>.priority</codeVoice> as a member.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[var options: ShippingOptions = [.secondDay, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let priorityOption = options.remove(.priority)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(priorityOption == .priority)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(options.remove(.priority))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"nil\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing><Para>In the next example, the <codeVoice>.express</codeVoice> element is passed to <codeVoice>remove(_:)</codeVoice>. Although <codeVoice>.express</codeVoice> is not a member of <codeVoice>options</codeVoice>, <codeVoice>.express</codeVoice> subsumes the remaining <codeVoice>.secondDay</codeVoice> element of the option set. Therefore, <codeVoice>options</codeVoice> is emptied and the intersection between <codeVoice>.express</codeVoice> and <codeVoice>options</codeVoice> is returned.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let expressOption = options.remove(.express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(expressOption == .express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"false\"]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(expressOption == .secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:FesRxs9OptionSetxzwx7ElementrS_6removeFwx7ElementGSqwxS1__::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:FesRxs9OptionSetxzwx7ElementrS_6removeFwx7ElementGSqwxS1__",
+        key.doc.full_as_xml: "<Function><Name>remove(_:)</Name><USR>s:FesRxs9OptionSetxzwx7ElementrS_6removeFwx7ElementGSqwxS1__</USR><Declaration>mutating func remove(_ member: Self.Element) -&gt; Self.Element?</Declaration><Abstract><Para>Removes the given element and all elements subsumed by it.</Para></Abstract><Parameters><Parameter><Name>member</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The element of the set to remove.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>The intersection of <codeVoice>[member]</codeVoice> and the set, if the intersection was nonempty; otherwise, <codeVoice>nil</codeVoice>.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>.priority</codeVoice> shipping option is removed from the <codeVoice>options</codeVoice> option set. Attempting to remove the same shipping option a second time results in <codeVoice>nil</codeVoice>, because <codeVoice>options</codeVoice> no longer contains <codeVoice>.priority</codeVoice> as a member.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[var options: ShippingOptions = [.secondDay, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let priorityOption = options.remove(.priority)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(priorityOption == .priority)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(options.remove(.priority))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"nil\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing><Para>In the next example, the <codeVoice>.express</codeVoice> element is passed to <codeVoice>remove(_:)</codeVoice>. Although <codeVoice>.express</codeVoice> is not a member of <codeVoice>options</codeVoice>, <codeVoice>.express</codeVoice> subsumes the remaining <codeVoice>.secondDay</codeVoice> element of the option set. Therefore, <codeVoice>options</codeVoice> is emptied and the intersection between <codeVoice>.express</codeVoice> and <codeVoice>options</codeVoice> is returned.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let expressOption = options.remove(.express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(expressOption == .express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"false\"]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(expressOption == .secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 2078,
         key.length: 71,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@discardableResult</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>remove</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>member</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>?</decl.function.returntype></decl.function.method.instance>",
@@ -5751,9 +5705,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "update(with:)",
-        key.usr: "s:FesRxs9OptionSetxzwx7ElementrS_6updateFT4withwxS0__GSqwxS0__::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FesRxs9OptionSetxzwx7ElementrS_6updateFT4withwxS0__GSqwxS0__",
-        key.doc.full_as_xml: "<Function><Name>update(with:)</Name><USR>s:FesRxs9OptionSetxzwx7ElementrS_6updateFT4withwxS0__GSqwxS0__</USR><Declaration>mutating func update(with newMember: Self) -&gt; Self?</Declaration><Abstract><Para>Inserts the given element into the set.</Para></Abstract><ResultDiscussion><Para>The intersection of <codeVoice>[newMember]</codeVoice> and the set if the intersection was nonempty; otherwise, <codeVoice>nil</codeVoice>.</Para></ResultDiscussion><Discussion><Para>If <codeVoice>newMember</codeVoice> is not contained in the set but subsumes current members of the set, the subsumed members are returned.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[var options: ShippingOptions = [.secondDay, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let replaced = options.update(with: .express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(replaced == .secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:FesRxs9OptionSetxzwx7ElementrS_6updateFT4withwx7Element_GSqwxS1__::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:FesRxs9OptionSetxzwx7ElementrS_6updateFT4withwx7Element_GSqwxS1__",
+        key.doc.full_as_xml: "<Function><Name>update(with:)</Name><USR>s:FesRxs9OptionSetxzwx7ElementrS_6updateFT4withwx7Element_GSqwxS1__</USR><Declaration>mutating func update(with newMember: Self.Element) -&gt; Self.Element?</Declaration><Abstract><Para>Inserts the given element into the set.</Para></Abstract><ResultDiscussion><Para>The intersection of <codeVoice>[newMember]</codeVoice> and the set if the intersection was nonempty; otherwise, <codeVoice>nil</codeVoice>.</Para></ResultDiscussion><Discussion><Para>If <codeVoice>newMember</codeVoice> is not contained in the set but subsumes current members of the set, the subsumed members are returned.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[var options: ShippingOptions = [.secondDay, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let replaced = options.update(with: .express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(replaced == .secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 2155,
         key.length: 77,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@discardableResult</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>update</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>with</decl.var.parameter.argument_label> <decl.var.parameter.name>newMember</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>?</decl.function.returntype></decl.function.method.instance>",
@@ -7247,7 +7201,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.name: "FooUnavailableMembers",
     key.usr: "c:objc(cs)FooUnavailableMembers",
     key.offset: 6758,
-    key.length: 637,
+    key.length: 592,
     key.fully_annotated_decl: "<decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>FooUnavailableMembers</decl.name> : <ref.class usr=\"c:objc(cs)FooClassBase\">FooClassBase</ref.class></decl.class>",
     key.inherits: [
       {
@@ -7275,35 +7229,10 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         ]
       },
       {
-        key.kind: source.lang.swift.decl.function.method.class,
-        key.name: "withInt(_:)",
-        key.usr: "c:objc(cs)FooUnavailableMembers(cm)unavailableMembersWithInt:",
-        key.offset: 6845,
-        key.length: 39,
-        key.fully_annotated_decl: "<decl.function.method.class><syntaxtype.keyword>class</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>withInt</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>i</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.class usr=\"c:objc(cs)FooUnavailableMembers\">Self</ref.class>!</decl.function.returntype></decl.function.method.class>",
-        key.entities: [
-          {
-            key.kind: source.lang.swift.decl.var.local,
-            key.keyword: "_",
-            key.name: "i",
-            key.offset: 6869,
-            key.length: 5
-          }
-        ],
-        key.attributes: [
-          {
-            key.kind: source.lang.swift.attribute.availability,
-            key.is_unavailable: 1,
-            key.message: "use object construction 'FooUnavailableMembers(int:)'"
-          }
-        ],
-        key.is_unavailable: 1
-      },
-      {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "unavailable()",
         key.usr: "c:objc(cs)FooUnavailableMembers(im)unavailable",
-        key.offset: 6890,
+        key.offset: 6845,
         key.length: 18,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>unavailable</decl.name>()</decl.function.method.instance>",
         key.attributes: [
@@ -7319,7 +7248,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "swiftUnavailable()",
         key.usr: "c:objc(cs)FooUnavailableMembers(im)swiftUnavailable",
-        key.offset: 6914,
+        key.offset: 6869,
         key.length: 23,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>swiftUnavailable</decl.name>()</decl.function.method.instance>",
         key.attributes: [
@@ -7334,7 +7263,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "deprecated()",
         key.usr: "c:objc(cs)FooUnavailableMembers(im)deprecated",
-        key.offset: 6943,
+        key.offset: 6898,
         key.length: 17,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>deprecated</decl.name>()</decl.function.method.instance>",
         key.attributes: [
@@ -7350,7 +7279,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "availabilityIntroduced()",
         key.usr: "c:objc(cs)FooUnavailableMembers(im)availabilityIntroduced",
-        key.offset: 6966,
+        key.offset: 6921,
         key.length: 29,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>availabilityIntroduced</decl.name>()</decl.function.method.instance>",
         key.attributes: [
@@ -7365,7 +7294,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "availabilityDeprecated()",
         key.usr: "c:objc(cs)FooUnavailableMembers(im)availabilityDeprecated",
-        key.offset: 7001,
+        key.offset: 6956,
         key.length: 29,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>availabilityDeprecated</decl.name>()</decl.function.method.instance>",
         key.attributes: [
@@ -7384,7 +7313,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "availabilityObsoleted()",
         key.usr: "c:objc(cs)FooUnavailableMembers(im)availabilityObsoleted",
-        key.offset: 7036,
+        key.offset: 6991,
         key.length: 28,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>availabilityObsoleted</decl.name>()</decl.function.method.instance>",
         key.attributes: [
@@ -7400,7 +7329,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "availabilityUnavailable()",
         key.usr: "c:objc(cs)FooUnavailableMembers(im)availabilityUnavailable",
-        key.offset: 7070,
+        key.offset: 7025,
         key.length: 30,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>availabilityUnavailable</decl.name>()</decl.function.method.instance>",
         key.attributes: [
@@ -7416,7 +7345,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "availabilityIntroducedMsg()",
         key.usr: "c:objc(cs)FooUnavailableMembers(im)availabilityIntroducedMsg",
-        key.offset: 7106,
+        key.offset: 7061,
         key.length: 32,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>availabilityIntroducedMsg</decl.name>()</decl.function.method.instance>",
         key.attributes: [
@@ -7432,7 +7361,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "availabilityDeprecatedMsg()",
         key.usr: "c:objc(cs)FooUnavailableMembers(im)availabilityDeprecatedMsg",
-        key.offset: 7144,
+        key.offset: 7099,
         key.length: 32,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>availabilityDeprecatedMsg</decl.name>()</decl.function.method.instance>",
         key.attributes: [
@@ -7451,7 +7380,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "availabilityObsoletedMsg()",
         key.usr: "c:objc(cs)FooUnavailableMembers(im)availabilityObsoletedMsg",
-        key.offset: 7182,
+        key.offset: 7137,
         key.length: 31,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>availabilityObsoletedMsg</decl.name>()</decl.function.method.instance>",
         key.attributes: [
@@ -7468,7 +7397,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "availabilityUnavailableMsg()",
         key.usr: "c:objc(cs)FooUnavailableMembers(im)availabilityUnavailableMsg",
-        key.offset: 7219,
+        key.offset: 7174,
         key.length: 33,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>availabilityUnavailableMsg</decl.name>()</decl.function.method.instance>",
         key.attributes: [
@@ -7486,7 +7415,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "_internalMeth3()",
         key.usr: "c:objc(cs)FooClassBase(im)_internalMeth3::SYNTHESIZED::c:objc(cs)FooUnavailableMembers",
         key.original_usr: "c:objc(cs)FooClassBase(im)_internalMeth3",
-        key.offset: 7258,
+        key.offset: 7213,
         key.length: 29,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth3</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
       },
@@ -7495,7 +7424,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "_internalMeth2()",
         key.usr: "c:objc(cs)FooClassBase(im)_internalMeth2::SYNTHESIZED::c:objc(cs)FooUnavailableMembers",
         key.original_usr: "c:objc(cs)FooClassBase(im)_internalMeth2",
-        key.offset: 7293,
+        key.offset: 7248,
         key.length: 29,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth2</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
       },
@@ -7504,7 +7433,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "nonInternalMeth()",
         key.usr: "c:objc(cs)FooClassBase(im)nonInternalMeth::SYNTHESIZED::c:objc(cs)FooUnavailableMembers",
         key.original_usr: "c:objc(cs)FooClassBase(im)nonInternalMeth",
-        key.offset: 7328,
+        key.offset: 7283,
         key.length: 30,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>nonInternalMeth</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
       },
@@ -7513,7 +7442,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "_internalMeth1()",
         key.usr: "c:objc(cs)FooClassBase(im)_internalMeth1::SYNTHESIZED::c:objc(cs)FooUnavailableMembers",
         key.original_usr: "c:objc(cs)FooClassBase(im)_internalMeth1",
-        key.offset: 7364,
+        key.offset: 7319,
         key.length: 29,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>_internalMeth1</decl.name>() -&gt; <decl.function.returntype>Any!</decl.function.returntype></decl.function.method.instance>"
       }
@@ -7523,7 +7452,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.class,
     key.name: "FooCFType",
     key.usr: "c:Foo.h@T@FooCFTypeRef",
-    key.offset: 7396,
+    key.offset: 7351,
     key.length: 19,
     key.fully_annotated_decl: "<decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>FooCFType</decl.name></decl.class>"
   },
@@ -7531,14 +7460,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.function.free,
     key.name: "FooCFTypeRelease(_:)",
     key.usr: "c:@F@FooCFTypeRelease",
-    key.offset: 7416,
+    key.offset: 7371,
     key.length: 38,
     key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>FooCFTypeRelease</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.class usr=\"c:Foo.h@T@FooCFTypeRef\">FooCFType</ref.class>!</decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
         key.keyword: "_",
-        key.offset: 7443,
+        key.offset: 7398,
         key.length: 10
       }
     ],
@@ -7555,7 +7484,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.enum,
     key.name: "ABAuthorizationStatus",
     key.usr: "c:@E@ABAuthorizationStatus",
-    key.offset: 7455,
+    key.offset: 7410,
     key.length: 81,
     key.fully_annotated_decl: "<decl.enum><syntaxtype.keyword>enum</syntaxtype.keyword> <decl.name>ABAuthorizationStatus</decl.name> : <ref.struct usr=\"s:Si\">Int</ref.struct></decl.enum>",
     key.inherits: [
@@ -7570,7 +7499,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.enumelement,
         key.name: "notDetermined",
         key.usr: "c:@E@ABAuthorizationStatus@kABAuthorizationStatusNotDetermined",
-        key.offset: 7495,
+        key.offset: 7450,
         key.length: 18,
         key.fully_annotated_decl: "<decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>notDetermined</decl.name> = <syntaxtype.number>0</syntaxtype.number></decl.enumelement>",
         key.attributes: [
@@ -7585,7 +7514,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.enumelement,
         key.name: "restricted",
         key.usr: "c:@E@ABAuthorizationStatus@kABAuthorizationStatusRestricted",
-        key.offset: 7519,
+        key.offset: 7474,
         key.length: 15,
         key.fully_annotated_decl: "<decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>restricted</decl.name> = <syntaxtype.number>1</syntaxtype.number></decl.enumelement>",
         key.attributes: [
@@ -7610,7 +7539,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.function.free,
     key.name: "fooSubFunc1(_:)",
     key.usr: "c:@F@fooSubFunc1",
-    key.offset: 7537,
+    key.offset: 7492,
     key.length: 37,
     key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooSubFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
     key.entities: [
@@ -7618,7 +7547,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.var.local,
         key.keyword: "_",
         key.name: "a",
-        key.offset: 7559,
+        key.offset: 7514,
         key.length: 5
       }
     ]
@@ -7627,7 +7556,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.struct,
     key.name: "FooSubEnum1",
     key.usr: "c:@E@FooSubEnum1",
-    key.offset: 7575,
+    key.offset: 7530,
     key.length: 145,
     key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooSubEnum1</decl.name> : <ref.protocol usr=\"s:Ps16RawRepresentable\">RawRepresentable</ref.protocol>, <ref.protocol usr=\"s:Ps9Equatable\">Equatable</ref.protocol></decl.struct>",
     key.conforms: [
@@ -7647,7 +7576,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(_:)",
         key.usr: "s:FVSC11FooSubEnum1cFVs6UInt32S_",
-        key.offset: 7631,
+        key.offset: 7586,
         key.length: 24,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rawValue</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
@@ -7655,7 +7584,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "rawValue",
-            key.offset: 7648,
+            key.offset: 7603,
             key.length: 6
           }
         ]
@@ -7664,7 +7593,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(rawValue:)",
         key.usr: "s:FVSC11FooSubEnum1cFT8rawValueVs6UInt32_S_",
-        key.offset: 7661,
+        key.offset: 7616,
         key.length: 31,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.conforms: [
@@ -7679,7 +7608,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "rawValue",
             key.name: "rawValue",
-            key.offset: 7685,
+            key.offset: 7640,
             key.length: 6
           }
         ]
@@ -7688,7 +7617,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "rawValue",
         key.usr: "s:vVSC11FooSubEnum18rawValueVs6UInt32",
-        key.offset: 7698,
+        key.offset: 7653,
         key.length: 20,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
         key.conforms: [
@@ -7705,7 +7634,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FooSubEnum1X",
     key.usr: "c:@E@FooSubEnum1@FooSubEnum1X",
-    key.offset: 7721,
+    key.offset: 7676,
     key.length: 37,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FooSubEnum1X</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
   },
@@ -7713,7 +7642,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FooSubEnum1Y",
     key.usr: "c:@E@FooSubEnum1@FooSubEnum1Y",
-    key.offset: 7759,
+    key.offset: 7714,
     key.length: 37,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FooSubEnum1Y</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
   },
@@ -7721,7 +7650,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FooSubUnnamedEnumeratorA1",
     key.usr: "c:@Ea@FooSubUnnamedEnumeratorA1@FooSubUnnamedEnumeratorA1",
-    key.offset: 7797,
+    key.offset: 7752,
     key.length: 42,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FooSubUnnamedEnumeratorA1</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
   }

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -124,7 +124,8 @@ MAP_STDLIB_TYPE("u_int32_t", UnsignedInt, 32, "UInt32", false, DoNothing)
 MAP_STDLIB_TYPE("u_int64_t", UnsignedInt, 64, "UInt64", false, DoNothing)
 
 // stdarg.h types.
-// FIXME: why does this not catch va_list on x86_64?
+// Note: this does not catch va_list on platforms where va_list is an array.
+// There's an explicit workaround in ImportType.cpp's VisitDecayedType for that.
 MAP_STDLIB_TYPE("va_list", VaList, 0, "CVaListPointer", false, DoNothing)
 MAP_STDLIB_TYPE("__gnuc_va_list", VaList, 0, "CVaListPointer", false, DoNothing)
 MAP_STDLIB_TYPE("__va_list", VaList, 0, "CVaListPointer", false, DoNothing)

@@ -2,45 +2,29 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 import SwiftShims
 
 %{
+from SwiftIntTypes import all_integer_types
 from SwiftFloatingPointTypes import all_floating_point_types
 
 #
 # Utility code for later in this template
 #
 
-# Bit counts for all int types
-allIntBits = [8, 16, 32, 64, 'Int']
-
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
-
-def allInts():
-    for bits in allIntBits:
-        for signed in False, True:
-            yield bits, signed
-
-def baseIntName(name):
-    return 'Int' if name == 'Int' else 'Int' + str(name)
-
-def builtinIntName(name):
-    return 'Int' + str(word_bits) if name == 'Int' else 'Int' + str(name)
-
-def intName(name, signed):
-    return ('' if signed else 'U') + baseIntName(name)
 }%
 
 //  TODO: remove once integer proposal is available ----------------------------
@@ -82,7 +66,7 @@ else:
 }%
 
 % if bits == 80:
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if (!os(Windows) || CYGWIN) && (arch(i386) || arch(x86_64))
 % end
 
 ${SelfDocComment}
@@ -668,6 +652,7 @@ extension ${Self}: BinaryFloatingPoint {
   public var significandWidth: Int {
     let trailingZeros = significandBitPattern.countTrailingZeros
     if isNormal {
+      guard significandBitPattern != 0 else { return 0 }
       return ${Self}.significandBitCount - trailingZeros
     }
     if isSubnormal {
@@ -721,7 +706,7 @@ extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLit
   }
 }
 
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if (!os(Windows) || CYGWIN) && (arch(i386) || arch(x86_64))
 
 % builtinFloatLiteralBits = 80
 extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
@@ -832,15 +817,31 @@ public prefix func - (x: ${Self}) -> ${Self} {
 
 // Construction from integers.
 extension ${Self} {
-% for (srcBits, srcSigned) in allInts():
-%    That = intName(srcBits, srcSigned)
-%    ThatBuiltinName = builtinIntName(srcBits)
-%    sign = 's' if srcSigned else 'u'
+
+% for self_ty in all_integer_types(word_bits):
+%   That = self_ty.stdlib_name
+%   ThatBuiltinName = self_ty.builtin_name
+%   srcBits = self_ty.bits
+%   sign = 's' if self_ty.is_signed else 'u'
   @_transparent
   public init(_ v: ${That}) {
     _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
   }
-% end
+  
+%   if srcBits < SignificandBitCount:
+  @available(*, message: "Converting ${That} to ${Self} will always succeed.")
+%   end
+  @inline(__always)
+  public init?(exactly value: ${That}) {
+    _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(value._value)
+
+%   if srcBits < SignificandBitCount:
+    if ${That}(self) != value {
+      return nil
+    }
+%   end
+  }
+% end # all_integer_types
 }
 
 // Construction from other floating point numbers.
@@ -850,7 +851,7 @@ extension ${Self} {
 %   That = src_type.stdlib_name
 
 %   if srcBits == 80:
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if (!os(Windows) || CYGWIN) && (arch(i386) || arch(x86_64))
 %   end
 
 %   if srcBits == bits:
@@ -1056,9 +1057,10 @@ public postfix func -- (lhs: inout ${Self}) -> ${Self} {
 }
 
 extension ${Self} {
-  @available(*, unavailable, message: "Please use the `abs(_:)` free function")
+  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Please use the `abs(_:)` free function")
+  @_transparent
   public static func abs(_ x: ${Self}) -> ${Self} {
-    fatalError("unavailable")
+    return x.magnitude
   }
 }
 

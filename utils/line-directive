@@ -3,11 +3,11 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See http://swift.org/LICENSE.txt for license information
-# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 # ----------------------------------------------------------------------------
 #
@@ -20,6 +20,7 @@ import bisect
 import re
 import subprocess
 import sys
+import os
 
 line_pattern = re.compile(
     r'^// ###sourceLocation\(file:\s*"([^"]+)",\s*line:\s*([0-9]+)\s*\)')
@@ -153,6 +154,21 @@ def map_line_from_source_file(source_filename, source_line_num, target_filename)
             return result + 1
     raise RuntimeError("line not found")
 
+def read_response_file(file_path):
+    with open(file_path, 'r') as files:
+        return filter(None, files.read().split(';'))
+
+def expand_response_files(files):
+    expanded_files = []
+    for file_path in files:
+        # Read a list of files from a response file.
+        if file_path[0] == '@':
+            expanded_files.extend(read_response_file(file_path[1:]))
+        else:
+            expanded_files.append(file_path)
+
+    return expanded_files
+
 def run():
     """Simulate a couple of gyb-generated files
 
@@ -242,10 +258,20 @@ def run():
         print(map_line_from_source_file(source_file, source_line, target_file))
     else:
         dashes = sys.argv.index('--')
-        sources = sys.argv[1:dashes]
+        sources = expand_response_files(sys.argv[1:dashes])
+
+        # The first argument of command_args is the process to open.
+        # subprocess.Popen doesn't normalize arguments. This means that trying
+        # to open a non-normalized file (e.g. C:/swift/./bin/swiftc.exe) on
+        # Windows results in file/directory not found errors, as Popen delegates
+        # to the Win32 CreateProcess API. Unix systems handle non-normalized
+        # paths, so don't have this problem.
+        # Arguments passed to the process are normalized by the process.
+        command_args = expand_response_files(sys.argv[dashes + 1:])
+        command_args[0] = os.path.normpath(command_args[0])
 
         command = subprocess.Popen(
-            sys.argv[dashes + 1:],
+            command_args,
             stderr=subprocess.STDOUT,
             stdout=subprocess.PIPE,
             universal_newlines=True

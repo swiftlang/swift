@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -63,7 +63,21 @@ let _x86_64SSERegisterWords = 2
 let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegisters * _x86_64SSERegisterWords
 #endif
 
-/// Invoke `body` with a C `va_list` argument derived from `args`.
+/// Invokes the given closure with a C `va_list` argument derived from the
+/// given array of arguments.
+///
+/// The pointer passed as an argument to `body` is valid only for the lifetime
+/// of the closure. Do not escape it from the closure for later use.
+///
+/// - Parameters:
+///   - args: An array of arguments to convert to a C `va_list` pointer.
+///   - body: A closure with a `CVaListPointer` parameter that references the
+///     arguments passed as `args`. If `body` has a return value, it is used
+///     as the return value for the `withVaList(_:)` function. The pointer
+///     argument is valid only for the duration of the closure's execution.
+/// - Returns: The return value of the `body` closure parameter, if any.
+///
+/// - SeeAlso: `getVaList(_:)`
 public func withVaList<R>(_ args: [CVarArg],
   _ body: (CVaListPointer) -> R) -> R {
   let builder = _VaListBuilder()
@@ -88,13 +102,18 @@ internal func _withVaList<R>(
 // of which correctly work without the ObjC Runtime right now.
 // See rdar://problem/18801510
 
-/// Returns a `CVaListPointer` built from `args` that's backed by
-/// autoreleased storage.
+/// Returns a `CVaListPointer` that is backed by autoreleased storage, built
+/// from the given array of arguments.
 ///
-/// - Warning: This function is best avoided in favor of
-///   `withVaList`, but occasionally (i.e. in a `class` initializer) you
-///   may find that the language rules don't allow you to use
-///   `withVaList` as intended.
+/// You should prefer `withVaList(_:_:)` instead of this function. In some
+/// uses, such as in a `class` initializer, you may find that the
+/// language rules do not allow you to use `withVaList(_:_:)` as intended.
+///
+/// - Parameters args: An array of arguments to convert to a C `va_list`
+///   pointer.
+/// - Returns: The return value of the `body` closure parameter, if any.
+///
+/// - SeeAlso: `withVaList(_:_:)`
 public func getVaList(_ args: [CVarArg]) -> CVaListPointer {
   let builder = _VaListBuilder()
   for a in args {

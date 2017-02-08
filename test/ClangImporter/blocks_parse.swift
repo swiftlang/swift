@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s
 
 // REQUIRES: objc_interop
 
@@ -32,7 +32,7 @@ func checkTypeImpl<T>(_ a: inout T, _: T.Type) {}
 do {
   var blockOpt = blockWithoutNullability()
   checkTypeImpl(&blockOpt, Optional<my_block_t>.self)
-  var block: my_block_t = blockWithoutNullability()
+  var _: my_block_t = blockWithoutNullability()
 }
 do {
   var block = blockWithNonnull()
@@ -41,7 +41,7 @@ do {
 do {
   var blockOpt = blockWithNullUnspecified()
   checkTypeImpl(&blockOpt, Optional<my_block_t>.self)
-  var block: my_block_t = blockWithNullUnspecified()
+  var _: my_block_t = blockWithNullUnspecified()
 }
 do {
   var block = blockWithNullable()

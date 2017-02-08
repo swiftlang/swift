@@ -1,9 +1,9 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
 class C {}
 
 
-// CHECK-LABEL: sil hidden @_TF7foreach13tupleElementsFGSaTCS_1CS0___T_
+// CHECK-LABEL: sil hidden @_T07foreach13tupleElementsySayAA1CC_ADtGF
 func tupleElements(_ xx: [(C, C)]) {
   // CHECK: [[PAYLOAD:%.*]] = unchecked_enum_data {{%.*}} : $Optional<(C, C)>, #Optional.some!enumelt.1
   // CHECK: [[A:%.*]] = tuple_extract [[PAYLOAD]] : $(C, C), 0

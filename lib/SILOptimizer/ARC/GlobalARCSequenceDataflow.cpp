@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -69,7 +69,7 @@ bool ARCSequenceDataflowEvaluator::processBBTopDown(ARCBBState &BBState) {
   // anything, we will still pair the retain, releases and then the guaranteed
   // parameter will ensure it is known safe to remove them.
   if (BB.isEntry()) {
-    auto Args = BB.getBBArgs();
+    auto Args = BB.getArguments();
     for (unsigned i = 0, e = Args.size(); i != e; ++i) {
       DataflowVisitor.visit(Args[i]);
     }
@@ -123,7 +123,7 @@ void ARCSequenceDataflowEvaluator::mergePredecessors(
   ARCBBState &BBState = DataHandle.getState();
 
   // For each successor of BB...
-  for (SILBasicBlock *PredBB : BB->getPreds()) {
+  for (SILBasicBlock *PredBB : BB->getPredecessorBlocks()) {
 
     // Try to look up the data handle for it. If we don't have any such state,
     // then the predecessor must be unreachable from the entrance and thus is
@@ -220,6 +220,8 @@ static bool isARCSignificantTerminator(TermInst *TI) {
   case TermKind::CheckedCastAddrBranchInst:
     return true;
   }
+
+  llvm_unreachable("Unhandled TermKind in switch.");
 }
 
 /// Analyze a single BB for refcount inc/dec instructions.
@@ -295,7 +297,7 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
   // that this block could not have multiple predecessors since otherwise, the
   // edge would be broken.
   llvm::TinyPtrVector<SILInstruction *> PredTerminators;
-  for (SILBasicBlock *PredBB : BB.getPreds()) {
+  for (SILBasicBlock *PredBB : BB.getPredecessorBlocks()) {
     auto *TermInst = PredBB->getTerminator();
     if (!isARCSignificantTerminator(TermInst))
       continue;

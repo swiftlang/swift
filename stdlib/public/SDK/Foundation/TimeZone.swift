@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -43,7 +43,7 @@ public struct TimeZone : Hashable, Equatable, ReferenceConvertible {
     
     /// The time zone currently used by the system, automatically updating to the user's current preference.
     ///
-    /// If this time zone is mutated, then it no longer tracks the application time zone.
+    /// If this time zone is mutated, then it no longer tracks the system time zone.
     ///
     /// The autoupdating time zone only compares equal to itself.
     public static var autoupdatingCurrent : TimeZone {
@@ -87,7 +87,7 @@ public struct TimeZone : Hashable, Equatable, ReferenceConvertible {
     
     /// Returns a time zone identified by a given abbreviation.
     ///
-    /// In general, you are discouraged from using abbreviations except for unique instances such as "GMT". Time Zone abbreviations are not standardized and so a given abbreviation may have multiple meanings—for example, "EST" refers to Eastern Time in both the United States and Australia
+    /// In general, you are discouraged from using abbreviations except for unique instances such as "GMT". Time Zone abbreviations are not standardized and so a given abbreviation may have multiple meanings--for example, "EST" refers to Eastern Time in both the United States and Australia
     ///
     /// - parameter abbreviation: The abbreviation for the time zone.
     /// - returns: A time zone identified by abbreviation determined by resolving the abbreviation to an identifier using the abbreviation dictionary and then returning the time zone for that identifier. Returns `nil` if there is no match for abbreviation.
@@ -223,9 +223,9 @@ public struct TimeZone : Hashable, Equatable, ReferenceConvertible {
 
 extension TimeZone : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     private var _kindDescription : String {
-        if (self == TimeZone.autoupdatingCurrent) {
+        if self == TimeZone.autoupdatingCurrent {
             return "autoupdatingCurrent"
-        } else if (self == TimeZone.current) {
+        } else if self == TimeZone.current {
             return "current"
         } else {
             return "fixed"
@@ -233,12 +233,13 @@ extension TimeZone : CustomStringConvertible, CustomDebugStringConvertible, Cust
     }
     
     public var customMirror : Mirror {
-        var c: [(label: String?, value: Any)] = []
-        c.append((label: "identifier", value: identifier))
-        c.append((label: "kind", value: _kindDescription))
-        c.append((label: "abbreviation", value: abbreviation()))
-        c.append((label: "secondsFromGMT", value: secondsFromGMT()))
-        c.append((label: "isDaylightSavingTime", value: isDaylightSavingTime()))
+        let c: [(label: String?, value: Any)] = [
+          ("identifier", identifier),
+          ("kind", _kindDescription),
+          ("abbreviation", abbreviation() as Any),
+          ("secondsFromGMT", secondsFromGMT()),
+          ("isDaylightSavingTime", isDaylightSavingTime()),
+        ]
         return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
     }
     

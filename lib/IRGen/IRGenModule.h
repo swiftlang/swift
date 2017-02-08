@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/SuccessorMap.h"
@@ -366,8 +367,17 @@ public:
   ModuleDecl *getSwiftModule() const;
   Lowering::TypeConverter &getSILTypes() const;
   SILModule &getSILModule() const { return IRGen.SIL; }
+  SILModuleConventions silConv;
+
   llvm::SmallString<128> OutputFilename;
-  
+
+#ifndef NDEBUG
+  // Used for testing ConformanceCollector.
+  ConformanceCollector EligibleConfs;
+  SILInstruction *CurrentInst = nullptr;
+  SILWitnessTable *CurrentWitnessTable = nullptr;
+#endif
+
   /// Order dependency -- TargetInfo must be initialized after Opts.
   const SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
@@ -505,6 +515,8 @@ public:
     case ReferenceCounting::Error:
       llvm_unreachable("unowned references to this type are not supported");
     }
+
+    llvm_unreachable("Not a valid ReferenceCounting.");
   }
   
   /// Return the spare bit mask to use for types that comprise heap object
@@ -531,6 +543,8 @@ public:
   LLVM_ATTRIBUTE_NORETURN
   void fatal_unimplemented(SourceLoc, StringRef Message);
   void error(SourceLoc loc, const Twine &message);
+
+  bool useDllStorage();
 
 private:
   Size PtrSize;
@@ -756,7 +770,7 @@ public:
   llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
                                              CanSILFunctionType origCalleeType,
                                              CanSILFunctionType substCalleeType,
-                                             ArrayRef<Substitution> subs,
+                                             SubstitutionList subs,
                                              const HeapLayout &layout);
   llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
 
@@ -770,6 +784,10 @@ public:
   /// Emit a reflection metadata record for an imported type referenced
   /// from this module.
   void emitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl);
+
+  /// Some nominal type declarations require us to emit a fixed-size type
+  /// descriptor, because they have special layout considerations.
+  bool shouldEmitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl);
 
   /// Emit reflection metadata records for builtin and imported types referenced
   /// from this module.
@@ -954,9 +972,10 @@ public:
 
   StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);
  
-  // Get the ArchetypeBuilder for the currently active generic context. Crashes
-  // if there is no generic context.
-  ArchetypeBuilder &getContextArchetypes();
+  /// Retrieve the generic environment for the current generic context.
+  ///
+  /// Fails if there is no generic context.
+  GenericEnvironment *getGenericEnvironment();
 
   ConstantReference
   getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity, Alignment alignment,
@@ -993,6 +1012,9 @@ private:
                                         llvm::Type *defaultType,
                                         DebugTypeInfo debugType,
                                         SymbolReferenceKind refKind);
+
+  void checkEligibleConf(const ProtocolConformance *Conf);
+  void checkEligibleMetaType(NominalTypeDecl *NT);
 
   void emitLazyPrivateDefinitions();
   void addRuntimeResolvableType(CanType type);

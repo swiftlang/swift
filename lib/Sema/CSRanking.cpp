@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "llvm/ADT/Statistic.h"
 
 using namespace swift;
@@ -27,9 +26,9 @@ using namespace constraints;
 #define DEBUG_TYPE "Constraint solver overall"
 STATISTIC(NumDiscardedSolutions, "Number of solutions discarded");
 
-void ConstraintSystem::increaseScore(ScoreKind kind) {
+void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
   unsigned index = static_cast<unsigned>(kind);
-  ++CurrentScore.Data[index];
+  CurrentScore.Data[index] += value;
 
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -150,6 +149,8 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::TupleIndex:
     return x.getTupleIndex() == y.getTupleIndex();
   }
+
+  llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
 }
 
 /// Compare two declarations to determine whether one is a witness of the other.
@@ -188,16 +189,16 @@ static Comparison compareWitnessAndRequirement(TypeChecker &tc, DeclContext *dc,
   // Determine whether the type of the witness's context conforms to the
   // protocol.
   auto owningType
-    = potentialWitness->getDeclContext()->getDeclaredTypeInContext();
-  ProtocolConformance *conformance = nullptr;
-  if (!tc.conformsToProtocol(owningType, proto, dc,
-                             ConformanceCheckFlags::InExpression, &conformance) ||
-      !conformance)
+    = potentialWitness->getDeclContext()->getDeclaredInterfaceType();
+  auto conformance = tc.conformsToProtocol(owningType, proto, dc,
+                                           ConformanceCheckFlags::InExpression);
+  if (!conformance || conformance->isAbstract())
     return Comparison::Unordered;
 
   // If the witness and the potential witness are not the same, there's no
   // ordering here.
-  if (conformance->getWitness(req, &tc).getDecl() != potentialWitness)
+  if (conformance->getConcrete()->getWitness(req, &tc).getDecl()
+        != potentialWitness)
     return Comparison::Unordered;
 
   // We have a requirement/witness match.
@@ -220,7 +221,7 @@ namespace {
     /// The second type conforms to the first.
     ConformedToBy
   };
-}
+} // end anonymous namespace
 
 /// Determines whether the first type is nominally a superclass of the second
 /// type, ignore generic arguments.
@@ -248,8 +249,8 @@ static SelfTypeRelationship computeSelfTypeRelationship(TypeChecker &tc,
   if (!dc1->isTypeContext() || !dc2->isTypeContext())
     return SelfTypeRelationship::Unrelated;
 
-  Type type1 = dc1->getDeclaredTypeInContext();
-  Type type2 = dc2->getDeclaredTypeInContext();
+  Type type1 = dc1->getDeclaredInterfaceType();
+  Type type2 = dc2->getDeclaredInterfaceType();
 
   // If the types are equal, the answer is simple.
   if (type1->isEqual(type2))
@@ -354,7 +355,7 @@ static Type getTypeAtIndex(const ParameterList *params, size_t index) {
     if (param->isVariadic())
       return param->getVarargBaseTy();
   
-    return param->getType();
+    return param->getInterfaceType();
   }
   
   /// FIXME: This looks completely wrong for varargs within a parameter list.
@@ -390,7 +391,7 @@ static bool hasEmptyExistentialParameterMismatch(ValueDecl *decl1,
       return false;
     
     if (t2->isAnyExistentialType() && !t1->isAnyExistentialType())
-      return t2->isEmptyExistentialComposition();
+      return t2->isAny();
   }
   return false;
 }
@@ -437,7 +438,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   Type selfType2 = sig2->getGenericParams()[0];
   cs.addConstraint(ConstraintKind::Bind,
                    replacements[selfType2->getCanonicalType()],
-                   ArchetypeBuilder::mapTypeIntoContext(dc1, selfType1),
+                   dc1->mapTypeIntoContext(selfType1),
                    nullptr);
 
   // Solve the system. If the first extension is at least as specialized as the
@@ -523,7 +524,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       if (isa<AbstractFunctionDecl>(decl1) || isa<EnumElementDecl>(decl1)) {
         // Nothing to do: these have the curried 'self' already.
         if (auto elt = dyn_cast<EnumElementDecl>(decl1)) {
-          checkKind = elt->hasArgumentType() ? CheckInput : CheckAll;
+          checkKind = elt->getArgumentInterfaceType() ? CheckInput : CheckAll;
         } else {
           checkKind = CheckInput;
         }
@@ -578,9 +579,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       }
 
       for (const auto &replacement : replacements) {
-        if (auto mapped = 
-                  ArchetypeBuilder::mapTypeIntoContext(dc1,
-                                                       replacement.first)) {
+        if (auto mapped = dc1->mapTypeIntoContext(replacement.first)) {
           cs.addConstraint(ConstraintKind::Bind, replacement.second, mapped,
                            locator);
         }
@@ -875,8 +874,10 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
             
             // If both are convenience initializers, and the instance type of
             // one is a subtype of the other's, favor the subtype constructor.
-            auto resType1 = ctor1->getResultType();
-            auto resType2 = ctor2->getResultType();
+            auto resType1 = ctor1->mapTypeIntoContext(
+                ctor1->getResultInterfaceType());
+            auto resType2 = ctor2->mapTypeIntoContext(
+                ctor2->getResultInterfaceType());
             
             if (!resType1->isEqual(resType2)) {
               if (tc.isSubtypeOf(resType1, resType2, cs.DC)) {
@@ -958,7 +959,7 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       auto check = [](const ValueDecl *VD) -> bool {
         if (!VD->getModuleContext()->isStdlibModule())
           return false;
-        auto fnTy = VD->getType()->castTo<AnyFunctionType>();
+        auto fnTy = VD->getInterfaceType()->castTo<AnyFunctionType>();
         if (!fnTy->getResult()->getAnyOptionalObjectType())
           return false;
 

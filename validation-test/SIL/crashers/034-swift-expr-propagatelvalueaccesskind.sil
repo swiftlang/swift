@@ -1,4 +1,0 @@
-// RUN: not --crash %target-sil-opt %s
-// REQUIRES: asserts
-.x.a=Int
-import Swift

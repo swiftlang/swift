@@ -133,5 +133,64 @@ class Z {
 // CHECK-NEXT: Third: 42
 Z(name: "Leeloo").testCaptures(x: 42)
 
+print("-------------------------------")
+
+func makeInstance<T: Base>(_: T.Type) -> T {
+    return T()
+}
+
+@_transparent
+func makeInstanceTransparent<T: Base>(_: T.Type) -> T {
+    return T()
+}
+
+@_transparent
+func makeInstanceTransparentProtocol<T: Base>(_: T.Type) -> T {
+    return T()
+}
+
+protocol Factory {
+  init()
+}
+
+class Base : Factory {
+  required init() {}
+
+  func returnsNewInstance() -> Self {
+    return makeInstance(type(of: self))
+  }
+
+  func returnsNewInstanceTransparent() -> Self {
+    return makeInstanceTransparent(type(of: self))
+  }
+
+  func returnsNewInstanceTransparentProtocol() -> Self {
+    return makeInstanceTransparentProtocol(type(of: self))
+  }
+}
+
+class Derived : Base { }
+
+// CHECK: main.Base
+// CHECK: main.Base
+// CHECK: main.Base
+print(Base().returnsNewInstance())
+print(Base().returnsNewInstanceTransparent())
+print(Base().returnsNewInstanceTransparentProtocol())
+
+// CHECK: main.Derived
+// CHECK: main.Derived
+// CHECK: main.Derived
+print(Derived().returnsNewInstance())
+print(Derived().returnsNewInstanceTransparent())
+print(Derived().returnsNewInstanceTransparentProtocol())
+
+// CHECK: main.Derived
+// CHECK: main.Derived
+// CHECK: main.Derived
+print((Derived() as Base).returnsNewInstance())
+print((Derived() as Base).returnsNewInstanceTransparent())
+print((Derived() as Base).returnsNewInstanceTransparentProtocol())
+
 // CHECK-NEXT: Done
 print("Done")

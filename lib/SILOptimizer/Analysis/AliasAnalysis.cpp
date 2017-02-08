@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -55,7 +55,7 @@ enum class AAKind : unsigned {
 } // end anonymous namespace
 
 static llvm::cl::opt<AAKind>
-DebugAAKinds("aa", llvm::cl::desc("Alias Analysis Kinds:"),
+DebugAAKinds("aa-kind", llvm::cl::desc("Alias Analysis Kinds:"),
              llvm::cl::init(AAKind::All),
              llvm::cl::values(clEnumValN(AAKind::None,
                                          "none",
@@ -68,8 +68,7 @@ DebugAAKinds("aa", llvm::cl::desc("Alias Analysis Kinds:"),
                                          "typed-access-tb-aa"),
                               clEnumValN(AAKind::All,
                                          "all",
-                                         "all"),
-                              clEnumValEnd));
+                                         "all")));
 
 static inline bool shouldRunAA() {
   return unsigned(AAKind(DebugAAKinds));
@@ -98,6 +97,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, AliasResult R) {
   case AliasResult::PartialAlias: return OS << "PartialAlias";
   case AliasResult::MustAlias:    return OS << "MustAlias";
   }
+
+  llvm_unreachable("Unhandled AliasResult in switch.");
 }
 
 SILValue getAccessedMemory(SILInstruction *User) {
@@ -119,10 +120,7 @@ SILValue getAccessedMemory(SILInstruction *User) {
 /// Return true if the given SILArgument is an argument to the first BB of a
 /// function.
 static bool isFunctionArgument(SILValue V) {
-  auto *Arg = dyn_cast<SILArgument>(V);
-  if (!Arg)
-    return false;
-  return Arg->isFunctionArg();
+  return isa<SILFunctionArgument>(V);
 }
 
 /// Return true if V is an object that at compile time can be uniquely
@@ -331,8 +329,8 @@ static bool isTypedAccessOracle(SILInstruction *I) {
 /// alias. Call arguments also cannot alias because they must follow \@in, @out,
 /// @inout, or \@in_guaranteed conventions.
 static bool isAddressRootTBAASafe(SILValue V) {
-  if (auto *Arg = dyn_cast<SILArgument>(V))
-    return Arg->isFunctionArg();
+  if (isa<SILFunctionArgument>(V))
+    return true;
 
   if (auto *PtrToAddr = dyn_cast<PointerToAddressInst>(V))
     return PtrToAddr->isStrict();

@@ -3,7 +3,7 @@ typedef struct CGPoint CGPoint;
 
 
 typedef CGPoint NSPoint;
-NSString *NSStringToNSString(NSString *str);
+__attribute__((warn_unused_result)) NSString *NSStringToNSString(NSString *str);
 
 struct FooStruct1 {
   int x;

@@ -56,7 +56,7 @@
 // RUN: %FileCheck %s < %t.embed-inc.txt
 // RUN: %FileCheck -check-prefix NO-REFERENCE-DEPENDENCIES %s < %t.embed-inc.txt
 
-// REQUIRES: X86
+// REQUIRES: CODEGENERATOR=X86
 
 
 // CHECK: bin/swift

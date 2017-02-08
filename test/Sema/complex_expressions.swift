@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // SR-139:
 // Infinite recursion parsing bitwise operators
@@ -97,3 +97,21 @@ let v4 = [1 + 2 + 3, 4] as [UInt32] + [2 * 3] as [UInt32]
 let v5 = ([1 + 2 + 3, 4] as [UInt32]) + ([2 * 3] as [UInt32])
 let v6 = [1 + 2 + 3, 4] as Set<UInt32>
 let v7: [UInt32] = [55 * 8, 0]
+
+// SR-3668
+// "Expression was too complex" errors for short dictionary literals
+// of simple closure expressions
+
+let sr3668Dict1: Dictionary<Int, (Int, Int) -> Bool> =
+  [  0: { $0 == $1 },  1: { $0 == $1 },  2: { $0 == $1 },  3: { $0 == $1 },
+     4: { $0 == $1 },  5: { $0 == $1 },  6: { $0 == $1 },  7: { $0 == $1 },
+     8: { $0 == $1 },  9: { $0 == $1 }, 10: { $0 == $1 }, 11: { $0 == $1 },
+    12: { $0 == $1 }, 13: { $0 == $1 }, 14: { $0 == $1 }, 15: { $0 == $1 },
+    16: { $0 == $1 }, 17: { $0 == $1 }, 18: { $0 == $1 }, 19: { $0 == $1 } ]
+
+let sr3668Dict2: [Int: (Int, Int) -> Bool] =
+  [  0: { $0 != $1 },  1: { $0 != $1 },  2: { $0 != $1 },  3: { $0 != $1 },
+     4: { $0 != $1 },  5: { $0 != $1 },  6: { $0 != $1 },  7: { $0 != $1 },
+     8: { $0 != $1 },  9: { $0 != $1 }, 10: { $0 != $1 }, 11: { $0 != $1 },
+    12: { $0 != $1 }, 13: { $0 != $1 }, 14: { $0 != $1 }, 15: { $0 != $1 },
+    16: { $0 != $1 }, 17: { $0 != $1 }, 18: { $0 != $1 }, 19: { $0 != $1 } ]

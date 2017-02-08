@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,26 +15,267 @@
 % for mutable in (True, False):
 %  Self = 'UnsafeMutablePointer' if mutable else 'UnsafePointer'
 %  a_Self = 'an `UnsafeMutablePointer`' if mutable else 'an `UnsafePointer`'
-
-/// A raw pointer for accessing data of type `Pointee`.  This type
-/// provides no automated memory management, and therefore must
-/// be handled with great care to ensure safety.
+%  Mutable = 'Mutable' if mutable else ''
+/// A pointer for accessing ${'and manipulating' if mutable else ''} data of a
+/// specific type.
 ///
-/// Instances must be aligned to `MemoryLayout<Pointee>.alignment`, i.e.
-/// `(UnsafePointer<Int8>(self) - nil) % MemoryLayout<Pointee>.alignment == 0`
+/// You use instances of the `Unsafe${Mutable}Pointer` type to access data of a
+/// specific type in memory. The type of data that a pointer can access is the
+/// pointer's `Pointee` type. `Unsafe${Mutable}Pointer` provides no automated
+/// memory management or alignment guarantees. You are responsible for
+/// handling the life cycle of any memory you work with through unsafe
+/// pointers to avoid leaks or undefined behavior.
 ///
-/// The memory referenced by an instance can be in one of the following states:
+/// Memory that you manually manage can be either *untyped* or *bound* to a
+/// specific type. You use the `Unsafe${Mutable}Pointer` type to access and
+/// manage memory that has been bound to a specific type.
 ///
-/// - Memory is not allocated (for example, pointer is null, or memory has
-///   been deallocated previously).
+/// Understanding a Pointer's Memory State
+/// ======================================
 ///
-/// - Memory is allocated, but value has not been initialized.
+/// The memory referenced by an `Unsafe${Mutable}Pointer` instance can be in
+/// one of several states. Many pointer operations must only be applied to
+/// pointers with memory in a specific state---you must keep track of the
+/// state of the memory you are working with and understand the changes to
+/// that state that different operations perform. Memory can be untyped and
+/// uninitialized, bound to a type and uninitialized, or bound to a type and
+/// initialized to a value. Finally, memory that was allocated previously may
+/// have been deallocated, leaving existing pointers referencing unallocated
+/// memory.
 ///
-/// - Memory is allocated and value is initialized.
+/// Uninitialized Memory
+/// --------------------
+///
+/// Memory that has just been allocated through a typed pointer or has been
+/// deinitialized is in an *uninitialized* state. Uninitialized memory must be
+/// initialized before it can be accessed for reading.
+///
+%if mutable:
+/// You can use methods like `initialize(to:count:)`, `initialize(from:)`, and
+/// `moveInitializeMemory(from:count)` to initialize the memory referenced by
+/// a pointer with a value or series of values.
+///
+% end
+/// Initialized Memory
+/// ------------------
+///
+/// *Initialized* memory has a value that can be read using a pointer's
+/// `pointee` property or through subscript notation. In the following
+/// example, `ptr` is a pointer to memory initialized with a value of `23`:
+///
+///     let ptr: Unsafe${Mutable}Pointer<Int> = ...
+///     // ptr.pointee == 23
+///     // ptr[0] == 23
+///
+/// Accessing a Pointer's Memory as a Different Type
+/// ================================================
+///
+/// When you access memory through an `Unsafe${Mutable}Pointer` instance, the
+/// `Pointee` type must be consistent with the bound type of the memory. If
+/// you do need to access memory that is bound to one type as a different
+/// type, Swift's pointer types provide type-safe ways to temporarily or
+/// permanently change the bound type of the memory, or to load typed
+/// instances directly from raw memory.
+///
+/// An `Unsafe${Mutable}Pointer<UInt8>` instance allocated with eight bytes of
+/// memory, `uint8Pointer`, will be used for the examples below.
+///
+% if mutable:
+///     let uint8Pointer = UnsafeMutablePointer<UInt8>.allocate(capacity: 8)
+///     uint8Pointer.initialize(from: [39, 77, 111, 111, 102, 33, 39, 0])
+% else:
+///     let uint8Pointer: UnsafePointer<UInt8> = fetchEightBytes()
+% end
+///
+/// When you only need to temporarily access a pointer's memory as a different
+/// type, use the `withMemoryRebound(to:capacity:)` method. For example, you
+/// can use this method to call an API that expects a pointer to a different
+/// type that is layout compatible with your pointer's `Pointee`. The following
+/// code temporarily rebinds the memory that `uint8Pointer` references from
+/// `UInt8` to `Int8` to call the imported C `strlen` function.
+///
+///     // Imported from C
+///     func strlen(_ __s: UnsafePointer<Int8>!) -> UInt
+///
+///     let length = uint8Pointer.withMemoryRebound(to: Int8.self, capacity: 8) {
+///         return strlen($0)
+///     }
+///     // length == 7
+///
+/// When you need to permanently rebind memory to a different type, first
+/// obtain a raw pointer to the memory and then call the
+/// `bindMemory(to:capacity:)` method on the raw pointer. The following
+/// example binds the memory referenced by `uint8Pointer` to one instance of
+/// the `UInt64` type:
+///
+///     let uint64Pointer = Unsafe${Mutable}RawPointer(uint64Pointer)
+///                               .bindMemory(to: UInt64.self, capacity: 1)
+///
+/// After rebinding the memory referenced by `uint8Pointer` to `UInt64`,
+/// accessing that pointer's referenced memory as a `UInt8` instance is
+/// undefined.
+///
+///     var fullInteger = uint64Pointer.pointee          // OK
+///     var firstByte = uint8Pointer.pointee             // undefined
+///
+% if mutable:
+/// Alternatively, you can access the same memory as a different type without
+/// rebinding through untyped memory access, so long as the bound type and the
+/// destination type are trivial types. Convert your pointer to an
+/// `UnsafeMutableRawPointer` instance and then use the raw pointer's
+/// `load(fromByteOffset:as:)` and `storeBytes(of:toByteOffset:as:)` methods
+/// to read and write values.
+% else:
+/// Alternatively, you can access the same memory as a different type without
+/// rebinding through untyped memory access, so long as the bound type and the
+/// destination type are trivial types. Convert your pointer to an
+/// `UnsafeRawPointer` instance and then use the raw pointer's
+/// `load(fromByteOffset:as:)` method to read values.
+% end
+///
+///     let rawPointer = Unsafe${Mutable}RawPointer(uint64Pointer)
+///     fullInteger = rawPointer.load(as: UInt64.self)   // OK
+///     firstByte = rawPointer.load(as: UInt8.self)      // OK
+///
+/// Performing Typed Pointer Arithmetic
+/// ===================================
+///
+/// Pointer arithmetic with a typed pointer is counted in strides of the
+/// pointer's `Pointee` type. When you add to or subtract from an `${Self}`
+/// instance, the result is a new pointer of the same type, offset by that
+/// number of instances of the `Pointee` type.
+///
+///     // 'intPointer' points to memory initialized with [10, 20, 30, 40]
+///     let intPointer: ${Self}<Int> = ...
+///
+///     // Load the first value in memory
+///     let x = intPointer.pointee
+///     // x == 10
+///
+///     // Load the third value in memory
+///     let offsetPointer = intPointer + 2
+///     let y = offsetPointer.pointee
+///     // y == 30
+///
+/// You can also use subscript notation to access the value in memory at a
+/// specific offset.
+///
+///     let z = intPointer[2]
+///     // z == 30
+///
+/// Implicit Casting and Bridging
+/// =============================
+///
+%if mutable:
+/// When calling a function or method with an `${Self}` parameter, you can pass
+/// an instance of that specific pointer type or use Swift's implicit bridging
+/// to pass a compatible pointer.
+///
+/// For example, the `printInt(atAddress:)` function in the following code
+/// sample expects an `${Self}<Int>` instance as its first parameter:
+///
+///     func printInt(atAddress p: ${Self}<Int>) {
+///         print(p.pointee)
+///     }
+///
+/// As is typical in Swift, you can call the `printInt(atAddress:)` function
+/// with an `${Self}` instance. This example passes `intPointer`, a mutable
+/// pointer to an `Int` value, to `print(address:)`.
+///
+///     printInt(atAddress: intPointer)
+///     // Prints "42"
+///
+/// Alternatively, you can use Swift's *implicit bridging* to pass a pointer to
+/// an instance or to the elements of an array. The following example passes a
+/// pointer to the `value` variable by using inout syntax:
+///
+///     var value: Int = 23
+///     printInt(atAddress: &value)
+///     // Prints "23"
+///
+/// A mutable pointer to the elements of an array is implicitly created when
+/// you pass the array using inout syntax. This example uses implicit bridging
+/// to pass a pointer to the elements of `numbers` when calling
+/// `printInt(atAddress:)`.
+///
+///     var numbers = [5, 10, 15, 20]
+///     printInt(atAddress: &numbers)
+///     // Prints "5"
+///
+/// No matter which way you call `printInt(atAddress:)`, Swift's type safety
+/// guarantees that you can only pass a pointer to the type required by the
+/// function---in this case, a pointer to an `Int`.
+%else:
+/// When calling a function or method with an `${Self}` parameter, you can pass
+/// an instance of that specific pointer type, pass an instance of a
+/// compatible pointer type, or use Swift's implicit bridging to pass a
+/// compatible pointer.
+///
+/// For example, the `printInt(atAddress:)` function in the following code
+/// sample expects an `${Self}<Int>` instance as its first parameter:
+///
+///     func printInt(atAddress p: ${Self}<Int>) {
+///         print(p.pointee)
+///     }
+///
+/// As is typical in Swift, you can call the `printInt(atAddress:)` function
+/// with an `${Self}` instance. This example passes `intPointer`, a pointer to
+/// an `Int` value, to `print(address:)`.
+///
+///     printInt(atAddress: intPointer)
+///     // Prints "42"
+///
+/// Because a mutable typed pointer can be implicitly cast to an immutable
+/// pointer with the same `Pointee` type when passed as a parameter, you can
+/// also call `printInt(atAddress:)` with an `UnsafeMutablePointer` instance.
+///
+///     let mutableIntPointer = UnsafeMutablePointer(mutating: intPointer)
+///     printInt(atAddress: mutableIntPointer)
+///     // Prints "42"
+///
+/// Alternatively, you can use Swift's *implicit bridging* to pass a pointer to
+/// an instance or to the elements of an array. The following example passes a
+/// pointer to the `value` variable by using inout syntax:
+///
+///     var value: Int = 23
+///     printInt(atAddress: &value)
+///     // Prints "23"
+///
+/// An immutable pointer to the elements of an array is implicitly created when
+/// you pass the array as an argument. This example uses implicit bridging to
+/// pass a pointer to the elements of `numbers` when calling
+/// `printInt(atAddress:)`.
+///
+///     let numbers = [5, 10, 15, 20]
+///     printInt(atAddress: numbers)
+///     // Prints "5"
+///
+/// You can also use inout syntax to pass a mutable pointer to the elements of
+/// an array. Because `printInt(atAddress:)` requires an immutable pointer,
+/// although this is syntactically valid, it isn't necessary.
+///
+///     var mutableNumbers = numbers
+///     printInt(atAddress: &mutableNumbers)
+///
+/// No matter which way you call `printInt(atAddress:)`, Swift's type safety
+/// guarantees that you can only pass a pointer to the type required by the
+/// function---in this case, a pointer to an `Int`.
+%end
+///
+/// - Important: The pointer created through implicit bridging of an instance
+///   or of an array's elements is only valid during the execution of the
+///   called function. Escaping the pointer to use after the execution of the
+///   function is undefined behavior. In particular, do not use implicit
+///   bridging when calling an `${Self}` initializer.
+///
+///       var number = 5
+///       let numberPointer = Unsafe${Mutable}Pointer<Int>(&number)
+///       // Accessing 'numberPointer' is undefined behavior.
 @_fixed_layout
 public struct ${Self}<Pointee>
   : Strideable, Hashable, _Pointer {
 
+  /// A type that represents the distance between two pointers.
   public typealias Distance = Int
 
   /// The underlying raw (untyped) pointer.
@@ -46,48 +287,66 @@ public struct ${Self}<Pointee>
     self._rawValue = _rawValue
   }
 
-  /// Converts from an opaque pointer to a typed pointer.
+  /// Creates a new typed pointer from the given opaque pointer.
+  ///
+  /// - Parameter from: The opaque pointer to convert to a typed pointer.
   @_transparent
   public init(_ from : OpaquePointer) {
     _rawValue = from._rawValue
   }
 
-  /// Converts from an opaque pointer to a typed pointer.
+  /// Creates a new typed pointer from the given opaque pointer.
   ///
-  /// Returns `nil` if `from` is `nil`.
+  /// - Parameter from: The opaque pointer to convert to a typed pointer. If
+  ///   `from` is `nil`, the result of this initializer is `nil`.
   @_transparent
   public init?(_ from : OpaquePointer?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
 
-  /// Creates ${a_Self} with a given pattern of bits.
+  /// Creates a new typed pointer from the given address, specified as a bit
+  /// pattern.
   ///
-  /// Returns `nil` if `bitPattern` is zero.
+  /// The address passed as `bitPattern` must have the correct alignment for
+  /// the pointer's `Pointee` type. That is,
+  /// `bitPattern % MemoryLayout<Pointee>.alignment` must be `0`.
+  ///
+  /// - Parameter bitPattern: A bit pattern to use for the address of the new
+  ///   pointer. If `bitPattern` is zero, the result is `nil`.
   @_transparent
   public init?(bitPattern: Int) {
     if bitPattern == 0 { return nil }
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Creates ${a_Self} with a given pattern of bits.
+  /// Creates a new typed pointer from the given address, specified as a bit
+  /// pattern.
   ///
-  /// Returns `nil` if `bitPattern` is zero.
+  /// The address passed as `bitPattern` must have the correct alignment for
+  /// the pointer's `Pointee` type. That is,
+  /// `bitPattern % MemoryLayout<Pointee>.alignment` must be `0`.
+  ///
+  /// - Parameter bitPattern: A bit pattern to use for the address of the new
+  ///   pointer. If `bitPattern` is zero, the result is `nil`.
   @_transparent
   public init?(bitPattern: UInt) {
     if bitPattern == 0 { return nil }
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Creates ${a_Self} from another `${Self}`.
+  /// Creates a new pointer from the given typed pointer.
+  ///
+  /// - Parameter other: The typed pointer to convert.
   @_transparent
   public init(_ other: ${Self}<Pointee>) {
     self = other
   }
 
-  /// Creates ${a_Self} from another `${Self}`.
+  /// Creates a new pointer from the given typed pointer.
   ///
-  /// Returns `nil` if `other` is `nil`.
+  /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
+  ///   result is `nil`.
   @_transparent
   public init?(_ other: ${Self}<Pointee>?) {
     guard let unwrapped = other else { return nil }
@@ -95,32 +354,40 @@ public struct ${Self}<Pointee>
   }
 
 %  if mutable:
-  /// Converts from `UnsafePointer` to `UnsafeMutablePointer` of the same
-  /// `Pointee`.
+  /// Creates a mutable typed pointer referencing the same memory as the given
+  /// immutable pointer.
+  ///
+  /// - Parameter other: The immutable pointer to convert.
   @_transparent
   public init(mutating other: UnsafePointer<Pointee>) {
     self._rawValue = other._rawValue
   }
 
-  /// Converts from `UnsafePointer` to `UnsafeMutablePointer` of the same
-  /// `Pointee`.
+  /// Creates a mutable typed pointer referencing the same memory as the given
+  /// immutable pointer.
   ///
-  /// Returns nil if `bitPattern` is zero.
+  /// - Parameter other: The immutable pointer to convert. If `other` is `nil`,
+  ///   the result is `nil`.
   @_transparent
   public init?(mutating other: UnsafePointer<Pointee>?) {
     guard let unwrapped = other else { return nil }
     self.init(mutating: unwrapped)
   }
 % else:
-  /// Converts from `UnsafeMutablePointer` to ${a_Self} of the same `Pointee`.
+  /// Creates an immutable typed pointer referencing the same memory as the
+  /// given mutable pointer.
+  ///
+  /// - Parameter other: The pointer to convert.
   @_transparent
   public init(_ other: UnsafeMutablePointer<Pointee>) {
     self._rawValue = other._rawValue
   }
 
-  /// Converts from `UnsafeMutablePointer` to ${a_Self} of the same `Pointee`.
+  /// Creates an immutable typed pointer referencing the same memory as the
+  /// given mutable pointer.
   ///
-  /// Returns nil if `from` is nil.
+  /// - Parameter other: The pointer to convert. If `other` is `nil`, the
+  ///   result is `nil`.
   @_transparent
   public init?(_ other: UnsafeMutablePointer<Pointee>?) {
     guard let unwrapped = other else { return nil }
@@ -129,10 +396,29 @@ public struct ${Self}<Pointee>
 %  end
 
 %  if mutable:
-  /// Allocates and points at uninitialized aligned memory for `count`
-  /// instances of `Pointee`.
+  /// Allocates uninitialized memory for the specified number of instances of
+  /// type `Pointee`.
   ///
-  /// - Postcondition: The pointee is allocated, but not initialized.
+  /// The resulting pointer references a region of memory that is bound to
+  /// `Pointee` and is `count * MemoryLayout<Pointee>.stride` bytes in size.
+  /// You must eventually deallocate the memory referenced by the returned
+  /// pointer.
+  ///
+  /// The following example allocates enough new memory to store four `Int`
+  /// instances and then initializes that memory with the elements of a range.
+  ///
+  ///     let intPointer = UnsafeMutablePointer<Int>.allocate(capacity: 4)
+  ///     intPointer.initialize(from: 1...4)
+  ///     print(intPointer.pointee)
+  ///     // Prints "1"
+  ///
+  /// When you allocate memory, always remember to deallocate once you're
+  /// finished.
+  ///
+  ///     intPointer.deallocate(capacity: 4)
+  ///
+  /// - Parameter count: The amount of memory to allocate, counted in instances
+  ///   of `Pointee`.
   static public func allocate(capacity count: Int)
     -> UnsafeMutablePointer<Pointee> {
     let size = MemoryLayout<Pointee>.stride * count
@@ -142,12 +428,14 @@ public struct ${Self}<Pointee>
     return UnsafeMutablePointer(rawPtr)
   }
 
-  /// Deallocates uninitialized memory allocated for `count` instances
-  /// of `Pointee`.
+  /// Deallocates memory that was allocated for `count` instances of `Pointee`.
   ///
-  /// - Precondition: The memory is not initialized.
+  /// The memory region that is deallocated is
+  /// `capacity * MemoryLayout<Pointee>.stride` bytes in size. The memory must
+  /// not be initialized or `Pointee` must be a trivial type.
   ///
-  /// - Postcondition: The memory has been deallocated.
+  /// - Parameter capacity: The amount of memory to deallocate, counted in
+  ///   instances of `Pointee`.
   public func deallocate(capacity: Int) {
     let size = MemoryLayout<Pointee>.stride * capacity
     Builtin.deallocRaw(
@@ -155,11 +443,21 @@ public struct ${Self}<Pointee>
   }
 %  end
 
-  /// Accesses the `Pointee` instance referenced by `self`.
+  /// Accesses the instance referenced by this pointer.
   ///
-  /// - Precondition: Either the pointee has been initialized with an
-  ///   instance of type `Pointee`, or `pointee` is being assigned to
-  ///   and `Pointee` is a trivial type.
+%  if mutable:
+  /// When reading from the `pointee` property, the instance referenced by this
+  /// pointer must already be initialized. When `pointee` is used as the left
+  /// side of an assignment, the instance must be initialized or this
+  /// pointer's `Pointee` type must be a trivial type.
+  ///
+  /// Do not assign an instance of a nontrivial type through `pointee` to
+  /// uninitialized memory. Instead, use an initializing method, such as
+  /// `initialize(to:count:)`.
+%  else:
+  /// When reading from the `pointee` property, the instance referenced by
+  /// this pointer must already be initialized.
+%  end
   public var pointee: Pointee {
 %  if mutable:
     @_transparent unsafeAddress {
@@ -176,14 +474,17 @@ public struct ${Self}<Pointee>
   }
 
 %  if mutable:
-  /// Initializes `self.pointee` with `count` consecutive copies of `newValue`
+  /// Initializes this pointer's memory with the specified number of
+  /// consecutive copies of the given value.
   ///
-  /// - Precondition: The pointee is not initialized.
+  /// The destination memory must be uninitialized or the pointer's `Pointee`
+  /// must be a trivial type. After a call to `initialize(to:count:)`, the
+  /// memory referenced by this pointer is initialized.
   ///
-  /// - Precondition: `count` is non-negative.
-  ///
-  /// - Postcondition: The pointee is initialized; the value should eventually
-  ///   be destroyed or moved from to avoid leaks.
+  /// - Parameters:
+  ///   - newValue: The instance to initialize this pointer's memory with.
+  ///   - count: The number of consecutive copies of `newValue` to initialize.
+  ///     `count` must not be negative. The default is `1`.
   public func initialize(to newValue: Pointee, count: Int = 1) {
     // FIXME: add tests (since the `count` has been added)
     _debugPrecondition(count >= 0,
@@ -195,29 +496,40 @@ public struct ${Self}<Pointee>
     }
   }
 
-  /// Retrieves the `pointee`, returning the referenced memory to an
-  /// uninitialized state.
+  /// Retrieves and returns the referenced instance, returning the pointer's
+  /// memory to an uninitialized state.
   ///
-  /// Equivalent to `{ defer { deinitialize() }; return pointee }()`, but
-  /// more efficient.
+  /// Calling the `move()` method on a pointer `p` that references memory of
+  /// type `T` is equivalent to the following code, aside from any cost and
+  /// incidental side effects of copying and destroying the value:
   ///
-  /// - Precondition: The pointee is initialized.
+  ///     let value: T = {
+  ///         defer { p.deinitialize() }
+  ///         return p.pointee
+  ///     }()
   ///
-  /// - Postcondition: The memory is uninitialized.
+  /// The memory referenced by this pointer must be initialized. After calling
+  /// `move()`, the memory is uninitialized.
+  ///
+  /// - Returns: The instance referenced by this pointer.
   public func move() -> Pointee {
     return Builtin.take(_rawValue)
   }
 
-  /// Replaces `count` initialized `Pointee`s starting at `self` with
-  /// the `count` `Pointee`s at `source`.
+  /// Replaces this pointer's initialized memory with the specified number of
+  /// instances from the given pointer's memory.
   ///
-  /// - Precondition: `count >= 0`
+  /// The region of memory starting at this pointer and covering `count`
+  /// instances of the pointer's `Pointee` type must be initialized or
+  /// `Pointee` must be a trivial type. After calling
+  /// `assign(from:count:)`, the region is initialized.
   ///
-  /// - Precondition: The `Pointee`s at `source..<source + count` are
-  ///   initialized.
-  ///
-  /// - Precondition: Either the `Pointee`s at `self..<self + count`
-  ///   are initialized, or `Pointee` is a trivial type.
+  /// - Parameters:
+  ///   - source: A pointer to at least `count` initialized instances of type
+  ///     `Pointee`. The memory regions referenced by `source` and this
+  ///     pointer may overlap.
+  ///   - count: The number of instances to copy from the memory referenced by
+  ///     `source` to this pointer's memory. `count` must not be negative.
   public func assign(from source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.assign with negative count")
@@ -237,19 +549,22 @@ public struct ${Self}<Pointee>
     }
   }
 
-  /// Initializes memory starting at `self` with `count` `Pointee`s
-  /// beginning at `source`, and returning the source memory to an
-  /// uninitialized state.
+  /// Moves instances from initialized source memory into the uninitialized
+  /// memory referenced by this pointer, leaving the source memory
+  /// uninitialized and the memory referenced by this pointer initialized.
   ///
-  /// - Precondition: `count >= 0`
+  /// The region of memory starting at this pointer and covering `count`
+  /// instances of the pointer's `Pointee` type must be uninitialized or
+  /// `Pointee` must be a trivial type. After calling
+  /// `initialize(from:count:)`, the region is initialized and the memory
+  /// region `source..<(source + count)` is uninitialized.
   ///
-  /// - Precondition: The memory at `self..<self + count` is uninitialized
-  ///   and the `Pointees` at `source..<source + count` are
-  ///   initialized.
-  ///
-  /// - Postcondition: The `Pointee`s at `self..<self + count` are
-  ///   initialized and the memory at `source..<source + count` is
-  ///   uninitialized.
+  /// - Parameters:
+  ///   - source: A pointer to the values to copy. The memory region
+  ///     `source..<(source + count)` must be initialized. The memory regions
+  ///     referenced by `source` and this pointer may overlap.
+  ///   - count: The number of instances to move from `source` to this
+  ///     pointer's memory. `count` must not be negative.
   public func moveInitialize(from source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.moveInitialize with negative count")
@@ -275,20 +590,20 @@ public struct ${Self}<Pointee>
     }
   }
 
-  /// Initializes memory starting at `self` with `count` `Pointee`s
-  /// beginning at `source`.
+  /// Initializes the memory referenced by this pointer with the values
+  /// starting at the given pointer.
   ///
-  /// - Precondition: `count >= 0`
+  /// The region of memory starting at this pointer and covering `count`
+  /// instances of the pointer's `Pointee` type must be uninitialized or
+  /// `Pointee` must be a trivial type. After calling
+  /// `initialize(from:count:)`, the region is initialized.
   ///
-  /// - Precondition: The memory regions `source..<source + count`
-  ///   and `self..<self + count` do not overlap.
-  ///
-  /// - Precondition: The memory at `self..<self + count` is uninitialized
-  ///   and the `Pointees` at `source..<source + count` are
-  ///   initialized.
-  ///
-  /// - Postcondition: The `Pointee`s at `self..<self + count` and
-  ///   `source..<source + count` are initialized.
+  /// - Parameters:
+  ///   - source: A pointer to the values to copy. The memory region
+  ///     `source..<(source + count)` must be initialized. The memory regions
+  ///     referenced by `source` and this pointer must not overlap.
+  ///   - count: The number of instances to move from `source` to this
+  ///     pointer's memory. `count` must not be negative.
   public func initialize(from source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.initialize with negative count")
@@ -304,33 +619,42 @@ public struct ${Self}<Pointee>
     // }
   }
 
-  /// Initializes memory starting at `self` with the elements of `source`.
+  /// Initializes memory starting at this pointer's address with the elements
+  /// of the given collection.
   ///
-  /// - Precondition: The memory at `self..<self + count` is
-  ///   uninitialized.
+  /// The region of memory starting at this pointer and covering `source.count`
+  /// instances of the pointer's `Pointee` type must be uninitialized or
+  /// `Pointee` must be a trivial type. After calling `initialize(from:)`, the
+  /// region is initialized.
   ///
-  /// - Postcondition: The `Pointee`s at `self..<self + count` are
-  ///   initialized.
+  /// - Parameter source: A collection of elements of the pointer's `Pointee`
+  ///   type.
+  // This is fundamentally unsafe since collections can underreport their count.
+  @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'UnsafeMutableBufferPointer.initialize(from:)' instead")
   public func initialize<C : Collection>(from source: C)
     where C.Iterator.Element == Pointee {
-    source._copyContents(initializing: self)
+    let buf = UnsafeMutableBufferPointer(start: self, count: numericCast(source.count))
+    var (remainders,writtenUpTo) = source._copyContents(initializing: buf)
+    // ensure that exactly rhs.count elements were written
+    _precondition(remainders.next() == nil, "rhs underreported its count")
+    _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")
   }
 
-  /// Replaces `count` initialized `Pointee`s starting at `self` with
-  /// the `count` `Pointee`s starting at `source`, returning the
-  /// source memory to an uninitialized state.
+  /// Replaces the memory referenced by this pointer with the values
+  /// starting at the given pointer, leaving the source memory uninitialized.
   ///
-  /// - Precondition: `count >= 0`
+  /// The region of memory starting at this pointer and covering `count`
+  /// instances of the pointer's `Pointee` type must be initialized or
+  /// `Pointee` must be a trivial type. After calling
+  /// `initialize(from:count:)`, the region is initialized and the memory
+  /// region `source..<(source + count)` is uninitialized.
   ///
-  /// - Precondition: The memory regions `source..<source + count`
-  ///   and `self..<self + count` do not overlap.
-  ///
-  /// - Precondition: The `Pointee`s at `self..<self + count` and
-  ///   `source..<source + count` are initialized.
-  ///
-  /// - Postcondition: The `Pointee`s at `self..<self + count` are
-  ///   initialized and the `Pointees` at `source..<source + count`
-  ///   are uninitialized.
+  /// - Parameters:
+  ///   - source: A pointer to the values to copy. The memory region
+  ///     `source..<(source + count)` must be initialized. The memory regions
+  ///     referenced by `source` and this pointer must not overlap.
+  ///   - count: The number of instances to move from `source` to this
+  ///     pointer's memory. `count` must not be negative.
   public func moveAssign(from source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.moveAssign(from:) with negative count")
@@ -346,15 +670,17 @@ public struct ${Self}<Pointee>
     // }
   }
 
-  /// De-initializes the `count` `Pointee`s starting at `self`, returning
-  /// their memory to an uninitialized state.
+  /// Deinitializes the specified number of values starting at this pointer.
   ///
-  /// Returns an UnsafeMutableRawPointer to this memory.
+  /// The region of memory starting at this pointer and covering `count`
+  /// instances of the pointer's `Pointee` type must be initialized. After
+  /// calling `deinitialize(count:)`, the memory is uninitialized, but still
+  /// bound to the `Pointee` type.
   ///
-  /// - Precondition: The `Pointee`s at `self..<self + count` are
-  ///   initialized.
-  ///
-  /// - Postcondition: The memory is uninitialized.
+  /// - Parameter count: The number of instances to deinitialize. `count` must
+  ///   not be negative. The default value is `1`.
+  /// - Returns: A raw pointer to the same address as this pointer. The memory
+  ///   referenced by the returned raw pointer is still bound to `Pointee`.
   @discardableResult
   public func deinitialize(count: Int = 1) -> UnsafeMutableRawPointer {
     _debugPrecondition(count >= 0, "${Self}.deinitialize with negative count")
@@ -365,27 +691,48 @@ public struct ${Self}<Pointee>
   }
 %  end
 
-  /// Rebinds memory at `self` to type `T` with capacity to hold `count`
-  /// adjacent `T` values while executing the `body` closure.
+  /// Executes the given closure while temporarily binding the specified number
+  /// of instances to the given type.
   ///
-  /// After executing the closure, rebinds memory back to `Pointee`.
+  /// Use this method when you have a pointer to memory bound to one type and
+  /// you need to access that memory as instances of another type. Accessing
+  /// memory as type `T` requires that the memory be bound to that type. A
+  /// memory location may only be bound to one type at a time, so accessing
+  /// the same memory as an unrelated type without first rebinding the memory
+  /// is undefined.
   ///
-  /// - Precondition: Type 'T' is layout compatible with type 'Pointee'.
-  /// - Precondition: The memory `self..<self + count * MemoryLayout<T>.stride`
-  ///   is bound to `Pointee`.
+  /// The region of memory starting at this pointer and covering `count`
+  /// instances of the pointer's `Pointee` type must be initialized.
   ///
-  /// Accessing `${Self}<T>.pointee` requires that the memory be "bound" to
-  /// type `T`.  A memory location may only be bound to one type at a time, so
-  /// accessing the same memory as an unrelated type without first rebinding the
-  /// memory is undefined. `self` may not be accessed within the `body` closure
-  /// because memory is no longer bound to `Pointee` while it executes. The
-  /// closure's `${Self}<T>` argument must not escape the closure because memory
-  /// is only temporarily bound to `T`.
+  /// The following example temporarily rebinds the memory of a `UInt64`
+  /// pointer to `Int64`, then accesses a property on the signed integer.
   ///
-  /// To persistently bind this memory to a different type, first obtain a
-  /// raw pointer to the memory, then invoke the `bindMemory` API:
-  /// `UnsafeRawPointer(typedPointer).bindMemory(to:capacity:)`.
-  public func withMemoryRebound<T, Result>(to: T.Type, capacity count: Int,
+  ///     let uint64Pointer: Unsafe${Mutable}Pointer<UInt64> = fetchValue()
+  ///     let isNegative = uint64Pointer.withMemoryRebound(to: Int64.self) { ptr in
+  ///         return ptr.pointee < 0
+  ///     }
+  ///
+  /// Because this pointer's memory is no longer bound to its `Pointee` type
+  /// while the `body` closure executes, do not access memory using the
+  /// original pointer from within `body`. Instead, use the `body` closure's
+  /// pointer argument to access the values in memory as instances of type
+  /// `T`.
+  ///
+  /// After executing `body`, this method rebinds memory back to the original
+  /// `Pointee` type.
+  ///
+  /// - Parameters:
+  ///   - type: The type to temporarily bind the memory referenced by this
+  ///     pointer. The type `T` must be the same size and be layout compatible
+  ///     with the pointer's `Pointee` type.
+  ///   - count: The number of instances of `T` to bind to `type`.
+  ///   - body: A closure that takes a ${Mutable.lower()} typed pointer to the
+  ///     same memory as this pointer, only bound to type `T`. The closure's
+  ///     pointer argument is valid only for the duration of the closure's
+  ///     execution. If `body` has a return value, it is used as the return
+  ///     value for the `withMemoryRebound(to:capacity:_:)` method.
+  /// - Returns: The return value of the `body` closure parameter, if any.
+  public func withMemoryRebound<T, Result>(to type: T.Type, capacity count: Int,
     _ body: (${Self}<T>) throws -> Result
   ) rethrows -> Result {
     Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
@@ -395,11 +742,24 @@ public struct ${Self}<Pointee>
     return try body(${Self}<T>(_rawValue))
   }
 
-  /// Accesses the pointee at `self + i`.
+  /// Accesses the pointee at the specified offset from this pointer.
   ///
-  /// - Precondition: Either the pointee at `self + i` is initialized, or the
-  ///   subscript is the left side of an assignment and `Pointee` is a trivial
-  ///   type.
+%  if mutable:
+  /// For a pointer `p`, the memory at `p + i` must be initialized when reading
+  /// the value by using the subscript. When the subscript is used as the left
+  /// side of an assignment, the memory at `p + i` must be uninitialized or
+  /// the pointer's `Pointee` type must be a trivial type.
+  ///
+  /// Do not assign an instance of a nontrivial type through the subscript to
+  /// uninitialized memory. Instead, use an initializing method, such as
+  /// `initialize(to:count:)`.
+%  else:
+  ///
+  /// For a pointer `p`, the memory at `p + i` must be initialized.
+%  end
+  ///
+  /// - Parameter i: The offset from this pointer at which to access an
+  ///   instance, measured in strides of the pointer's `Pointee` type.
   public subscript(i: Int) -> Pointee {
 %  if mutable:
     @_transparent
@@ -431,22 +791,68 @@ public struct ${Self}<Pointee>
     return Int(bitPattern: self)
   }
 
-  /// Returns the next consecutive position.
+  /// Returns a pointer to the next consecutive instance.
+  ///
+  /// The resulting pointer must be within the bounds of the same allocation as
+  /// this pointer.
+  ///
+  /// - Returns: A pointer advanced from this pointer by
+  ///   `MemoryLayout<Pointee>.stride` bytes.
   public func successor() -> ${Self} {
     return self + 1
   }
 
-  /// Returns the previous consecutive position.
+  /// Returns a pointer to the previous consecutive instance.
+  ///
+  /// The resulting pointer must be within the bounds of the same allocation as
+  /// this pointer.
+  ///
+  /// - Returns: A pointer shifted backward from this pointer by
+  ///   `MemoryLayout<Pointee>.stride` bytes.
   public func predecessor() -> ${Self} {
     return self - 1
   }
 
-  /// Returns `end - self`.
-  public func distance(to x: ${Self}) -> Int {
-    return x - self
+  /// Returns the distance from this pointer to the given pointer, counted as
+  /// instances of the pointer's `Pointee` type.
+  ///
+  /// With pointers `p` and `q`, the result of `p.distance(to: q)` is
+  /// equivalent to `q - p`.
+  ///
+  /// Typed pointers are required to be properly aligned for their `Pointee`
+  /// type. Proper alignment ensures that the result of `distance(to:)`
+  /// accurately measures the distance between the two pointers, counted in
+  /// strides of `Pointee`. To find the distance in bytes between two
+  /// pointers, convert them to `UnsafeRawPointer` instances before calling
+  /// `distance(to:)`.
+  ///
+  /// - Parameter end: The pointer to calculate the distance to.
+  /// - Returns: The distance from this pointer to `end`, in strides of the
+  ///   pointer's `Pointee` type. To access the stride, use
+  ///   `MemoryLayout<Pointee>.stride`.
+  ///
+  /// - SeeAlso: `MemoryLayout`
+  public func distance(to end: ${Self}) -> Int {
+    return end - self
   }
 
-  /// Returns `self + n`.
+  /// Returns a pointer offset from this pointer by the specified number of
+  /// instances.
+  ///
+  /// With pointer `p` and distance `n`, the result of `p.advanced(by: n)` is
+  /// equivalent to `p + n`.
+  ///
+  /// The resulting pointer must be within the bounds of the same allocation as
+  /// this pointer.
+  ///
+  /// - Parameter n: The number of strides of the pointer's `Pointee` type to
+  ///   offset this pointer. To access the stride, use
+  ///   `MemoryLayout<Pointee>.stride`. `n` may be positive, negative, or
+  ///   zero.
+  /// - Returns: A pointer offset from this pointer by `n` instances of the
+  ///   `Pointee` type.
+  ///
+  /// - SeeAlso: `MemoryLayout`
   public func advanced(by n: Int) -> ${Self} {
     return self + n
   }
@@ -478,60 +884,164 @@ extension ${Self} : CustomPlaygroundQuickLookable {
   }
 }
 
-/// - Note: Strideable's implementation is potentially less efficient and cannot
-///   handle misaligned pointers.
-@_transparent
-public func == <Pointee>(
-  lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>
-) -> Bool {
-  return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
-}
+extension ${Self} {
+  // - Note: Strideable's implementation is potentially less efficient and cannot
+  //   handle misaligned pointers.
+  /// Returns a Boolean value indicating whether two pointers are equal.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: Another pointer.
+  /// - Returns: `true` if `lhs` and `rhs` reference the same memory address;
+  ///   otherwise, `false`.
+  @_transparent
+  public static func == (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
+    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
 
-/// - Note: Strideable's implementation is potentially less efficient and cannot
-///   handle misaligned pointers.
-///
-/// - Note: This is an unsigned comparison unlike Strideable's implementation.
-@_transparent
-public func < <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
-  return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
-}
+  // - Note: Strideable's implementation is potentially less efficient and
+  // cannot handle misaligned pointers.
+  //
+  // - Note: This is an unsigned comparison unlike Strideable's implementation.
+  /// Returns a Boolean value indicating whether the first pointer references
+  /// an earlier memory location than the second pointer.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: Another pointer.
+  /// - Returns: `true` if `lhs` references a memory address earlier than
+  ///   `rhs`; otherwise, `false`.
+  @_transparent
+  public static func < (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
+    return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
+  }
 
-/// - Note: The following family of operator overloads are redundant
-///   with Strideable. However, optimizer improvements are needed
-///   before they can be removed without affecting performance.
-@_transparent
-public func + <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
-  return ${Self}(Builtin.gep_Word(
-    lhs._rawValue, rhs._builtinWordValue, Pointee.self))
-}
+  // - Note: The following family of operator overloads are redundant
+  //   with Strideable. However, optimizer improvements are needed
+  //   before they can be removed without affecting performance.
 
-@_transparent
-public func + <Pointee>(lhs: Int,
-           rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
-  return rhs + lhs
-}
+  /// Creates a new pointer, offset from a pointer by a specified number of
+  /// instances of the pointer's `Pointee` type.
+  ///
+  /// You use the addition operator (`+`) to advance a pointer by a number of
+  /// contiguous instances. The resulting pointer must be within the bounds of
+  /// the same allocation as `lhs`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
+  ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
+  /// - Returns: A pointer offset from `lhs` by `rhs` instances of the
+  ///   `Pointee` type.
+  ///
+  /// - SeeAlso: `MemoryLayout`
+  @_transparent
+  public static func + (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
+    return ${Self}(Builtin.gep_Word(
+      lhs._rawValue, rhs._builtinWordValue, Pointee.self))
+  }
 
-@_transparent
-public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
-  return lhs + -rhs
-}
+  /// Creates a new pointer, offset from a pointer by a specified number of
+  /// instances of the pointer's `Pointee` type.
+  ///
+  /// You use the addition operator (`+`) to advance a pointer by a number of
+  /// contiguous instances. The resulting pointer must be within the bounds of
+  /// the same allocation as `rhs`.
+  ///
+  /// - Parameters:
+  ///   - lhs: The number of strides of the pointer's `Pointee` type to offset
+  ///     `rhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
+  ///   - rhs: A pointer.
+  /// - Returns: A pointer offset from `rhs` by `lhs` instances of the
+  ///   `Pointee` type.
+  ///
+  /// - SeeAlso: `MemoryLayout`
+  @_transparent
+  public static func + (lhs: Int, rhs: ${Self}<Pointee>) -> ${Self}<Pointee> {
+    return rhs + lhs
+  }
 
-@_transparent
-public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
-  return
-    Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
-                         Builtin.ptrtoint_Word(rhs._rawValue)))
-    / MemoryLayout<Pointee>.stride
-}
+  /// Creates a new pointer, offset backward from a pointer by a specified
+  /// number of instances of the pointer's `Pointee` type.
+  ///
+  /// You use the subtraction operator (`-`) to shift a pointer backward by a
+  /// number of contiguous instances. The resulting pointer must be within the
+  /// bounds of the same allocation as `lhs`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
+  ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
+  /// - Returns: A pointer offset backward from `lhs` by `rhs` instances of
+  ///   the `Pointee` type.
+  ///
+  /// - SeeAlso: `MemoryLayout`
+  @_transparent
+  public static func - (lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
+    return lhs + -rhs
+  }
 
-@_transparent
-public func += <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
-  lhs = lhs + rhs
-}
+  /// Returns the distance between two pointers, counted as instances of the
+  /// pointers' `Pointee` type.
+  ///
+  /// Typed pointers are required to be properly aligned for their `Pointee`
+  /// type. Proper alignment ensures that the result of the subtraction
+  /// operator (`-`) accurately measures the distance between the two
+  /// pointers, counted in strides of `Pointee`. To find the distance in bytes
+  /// between two pointers, convert them to `UnsafeRawPointer` instances
+  /// before subtracting.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: Another pointer.
+  /// - Returns: The distance from `lhs` to `rhs`, in strides of the pointer's
+  ///   `Pointee` type. To access the stride, use
+  ///   `MemoryLayout<Pointee>.stride`.
+  ///
+  /// - SeeAlso: `MemoryLayout`
+  @_transparent
+  public static func - (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
+    return
+      Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
+                           Builtin.ptrtoint_Word(rhs._rawValue)))
+      / MemoryLayout<Pointee>.stride
+  }
 
-@_transparent
-public func -= <Pointee>(lhs: inout ${Self}<Pointee>, rhs: Int) {
-  lhs = lhs - rhs
+  /// Advances a pointer by a specified number of instances of the pointer's
+  /// `Pointee` type.
+  ///
+  /// You use the addition assignment operator (`+=`) to advance a pointer by a
+  /// number of contiguous instances. The resulting pointer must be within the
+  /// bounds of the same allocation as `rhs`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer to advance in place.
+  ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
+  ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
+  ///
+  /// - SeeAlso: `MemoryLayout`
+  @_transparent
+  public static func += (lhs: inout ${Self}<Pointee>, rhs: Int) {
+    lhs = lhs + rhs
+  }
+
+  /// Shifts a pointer backward by a specified number of instances of the
+  /// pointer's `Pointee` type.
+  ///
+  /// You use the subtraction assignment operator (`-=`) to shift a pointer
+  /// backward by a number of contiguous instances. The resulting pointer must
+  /// be within the bounds of the same allocation as `rhs`.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer to advance in place.
+  ///   - rhs: The number of strides of the pointer's `Pointee` type to offset
+  ///     `lhs`. To access the stride, use `MemoryLayout<Pointee>.stride`.
+  ///
+  /// - SeeAlso: `MemoryLayout`
+  @_transparent
+  public static func -= (lhs: inout ${Self}<Pointee>, rhs: Int) {
+    lhs = lhs - rhs
+  }
 }
 
 extension ${Self} {

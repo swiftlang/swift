@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -19,6 +19,7 @@
 #define SWIFT_SIL_TYPESUBSTCLONER_H
 
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -41,7 +42,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
   void computeSubsMap() {
     if (auto *env = Original.getGenericEnvironment()) {
-      SubsMap = env->getSubstitutionMap(SwiftMod, ApplySubs);
+      SubsMap = env->getSubstitutionMap(ApplySubs);
     }
   }
 
@@ -62,7 +63,7 @@ public:
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
-                  ArrayRef<Substitution> ApplySubs,
+                  SubstitutionList ApplySubs,
                   SILOpenedArchetypesTracker &OpenedArchetypesTracker,
                   bool Inlining = false)
     : SILClonerWithScopes<ImplClass>(To, OpenedArchetypesTracker, Inlining),
@@ -75,7 +76,7 @@ public:
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
-                  ArrayRef<Substitution> ApplySubs,
+                  SubstitutionList ApplySubs,
                   bool Inlining = false)
     : SILClonerWithScopes<ImplClass>(To, Inlining),
       SwiftMod(From.getModule().getSwiftModule()),
@@ -88,8 +89,7 @@ public:
 
 protected:
   SILType remapType(SILType Ty) {
-    return SILType::substType(Original.getModule(), SwiftMod,
-                              SubsMap.getMap(), Ty);
+    return Ty.subst(Original.getModule(), SubsMap);
   }
 
   CanType remapASTType(CanType ty) {
@@ -191,7 +191,7 @@ protected:
                                         &Builder.getFunction());
         Builder.createPartialApply(getOpLocation(Inst->getLoc()), FRI,
                                    getOpType(Inst->getSubstCalleeSILType()),
-                                   ArrayRef<Substitution>(),
+                                   SubstitutionList(),
                                    Args,
                                    getOpType(Inst->getType()));
         return;
@@ -286,13 +286,13 @@ protected:
   }
 
   /// The Swift module that the cloned function belongs to.
-  Module *SwiftMod;
+  ModuleDecl *SwiftMod;
   /// The substitutions list for the specialization.
   SubstitutionMap SubsMap;
   /// The original function to specialize.
   SILFunction &Original;
   /// The substitutions used at the call site.
-  ArrayRef<Substitution> ApplySubs;
+  SubstitutionList ApplySubs;
   /// True, if used for inlining.
   bool Inlining;
 };

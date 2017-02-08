@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -202,7 +202,6 @@ import SwiftShims
 ///     print(capitalA.utf8.count)
 ///     // Prints "1"
 ///
-///
 /// On the other hand, an emoji flag character is constructed from a pair of
 /// Unicode scalars values, like `"\u{1F1F5}"` and `"\u{1F1F7}"`. Each of
 /// these scalar values, in turn, is too large to fit into a single UTF-16 or
@@ -218,6 +217,11 @@ import SwiftShims
 ///     // Prints "4"
 ///     print(flag.utf8.count)
 ///     // Prints "8"
+///
+/// To check whether a string is empty, use its `isEmpty` property instead
+/// of comparing the length of one of the views to `0`. Unlike `isEmpty`,
+/// calculating a view's `count` property requires iterating through the
+/// elements of the string.
 ///
 /// Accessing String View Elements
 /// ==============================
@@ -352,7 +356,7 @@ extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
 extension String : ExpressibleByUnicodeScalarLiteral {
   /// Creates an instance initialized to the given Unicode scalar value.
   ///
-  /// Don't call this initializer directly. It may be used by the compiler when
+  /// Do not call this initializer directly. It may be used by the compiler when
   /// you initialize a string using a string literal that contains a single
   /// Unicode scalar value.
   public init(unicodeScalarLiteral value: String) {
@@ -379,7 +383,7 @@ extension String : ExpressibleByExtendedGraphemeClusterLiteral {
   /// Creates an instance initialized to the given extended grapheme cluster
   /// literal.
   ///
-  /// Don't call this initializer directly. It may be used by the compiler when
+  /// Do not call this initializer directly. It may be used by the compiler when
   /// you initialize a string using a string literal containing a single
   /// extended grapheme cluster.
   public init(extendedGraphemeClusterLiteral value: String) {
@@ -431,7 +435,7 @@ extension String : _ExpressibleByBuiltinStringLiteral {
 extension String : ExpressibleByStringLiteral {
   /// Creates an instance initialized to the given string value.
   ///
-  /// Don't call this initializer directly. It is used by the compiler when you
+  /// Do not call this initializer directly. It is used by the compiler when you
   /// initialize a string using a string literal. For example:
   ///
   ///     let nextStop = "Clark & Lake"

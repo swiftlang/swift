@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -17,7 +17,7 @@
 
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Mutex.h"
-#include "llvm/Support/TimeValue.h"
+#include <chrono>
 #include <xpc/xpc.h>
 #include <dispatch/dispatch.h>
 
@@ -251,7 +251,7 @@ void sourcekitd::initialize() {
   initializeTracing();
 
   assert(!GlobalConn);
-  GlobalConn = xpc_connection_create(SOURCEKIT_XPCSERVICE_IDENTIFIER, NULL);
+  GlobalConn = xpc_connection_create(SOURCEKIT_XPCSERVICE_IDENTIFIER, nullptr);
 
   xpc_connection_set_event_handler(GlobalConn, ^(xpc_object_t event) {
     xpc_type_t type = xpc_get_type(event);
@@ -406,26 +406,27 @@ static void sendNotification(xpc_object_t event) {
 }
 
 static void updateSemanticEditorDelay() {
-  using namespace llvm::sys;
+  using namespace std::chrono;
+  using TimePoint = time_point<system_clock, nanoseconds>;
 
   // Clear any previous setting.
   SemanticEditorDelaySecondsNum = 0;
 
-  static TimeValue gPrevCrashTime;
+  static TimePoint gPrevCrashTime;
 
-  TimeValue PrevTime = gPrevCrashTime;
-  TimeValue CurrTime = TimeValue::now();
+  TimePoint PrevTime = gPrevCrashTime;
+  TimePoint CurrTime = system_clock::now();
   gPrevCrashTime = CurrTime;
-  if (PrevTime == TimeValue()) {
+  if (PrevTime == TimePoint()) {
     // First time that it crashed.
     return;
   }
 
-  TimeValue Diff = CurrTime - PrevTime;
-  if (Diff.seconds() > 30)
+  auto Diff = duration_cast<seconds>(CurrTime - PrevTime);
+  if (Diff.count() > 30)
     return; // treat this as more likely unrelated to the previous crash.
 
-  size_t Delay = std::min(size_t(20), size_t(Diff.seconds()*2 + 1));
+  size_t Delay = std::min(size_t(20), size_t(Diff.count()*2 + 1));
   LOG_WARN_FUNC("disabling semantic editor for " << Delay << " seconds");
   SemanticEditorDelaySecondsNum = Delay;
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -O -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests  -O -emit-sil -primary-file %s | %FileCheck %s
 
 struct XXX<T> {
   init(t : T) {m_t = t}
@@ -18,4 +18,4 @@ public func exp1() {
   J.bar(3)
 }
 // Make sure that we are able to specialize the extension 'bar'
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV14specialize_ext3XXX3bar
+//CHECK: sil shared [noinline] @_T014specialize_ext3XXXV3bar{{[_0-9a-zA-Z]*}}FSi_Tg5

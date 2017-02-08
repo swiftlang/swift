@@ -2,8 +2,8 @@
 // RUN: echo '%S/Inputs/filelist-other.swift' >> %t/input.txt
 // RUN: echo '%s' >> %t/input.txt
 // RUN: echo '%S/../Inputs/empty.swift' >> %t/input.txt
-// RUN: not %target-swift-frontend -parse -filelist %t/input.txt -primary-file %s 2>&1 | %FileCheck %s
-// RUN: not %target-swift-frontend -parse -filelist %t/input.txt 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck -filelist %t/input.txt -primary-file %s 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck -filelist %t/input.txt 2>&1 | %FileCheck %s
 
 // RUN: not %target-swift-frontend -emit-bc -filelist %t/nonexistent-input.txt 2>&1 | %FileCheck -check-prefix=CHECK-BADFILE %s
 // CHECK-BADFILE: error: cannot open file

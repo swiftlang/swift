@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -47,8 +47,9 @@ class alignas(8) Pattern {
     friend class Pattern;
     unsigned Kind : 8;
     unsigned isImplicit : 1;
+    mutable unsigned hasInterfaceType : 1;
   };
-  enum { NumPatternBits = 9 };
+  enum { NumPatternBits = 10 };
   enum { NumBitsAllocated = 32 };
 
   class TuplePatternBitfields {
@@ -73,11 +74,16 @@ protected:
   Pattern(PatternKind kind) {
     PatternBits.Kind = unsigned(kind);
     PatternBits.isImplicit = false;
+    PatternBits.hasInterfaceType = false;
   }
 
 private:
   /// The checked type of the pattern.
-  Type Ty;
+  ///
+  /// if \c PatternBits.hasInterfaceType, this stores the interface type of the
+  /// pattern, which will be lazily resolved to the contextual type using
+  /// the environment in \c ASTContext::DelayedPatternContexts.
+  mutable Type Ty;
 
 public:
   PatternKind getKind() const { return PatternKind(PatternBits.Kind); }
@@ -108,11 +114,25 @@ public:
 
   /// If this pattern has been type-checked, return the type it
   /// matches.
-  Type getType() const { assert(hasType()); return Ty; }
+  Type getType() const;
 
   /// Set the type of this pattern, given that it was previously not
   /// type-checked.
   void setType(Type ty) { Ty = ty; }
+
+  /// Retrieve the delayed interface type of this pattern, if it has one.
+  ///
+  /// Note: this is used for delayed deserialization logic.
+  Type getDelayedInterfaceType() const {
+    if (PatternBits.hasInterfaceType) return Ty;
+    return nullptr;
+  }
+
+  /// Set the type of this pattern as an interface type whose resolution to
+  /// a context type will be performed lazily.
+  ///
+  /// \param dc The context in which the type will be resolved.
+  void setDelayedInterfaceType(Type interfaceTy, DeclContext *dc);
 
   /// Overwrite the type of this pattern.
   void overwriteType(Type ty) { assert(hasType()); Ty = ty; }
@@ -351,7 +371,7 @@ public:
 /// dynamic type match.
 class TypedPattern : public Pattern {
   Pattern *SubPattern;
-  TypeLoc PatType;
+  mutable TypeLoc PatType;
 
 public:
   TypedPattern(Pattern *pattern, TypeLoc tl, Optional<bool> implicit = None)
@@ -380,8 +400,20 @@ public:
   const Pattern *getSubPattern() const { return SubPattern; }
   void setSubPattern(Pattern *p) { SubPattern = p; }
 
-  TypeLoc &getTypeLoc() { return PatType; }
-  TypeLoc getTypeLoc() const { return PatType; }
+  TypeLoc &getTypeLoc() {
+    // If we have a delayed interface type, set our type from that.
+    if (getDelayedInterfaceType())
+      PatType.setType(getType());
+
+    return PatType;
+  }
+  TypeLoc getTypeLoc() const {
+    // If we have a delayed interface type, set our type from that.
+    if (getDelayedInterfaceType())
+      PatType.setType(getType());
+
+    return PatType;
+  }
 
   SourceLoc getLoc() const {
     if (SubPattern->isImplicit())
@@ -503,7 +535,10 @@ public:
                                     : NameLoc;
   }
   SourceLoc getEndLoc() const {
-    return SubPattern ? SubPattern->getSourceRange().End : NameLoc;
+    if (SubPattern && SubPattern->getSourceRange().isValid()) {
+      return SubPattern->getSourceRange().End;
+    }
+    return NameLoc;
   }
   SourceRange getSourceRange() const { return {getStartLoc(), getEndLoc()}; }
   

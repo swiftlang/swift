@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -42,6 +42,20 @@ SourceLoc ASTNode::getEndLoc() const {
   return getSourceRange().End;
 }
 
+DeclContext *ASTNode::getAsDeclContext() const {
+  if (Expr *E = this->dyn_cast<Expr*>()) {
+    if (isa<AbstractClosureExpr>(E))
+      return static_cast<AbstractClosureExpr*>(E);
+  } else if (is<Stmt*>()) {
+    return nullptr;
+  } else if (Decl *D = this->dyn_cast<Decl*>()) {
+    if (isa<DeclContext>(D))
+      return cast<DeclContext>(D);
+  } else if (getOpaqueValue())
+    llvm_unreachable("unsupported AST node");
+  return nullptr;
+}
+
 void ASTNode::walk(ASTWalker &Walker) {
   if (Expr *E = this->dyn_cast<Expr*>())
     E->walk(Walker);
@@ -49,6 +63,16 @@ void ASTNode::walk(ASTWalker &Walker) {
     S->walk(Walker);
   else if (Decl *D = this->dyn_cast<Decl*>())
     D->walk(Walker);
+  else
+    llvm_unreachable("unsupported AST node");
+}
+void ASTNode::walk(SourceEntityWalker &Walker) {
+  if (Expr *E = this->dyn_cast<Expr*>())
+    Walker.walk(E);
+  else if (Stmt *S = this->dyn_cast<Stmt*>())
+    Walker.walk(S);
+  else if (Decl *D = this->dyn_cast<Decl*>())
+    Walker.walk(D);
   else
     llvm_unreachable("unsupported AST node");
 }

@@ -1,0 +1,153 @@
+// RUN: %target-sil-opt -enable-sil-ownership -sil-ownership-verifier-enable-testing -enable-sil-verify-all=0 -o /dev/null 2>&1  %s | %FileCheck %s
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
+class RefWithInt {
+  var value: Builtin.Int32
+
+  init()
+}
+
+///////////
+// Tests //
+///////////
+
+// This checks if the dataflow verifier asserts when we have two consuming users
+// in the same block.
+// CHECK-LABEL: Function: 'double_consume_same_bb'
+// CHECK: Found over consume?!
+// CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: User:   destroy_value %0 : $Builtin.NativeObject
+// CHECK: Block: bb0
+sil @double_consume_same_bb : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  destroy_value %0 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// This test checks if the dataflow verifier asserts when there are two
+// consuming users in chained blocks.
+// CHECK-LABEL: Function: 'double_consume_jump_thread_blocks'
+// CHECK: Found over consume?!
+// CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: User:   destroy_value %0 : $Builtin.NativeObject
+// CHECK: Block: bb0
+sil @double_consume_jump_thread_blocks : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  destroy_value %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+
+// We have a double consume, since we need to copy %0 before we store it.
+// CHECK-LABEL: Function: 'double_consume_loop_test'
+// CHECK: Found over consume?!
+// CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: Block: bb0
+sil @double_consume_loop_test : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb5
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb1
+
+bb4:
+  br bb1
+
+bb5:
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We have a consume of a guaranteed argument
+// CHECK-LABEL: Function: 'consumed_guaranteed_arg'
+// CHECK: Have operand with incompatible ownership?!
+// CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: User:   destroy_value %0 : $Builtin.NativeObject
+// CHECK: Conv: guaranteed
+sil @consumed_guaranteed_arg : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We have a use of a borrowed value after an end_borrow. This is effectively a
+// use after consume.
+//
+// CHECK-LABEL: Function: 'use_after_end_borrow'
+// CHECK: Found use after free?!
+// CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
+// CHECK: Consuming User:   end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+// CHECK: Non Consuming User:   %4 = apply %2(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: Block: bb0
+sil @use_after_end_borrow : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  apply %2(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We have a destroy value of an owned value before a borrow of the owned value
+// has finished.
+//
+// CHECK-LABEL: Function: 'destroy_before_end_borrow'
+// CHECK: Found use after free?!
+// CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: Consuming User:   destroy_value %0 : $Builtin.NativeObject
+// CHECK: Non Consuming User:   end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+// CHECK: Block: bb0
+sil @destroy_before_end_borrow : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %0 : $Builtin.NativeObject
+  end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: Function: 'ref_element_addr_requires_borrow'
+// CHECK: Have operand with incompatible ownership?!
+// CHECK: Value:   %0 = argument of bb0 : $RefWithInt
+// CHECK: BaseValue:    %0 = argument of bb0 : $RefWithInt
+// CHECK: User:   %1 = ref_element_addr %0 : $RefWithInt, #RefWithInt.value
+// CHECK: Conv: owned
+sil @ref_element_addr_requires_borrow : $@convention(thin) (@owned RefWithInt) -> () {
+bb0(%0 : @owned $RefWithInt):
+  %1 = ref_element_addr %0 : $RefWithInt, #RefWithInt.value
+  destroy_value %0 : $RefWithInt
+  %9999 = tuple()
+  return %9999 : $()
+}

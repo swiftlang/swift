@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct SelfRecursiveStruct { // expected-error{{value type 'SelfRecursiveStruct' cannot have a stored property that references itself}}
   let a: SelfRecursiveStruct

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -D ERRORS
+// RUN: %target-typecheck-verify-swift -D ERRORS
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 

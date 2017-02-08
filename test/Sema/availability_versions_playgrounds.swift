@@ -1,8 +1,8 @@
 // Playgrounds
-// RUN: %target-parse-verify-swift -playground
+// RUN: %target-typecheck-verify-swift -playground
 
 // Immediate mode
-// RUN: %target-parse-verify-swift -interpret
+// RUN: %target-typecheck-verify-swift -interpret
 
 // REQUIRES: OS=macosx
 // REQUIRES: swift_interpreter

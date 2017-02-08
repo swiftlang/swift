@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -14,10 +14,8 @@
 
 using namespace swift;
 
-void SILOpenedArchetypesTracker::addOpenedArchetypeDef(Type archetype,
+void SILOpenedArchetypesTracker::addOpenedArchetypeDef(ArchetypeType *archetype,
                                                        SILValue Def) {
-  archetype = archetype->getDesugaredType();
-  assert(archetype->is<ArchetypeType>() && "The type should be an archetype");
   auto OldDef = getOpenedArchetypeDef(archetype);
   if (OldDef && isa<GlobalAddrInst>(OldDef)) {
     // It is a forward definition created during deserialization.
@@ -52,19 +50,19 @@ void SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(Type Ty) {
     if (!ty->isOpenedExistential())
       return;
 
-    ty = ty->getDesugaredType();
-
+    auto *archetypeTy = ty->castTo<ArchetypeType>();
     // Nothing to do if a definition was seen already.
-    if (getOpenedArchetypeDef(ty))
+    if (getOpenedArchetypeDef(archetypeTy))
       return;
 
     auto &SILMod = this->getFunction().getModule();
     // Create a placeholder representing a forward definition.
     auto Placeholder = new (SILMod)
-        GlobalAddrInst(SILDebugLocation(), SILMod.Types.getLoweredType(ty));
+        GlobalAddrInst(SILDebugLocation(),
+                       SILMod.Types.getLoweredType(archetypeTy));
     // Make it available to SILBuilder, so that instructions using this
     // archetype can be constructed.
-    addOpenedArchetypeDef(ty, Placeholder);
+    addOpenedArchetypeDef(archetypeTy, Placeholder);
   });
 }
 
@@ -115,28 +113,17 @@ void SILOpenedArchetypesTracker::handleDeleteNotification(
 
 /// Find an opened archetype defined by an instruction.
 /// \returns The found archetype or empty type otherwise.
-CanType swift::getOpenedArchetypeOf(const SILInstruction *I) {
+ArchetypeType *swift::getOpenedArchetypeOf(const SILInstruction *I) {
   if (isa<OpenExistentialAddrInst>(I) || isa<OpenExistentialRefInst>(I) ||
       isa<OpenExistentialBoxInst>(I) || isa<OpenExistentialMetatypeInst>(I)) {
     auto Ty = getOpenedArchetypeOf(I->getType().getSwiftRValueType());
     assert(Ty->isOpenedExistential() && "Type should be an opened archetype");
-    return Ty;
+    return Ty->castTo<ArchetypeType>();
   }
 
-  return CanType();
+  return nullptr;
 }
 
-
-bool hasAtMostOneOpenedArchetype(CanType Ty) {
-  int NumOpenedArchetypes = 0;
-  Ty.visit([&](Type t) {
-    if (t->isOpenedExistential()) {
-      NumOpenedArchetypes++;
-    }
-    return;
-  });
-  return NumOpenedArchetypes <= 1;
-}
 
 /// Find an opened archetype represented by this type.
 /// It is assumed by this method that the type contains
@@ -146,31 +133,28 @@ bool hasAtMostOneOpenedArchetype(CanType Ty) {
 /// recursively check any children of this type, because
 /// this is the task of the type visitor invoking it.
 /// \returns The found archetype or empty type otherwise.
-CanType swift::getOpenedArchetypeOf(CanType Ty) {
+ArchetypeType *swift::getOpenedArchetypeOf(Type Ty) {
   if (!Ty)
-    return CanType();
-  assert(hasAtMostOneOpenedArchetype(Ty) &&
-         "Type should contain at most one opened archetype");
-  while (auto MetaTy = dyn_cast<AnyMetatypeType>(Ty)) {
-    Ty = MetaTy->getInstanceType().getCanonicalTypeOrNull();
-  }
+    return nullptr;
+  while (auto MetaTy = Ty->getAs<AnyMetatypeType>())
+    Ty = MetaTy->getInstanceType();
   if (Ty->isOpenedExistential())
-    return Ty;
-  return CanType();
+    return Ty->castTo<ArchetypeType>();
+  return nullptr;
 }
 
-SILValue SILOpenedArchetypesState::getOpenedArchetypeDef(Type Ty) const {
-  if (!Ty)
+SILValue SILOpenedArchetypesState::getOpenedArchetypeDef(
+    ArchetypeType *archetypeTy) const {
+  if (!archetypeTy)
     return SILValue();
-  auto CanTy = Ty.getCanonicalTypeOrNull();
   // First perform a quick check.
   for (auto &Op : OpenedArchetypeOperands) {
     auto Def = Op.get();
-    if (getOpenedArchetypeOf(cast<SILInstruction>(Def)) == CanTy)
+    if (getOpenedArchetypeOf(cast<SILInstruction>(Def)) == archetypeTy)
       return Def;
   }
   // Then use a regular lookup.
   if (OpenedArchetypesTracker)
-    return OpenedArchetypesTracker->getOpenedArchetypeDef(Ty);
+    return OpenedArchetypesTracker->getOpenedArchetypeDef(archetypeTy);
   return SILValue();
 }

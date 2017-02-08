@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 //===----------------------------------------------------------------------===//
 // Tests for various simple enum constructs
@@ -311,3 +311,9 @@ enum SyntheticMember { // expected-note {{did you mean the implicitly-synthesize
   case Foo
 }
 print(SyntheticMember.Foo.hasValue) // expected-error {{value of type 'SyntheticMember' has no member 'hasValue'}}
+
+// Non-materializable argument type
+enum Lens<T> {
+  case foo(inout T) // expected-error {{'inout' may only be used on parameters}}
+  case bar(inout T, Int) // expected-error {{'inout' may only be used on parameters}}
+}

@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+
+#
+# Generate the static-stdlib-args.lnk used by the -static-stdlib option for
+# 'GenericUnix' (eg linux) plaforms. Tries to find static .a files for libs
+# not normally installed by default (currently libicu)
+# If libicu is built locally then include libicudata
+#
+
+# SDK=$1
+OUTPUTFILE=$2
+ICU_STATIC_LIB=$3
+# libdirs from pkg-config
+ICU_UC_LIBDIR=$4
+ICU_I18N_LIBDIR=$5
+
+
+# Try and find the libicu .a library files to directly link in using the
+# fullpath to the files otherwise fullback to the default
+function find_static_iculibs {
+    if [ -n "${ICU_I18N_LIBDIR}" ]; then
+        LIBICU_I18N_A=${ICU_I18N_LIBDIR}/libicui18n.a
+    fi
+
+    if [ -n "${ICU_UC_LIBDIR}" ]; then
+        LIBICU_UC_A=${ICU_UC_LIBDIR}/libicuuc.a
+        LIBICU_DATA_A=${ICU_UC_LIBDIR}/libicudata.a
+    fi
+
+    if [ -f "${LIBICU_I18N_A}" ] && [ -f "${LIBICU_UC_A}" ] &&
+       [ -f "${LIBICU_DATA_A}" ]; then
+        read -d '' ICU_LIBS <<EOF
+$LIBICU_I18N_A
+$LIBICU_UC_A
+$LIBICU_DATA_A
+EOF
+    else
+        read -d '' ICU_LIBS <<EOF
+-licui18n
+-licuuc
+EOF
+    fi
+}
+
+
+# If libicu was compiled as part of the swift build then link the libs as normal
+function use_local_iculibs {
+   read -d '' ICU_LIBS <<EOF
+-licui18n
+-licuuc
+-licudata
+EOF
+}
+
+
+function write_linkfile {
+    if [ -z "${OUTPUTFILE}" ]; then
+        echo $0: No outputfile specified
+        exit 1
+    fi
+    cat >$OUTPUTFILE <<EOF
+-ldl
+-lpthread
+-lswiftCore
+-lswiftImageInspectionShared
+$ICU_LIBS
+-Xlinker
+-export-dynamic
+-Xlinker
+--exclude-libs
+-Xlinker
+ALL
+EOF
+}
+
+
+if [ "${ICU_STATIC_LIB}" == "TRUE" ]; then
+    use_local_iculibs
+else
+    find_static_iculibs
+fi
+write_linkfile

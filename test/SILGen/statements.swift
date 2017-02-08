@@ -166,7 +166,7 @@ func for_loops2() {
   // rdar://problem/19316670
   // CHECK: [[NEXT:%[0-9]+]] = function_ref @_TFVs16IndexingIterator4next
   // CHECK-NEXT: alloc_stack $Optional<MyClass>
-  // CHECK-NEXT: apply [[NEXT]]<[MyClass]
+  // CHECK-NEXT: apply [[NEXT]]<[MyClass]>
   // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo!1
   let objects = [MyClass(), MyClass() ]
   for obj in objects {
@@ -507,7 +507,7 @@ func defer_in_generic<T>(_ x: T) {
 // CHECK-LABEL: sil hidden @_TF10statements13defer_mutableFSiT_
 func defer_mutable(_ x: Int) {
   var x = x
-  // CHECK: [[BOX:%.*]] = alloc_box $@box Int
+  // CHECK: [[BOX:%.*]] = alloc_box ${ var Int }
   // CHECK-NEXT: project_box [[BOX]]
   // CHECK-NOT: [[BOX]]
   // CHECK: function_ref @_TFF10statements13defer_mutableFSiT_L_6$deferfT_T_ : $@convention(thin) (@inout_aliasable Int) -> ()

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass="Function Signature Optimization" -disable-arc-opts -emit-sil -Xllvm -enable-destroyhoisting=false %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O -Xllvm -sil-disable-pass="Function Signature Optimization" -disable-arc-opts -emit-sil -Xllvm -enable-destroyhoisting=false %s | %FileCheck %s
 
 // We can't deserialize apply_inst with subst lists. When radar://14443304
 // is fixed then we should convert this test to a SIL test.
@@ -19,8 +19,8 @@ func inner_function<T : P>(In In : T) { }
 @inline(never)
 func outer_function<T : P>(In In : T) { inner_function(In: In) }
 
-//CHECK: sil shared [noinline] @_TTSg5C10spec_conf13FooS0_S_1PS____TF10spec_conf114outer_function
-//CHECK: _TTSg5C10spec_conf13FooS0_S_1PS____TF10spec_conf114inner_function
+//CHECK: sil shared [noinline] @_T010spec_conf114outer_functionyx2In_tAA1PRzlFAA3FooC_Tg5
+//CHECK: _T010spec_conf114inner_functionyx2In_tAA1PRzlFAA3FooC_Tg5
 //CHECK-NEXT: apply
 //CHECK: return
 

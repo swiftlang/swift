@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -115,9 +115,9 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
 #if OPTIONAL_OBJECT_OPTIMIZATION
   auto payloadVWT = payload->getValueWitnesses();
   if (emptyCases == 1
-      && (payloadVWT == &_TWVBo
+      && (payloadVWT == &VALUE_WITNESS_SYM(Bo)
 #if SWIFT_OBJC_INTEROP
-          || payloadVWT == &_TWVBO
+          || payloadVWT == &VALUE_WITNESS_SYM(BO)
 #endif
           )) {
 #define COPY_PAYLOAD_WITNESS(NAME) vwtable->NAME = payloadVWT->NAME;
@@ -140,11 +140,9 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
   }
 }
 
-SWIFT_RT_ENTRY_VISIBILITY
-int
-swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
-                                      const Metadata *payload,
-                                      unsigned emptyCases)
+int swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
+                                          const Metadata *payload,
+                                          unsigned emptyCases)
   SWIFT_CC(RegisterPreservingCC_IMPL) {
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto payloadSize = payloadWitnesses->getSize();
@@ -200,12 +198,9 @@ swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
   return -1;
 }
 
-SWIFT_RT_ENTRY_VISIBILITY
-void
-swift::swift_storeEnumTagSinglePayload(OpaqueValue *value,
-                                       const Metadata *payload,
-                                       int whichCase,
-                                       unsigned emptyCases)
+void swift::swift_storeEnumTagSinglePayload(OpaqueValue *value,
+                                            const Metadata *payload,
+                                            int whichCase, unsigned emptyCases)
   SWIFT_CC(RegisterPreservingCC_IMPL) {
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto payloadSize = payloadWitnesses->getSize();
@@ -322,7 +317,7 @@ struct MultiPayloadLayout {
   size_t payloadSize;
   size_t numTagBytes;
 };
-}
+} // end anonymous namespace
 
 static MultiPayloadLayout getMultiPayloadLayout(const EnumMetadata *enumType) {
   size_t payloadSize = enumType->getPayloadSize();

@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s -emit-ir -g -o - | %FileCheck %s
 
 public struct S {
   func f() {
-    // CHECK: define {{.*}}_TFV4main1S1ffT_T_
+    // CHECK: define {{.*}}_T04main1SV1fyyF
     // CHECK: call void @llvm.dbg.value(metadata i{{.*}} 0,
     // CHECK-SAME:                      metadata ![[SELF:[0-9]+]]
     // CHECK: ![[SELF]] = !DILocalVariable(name: "self", arg: 1,

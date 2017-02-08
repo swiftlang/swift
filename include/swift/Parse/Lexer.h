@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -22,6 +22,7 @@
 #include "swift/Parse/Token.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 namespace swift {
   class DiagnosticEngine;
@@ -232,14 +233,13 @@ public:
 
   /// \brief Restore the lexer state to a given one, that can be located either
   /// before or after the current position.
-  void restoreState(State S) {
+  void restoreState(State S, bool enableDiagnostics = false) {
     assert(S.isValid());
     CurPtr = getBufferPtrForSourceLoc(S.Loc);
     // Don't reemit diagnostics while readvancing the lexer.
-    auto TmpDiags = Diags;
-    Diags = nullptr;
+    llvm::SaveAndRestore<DiagnosticEngine*>
+      D(Diags, enableDiagnostics ? Diags : nullptr);
     lexImpl();
-    Diags = TmpDiags;
   }
 
   /// \brief Restore the lexer state to a given state that is located before

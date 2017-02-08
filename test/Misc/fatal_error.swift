@@ -1,5 +1,5 @@
-// RUN: not %target-swift-frontend -parse %s -sdk "" 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=NO-MODULE %s
-// RUN: not %target-swift-frontend -parse %s -resource-dir / 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=NO-STDLIB %s
+// RUN: not %target-swift-frontend -typecheck %s -sdk "" 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=NO-MODULE %s
+// RUN: not %target-swift-frontend -typecheck %s -resource-dir / 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=NO-STDLIB %s
 
 // NO-MODULE: error: no such module 'NonExistent'
 

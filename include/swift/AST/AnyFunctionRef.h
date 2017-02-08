@@ -2,17 +2,18 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_AST_ANY_FUNCTION_REF_H
 #define SWIFT_AST_ANY_FUNCTION_REF_H
 
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -69,19 +70,11 @@ public:
   
   bool hasType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->hasType();
+      return AFD->hasInterfaceType();
     return !TheFunction.get<AbstractClosureExpr *>()->getType().isNull();
   }
 
   Type getType() const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->getType();
-    return TheFunction.get<AbstractClosureExpr *>()->getType();
-  }
-  
-  /// FIXME: This should just be getType() when interface types take over in
-  /// the AST.
-  Type getInterfaceType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getInterfaceType();
     return TheFunction.get<AbstractClosureExpr *>()->getType();
@@ -90,7 +83,7 @@ public:
   Type getBodyResultType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       if (auto *FD = dyn_cast<FuncDecl>(AFD))
-        return FD->getBodyResultType();
+        return FD->mapTypeIntoContext(FD->getResultInterfaceType());
       return TupleType::getEmpty(AFD->getASTContext());
     }
     return TheFunction.get<AbstractClosureExpr *>()->getResultType();
@@ -157,7 +150,12 @@ public:
     }
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
-  
+
+// Disable "only for use within the debugger" warning.
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(push)
+#pragma warning(disable: 4996)
+#endif
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger") {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
@@ -168,7 +166,30 @@ public:
     }
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
+  
+  GenericEnvironment *getGenericEnvironment() const {
+    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      return afd->getGenericEnvironment();
+    }
+    if (auto ce = TheFunction.dyn_cast<AbstractClosureExpr *>()) {
+      return ce->getGenericEnvironmentOfContext();
+    }
+    llvm_unreachable("unexpected AnyFunctionRef representation");
+  }
+
+  GenericSignature *getGenericSignature() const {
+    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      return afd->getGenericSignature();
+    }
+    if (auto ce = TheFunction.dyn_cast<AbstractClosureExpr *>()) {
+      return ce->getGenericSignatureOfContext();
+    }
+    llvm_unreachable("unexpected AnyFunctionRef representation");
+  }
 };
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(pop)
+#endif
 
 } // namespace swift
 

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // Extern C functions
@@ -84,8 +84,8 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
     input: UnsafeBufferPointer(start: stringPtr, count: count))
 }
 
-@_silgen_name("swift_getTypeByMangledName")
-func _getTypeByMangledName(
+@_silgen_name("swift_getTypeByName")
+func _getTypeByName(
     _ name: UnsafePointer<UInt8>,
     _ nameLength: UInt)
   -> Any.Type?
@@ -94,26 +94,10 @@ func _getTypeByMangledName(
 /// names is stabilized, this is limited to top-level class names (Foo.bar).
 public // SPI(Foundation)
 func _typeByName(_ name: String) -> Any.Type? {
-  let components = name.characters.split{$0 == "."}.map(String.init)
-  guard components.count == 2 else {
-    return nil
-  }
-
-  // Note: explicitly build a class name to match on, rather than matching
-  // on the result of _typeName(), to ensure the type we are resolving is
-  // actually a class.
-  var name = "C"
-  if components[0] == "Swift" {
-    name += "s"
-  } else {
-    name += String(components[0].characters.count) + components[0]
-  }
-  name += String(components[1].characters.count) + components[1]
-
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
-    let type = _getTypeByMangledName(nameUTF8.baseAddress!,
-                                     UInt(nameUTF8.endIndex))
+    let type = _getTypeByName(nameUTF8.baseAddress!,
+                              UInt(nameUTF8.endIndex))
 
     return type
   }

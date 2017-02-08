@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,6 +21,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILCoverageMap.h"
@@ -29,7 +30,6 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/Notifications.h"
-#include "swift/SIL/SILLayout.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
@@ -486,7 +486,7 @@ public:
       Inline_t inlineStrategy = InlineDefault,
       EffectsKind EK = EffectsKind::Unspecified,
       SILFunction *InsertBefore = nullptr,
-      const SILDebugScope *DebugScope = nullptr, DeclContext *DC = nullptr);
+      const SILDebugScope *DebugScope = nullptr);
 
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced
@@ -534,6 +534,9 @@ public:
   SILDefaultWitnessTable *
   createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol,
                                        SILLinkage Linkage);
+
+  /// Deletes a dead witness table.
+  void deleteWitnessTable(SILWitnessTable *Wt);
 
   /// \brief Return the stage of processing this module is at.
   SILStage getStage() const { return Stage; }
@@ -585,6 +588,22 @@ public:
 
   /// Allocate memory using the module's internal allocator.
   void *allocate(unsigned Size, unsigned Align) const;
+
+  template <typename T> T *allocate(unsigned Count) const {
+    return static_cast<T *>(allocate(sizeof(T) * Count, alignof(T)));
+  }
+
+  template <typename T>
+  MutableArrayRef<T> allocateCopy(ArrayRef<T> Array) const {
+    MutableArrayRef<T> result(allocate<T>(Array.size()), Array.size());
+    std::uninitialized_copy(Array.begin(), Array.end(), result.begin());
+    return result;
+  }
+
+  StringRef allocateCopy(StringRef Str) const {
+    auto result = allocateCopy<char>({Str.data(), Str.size()});
+    return {result.data(), result.size()};
+  }
 
   /// Allocate memory for an instruction using the module's internal allocator.
   void *allocateInst(unsigned Size, unsigned Align) const;

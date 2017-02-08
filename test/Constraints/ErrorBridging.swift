@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %clang-importer-sdk -parse %s -verify
+// RUN: %target-swift-frontend %clang-importer-sdk -typecheck %s -verify
 
 // REQUIRES: objc_interop
 

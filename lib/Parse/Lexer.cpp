@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -96,7 +96,9 @@ static unsigned CLO8(unsigned char C) {
 /// isStartOfUTF8Character - Return true if this isn't a UTF8 continuation
 /// character, which will be of the form 0b10XXXXXX
 static bool isStartOfUTF8Character(unsigned char C) {
-  return (signed char)C >= 0 || C >= 0xC0;  // C0 = 0b11000000
+  // RFC 2279: The octet values FE and FF never appear.
+  // RFC 3629: The octet values C0, C1, F5 to FF never appear.
+  return C <= 0x80 || (C >= 0xC2 && C < 0xF5);
 }
 
 /// validateUTF8CharacterAndAdvance - Given a pointer to the starting byte of a
@@ -117,11 +119,7 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
   
   // If this is 0b10XXXXXX, then it is a continuation character.
   if (EncodedBytes == 1 ||
-      // If the number of encoded bytes is > 4, then this is an invalid
-      // character in the range of 0xF5 and above.  These would start an
-      // encoding for something that couldn't be represented with UTF16
-      // digraphs, so Unicode rejects them.
-      EncodedBytes > 4) {
+      !isStartOfUTF8Character(CurByte)) {
     // Skip until we get the start of another character.  This is guaranteed to
     // at least stop at the nul at the end of the buffer.
     while (Ptr < End && !isStartOfUTF8Character(*Ptr))
@@ -474,7 +472,7 @@ static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
 static bool isValidIdentifierStartCodePoint(uint32_t c) {
   if (!isValidIdentifierContinuationCodePoint(c))
     return false;
-  if (c < 0x80 && isDigit(c))
+  if (c < 0x80 && (isDigit(c) || c == '$'))
     return false;
 
   // N1518: Recommendations for extended identifier characters for C and C++
@@ -550,13 +548,17 @@ tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
 #include "swift/Parse/Tokens.def"
     .Default(tok::identifier);
 
-  // These keywords are only active in SIL mode.
-  if ((Kind == tok::kw_sil || Kind == tok::kw_sil_stage ||
-       Kind == tok::kw_sil_vtable || Kind == tok::kw_sil_global ||
-       Kind == tok::kw_sil_witness_table || Kind == tok::kw_sil_default_witness_table ||
-       Kind == tok::kw_sil_coverage_map || Kind == tok::kw_undef) &&
-      !InSILMode)
-    Kind = tok::identifier;
+  // SIL keywords are only active in SIL mode.
+  switch (Kind) {
+#define SIL_KEYWORD(kw) \
+    case tok::kw_##kw:
+#include "swift/Parse/Tokens.def"
+      if (!InSILMode)
+        Kind = tok::identifier;
+      break;
+    default:
+      break;
+  }
   return Kind;
 }
 
@@ -676,6 +678,19 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound,
   }
 }
 
+static bool rangeContainsPlaceholderEnd(const char *CurPtr,
+                                        const char *End) {
+  for (auto SubStr = CurPtr; SubStr != End - 1; ++SubStr) {
+    if (SubStr[0] == '\n') {
+      return false;
+    }
+    if (SubStr[0] == '#' && SubStr[1] == '>') {
+      return true;
+    }
+  }
+  return false;
+}
+
 /// lexOperatorIdentifier - Match identifiers formed out of punctuation.
 void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;
@@ -695,6 +710,10 @@ void Lexer::lexOperatorIdentifier() {
     // started with a '.'.
     if (*CurPtr == '.' && *TokStart != '.')
       break;
+    if (Identifier::isEditorPlaceholder(StringRef(CurPtr, BufferEnd-CurPtr)) &&
+        rangeContainsPlaceholderEnd(CurPtr + 2, BufferEnd)) {
+      break;
+    }
   } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
 
   if (CurPtr-TokStart > 2) {
@@ -1387,6 +1406,14 @@ void Lexer::lexEscapedIdentifier() {
     }
   }
 
+  // Special case; allow '`$`'.
+  if (Quote[1] == '$' && Quote[2] == '`') {
+    CurPtr = Quote + 3;
+    formToken(tok::identifier, Quote);
+    NextToken.setEscapedIdentifier(true);
+    return;
+  }
+
   // The backtick is punctuation.
   CurPtr = IdentifierStart;
   formToken(tok::backtick, Quote);
@@ -1863,7 +1890,7 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
       if (Tok.is(tok::string_literal)) {
         assert(!InInterpolatedString);
         SmallVector<Lexer::StringSegment, 4> Segments;
-        Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/0);
+        Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/nullptr);
         for (auto &Seg : Segments) {
           unsigned SegOffs = SM.getLocOffsetInBuffer(Seg.Loc, BufferID);
           unsigned SegEnd = SegOffs+Seg.Length;

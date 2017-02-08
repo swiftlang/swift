@@ -1555,7 +1555,7 @@ Enumerators:
 - Name: NSXMLTextKind
   SwiftName: text
 - Name: NSXMLDTDKind
-  SwiftName: dtd
+  SwiftName: DTDKind
 - Name: NSXMLEntityDeclarationKind
   SwiftName: entityDeclaration
 - Name: NSXMLAttributeDeclarationKind
@@ -1738,3 +1738,13 @@ Enumerators:
   SwiftName: regularExpression
 - Name: NSStringEnumerationByLines
   SwiftName: byLines
+SwiftVersions:
+- Version: 3
+  Protocols:
+  - Name: NSFastEnumeration
+    Methods:
+    - Selector: 'countByEnumeratingWithState:objects:count:'
+      MethodKind: Instance
+      Parameters:
+      - Position: 1
+        Nullability: U

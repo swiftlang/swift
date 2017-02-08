@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -D FOO
+// RUN: %target-typecheck-verify-swift -D FOO
 
 var x = 0
 

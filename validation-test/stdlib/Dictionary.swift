@@ -1272,8 +1272,8 @@ class ParallelArrayDictionary : NSDictionary {
   }
 
   override init(
-    objects: UnsafePointer<AnyObject>,
-    forKeys keys: UnsafePointer<NSCopying>,
+    objects: UnsafePointer<AnyObject>?,
+    forKeys keys: UnsafePointer<NSCopying>?,
     count: Int) {
     super.init(objects: objects, forKeys: keys, count: count)
   }
@@ -1336,8 +1336,8 @@ class CustomImmutableNSDictionary : NSDictionary {
   }
 
   override init(
-    objects: UnsafePointer<AnyObject>,
-    forKeys keys: UnsafePointer<NSCopying>,
+    objects: UnsafePointer<AnyObject>?,
+    forKeys keys: UnsafePointer<NSCopying>?,
     count: Int) {
     expectUnreachable()
     super.init(objects: objects, forKeys: keys, count: count)
@@ -3060,7 +3060,7 @@ DictionaryTestSuite.test("DictionaryUpcastBridged") {
   d[TestBridgedKeyTy(30)] = TestBridgedValueTy(1030)
 
   do {
-    var dOO = d as Dictionary<NSObject, AnyObject>
+    var dOO = d as! Dictionary<NSObject, AnyObject>
 
     assert(dOO.count == 3)
     var v: AnyObject? = dOO[TestObjCKeyTy(10)]
@@ -3074,7 +3074,7 @@ DictionaryTestSuite.test("DictionaryUpcastBridged") {
   }
 
   do {
-    var dOV = d as Dictionary<NSObject, TestBridgedValueTy>
+    var dOV = d as! Dictionary<NSObject, TestBridgedValueTy>
 
     assert(dOV.count == 3)
     var v = dOV[TestObjCKeyTy(10)]
@@ -3483,8 +3483,8 @@ class MockDictionaryWithCustomCount : NSDictionary {
   }
 
   override init(
-    objects: UnsafePointer<AnyObject>,
-    forKeys keys: UnsafePointer<NSCopying>,
+    objects: UnsafePointer<AnyObject>?,
+    forKeys keys: UnsafePointer<NSCopying>?,
     count: Int) {
     expectUnreachable()
     super.init(objects: objects, forKeys: keys, count: count)

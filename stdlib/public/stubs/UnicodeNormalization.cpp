@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if !defined(__APPLE__)
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
@@ -22,10 +23,15 @@
 #include <mutex>
 #include <assert.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdocumentation"
+
 #include <unicode/ustring.h>
 #include <unicode/ucol.h>
 #include <unicode/ucoleitr.h>
 #include <unicode/uiter.h>
+
+#pragma clang diagnostic pop
 
 #include "../SwiftShims/UnicodeShims.h"
 
@@ -283,3 +289,5 @@ swift::_swift_stdlib_unicode_strToLower(uint16_t *Destination,
 }
 
 swift::Lazy<ASCIICollation> ASCIICollation::theTable;
+#endif
+

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 @_cdecl("cdecl_foo") func foo(x: Int) -> Int { return x }
 

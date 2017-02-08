@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 #if _compiler_version("999.*.999.999.999")
   let w = 1

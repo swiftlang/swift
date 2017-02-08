@@ -1,3 +1,4 @@
+// REQUIRES: no_asan
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %s -emit-module -emit-library -module-name capture_descriptors -o %t/capture_descriptors.%target-dylib-extension
 // RUN: %target-swift-reflection-dump -binary-filename %t/capture_descriptors.%target-dylib-extension | %FileCheck %s
@@ -15,22 +16,22 @@ import SwiftShims
 
 protocol P {}
 
-sil @concrete_callee1 : $@convention(thin) (Int, @owned @box Int, @thin Int.Type, @thick P.Type) -> () {
-bb0(%i: $Int, %b: $@box Int, %m: $@thin Int.Type, %p: $@thick P.Type):
+sil @concrete_callee1 : $@convention(thin) (Int, @owned <τ_0_0> { var τ_0_0 } <Int>, @thin Int.Type, @thick P.Type) -> () {
+bb0(%i: $Int, %b: $<τ_0_0> { var τ_0_0 } <Int>, %m: $@thin Int.Type, %p: $@thick P.Type):
   %12 = tuple ()
   return %12 : $()
 }
 
 sil @concrete_caller1 : $@convention(thin) (Int, @thick P.Type) -> @owned @callee_owned () -> () {
 bb0(%i: $Int, %p: $@thick P.Type):
-  %f = function_ref @concrete_callee1 : $@convention(thin) (Int, @owned @box Int, @thin Int.Type, @thick P.Type) -> ()
-  %b = alloc_box $@box Int
+  %f = function_ref @concrete_callee1 : $@convention(thin) (Int, @owned <τ_0_0> { var τ_0_0 } <Int>, @thin Int.Type, @thick P.Type) -> ()
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %m = metatype $@thin Int.Type
-  %c = partial_apply %f(%i, %b, %m, %p) : $@convention(thin) (Int, @owned @box Int, @thin Int.Type, @thick P.Type) -> ()
+  %c = partial_apply %f(%i, %b, %m, %p) : $@convention(thin) (Int, @owned <τ_0_0> { var τ_0_0 } <Int>, @thin Int.Type, @thick P.Type) -> ()
   return %c : $@callee_owned () -> ()
 }
 
-// This is the descriptor for '@box Int' above
+// This is the descriptor for '<τ_0_0> { var τ_0_0 } <Int>' above
 
 // CHECK:      - Capture types:
 // CHECK-NEXT: (struct Swift.Int)
@@ -50,23 +51,23 @@ bb0(%i: $Int, %p: $@thick P.Type):
 // Concrete caller and generic callee -- capture types are fully substituted,
 // and there are no metadata bindings
 
-sil @generic_callee2 : $@convention(thin) <T, U> (@in T, @owned @box U) -> () {
-bb0(%i: $*T, %b: $@box U):
+sil @generic_callee2 : $@convention(thin) <T, U> (@in T, @owned <τ_0_0> { var τ_0_0 } <U>) -> () {
+bb0(%i: $*T, %b: $<τ_0_0> { var τ_0_0 } <U>):
   %12 = tuple ()
   return %12 : $()
 }
 
 sil @concrete_caller2 : $@convention(thin) () -> @owned @callee_owned () -> () {
 bb0:
-  %f = function_ref @generic_callee2 : $@convention(thin) <T, U> (@in T, @owned @box U) -> ()
+  %f = function_ref @generic_callee2 : $@convention(thin) <T, U> (@in T, @owned <τ_0_0> { var τ_0_0 } <U>) -> ()
   %i = alloc_stack $Int
-  %b = alloc_box $@box String
-  %c = partial_apply %f<Int, String>(%i, %b) : $@convention(thin) <T, U> (@in T, @owned @box U) -> ()
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <String>
+  %c = partial_apply %f<Int, String>(%i, %b) : $@convention(thin) <T, U> (@in T, @owned <τ_0_0> { var τ_0_0 } <U>) -> ()
   dealloc_stack %i : $*Int
   return %c : $@callee_owned () -> ()
 }
 
-// This is the descriptor for '@box String' above
+// This is the descriptor for '<τ_0_0> { var τ_0_0 } <String>' above
 
 // CHECK:      - Capture types:
 // CHECK-NEXT: (struct Swift.String)

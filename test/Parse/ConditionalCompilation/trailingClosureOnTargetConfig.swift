@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify -D FOO -D BAZ -target x86_64-apple-macosx10.9 -parse-stdlib
+// RUN: %swift -typecheck %s -verify -D FOO -D BAZ -target x86_64-apple-macosx10.9 -parse-stdlib
 
 struct Foo {}
 

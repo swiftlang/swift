@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -43,10 +43,9 @@ void EpilogueARCContext::initializeDataflow() {
     if (Processed.find(CArg) != Processed.end())
        continue;
     Processed.insert(CArg);
-    SILArgument *A = dyn_cast<SILArgument>(CArg);
-    if (A && !A->isFunctionArg()) {
+    if (auto *A = dyn_cast<SILPHIArgument>(CArg)) {
       // Find predecessor and break the SILArgument to predecessors.
-      for (auto X : A->getParent()->getPreds()) {
+      for (auto X : A->getParent()->getPredecessorBlocks()) {
         // Try to find the predecessor edge-value.
         SILValue IA = A->getIncomingValue(X);
         EpilogueARCBlockStates[X]->LocalArg = IA;

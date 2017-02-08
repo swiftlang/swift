@@ -12,5 +12,6 @@ set(UTILS_SOURCES
   Utils/PerformanceInlinerUtils.cpp
   Utils/SILInliner.cpp
   Utils/SILSSAUpdater.cpp
+  Utils/SpecializationMangler.cpp
   PARENT_SCOPE)
 

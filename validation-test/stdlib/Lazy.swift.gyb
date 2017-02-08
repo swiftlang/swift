@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swiftgyb
@@ -640,10 +640,9 @@ tests.test("LazySequence/Sequence") {
 func expectSequencePassthrough<
   S : Sequence,
   Base : Sequence
-  where
-  S : LazySequenceProtocol, Base : LoggingType,
-  Base.Iterator.Element == S.Iterator.Element
->(_ s: S, base: Base, arbitraryElement: S.Iterator.Element, count: Int) {
+>(_ s: S, base: Base, arbitraryElement: S.Iterator.Element, count: Int)
+where S : LazySequenceProtocol, Base : LoggingType,
+Base.Iterator.Element == S.Iterator.Element {
   let baseType = type(of: base)
 
   SequenceLog.makeIterator.expectIncrement(baseType) { _ = s.makeIterator() }
@@ -658,12 +657,15 @@ func expectSequencePassthrough<
   }
 
   SequenceLog._copyContents.expectIncrement(baseType) { () -> Void in
-    let buf = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
-
-    let end = s._copyContents(initializing: buf)
-    expectTrue(end <= buf + count)
-    buf.deinitialize(count: end - buf)
-    buf.deallocate(capacity: count)
+    let ptr = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
+    let buf = UnsafeMutableBufferPointer(start: ptr, count: count)
+    var (remainders,writtenUpTo) = s._copyContents(initializing: buf)
+    expectTrue(remainders.next() == nil, 
+      "_copyContents returned unwritten elements")
+    expectTrue(writtenUpTo == buf.endIndex, 
+      "_copyContents failed to use entire buffer")
+    ptr.deinitialize(count: count)
+    ptr.deallocate(capacity: count)
   }
 }
 
@@ -1023,10 +1025,8 @@ tests.test("ReversedCollection/Lazy") {
 // both from an underlying sequence of whole numbers.
 func checkFilterIteratorBase<
   S : Sequence, I : IteratorProtocol
-  where
-  S.Iterator == LazyFilterIterator<I>,
-  I.Element == OpaqueValue<Int>
->(_ s1: S, _ s2: S) {
+>(_ s1: S, _ s2: S)
+where S.Iterator == LazyFilterIterator<I>, I.Element == OpaqueValue<Int> {
   var iter1 = s1.makeIterator()
   expectEqual(0, iter1.next()!.value)
   expectEqual(2, iter1.next()!.value)

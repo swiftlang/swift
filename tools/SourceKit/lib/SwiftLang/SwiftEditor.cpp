@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -522,7 +522,7 @@ public:
   }
 };
 
-} // anonymous namespace.
+} // anonymous namespace
 
 uint64_t SwiftDocumentSemanticInfo::getASTGeneration() const {
   llvm::sys::ScopedLock L(Mtx);
@@ -771,7 +771,8 @@ public:
     : SM(SM), BufferID(BufferID) {}
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type T) override {
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+                          SemaReferenceKind Kind) override {
     if (isa<VarDecl>(D) && D->hasName() && D->getName().str() == "self")
       return true;
 
@@ -788,7 +789,8 @@ public:
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override {
     // We should treat both open and close brackets equally
-    return visitDeclReference(D, Range, nullptr, Type());
+    return visitDeclReference(D, Range, nullptr, nullptr, Type(),
+                              SemaReferenceKind::SubscriptRef);
   }
 
   void annotate(const Decl *D, bool IsRef, CharSourceRange Range) {
@@ -1408,14 +1410,14 @@ private:
       if (auto *FTR = dyn_cast<FunctionTypeRepr>(T)) {
         FoundFunctionTypeRepr = true;
         if (auto *TTR = dyn_cast_or_null<TupleTypeRepr>(FTR->getArgsTypeRepr())) {
-          for (auto *ArgTR : TTR->getElements()) {
+          for (unsigned i = 0, end = TTR->getNumElements(); i != end; ++i) {
+            auto *ArgTR = TTR->getElement(i);
             CharSourceRange NR;
             CharSourceRange TR;
-            auto *NTR = dyn_cast<NamedTypeRepr>(ArgTR);
-            if (NTR && NTR->hasName()) {
-              NR = CharSourceRange(NTR->getNameLoc(),
-                                   NTR->getName().getLength());
-              ArgTR = NTR->getTypeRepr();
+            auto name = TTR->getElementName(i);
+            if (!name.empty()) {
+              NR = CharSourceRange(TTR->getElementNameLoc(i),
+                                   name.getLength());
             }
             SourceLoc SRE = Lexer::getLocForEndOfToken(SM,
                                                        ArgTR->getEndLoc());

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 infix operator ====
 infix operator <<<<
@@ -13,20 +13,20 @@ func <><><T>(x: T, y: T) {}
 
 //===--- Check that we recover when the parameter tuple is missing.
 
-func recover_missing_parameter_tuple_1 { // expected-error {{expected '(' in argument list of function declaration}}
+func recover_missing_parameter_tuple_1 { // expected-error {{expected '(' in argument list of function declaration}} {{39-39=()}}
 }
 
-func recover_missing_parameter_tuple_1a // expected-error {{expected '(' in argument list of function declaration}}
+func recover_missing_parameter_tuple_1a // expected-error {{expected '(' in argument list of function declaration}} {{40-40=()}}
 {
 }
 
-func recover_missing_parameter_tuple_2<T> { // expected-error {{expected '(' in argument list of function declaration}} expected-error {{generic parameter 'T' is not used in function signature}}
+func recover_missing_parameter_tuple_2<T> { // expected-error {{expected '(' in argument list of function declaration}} {{42-42=()}} expected-error {{generic parameter 'T' is not used in function signature}}
 }
 
-func recover_missing_parameter_tuple_3 -> Int { // expected-error {{expected '(' in argument list of function declaration}}
+func recover_missing_parameter_tuple_3 -> Int { // expected-error {{expected '(' in argument list of function declaration}} {{39-39=()}}
 }
 
-func recover_missing_parameter_tuple_4<T> -> Int { // expected-error {{expected '(' in argument list of function declaration}} expected-error {{generic parameter 'T' is not used in function signature}}
+func recover_missing_parameter_tuple_4<T> -> Int { // expected-error {{expected '(' in argument list of function declaration}} {{42-42=()}} expected-error {{generic parameter 'T' is not used in function signature}}
 }
 
 //===--- Check that we recover when the function return type is missing.
@@ -39,7 +39,7 @@ func recover_missing_return_type_1() -> // expected-error {{expected type for fu
 func recover_missing_return_type_2() -> // expected-error {{expected type for function result}} expected-error{{expected '{' in body of function declaration}}
 
 // Note: Don't move braces to a different line here.
-func recover_missing_return_type_3 -> // expected-error {{expected '(' in argument list of function declaration}} expected-error {{expected type for function result}}
+func recover_missing_return_type_3 -> // expected-error {{expected '(' in argument list of function declaration}} {{35-35=()}} expected-error {{expected type for function result}}
 {
 }
 

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -print-implicit-attrs
 
 struct NotObjCAble {

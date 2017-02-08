@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -230,8 +230,8 @@ SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
     SILBasicBlock *EnumBlock = EI->getParent();
     if (EnumArg->getParent() != EnumBlock)
       return SILValue();
-    
-    auto *Pred = EnumBlock->getSinglePredecessor();
+
+    auto *Pred = EnumBlock->getSinglePredecessorBlock();
     if (!Pred)
       return SILValue();
 
@@ -257,7 +257,7 @@ SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
   //
   // we'll return %0
   auto *BB = EI->getParent();
-  auto *Pred = BB->getSinglePredecessor();
+  auto *Pred = BB->getSinglePredecessorBlock();
   if (!Pred)
     return SILValue();
 
@@ -477,9 +477,10 @@ static SILValue simplifyBuiltin(BuiltinInst *BI) {
   switch (Builtin.ID) {
   default: break;
 
+  case BuiltinValueKind::ZExtOrBitCast:
   case BuiltinValueKind::SExtOrBitCast: {
     const SILValue &Op = Args[0];
-    // extOrBitCast_N_N(x) -> x
+    // [s|z]extOrBitCast_N_N(x) -> x
     if (Op->getType() == BI->getType())
       return Op;
   }

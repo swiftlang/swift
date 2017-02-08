@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %utils/split_file.py -o %t %s
-// RUN: %target-swift-frontend -parse -primary-file %t/swift3.swift %t/common.swift -verify -swift-version 3
-// RUN: %target-swift-frontend -parse -primary-file %t/swift4.swift %t/common.swift -verify -swift-version 4
+// RUN: %target-swift-frontend -typecheck -primary-file %t/swift3.swift %t/common.swift -verify -swift-version 3
+// RUN: %target-swift-frontend -typecheck -primary-file %t/swift4.swift %t/common.swift -verify -swift-version 4
 
 // BEGIN common.swift
 protocol P1 {

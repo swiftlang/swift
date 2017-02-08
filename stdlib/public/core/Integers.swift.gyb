@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
  %{
@@ -63,26 +63,11 @@ infix operator &>> : BitwiseShiftPrecedence
 infix operator &>>= : AssignmentPrecedence
 
 //===----------------------------------------------------------------------===//
-//===--- Bits for the Stdlib ----------------------------------------------===//
-//===----------------------------------------------------------------------===//
-
-
-// FIXME(integers): This should go in the stdlib separately, probably.
-extension ExpressibleByIntegerLiteral
-  where Self : _ExpressibleByBuiltinIntegerLiteral {
-  /// Create an instance initialized to `value`.
-  @_transparent
-  public init(integerLiteral value: Self) {
-    self = value
-  }
-}
-
-//===----------------------------------------------------------------------===//
 //===--- Arithmetic -------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-/// Declares methods backing binary arithmetic operators—such as `+`, `-` and
-/// `*`—and their mutating counterparts.
+/// Declares methods backing binary arithmetic operators--such as `+`, `-` and
+/// `*`--and their mutating counterparts.
 ///
 /// It provides a suitable basis for arithmetic on scalars such as integers and
 /// floating point numbers.
@@ -122,7 +107,7 @@ public protocol Arithmetic : Equatable, ExpressibleByIntegerLiteral {
 }
 
 extension Arithmetic {
-  @_transparent
+  // @_transparent
   public init() {
     self = 0
   }
@@ -359,7 +344,7 @@ public func > <T : BinaryInteger>(lhs: T, rhs: T) -> Bool {
 //===----------------------------------------------------------------------===//
 
 public enum ArithmeticOverflow {
-  @_transparent
+  // @_transparent
   public init(_ overflow: Bool) { self = overflow ? .overflow : .none }
   case none, overflow
 }
@@ -551,7 +536,7 @@ extension FixedWidthInteger {
     fatalError()
   }
 
-  @_transparent
+  // @_transparent
   public init<T : BinaryInteger>(extendingOrTruncating source: T) {
     if Self.bitWidth <= ${word_bits} {
       self = Self.init(_truncatingBits: source.word(at: 0))

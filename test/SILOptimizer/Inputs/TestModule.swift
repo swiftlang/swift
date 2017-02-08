@@ -1,5 +1,6 @@
 
-private protocol Proto {
+@_versioned
+protocol Proto {
   func confx()
 }
 
@@ -12,7 +13,8 @@ public struct MyStruct : Proto {
 }
 
 @inline(never)
-private func callit(_ p: Proto) {
+@_versioned
+func callit(_ p: Proto) {
 }
 
 @_transparent

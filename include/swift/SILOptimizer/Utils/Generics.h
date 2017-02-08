@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -42,15 +42,16 @@ void trySpecializeApplyOfGeneric(
 /// Helper class to describe re-abstraction of function parameters done during
 /// specialization.
 ///
-/// Specifically, it contains information which parameters and returns are
-/// changed from indirect values to direct values.
+/// Specifically, it contains information which formal parameters and returns
+/// are changed from indirect values to direct values.
 class ReabstractionInfo {
   /// A 1-bit means that this parameter/return value is converted from indirect
   /// to direct.
   llvm::SmallBitVector Conversions;
 
-  /// The first NumResults bits in Conversions refer to indirect out-parameters.
-  unsigned NumResults;
+  /// The first NumResults bits in Conversions refer to formal indirect
+  /// out-parameters.
+  unsigned NumFormalIndirectResults;
 
   /// The function type after applying the substitutions of the original
   /// apply site.
@@ -65,34 +66,19 @@ public:
   /// substitutions \p ParamSubs.
   /// If specialization is not possible getSpecializedType() will return an
   /// invalid type.
-  ReabstractionInfo(SILFunction *Orig, ArrayRef<Substitution> ParamSubs);
+  ReabstractionInfo(SILFunction *Orig, SubstitutionList ParamSubs);
 
-  /// Does the \p ArgIdx refer to an indirect out-parameter?
-  bool isResultIndex(unsigned ArgIdx) const {
-    assert(ArgIdx < Conversions.size());
-    return ArgIdx < NumResults;
-  }
-
-  /// Returns true if the \p ParamIdx'th (non-result) parameter is converted
-  /// from indirect to direct.
+  /// Returns true if the \p ParamIdx'th (non-result) formal parameter is
+  /// converted from indirect to direct.
   bool isParamConverted(unsigned ParamIdx) const {
-    return Conversions.test(ParamIdx + NumResults);
+    return Conversions.test(ParamIdx + NumFormalIndirectResults);
   }
 
-  /// Returns true if the \p ResultIdx'th result is converted from indirect
-  /// to direct.
-  bool isResultConverted(unsigned ResultIdx) const {
-    assert(ResultIdx < NumResults);
+  /// Returns true if the \p ResultIdx'th formal result is converted from
+  /// indirect to direct.
+  bool isFormalResultConverted(unsigned ResultIdx) const {
+    assert(ResultIdx < NumFormalIndirectResults);
     return Conversions.test(ResultIdx);
-  }
-
-  /// Gets the total number of original function arguments.
-  unsigned getNumArguments() const { return Conversions.size(); }
-
-  /// Returns true if the \p ArgIdx'th argument is converted from an indirect
-  /// result or parameter to a direct result or parameter.
-  bool isArgConverted(unsigned ArgIdx) const {
-    return Conversions.test(ArgIdx);
   }
 
   /// Returns true if there are any conversions from indirect to direct values.
@@ -101,17 +87,9 @@ public:
   /// Remove the arguments of a partial apply, leaving the arguments for the
   /// partial apply result function.
   void prunePartialApplyArgs(unsigned numPartialApplyArgs) {
+    assert(numPartialApplyArgs <= SubstitutedType->getNumParameters());
     assert(numPartialApplyArgs <= Conversions.size());
     Conversions.resize(Conversions.size() - numPartialApplyArgs);
-  }
-
-  /// Returns the index of the first argument of an apply site, which may be
-  /// > 0 in case of a partial_apply.
-  unsigned getIndexOfFirstArg(ApplySite Apply) const {
-    unsigned numArgs = Apply.getNumArguments();
-    assert(numArgs == Conversions.size() || (numArgs < Conversions.size() &&
-                                             isa<PartialApplyInst>(Apply)));
-    return Conversions.size() - numArgs;
   }
 
   /// Get the function type after applying the substitutions to the original
@@ -134,7 +112,7 @@ public:
 class GenericFuncSpecializer {
   SILModule &M;
   SILFunction *GenericFunc;
-  ArrayRef<Substitution> ParamSubs;
+  SubstitutionList ParamSubs;
   IsFragile_t Fragile;
   const ReabstractionInfo &ReInfo;
 
@@ -142,7 +120,7 @@ class GenericFuncSpecializer {
   std::string ClonedName;
 public:
   GenericFuncSpecializer(SILFunction *GenericFunc,
-                         ArrayRef<Substitution> ParamSubs,
+                         SubstitutionList ParamSubs,
                          IsFragile_t Fragile,
                          const ReabstractionInfo &ReInfo);
 

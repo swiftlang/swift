@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,6 +21,7 @@
 #include "swift/Remote/RemoteAddress.h"
 
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <cassert>
 #include <string>
 #include <cstring>
@@ -107,6 +108,8 @@ private:
     case Kind::KIND: return TEXT;
 #include "swift/Remote/FailureKinds.def"    
     }
+
+    llvm_unreachable("Unhandled FailureKind in switch.");
   }
 
   union ArgStorage {

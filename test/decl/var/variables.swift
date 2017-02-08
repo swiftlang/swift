@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 var t1 : Int
 var t2 = 10
@@ -13,10 +13,6 @@ var (x = 123, // expected-error {{expected ',' separator}} {{7-7=,}} expected-er
 var bfx : Int, bfy : Int
 
 _ = 10
-
-func _(_ x: Int) {} // expected-error {{keyword '_' cannot be used as an identifier here}}
-// expected-note @-1 {{if this name is unavoidable, use backticks to escape it}}
-
 
 var self1 = self1 // expected-error {{variable used within its own initial value}}
 var self2 : Int = self2 // expected-error {{variable used within its own initial value}}
@@ -52,6 +48,7 @@ var aot2 = aot1          // expected-warning {{variable 'aot2' inferred to have 
 
 
 for item in [AnyObject]() {  // No warning in for-each loop.
+  _ = item
 }
 
 
@@ -103,6 +100,7 @@ func test21081340() {
 if true {
   let s : Int
   s = 42  // should be valid.
+  _ = s
 }
 
 

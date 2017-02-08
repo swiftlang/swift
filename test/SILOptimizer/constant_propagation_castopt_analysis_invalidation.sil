@@ -202,7 +202,7 @@ bb4(%12 : $Foo2):                                 // Preds: bb3
   br bb6                                          // id: %17
 
 bb5:                                              // Preds: bb3
-  %18 = class_method %0 : $Foo, #Foo.speak!1 : Foo -> () -> () , $@convention(method) (@guaranteed Foo) -> () // user: %19
+  %18 = class_method %0 : $Foo, #Foo.speak!1 : Foo -> () -> (), $@convention(method) (@guaranteed Foo) -> () // user: %19
   %19 = apply %18(%0) : $@convention(method) (@guaranteed Foo) -> ()
   br bb6                                          // id: %20
 

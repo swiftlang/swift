@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func markUsed<T>(_ t: T) {}
 
@@ -165,3 +165,33 @@ struct X2 {
 
 let x2 = X2(Int.self)
 let x2check: X2 = x2 // expected-error{{value of optional type 'X2?' not unwrapped; did you mean to use '!' or '?'?}}
+
+// rdar://problem/28051973
+struct R_28051973 {
+  mutating func f(_ i: Int) {}
+  @available(*, deprecated, message: "deprecated")
+  func f(_ f: Float) {}
+}
+
+let r28051973: Int = 42
+R_28051973().f(r28051973) // expected-error {{cannot use mutating member on immutable value: function call returns immutable value}}
+
+
+// Fix for CSDiag vs CSSolver disagreement on what constitutes a
+// valid overload.
+
+func overloadedMethod(n: Int) {} // expected-note {{'overloadedMethod(n:)' declared here}}
+func overloadedMethod<T>() {}
+// expected-error@-1 {{generic parameter 'T' is not used in function signature}}
+
+overloadedMethod()
+// expected-error@-1 {{missing argument for parameter 'n' in call}}
+
+// Ensure we select the overload of '??' returning T? rather than T.
+func SR3817(_ d: [String : Any], _ s: String, _ t: String) -> Any {
+  if let r = d[s] ?? d[t] {
+    return r
+  } else {
+    return 0
+  }
+}

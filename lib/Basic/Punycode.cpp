@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -47,7 +47,9 @@ static int digit_index(char value) {
 }
 
 static bool isValidUnicodeScalar(uint32_t S) {
-  return (S < 0xD800) || (S >= 0xE000 && S <= 0x1FFFFF);
+  // Also accept the range of 0xD800 - 0xD880, which is used for non-symbol
+  // ASCII characters.
+  return (S < 0xD880) || (S >= 0xE000 && S <= 0x1FFFFF);
 }
 
 // Section 6.1: Bias adaptation function
@@ -200,6 +202,8 @@ static bool encodeToUTF8(const std::vector<uint32_t> &Scalars,
       OutUTF8.clear();
       return false;
     }
+    if (S >= 0xD800 && S < 0xD880)
+      S -= 0xD800;
 
     unsigned Bytes = 0;
     if (S < 0x80)

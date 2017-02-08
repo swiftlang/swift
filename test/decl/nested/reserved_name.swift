@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct S1 {
   // expected-error @+4 {{type member may not be named 'Type', since it would conflict with the 'foo.Type' expression}}

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -256,8 +256,7 @@ extension ${Self} where Self.Iterator.Element : Comparable {
   ///
   /// - Returns: A sorted array of the ${sequenceKind}'s elements.
   ///
-  /// - SeeAlso: `sorted(by:)`
-  /// ${'- MutatingVariant: sort' if Self == 'MutableCollection' else ''}
+  /// - SeeAlso: `sorted(by:)`, `sort()`
   public func sorted() -> [Iterator.Element] {
     var result = ContiguousArray(self)
     result.sort()
@@ -330,8 +329,7 @@ ${orderingExplanation}
   ///   `false`.
   /// - Returns: A sorted array of the ${sequenceKind}'s elements.
   ///
-  /// - SeeAlso: `sorted()`
-  /// ${'- MutatingVariant: sort' if Self == 'MutableCollection' else ''}
+  /// - SeeAlso: `sorted()`, `sort(by:)`
   public func sorted(
     by areInIncreasingOrder:
       (${IElement}, ${IElement}) -> Bool
@@ -447,24 +445,20 @@ ${orderingExplanation}
     by areInIncreasingOrder:
       (${IElement}, ${IElement}) -> Bool
   ) {
-    typealias EscapingBinaryPredicate =
-      (Iterator.Element, Iterator.Element) -> Bool
-    let escapableIsOrderedBefore =
-      unsafeBitCast(areInIncreasingOrder, to: EscapingBinaryPredicate.self)
 
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Void in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, count: count)
-      bufferPointer.sort(by: escapableIsOrderedBefore)
+      bufferPointer.sort(by: areInIncreasingOrder)
       return ()
     }
     if didSortUnsafeBuffer == nil {
       _introSort(
         &self,
         subRange: startIndex..<endIndex,
-        by: escapableIsOrderedBefore)
+        by: areInIncreasingOrder)
     }
   }
 }
@@ -505,6 +499,7 @@ subscriptCommentPost = """\
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection."""
 }%
+// FIXME(ABI)#180 (Type checker)
 // WORKAROUND rdar://25214066 - should be on Collection
 extension ${Self} {
 ${subscriptCommentPre}
@@ -532,6 +527,7 @@ ${subscriptCommentPost}
   }
 }
 
+// FIXME(ABI)#180 (Type checker)
 // WORKAROUND rdar://25214066 - should be on Collection
 extension ${Self} where Index : Strideable, Index.Stride : SignedInteger {
 ${subscriptCommentPre}

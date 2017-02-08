@@ -30,7 +30,7 @@ TEST(ThreadSafeRefCountedBase, Release) {
 struct TestReleaseVPTR : swift::ThreadSafeRefCountedBaseVPTR {
   bool &destroy;
   TestReleaseVPTR(bool &destroy) : destroy(destroy) {}
-  virtual ~TestReleaseVPTR() { destroy = true; }
+  ~TestReleaseVPTR() override { destroy = true; }
 };
 
 TEST(ThreadSafeRefCountedBaseVPTR, ReleaseSimple) {

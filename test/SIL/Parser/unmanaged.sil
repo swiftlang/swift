@@ -1,10 +1,26 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s
+// RUN: %target-sil-opt %s
 
 import Swift
+import Builtin
+
+class C {}
+
 sil @test : $@convention(thin) <U where U : AnyObject> (@inout Optional<U>) -> () {
-bb0(%1 : $*Optional<U>):
-  %17 = load %1 : $*Optional<U>
-  %18 = ref_to_unmanaged %17 : $Optional<U> to $@sil_unmanaged Optional<U>
-  %6 = tuple ()
-  return %6 : $()
+bb0(%0 : $*Optional<U>):
+  %1 = load [copy] %0 : $*Optional<U>
+  %2 = ref_to_unmanaged %1 : $Optional<U> to $@sil_unmanaged Optional<U>
+  %3 = unmanaged_to_ref %2 : $@sil_unmanaged Optional<U> to $Optional<U>
+  destroy_value %1 : $Optional<U>
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil @retain_release : $@convention(thin) (@sil_unmanaged Optional<C>) -> () {
+bb0(%0 : $@sil_unmanaged Optional<C>):
+  %1 = unmanaged_to_ref %0 : $@sil_unmanaged Optional<C> to $Optional<C>
+  unmanaged_retain_value %1 : $Optional<C>
+  unmanaged_autorelease_value %1 : $Optional<C>
+  unmanaged_release_value %1 : $Optional<C>
+  %9999 = tuple()
+  return %9999 : $()
 }

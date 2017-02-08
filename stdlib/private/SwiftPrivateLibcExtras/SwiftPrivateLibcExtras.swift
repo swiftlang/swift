@@ -2,19 +2,21 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 import SwiftPrivate
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || CYGWIN
 import Glibc
+#elseif os(Windows)
+import ucrt
 #endif
 
 #if !os(Windows) || CYGWIN
@@ -97,6 +99,9 @@ public func _stdlib_select(
         let readAddr = readfds.baseAddress
         let writeAddr = writefds.baseAddress
         let errorAddr = errorfds.baseAddress
+#if CYGWIN
+        typealias fd_set = _types_fd_set
+#endif
         func asFdSetPtr(
           _ p: UnsafeMutablePointer<UInt>?
         ) -> UnsafeMutablePointer<fd_set>? {
@@ -120,7 +125,11 @@ public func _stdlib_select(
 public func _stdlib_pipe() -> (readEnd: CInt, writeEnd: CInt, error: CInt) {
   var fds: [CInt] = [0, 0]
   let ret = fds.withUnsafeMutableBufferPointer { unsafeFds -> CInt in
-    pipe(unsafeFds.baseAddress)
+#if !os(Windows) || CYGWIN
+    return pipe(unsafeFds.baseAddress)
+#else
+    return _pipe(unsafeFds.baseAddress, 0, 0)
+#endif
   }
   return (readEnd: fds[0], writeEnd: fds[1], error: ret)
 }

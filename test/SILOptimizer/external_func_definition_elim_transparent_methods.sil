@@ -1,0 +1,54 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -external-func-definition-elim %s | %FileCheck %s
+
+// Check that public_external transparent methods referenced from vtables
+// and witness tables are not removed by ExternalFunctionDefinitionsElimination.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+private class Base {
+	init()
+  func foo()
+}
+
+private class Derived : Base {
+}
+
+sil private @BaseInit : $@convention(method) (@owned Base) -> @owned Base {
+bb0(%4 : $Base):
+  return %4 : $Base
+}
+
+sil private @DerivedInit : $@convention(method) (@owned Derived) -> @owned Derived {
+bb0(%4 : $Derived):
+  return %4 : $Derived
+}
+
+sil public_external [transparent] @foo : $@convention(method) (@guaranteed Base) -> () {
+bb0(%0 : $Base):
+  %2 = tuple ()
+  return %2 : $()
+} // end sil function 'foo'
+
+
+sil_vtable Base {
+  #Base.init!initializer.1: BaseInit
+  #Base.foo!1: foo
+}
+
+sil_vtable Derived {
+  #Base.init!initializer.1: DerivedInit
+  #Base.foo!1: foo
+}
+
+// CHECK-LABEL: sil public_external [transparent] @foo
+// CHECK: end sil function 'foo'
+
+// CHECK-LABEL: sil_vtable Base
+// CHECK-: BaseInit
+
+// CHECK-LABEL: sil_vtable Derived
+// CHECK: DerivedInit

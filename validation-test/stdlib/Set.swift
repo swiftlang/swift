@@ -1196,7 +1196,7 @@ class CustomImmutableNSSet : NSSet {
     super.init()
   }
 
-  override init(objects: UnsafePointer<AnyObject>, count: Int) {
+  override init(objects: UnsafePointer<AnyObject>?, count: Int) {
     expectUnreachable()
     super.init(objects: objects, count: count)
   }
@@ -2482,7 +2482,7 @@ SetTestSuite.test("SetUpcastBridged") {
   }
 
   do {
-    var s = s as Set<NSObject>
+    var s = s as! Set<NSObject>
 
     expectEqual(3, s.count)
     expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))
@@ -3509,7 +3509,7 @@ class MockSetWithCustomCount : NSSet {
     super.init()
   }
 
-  override init(objects: UnsafePointer<AnyObject>, count: Int) {
+  override init(objects: UnsafePointer<AnyObject>?, count: Int) {
     expectUnreachable()
     super.init(objects: objects, count: count)
   }

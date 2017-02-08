@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -23,12 +23,12 @@
 namespace swift {
   class AbstractFunctionDecl;
   class ApplyExpr;
-  class AvailableAttr;
   class CallExpr;
   class DeclContext;
   class Expr;
   class InFlightDiagnostic;
   class Stmt;
+  class TopLevelCodeDecl;
   class TypeChecker;
   class ValueDecl;
 
@@ -42,6 +42,9 @@ void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
 
 void performAbstractFuncDeclDiagnostics(TypeChecker &TC,
                                         AbstractFunctionDecl *AFD);
+
+/// Perform diagnostics on the top level code declaration.
+void performTopLevelDeclDiagnostics(TypeChecker &TC, TopLevelCodeDecl *TLCD);
   
 /// Emit a fix-it to set the accessibility of \p VD to \p desiredAccess.
 ///
@@ -61,23 +64,12 @@ bool diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
                                 bool isSubscript,
                                 InFlightDiagnostic *existingDiag = nullptr);
 
-/// Emit fix-its to rename the base name at \p referenceRange based on the
-/// "renamed" argument in \p attr. If \p call is provided, the argument labels
-/// will also be updated.
-void fixItAvailableAttrRename(TypeChecker &TC,
-                              InFlightDiagnostic &diag,
-                              SourceRange referenceRange,
-                              const ValueDecl *renamedDecl,
-                              const AvailableAttr *attr,
-                              const ApplyExpr *call);
-
 /// Attempt to fix the type of \p decl so that it's a valid override for
 /// \p base...but only if we're highly confident that we know what the user
 /// should have written.
 ///
 /// \returns true iff any fix-its were attached to \p diag.
-bool fixItOverrideDeclarationTypes(TypeChecker &TC,
-                                   InFlightDiagnostic &diag,
+bool fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
                                    ValueDecl *decl,
                                    const ValueDecl *base);
 
@@ -86,16 +78,6 @@ void fixItEncloseTrailingClosure(TypeChecker &TC,
                                  InFlightDiagnostic &diag,
                                  const CallExpr *call,
                                  Identifier closureLabel);
-
-/// Run the Availability-diagnostics algorithm otherwise used in an expr
-/// context, but for non-expr contexts such as TypeDecls referenced from
-/// TypeReprs.
-bool diagnoseDeclAvailability(const ValueDecl *Decl,
-                              TypeChecker &TC,
-                              DeclContext *DC,
-                              SourceRange R,
-                              bool AllowPotentiallyUnavailableProtocol,
-                              bool SignalOnPotentialUnavailability);
 
 } // namespace swift
 

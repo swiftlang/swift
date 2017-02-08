@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -136,7 +136,8 @@ public:
 
   enum ActionType {
     NoneAction, ///< No specific action
-    Parse, ///< Parse and type-check only
+    Parse, ///< Parse only
+    Typecheck, ///< Parse and type-check only
     DumpParse, ///< Parse only and dump AST
     DumpInterfaceHash, ///< Parse and dump the interface token hash.
     DumpAST, ///< Parse, type-check, and dump AST
@@ -147,6 +148,8 @@ public:
 
     /// Parse, type-check, and dump type refinement context hierarchy
     DumpTypeRefinementContexts,
+
+    EmitPCH, ///< Emit PCH of imported bridging header
 
     EmitSILGen, ///< Emit raw SIL
     EmitSIL, ///< Emit canonical SIL
@@ -178,6 +181,9 @@ public:
   /// If set, dumps wall time taken to check each function body to llvm::errs().
   bool DebugTimeFunctionBodies = false;
 
+  /// If set, dumps wall time taken to check each expression.
+  bool DebugTimeExpressionTypeChecking = false;
+
   /// If set, prints the time taken in each major compilation phase to 
   /// llvm::errs().
   ///
@@ -187,6 +193,11 @@ public:
   /// Indicates whether function body parsing should be delayed
   /// until the end of all files.
   bool DelayedFunctionBodyParsing = false;
+
+  /// If true, serialization encodes an extra lookup table for use in module-
+  /// merging when emitting partial modules (the per-file modules in a non-WMO
+  /// build).
+  bool EnableSerializationNestedTypeLookupTable = true;
 
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).
@@ -229,6 +240,13 @@ public:
 
   /// Indicates whether the playground transformation should be applied.
   bool PlaygroundTransform = false;
+  
+  /// Indicates whether the AST should be instrumented to simulate a debugger's
+  /// program counter. Similar to the PlaygroundTransform, this will instrument
+  /// the AST with function calls that get called when you would see a program
+  /// counter move in a debugger. To adopt this implement the
+  /// __builtin_pc_before and __builtin_pc_after functions.
+  bool PCMacro = false;
 
   /// Indicates whether the playground transformation should omit
   /// instrumentation that has a high runtime performance impact.

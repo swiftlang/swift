@@ -1,6 +1,6 @@
-// RUN: %target-parse-verify-swift
-// RUN: not %target-swift-frontend -parse -disable-typo-correction %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
-// RUN: not %target-swift-frontend -parse -DIMPORT_FAIL %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
+// RUN: %target-typecheck-verify-swift
+// RUN: not %target-swift-frontend -typecheck -disable-typo-correction %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
+// RUN: not %target-swift-frontend -typecheck -DIMPORT_FAIL %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
 // DISABLED-NOT: did you mean
 
 #if IMPORT_FAIL

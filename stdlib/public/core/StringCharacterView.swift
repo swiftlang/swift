@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -29,7 +29,7 @@ extension String {
   /// `CharacterView` collection is a `Character` instance.
   ///
   ///     let flowers = "Flowers 💐"
-  ///     for c in flowers {
+  ///     for c in flowers.characters {
   ///         print(c)
   ///     }
   ///     // F
@@ -86,12 +86,12 @@ extension String {
   /// Applies the given closure to a mutable view of the string's characters.
   ///
   /// Do not use the string that is the target of this method inside the
-  /// closure passed to `body`, as it may not have its correct value. 
-  /// Instead, use the closure's `String.CharacterView` argument.
+  /// closure passed to `body`, as it may not have its correct value. Instead,
+  /// use the closure's `CharacterView` argument.
   ///
-  /// This example below uses the `withMutableCharacters(_:)` method to truncate
-  /// the string `str` at the first space and to return the remainder of the
-  /// string.
+  /// This example below uses the `withMutableCharacters(_:)` method to
+  /// truncate the string `str` at the first space and to return the remainder
+  /// of the string.
   ///
   ///     var str = "All this happened, more or less."
   ///     let afterSpace = str.withMutableCharacters { chars -> String.CharacterView in
@@ -109,6 +109,8 @@ extension String {
   ///     // Prints "this happened, more or less."
   ///
   /// - Parameter body: A closure that takes a character view as its argument.
+  ///   The `CharacterView` argument is valid only for the duration of the
+  ///   closure's execution.
   /// - Returns: The return value of the `body` closure, if any, is the return
   ///   value of this method.
   public mutating func withMutableCharacters<R>(
@@ -127,7 +129,7 @@ extension String {
   /// Creates a string from the given character view.
   ///
   /// Use this initializer to recover a string after performing a collection
-  /// slicing operation on a character view.
+  /// slicing operation on a string's character view.
   ///
   ///     let poem = "'Twas brillig, and the slithy toves / " +
   ///                "Did gyre and gimbal in the wabe: / " +

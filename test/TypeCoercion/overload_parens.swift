@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func f0(_ x: Int) -> Int { return 0 }
 func f0(_ x: Float) -> Float { return 0.0 }

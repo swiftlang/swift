@@ -2,17 +2,18 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 #include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Remote/CMemoryReader.h"
+#include "swift/Runtime/Unreachable.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
 
 using namespace swift;
@@ -20,7 +21,7 @@ using namespace swift::reflection;
 using namespace swift::remote;
 
 using NativeReflectionContext
-  = ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
+  = swift::reflection::ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
 
 uint16_t
 swift_reflection_getSupportedMetadataVersion() {
@@ -45,12 +46,12 @@ swift_reflection_createReflectionContext(void *ReaderContext,
 
   auto Reader = std::make_shared<CMemoryReader>(ReaderImpl);
   auto Context
-    = new ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>(Reader);
+    = new swift::reflection::ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>(Reader);
   return reinterpret_cast<SwiftReflectionContextRef>(Context);
 }
 
 void swift_reflection_destroyReflectionContext(SwiftReflectionContextRef ContextRef) {
-  auto Context = reinterpret_cast<ReflectionContext<InProcess> *>(ContextRef);
+  auto Context = reinterpret_cast<swift::reflection::ReflectionContext<InProcess> *>(ContextRef);
   delete Context;
 }
 
@@ -175,6 +176,8 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
     }
   }
   }
+
+  swift_runtime_unreachable("Unhandled TypeInfoKind in switch");
 }
 
 static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {
@@ -334,7 +337,7 @@ void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
 
 size_t swift_reflection_demangle(const char *MangledName, size_t Length,
                                  char *OutDemangledName, size_t MaxLength) {
-  if (MangledName == NULL || Length == 0)
+  if (MangledName == nullptr || Length == 0)
     return 0;
 
   std::string Mangled(MangledName, Length);

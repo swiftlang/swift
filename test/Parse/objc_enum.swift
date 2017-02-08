@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 @objc enum Foo: Int {
   case Zim, Zang, Zung

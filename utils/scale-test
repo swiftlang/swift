@@ -67,8 +67,8 @@ def run_once_with_primary(args, ast, rng, primary_idx):
         ofile = "out.o"
 
         mode = "-c"
-        if args.parse:
-            mode = "-parse"
+        if args.typecheck:
+            mode = "-typecheck"
 
         focus = ["-primary-file", primary]
         if args.whole_module_optimization:
@@ -228,8 +228,8 @@ def main():
         '--threshold', type=float,
         default=1.2, help='exponent beyond which to consider "bad scaling"')
     parser.add_argument(
-        '-parse', '--parse', action='store_true',
-        default=False, help='only run compiler with -parse')
+        '-typecheck', '--typecheck', action='store_true',
+        default=False, help='only run compiler with -typecheck')
     parser.add_argument(
         '-g', '--debuginfo', action='store_true',
         default=False, help='run compiler with -g')

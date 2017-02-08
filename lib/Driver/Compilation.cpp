@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -30,6 +30,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -47,7 +48,7 @@ Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          InputFileList InputsWithTypes,
-                         StringRef ArgsHash, llvm::sys::TimeValue StartTime,
+                         StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
                          unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
                          bool SkipTaskExecution,
@@ -89,7 +90,7 @@ namespace {
     /// Only intended for source files.
     llvm::SmallDenseMap<const Job *, bool, 16> UnfinishedCommands;
   };
-}
+} // end anonymous namespace
 
 Compilation::~Compilation() = default;
 
@@ -115,7 +116,9 @@ static void populateInputInfoMap(InputInfoMap &inputs,
                                  const PerformJobsState &endState) {
   for (auto &entry : endState.UnfinishedCommands) {
     for (auto *action : entry.first->getSource().getInputs()) {
-      auto inputFile = cast<InputAction>(action);
+      auto inputFile = dyn_cast<InputAction>(action);
+      if (!inputFile)
+        continue;
 
       CompileJobAction::InputInfo info;
       info.previousModTime = entry.first->getInputModTime();
@@ -132,7 +135,9 @@ static void populateInputInfoMap(InputInfoMap &inputs,
       continue;
 
     for (auto *action : compileAction->getInputs()) {
-      auto inputFile = cast<InputAction>(action);
+      auto inputFile = dyn_cast<InputAction>(action);
+      if (!inputFile)
+        continue;
 
       CompileJobAction::InputInfo info;
       info.previousModTime = entry->getInputModTime();
@@ -158,7 +163,7 @@ static void checkForOutOfDateInputs(DiagnosticEngine &diags,
                                     const InputInfoMap &inputs) {
   for (const auto &inputPair : inputs) {
     auto recordedModTime = inputPair.second.previousModTime;
-    if (recordedModTime == llvm::sys::TimeValue::MaxTime())
+    if (recordedModTime == llvm::sys::TimePoint<>::max())
       continue;
 
     const char *input = inputPair.first->getValue();
@@ -178,8 +183,13 @@ static void checkForOutOfDateInputs(DiagnosticEngine &diags,
 }
 
 static void writeCompilationRecord(StringRef path, StringRef argsHash,
-                                   llvm::sys::TimeValue buildTime,
+                                   llvm::sys::TimePoint<> buildTime,
                                    const InputInfoMap &inputs) {
+  // Before writing to the dependencies file path, preserve any previous file
+  // that may have been there. No error handling -- this is just a nicety, it
+  // doesn't matter if it fails.
+  llvm::sys::fs::rename(path, path + "~");
+
   std::error_code error;
   llvm::raw_fd_ostream out(path, error, llvm::sys::fs::F_None);
   if (out.has_error()) {
@@ -188,8 +198,13 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
     return;
   }
 
-  auto writeTimeValue = [](llvm::raw_ostream &out, llvm::sys::TimeValue time) {
-    out << "[" << time.seconds() << ", " << time.nanoseconds() << "]";
+  auto writeTimeValue = [](llvm::raw_ostream &out,
+                           llvm::sys::TimePoint<> time) {
+    using namespace std::chrono;
+    auto secs = time_point_cast<seconds>(time);
+    time -= secs.time_since_epoch(); // remainder in nanoseconds
+    out << "[" << secs.time_since_epoch().count()
+        << ", " << time.time_since_epoch().count() << "]";
   };
 
   using compilation_record::TopLevelKey;
@@ -427,7 +442,7 @@ int Compilation::performJobsImpl() {
   }
 
   int Result = EXIT_SUCCESS;
-  llvm::TimerGroup DriverTimerGroup("Driver Time Compilation");
+  llvm::TimerGroup DriverTimerGroup("driver", "Driver Compilation Time");
   llvm::SmallDenseMap<const Job *, std::unique_ptr<llvm::Timer>, 16>
     DriverTimers;
 
@@ -459,7 +474,7 @@ int Compilation::performJobsImpl() {
       DriverTimers.insert({
         BeganCmd,
         std::unique_ptr<llvm::Timer>(
-          new llvm::Timer(OS.str(), DriverTimerGroup))
+          new llvm::Timer("task", OS.str(), DriverTimerGroup))
       });
       DriverTimers[BeganCmd]->startTimer();
     }
@@ -476,8 +491,9 @@ int Compilation::performJobsImpl() {
   // continue (if execution should stop, this callback should return true), and
   // it should also schedule any additional commands which we now know need
   // to run.
-  auto taskFinished = [&] (ProcessId Pid, int ReturnCode, StringRef Output,
-                           void *Context) -> TaskFinishedResponse {
+  auto taskFinished = [&](ProcessId Pid, int ReturnCode, StringRef Output,
+                          StringRef Errors,
+                          void *Context) -> TaskFinishedResponse {
     const Job *FinishedCmd = (const Job *)Context;
 
     if (ShowDriverTimeCompilation) {
@@ -607,8 +623,9 @@ int Compilation::performJobsImpl() {
     return TaskFinishedResponse::ContinueExecution;
   };
 
-  auto taskSignalled = [&] (ProcessId Pid, StringRef ErrorMsg, StringRef Output,
-                            void *Context) -> TaskFinishedResponse {
+  auto taskSignalled = [&](ProcessId Pid, StringRef ErrorMsg, StringRef Output,
+                           StringRef Errors,
+                           void *Context, Optional<int> Signal) -> TaskFinishedResponse {
     const Job *SignalledCmd = (const Job *)Context;
 
     if (ShowDriverTimeCompilation) {
@@ -618,7 +635,7 @@ int Compilation::performJobsImpl() {
     if (Level == OutputLevel::Parseable) {
       // Parseable output was requested.
       parseable_output::emitSignalledMessage(llvm::errs(), *SignalledCmd, Pid,
-                                             ErrorMsg, Output);
+                                             ErrorMsg, Output, Signal);
     } else {
       // Otherwise, send the buffered output to stderr, though only if we
       // support getting buffered output.
@@ -629,9 +646,14 @@ int Compilation::performJobsImpl() {
     if (!ErrorMsg.empty())
       Diags.diagnose(SourceLoc(), diag::error_unable_to_execute_command,
                      ErrorMsg);
-
-    Diags.diagnose(SourceLoc(), diag::error_command_signalled,
-                   SignalledCmd->getSource().getClassName());
+    
+    if (Signal.hasValue()) {
+      Diags.diagnose(SourceLoc(), diag::error_command_signalled,
+                     SignalledCmd->getSource().getClassName(), Signal.getValue());
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_command_signalled_without_signal_number,
+                     SignalledCmd->getSource().getClassName());
+    }
 
     // Since the task signalled, unconditionally set result to -2.
     Result = -2;
@@ -718,7 +740,7 @@ int Compilation::performSingleCommand(const Job *Cmd) {
   SmallVector<const char *, 128> Argv;
   Argv.push_back(Cmd->getExecutable());
   Argv.append(Cmd->getArguments().begin(), Cmd->getArguments().end());
-  Argv.push_back(0);
+  Argv.push_back(nullptr);
 
   const char *ExecPath = Cmd->getExecutable();
   const char **argv = Argv.data();

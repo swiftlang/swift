@@ -1028,7 +1028,7 @@ VTables
   decl ::= sil-vtable
   sil-vtable ::= 'sil_vtable' identifier '{' sil-vtable-entry* '}'
 
-  sil-vtable-entry ::= sil-decl-ref ':' sil-function-name
+  sil-vtable-entry ::= sil-decl-ref ':' sil-linkage? sil-function-name
 
 SIL represents dynamic dispatch for class methods using the `class_method`_,
 `super_method`_, and `dynamic_method`_ instructions. The potential destinations
@@ -1083,6 +1083,9 @@ visible through that class (in the example above, ``B``'s vtable references
 ``C.bas``). The Swift AST maintains override relationships between declarations
 that can be used to look up overridden methods in the SIL vtable for a derived
 class (such as ``C.bas`` in ``C``'s vtable).
+
+In case the SIL function is a thunk, the function name is preceded with the
+linkage of the original implementing function.
 
 Witness Tables
 ~~~~~~~~~~~~~~
@@ -3233,6 +3236,23 @@ For aggregate types, especially enums, it is typically both easier
 and more efficient to reason about aggregate copies than it is to
 reason about copies of the subobjects.
 
+unmanaged_retain_value
+``````````````````````
+
+::
+
+  sil-instruction ::= 'unmanaged_retain_value' sil-value
+
+  unmanaged_retain_value %0 : $A
+
+This instruction has the same local semantics as ``retain_value`` but:
+
+* Is valid in ownership qualified SIL.
+* Is not intended to be statically paired at compile time by the compiler.
+
+The intention is that this instruction is used to implement unmanaged
+constructs.
+
 copy_value
 ``````````
 
@@ -3281,6 +3301,23 @@ are the preferred forms.
 For aggregate types, especially enums, it is typically both easier
 and more efficient to reason about aggregate destroys than it is to
 reason about destroys of the subobjects.
+
+unmanaged_release_value
+```````````````````````
+
+::
+
+  sil-instruction ::= 'unmanaged_release_value' sil-value
+
+  unmanaged_release_value %0 : $A
+
+This instruction has the same local semantics as ``release_value`` but:
+
+* Is valid in ownership qualified SIL.
+* Is not intended to be statically paired at compile time by the compiler.
+
+The intention is that this instruction is used to implement unmanaged
+constructs.
 
 destroy_value
 `````````````

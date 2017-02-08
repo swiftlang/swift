@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -67,25 +67,24 @@ protected:
   }
 };
 
-} // End anonymous namespace.
+} // end anonymous namespace
 
 void LoopCloner::cloneLoop() {
   auto *Header = Loop->getHeader();
   auto *CurFun = Loop->getHeader()->getParent();
-  auto &Mod = CurFun->getModule();
 
   SmallVector<SILBasicBlock *, 16> ExitBlocks;
   Loop->getExitBlocks(ExitBlocks);
   for (auto *ExitBB : ExitBlocks)
     BBMap[ExitBB] = ExitBB;
 
-  auto *ClonedHeader = new (Mod) SILBasicBlock(CurFun);
+  auto *ClonedHeader = CurFun->createBasicBlock();
   BBMap[Header] = ClonedHeader;
 
   // Clone the arguments.
-  for (auto *Arg : Header->getBBArgs()) {
-    SILValue MappedArg =
-        new (Mod) SILArgument(ClonedHeader, getOpType(Arg->getType()));
+  for (auto *Arg : Header->getArguments()) {
+    SILValue MappedArg = ClonedHeader->createPHIArgument(
+        getOpType(Arg->getType()), ValueOwnershipKind::Owned);
     ValueMap.insert(std::make_pair(Arg, MappedArg));
   }
 
@@ -111,7 +110,8 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
 
   // Skip a split backedge.
   SILBasicBlock *OrigLatch = Latch;
-  if (!Loop->isLoopExiting(Latch) && !(Latch = Latch->getSinglePredecessor()))
+  if (!Loop->isLoopExiting(Latch) &&
+      !(Latch = Latch->getSinglePredecessorBlock()))
     return None;
   if (!Loop->isLoopExiting(Latch))
     return None;
@@ -122,7 +122,7 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
     return None;
 
   // Match an add 1 recurrence.
-  SILArgument *RecArg;
+  SILPHIArgument *RecArg;
   IntegerLiteralInst *End;
   SILValue RecNext;
 
@@ -132,7 +132,7 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
     return None;
   if (!match(RecNext,
              m_TupleExtractInst(m_ApplyInst(BuiltinValueKind::SAddOver,
-                                            m_SILArgument(RecArg), m_One()),
+                                            m_SILPHIArgument(RecArg), m_One()),
                                 0)))
     return None;
 
@@ -216,8 +216,8 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
     // On the last iteration change the conditional exit to an unconditional
     // one.
     if (CurLoopIter == LastLoopIter) {
-      auto *CondBr =
-          cast<CondBranchInst>(Latch->getSinglePredecessor()->getTerminator());
+      auto *CondBr = cast<CondBranchInst>(
+          Latch->getSinglePredecessorBlock()->getTerminator());
       if (CondBr->getTrueBB() != Latch)
         SILBuilder(CondBr).createBranch(CondBr->getLoc(), CondBr->getTrueBB(),
                                         CondBr->getTrueArgs());
@@ -271,7 +271,7 @@ static void collectLoopLiveOutValues(
     DenseMap<SILInstruction *, SILInstruction *> &ClonedInstructions) {
   for (auto *Block : Loop->getBlocks()) {
     // Look at block arguments.
-    for (auto *Arg : Block->getBBArgs()) {
+    for (auto *Arg : Block->getArguments()) {
       for (auto *Op : Arg->getUses()) {
         // Is this use outside the loop?
         if (!Loop->contains(Op->getUser())) {
@@ -457,7 +457,7 @@ class LoopUnrolling : public SILFunctionTransform {
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 SILTransform *swift::createLoopUnroll() {
   return new LoopUnrolling();

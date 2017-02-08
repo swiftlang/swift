@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -477,9 +477,11 @@ internal func += <Element, C : Collection>(
   let oldCount = lhs.count
   let newCount = oldCount + numericCast(rhs.count)
 
+  let buf: UnsafeMutableBufferPointer<Element>
+  
   if _fastPath(newCount <= lhs.capacity) {
+    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
     lhs.count = newCount
-    (lhs.firstElementAddress + oldCount).initialize(from: rhs)
   }
   else {
     var newLHS = _ContiguousArrayBuffer<Element>(
@@ -490,8 +492,14 @@ internal func += <Element, C : Collection>(
       from: lhs.firstElementAddress, count: oldCount)
     lhs.count = 0
     swap(&lhs, &newLHS)
-    (lhs.firstElementAddress + oldCount).initialize(from: rhs)
+    buf = UnsafeMutableBufferPointer(start: lhs.firstElementAddress + oldCount, count: numericCast(rhs.count))
   }
+
+  var (remainders,writtenUpTo) = buf.initialize(from: rhs)
+
+  // ensure that exactly rhs.count elements were written
+  _precondition(remainders.next() == nil, "rhs underreported its count")
+  _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")    
 }
 
 extension _ContiguousArrayBuffer : RandomAccessCollection {

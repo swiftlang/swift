@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -104,7 +104,7 @@ Projection::Projection(SILInstruction *I) : Value() {
   }
   case ValueKind::ProjectBoxInst: {
     auto *PBI = cast<ProjectBoxInst>(I);
-    Value = ValueTy(ProjectionKind::Box, (unsigned)0);
+    Value = ValueTy(ProjectionKind::Box, static_cast<uintptr_t>(0));
     assert(getKind() == ProjectionKind::Box);
     assert(getIndex() == 0);
     assert(getType(PBI->getOperand()->getType(), PBI->getModule()) ==
@@ -228,6 +228,8 @@ Projection::createObjectProjection(SILBuilder &B, SILLocation Loc,
   case ProjectionKind::BitwiseCast:
     return B.createUncheckedBitwiseCast(Loc, Base, getCastType(BaseTy));
   }
+
+  llvm_unreachable("Unhandled ProjectionKind in switch.");
 }
 
 NullablePtr<SILInstruction>
@@ -270,6 +272,8 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
   case ProjectionKind::BitwiseCast:
     return B.createUncheckedAddrCast(Loc, Base, getCastType(BaseTy));
   }
+
+  llvm_unreachable("Unhandled ProjectionKind in switch.");
 }
 
 void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
@@ -318,15 +322,16 @@ void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
   }
 
   if (auto Box = Ty.getAs<SILBoxType>()) {
-    Projection P(ProjectionKind::Box, (unsigned)0);
-    DEBUG(ProjectionPath X(Ty);
-          assert(X.getMostDerivedType(Mod) == Ty);
-          X.append(P);
-          assert(X.getMostDerivedType(Mod) == SILType::getPrimitiveAddressType(
-                                                Box->getBoxedType()));
-          X.verify(Mod););
-    (void) Box;
-    Out.push_back(P);
+    for (unsigned field : indices(Box->getLayout()->getFields())) {
+      Projection P(ProjectionKind::Box, field);
+      DEBUG(ProjectionPath X(Ty);
+            assert(X.getMostDerivedType(Mod) == Ty);
+            X.append(P);
+            assert(X.getMostDerivedType(Mod) == Box->getFieldType(Mod, field));
+            X.verify(Mod););
+      (void)Box;
+      Out.push_back(P);
+    }
     return;
   }
 }

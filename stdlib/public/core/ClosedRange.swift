@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,6 +15,7 @@
 
 internal enum _ClosedRangeIndexRepresentation<Bound>
   where
+  // FIXME(ABI)#176 (Type checker)
   // WORKAROUND rdar://25214598 - should be Bound : Strideable
   Bound : _Strideable & Comparable,
   Bound.Stride : Integer {
@@ -27,6 +28,7 @@ internal enum _ClosedRangeIndexRepresentation<Bound>
 /// A position in a `CountableClosedRange` instance.
 public struct ClosedRangeIndex<Bound>
   where
+  // FIXME(ABI)#176 (Type checker)
   // WORKAROUND rdar://25214598 - should be Bound : Strideable
   // swift-3-indexing-model: should conform to _Strideable, otherwise
   // CountableClosedRange is not interchangeable with CountableRange in all
@@ -78,10 +80,12 @@ extension ClosedRangeIndex : Comparable {
   }
 }
 
+// FIXME(ABI)#175 (Type checker)
 // WORKAROUND: needed because of rdar://25584401
 /// An iterator over the elements of a `CountableClosedRange` instance.
 public struct ClosedRangeIterator<Bound> : IteratorProtocol, Sequence
   where
+  // FIXME(ABI)#176 (Type checker)
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
   Bound : _Strideable & Comparable,
   Bound.Stride : SignedInteger {
@@ -156,6 +160,7 @@ public struct ClosedRangeIterator<Bound> : IteratorProtocol, Sequence
 /// - SeeAlso: `CountableRange`, `ClosedRange`, `Range`
 public struct CountableClosedRange<Bound> : RandomAccessCollection
   where
+  // FIXME(ABI)#176 (Type checker)
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
   Bound : _Strideable & Comparable,
   Bound.Stride : SignedInteger {
@@ -177,9 +182,11 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
 
   public typealias IndexDistance = Bound.Stride
 
+  // FIXME(ABI)#175 (Type checker)
   // WORKAROUND: needed because of rdar://25584401
   public typealias Iterator = ClosedRangeIterator<Bound>
 
+  // FIXME(ABI)#175 (Type checker)
   // WORKAROUND: needed because of rdar://25584401
   public func makeIterator() -> ClosedRangeIterator<Bound> {
     return ClosedRangeIterator(_range: self)
@@ -278,6 +285,7 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
     return RandomAccessSlice(base: self, bounds: bounds)
   }
 
+  // FIXME(ABI)#175 (Type checker)
   public // WORKAROUND: needed because of rdar://25584401
   var indices: DefaultRandomAccessIndices<CountableClosedRange<Bound>> {
     return DefaultRandomAccessIndices(
@@ -431,6 +439,7 @@ public func ... <Bound>(
   minimum: Bound, maximum: Bound
 ) -> CountableClosedRange<Bound>
   where
+  // FIXME(ABI)#176 (Type checker)
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
   Bound : _Strideable & Comparable,
   Bound.Stride : SignedInteger {

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -418,13 +418,8 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
   return StringRef();
 }
 
-clang::SwiftNewtypeAttr *
-importer::getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
-                              bool useSwift2Name) {
-  // If we're determining the Swift 2 name, don't honor this attribute.
-  if (useSwift2Name)
-    return nullptr;
-
+static clang::SwiftNewtypeAttr *
+retrieveNewTypeAttr(const clang::TypedefNameDecl *decl) {
   // Retrieve the attribute.
   auto attr = decl->getAttr<clang::SwiftNewtypeAttr>();
   if (!attr)
@@ -439,14 +434,22 @@ importer::getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
   return attr;
 }
 
+clang::SwiftNewtypeAttr *
+importer::getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
+                              ImportNameVersion version) {
+  // Newtype was introduced in Swift 3
+  if (version < ImportNameVersion::Swift3 )
+    return nullptr;
+  return retrieveNewTypeAttr(decl);
+}
+
 // If this decl is associated with a swift_newtype typedef, return it, otherwise
 // null
 clang::TypedefNameDecl *importer::findSwiftNewtype(const clang::NamedDecl *decl,
                                                    clang::Sema &clangSema,
-                                                   bool useSwift2Name) {
-  // If we aren't honoring the swift_newtype attribute, don't even
-  // bother looking. Similarly for swift2 names
-  if (useSwift2Name)
+                                                   ImportNameVersion version) {
+  // Newtype was introduced in Swift 3
+  if (version < ImportNameVersion::Swift3 )
     return nullptr;
 
   auto varDecl = dyn_cast<clang::VarDecl>(decl);
@@ -454,7 +457,7 @@ clang::TypedefNameDecl *importer::findSwiftNewtype(const clang::NamedDecl *decl,
     return nullptr;
 
   if (auto typedefTy = varDecl->getType()->getAs<clang::TypedefType>())
-    if (getSwiftNewtypeAttr(typedefTy->getDecl(), false))
+    if (retrieveNewTypeAttr(typedefTy->getDecl()))
       return typedefTy->getDecl();
 
   // Special case: "extern NSString * fooNotification" adopts
@@ -472,7 +475,7 @@ clang::TypedefNameDecl *importer::findSwiftNewtype(const clang::NamedDecl *decl,
       return nullptr;
 
     // Make sure it also has a newtype decl on it
-    if (getSwiftNewtypeAttr(nsDecl, false))
+    if (retrieveNewTypeAttr(nsDecl))
       return nsDecl;
 
     return nullptr;
@@ -563,6 +566,8 @@ OptionalTypeKind importer::translateNullability(clang::NullabilityKind kind) {
   case clang::NullabilityKind::Unspecified:
     return OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional;
   }
+
+  llvm_unreachable("Invalid NullabilityKind.");
 }
 
 bool importer::hasDesignatedInitializers(
@@ -666,14 +671,8 @@ bool importer::isUnavailableInSwift(
   if (enableObjCInterop && isObjCId(decl))
     return true;
 
-  // FIXME: Somewhat duplicated from importAttributes(), but this is a
-  // more direct path.
-  if (decl->getAvailability() == clang::AR_Unavailable)
+  if (decl->isUnavailable())
     return true;
-
-  // Apply the deprecated-as-unavailable filter.
-  if (!platformAvailability.deprecatedAsUnavailableFilter)
-    return false;
 
   for (auto *attr : decl->specific_attrs<clang::AvailabilityAttr>()) {
     if (attr->getPlatform()->getName() == "swift")
@@ -684,29 +683,41 @@ bool importer::isUnavailableInSwift(
       continue;
     }
 
-    clang::VersionTuple version = attr->getDeprecated();
-    if (version.empty())
-      continue;
-    if (platformAvailability.deprecatedAsUnavailableFilter(version.getMajor(),
-                                                           version.getMinor()))
-      return true;
+    if (platformAvailability.deprecatedAsUnavailableFilter) {
+      clang::VersionTuple version = attr->getDeprecated();
+      if (version.empty())
+        continue;
+      if (platformAvailability.deprecatedAsUnavailableFilter(
+            version.getMajor(), version.getMinor())) {
+        return true;
+      }
+    }
   }
 
   return false;
 }
 
-OptionalTypeKind importer::getParamOptionality(const clang::ParmVarDecl *param,
+OptionalTypeKind importer::getParamOptionality(version::Version swiftVersion,
+                                               const clang::ParmVarDecl *param,
                                                bool knownNonNull) {
   auto &clangCtx = param->getASTContext();
 
   // If nullability is available on the type, use it.
-  if (auto nullability = param->getType()->getNullability(clangCtx)) {
+  clang::QualType paramTy = param->getType();
+  if (auto nullability = paramTy->getNullability(clangCtx)) {
     return translateNullability(*nullability);
   }
 
   // If it's known non-null, use that.
   if (knownNonNull || param->hasAttr<clang::NonNullAttr>())
     return OTK_None;
+
+  // Check for the 'static' annotation on C arrays.
+  if (!swiftVersion.isVersion3())
+    if (const auto *DT = dyn_cast<clang::DecayedType>(paramTy))
+      if (const auto *AT = DT->getOriginalType()->getAsArrayTypeUnsafe())
+        if (AT->getSizeModifier() == clang::ArrayType::Static)
+          return OTK_None;
 
   // Default to implicitly unwrapped optionals.
   return OTK_ImplicitlyUnwrappedOptional;

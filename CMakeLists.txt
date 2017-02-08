@@ -4,8 +4,16 @@ cmake_minimum_required(VERSION 3.4.3)
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
+# Make a job pool for things that can't yet be distributed
+cmake_host_system_information(
+  RESULT localhost_logical_cores QUERY NUMBER_OF_LOGICAL_CORES)
+set_property(GLOBAL PROPERTY JOB_POOLS local_jobs=${localhost_logical_cores})
+# Put linking in that category
+set_property(GLOBAL PROPERTY JOB_POOL_LINK local_jobs)
+
 # First include general CMake utilities.
 include(SwiftUtils)
+include(CheckSymbolExists)
 
 #
 # User-configurable options that control the inclusion and default build
@@ -97,7 +105,7 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
     STRINGS FALSE "NOT-MERGED" "MERGED")
 
-set(SWIFT_VERSION "3.0" CACHE STRING
+set(SWIFT_VERSION "3.1" CACHE STRING
     "The user-visible version of the Swift compiler")
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -140,6 +148,10 @@ set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
   "Define the maximum number of linker jobs for swift.")
+
+option(SWIFT_FORCE_OPTIMIZED_TYPECHECKER "Override the optimization setting of
+  the type checker so that it always compiles with optimization. This eases
+  debugging after type checking occurs by speeding up type checking" FALSE)
 
 #
 # User-configurable Android specific options.
@@ -280,6 +292,63 @@ endif()
 # End of user-configurable options.
 #
 
+# Look for either a program in execute_process()'s path or for a hardcoded path.
+# Find a program's version and set it in the parent scope.
+# Replace newlines with spaces so it prints on one line.
+function(find_version cmd flag find_in_path)
+  if(find_in_path)
+    message(STATUS "Finding installed version for: ${cmd}")
+  else()
+    message(STATUS "Finding version for: ${cmd}")
+  endif()
+  execute_process(
+    COMMAND ${cmd} ${flag}
+    OUTPUT_VARIABLE out
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT out)
+    if(find_in_path)
+      message(STATUS "tried to find version for ${cmd}, but ${cmd} not found in path, continuing")
+    else()
+      message(FATAL_ERROR "tried to find version for ${cmd}, but ${cmd} not found")
+    endif()
+  else()
+    string(REPLACE "\n" " " out2 ${out})
+    message(STATUS "Found version: ${out2}")
+  endif()
+  message(STATUS "")
+endfunction()
+
+# Print out path and version of any installed commands.
+# We migth be using the wrong version of a command, so record them all.
+function(print_versions)
+  find_version("cmake" "--version" TRUE)
+
+  message(STATUS "Finding version for: ${CMAKE_COMMAND}")
+  message(STATUS "Found version: ${CMAKE_VERSION}")
+  message(STATUS "")
+
+  get_filename_component(CMAKE_MAKE_PROGRAM_BN "${CMAKE_MAKE_PROGRAM}" NAME_WE)
+  if(${CMAKE_MAKE_PROGRAM_BN} STREQUAL "ninja" OR
+     ${CMAKE_MAKE_PROGRAM_BN} STREQUAL "make")
+    find_version(${CMAKE_MAKE_PROGRAM_BN} "--version" TRUE)
+    find_version(${CMAKE_MAKE_PROGRAM} "--version" FALSE)
+  endif()
+
+  if(${SWIFT_PATH_TO_CMARK_BUILD})
+    find_version("cmark" "--version" TRUE)
+    find_version("${SWIFT_PATH_TO_CMARK_BUILD}/src/cmark" "--version" FALSE)
+  endif()
+
+  message(STATUS "Finding version for: ${CMAKE_C_COMPILER}")
+  message(STATUS "Found version: ${CMAKE_C_COMPILER_VERSION}")
+  message(STATUS "")
+
+  message(STATUS "Finding version for: ${CMAKE_CXX_COMPILER}")
+  message(STATUS "Found version: ${CMAKE_CXX_COMPILER_VERSION}")
+  message(STATUS "")
+endfunction()
+
+
 set(SWIFT_BUILT_STANDALONE FALSE)
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
   set(SWIFT_BUILT_STANDALONE TRUE)
@@ -320,6 +389,10 @@ set(CMAKE_CXX_ARCHIVE_FINISH "")
 
 include(CheckCXXSourceRuns)
 include(CMakeParseArguments)
+include(CMakePushCheckState)
+
+print_versions()
+
 include(SwiftComponents)
 include(SwiftHandleGybSources)
 include(SwiftSetIfArchBitness)
@@ -341,7 +414,11 @@ endif()
 # lipo is used to create universal binaries.
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   include(SwiftDarwin)
-  find_toolchain_tool(LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
+  if(SWIFT_LIPO)
+    set(LIPO ${SWIFT_LIPO})
+  else()
+    find_toolchain_tool(LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
+  endif()
 endif()
 
 if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")
@@ -441,6 +518,8 @@ else()
     set(SWIFT_HOST_VARIANT_SDK_default "FREEBSD")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
     set(SWIFT_HOST_VARIANT_SDK_default "CYGWIN")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+    set(SWIFT_HOST_VARIANT_SDK_default "WINDOWS")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     set(SWIFT_HOST_VARIANT_SDK_default "OSX")
   else()
@@ -467,6 +546,12 @@ else()
     set(SWIFT_HOST_VARIANT_ARCH_default "armv6")
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv7l")
     set(SWIFT_HOST_VARIANT_ARCH_default "armv7")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
+    set(SWIFT_HOST_VARIANT_ARCH_default "x86_64")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "IA64")
+    set(SWIFT_HOST_VARIANT_ARCH_default "itanium")
+  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86")
+    set(SWIFT_HOST_VARIANT_ARCH_default "i686")
   else()
     message(FATAL_ERROR "Unrecognized architecture on host system: ${CMAKE_SYSTEM_PROCESSOR}")
   endif()
@@ -481,6 +566,11 @@ set(SWIFT_HOST_VARIANT_ARCH "${SWIFT_HOST_VARIANT_ARCH_default}" CACHE STRING
 # Enable additional warnings.
 #
 swift_common_cxx_warnings()
+
+# Check if we're build with MSVC or Clang-cl, as these compilers have similar command line arguments.
+if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" OR "${CMAKE_CXX_SIMULATE_ID}" STREQUAL "MSVC")
+  set(SWIFT_COMPILER_IS_MSVC_LIKE TRUE)
+endif()
 
 #
 # Configure SDKs.
@@ -567,12 +657,17 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
 
   # set(CMAKE_EXECUTABLE_FORMAT "ELF")
-  set(SWIFT_HOST_VARIANT "windows" CACHE STRING
-      "Deployment OS for Swift host tools (the compiler) [windows].")
+  set(SWIFT_HOST_VARIANT "cygwin" CACHE STRING
+      "Deployment OS for Swift host tools (the compiler) [cygwin].")
 
-  configure_sdk_unix(CYGWIN "Cygwin" "windows" "cygwin" "windows" "x86_64-unknown-windows-cygnus" "/")
-  set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
+  configure_sdk_unix(CYGWIN "Cygwin" "cygwin" "cygwin" "x86_64" "x86_64-unknown-windows-cygnus" "/")
+  set(SWIFT_PRIMARY_VARIANT_SDK_default "${SWIFT_HOST_VARIANT_SDK}")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
+  configure_sdk_windows(WINDOWS "Windows" "msvc" "${SWIFT_HOST_VARIANT_ARCH}")
+  set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
+  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
 
 elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
 
@@ -717,7 +812,7 @@ endif()
 
 # Should we cross-compile the standard library for Windows?
 is_sdk_requested(WINDOWS swift_build_windows)
-if(swift_build_windows)
+if(swift_build_windows AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
   configure_sdk_windows(WINDOWS "Windows" "msvc" i686)
 endif()
 
@@ -783,6 +878,13 @@ message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEA
 message(STATUS "")
 
 #
+# Find required dependencies.
+#
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND "${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "")
+  find_package(ICU REQUIRED COMPONENTS uc i18n)
+endif()
+
+#
 # Find optional dependencies.
 #
 
@@ -792,6 +894,19 @@ find_package(LibXml2)
 if(LIBXML2_FOUND)
   set(SWIFT_HAVE_LIBXML 1)
 endif()
+
+# You need libedit linked in order to check if you have el_wgets.
+cmake_push_check_state()
+list(APPEND CMAKE_REQUIRED_LIBRARIES "edit")
+check_symbol_exists(el_wgets "histedit.h" HAVE_EL_WGETS)
+check_symbol_exists(wcslcat wchar.h HAVE_WCSLCAT)
+# FIXME: UNICODE_LIBEDIT shouldn't need BSD's wcslcat function,
+#        rewrite the usages in terms of wcsncat to get the REPL
+#        building on linux.
+if(HAVE_EL_WGETS AND HAVE_WCSLCAT)
+  set(HAVE_UNICODE_LIBEDIT 1)
+endif()
+cmake_pop_check_state()
 
 if (LLVM_ENABLE_DOXYGEN)
   message(STATUS "Doxygen: enabled")

@@ -177,16 +177,16 @@ With the basic approach above, you can only perform actions on actors that are
 built into the actor. For example, if you had an actor with two methods::
 
   actor MyActor {
-    func foo() {…}
-    func bar() {…}
-    func getvalue() -> double {… }
+    func foo() {...}
+    func bar() {...}
+    func getvalue() -> double {... }
   }
 
 Then there is no way to perform a composite operation that needs to "atomically"
 perform foo() and bar() without any other operations getting in between. If you
 had code like this::
 
-  var a : MyActor = …
+  var a : MyActor = ...
   a.foo()
   a.bar()
 
@@ -196,7 +196,7 @@ wouldn't be run in between them. To handle this, the async block structure can
 be used to submit a sequence of code that is atomically run in the actor's
 context, e.g.::
 
-  var a : MyActor = …
+  var a : MyActor = ...
   async a {
     a.foo()
     a.bar()
@@ -206,7 +206,7 @@ This conceptually submits a closure to run in the context of the actor. If you
 look at it this way, an async message send is conceptually equivalent to an
 async block. As such, the original example was equivalent to::
 
-  var a : MyActor = …
+  var a : MyActor = ...
   async a { a.foo() }
   async a { a.bar() }
 

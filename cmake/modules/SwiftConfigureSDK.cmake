@@ -157,7 +157,7 @@ macro(configure_sdk_windows prefix sdk_name environment architectures)
   set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "NOTFOUND")
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "windows")
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "NOTFOUND")
-  set(SWIFT_SDK_${prefix}_TRIPLE_NAME "NOTFOUND")
+  set(SWIFT_SDK_${prefix}_TRIPLE_NAME "Win32")
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
 

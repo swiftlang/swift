@@ -4,21 +4,21 @@
 // RUN: %target-swift-frontend -emit-module -o %t/Frameworks/has_alias.framework/Modules/has_alias.swiftmodule/%target-swiftmodule-name %S/Inputs/alias.swift -module-name has_alias
 
 // RUN: %target-swift-frontend -emit-module -o %t -I %t/secret -F %t/Frameworks -parse-as-library %S/Inputs/has_xref.swift
-// RUN: %target-swift-frontend %s -parse -I %t -verify -show-diagnostics-after-fatal
+// RUN: %target-swift-frontend %s -typecheck -I %t -verify -show-diagnostics-after-fatal
 
 // Try again, treating has_xref as a main file to force serialization to occur.
 // RUN: %target-swift-frontend -emit-module -o %t -I %t/secret -F %t/Frameworks %S/Inputs/has_xref.swift
-// RUN: %target-swift-frontend %s -parse -I %t
+// RUN: %target-swift-frontend %s -typecheck -I %t
 
 // RUN: %target-swift-frontend -emit-module -o %t -I %t/secret -F %t/Frameworks -parse-as-library %S/Inputs/has_xref.swift -serialize-debugging-options
-// RUN: %target-swift-frontend %s -parse -I %t
+// RUN: %target-swift-frontend %s -typecheck -I %t
 
 // RUN: %target-swift-frontend -emit-module -o %t -I %t/secret -F %t/Frameworks -parse-as-library %S/Inputs/has_xref.swift -application-extension
-// RUN: %target-swift-frontend %s -parse -I %t
+// RUN: %target-swift-frontend %s -typecheck -I %t
 
 // Make sure we don't end up with duplicate search paths.
 // RUN: %target-swiftc_driver -emit-module -o %t/has_xref.swiftmodule -I %t/secret -F %t/Frameworks -parse-as-library %S/Inputs/has_xref.swift %S/../Inputs/empty.swift -Xfrontend -serialize-debugging-options
-// RUN: %target-swift-frontend %s -parse -I %t
+// RUN: %target-swift-frontend %s -typecheck -I %t
 // RUN: llvm-bcanalyzer -dump %t/has_xref.swiftmodule | %FileCheck %s
 
 // RUN: %target-swift-frontend %s -emit-module -o %t/main.swiftmodule -I %t -I %t/secret -F %t/Frameworks

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -sdk %S/Inputs -I %S/Inputs/custom-modules -I %S/../Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -sdk %S/Inputs -I %S/Inputs/custom-modules -I %S/../Inputs/custom-modules
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s -sdk %S/Inputs -I %S/Inputs/custom-modules -I %S/../Inputs/custom-modules -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module  | %FileCheck %s
 
 // REQUIRES: objc_interop

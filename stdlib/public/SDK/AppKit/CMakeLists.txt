@@ -7,4 +7,6 @@ add_swift_library(swiftAppKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OV
   TARGET_SDKS OSX
   SWIFT_MODULE_DEPENDS_OSX Darwin CoreData CoreGraphics CoreImage Dispatch Foundation IOKit ObjectiveC QuartzCore XPC # auto-updated
   FRAMEWORK_DEPENDS AppKit
+
+  DEPLOYMENT_VERSION_OSX ${SWIFTLIB_DEPLOYMENT_VERSION_APPKIT_OSX}
 )

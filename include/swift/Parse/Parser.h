@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -18,13 +18,15 @@
 #define SWIFT_PARSER_H
 
 #include "swift/AST/AST.h"
+#include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/OptionSet.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Parse/Token.h"
 #include "swift/Parse/ParserResult.h"
-#include "swift/Basic/OptionSet.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -61,7 +63,7 @@ namespace swift {
     /// The body of the inactive clause of an #if/#else/#endif block
     InactiveConditionalBlock,
     /// The body of the active clause of an #if/#else/#endif block
-    ActiveConditionalBlock
+    ActiveConditionalBlock,
   };
 
   
@@ -320,8 +322,8 @@ public:
   /// \brief Return parser position after the first character of token T
   ParserPosition getParserPositionAfterFirstCharacter(Token T);
 
-  void restoreParserPosition(ParserPosition PP) {
-    L->restoreState(PP.LS);
+  void restoreParserPosition(ParserPosition PP, bool enableDiagnostics = false) {
+    L->restoreState(PP.LS, enableDiagnostics);
 
     // We might be at tok::eof now, so ensure that consumeToken() does not
     // assert about lexing past eof.
@@ -398,7 +400,8 @@ public:
   }
 
   SourceLoc consumeIdentifier(Identifier *Result = nullptr) {
-    assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self, tok::kw_throws));
+    assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self,
+                     /* for Swift3 */tok::kw_throws, tok::kw_rethrows));
     if (Result)
       *Result = Context.getIdentifier(Tok.getText());
     return consumeToken();
@@ -460,7 +463,7 @@ public:
 
   /// Parse an #endif.
   bool parseEndIfDirective(SourceLoc &Loc);
-
+  
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
@@ -487,6 +490,11 @@ public:
   }
   
   void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New);
+  
+  /// Add a fix-it to remove the space in consecutive identifiers.
+  /// Add a camel-cased option if it is different than the first option.
+  void diagnoseConsecutiveIDs(StringRef First, SourceLoc FirstLoc,
+                              StringRef DeclKindName);
      
   /// \brief Check whether the current token starts with '<'.
   bool startsWithLess(Token Tok) {
@@ -601,9 +609,8 @@ public:
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
-  /// \brief Parse the list of statements, expressions, or declarations.
+  /// \brief Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
-                         tok SeparatorK, bool OptionalSep,
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
                          std::function<ParserStatus()> callback);
 
@@ -616,10 +623,6 @@ public:
                                BraceItemListKind ConditionalBlockKind =
                                    BraceItemListKind::Brace);
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
-  
-  void parseIfConfigClauseElements(bool isActive,
-                                   BraceItemListKind Kind,
-                                   SmallVectorImpl<ASTNode> &Elements);
   
   void parseTopLevelCodeDeclDelayed();
 
@@ -644,7 +647,7 @@ public:
     PD_InExtension          = 1 << 8,
     PD_InStruct             = 1 << 9,
     PD_InEnum               = 1 << 10,
-    PD_InLoop               = 1 << 11
+    PD_InLoop               = 1 << 11,
   };
 
   /// Options that control the parsing of declarations.
@@ -677,8 +680,8 @@ public:
     return AlreadyHandledDecls.erase(D);
   }
 
-  ParserStatus parseDecl(ParseDeclOptions Flags,
-                         llvm::function_ref<void(Decl*)> Handler);
+  ParserResult<Decl> parseDecl(ParseDeclOptions Flags,
+                               llvm::function_ref<void(Decl*)> Handler);
 
   void parseDeclDelayed();
 
@@ -699,6 +702,12 @@ public:
   bool parseDeclAttributeList(DeclAttributes &Attributes,
                               bool &FoundCodeCompletionToken);
 
+  /// Parse the @_specialize attribute.
+  /// \p closingBrace is the expected closing brace, which can be either ) or ]
+  /// \p Attr is where to store the parsed attribute
+  bool parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
+                                SourceLoc Loc, SpecializeAttr *&Attr);
+
   /// Parse a specific attribute.
   bool parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
 
@@ -710,12 +719,13 @@ public:
   bool parseVersionTuple(clang::VersionTuple &Version, SourceRange &Range,
                          const Diagnostic &D);
 
-  bool parseTypeAttributeList(TypeAttributes &Attributes) {
-    if (Tok.is(tok::at_sign))
-      return parseTypeAttributeListPresent(Attributes);
+  bool parseTypeAttributeList(SourceLoc &InOutLoc, TypeAttributes &Attributes) {
+    if (Tok.is(tok::at_sign) || Tok.is(tok::kw_inout))
+      return parseTypeAttributeListPresent(InOutLoc, Attributes);
     return false;
   }
-  bool parseTypeAttributeListPresent(TypeAttributes &Attributes);
+  bool parseTypeAttributeListPresent(SourceLoc &InOutLoc,
+                                     TypeAttributes &Attributes);
   bool parseTypeAttribute(TypeAttributes &Attributes,
                           bool justChecking = false);
   
@@ -724,25 +734,27 @@ public:
                                            DeclAttributes &Attributes);
   ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
                                 SourceLoc *classRequirementLoc);
+  bool parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
+                     Diag<> ErrorDiag, ParseDeclOptions Options,
+                     llvm::function_ref<void(Decl*)> handler);
   ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);
   ParserResult<EnumDecl> parseDeclEnum(ParseDeclOptions Flags,
                                        DeclAttributes &Attributes);
-  ParserStatus parseDeclEnumCase(ParseDeclOptions Flags, DeclAttributes &Attributes,
-                                 SmallVectorImpl<Decl *> &decls);
-  bool parseNominalDeclMembers(SourceLoc LBLoc, SourceLoc &RBLoc,
-                               Diag<> ErrorDiag, ParseDeclOptions flags,
-                               llvm::function_ref<void(Decl*)> handler);
+  ParserResult<EnumCaseDecl>
+  parseDeclEnumCase(ParseDeclOptions Flags, DeclAttributes &Attributes,
+                    SmallVectorImpl<Decl *> &decls);
   ParserResult<StructDecl>
   parseDeclStruct(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<ClassDecl>
   parseDeclClass(SourceLoc ClassLoc,
                  ParseDeclOptions Flags, DeclAttributes &Attributes);
-  ParserStatus parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attributes,
-                            SmallVectorImpl<Decl *> &Decls,
-                            SourceLoc StaticLoc,
-                            StaticSpellingKind StaticSpelling,
-                            SourceLoc TryLoc);
+  ParserResult<PatternBindingDecl>
+  parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attributes,
+               SmallVectorImpl<Decl *> &Decls,
+               SourceLoc StaticLoc,
+               StaticSpellingKind StaticSpelling,
+               SourceLoc TryLoc);
 
   void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
 
@@ -791,9 +803,9 @@ public:
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 
-  ParserStatus parseDeclSubscript(ParseDeclOptions Flags,
-                                  DeclAttributes &Attributes,
-                                  SmallVectorImpl<Decl *> &Decls);
+  ParserResult<SubscriptDecl>
+  parseDeclSubscript(ParseDeclOptions Flags, DeclAttributes &Attributes,
+                     SmallVectorImpl<Decl *> &Decls);
 
   ParserResult<ConstructorDecl>
   parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes);
@@ -830,7 +842,8 @@ public:
   
   ParserResult<TypeRepr> parseType();
   ParserResult<TypeRepr> parseType(Diag<> MessageID,
-                                   bool HandleCodeCompletion = true);
+                                   bool HandleCodeCompletion = true,
+                                   bool IsSILFuncDecl = false);
 
   /// \brief Parse any type, but diagnose all types except type-identifier or
   /// type-composition with non-type-identifier.
@@ -854,6 +867,10 @@ public:
   ParserResult<TypeRepr> parseTypeSimple();
   ParserResult<TypeRepr> parseTypeSimple(Diag<> MessageID,
                                          bool HandleCodeCompletion = true);
+
+  /// \brief Parse layout constraint.
+  LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
+
   bool parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);
@@ -861,7 +878,10 @@ public:
   ParserResult<TypeRepr> parseTypeIdentifier();
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<CompositionTypeRepr> parseAnyType();
-
+  ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
+                                         const TypeAttributes &attrs,
+                                         Optional<Scope> &GenericsScope);
+  
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
   ParserResult<TypeRepr> parseTypeArray(TypeRepr *Base);
 
@@ -881,7 +901,8 @@ public:
   bool isImplicitlyUnwrappedOptionalToken(const Token &T) const;
   SourceLoc consumeImplicitlyUnwrappedOptionalToken();
 
-  TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr);
+  TypeRepr *applyAttributeToType(TypeRepr *Ty, SourceLoc InOutLoc,
+                                 const TypeAttributes &Attr);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -993,7 +1014,8 @@ public:
 
   ParserResult<ParameterList> parseSingleParameterClause(
                           ParameterContextKind paramContext,
-                          SmallVectorImpl<Identifier> *namePieces = nullptr);
+                          SmallVectorImpl<Identifier> *namePieces = nullptr,
+                          DefaultArgumentInfo *defaultArgs = nullptr);
 
   ParserStatus parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                     SmallVectorImpl<ParameterList*> &BodyParams,
@@ -1006,9 +1028,6 @@ public:
                                       SourceLoc &throws,
                                       bool &rethrows,
                                       TypeRepr *&retType);
-  ParserStatus parseConstructorArguments(DeclName &FullName,
-                                         ParameterList *&BodyParams,
-                                         DefaultArgumentInfo &defaultArgs);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -1223,9 +1242,14 @@ public:
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
   ParserResult<CaseStmt> parseStmtCase();
 
-  /// Evaluate the condition of an #if directive.
-  ConditionalCompilationExprState
-  evaluateConditionalCompilationExpr(Expr *condition);
+  /// Classify the condition of an #if directive according to whether it can
+  /// be evaluated statically.  The first member of the pair indicates whether
+  /// parsing of the condition body should occur, the second contains the result
+  /// of evaluating the conditional expression.
+  static ConditionalCompilationExprState
+  classifyConditionalCompilationExpr(Expr *condition,
+                                     ASTContext &context,
+                                     DiagnosticEngine &diags);
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing
@@ -1244,12 +1268,10 @@ public:
   ParserStatus
   parseFreestandingGenericWhereClause(GenericParamList *&GPList,
                              WhereClauseKind kind=WhereClauseKind::Declaration);
-  
-  ParserStatus parseGenericWhereClause(SourceLoc &WhereLoc,
-                               SmallVectorImpl<RequirementRepr> &Requirements,
-                                       bool &FirstTypeInComplete);
-  
 
+  ParserStatus parseGenericWhereClause(
+      SourceLoc &WhereLoc, SmallVectorImpl<RequirementRepr> &Requirements,
+      bool &FirstTypeInComplete, bool AllowLayoutConstraints = false);
 
   //===--------------------------------------------------------------------===//
   // Availability Specification Parsing

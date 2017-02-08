@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -304,8 +304,6 @@ public func print<T>(_: T, appendNewline: Bool = true) {}
 @available(*, unavailable, message: "Please use 'terminator: \"\"' instead of 'appendNewline: false': 'debugPrint((...), terminator: \"\")'")
 public func debugPrint<T>(_: T, appendNewline: Bool = true) {}
 
-
-//===--- FIXME: Not working due to <rdar://22101775> ----------------------===//
 @available(*, unavailable, message: "Please use the 'to' label for the target stream: 'print((...), to: &...)'")
 public func print<T>(_: T, _: inout TextOutputStream) {}
 @available(*, unavailable, message: "Please use the 'to' label for the target stream: 'debugPrint((...), to: &...))'")

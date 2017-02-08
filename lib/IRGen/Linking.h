@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,6 +21,7 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
@@ -310,6 +311,9 @@ class LinkEntity {
   }
 
   LinkEntity() = default;
+
+  std::string mangleOld() const;
+  std::string mangleNew() const;
 
 public:
   static LinkEntity forNonFunction(ValueDecl *decl) {
@@ -624,7 +628,7 @@ public:
   }
 
   /// Determine whether this entity will be weak-imported.
-  bool isWeakImported(Module *module) const {
+  bool isWeakImported(ModuleDecl *module) const {
     if (getKind() == Kind::SILGlobalVariable &&
         getSILGlobalVariable()->getDecl())
       return getSILGlobalVariable()->getDecl()->isWeakImported(module);

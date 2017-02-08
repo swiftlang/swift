@@ -1,0 +1,52 @@
+{
+  key.hash: <hash>,
+  key.dependencies: [
+    {
+      key.kind: source.lang.swift.import.module.swift,
+      key.name: "Swift",
+      key.filepath: Swift.swiftmodule,
+      key.hash: <hash>,
+      key.is_system: 1
+    },
+    {
+      key.kind: source.lang.swift.import.module.swift,
+      key.name: "test_module",
+      key.filepath: test_module.swiftmodule,
+      key.hash: <hash>,
+      key.dependencies: [
+        {
+          key.kind: source.lang.swift.import.module.swift,
+          key.name: "Swift",
+          key.filepath: Swift.swiftmodule,
+          key.hash: <hash>,
+          key.is_system: 1
+        }
+      ]
+    }
+  ],
+  key.entities: [
+    {
+      key.kind: source.lang.swift.ref.function.free,
+      key.name: "globalFunc()",
+      key.usr: "s:F11test_module10globalFuncFT_T_",
+      key.line: 8,
+      key.column: 25
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.name: "test()",
+      key.usr: "s:F17index_func_import4testFT_T_",
+      key.line: 10,
+      key.column: 6,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.function.free,
+          key.name: "globalFunc()",
+          key.usr: "s:F11test_module10globalFuncFT_T_",
+          key.line: 11,
+          key.column: 3
+        }
+      ]
+    }
+  ]
+}

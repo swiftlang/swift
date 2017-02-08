@@ -130,22 +130,6 @@ func test3(_ c: SB1, s: S2) {
   s.sfoo()
 }
 
-// Test candidates.
-struct S3 {
-  func test() {} // no.
-}
-protocol P2 {
-  func test() // no.
-}
-class CC3 {
-  func meth() {} // no.
-  class func test1() {} // no.
-  func test2() {} // yes.
-}
-extension CC3 {
-  func test3() {} // yes.
-}
-
 extension Undeclared {
   func meth() {}
 }

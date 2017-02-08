@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -35,7 +35,7 @@ namespace swift { extern "C" {
 // the current platform in the runtime code.
 #if defined(__linux__) && defined (__arm__) && !defined(__android__)
 typedef           int __swift_ssize_t;
-#elif defined(_MSC_VER)
+#elif defined(_WIN32)
 #if defined(_M_ARM) || defined(_M_IX86)
 typedef           int __swift_ssize_t;
 #elif defined(_M_X64)
@@ -63,6 +63,9 @@ __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
 __attribute__((__pure__)) SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
 _swift_stdlib_strlen(const char *s);
 
+__attribute__((__pure__)) SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
+_swift_stdlib_strlen_unsigned(const unsigned char *s);
+
 __attribute__((__pure__))
 SWIFT_RUNTIME_STDLIB_INTERFACE
 int _swift_stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
@@ -88,19 +91,40 @@ __swift_uint32_t
 _swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
 
 // Math library functions
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_remainderf(float, float);
-SWIFT_RUNTIME_STDLIB_INTERFACE float _swift_stdlib_squareRootf(float);
+static inline __attribute__((always_inline))
+float _swift_stdlib_remainderf(float _self, float _other) {
+  return __builtin_remainderf(_self, _other);
+}
+  
+static inline __attribute__((always_inline))
+float _swift_stdlib_squareRootf(float _self) {
+  return __builtin_sqrt(_self);
+}
 
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_remainder(double, double);
-SWIFT_RUNTIME_STDLIB_INTERFACE double _swift_stdlib_squareRoot(double);
+static inline __attribute__((always_inline))
+double _swift_stdlib_remainder(double _self, double _other) {
+  return __builtin_remainder(_self, _other);
+}
+
+static inline __attribute__((always_inline))
+double _swift_stdlib_squareRoot(double _self) {
+  return __builtin_sqrt(_self);
+}
 
 // TODO: Remove horrible workaround when importer does Float80 <-> long double.
 #if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
-SWIFT_RUNTIME_STDLIB_INTERFACE
-void _swift_stdlib_remainderl(void *_self, const void *_other);
-SWIFT_RUNTIME_STDLIB_INTERFACE
-void _swift_stdlib_squareRootl(void *_self);
-#endif
+static inline __attribute__((always_inline))
+void _swift_stdlib_remainderl(void *_self, const void *_other) {
+  long double *_f80self = (long double *)_self;
+  *_f80self = __builtin_remainderl(*_f80self, *(const long double *)_other);
+}
+
+static inline __attribute__((always_inline))
+void _swift_stdlib_squareRootl(void *_self) {
+  long double *_f80self = (long double *)_self;
+  *_f80self = __builtin_sqrtl(*_f80self);
+}
+#endif // Have Float80
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift

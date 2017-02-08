@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 
 func _Algorithm<I : IteratorProtocol, S : Sequence>(i: I, s: S) {
@@ -59,7 +59,7 @@ func _Collection() {
 }
 
 func _Collection<C : Collection>(c: C) {
-  func fn<T : Collection, U>(_: T, _: U) where T.Generator == U {} // expected-error {{'T' does not have a member type named 'Generator'; did you mean 'Iterator'?}} {{50-59=Iterator}} {{none}} 
+  func fn<T : Collection, U>(_: T, _: U) where T.Generator == U {} // expected-error {{'Generator' has been renamed to 'Iterator'}} {{50-59=Iterator}} {{none}}
   _ = c.generate() // expected-error {{'generate()' has been renamed to 'makeIterator()'}} {{9-17=makeIterator}} {{none}}
   _ = c.underestimateCount() // expected-error {{'underestimateCount()' has been replaced by 'underestimatedCount'}} {{9-27=underestimatedCount}} {{27-29=}} {{none}}
   _ = c.split(1) { _ in return true} // expected-error {{split(maxSplits:omittingEmptySubsequences:whereSeparator:) instead}} {{none}}

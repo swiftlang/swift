@@ -5,13 +5,13 @@ import Swift
 // CHECK-LABEL: sil @alloc_dealloc : $@convention(thin) (Int) -> () {
 sil @alloc_dealloc : $@convention(thin) (Int) -> () {
 entry(%x : $Int):
-  // CHECK: [[B:%.*]] = alloc_box $@box Int
-  %b = alloc_box $@box Int
-  // CHECK: [[PB:%.*]] = project_box [[B]] : $@box Int, 0
-  %ba = project_box %b : $@box Int, 0
+  // CHECK: [[B:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK: [[PB:%.*]] = project_box [[B]] : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
   // CHECK: store [[X:%.*]] to [trivial] [[PB]] : $*Int
   store %x to [trivial] %ba : $*Int
-  // CHECK: dealloc_box [[B]] : $@box Int
-  dealloc_box %b : $@box Int
+  // CHECK: dealloc_box [[B]] : $<τ_0_0> { var τ_0_0 } <Int>
+  dealloc_box %b : $<τ_0_0> { var τ_0_0 } <Int>
   return undef : $()
 }

@@ -45,12 +45,12 @@ sil @looprotate : $@convention(thin) (Int32, @owned Bar) -> Int32 {
 bb0(%0 : $Int32, %25: $Bar):
   %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
-  %30 = alloc_box $@box Bool
-  %30a = project_box %30 : $@box Bool, 0
-  br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar, %30 : $@box Bool, %30a : $*Bool)
+  %30 = alloc_box $<τ_0_0> { var τ_0_0 } <Bool>
+  %30a = project_box %30 : $<τ_0_0> { var τ_0_0 } <Bool>, 0
+  br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar, %30 : $<τ_0_0> { var τ_0_0 } <Bool>, %30a : $*Bool)
 
-bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $Bar, %31 : $@box Bool, %32 : $*Bool):
-  %24 = class_method %26 : $Bar, #Bar.foo!1 : (Bar) -> () -> () , $@convention(method) (@guaranteed Bar) -> () // user: %6
+bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $Bar, %31 : $<τ_0_0> { var τ_0_0 } <Bool>, %32 : $*Bool):
+  %24 = class_method %26 : $Bar, #Bar.foo!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %6
   %27 = apply %24(%25) : $@convention(method) (@guaranteed Bar) -> ()
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
@@ -67,7 +67,7 @@ bb2:
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Int32, %17 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
-  br bb1(%21 : $Builtin.Int32, %14 : $Builtin.Int32, %26: $Bar, %31 : $@box Bool, %32 : $*Bool)
+  br bb1(%21 : $Builtin.Int32, %14 : $Builtin.Int32, %26: $Bar, %31 : $<τ_0_0> { var τ_0_0 } <Bool>, %32 : $*Bool)
 
 bb3:
   %23 = struct $Int32 (%4 : $Builtin.Int32)
@@ -120,12 +120,12 @@ sil @looprotate_with_opened_archetype : $@convention(thin) (Int32, @in P) -> Int
 bb0(%0 : $Int32, %25: $*P):
   %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
-  %30 = alloc_box $@box Bool
-  %30a = project_box %30 : $@box Bool, 0
+  %30 = alloc_box $<τ_0_0> { var τ_0_0 } <Bool>
+  %30a = project_box %30 : $<τ_0_0> { var τ_0_0 } <Bool>, 0
   %40 = open_existential_addr %25 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P
-  br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $*P, %30 : $@box Bool, %30a : $*Bool)
+  br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $*P, %30 : $<τ_0_0> { var τ_0_0 } <Bool>, %30a : $*Bool)
 
-bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $*P, %31 : $@box Bool, %32 : $*Bool):
+bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $*P, %31 : $<τ_0_0> { var τ_0_0 } <Bool>, %32 : $*Bool):
   %111 = witness_method $@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P, #P.boo!1, %40 : $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   %122 = apply %111<@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P>(%40) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   %6 = struct $Int32 (%5 : $Builtin.Int32)
@@ -143,7 +143,7 @@ bb2:
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Int32, %17 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
-  br bb1(%21 : $Builtin.Int32, %14 : $Builtin.Int32, %26: $*P, %31 : $@box Bool, %32 : $*Bool)
+  br bb1(%21 : $Builtin.Int32, %14 : $Builtin.Int32, %26: $*P, %31 : $<τ_0_0> { var τ_0_0 } <Bool>, %32 : $*Bool)
 
 bb3:
   %23 = struct $Int32 (%4 : $Builtin.Int32)
@@ -224,7 +224,7 @@ bb0(%0 : $Int32, %25: $Bar):
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar)
 
 bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $Bar):
-  %101 = class_method [volatile] %100 : $Bar, #Bar.foo!1.foreign : (Bar) -> () -> () , $@convention(objc_method) (Bar) -> ()
+  %101 = class_method [volatile] %100 : $Bar, #Bar.foo!1.foreign : (Bar) -> () -> (), $@convention(objc_method) (Bar) -> ()
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   cond_br %8, bb3, bb2

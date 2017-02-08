@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -468,7 +468,7 @@ extension String {
 
   /// Enumerates all the lines in a string.
   public func enumerateLines(
-    invoking body: @escaping (_ line: String, _ stop: inout Bool) -> ()
+    invoking body: @escaping (_ line: String, _ stop: inout Bool) -> Void
   ) {
     _ns.enumerateLines {
       (line: String, stop: UnsafeMutablePointer<ObjCBool>)
@@ -501,7 +501,7 @@ extension String {
     options opts: NSLinguisticTagger.Options = [],
     orthography: NSOrthography? = nil,
     invoking body:
-      (String, Range<Index>, Range<Index>, inout Bool) -> ()
+      (String, Range<Index>, Range<Index>, inout Bool) -> Void
   ) {
     _ns.enumerateLinguisticTags(
       in: _toNSRange(range),
@@ -536,7 +536,7 @@ extension String {
     _ body: @escaping (
       _ substring: String?, _ substringRange: Range<Index>,
       _ enclosingRange: Range<Index>, inout Bool
-    ) -> ()
+    ) -> Void
   ) {
     _ns.enumerateSubstrings(in: _toNSRange(range), options: opts) {
       var stop_ = false
@@ -1147,8 +1147,7 @@ extension String {
   /// values found in the `String`.
   public
   func propertyListFromStringsFileFormat() -> [String : String] {
-    return _ns.propertyListFromStringsFileFormat()! as [NSObject : AnyObject]
-      as! [String : String]
+    return _ns.propertyListFromStringsFileFormat() as! [String : String]? ?? [:]
   }
 
   // - (NSRange)rangeOfCharacterFromSet:(NSCharacterSet *)aSet
@@ -1737,7 +1736,7 @@ extension String {
     options opts: NSLinguisticTagger.Options,
     orthography: NSOrthography?,
     _ body:
-      (String, Range<Index>, Range<Index>, inout Bool) -> ()
+      (String, Range<Index>, Range<Index>, inout Bool) -> Void
   ) {
     fatalError("unavailable function can't be called")
   }
@@ -1749,7 +1748,7 @@ extension String {
     _ body: (
       _ substring: String?, _ substringRange: Range<Index>,
       _ enclosingRange: Range<Index>, inout Bool
-    ) -> ()
+    ) -> Void
   ) {
     fatalError("unavailable function can't be called")
   }

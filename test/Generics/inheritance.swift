@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 class A {
   func foo() { }
@@ -56,11 +56,11 @@ func testGenericInherit() {
 
 
 struct SS<T> : T { } // expected-error{{inheritance from non-protocol type 'T'}}
-enum SE<T> : T { case X } // expected-error{{raw type 'T' is not expressible by any literal}} expected-error {{SE<T>' declares raw type 'T', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum SE<T> : T { case X } // expected-error{{raw type 'T' is not expressible by any literal}} // expected-error {{SE<T>' declares raw type 'T', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-error{{RawRepresentable conformance cannot be synthesized because raw type 'T' is not Equatable}}
 
 // Also need Equatable for init?(RawValue)
 enum SE2<T : ExpressibleByIntegerLiteral>
-  : T // expected-error {{'SE2<T>' declares raw type 'T', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-error{{RawRepresentable 'init' cannot be synthesized because raw type 'T' is not Equatable}}
+  : T // expected-error {{'SE2<T>' declares raw type 'T', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-error{{RawRepresentable conformance cannot be synthesized because raw type 'T' is not Equatable}}
 { case X }
 
 // ... but not if init?(RawValue) and `rawValue` are directly implemented some other way.

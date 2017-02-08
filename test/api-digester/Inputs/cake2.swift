@@ -4,6 +4,7 @@ public struct S1 {
   mutating public func foo2() {}
   public static func foo3() {}
   public func foo4() {}
+  public func foo5(x : Int, y: Int, z: Int) {}
 }
 
 public class C1 {

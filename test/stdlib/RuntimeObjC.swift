@@ -650,7 +650,7 @@ Reflection.test("MetatypeMirror") {
     expectEqual(expectedObjCProtocolConcrete, output)
 
     let compositionConcreteMetatype = (SomeNativeProto & SomeObjCProto).self
-    let expectedComposition = "- a.SomeNativeProto & a.SomeObjCProto #0\n"
+    let expectedComposition = "- a.SomeObjCProto & a.SomeNativeProto #0\n"
     output = ""
     dump(compositionConcreteMetatype, to: &output)
     expectEqual(expectedComposition, output)
@@ -782,11 +782,21 @@ var KVOHandle = 0
 
 Reflection.test("Name of metatype of artificial subclass") {
   let obj = TestArtificialSubclass()
+
+  expectEqual("\(type(of: obj))", "TestArtificialSubclass")
+  expectEqual(String(describing: type(of: obj)), "TestArtificialSubclass")
+  expectEqual(String(reflecting: type(of: obj)), "a.TestArtificialSubclass")
+
   // Trigger the creation of a KVO subclass for TestArtificialSubclass.
   obj.addObserver(obj, forKeyPath: "foo", options: [.new], context: &KVOHandle)
+  expectEqual("\(type(of: obj))", "TestArtificialSubclass")
+  expectEqual(String(describing: type(of: obj)), "TestArtificialSubclass")
+  expectEqual(String(reflecting: type(of: obj)), "a.TestArtificialSubclass")
   obj.removeObserver(obj, forKeyPath: "foo")
 
   expectEqual("\(type(of: obj))", "TestArtificialSubclass")
+  expectEqual(String(describing: type(of: obj)), "TestArtificialSubclass")
+  expectEqual(String(reflecting: type(of: obj)), "a.TestArtificialSubclass")
 }
 
 @objc class StringConvertibleInDebugAndOtherwise : NSObject {

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // REQUIRES: objc_interop
 
@@ -66,13 +66,13 @@ func test5() -> Int? {
 func test6<T>(_ x : T) {
   // FIXME: this code should work; T could be Int? or Int??
   // or something like that at runtime.  rdar://16374053
-  let y = x as? Int? // expected-error {{cannot downcast from 'T' to a more optional type 'Int?'}}
+  _ = x as? Int? // expected-error {{cannot downcast from 'T' to a more optional type 'Int?'}}
 }
 
 class B : A { }
 
 func test7(_ x : A) {
-  let y = x as? B? // expected-error{{cannot downcast from 'A' to a more optional type 'B?'}}
+  _ = x as? B? // expected-error{{cannot downcast from 'A' to a more optional type 'B?'}}
 }
 
 func test8(_ x : AnyObject?) {
@@ -146,4 +146,35 @@ func sr2752(x: String?, y: String?) {
   _ = x.map { xx in
     y.map { _ in "" } ?? "\(xx)"
   }
+}
+
+// SR-3248 - Invalid diagnostic calling implicitly unwrapped closure
+var sr3248 : ((Int) -> ())!
+sr3248?(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
+sr3248!(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
+sr3248(a: 2)  // expected-error {{extraneous argument label 'a:' in call}}
+
+struct SR_3248 {
+    var callback: (([AnyObject]) -> Void)!
+}
+
+SR_3248().callback?("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
+SR_3248().callback!("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
+SR_3248().callback("test")  // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
+
+_? = nil  // expected-error {{'nil' requires a contextual type}}
+_?? = nil // expected-error {{'nil' requires a contextual type}}
+
+
+// rdar://problem/29993596
+func takeAnyObjects(_ lhs: AnyObject?, _ rhs: AnyObject?) { }
+
+infix operator !====
+
+func !====(_ lhs: AnyObject?, _ rhs: AnyObject?) -> Bool { return false }
+
+func testAnyObjectImplicitForce(lhs: AnyObject?!, rhs: AnyObject?) {
+  if lhs !==== rhs { }
+
+  takeAnyObjects(lhs, rhs)
 }

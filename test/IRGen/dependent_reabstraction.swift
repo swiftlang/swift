@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -8,7 +8,7 @@ protocol A {
 }
 
 struct X<Y> : A {
-  // CHECK-LABEL: define hidden void @_TTWurGV23dependent_reabstraction1Xx_S_1AS_FS1_1bfwx1BT_(%swift.type** noalias nocapture dereferenceable({{.*}}), %V23dependent_reabstraction1X* noalias nocapture, %swift.type* %Self, i8** %SelfWitnessTable)
+  // CHECK-LABEL: define hidden void @_T023dependent_reabstraction1XVyxGAA1AAAlAaDP1by1BQzFTW(%swift.type** noalias nocapture dereferenceable({{.*}}), %V23dependent_reabstraction1X* noalias nocapture, %swift.type* %Self, i8** %SelfWitnessTable)
   func b(_ b: X.Type) {
     let x: Any = b
     markUsed(b as X.Type)

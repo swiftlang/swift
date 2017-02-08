@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -17,7 +17,7 @@
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || CYGWIN
 import Glibc
 #endif
 
@@ -59,9 +59,15 @@ internal func invokeBlockContext(
   return context.run()
 }
 
+#if CYGWIN || os(FreeBSD)
+public typealias _stdlib_pthread_attr_t = UnsafePointer<pthread_attr_t?>
+#else
+public typealias _stdlib_pthread_attr_t = UnsafePointer<pthread_attr_t>
+#endif
+
 /// Block-based wrapper for `pthread_create`.
 public func _stdlib_pthread_create_block<Argument, Result>(
-  _ attr: UnsafePointer<pthread_attr_t>?,
+  _ attr: _stdlib_pthread_attr_t?,
   _ start_routine: @escaping (Argument) -> Result,
   _ arg: Argument
 ) -> (CInt, pthread_t?) {

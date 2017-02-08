@@ -2,14 +2,14 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 import StdlibUnittest
 
@@ -192,27 +192,38 @@ func disallowSubscriptingOnIntegers() {
 
     r0[0]       // expected-error {{ambiguous use of 'subscript'}}
     r1[0]       // expected-error {{ambiguous use of 'subscript'}}
-    r2[0]       // expected-error {{cannot convert value of type 'Int' to expected argument type 'Range<ClosedRangeIndex<_>>'}}
-    r3[0]       // expected-error {{cannot convert value of type 'Int' to expected argument type 'Range<ClosedRangeIndex<_>>'}}
+    r2[0]       // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'Int'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
+    r3[0]       // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'Int'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
 
-    r0[UInt(0)] // expected-error {{cannot subscript a value of type 'CountableRange<Int>' with an index of type 'UInt'}} expected-note {{overloads for 'subscript' exist}}
+    r0[UInt(0)] // expected-error {{ambiguous reference to member 'subscript'}}
     r1[UInt(0)] // expected-error {{ambiguous use of 'subscript'}}
-    r2[UInt(0)] // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Range<ClosedRangeIndex<_>>'}}
-    r3[UInt(0)] // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Range<ClosedRangeIndex<_>>'}}
+    r2[UInt(0)] // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'UInt'}}
+    // expected-note@-1 {{overloads for 'subscript' exist}}
+    r3[UInt(0)] // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'UInt'}}
+    // expected-note@-1 {{overloads for 'subscript' exist}}
 
     r0[0..<4]   // expected-error {{ambiguous use of 'subscript'}}
     r1[0..<4]   // expected-error {{ambiguous use of 'subscript'}}
-    r2[0..<4]   // expected-error {{cannot convert call result type 'CountableRange<_>' to expected type 'Range<ClosedRangeIndex<_>>'}}
-    r3[0..<4]   // expected-error {{cannot convert call result type 'CountableRange<_>' to expected type 'Range<ClosedRangeIndex<_>>'}}
+    r2[0..<4]   // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableRange<Int>'}}
+    // expected-note@-1 {{overloads for 'subscript' exist}}
+    r3[0..<4]   // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableRange<Int>'}}
+    // expected-note@-1 {{overloads for 'subscript' exist}}
     (10..<100)[0]           // expected-error {{ambiguous use of 'subscript'}}
-    (UInt(10)...100)[0..<4] // expected-error {{cannot convert call result type 'CountableRange<_>' to expected type 'Range<ClosedRangeIndex<_>>'}}
+    (UInt(10)...100)[0..<4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableRange<Int>'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
 
     r0[0...4]   // expected-error {{ambiguous use of 'subscript'}}
     r1[0...4]   // expected-error {{ambiguous use of 'subscript'}}
-    r2[0...4]   // expected-error {{cannot convert call result type 'CountableClosedRange<_>' to expected type 'Range<ClosedRangeIndex<_>>'}}
-    r3[0...4]   // expected-error {{cannot convert call result type 'CountableClosedRange<_>' to expected type 'Range<ClosedRangeIndex<_>>'}}
-    (10...100)[0...4] // expected-error {{cannot convert call result type 'CountableClosedRange<_>' to expected type 'Range<ClosedRangeIndex<_>>'}}
-    (UInt(10)...100)[0...4] // expected-error {{cannot convert call result type 'CountableClosedRange<_>' to expected type 'Range<ClosedRangeIndex<_>>'}}
+    r2[0...4]   // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableClosedRange<Int>'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
+    r3[0...4]   // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableClosedRange<Int>'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
+    (10...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableClosedRange<Int>'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
+    (UInt(10)...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableClosedRange<Int>'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
 
     r0[r0]      // expected-error {{ambiguous use of 'subscript'}}
     r0[r1]      // expected-error {{ambiguous reference to member 'subscript'}}
@@ -224,15 +235,23 @@ func disallowSubscriptingOnIntegers() {
     r1[r2]      // expected-error {{ambiguous reference to member 'subscript'}}
     r1[r3]      // expected-error {{ambiguous use of 'subscript'}}
 
-    r2[r0]      // expected-error {{cannot convert value}}
-    r2[r1]      // expected-error {{cannot convert value}}
-    r2[r2]      // expected-error {{cannot convert value}}
-    r2[r3]      // expected-error {{cannot convert value}}
+    r2[r0]      // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableRange<Int>'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
+    r2[r1]      // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableRange<UInt>'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
+    r2[r2]      // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableClosedRange<Int>'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
+    r2[r3]      // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableClosedRange<UInt>'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
 
-    r3[r0]      // expected-error {{cannot convert value}}
-    r3[r1]      // expected-error {{cannot convert value}}
-    r3[r2]      // expected-error {{cannot convert value}}
-    r3[r3]      // expected-error {{cannot convert value}}
+    r3[r0]      // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableRange<Int>'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
+    r3[r1]      // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableRange<UInt>'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
+    r3[r2]      // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableClosedRange<Int>'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
+    r3[r3]      // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableClosedRange<UInt>'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
   }
 
   do {
@@ -255,14 +274,17 @@ func disallowSubscriptingOnIntegers() {
     r2[0..<4]   // expected-error {{type 'ClosedRange<Int>' has no subscript members}}
     r3[0..<4]   // expected-error {{type 'ClosedRange<UInt>' has no subscript members}}
     (10..<100)[0]           // expected-error {{ambiguous use of 'subscript'}}
-    (UInt(10)...100)[0..<4] // expected-error {{cannot convert call result type}}
+    (UInt(10)...100)[0..<4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableRange<Int>'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
 
     r0[0...4]   // expected-error {{type 'Range<Int>' has no subscript members}}
     r1[0...4]   // expected-error {{type 'Range<UInt>' has no subscript members}}
     r2[0...4]   // expected-error {{type 'ClosedRange<Int>' has no subscript members}}
     r3[0...4]   // expected-error {{type 'ClosedRange<UInt>' has no subscript members}}
-    (10...100)[0...4] // expected-error {{cannot convert call result type 'CountableClosedRange<_>' to expected type 'Range<ClosedRangeIndex<_>>'}}
-    (UInt(10)...100)[0...4] // expected-error {{cannot convert call result type}}
+    (10...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<Int>' with an index of type 'CountableClosedRange<Int>'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
+    (UInt(10)...100)[0...4] // expected-error {{cannot subscript a value of type 'CountableClosedRange<UInt>' with an index of type 'CountableClosedRange<Int>'}}
+    // expected-note@-1 {{overloads for 'subscript'}}
 
     r0[r0]      // expected-error {{type 'Range<Int>' has no subscript members}}
     r0[r1]      // expected-error {{type 'Range<Int>' has no subscript members}}

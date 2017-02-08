@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -70,8 +70,25 @@ class SkipNonTransparentFunctions : public DelayedParsingCallbacks {
 
 } // unnamed namespace
 
-Module *SourceLoader::loadModule(SourceLoc importLoc,
-                             ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+bool SourceLoader::canImportModule(std::pair<Identifier, SourceLoc> ID) {
+  // Search the memory buffers to see if we can find this file on disk.
+  FileOrError inputFileOrError = findModule(Ctx, ID.first.str(),
+                                            ID.second);
+  if (!inputFileOrError) {
+    auto err = inputFileOrError.getError();
+    if (err != std::errc::no_such_file_or_directory) {
+      Ctx.Diags.diagnose(ID.second, diag::sema_opening_import,
+                         ID.first, err.message());
+    }
+
+    return false;
+  }
+  return true;
+}
+
+ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
+                                     ArrayRef<std::pair<Identifier,
+                                     SourceLoc>> path) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -105,7 +122,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   else
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(inputFile));
 
-  auto *importMod = Module::create(moduleID.first, Ctx);
+  auto *importMod = ModuleDecl::create(moduleID.first, Ctx);
   if (EnableResilience)
     importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
   Ctx.LoadedModules[moduleID.first] = importMod;
@@ -125,7 +142,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
                       SkipBodies ? &delayCallbacks : nullptr);
   assert(done && "Parser returned early?");
   (void)done;
-  
+
   if (SkipBodies)
     performDelayedParsing(importMod, persistentState, nullptr);
 
@@ -134,9 +151,8 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   if (SkipBodies)
     performNameBinding(*importFile);
   else
-    performTypeChecking(*importFile, persistentState.getTopLevelContext(), 
+    performTypeChecking(*importFile, persistentState.getTopLevelContext(),
                         None);
-
   return importMod;
 }
 

@@ -1,14 +1,14 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/Inputs/abi %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -I %S/Inputs/abi %s -emit-ir | %FileCheck %s
 
 sil_stage canonical
 import c_layout
 
-// CHECK-LABEL: @_TMVVSC14HasNestedUnion18__Unnamed_struct_s = linkonce_odr hidden global
+// CHECK-LABEL: @_T0SC14HasNestedUnionV18__Unnamed_struct_sVN = linkonce_odr hidden global
 // CHECK-SAME:  void (%swift.type*)* @initialize_metadata___Unnamed_struct_s,
 // CHECK-SAME:  i8* getelementptr inbounds
 // CHECK-SAME:  %swift.type* null,
 // CHECK-SAME:  [[INT:i[0-9]+]] 1,
-// CHECK-SAME:  @_TWVVVSC14HasNestedUnion18__Unnamed_struct_s
+// CHECK-SAME:  @_T0SC14HasNestedUnionV18__Unnamed_struct_sVWV
 // CHECK-SAME:  [[INT]] 1,
 // CHECK-SAME:  [[INT]] sub ({{.*}}),
 // CHECK-SAME:  %swift.type* null,
@@ -24,7 +24,7 @@ bb0:
 }
 
 // CHECK-LABEL: define private void @initialize_metadata___Unnamed_struct_s
-// CHECK:       [[PARENT:%.*]] = call %swift.type* @_TMaVSC14HasNestedUnion()
+// CHECK:       [[PARENT:%.*]] = call %swift.type* @_T0SC14HasNestedUnionVMa()
 // CHECK-NEXT:  [[T0:%.]] = bitcast %swift.type* %0 to %swift.type**
 // CHECK-NEXT:  [[T1:%.]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], [[INT]] 2
 // CHECK-NEXT:  store %swift.type* [[PARENT]], %swift.type** [[T1]],

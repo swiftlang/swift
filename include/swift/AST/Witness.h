@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -119,7 +119,7 @@ public:
   ///
   /// \param reqToSyntheticEnvMap The mapping from the interface types of the
   /// requirement into the interface types of the synthetic environment.
-  Witness(ValueDecl *decl, ArrayRef<Substitution> substitutions,
+  Witness(ValueDecl *decl, SubstitutionList substitutions,
           GenericEnvironment *syntheticEnv,
           SubstitutionMap reqToSyntheticEnvMap);
 
@@ -154,17 +154,8 @@ public:
   ///
   /// The substitutions are substitutions for the witness, providing interface
   /// types from the synthetic environment.
-  ArrayRef<Substitution> getSubstitutions() const {
+  SubstitutionList getSubstitutions() const {
     return getDeclRef().getSubstitutions();
-  }
-
-  /// Retrieve the generic signature of the synthetic environment.
-  GenericSignature *getSyntheticSignature() const {
-    assert(requiresSubstitution() && "No substitutions required for witness");
-    if (auto *env = getSyntheticEnvironment())
-      return env->getGenericSignature();
-    else
-      return nullptr;
   }
 
   /// Retrieve the synthetic generic environment.

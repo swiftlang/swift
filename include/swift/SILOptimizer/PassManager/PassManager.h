@@ -2,20 +2,21 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <vector>
 
@@ -31,10 +32,17 @@ class SILModuleTransform;
 class SILOptions;
 class SILTransform;
 
+namespace irgen {
+class IRGenModule;
+}
+
 /// \brief The SIL pass manager.
 class SILPassManager {
   /// The module that the pass manager will transform.
   SILModule *Mod;
+
+  /// An optional IRGenModule associated with this PassManager.
+  irgen::IRGenModule *IRMod;
 
   /// The list of transformations to run.
   llvm::SmallVector<SILTransform *, 16> Transformations;
@@ -89,10 +97,19 @@ class SILPassManager {
   /// same function.
   bool RestartPipeline = false;
 
+
+  /// The IRGen SIL passes. These have to be dynamically added by IRGen.
+  llvm::DenseMap<unsigned, SILFunctionTransform *> IRGenPasses;
+
 public:
   /// C'tor. It creates and registers all analysis passes, which are defined
   /// in Analysis.def.
   SILPassManager(SILModule *M, llvm::StringRef Stage = "");
+
+  /// C'tor. It creates an IRGen pass manager. Passes can query for the
+  /// IRGenModule.
+  SILPassManager(SILModule *M, irgen::IRGenModule *IRMod,
+                 llvm::StringRef Stage = "");
 
   const SILOptions &getOptions() const;
 
@@ -110,8 +127,9 @@ public:
   /// \returns the module that the pass manager owns.
   SILModule *getModule() { return Mod; }
 
-  /// \brief Run the transformations on the module.
-  void run();
+  /// \returns the associated IGenModule or null if this is not an IRGen
+  /// pass manager.
+  irgen::IRGenModule *getIRGenModule() { return IRMod; }
 
   /// \brief Run one iteration of the optimization pipeline.
   void runOneIteration();
@@ -209,18 +227,37 @@ public:
     }
   }
 
+  void executePassPipelinePlan(const SILPassPipelinePlan &Plan) {
+    for (const SILPassPipeline &Pipeline : Plan.getPipelines()) {
+      setStageName(Pipeline.Name);
+      resetAndRemoveTransformations();
+      for (PassKind Kind : Plan.getPipelinePasses(Pipeline)) {
+        addPass(Kind);
+      }
+      execute();
+    }
+  }
+
+  void registerIRGenPass(PassKind Kind, SILFunctionTransform *Transform) {
+    assert(IRGenPasses.find(unsigned(Kind)) == IRGenPasses.end() &&
+           "Pass already registered");
+    assert(
+        IRMod &&
+        "Attempting to register an IRGen pass with a non-IRGen pass manager");
+    IRGenPasses[unsigned(Kind)] = Transform;
+  }
+
+private:
+  void execute() {
+    runOneIteration();
+  }
+
   /// Add a pass of a specific kind.
   void addPass(PassKind Kind);
 
   /// Add a pass with a given name.
   void addPassForName(StringRef Name);
 
-  // Each pass gets its own add-function.
-#define PASS(ID, NAME, DESCRIPTION) void add##ID();
-#include "Passes.def"
-
-  typedef llvm::ArrayRef<SILFunctionTransform *> PassList;
-private:
   /// Run the SIL module transform \p SMT over all the functions in
   /// the module.
   void runModulePass(SILModuleTransform *SMT);
@@ -231,7 +268,7 @@ private:
   /// Run the passes in \p FuncTransforms. Return true
   /// if the pass manager requested to stop the execution
   /// of the optimization cycle (this is a debug feature).
-  void runFunctionPasses(PassList FuncTransforms);
+  void runFunctionPasses(ArrayRef<SILFunctionTransform *> FuncTransforms);
 
   /// A helper function that returns (based on SIL stage and debug
   /// options) whether we should continue running passes.

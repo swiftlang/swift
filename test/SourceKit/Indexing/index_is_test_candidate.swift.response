@@ -13,21 +13,21 @@
     {
       key.kind: source.lang.swift.decl.function.free,
       key.name: "test_takesNoParams_andReturnsVoid_butIsNotAnInstanceMethod()",
-      key.usr: "s:F23index_is_test_candidate58test_takesNoParams_andReturnsVoid_butIsNotAnInstanceMethodFT_T_",
+      key.usr: "s:23index_is_test_candidate0C54_takesNoParams_andReturnsVoid_butIsNotAnInstanceMethodyyF",
       key.line: 10,
       key.column: 6
     },
     {
       key.kind: source.lang.swift.decl.struct,
       key.name: "MyStruct",
-      key.usr: "s:V23index_is_test_candidate8MyStruct",
+      key.usr: "s:23index_is_test_candidate8MyStructV",
       key.line: 12,
       key.column: 8,
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "test_startsWithTest_takesNoParams_returnsVoid_butIsDefinedOnAStruct()",
-          key.usr: "s:FV23index_is_test_candidate8MyStruct67test_startsWithTest_takesNoParams_returnsVoid_butIsDefinedOnAStructFT_T_",
+          key.usr: "s:23index_is_test_candidate8MyStructV0C63_startsWithTest_takesNoParams_returnsVoid_butIsDefinedOnAStructyyF",
           key.line: 13,
           key.column: 8
         }
@@ -35,15 +35,38 @@
     },
     {
       key.kind: source.lang.swift.decl.class,
+      key.name: "XCTestCase",
+      key.usr: "s:C28index_is_test_candidate_objc10XCTestCase",
+      key.line: 15,
+      key.column: 7
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
       key.name: "MyPrivateClass",
-      key.usr: "s:C23index_is_test_candidateP33_E06F4E7BC5F577AB6E2EC6D3ECA1C8B914MyPrivateClass",
+      key.usr: "s:23index_is_test_candidate14MyPrivateClass33_E06F4E7BC5F577AB6E2EC6D3ECA1C8B9LLC",
       key.line: 16,
       key.column: 15,
+      key.related: [
+        {
+          key.kind: source.lang.swift.ref.class,
+          key.name: "XCTestCase",
+          key.usr: "s:C28index_is_test_candidate_objc10XCTestCase",
+          key.line: 16,
+          key.column: 32
+        }
+      ],
       key.entities: [
+        {
+          key.kind: source.lang.swift.ref.class,
+          key.name: "XCTestCase",
+          key.usr: "s:C28index_is_test_candidate_objc10XCTestCase",
+          key.line: 16,
+          key.column: 32
+        },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "test_startsWithTest_takesNoParams_returnsVoid_butIsPrivate()",
-          key.usr: "s:FC23index_is_test_candidateP33_E06F4E7BC5F577AB6E2EC6D3ECA1C8B914MyPrivateClass58test_startsWithTest_takesNoParams_returnsVoid_butIsPrivateFT_T_",
+          key.usr: "s:23index_is_test_candidate14MyPrivateClass33_E06F4E7BC5F577AB6E2EC6D3ECA1C8B9LLC0c47_startsWithTest_takesNoParams_returnsVoid_butIsF0yyF",
           key.line: 17,
           key.column: 8
         }
@@ -52,21 +75,37 @@
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "MyClass",
-      key.usr: "s:C23index_is_test_candidate7MyClass",
+      key.usr: "s:23index_is_test_candidate7MyClassC",
       key.line: 20,
       key.column: 14,
+      key.related: [
+        {
+          key.kind: source.lang.swift.ref.class,
+          key.name: "XCTestCase",
+          key.usr: "s:C28index_is_test_candidate_objc10XCTestCase",
+          key.line: 20,
+          key.column: 24
+        }
+      ],
       key.entities: [
+        {
+          key.kind: source.lang.swift.ref.class,
+          key.name: "XCTestCase",
+          key.usr: "s:C28index_is_test_candidate_objc10XCTestCase",
+          key.line: 20,
+          key.column: 24
+        },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "doesNotStartWithTest()",
-          key.usr: "s:FC23index_is_test_candidate7MyClass20doesNotStartWithTestFT_T_",
+          key.usr: "s:23index_is_test_candidate7MyClassC20doesNotStartWithTestyyF",
           key.line: 21,
           key.column: 8
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "test_startsWithTest_butTakesAParam(param:)",
-          key.usr: "s:FC23index_is_test_candidate7MyClass34test_startsWithTest_butTakesAParamFT5paramSi_T_",
+          key.usr: "s:23index_is_test_candidate7MyClassC0C30_startsWithTest_butTakesAParamySi5param_tF",
           key.line: 22,
           key.column: 8,
           key.entities: [
@@ -82,7 +121,7 @@
         {
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "test_startsWithTest_andTakesNoParams_butReturnsNonVoid()",
-          key.usr: "s:FC23index_is_test_candidate7MyClass54test_startsWithTest_andTakesNoParams_butReturnsNonVoidFT_Si",
+          key.usr: "s:23index_is_test_candidate7MyClassC0C50_startsWithTest_andTakesNoParams_butReturnsNonVoidSiyF",
           key.line: 23,
           key.column: 8,
           key.entities: [
@@ -98,14 +137,14 @@
         {
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "test_startsWithTest_takesNoParams_andReturnsVoid_butIsPrivate()",
-          key.usr: "s:FC23index_is_test_candidate7MyClassP33_E06F4E7BC5F577AB6E2EC6D3ECA1C8B961test_startsWithTest_takesNoParams_andReturnsVoid_butIsPrivateFT_T_",
+          key.usr: "s:23index_is_test_candidate7MyClassC0C57_startsWithTest_takesNoParams_andReturnsVoid_butIsPrivate33_E06F4E7BC5F577AB6E2EC6D3ECA1C8B9LLyyF",
           key.line: 24,
           key.column: 16
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "test_startsWithTest_takesNoParams_returnsVoid()",
-          key.usr: "s:FC23index_is_test_candidate7MyClass45test_startsWithTest_takesNoParams_returnsVoidFT_T_",
+          key.usr: "s:23index_is_test_candidate7MyClassC0C41_startsWithTest_takesNoParams_returnsVoidyyF",
           key.line: 25,
           key.column: 8,
           key.is_test_candidate: 1
@@ -113,7 +152,7 @@
         {
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "test_startsWithTest_takesNoParams_returnsVoid_andThrows()",
-          key.usr: "s:FC23index_is_test_candidate7MyClass55test_startsWithTest_takesNoParams_returnsVoid_andThrowsFzT_T_",
+          key.usr: "s:23index_is_test_candidate7MyClassC0C51_startsWithTest_takesNoParams_returnsVoid_andThrowsyyKF",
           key.line: 26,
           key.column: 8,
           key.is_test_candidate: 1

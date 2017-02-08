@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -10,7 +10,7 @@ enum NullableObjCRefcounted {
   case Ref(Builtin.UnknownObject)
   case None
 }
-// CHECK-LABEL: define linkonce_odr hidden void @_TwxxO39enum_value_semantics_special_cases_objc22NullableObjCRefcounted(%swift.opaque* %object, %swift.type* %NullableObjCRefcounted) {{.*}} {
+// CHECK-LABEL: define linkonce_odr hidden void @_T039enum_value_semantics_special_cases_objc22NullableObjCRefcountedOwxx(%swift.opaque* %object, %swift.type* %NullableObjCRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %O39enum_value_semantics_special_cases_objc22NullableObjCRefcounted*
 // CHECK:   %1 = bitcast %O39enum_value_semantics_special_cases_objc22NullableObjCRefcounted* %0 to %objc_object**
@@ -31,7 +31,7 @@ enum AllMixedRefcounted {
   case None
 }
 
-// CHECK-LABEL: define linkonce_odr hidden void @_TwxxO39enum_value_semantics_special_cases_objc18AllMixedRefcounted(%swift.opaque* %object, %swift.type* %AllMixedRefcounted) {{.*}} {
+// CHECK-LABEL: define linkonce_odr hidden void @_T039enum_value_semantics_special_cases_objc18AllMixedRefcountedOwxx(%swift.opaque* %object, %swift.type* %AllMixedRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %O39enum_value_semantics_special_cases_objc18AllMixedRefcounted*
 // CHECK:   %1 = bitcast %O39enum_value_semantics_special_cases_objc18AllMixedRefcounted* %0 to i64*
@@ -51,5 +51,5 @@ enum AllMixedRefcountedTwoSimple {
   case Nothing
 }
 
-// CHECK-LABEL: define linkonce_odr hidden void @_TwxxO39enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimple
-// CHECK:   switch
+// CHECK-LABEL: define linkonce_odr hidden void @_T039enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOwxx
+// CHECK:   call void @_T039enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOWy

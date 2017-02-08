@@ -134,7 +134,7 @@ func stringToPointer(_ s: String) {
 // CHECK-LABEL: sil hidden @_TF18pointer_conversion14inoutToPointerFT_T_ 
 func inoutToPointer() {
   var int = 0
-  // CHECK: [[INT:%.*]] = alloc_box $@box Int
+  // CHECK: [[INT:%.*]] = alloc_box ${ var Int }
   // CHECK: [[PB:%.*]] = project_box [[INT]]
   takesMutablePointer(&int)
   // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointer
@@ -184,7 +184,7 @@ func takesPlusZeroOptionalPointer(_ x: AutoreleasingUnsafeMutablePointer<C?>) {}
 // CHECK-LABEL: sil hidden @_TF18pointer_conversion19classInoutToPointerFT_T_
 func classInoutToPointer() {
   var c = C()
-  // CHECK: [[VAR:%.*]] = alloc_box $@box C
+  // CHECK: [[VAR:%.*]] = alloc_box ${ var C }
   // CHECK: [[PB:%.*]] = project_box [[VAR]]
   takesPlusOnePointer(&c)
   // CHECK: [[TAKES_PLUS_ONE:%.*]] = function_ref @_TF18pointer_conversion19takesPlusOnePointer
@@ -223,7 +223,7 @@ func classInoutToPointer() {
 // rdar://problem/21505805
 // CHECK-LABEL: sil hidden @_TF18pointer_conversion22functionInoutToPointerFT_T_
 func functionInoutToPointer() {
-  // CHECK: [[BOX:%.*]] = alloc_box $@box @callee_owned () -> ()
+  // CHECK: [[BOX:%.*]] = alloc_box ${ var @callee_owned () -> () }
   var f: () -> () = {}
 
   // CHECK: [[REABSTRACT_BUF:%.*]] = alloc_stack $@callee_owned (@in ()) -> @out ()

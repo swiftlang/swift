@@ -1,5 +1,5 @@
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/custom-modules/CollisionImportAsMember.h -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=InferImportAsMember -always-argument-labels -enable-infer-import-as-member > %t.printed.A.txt
-// RUN: %target-swift-frontend -parse -import-objc-header %S/Inputs/custom-modules/CollisionImportAsMember.h -I %t -I %S/Inputs/custom-modules %s -enable-infer-import-as-member -verify
+// RUN: %target-swift-frontend -typecheck -import-objc-header %S/Inputs/custom-modules/CollisionImportAsMember.h -I %t -I %S/Inputs/custom-modules %s -enable-infer-import-as-member -verify
 // RUN: %FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
 
 // REQUIRES: objc_interop

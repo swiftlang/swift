@@ -21,7 +21,6 @@ add_swift_library(swiftSIL STATIC
   SILGlobalVariable.cpp
   SILInstruction.cpp
   SILInstructions.cpp
-  SILLayout.cpp
   SILLocation.cpp
   SILModule.cpp
   SILOpenedArchetypesTracker.cpp
@@ -30,6 +29,7 @@ add_swift_library(swiftSIL STATIC
   SILType.cpp
   SILValue.cpp
   SILVerifier.cpp
+  SILOwnershipVerifier.cpp
   SILVTable.cpp
   SILWitnessTable.cpp
   TypeLowering.cpp

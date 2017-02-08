@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -36,6 +37,8 @@ DeclContext *ConformanceLookupTable::ConformanceSource::getDeclContext() const {
   case ConformanceEntryKind::Synthesized:
     return getSynthesizedDecl();
   }
+
+  llvm_unreachable("Unhandled ConformanceEntryKind in switch.");
 }
 
 ProtocolDecl *ConformanceLookupTable::ConformanceEntry::getProtocol() const {
@@ -432,7 +435,7 @@ namespace {
       return;
     }
   }
-}
+} // end anonymous namespace
 
 bool ConformanceLookupTable::addProtocol(NominalTypeDecl *nominal,
                                          ProtocolDecl *protocol, SourceLoc loc,
@@ -551,6 +554,8 @@ static bool isReplaceable(ConformanceEntryKind kind) {
   case ConformanceEntryKind::Inherited:
     return false;
   }
+
+  llvm_unreachable("Unhandled ConformanceEntryKind in switch.");
 }
 
 ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
@@ -801,8 +806,7 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
     return nullptr;
 
   auto *conformingNominal =
-    cast<NominalTypeDecl>(conformingDC->
-                          getAsGenericTypeOrGenericTypeExtensionContext());
+    conformingDC->getAsNominalTypeOrNominalTypeExtensionContext();
 
   // Form the conformance.
   Type type = entry->getDeclContext()->getDeclaredTypeInContext();
@@ -820,7 +824,7 @@ ProtocolConformance *ConformanceLookupTable::getConformance(
       superclassTy = superclassTy->getSuperclass(resolver);
 
     // Look up the inherited conformance.
-    Module *module = entry->getDeclContext()->getParentModule();
+    ModuleDecl *module = entry->getDeclContext()->getParentModule();
     auto inheritedConformance = module->lookupConformance(superclassTy,
                                                           protocol,
                                                           resolver)
@@ -893,7 +897,7 @@ void ConformanceLookupTable::registerProtocolConformance(
 }
 
 bool ConformanceLookupTable::lookupConformance(
-       Module *module, 
+       ModuleDecl *module, 
        NominalTypeDecl *nominal,
        ProtocolDecl *protocol, 
        LazyResolver *resolver,
@@ -1038,7 +1042,7 @@ int ConformanceLookupTable::compareProtocolConformances(
         }
 
         // Otherwise, order by buffer identifier.
-        return StringRef(ctx.SourceMgr.getIdentifierForBuffer(lhsBuffer))
+        return ctx.SourceMgr.getIdentifierForBuffer(lhsBuffer)
                  .compare(ctx.SourceMgr.getIdentifierForBuffer(rhsBuffer));
       }
     }

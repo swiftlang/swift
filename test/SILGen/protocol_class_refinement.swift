@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
 protocol UID {
     func uid() -> Int
@@ -25,10 +25,10 @@ extension ObjectUID {
 
 class Base {}
 
-// CHECK-LABEL: sil hidden @_TF25protocol_class_refinement12getObjectUID
+// CHECK-LABEL: sil hidden @_T025protocol_class_refinement12getObjectUID{{[_0-9a-zA-Z]*}}F
 func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   var x = x
-  // CHECK: [[XBOX:%.*]] = alloc_box $@box T
+  // CHECK: [[XBOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : ObjectUID> { var τ_0_0 } <T>
   // CHECK: [[PB:%.*]] = project_box [[XBOX]]
   // -- call x.uid()
   // CHECK: [[X:%.*]] = load [copy] [[PB]]
@@ -52,7 +52,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
   // CHECK: destroy_value [[X2]]
   // -- call nextCLSID from protocol ext
-  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_TFE25protocol_class_refinementPS_3UIDs9nextCLSIDSi
+  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_T025protocol_class_refinement3UIDPAAE9nextCLSIDSifs
   // CHECK: apply [[SET_NEXTCLSID]]<T>([[UID]], [[PB]])
   x.nextCLSID = x.uid()
 
@@ -66,17 +66,17 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
   // CHECK: destroy_value [[X2]]
   // -- call secondNextCLSID from class-constrained protocol ext
-  // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @_TFE25protocol_class_refinementPS_9ObjectUIDs15secondNextCLSIDSi
+  // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @_T025protocol_class_refinement9ObjectUIDPAAE15secondNextCLSIDSifs
   // CHECK: apply [[SET_SECONDNEXT]]<T>([[UID]], [[X1]])
   // CHECK: destroy_value [[X1]]
   x.secondNextCLSID = x.uid()
   return (x.iid, x.clsid, x.nextCLSID, x.secondNextCLSID)
 }
 
-// CHECK-LABEL: sil hidden @_TF25protocol_class_refinement16getBaseObjectUID
+// CHECK-LABEL: sil hidden @_T025protocol_class_refinement16getBaseObjectUID{{[_0-9a-zA-Z]*}}F
 func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   var x = x
-  // CHECK: [[XBOX:%.*]] = alloc_box $@box T
+  // CHECK: [[XBOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : Base, τ_0_0 : UID> { var τ_0_0 } <T>
   // CHECK: [[PB:%.*]] = project_box [[XBOX]]
   // -- call x.uid()
   // CHECK: [[X:%.*]] = load [copy] [[PB]]
@@ -100,7 +100,7 @@ func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
   // CHECK: destroy_value [[X2]]
   // -- call nextCLSID from protocol ext
-  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_TFE25protocol_class_refinementPS_3UIDs9nextCLSIDSi
+  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_T025protocol_class_refinement3UIDPAAE9nextCLSIDSifs
   // CHECK: apply [[SET_NEXTCLSID]]<T>([[UID]], [[PB]])
   x.nextCLSID = x.uid()
   return (x.iid, x.clsid, x.nextCLSID)

@@ -11,7 +11,7 @@ endif()
 add_sourcekit_executable(complete-test
   complete-test.cpp
   DEPENDS ${SOURCEKITD_TEST_DEPEND}
-  LLVM_COMPONENT_DEPENDS support option
+  LLVM_COMPONENT_DEPENDS support option coverage lto
 )
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,6 +24,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/TypeLowering.h"
@@ -50,6 +51,10 @@ static llvm::cl::opt<bool> SkipUnreachableMustBeLastErrors(
 // prevent release builds from triggering spurious unused variable warnings.
 #ifndef NDEBUG
 
+//===----------------------------------------------------------------------===//
+//                                SILVerifier
+//===----------------------------------------------------------------------===//
+
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
 static bool isArchetypeValidInFunction(ArchetypeType *A, SILFunction *F) {
@@ -62,13 +67,14 @@ static bool isArchetypeValidInFunction(ArchetypeType *A, SILFunction *F) {
   // Ok, we have a primary archetype, make sure it is in the nested generic
   // environment of our caller.
   if (auto *genericEnv = F->getGenericEnvironment())
-    if (genericEnv->getArchetypeToInterfaceMap().count(A))
+    if (genericEnv->containsPrimaryArchetype(A))
       return true;
 
   return false;
 }
 
 namespace {
+
 /// Metaprogramming-friendly base class.
 template <class Impl>
 class SILVerifierBase : public SILVisitor<Impl> {
@@ -95,8 +101,9 @@ namespace {
 /// The SIL verifier walks over a SIL function / basic block / instruction,
 /// checking and enforcing its invariants.
 class SILVerifier : public SILVerifierBase<SILVerifier> {
-  Module *M;
+  ModuleDecl *M;
   const SILFunction &F;
+  SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
   SILOpenedArchetypesTracker OpenedArchetypes;
   const SILInstruction *CurInstruction = nullptr;
@@ -231,14 +238,6 @@ public:
     // TODO: We should compare generic signatures. Class and witness methods
     // allow variance in "self"-fulfilled parameters; other functions must
     // match exactly.
-    auto signature1 = type1->getGenericSignature();
-    auto signature2 = type2->getGenericSignature();
-
-    auto getAnyOptionalObjectTypeInContext = [&](CanGenericSignature sig,
-                                                 SILType type) {
-      Lowering::GenericContextScope context(F.getModule().Types, sig);
-      return type.getAnyOptionalObjectType();
-    };
 
     // TODO: More sophisticated param and return ABI compatibility rules could
     // diverge.
@@ -292,8 +291,8 @@ public:
           continue;
         
         // Optional and IUO are interchangeable if their elements are.
-        auto aObject = getAnyOptionalObjectTypeInContext(signature1, aa);
-        auto bObject = getAnyOptionalObjectTypeInContext(signature2, bb);
+        auto aObject = aa.getAnyOptionalObjectType();
+        auto bObject = bb.getAnyOptionalObjectType();
         if (aObject && bObject
             && areABICompatibleParamsOrReturns(aObject, bObject))
           continue;
@@ -343,17 +342,17 @@ public:
     };
     
     // Check the results.
-    _require(type1->getNumAllResults() == type2->getNumAllResults(),
-             what, complain("different number of results"));
-    for (unsigned i : indices(type1->getAllResults())) {
-      auto result1 = type1->getAllResults()[i];
-      auto result2 = type2->getAllResults()[i];
+    _require(type1->getNumResults() == type2->getNumResults(), what,
+             complain("different number of results"));
+    for (unsigned i : indices(type1->getResults())) {
+      auto result1 = type1->getResults()[i];
+      auto result2 = type2->getResults()[i];
 
       _require(result1.getConvention() == result2.getConvention(), what,
                complain("Different return value conventions"));
-      _require(areABICompatibleParamsOrReturns(result1.getSILType(),
-                                               result2.getSILType()), what,
-               complain("ABI-incompatible return values"));
+      _require(areABICompatibleParamsOrReturns(result1.getSILStorageType(),
+                                               result2.getSILStorageType()),
+               what, complain("ABI-incompatible return values"));
     }
 
     // Our error result conventions are designed to be ABI compatible
@@ -364,9 +363,9 @@ public:
       auto error2 = type2->getErrorResult();
       _require(error1.getConvention() == error2.getConvention(), what,
                complain("Different error result conventions"));
-      _require(areABICompatibleParamsOrReturns(error1.getSILType(),
-                                               error2.getSILType()), what,
-               complain("ABI-incompatible error results"));
+      _require(areABICompatibleParamsOrReturns(error1.getSILStorageType(),
+                                               error2.getSILStorageType()),
+               what, complain("ABI-incompatible error results"));
     }
 
     // Check the parameters.
@@ -383,9 +382,9 @@ public:
                complainBy([=] {
                  llvm::dbgs() << "Different conventions for parameter " << i;
                }));
-      _require(areABICompatibleParamsOrReturns(param1.getSILType(),
-                                               param2.getSILType()), what,
-               complainBy([=] {
+      _require(areABICompatibleParamsOrReturns(param1.getSILStorageType(),
+                                               param2.getSILStorageType()),
+               what, complainBy([=] {
                  llvm::dbgs() << "ABI-incompatible types for parameter " << i;
                }));
     }
@@ -394,10 +393,10 @@ public:
   void requireSameFunctionComponents(CanSILFunctionType type1,
                                      CanSILFunctionType type2,
                                      const Twine &what) {
-    require(type1->getNumAllResults() == type2->getNumAllResults(),
+    require(type1->getNumResults() == type2->getNumResults(),
             "results of " + what + " do not match in count");
-    for (auto i : indices(type1->getAllResults())) {
-      require(type1->getAllResults()[i] == type2->getAllResults()[i],
+    for (auto i : indices(type1->getResults())) {
+      require(type1->getResults()[i] == type2->getResults()[i],
               "result " + Twine(i) + " of " + what + " do not match");
     }
     require(type1->getParameters().size() ==
@@ -411,8 +410,9 @@ public:
   }
 
   SILVerifier(const SILFunction &F, bool SingleFunction = true)
-      : M(F.getModule().getSwiftModule()), F(F), TC(F.getModule().Types),
-        OpenedArchetypes(F), Dominance(nullptr),
+      : M(F.getModule().getSwiftModule()), F(F),
+        fnConv(F.getLoweredFunctionType(), F.getModule()),
+        TC(F.getModule().Types), OpenedArchetypes(F), Dominance(nullptr),
         SingleFunction(SingleFunction) {
     if (F.isExternalDeclaration())
       return;
@@ -440,6 +440,7 @@ public:
 
   void visitSILArgument(SILArgument *arg) {
     checkLegalType(arg->getFunction(), arg, nullptr);
+    checkValueBaseOwnership(arg);
   }
 
   void visitSILInstruction(SILInstruction *I) {
@@ -451,6 +452,31 @@ public:
     checkInstructionsSILLocation(I);
 
     checkLegalType(I->getFunction(), I, I);
+
+    // Check ownership.
+    SILFunction *F = I->getFunction();
+    assert(F && "Expected value base with parent function");
+
+    // Check ownership.
+    checkValueBaseOwnership(I);
+  }
+
+  void checkValueBaseOwnership(ValueBase *V) {
+    // If ownership is not enabled, bail.
+    if (!isSILOwnershipEnabled())
+      return;
+
+    // If V does not have a value, bail.
+    if (!V->hasValue())
+      return;
+
+    SILFunction *F = V->getFunction();
+    assert(F && "Expected value base with parent function");
+    // If we do not have qualified ownership, then do not verify value base
+    // ownership.
+    if (!F->hasQualifiedOwnership())
+      return;
+    SILValue(V).verifyOwnership(F->getModule());
   }
 
   void checkSILInstruction(SILInstruction *I) {
@@ -619,7 +645,7 @@ public:
       require(isArchetypeValidInFunction(A, F),
               "Operand is of an ArchetypeType that does not exist in the "
               "Caller's generic param list.");
-      if (auto OpenedA = getOpenedArchetype(t.getCanonicalTypeOrNull())) {
+      if (auto OpenedA = getOpenedArchetypeOf(CanType(A))) {
         auto Def = OpenedArchetypes.getOpenedArchetypeDef(OpenedA);
         require (Def, "Opened archetype should be registered in SILFunction");
         require(I == nullptr || Def == I ||
@@ -722,7 +748,7 @@ public:
   }
 
   /// Check the substitutions passed to an apply or partial_apply.
-  CanSILFunctionType checkApplySubstitutions(ArrayRef<Substitution> subs,
+  CanSILFunctionType checkApplySubstitutions(SubstitutionList subs,
                                              SILType calleeTy) {
     auto fnTy = requireObjectType(SILFunctionType, calleeTy, "callee operand");
 
@@ -736,7 +762,7 @@ public:
             "callee of apply with substitutions must be polymorphic");
 
     // Apply the substitutions.
-    return fnTy->substGenericArgs(F.getModule(), M, subs);
+    return fnTy->substGenericArgs(F.getModule(), subs);
   }
 
   /// Check that for each opened archetype or dynamic self type in substitutions
@@ -744,7 +770,7 @@ public:
   void checkApplyTypeDependentArguments(ApplySite AS) {
     SILInstruction *AI = AS.getInstruction();
 
-    llvm::DenseSet<CanType> FoundOpenedArchetypes;
+    llvm::DenseSet<ArchetypeType *> FoundOpenedArchetypes;
     unsigned hasDynamicSelf = 0;
 
     // Function to collect opened archetypes in FoundOpenedArchetypes and set
@@ -755,11 +781,11 @@ public:
         require(isArchetypeValidInFunction(A, AI->getFunction()),
                 "Archetype to be substituted must be valid in function.");
         // Collect all opened archetypes used in the substitutions list.
-        FoundOpenedArchetypes.insert(Ty.getCanonicalTypeOrNull());
+        FoundOpenedArchetypes.insert(A);
         // Also check that they are properly tracked inside the current
         // function.
         auto Def =
-          OpenedArchetypes.getOpenedArchetypeDef(Ty.getCanonicalTypeOrNull());
+          OpenedArchetypes.getOpenedArchetypeDef(A);
         require(Def, "Opened archetype should be registered in SILFunction");
         require(Def == AI ||
                 Dominance->properlyDominates(cast<SILInstruction>(Def), AI),
@@ -823,34 +849,28 @@ public:
             "substituted callee type does not match substitutions");
 
     // Check that the arguments and result match.
+    SILFunctionConventions substConv(substTy, F.getModule());
     //require(site.getArguments().size() == substTy->getNumSILArguments(),
-    require(site.getNumCallArguments() == substTy->getNumSILArguments(),
+    require(site.getNumCallArguments() == substConv.getNumSILArguments(),
             "apply doesn't have right number of arguments for function");
-    auto numIndirects = substTy->getNumIndirectResults();
     for (size_t i = 0, size = site.getNumCallArguments(); i < size; ++i) {
-      if (i < numIndirects) {
-        requireSameType(site.getArguments()[i]->getType(),
-                        substTy->getIndirectResults()[i].getSILType(),
-                        "operand of 'apply' doesn't match function input type");
-      } else {
-        requireSameType(site.getArguments()[i]->getType(),
-                        substTy->getParameters()[i - numIndirects].getSILType(),
-                        "operand of 'apply' doesn't match function input type");
-      }
+      requireSameType(site.getArguments()[i]->getType(),
+                      substConv.getSILArgumentType(i),
+                      "operand of 'apply' doesn't match function input type");
     }
   }
 
   void checkApplyInst(ApplyInst *AI) {
     checkFullApplySite(AI);
 
-    auto substTy = AI->getSubstCalleeType();
-    require(AI->getType() == substTy->getSILResult(),
+    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), F.getModule());
+    require(AI->getType() == calleeConv.getSILResultType(),
             "type of apply instruction doesn't match function result type");
     if (AI->isNonThrowing()) {
-      require(substTy->hasErrorResult(),
+      require(calleeConv.funcTy->hasErrorResult(),
               "nothrow flag used for callee without error result");
     } else {
-      require(!substTy->hasErrorResult(),
+      require(!calleeConv.funcTy->hasErrorResult(),
               "apply instruction cannot call function with error result");
     }
 
@@ -866,23 +886,23 @@ public:
   void checkTryApplyInst(TryApplyInst *AI) {
     checkFullApplySite(AI);
 
-    auto substTy = AI->getSubstCalleeType();
+    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), F.getModule());
 
     auto normalBB = AI->getNormalBB();
-    require(normalBB->bbarg_size() == 1,
+    require(normalBB->args_size() == 1,
             "normal destination of try_apply must take one argument");
-    requireSameType((*normalBB->bbarg_begin())->getType(),
-                    substTy->getSILResult(),
+    requireSameType((*normalBB->args_begin())->getType(),
+                    calleeConv.getSILResultType(),
                     "normal destination of try_apply must take argument "
                     "of normal result type");
 
     auto errorBB = AI->getErrorBB();
-    require(substTy->hasErrorResult(),
+    require(calleeConv.funcTy->hasErrorResult(),
             "try_apply must call function with error result");
-    require(errorBB->bbarg_size() == 1,
+    require(errorBB->args_size() == 1,
             "error destination of try_apply must take one argument");
-    requireSameType((*errorBB->bbarg_begin())->getType(),
-                    substTy->getErrorResult().getSILType(),
+    requireSameType((*errorBB->args_begin())->getType(),
+                    calleeConv.getSILErrorType(),
                     "error destination of try_apply must take argument "
                     "of error result type");
   }
@@ -946,12 +966,12 @@ public:
             "result of partial_apply should take as many inputs as were not "
             "applied by the instruction");
 
-    unsigned offset =
-      substTy->getParameters().size() - PAI->getArguments().size();
-
+    SILFunctionConventions substConv(substTy, F.getModule());
+    unsigned appliedArgStartIdx =
+        substConv.getNumSILArguments() - PAI->getNumArguments();
     for (unsigned i = 0, size = PAI->getArguments().size(); i < size; ++i) {
       require(PAI->getArguments()[i]->getType()
-                == substTy->getParameters()[i + offset].getSILType(),
+                  == substConv.getSILArgumentType(appliedArgStartIdx + i),
               "applied argument types do not match suffix of function type's "
               "inputs");
     }
@@ -966,11 +986,11 @@ public:
               "of original function");
     }
 
-    require(resultInfo->getNumAllResults() == substTy->getNumAllResults(),
+    require(resultInfo->getNumResults() == substTy->getNumResults(),
             "applied results do not agree in count with function type");
-    for (unsigned i = 0, size = resultInfo->getNumAllResults(); i < size; ++i) {
-      auto originalResult = resultInfo->getAllResults()[i];
-      auto expectedResult = substTy->getAllResults()[i];
+    for (unsigned i = 0, size = resultInfo->getNumResults(); i < size; ++i) {
+      auto originalResult = resultInfo->getResults()[i];
+      auto expectedResult = substTy->getResults()[i];
 
       // The "returns inner pointer" convention doesn't survive through a
       // partial application, since the thunk takes responsibility for
@@ -1108,7 +1128,8 @@ public:
 
   void checkLoadInst(LoadInst *LI) {
     require(LI->getType().isObject(), "Result of load must be an object");
-    require(LI->getType().isLoadable(LI->getModule()),
+    require(!fnConv.useLoweredAddresses()
+                || LI->getType().isLoadable(LI->getModule()),
             "Load must have a loadable type");
     require(LI->getOperand()->getType().isAddress(),
             "Load operand must be an address");
@@ -1161,8 +1182,8 @@ public:
     // We allow for end_borrow to express relationships in between addresses and
     // values, but we require that the types are the same ignoring value
     // category.
-    require(EBI->getDest()->getType().getObjectType() ==
-                EBI->getSrc()->getType().getObjectType(),
+    require(EBI->getBorrowedValue()->getType().getObjectType() ==
+                EBI->getOriginalValue()->getType().getObjectType(),
             "end_borrow can only relate the same types ignoring value "
             "category");
   }
@@ -1170,7 +1191,8 @@ public:
   void checkStoreInst(StoreInst *SI) {
     require(SI->getSrc()->getType().isObject(),
             "Can't store from an address source");
-    require(SI->getSrc()->getType().isLoadable(SI->getModule()),
+    require(!fnConv.useLoweredAddresses()
+                || SI->getSrc()->getType().isLoadable(SI->getModule()),
             "Can't store a non loadable type");
     require(SI->getDest()->getType().isAddress(),
             "Must store to an address dest");
@@ -1287,10 +1309,9 @@ public:
     require(InitStorageTy,
             "mark_uninitialized initializer must be a function");
     auto SubstInitStorageTy = InitStorageTy->substGenericArgs(F.getModule(),
-                                             F.getModule().getSwiftModule(),
                                              MU->getInitStorageSubstitutions());
     // FIXME: Destructured value or results?
-    require(SubstInitStorageTy->getAllResults().size() == 1,
+    require(SubstInitStorageTy->getResults().size() == 1,
             "mark_uninitialized initializer must have one result");
     auto StorageTy = SILType::getPrimitiveAddressType(
                               SubstInitStorageTy->getSingleResult().getType());
@@ -1302,14 +1323,13 @@ public:
     require(SetterTy,
             "mark_uninitialized setter must be a function");
     auto SubstSetterTy = SetterTy->substGenericArgs(F.getModule(),
-                                               F.getModule().getSwiftModule(),
                                                MU->getSetterSubstitutions());
     require(SubstSetterTy->getParameters().size() == 2,
             "mark_uninitialized setter must have a value and self param");
-    auto SelfTy = SubstSetterTy->getSelfParameter().getSILType();
-    requireSameType(SelfTy, MU->getSelf()->getType(),
+    requireSameType(fnConv.getSILType(SubstSetterTy->getSelfParameter()),
+                    MU->getSelf()->getType(),
                     "self type must match setter's self parameter type");
-    
+
     auto ValueTy = SubstInitStorageTy->getParameters()[0].getType();
     requireSameType(SILType::getPrimitiveAddressType(ValueTy),
                     SILType::getPrimitiveAddressType(
@@ -1349,15 +1369,25 @@ public:
   void checkCopyValueInst(CopyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(F.hasQualifiedOwnership(),
+    require(!fnConv.useLoweredAddresses() || F.hasQualifiedOwnership(),
             "copy_value is only valid in functions with qualified "
+            "ownership");
+  }
+
+  void checkCopyUnownedValueInst(CopyUnownedValueInst *I) {
+    auto unownedType = requireObjectType(UnownedStorageType, I->getOperand(),
+                                         "Operand of unowned_retain");
+    require(unownedType->isLoadable(ResilienceExpansion::Maximal),
+            "unowned_retain requires unowned type to be loadable");
+    require(F.hasQualifiedOwnership(),
+            "copy_unowned_value is only valid in functions with qualified "
             "ownership");
   }
 
   void checkDestroyValueInst(DestroyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(F.hasQualifiedOwnership(),
+    require(!fnConv.useLoweredAddresses() || F.hasQualifiedOwnership(),
             "destroy_value is only valid in functions with qualified "
             "ownership");
   }
@@ -1409,10 +1439,10 @@ public:
   void checkProjectBoxInst(ProjectBoxInst *I) {
     require(I->getOperand()->getType().isObject(),
             "project_box operand should be a value");
-    require(I->getOperand()->getType().is<SILBoxType>(),
-            "project_box operand should be a @box type");
-    require(I->getType() == I->getOperand()->getType().castTo<SILBoxType>()
-                             ->getBoxedAddressType(),
+    auto boxTy = I->getOperand()->getType().getAs<SILBoxType>();
+    require(boxTy, "project_box operand should be a @box type");
+    require(I->getType() == boxTy->getFieldType(F.getModule(),
+                                                I->getFieldIndex()),
             "project_box result should be address of boxed type");
   }
 
@@ -1481,10 +1511,10 @@ public:
             "EnumInst case must be a case of the result enum type");
     require(UI->getType().isObject(),
             "EnumInst must produce an object");
-    require(UI->hasOperand() == UI->getElement()->hasArgumentType(),
+    require(UI->hasOperand() == !!UI->getElement()->getArgumentInterfaceType(),
             "EnumInst must take an argument iff the element does");
 
-    if (UI->getElement()->hasArgumentType()) {
+    if (UI->getElement()->getArgumentInterfaceType()) {
       require(UI->getOperand()->getType().isObject(),
               "EnumInst operand must be an object");
       SILType caseTy = UI->getType().getEnumElementType(UI->getElement(),
@@ -1499,7 +1529,7 @@ public:
     require(ud, "InitEnumDataAddrInst must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "InitEnumDataAddrInst case must be a case of the enum operand type");
-    require(UI->getElement()->hasArgumentType(),
+    require(UI->getElement()->getArgumentInterfaceType(),
             "InitEnumDataAddrInst case must have a data type");
     require(UI->getOperand()->getType().isAddress(),
             "InitEnumDataAddrInst must take an address operand");
@@ -1518,7 +1548,7 @@ public:
     require(ud, "UncheckedEnumData must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "UncheckedEnumData case must be a case of the enum operand type");
-    require(UI->getElement()->hasArgumentType(),
+    require(UI->getElement()->getArgumentInterfaceType(),
             "UncheckedEnumData case must have a data type");
     require(UI->getOperand()->getType().isObject(),
             "UncheckedEnumData must take an address operand");
@@ -1537,7 +1567,7 @@ public:
     require(ud, "UncheckedTakeEnumDataAddrInst must take an enum operand");
     require(UI->getElement()->getParentEnum() == ud,
             "UncheckedTakeEnumDataAddrInst case must be a case of the enum operand type");
-    require(UI->getElement()->hasArgumentType(),
+    require(UI->getElement()->getArgumentInterfaceType(),
             "UncheckedTakeEnumDataAddrInst case must have a data type");
     require(UI->getOperand()->getType().isAddress(),
             "UncheckedTakeEnumDataAddrInst must take an address operand");
@@ -1578,26 +1608,22 @@ public:
   // Is a SIL type a potential lowering of a formal type?
   static bool isLoweringOf(SILType loweredType,
                            CanType formalType) {
+    
+    
     // Dynamic self has the same lowering as its contained type.
     if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalType))
       formalType = CanType(dynamicSelf->getSelfType());
 
-    // Optional of dynamic self has the same lowering as its contained type.
-    OptionalTypeKind loweredOptionalKind;
-    OptionalTypeKind formalOptionalKind;
-
-    CanType loweredObjectType = loweredType.getSwiftRValueType()
-        .getAnyOptionalObjectType(loweredOptionalKind);
+    // Optional lowers its contained type. The difference between Optional
+    // and IUO is lowered away.
+    SILType loweredObjectType = loweredType
+        .getAnyOptionalObjectType();
     CanType formalObjectType = formalType
-        .getAnyOptionalObjectType(formalOptionalKind);
+        .getAnyOptionalObjectType();
 
-    if (loweredOptionalKind != OTK_None) {
-      if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalObjectType)) {
-        formalObjectType = dynamicSelf->getSelfType()->getCanonicalType();
-      }
-      return loweredOptionalKind == formalOptionalKind &&
-             isLoweringOf(SILType::getPrimitiveAddressType(loweredObjectType),
-                          formalObjectType);
+    if (loweredObjectType) {
+      return formalObjectType &&
+             isLoweringOf(loweredObjectType, formalObjectType);
     }
 
     // Metatypes preserve their instance type through lowering.
@@ -1728,26 +1754,21 @@ public:
   }
 
   void checkAllocBoxInst(AllocBoxInst *AI) {
-    // TODO: Allow the box to be typed, but for staging purposes, only require
-    // it when -sil-enable-typed-boxes is enabled.
     auto boxTy = AI->getType().getAs<SILBoxType>();
     require(boxTy, "alloc_box must have a @box type");
 
     require(AI->getType().isObject(),
             "result of alloc_box must be an object");
-    verifyOpenedArchetype(AI, AI->getElementType().getSwiftRValueType());
+    for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields()))
+      verifyOpenedArchetype(AI,
+                   AI->getBoxType()->getFieldLoweredType(F.getModule(), field));
   }
 
   void checkDeallocBoxInst(DeallocBoxInst *DI) {
-    // TODO: Allow the box to be typed, but for staging purposes, only require
-    // it when -sil-enable-typed-boxes is enabled.
     auto boxTy = DI->getOperand()->getType().getAs<SILBoxType>();
     require(boxTy, "operand must be a @box type");
     require(DI->getOperand()->getType().isObject(),
             "operand must be an object");
-    requireSameType(boxTy->getBoxedAddressType().getObjectType(),
-                    DI->getElementType().getObjectType(),
-                    "element type of dealloc_box must match box element type");
   }
 
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
@@ -1894,7 +1915,7 @@ public:
   }
   
   SILType getMethodSelfType(CanSILFunctionType ft) {
-    return ft->getParameters().back().getSILType();
+    return fnConv.getSILType(ft->getParameters().back());
   }
 
   void checkWitnessMethodInst(WitnessMethodInst *AMI) {
@@ -1913,21 +1934,32 @@ public:
     require(methodType->isPolymorphic(),
             "result of witness_method must be polymorphic");
 
-    auto selfGenericParam
-      = methodType->getGenericSignature()->getGenericParams()[0];
+    auto genericSig = methodType->getGenericSignature();
+
+    auto selfGenericParam = genericSig->getGenericParams()[0];
     require(selfGenericParam->getDepth() == 0
             && selfGenericParam->getIndex() == 0,
             "method should be polymorphic on Self parameter at depth 0 index 0");
-    auto selfRequirement
-      = methodType->getGenericSignature()->getRequirements()[0];
-    require(selfRequirement.getKind() == RequirementKind::Conformance
-            && selfRequirement.getFirstType()->isEqual(selfGenericParam)
-            && selfRequirement.getSecondType()->getAs<ProtocolType>()
-              ->getDecl() == protocol,
-            "method's Self parameter should be constrained by protocol");
+    Optional<Requirement> selfRequirement;
+    for (auto req : genericSig->getRequirements()) {
+      if (req.getKind() != RequirementKind::SameType) {
+        selfRequirement = req;
+        break;
+      }
+    }
+
+    require(selfRequirement &&
+            selfRequirement->getKind() == RequirementKind::Conformance,
+            "first non-same-typerequirement should be conformance requirement");
+    auto conformsTo = genericSig->getConformsTo(selfGenericParam,
+                                                *F.getModule().getSwiftModule());
+    require(conformsTo.size() == 1,
+            "requirement Self parameter must conform to exactly one protocol");
+    require(conformsTo[0] == protocol,
+            "requirement Self parameter should be constrained by protocol");
 
     auto lookupType = AMI->getLookupType();
-    if (getOpenedArchetype(lookupType)) {
+    if (getOpenedArchetypeOf(lookupType)) {
       require(AMI->getTypeDependentOperands().size() == 1,
               "Must have a type dependent operand for the opened archetype");
       verifyOpenedArchetype(AMI, lookupType);
@@ -1949,10 +1981,6 @@ public:
     }
   }
 
-  CanType getOpenedArchetype(CanType t) {
-    return getOpenedArchetypeOf(t);
-  }
-
   // Get the expected type of a dynamic method reference.
   SILType getDynamicMethodType(SILType selfType, SILDeclRef method) {
     auto &C = F.getASTContext();
@@ -1964,8 +1992,8 @@ public:
 
     // Map interface types to archetypes.
     if (auto *env = constantInfo.GenericEnv) {
-      auto subs = env->getForwardingSubstitutions(M);
-      methodTy = methodTy->substGenericArgs(F.getModule(), M, subs);
+      auto subs = env->getForwardingSubstitutions();
+      methodTy = methodTy->substGenericArgs(F.getModule(), subs);
     }
     assert(!methodTy->isPolymorphic());
 
@@ -1976,7 +2004,7 @@ public:
     dynParams.push_back(SILParameterInfo(selfType.getSwiftRValueType(),
                                          params.back().getConvention()));
 
-    auto results = methodTy->getAllResults();
+    auto results = methodTy->getResults();
     SmallVector<SILResultInfo, 4> dynResults(results.begin(), results.end());    
 
     // If the method returns Self, substitute AnyObject for the result type.
@@ -2098,7 +2126,7 @@ public:
     require(OEI->getType().isAddress(),
             "open_existential_addr result must be an address");
 
-    auto archetype = getOpenedArchetype(OEI->getType().getSwiftRValueType());
+    auto archetype = getOpenedArchetypeOf(OEI->getType().getSwiftRValueType());
     require(archetype,
         "open_existential_addr result must be an opened existential archetype");
     require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
@@ -2120,7 +2148,7 @@ public:
     require(OEI->getType().isObject(),
             "open_existential_ref result must be an address");
 
-    auto archetype = getOpenedArchetype(resultInstanceTy);
+    auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_ref result must be an opened existential archetype");
     require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
@@ -2142,7 +2170,7 @@ public:
     require(OEI->getType().isAddress(),
             "open_existential_box result must be an address");
 
-    auto archetype = getOpenedArchetype(resultInstanceTy);
+    auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_box result must be an opened existential archetype");
     require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
@@ -2187,7 +2215,7 @@ public:
     require(operandInstTy.isExistentialType(),
             "ill-formed existential metatype in open_existential_metatype "
             "operand");
-    auto archetype = getOpenedArchetype(resultInstTy);
+    auto archetype = getOpenedArchetypeOf(resultInstTy);
     require(archetype, "open_existential_metatype result must be an opened "
                        "existential metatype");
     require(
@@ -2404,7 +2432,8 @@ public:
     Ty.visit([&](Type t) {
       SILValue Def;
       if (t->isOpenedExistential()) {
-        Def = OpenedArchetypes.getOpenedArchetypeDef(t);
+        auto *archetypeTy = t->castTo<ArchetypeType>();
+        Def = OpenedArchetypes.getOpenedArchetypeDef(archetypeTy);
         require(Def, "Opened archetype should be registered in SILFunction");
       } else if (t->hasDynamicSelfType()) {
         require(I->getFunction()->hasSelfParam(),
@@ -2428,12 +2457,13 @@ public:
                       CBI->getCastType());
     verifyOpenedArchetype(CBI, CBI->getCastType().getSwiftRValueType());
 
-    require(CBI->getSuccessBB()->bbarg_size() == 1,
+    require(CBI->getSuccessBB()->args_size() == 1,
             "success dest of checked_cast_br must take one argument");
-    require(CBI->getSuccessBB()->bbarg_begin()[0]->getType()
-              == CBI->getCastType(),
-            "success dest block argument of checked_cast_br must match type of cast");
-    require(CBI->getFailureBB()->bbarg_empty(),
+    require(CBI->getSuccessBB()->args_begin()[0]->getType() ==
+                CBI->getCastType(),
+            "success dest block argument of checked_cast_br must match type of "
+            "cast");
+    require(CBI->getFailureBB()->args_empty(),
             "failure dest of checked_cast_br must take no arguments");
   }
 
@@ -2443,9 +2473,11 @@ public:
     require(CCABI->getDest()->getType().isAddress(),
             "checked_cast_addr_br dest must be an address");
 
-    require(CCABI->getSuccessBB()->bbarg_size() == 0,
+    require(
+        CCABI->getSuccessBB()->args_size() == 0,
         "success dest block of checked_cast_addr_br must not take an argument");
-    require(CCABI->getFailureBB()->bbarg_size() == 0,
+    require(
+        CCABI->getFailureBB()->args_size() == 0,
         "failure dest block of checked_cast_addr_br must not take an argument");
   }
 
@@ -2775,8 +2807,8 @@ public:
   void checkReturnInst(ReturnInst *RI) {
     DEBUG(RI->print(llvm::dbgs()));
 
-    CanSILFunctionType ti = F.getLoweredFunctionType();
-    SILType functionResultType = F.mapTypeIntoContext(ti->getSILResult());
+    SILType functionResultType =
+        F.mapTypeIntoContext(fnConv.getSILResultType());
     SILType instResultType = RI->getOperand()->getType();
     DEBUG(llvm::dbgs() << "function return type: ";
           functionResultType.dump();
@@ -2793,8 +2825,7 @@ public:
     require(fnType->hasErrorResult(),
             "throw in function that doesn't have an error result");
 
-    SILType functionResultType
-      = F.mapTypeIntoContext(fnType->getErrorResult().getSILType());
+    SILType functionResultType = F.mapTypeIntoContext(fnConv.getSILErrorType());
     SILType instResultType = TI->getOperand()->getType();
     DEBUG(llvm::dbgs() << "function error result type: ";
           functionResultType.dump();
@@ -2881,12 +2912,12 @@ public:
               "multiple switch_value cases for same value");
       cases.insert(value);
 
-      require(dest->bbarg_empty(),
+      require(dest->args_empty(),
               "switch_value case destination cannot take arguments");
     }
 
     if (SVI->hasDefault())
-      require(SVI->getDefaultBB()->bbarg_empty(),
+      require(SVI->getDefaultBB()->args_empty(),
               "switch_value default destination cannot take arguments");
   }
 
@@ -2969,23 +3000,23 @@ public:
 
       // The destination BB can take the argument payload, if any, as a BB
       // arguments, or it can ignore it and take no arguments.
-      if (elt->hasArgumentType()) {
-        require(dest->getBBArgs().size() == 0
-                  || dest->getBBArgs().size() == 1,
+      if (elt->getArgumentInterfaceType()) {
+        require(dest->getArguments().size() == 0 ||
+                    dest->getArguments().size() == 1,
                 "switch_enum destination for case w/ args must take 0 or 1 "
                 "arguments");
 
-        if (dest->getBBArgs().size() == 1) {
+        if (dest->getArguments().size() == 1) {
           SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule());
-          SILType bbArgTy = dest->getBBArgs()[0]->getType();
+          SILType bbArgTy = dest->getArguments()[0]->getType();
           require(eltArgTy == bbArgTy,
                   "switch_enum destination bbarg must match case arg type");
-          require(!dest->getBBArgs()[0]->getType().isAddress(),
+          require(!dest->getArguments()[0]->getType().isAddress(),
                   "switch_enum destination bbarg type must not be an address");
         }
 
       } else {
-        require(dest->getBBArgs().size() == 0,
+        require(dest->getArguments().size() == 0,
                 "switch_enum destination for no-argument case must take no "
                 "arguments");
       }
@@ -2995,7 +3026,7 @@ public:
     require(unswitchedElts.empty() || SOI->hasDefault(),
             "nonexhaustive switch_enum must have a default destination");
     if (SOI->hasDefault())
-      require(SOI->getDefaultBB()->bbarg_empty(),
+      require(SOI->getDefaultBB()->args_empty(),
               "switch_enum default destination must take no arguments");
   }
 
@@ -3029,7 +3060,7 @@ public:
       unswitchedElts.erase(elt);
 
       // The destination BB must not have BB arguments.
-      require(dest->getBBArgs().size() == 0,
+      require(dest->getArguments().size() == 0,
               "switch_enum_addr destination must take no BB args");
     }
 
@@ -3038,7 +3069,7 @@ public:
             "nonexhaustive switch_enum_addr must have a default "
             "destination");
     if (SOI->hasDefault())
-      require(SOI->getDefaultBB()->bbarg_empty(),
+      require(SOI->getDefaultBB()->args_empty(),
               "switch_enum_addr default destination must take "
               "no arguments");
   }
@@ -3054,10 +3085,10 @@ public:
   }
 
   void checkBranchInst(BranchInst *BI) {
-    require(BI->getArgs().size() == BI->getDestBB()->bbarg_size(),
+    require(BI->getArgs().size() == BI->getDestBB()->args_size(),
             "branch has wrong number of arguments for dest bb");
     require(std::equal(BI->getArgs().begin(), BI->getArgs().end(),
-                       BI->getDestBB()->bbarg_begin(),
+                       BI->getDestBB()->args_begin(),
                        [&](SILValue branchArg, SILArgument *bbArg) {
                          return verifyBranchArgs(branchArg, bbArg);
                        }),
@@ -3076,24 +3107,24 @@ public:
                                  CBI->getCondition()->getType().getASTContext()),
             "condition of conditional branch must have Int1 type");
 
-    require(CBI->getTrueArgs().size() == CBI->getTrueBB()->bbarg_size(),
+    require(CBI->getTrueArgs().size() == CBI->getTrueBB()->args_size(),
             "true branch has wrong number of arguments for dest bb");
     require(CBI->getTrueBB() != CBI->getFalseBB(),
             "identical destinations");
     require(std::equal(CBI->getTrueArgs().begin(), CBI->getTrueArgs().end(),
-                      CBI->getTrueBB()->bbarg_begin(),
-                      [&](SILValue branchArg, SILArgument *bbArg) {
-                        return verifyBranchArgs(branchArg, bbArg);
-                      }),
+                       CBI->getTrueBB()->args_begin(),
+                       [&](SILValue branchArg, SILArgument *bbArg) {
+                         return verifyBranchArgs(branchArg, bbArg);
+                       }),
             "true branch argument types do not match arguments for dest bb");
 
-    require(CBI->getFalseArgs().size() == CBI->getFalseBB()->bbarg_size(),
+    require(CBI->getFalseArgs().size() == CBI->getFalseBB()->args_size(),
             "false branch has wrong number of arguments for dest bb");
     require(std::equal(CBI->getFalseArgs().begin(), CBI->getFalseArgs().end(),
-                      CBI->getFalseBB()->bbarg_begin(),
-                      [&](SILValue branchArg, SILArgument *bbArg) {
-                        return verifyBranchArgs(branchArg, bbArg);
-                      }),
+                       CBI->getFalseBB()->args_begin(),
+                       [&](SILValue branchArg, SILArgument *bbArg) {
+                         return verifyBranchArgs(branchArg, bbArg);
+                       }),
             "false branch argument types do not match arguments for dest bb");
   }
 
@@ -3110,16 +3141,16 @@ public:
     }
 
     // Check that the branch argument is of the expected dynamic method type.
-    require(DMBI->getHasMethodBB()->bbarg_size() == 1,
+    require(DMBI->getHasMethodBB()->args_size() == 1,
             "true bb for dynamic_method_br must take an argument");
-    
-    auto bbArgTy = DMBI->getHasMethodBB()->bbarg_begin()[0]->getType();
+
+    auto bbArgTy = DMBI->getHasMethodBB()->args_begin()[0]->getType();
     require(getDynamicMethodType(operandType, DMBI->getMember())
               .getSwiftRValueType()
               ->isBindableTo(bbArgTy.getSwiftRValueType(), nullptr),
             "bb argument for dynamic_method_br must be of the method's type");
   }
-  
+
   void checkProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {
     require(PBSI->getOperand()->getType().isAddress(),
             "operand must be an address");
@@ -3170,9 +3201,9 @@ public:
     require(blockTy, "result must be a function");
     require(blockTy->getRepresentation() == SILFunctionType::Representation::Block,
             "result must be a cdecl block function");
-    require(blockTy->getAllResults() == invokeTy->getAllResults(),
+    require(blockTy->getResults() == invokeTy->getResults(),
             "result must have same results as invoke function");
-    
+
     require(blockTy->getParameters().size() + 1
               == invokeTy->getParameters().size(),
           "result must match all parameters of invoke function but the first");
@@ -3226,49 +3257,60 @@ public:
   }
 
   void verifyEntryPointArguments(SILBasicBlock *entry) {
-    SILFunctionType *ti = F.getLoweredFunctionType();
-
     DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
-          for (auto *arg : make_range(entry->bbarg_begin(), entry->bbarg_end()))
-            arg->getType().dump();
+          for (auto *arg
+               : make_range(entry->args_begin(), entry->args_end()))
+              arg->getType()
+                  .dump();
           llvm::dbgs() << "Input types for SIL function type ";
-          ti->print(llvm::dbgs());
+          F.getLoweredFunctionType()->print(llvm::dbgs());
           llvm::dbgs() << ":\n";
-          for (auto input : ti->getParameters())
-            input.getSILType().dump(););
+          for (auto paramTy
+               : fnConv.getParameterSILTypes()) { paramTy.dump(); });
 
-    require(entry->bbarg_size() ==
-              ti->getNumIndirectResults() + ti->getParameters().size(),
+    require(entry->args_size() == (fnConv.getNumIndirectSILResults()
+                                   + fnConv.getNumParameters()),
             "entry point has wrong number of arguments");
 
     bool matched = true;
-    auto argI = entry->bbarg_begin();
+    auto argI = entry->args_begin();
+    SILModule &M = F.getModule();
 
     auto check = [&](const char *what, SILType ty) {
       auto mappedTy = F.mapTypeIntoContext(ty);
-      SILArgument *bbarg = *argI++;
+      SILArgument *bbarg = *argI;
+      ++argI;
+      auto ownershipkind = ValueOwnershipKind(
+          M, mappedTy, fnConv.getSILArgumentConvention(bbarg->getIndex()));
       if (bbarg->getType() != mappedTy) {
         llvm::errs() << what << " type mismatch!\n";
         llvm::errs() << "  argument: "; bbarg->dump();
         llvm::errs() << "  expected: "; mappedTy.dump();
         matched = false;
       }
+
+      if (bbarg->getOwnershipKind() != ownershipkind) {
+        llvm::errs() << what << " ownership kind mismatch!\n";
+        llvm::errs() << "  argument: " << bbarg->getOwnershipKind() << '\n';
+        llvm::errs() << "  expected: " << ownershipkind << '\n';
+        matched = false;
+      }
     };
 
-    for (auto result : ti->getIndirectResults()) {
-      assert(result.isIndirect());
-      check("result", result.getSILType());
+    for (auto result : fnConv.getIndirectSILResults()) {
+      assert(fnConv.isSILIndirect(result));
+      check("result", fnConv.getSILType(result));
     }
-    for (auto param : ti->getParameters()) {
-      check("parameter", param.getSILType());
+    for (auto param : F.getLoweredFunctionType()->getParameters()) {
+      check("parameter", fnConv.getSILType(param));
     }
 
     require(matched, "entry point argument types do not match function type");
 
     // TBAA requirement for all address arguments.
-    require(std::equal(entry->bbarg_begin() + ti->getNumIndirectResults(),
-                       entry->bbarg_end(),
-                       ti->getParameters().begin(),
+    require(std::equal(entry->args_begin() + fnConv.getNumIndirectSILResults(),
+                       entry->args_end(),
+                       fnConv.funcTy->getParameters().begin(),
                        [&](SILArgument *bbarg, SILParameterInfo paramInfo) {
                          if (!bbarg->getType().isAddress())
                            return true;
@@ -3397,7 +3439,7 @@ public:
       // And its destination block has more than one predecessor.
       SILBasicBlock *DestBB = SrcSuccs[EdgeIdx];
       assert(!DestBB->pred_empty() && "There should be a predecessor");
-      if (DestBB->getSinglePredecessor())
+      if (DestBB->getSinglePredecessorBlock())
         return false;
 
       return true;
@@ -3423,7 +3465,7 @@ public:
     // OpenedArchetypesDefs are existing instructions
     // belonging to the function F.
     for (auto KV: OpenedArchetypes.getOpenedArchetypeDefs()) {
-      require(getOpenedArchetype(KV.first.getCanonicalTypeOrNull()),
+      require(getOpenedArchetypeOf(KV.first),
               "Only opened archetypes should be registered in SILFunction");
       auto Def = cast<SILInstruction>(KV.second);
       require(Def->getFunction() == F, 
@@ -3437,16 +3479,16 @@ public:
     // have this basic block in its predecessor/successor list.
     for (const auto *SuccBB : BB->getSuccessorBlocks()) {
       bool FoundSelfInSuccessor = false;
-      if (SuccBB->isPredecessor(BB)) {
+      if (SuccBB->isPredecessorBlock(BB)) {
         FoundSelfInSuccessor = true;
         break;
       }
       require(FoundSelfInSuccessor, "Must be a predecessor of each successor.");
     }
 
-    for (const SILBasicBlock *PredBB : BB->getPreds()) {
+    for (const SILBasicBlock *PredBB : BB->getPredecessorBlocks()) {
       bool FoundSelfInPredecessor = false;
-      if (PredBB->isSuccessor(BB)) {
+      if (PredBB->isSuccessorBlock(BB)) {
         FoundSelfInPredecessor = true;
         break;
       }
@@ -3546,6 +3588,10 @@ public:
 #undef requireObjectType
 #endif //NDEBUG
 
+//===----------------------------------------------------------------------===//
+//                     Out of Line Verifier Run Functions
+//===----------------------------------------------------------------------===//
+
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
 void SILFunction::verify(bool SingleFunction) const {
@@ -3562,9 +3608,9 @@ void SILVTable::verify(const SILModule &M) const {
 #ifndef NDEBUG
   for (auto &entry : getEntries()) {
     // All vtable entries must be decls in a class context.
-    assert(entry.first.hasDecl() && "vtable entry is not a decl");
-    auto baseInfo = M.Types.getConstantInfo(entry.first);
-    ValueDecl *decl = entry.first.getDecl();
+    assert(entry.Method.hasDecl() && "vtable entry is not a decl");
+    auto baseInfo = M.Types.getConstantInfo(entry.Method);
+    ValueDecl *decl = entry.Method.getDecl();
     
     assert((!isa<FuncDecl>(decl)
             || !cast<FuncDecl>(decl)->isObservingAccessor())
@@ -3572,7 +3618,7 @@ void SILVTable::verify(const SILModule &M) const {
 
     // For ivar destroyers, the decl is the class itself.
     ClassDecl *theClass;
-    if (entry.first.kind == SILDeclRef::Kind::IVarDestroyer)
+    if (entry.Method.kind == SILDeclRef::Kind::IVarDestroyer)
       theClass = dyn_cast<ClassDecl>(decl);
     else
       theClass = dyn_cast<ClassDecl>(decl->getDeclContext());
@@ -3592,22 +3638,22 @@ void SILVTable::verify(const SILModule &M) const {
     assert(c && "vtable entry must refer to a member of the vtable's class");
 
     // All function vtable entries must be at their natural uncurry level.
-    assert(!entry.first.isCurried && "vtable entry must not be curried");
+    assert(!entry.Method.isCurried && "vtable entry must not be curried");
 
     // Foreign entry points shouldn't appear in vtables.
-    assert(!entry.first.isForeign && "vtable entry must not be foreign");
+    assert(!entry.Method.isForeign && "vtable entry must not be foreign");
     
     // The vtable entry must be ABI-compatible with the overridden vtable slot.
     SmallString<32> baseName;
     {
       llvm::raw_svector_ostream os(baseName);
-      entry.first.print(os);
+      entry.Method.print(os);
     }
     
-    SILVerifier(*entry.second)
+    SILVerifier(*entry.Implementation)
       .requireABICompatibleFunctionTypes(
                     baseInfo.getSILType().castTo<SILFunctionType>(),
-                    entry.second->getLoweredFunctionType(),
+                    entry.Implementation->getLoweredFunctionType(),
                     "vtable entry for " + baseName + " must be ABI-compatible");
   }
 #endif
@@ -3717,9 +3763,9 @@ void SILModule::verify() const {
     vt.verify(*this);
     // Check if there is a cache entry for each vtable entry
     for (auto entry : vt.getEntries()) {
-      if (VTableEntryCache.find({&vt, entry.first}) == VTableEntryCache.end()) {
-        llvm::errs() << "Vtable entry for function: " << entry.second->getName()
-                     << "not in cache!\n";
+      if (VTableEntryCache.find({&vt, entry.Method}) == VTableEntryCache.end()) {
+        llvm::errs() << "Vtable entry for function: "
+                     << entry.Implementation->getName() << "not in cache!\n";
         assert(false && "triggering standard assertion failure routine");
       }
       EntriesSZ++;

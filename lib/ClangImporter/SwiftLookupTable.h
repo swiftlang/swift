@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -27,6 +27,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/Compiler.h"
 #include <functional>
 #include <utility>
 
@@ -62,17 +63,15 @@ public:
   };
 
 private:
-  Kind TheKind;
-
   union {
     const clang::DeclContext *DC;
     const clang::TypedefNameDecl *Typedef;
     struct {
       const char *Data;
-      unsigned Length;
     } Unresolved;
   };
-
+  Kind TheKind;
+  unsigned UnresolvedLength;
   
 public:
   EffectiveClangContext() : TheKind(DeclContext) {
@@ -107,7 +106,7 @@ public:
 
   EffectiveClangContext(StringRef unresolved) : TheKind(UnresolvedContext) {
     Unresolved.Data = unresolved.data();
-    Unresolved.Length = unresolved.size();
+    UnresolvedLength = unresolved.size();
   }
 
   /// Determine whether this effective Clang context was set.
@@ -132,9 +131,17 @@ public:
   /// Retrieve the unresolved context name.
   StringRef getUnresolvedName() const {
     assert(getKind() == UnresolvedContext);
-    return StringRef(Unresolved.Data, Unresolved.Length);
+    return StringRef(Unresolved.Data, UnresolvedLength);
   }
 };
+
+#if LLVM_PTR_SIZE == 4
+static_assert(sizeof(EffectiveClangContext) <= 4 * sizeof(void *),
+              "should fit in four pointers");
+#else
+static_assert(sizeof(EffectiveClangContext) <= 2 * sizeof(void *),
+              "should fit in a couple pointers");
+#endif
 
 class SwiftLookupTableReader;
 class SwiftLookupTableWriter;
@@ -398,6 +405,22 @@ public:
   void dump() const;
 };
 
+namespace importer {
+class NameImporter;
+
+/// Add the given named declaration as an entry to the given Swift name
+/// lookup table, including any of its child entries.
+void addEntryToLookupTable(SwiftLookupTable &table, clang::NamedDecl *named,
+                           NameImporter &);
+
+/// Add the macros from the given Clang preprocessor to the given
+/// Swift name lookup table.
+void addMacrosToLookupTable(SwiftLookupTable &table, NameImporter &);
+
+/// Finalize a lookup table, handling any as-yet-unresolved entries
+/// and emitting diagnostics if necessary.
+void finalizeLookupTable(SwiftLookupTable &table, NameImporter &);
+}
 }
 
 namespace llvm {

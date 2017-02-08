@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -16,6 +16,7 @@
 
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
@@ -311,8 +312,10 @@ FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
     llvm::Value *spareIdx
       = emitGatherSpareBits(IGF, SpareBits, val, numOccupiedBits, 31);
     // Unbias by subtracting one.
+
+    uint64_t shifted = static_cast<uint64_t>(1) << numOccupiedBits;
     spareIdx = IGF.Builder.CreateSub(spareIdx,
-            llvm::ConstantInt::get(spareIdx->getType(), 1 << numOccupiedBits));
+            llvm::ConstantInt::get(spareIdx->getType(), shifted));
     idx = IGF.Builder.CreateOr(idx, spareIdx);
   }
   idx = IGF.Builder.CreateZExt(idx, IGF.IGM.Int32Ty);
@@ -600,7 +603,7 @@ namespace {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
   };
-}
+} // end anonymous namespace
 
 /// Constructs a type info which performs simple loads and stores of
 /// the given IR type.
@@ -676,15 +679,14 @@ void TypeConverter::popGenericContext(CanGenericSignature signature) {
   Types.DependentCache.clear();
 }
 
-ArchetypeBuilder &TypeConverter::getArchetypes() {
+GenericEnvironment *TypeConverter::getGenericEnvironment() {
   auto moduleDecl = IGM.getSwiftModule();
   auto genericSig = IGM.getSILTypes().getCurGenericContext();
-  return *moduleDecl->getASTContext()
-      .getOrCreateArchetypeBuilder(genericSig, moduleDecl);
+  return genericSig->getCanonicalSignature().getGenericEnvironment(*moduleDecl);
 }
 
-ArchetypeBuilder &IRGenModule::getContextArchetypes() {
-  return Types.getArchetypes();
+GenericEnvironment *IRGenModule::getGenericEnvironment() {
+  return Types.getGenericEnvironment();
 }
 
 /// Add a temporary forward declaration for a type.  This will live
@@ -744,6 +746,8 @@ IRGenModule::getReferenceObjectTypeInfo(ReferenceCounting refcounting) {
   case ReferenceCounting::ObjC:
     llvm_unreachable("not implemented");
   }
+
+  llvm_unreachable("Not a valid ReferenceCounting.");
 }
 
 const LoadableTypeInfo &IRGenModule::getNativeObjectTypeInfo() {
@@ -939,173 +943,27 @@ const TypeInfo *TypeConverter::tryGetCompleteTypeInfo(CanType T) {
   return &ti;
 }
 
-/// Profile the archetype constraints that may affect type layout into a
-/// folding set node ID.
-static void profileArchetypeConstraints(
-              Type ty,
-              llvm::FoldingSetNodeID &ID,
-              llvm::DenseMap<ArchetypeType*, unsigned> &seen) {
-  // Helper.
-  class ProfileType : public CanTypeVisitor<ProfileType> {
-    llvm::FoldingSetNodeID &ID;
-    llvm::DenseMap<ArchetypeType *, unsigned> &seen;
-
-  public:
-    ProfileType(llvm::FoldingSetNodeID &ID,
-                llvm::DenseMap<ArchetypeType *, unsigned> &seen)
-        : ID(ID), seen(seen) {}
-
-#define TYPE_WITHOUT_ARCHETYPE(KIND)                                           \
-  void visit##KIND##Type(Can##KIND##Type type) {                               \
-    llvm_unreachable("does not contain an archetype");                         \
-  }
-
-    TYPE_WITHOUT_ARCHETYPE(Builtin)
-
-    void visitNominalType(CanNominalType type) {
-      if (type.getParent())
-        profileArchetypeConstraints(type.getParent(), ID, seen);
-      ID.AddPointer(type->getDecl());
-    }
-
-    void visitTupleType(CanTupleType type) {
-      ID.AddInteger(type->getNumElements());
-      for (auto &elt : type->getElements()) {
-        ID.AddInteger(elt.isVararg());
-        profileArchetypeConstraints(elt.getType(), ID, seen);
-      }
-    }
-
-    void visitReferenceStorageType(CanReferenceStorageType type) {
-      profileArchetypeConstraints(type.getReferentType(), ID, seen);
-    }
-
-    void visitAnyMetatypeType(CanAnyMetatypeType type) {
-      profileArchetypeConstraints(type.getInstanceType(), ID, seen);
-    }
-
-    TYPE_WITHOUT_ARCHETYPE(Module)
-
-    void visitDynamicSelfType(CanDynamicSelfType type) {
-      profileArchetypeConstraints(type.getSelfType(), ID, seen);
-    }
-
-    void visitArchetypeType(CanArchetypeType type) {
-      profileArchetypeConstraints(type, ID, seen);
-    }
-
-    TYPE_WITHOUT_ARCHETYPE(GenericTypeParam)
-
-    void visitDependentMemberType(CanDependentMemberType type) {
-      ID.AddPointer(type->getAssocType());
-      profileArchetypeConstraints(type.getBase(), ID, seen);
-    }
-
-    void visitAnyFunctionType(CanAnyFunctionType type) {
-      ID.AddInteger(type->getExtInfo().getFuncAttrKey());
-      profileArchetypeConstraints(type.getInput(), ID, seen);
-      profileArchetypeConstraints(type.getResult(), ID, seen);
-    }
-
-    TYPE_WITHOUT_ARCHETYPE(SILFunction)
-    TYPE_WITHOUT_ARCHETYPE(SILBlockStorage)
-    TYPE_WITHOUT_ARCHETYPE(SILBox)
-    TYPE_WITHOUT_ARCHETYPE(ProtocolComposition)
-
-    void visitLValueType(CanLValueType type) {
-      profileArchetypeConstraints(type.getObjectType(), ID, seen);
-    }
-
-    void visitInOutType(CanInOutType type) {
-      profileArchetypeConstraints(type.getObjectType(), ID, seen);
-    }
-
-    TYPE_WITHOUT_ARCHETYPE(UnboundGeneric)
-
-    void visitBoundGenericType(CanBoundGenericType type) {
-      if (type.getParent())
-        profileArchetypeConstraints(type.getParent(), ID, seen);
-      ID.AddPointer(type->getDecl());
-      for (auto arg : type.getGenericArgs()) {
-        profileArchetypeConstraints(arg, ID, seen);
-      }
-    }
-#undef TYPE_WITHOUT_ARCHETYPE
-  };
-
-  // End recursion if we found a concrete associated type.
-  auto arch = ty->getAs<ArchetypeType>();
-  if (!arch) {
-    auto concreteTy = ty->getCanonicalType();
-    if (!concreteTy->hasArchetype()) {
-      // Trivial case: if there are no archetypes, just use the canonical type
-      // pointer.
-      ID.AddBoolean(true);
-      ID.AddPointer(concreteTy.getPointer());
-      return;
-    }
-
-    // When there are archetypes, recurse to profile the type itself.
-    ID.AddInteger(1);
-    ID.AddInteger(static_cast<unsigned>(concreteTy->getKind()));
-
-    ProfileType(ID, seen).visit(concreteTy);
-    return;
-  }
-  
-  auto found = seen.find(arch);
-  if (found != seen.end()) {
-    ID.AddInteger(found->second);
-    return;
-  }
-  seen.insert({arch, seen.size()});
-  
-  // Is the archetype class-constrained?
-  ID.AddBoolean(arch->requiresClass());
-  
-  // The archetype's superclass constraint.
-  auto superclass = arch->getSuperclass();
-  if (superclass) {
-    ProfileType(ID, seen).visit(superclass->getCanonicalType());
-  } else {
-    ID.AddPointer(nullptr);
-  }
-
-  // The archetype's protocol constraints.
-  for (auto proto : arch->getConformsTo()) {
-    ID.AddPointer(proto);
-  }
-  
-  // Recursively profile nested archetypes.
-  for (auto nested : arch->getNestedTypes()) {
-    profileArchetypeConstraints(nested.second.getValue(), ID, seen);
-  }
-}
-
-void ExemplarArchetype::Profile(llvm::FoldingSetNodeID &ID) const {
-  llvm::DenseMap<ArchetypeType*, unsigned> seen;
-  profileArchetypeConstraints(Archetype, ID, seen);
-}
-
 ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
-  // Check the folding set to see whether we already have an exemplar matching
-  // this archetype.
-  llvm::FoldingSetNodeID ID;
-  llvm::DenseMap<ArchetypeType*, unsigned> seen;
-  profileArchetypeConstraints(t, ID, seen);
-  void *insertPos;
-  ExemplarArchetype *existing
-    = Types.ExemplarArchetypes.FindNodeOrInsertPos(ID, insertPos);
-  if (existing) {
-    return existing->Archetype;
-  }
-  
-  // Otherwise, use this archetype as the exemplar for future similar
-  // archetypes.
-  Types.ExemplarArchetypeStorage.push_back({t});
-  Types.ExemplarArchetypes.InsertNode(&Types.ExemplarArchetypeStorage.back(),
-                                      insertPos);
-  return t;
+  // Retrieve the generic environment of the archetype.
+  auto genericEnv = t->getGenericEnvironment();
+
+  // If there is no generic environment, the archetype is an exemplar.
+  if (!genericEnv) return t;
+
+  // Dig out the canonical generic environment.
+  auto genericSig = genericEnv->getGenericSignature();
+  auto canGenericSig = genericSig->getCanonicalSignature();
+  auto module = IGM.getSwiftModule();
+  auto canGenericEnv = canGenericSig.getGenericEnvironment(*module);
+  if (canGenericEnv == genericEnv) return t;
+
+  // Map the archetype out of its own generic environment and into the
+  // canonical generic environment.
+  auto interfaceType = genericEnv->mapTypeOutOfContext(t);
+  auto exemplar = canGenericEnv->mapTypeIntoContext(interfaceType)
+                    ->castTo<ArchetypeType>();
+  assert(isExemplarArchetype(exemplar));
+  return exemplar;
 }
 
 /// Fold archetypes to unique exemplars. Any archetype with the same
@@ -1114,14 +972,19 @@ CanType TypeConverter::getExemplarType(CanType contextTy) {
   // FIXME: A generic SILFunctionType should not contain any nondependent
   // archetypes.
   if (isa<SILFunctionType>(contextTy)
-      && cast<SILFunctionType>(contextTy)->isPolymorphic())
+      && cast<SILFunctionType>(contextTy)->isPolymorphic()) {
     return contextTy;
-  else
-    return CanType(contextTy.transform([&](Type t) -> Type {
-      if (auto arch = dyn_cast<ArchetypeType>(t.getPointer()))
-        return getExemplarArchetype(arch);
-      return t;
-    }));
+  } else {
+    auto exemplified = contextTy.subst(
+      [&](SubstitutableType *type) -> Type {
+        if (auto arch = dyn_cast<ArchetypeType>(type))
+          return getExemplarArchetype(arch);
+        return type;
+      },
+      MakeAbstractConformanceForGenericType(),
+      SubstFlags::AllowLoweredTypes);
+    return CanType(exemplified);
+  }
 }
 
 TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
@@ -1139,10 +1002,10 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   auto contextTy = canonicalTy;
   if (contextTy->hasTypeParameter()) {
     // The type we got should be lowered, so lower it like a SILType.
-    contextTy = getArchetypes().substDependentType(IGM.getSILModule(),
-                                   SILType::getPrimitiveAddressType(contextTy))
+    contextTy = getGenericEnvironment()->mapTypeIntoContext(
+                  IGM.getSILModule(),
+                  SILType::getPrimitiveAddressType(contextTy))
       .getSwiftRValueType();
-    
   }
   
   // Fold archetypes to unique exemplars. Any archetype with the same
@@ -1350,7 +1213,6 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
   case TypeKind::Tuple:
     return convertTupleType(cast<TupleType>(ty));
   case TypeKind::Function:
-  case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction:
     llvm_unreachable("AST FunctionTypes should be lowered by SILGen");
   case TypeKind::SILFunction:
@@ -1483,7 +1345,7 @@ namespace {
         return false;
 
       for (auto elt : decl->getAllElements()) {
-        if (elt->hasArgumentType() &&
+        if (elt->getArgumentInterfaceType() &&
             !elt->isIndirect() &&
             visit(elt->getArgumentInterfaceType()->getCanonicalType()))
           return true;
@@ -1519,7 +1381,7 @@ namespace {
       return true;
     }
   };
-}
+} // end anonymous namespace
 
 static bool isIRTypeDependent(IRGenModule &IGM, NominalTypeDecl *decl) {
   assert(!isa<ProtocolDecl>(decl));
@@ -1592,14 +1454,14 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
     llvm_unreachable("classes are always considered dependent for now");
 
   case DeclKind::Enum: {
-    auto type = CanType(decl->getDeclaredTypeInContext());
+    auto type = decl->getDeclaredTypeInContext()->getCanonicalType();
     auto result = convertEnumType(key, type, cast<EnumDecl>(decl));
     overwriteForwardDecl(Cache, key, result);
     return result;
   }
 
   case DeclKind::Struct: {
-    auto type = CanType(decl->getDeclaredTypeInContext());
+    auto type = decl->getDeclaredTypeInContext()->getCanonicalType();
     auto result = convertStructType(key, type, cast<StructDecl>(decl));
     overwriteForwardDecl(Cache, key, result);
     return result;
@@ -1817,6 +1679,8 @@ llvm::Value *IRGenFunction::getLocalSelfMetadata() {
   case ObjectReference:
     return emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf);
   }
+
+  llvm_unreachable("Not a valid LocalSelfKind.");
 }
 
 void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,
@@ -1840,9 +1704,18 @@ CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *t) const {
 }
 
 bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
-  for (auto &ea : Types.ExemplarArchetypeStorage)
-    if (ea.Archetype == arch) return true;
-  return false;
+  auto genericEnv = arch->getGenericEnvironment();
+  if (!genericEnv) return true;
+
+  // Dig out the canonical generic environment.
+  auto genericSig = genericEnv->getGenericSignature();
+  auto canGenericSig = genericSig->getCanonicalSignature();
+  auto module = IGM.getSwiftModule();
+  auto canGenericEnv = canGenericSig.getGenericEnvironment(*module);
+
+  // If this archetype is in the canonical generic environment, it's an
+  // exemplar archetype.
+  return canGenericEnv == genericEnv;
 }
 #endif
 
@@ -1884,7 +1757,7 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     
     auto theCase = allCases.begin();
     if (!allCases.empty() && std::next(theCase) == allCases.end()
-        && (*theCase)->hasArgumentType())
+        && (*theCase)->getArgumentInterfaceType())
       return t.getEnumElementType(*theCase, IGM.getSILModule());
 
     return SILType();

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -132,13 +132,11 @@ static SILValue skipValueProjections(SILValue V) {
 Effects *FunctionEffects::getEffectsOn(SILValue Addr) {
   SILValue BaseAddr = skipValueProjections(skipAddrProjections(Addr));
   switch (BaseAddr->getKind()) {
-    case swift::ValueKind::SILArgument: {
-      // Can we associate the address to a function parameter?
-      SILArgument *Arg = cast<SILArgument>(BaseAddr);
-      if (Arg->isFunctionArg()) {
-        return &ParamEffects[Arg->getIndex()];
-      }
-      break;
+  case swift::ValueKind::SILFunctionArgument: {
+    // Can we associate the address to a function parameter?
+    auto *Arg = cast<SILFunctionArgument>(BaseAddr);
+    return &ParamEffects[Arg->getIndex()];
+    break;
     }
     case ValueKind::AllocStackInst:
     case ValueKind::AllocRefInst:
@@ -210,8 +208,9 @@ bool SideEffectAnalysis::getSemanticEffects(FunctionEffects &FE,
       if (!ASC.mayHaveBridgedObjectElementType()) {
         SelfEffects.Reads = true;
         SelfEffects.Releases |= !ASC.hasGuaranteedSelf();
-        for (auto i : indices(((ApplyInst *)ASC)->getOrigCalleeType()
-                                                ->getIndirectResults())) {
+        for (auto i : range(((ApplyInst *)ASC)
+                                ->getOrigCalleeConv()
+                                .getNumIndirectSILResults())) {
           assert(!ASC.hasGetElementDirectResult());
           FE.ParamEffects[i].Writes = true;
         }
@@ -366,7 +365,7 @@ void SideEffectAnalysis::analyzeInstruction(FunctionInfo *FInfo,
       auto Params = PAI->getSubstCalleeType()->getParameters();
       Params = Params.slice(Params.size() - Args.size(), Args.size());
       for (unsigned Idx : indices(Args)) {
-        if (isIndirectParameter(Params[Idx].getConvention()))
+        if (isIndirectFormalParameter(Params[Idx].getConvention()))
           FInfo->FE.getEffectsOn(Args[Idx])->Reads = true;
       }
       return;

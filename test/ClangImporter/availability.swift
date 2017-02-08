@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify -I %S/Inputs/custom-modules %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules %s -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 
@@ -115,3 +115,8 @@ func testUnavailableRenamedEnum() {
   _ = NSClothingStyle.hipster
   _ = NSClothingStyleOfficeCasual // expected-error{{'NSClothingStyleOfficeCasual' has been renamed to 'NSClothingStyle.semiFormal'}} {{7-34=NSClothingStyle.semiFormal}}
 }
+
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected warning produced: imported declaration 'dispatch_sync' could not be mapped to 'DispatchQueue.sync(self:execute:)'
+// <unknown>:0: error: unexpected note produced: 'NSConnectionDidDieNotification' has been explicitly marked unavailable here
+// <unknown>:0: error: unexpected note produced: 'CGColorCreateGenericGray' was obsoleted in Swift 3

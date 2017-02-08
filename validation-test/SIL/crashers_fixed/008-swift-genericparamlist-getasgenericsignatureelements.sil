@@ -1,3 +1,2 @@
 // RUN: not %target-sil-opt %s
-// REQUIRES: asserts
 sil@__:$<__ where τ:k>()->(

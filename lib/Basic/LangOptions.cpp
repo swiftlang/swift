@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -20,11 +20,13 @@
 #include "swift/Config.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
+#include <limits.h>
 
 using namespace swift;
 
 static const StringRef SupportedConditionalCompilationOSs[] = {
   "OSX",
+  "macOS",
   "tvOS",
   "watchOS",
   "iOS",
@@ -50,25 +52,52 @@ static const StringRef SupportedConditionalCompilationEndianness[] = {
   "big"
 };
 
-template <typename Type, size_t N>
-bool contains(const Type (&Array)[N], const Type &V) {
-  return std::find(std::begin(Array), std::end(Array), V) != std::end(Array);
+template <size_t N>
+bool contains(const StringRef (&Array)[N], const StringRef &V,
+              std::vector<StringRef> &suggestions) {
+  // Compare against known values, ignoring case to avoid penalizing
+  // characters with incorrect case.
+  unsigned minDistance = std::numeric_limits<unsigned>::max();
+  std::string lower = V.lower();
+  for (const StringRef& candidate : Array) {
+    if (candidate == V) {
+      suggestions.clear();
+      return true;
+    }
+    unsigned distance = StringRef(lower).edit_distance(candidate.lower());
+    if (distance < minDistance) {
+      suggestions.clear();
+      minDistance = distance;
+    }
+    if (distance == minDistance)
+      suggestions.emplace_back(candidate);
+  }
+  return false;
 }
 
-bool LangOptions::checkPlatformConditionOS(StringRef &OSName) {
+bool LangOptions::checkPlatformConditionOS(
+  StringRef &OSName, std::vector<StringRef> &suggestions) {
   if (OSName == "macOS")
     OSName = "OSX";
-  return contains(SupportedConditionalCompilationOSs, OSName);
+  return contains(SupportedConditionalCompilationOSs,
+                  OSName,
+                  suggestions);
 }
 
 bool
-LangOptions::isPlatformConditionArchSupported(StringRef ArchName) {
-  return contains(SupportedConditionalCompilationArches, ArchName);
+LangOptions::isPlatformConditionArchSupported(
+  StringRef ArchName, std::vector<StringRef> &suggestions) {
+  return contains(SupportedConditionalCompilationArches,
+                  ArchName,
+                  suggestions);
 }
 
 bool
-LangOptions::isPlatformConditionEndiannessSupported(StringRef Endianness) {
-  return contains(SupportedConditionalCompilationEndianness, Endianness);
+LangOptions::isPlatformConditionEndiannessSupported(
+  StringRef Endianness, std::vector<StringRef> &suggestions) {
+  return contains(SupportedConditionalCompilationEndianness,
+                  Endianness,
+                  suggestions);
 }
 
 StringRef

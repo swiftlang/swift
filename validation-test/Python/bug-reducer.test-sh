@@ -1,0 +1,4 @@
+// RUN: BUGREDUCE_TEST_TMP_DIR=%t BUGREDUCE_TEST_SWIFT_OBJ_ROOT=%swift_obj_root %{python} -m unittest discover -s %utils/bug_reducer
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+// REQUIRES: CMAKE_GENERATOR=Ninja

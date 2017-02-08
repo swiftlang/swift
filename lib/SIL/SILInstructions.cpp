@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -16,6 +16,7 @@
 
 #include "swift/SIL/SILInstruction.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/Basic/AssertImplements.h"
@@ -35,9 +36,9 @@ using namespace Lowering;
 // \p openedArchetypes is being used as a set. We don't use a real set type here
 // for performance reasons.
 static void
-collectDependentTypeInfo(CanType Ty,
-                        SmallVectorImpl<CanType> &openedArchetypes,
-                        bool &hasDynamicSelf) {
+collectDependentTypeInfo(Type Ty,
+                         SmallVectorImpl<ArchetypeType *> &openedArchetypes,
+                         bool &hasDynamicSelf) {
   if (!Ty)
     return;
   if (Ty->hasDynamicSelfType())
@@ -50,9 +51,10 @@ collectDependentTypeInfo(CanType Ty,
       // We don't use a set here, because the number of open archetypes
       // is usually very small and using a real set may introduce too
       // much overhead.
+      auto *archetypeTy = t->castTo<ArchetypeType>();
       if (std::find(openedArchetypes.begin(), openedArchetypes.end(),
-                    t->getCanonicalType()) == openedArchetypes.end())
-        openedArchetypes.push_back(t.getCanonicalTypeOrNull());
+                    archetypeTy) == openedArchetypes.end())
+        openedArchetypes.push_back(archetypeTy);
     }
   });
 }
@@ -60,14 +62,13 @@ collectDependentTypeInfo(CanType Ty,
 // Takes a set of open archetypes as input and produces a set of
 // references to open archetype definitions.
 static void buildTypeDependentOperands(
-    SmallVectorImpl<CanType> &OpenedArchetypes,
+    SmallVectorImpl<ArchetypeType *> &OpenedArchetypes,
     bool hasDynamicSelf,
     SmallVectorImpl<SILValue> &TypeDependentOperands,
     SILOpenedArchetypesState &OpenedArchetypesState, SILFunction &F) {
 
   for (auto archetype : OpenedArchetypes) {
-    auto Def = OpenedArchetypesState.getOpenedArchetypeDef(
-        F.getModule().Types.getLoweredType(archetype).getSwiftRValueType());
+    auto Def = OpenedArchetypesState.getOpenedArchetypeDef(archetype);
     assert(Def);
     assert(getOpenedArchetypeOf(Def->getType().getSwiftRValueType()) &&
            "Opened archetype operands should be of an opened existential type");
@@ -87,18 +88,18 @@ static void collectTypeDependentOperands(
                       SmallVectorImpl<SILValue> &TypeDependentOperands,
                       SILOpenedArchetypesState &OpenedArchetypesState,
                       SILFunction &F,
-                      CanType Ty,
-                      ArrayRef<Substitution> subs = ArrayRef<Substitution>()) {
-  SmallVector<CanType, 32> openedArchetypes;
+                      Type Ty,
+                      SubstitutionList subs = SubstitutionList()) {
+  SmallVector<ArchetypeType *, 4> openedArchetypes;
   bool hasDynamicSelf = false;
   collectDependentTypeInfo(Ty, openedArchetypes, hasDynamicSelf);
   for (auto sub : subs) {
-    auto ReplTy = sub.getReplacement().getCanonicalTypeOrNull();
+    auto ReplTy = sub.getReplacement();
     collectDependentTypeInfo(ReplTy, openedArchetypes, hasDynamicSelf);
   }
   buildTypeDependentOperands(openedArchetypes, hasDynamicSelf,
-                                 TypeDependentOperands,
-                                 OpenedArchetypesState, F);
+                             TypeDependentOperands,
+                             OpenedArchetypesState, F);
 }
 
 //===----------------------------------------------------------------------===//
@@ -355,7 +356,7 @@ AllocValueBufferInst::create(SILDebugLocation DebugLoc, SILType valueType,
 
 BuiltinInst *BuiltinInst::create(SILDebugLocation Loc, Identifier Name,
                                  SILType ReturnType,
-                                 ArrayRef<Substitution> Substitutions,
+                                 SubstitutionList Substitutions,
                                  ArrayRef<SILValue> Args,
                                  SILFunction &F) {
   void *Buffer = F.getModule().allocateInst(
@@ -368,7 +369,7 @@ BuiltinInst *BuiltinInst::create(SILDebugLocation Loc, Identifier Name,
 }
 
 BuiltinInst::BuiltinInst(SILDebugLocation Loc, Identifier Name,
-                         SILType ReturnType, ArrayRef<Substitution> Subs,
+                         SILType ReturnType, SubstitutionList Subs,
                          ArrayRef<SILValue> Args)
     : SILInstruction(ValueKind::BuiltinInst, Loc, ReturnType), Name(Name),
       NumSubstitutions(Subs.size()), Operands(this, Args) {
@@ -382,7 +383,7 @@ InitBlockStorageHeaderInst *
 InitBlockStorageHeaderInst::create(SILFunction &F,
                                SILDebugLocation DebugLoc, SILValue BlockStorage,
                                SILValue InvokeFunction, SILType BlockType,
-                               ArrayRef<Substitution> Subs) {
+                               SubstitutionList Subs) {
   void *Buffer = F.getModule().allocateInst(
     sizeof(InitBlockStorageHeaderInst) + sizeof(Substitution) * Subs.size(),
     alignof(InitBlockStorageHeaderInst));
@@ -394,7 +395,7 @@ InitBlockStorageHeaderInst::create(SILFunction &F,
 
 ApplyInst::ApplyInst(SILDebugLocation Loc, SILValue Callee,
                      SILType SubstCalleeTy, SILType Result,
-                     ArrayRef<Substitution> Subs,
+                     SubstitutionList Subs,
                      ArrayRef<SILValue> Args, ArrayRef<SILValue> TypeDependentOperands,
                      bool isNonThrowing)
     : ApplyInstBase(ValueKind::ApplyInst, Loc, Callee, SubstCalleeTy, Subs,
@@ -404,7 +405,7 @@ ApplyInst::ApplyInst(SILDebugLocation Loc, SILValue Callee,
 
 ApplyInst *ApplyInst::create(SILDebugLocation Loc, SILValue Callee,
                              SILType SubstCalleeTy, SILType Result,
-                             ArrayRef<Substitution> Subs,
+                             SubstitutionList Subs,
                              ArrayRef<SILValue> Args, bool isNonThrowing,
                              SILFunction &F,
                              SILOpenedArchetypesState &OpenedArchetypes) {
@@ -430,7 +431,7 @@ void *swift::allocateApplyInst(SILFunction &F, size_t size, size_t alignment) {
 
 PartialApplyInst::PartialApplyInst(SILDebugLocation Loc, SILValue Callee,
                                    SILType SubstCalleeTy,
-                                   ArrayRef<Substitution> Subs,
+                                   SubstitutionList Subs,
                                    ArrayRef<SILValue> Args,
                                    ArrayRef<SILValue> TypeDependentOperands,
                                    SILType ClosureType)
@@ -443,7 +444,7 @@ PartialApplyInst::PartialApplyInst(SILDebugLocation Loc, SILValue Callee,
 
 PartialApplyInst *
 PartialApplyInst::create(SILDebugLocation Loc, SILValue Callee,
-                         SILType SubstCalleeTy, ArrayRef<Substitution> Subs,
+                         SILType SubstCalleeTy, SubstitutionList Subs,
                          ArrayRef<SILValue> Args, SILType ClosureType,
                          SILFunction &F,
                          SILOpenedArchetypesState &OpenedArchetypes) {
@@ -462,7 +463,7 @@ TryApplyInstBase::TryApplyInstBase(ValueKind valueKind, SILDebugLocation Loc,
     : TermInst(valueKind, Loc), DestBBs{{this, normalBB}, {this, errorBB}} {}
 
 TryApplyInst::TryApplyInst(SILDebugLocation Loc, SILValue callee,
-                           SILType substCalleeTy, ArrayRef<Substitution> subs,
+                           SILType substCalleeTy, SubstitutionList subs,
                            ArrayRef<SILValue> args,
                            ArrayRef<SILValue> TypeDependentOperands,
                            SILBasicBlock *normalBB, SILBasicBlock *errorBB)
@@ -472,7 +473,7 @@ TryApplyInst::TryApplyInst(SILDebugLocation Loc, SILValue callee,
 
 TryApplyInst *TryApplyInst::create(SILDebugLocation Loc, SILValue callee,
                                    SILType substCalleeTy,
-                                   ArrayRef<Substitution> subs,
+                                   SubstitutionList subs,
                                    ArrayRef<SILValue> args,
                                    SILBasicBlock *normalBB,
                                    SILBasicBlock *errorBB, SILFunction &F,
@@ -662,10 +663,19 @@ StoreInst::StoreInst(
     : SILInstruction(ValueKind::StoreInst, Loc), Operands(this, Src, Dest),
       OwnershipQualifier(Qualifier) {}
 
+StoreBorrowInst::StoreBorrowInst(SILDebugLocation DebugLoc, SILValue Src,
+                                 SILValue Dest)
+    : SILInstruction(ValueKind::StoreBorrowInst, DebugLoc, Dest->getType()),
+      Operands(this, Src, Dest) {}
+
 EndBorrowInst::EndBorrowInst(SILDebugLocation DebugLoc, SILValue Src,
                              SILValue Dest)
     : SILInstruction(ValueKind::EndBorrowInst, DebugLoc),
       Operands(this, Src, Dest) {}
+
+EndBorrowArgumentInst::EndBorrowArgumentInst(SILDebugLocation DebugLoc,
+                                             SILArgument *Arg)
+    : UnaryInstructionBase(DebugLoc, SILValue(Arg)) {}
 
 AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest)
     : SILInstruction(ValueKind::AssignInst, Loc), Operands(this, Src, Dest) {}
@@ -971,6 +981,8 @@ bool TermInst::isFunctionExiting() const {
     case TermKind::ThrowInst:
       return true;
   }
+
+  llvm_unreachable("Unhandled TermKind in switch.");
 }
 
 BranchInst::BranchInst(SILDebugLocation Loc, SILBasicBlock *DestBB,
@@ -1331,7 +1343,7 @@ namespace {
 
     return nullptr;
   }
-}
+} // end anonymous namespace
 
 NullablePtr<EnumElementDecl> SelectEnumInstBase::getUniqueCaseForDefault() {
   return getUniqueCaseForDefaultValue(this, getEnumOperand());
@@ -1588,10 +1600,10 @@ MarkUninitializedBehaviorInst *
 MarkUninitializedBehaviorInst::create(SILModule &M,
                                       SILDebugLocation DebugLoc,
                                       SILValue InitStorage,
-                                      ArrayRef<Substitution> InitStorageSubs,
+                                      SubstitutionList InitStorageSubs,
                                       SILValue Storage,
                                       SILValue Setter,
-                                      ArrayRef<Substitution> SetterSubs,
+                                      SubstitutionList SetterSubs,
                                       SILValue Self,
                                       SILType Ty) {
   auto totalSubs = InitStorageSubs.size() + SetterSubs.size();
@@ -1609,10 +1621,10 @@ MarkUninitializedBehaviorInst::create(SILModule &M,
 MarkUninitializedBehaviorInst::MarkUninitializedBehaviorInst(
                                         SILDebugLocation DebugLoc,
                                         SILValue InitStorage,
-                                        ArrayRef<Substitution> InitStorageSubs,
+                                        SubstitutionList InitStorageSubs,
                                         SILValue Storage,
                                         SILValue Setter,
-                                        ArrayRef<Substitution> SetterSubs,
+                                        SubstitutionList SetterSubs,
                                         SILValue Self,
                                         SILType Ty)
   : SILInstruction(ValueKind::MarkUninitializedBehaviorInst, DebugLoc, Ty),

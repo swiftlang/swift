@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func f1() -> (Int, Int) { return (1, 2) }
 func f2() -> (Int, Int) { return (1, 2) }

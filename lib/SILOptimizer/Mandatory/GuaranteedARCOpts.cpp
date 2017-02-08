@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -32,8 +32,7 @@ struct GuaranteedARCOptsVisitor
 
 static SILBasicBlock::reverse_iterator
 getPrevReverseIterator(SILInstruction *I) {
-  auto Iter = std::next(I->getIterator());
-  return std::next(SILBasicBlock::reverse_iterator(Iter));
+  return std::next(I->getIterator().getReverse());
 }
 
 bool GuaranteedARCOptsVisitor::visitDestroyAddrInst(DestroyAddrInst *DAI) {
@@ -218,7 +217,7 @@ struct GuaranteedARCOpts : SILFunctionTransform {
   StringRef getName() override { return "Guaranteed ARC Opts"; }
 };
 
-} // end swift namespace
+} // end anonymous namespace
 
 SILTransform *swift::createGuaranteedARCOpts() {
   return new GuaranteedARCOpts();

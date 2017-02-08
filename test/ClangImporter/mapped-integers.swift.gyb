@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %gyb %s -o %t/mapped-integers.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify %t/mapped-integers.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %t/mapped-integers.swift
 
 import ctypes
 

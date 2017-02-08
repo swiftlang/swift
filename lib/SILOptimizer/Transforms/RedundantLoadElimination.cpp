@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -585,7 +585,7 @@ void BlockState::mergePredecessorsAvailSetMax(RLEContext &Ctx) {
 
 void BlockState::mergePredecessorAvailSet(RLEContext &Ctx) {
   // Clear the state if the basic block has no predecessor.
-  if (BB->getPreds().begin() == BB->getPreds().end()) {
+  if (BB->getPredecessorBlocks().begin() == BB->getPredecessorBlocks().end()) {
     ForwardSetIn.reset();
     return;
   }
@@ -600,7 +600,7 @@ void BlockState::mergePredecessorAvailSet(RLEContext &Ctx) {
 
 void BlockState::mergePredecessorAvailSetAndValue(RLEContext &Ctx) {
   // Clear the state if the basic block has no predecessor.
-  if (BB->getPreds().begin() == BB->getPreds().end()) {
+  if (BB->getPredecessorBlocks().begin() == BB->getPredecessorBlocks().end()) {
     ForwardSetIn.reset();
     ForwardValIn.clear();
     return;
@@ -1096,7 +1096,7 @@ getProcessFunctionKind(unsigned LoadCount, unsigned StoreCount) {
   llvm::DenseSet<SILBasicBlock *> HandledBBs;
   for (SILBasicBlock *B : PO->getReversePostOrder()) {
     ++BBCount;
-    for (auto X : B->getPreds()) {
+    for (auto X : B->getPredecessorBlocks()) {
       if (HandledBBs.find(X) == HandledBBs.end()) {
         RunOneIteration = false;
         break;
@@ -1199,7 +1199,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
   llvm::SmallVector<SILBasicBlock *, 8> WorkList;
 
   // Push in all the predecessors to get started.
-  for (auto Pred : BB->getPreds()) {
+  for (auto Pred : BB->getPredecessorBlocks()) {
     WorkList.push_back(Pred);
   }
 
@@ -1230,7 +1230,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
     // This BlockState does not contain concrete value for any of the expanded
     // locations, collect in this block's predecessors.
     if (Forwarder.isCoverValues(*this, L)) {
-      for (auto Pred : CurBB->getPreds()) {
+      for (auto Pred : CurBB->getPredecessorBlocks()) {
         if (HandledBBs.find(Pred) != HandledBBs.end())
           continue;
         WorkList.push_back(Pred);

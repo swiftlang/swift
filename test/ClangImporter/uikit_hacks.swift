@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse %s
+// RUN: %target-swift-frontend -typecheck %s
 
 // REQUIRES: OS=ios
 // FIXME: this test could use the %clang-importer-sdk, but swift tries to

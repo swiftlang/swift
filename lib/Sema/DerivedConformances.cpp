@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -106,7 +106,7 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                                                  bool isFinal) {
   auto &C = tc.Context;
   auto parentDC = cast<DeclContext>(parentDecl);
-  auto selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), parentDC, isStatic);
+  auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC, isStatic);
   ParameterList *params[] = {
     ParameterList::createWithoutLoc(selfDecl),
     ParameterList::createEmpty(C)
@@ -117,8 +117,8 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                      /*FuncLoc=*/SourceLoc(), DeclName(), /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
-                     nullptr, params, Type(),
-                     TypeLoc::withoutLoc(propertyContextType), parentDC);
+                     nullptr, params,
+                     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
 
@@ -128,24 +128,10 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
       !getterDecl->isFinal())
     getterDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
-  // Compute the type of the getter.
-  GenericParamList *genericParams = getterDecl->getGenericParamsOfContext();
-  Type type = FunctionType::get(TupleType::getEmpty(C),
-                                propertyContextType);
-  Type selfType = getterDecl->computeSelfType();
-  selfDecl->overwriteType(selfType);
-  
-  if (genericParams)
-    type = PolymorphicFunctionType::get(selfType, type, genericParams);
-  else
-    type = FunctionType::get(selfType, type);
-  getterDecl->setType(type);
-  getterDecl->setBodyResultType(propertyContextType);
-
   // Compute the interface type of the getter.
   Type interfaceType = FunctionType::get(TupleType::getEmpty(C),
                                          propertyInterfaceType);
-  Type selfInterfaceType = getterDecl->computeInterfaceSelfType(false);
+  Type selfInterfaceType = getterDecl->computeInterfaceSelfType();
   if (auto sig = parentDC->getGenericSignatureOfContext()) {
     getterDecl->setGenericEnvironment(
         parentDC->getGenericEnvironmentOfContext());
@@ -153,7 +139,7 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                                              interfaceType,
                                              FunctionType::ExtInfo());
   } else
-    interfaceType = type;
+    interfaceType = FunctionType::get(selfInterfaceType, interfaceType);
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setAccessibility(std::max(typeDecl->getFormalAccess(),
                                         Accessibility::Internal));
@@ -180,10 +166,9 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
   auto &C = tc.Context;
   auto parentDC = cast<DeclContext>(parentDecl);
 
-  VarDecl *propDecl = new (C) VarDecl(isStatic, /*let*/ false,
-                                      SourceLoc(), name,
-                                      propertyContextType,
-                                      parentDC);
+  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, /*IsLet*/false,
+                                      /*IsCaptureList*/false, SourceLoc(), name,
+                                      propertyContextType, parentDC);
   propDecl->setImplicit();
   propDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
                          SourceLoc());

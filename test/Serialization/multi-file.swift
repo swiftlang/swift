@@ -24,9 +24,9 @@ func bar() {
   foo(EquatableEnum.A)
 }
 
-// THIS-FILE: CLASS_DECL
-// OTHER-FILE-NEG-NOT: CLASS_DECL
-// OTHER-FILE: ENUM_DECL
+// THIS-FILE-DAG: PROTOCOL_DECL
+// OTHER-FILE-NEG-NOT: PROTOCOL_DECL
+// OTHER-FILE-DAG: ENUM_DECL
 // THIS-FILE-NEG-NOT: ENUM_DECL
 
 
@@ -41,4 +41,21 @@ struct StructWithInheritedConformances: Sequence {
   func makeIterator() -> EmptyIterator {
     return EmptyIterator()
   }
+}
+
+// https://bugs.swift.org/browse/SR-2576
+// An associated type inside a private protocol would cause crashes during
+// module merging.
+private protocol SomeProto {
+  // THIS-FILE-DAG: ASSOCIATED_TYPE_DECL
+  associatedtype Item
+}
+
+private struct Generic<T> {
+  // THIS-FILE-DAG: GENERIC_TYPE_PARAM_DECL
+}
+
+class Sub: Base {
+  override class var conflict: Int { return 100 }
+  override var conflict: Int { return 200 }
 }

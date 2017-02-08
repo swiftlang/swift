@@ -3,7 +3,7 @@
 // RUN: llvm-bcanalyzer %t/Test.swiftmodule | %FileCheck %s
 
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -parse -verify %t/main.swift -primary-file %S/Inputs/top-level-code-other.swift
+// RUN: %target-swift-frontend -typecheck -verify %t/main.swift -primary-file %S/Inputs/top-level-code-other.swift
 
 // CHECK-NOT: UnknownCode
 

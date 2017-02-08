@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func dict_to_array(_: Dictionary<String, Int>) -> [(String, Int)] {
   return Array<(String, Int)>()

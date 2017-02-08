@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library -swift-version 4
 
 @objc class ObjCClassA {}
 @objc class ObjCClassB : ObjCClassA {}
@@ -7,8 +7,11 @@ class A {
   func f1() { } // expected-note{{overridden declaration is here}}
   func f2() -> A { } // expected-note{{overridden declaration is here}}
 
-  @objc func f3() { }
-  @objc func f4() -> ObjCClassA { }
+  @objc func f3() { } // expected-note{{overridden declaration is here}}
+  @objc func f4() -> ObjCClassA { } // expected-note{{overridden declaration is here}}
+
+  dynamic func f3D() { }
+  dynamic func f4D() -> ObjCClassA { }
 }
 
 extension A {
@@ -25,8 +28,11 @@ extension B {
   func f1() { }  // expected-error{{declarations in extensions cannot override yet}}
   func f2() -> B { } // expected-error{{declarations in extensions cannot override yet}}
 
-  override func f3() { }
-  override func f4() -> ObjCClassB { }
+  override func f3() { } // expected-error{{cannot override a non-dynamic class declaration from an extension}}
+  override func f4() -> ObjCClassB { } // expected-error{{cannot override a non-dynamic class declaration from an extension}}
+
+  override func f3D() { }
+  override func f4D() -> ObjCClassB { }
 
   func f5() { }  // expected-error{{declarations in extensions cannot override yet}}
   func f6() -> A { }  // expected-error{{declarations in extensions cannot override yet}}

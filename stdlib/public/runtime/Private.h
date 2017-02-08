@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -31,7 +31,7 @@ namespace swift {
 
 #if SWIFT_HAS_ISA_MASKING
   SWIFT_RUNTIME_EXPORT
-  extern "C" uintptr_t swift_isaMask;
+  uintptr_t swift_isaMask;
 #endif
 
 #if SWIFT_OBJC_INTEROP
@@ -156,9 +156,7 @@ namespace swift {
   const Metadata *
   _searchConformancesByMangledTypeName(const llvm::StringRef typeName);
 
-#if SWIFT_OBJC_INTEROP
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type);
-#endif
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when
@@ -172,18 +170,6 @@ namespace swift {
       dest = newValue;
   }
 
-#if defined(__CYGWIN__) || defined(_MSC_VER)
-  struct dl_phdr_info {
-    void *dlpi_addr;
-    const char *dlpi_name;
-  };
-
-  int _swift_dl_iterate_phdr(int (*Callback)(struct dl_phdr_info *info,
-                                             size_t size, void *data),
-                             void *data);
-  uint8_t *_swift_getSectionDataPE(void *handle, const char *sectionName,
-                                   unsigned long *sectionSize);
-#endif
 #if defined(__CYGWIN__)
   void _swift_once_f(uintptr_t *predicate, void *context,
                      void (*function)(void *));

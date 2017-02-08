@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -95,6 +95,9 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   if (!canDevirtualizeClassMethod(AI, SubType))
     return FullApplySite();
 
+  if (SubType.getSwiftRValueType()->hasDynamicSelfType())
+    return FullApplySite();
+
   // Create a diamond shaped control flow and a checked_cast_branch
   // instruction that checks the exact type of the object.
   // This cast selects between two paths: one that calls the slow dynamic
@@ -107,9 +110,9 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILBasicBlock *Iden = F->createBasicBlock();
   // Virt is the block containing the slow virtual call.
   SILBasicBlock *Virt = F->createBasicBlock();
-  Iden->createBBArg(SubType);
+  Iden->createPHIArgument(SubType, ValueOwnershipKind::Owned);
 
-  SILBasicBlock *Continue = Entry->splitBasicBlock(It);
+  SILBasicBlock *Continue = Entry->split(It);
 
   SILBuilderWithScope Builder(Entry, AI.getInstruction());
   // Create the checked_cast_branch instruction that checks at runtime if the
@@ -125,7 +128,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILBuilderWithScope VirtBuilder(Virt, AI.getInstruction());
   SILBuilderWithScope IdenBuilder(Iden, AI.getInstruction());
   // This is the class reference downcasted into subclass SubType.
-  SILValue DownCastedClassInstance = Iden->getBBArg(0);
+  SILValue DownCastedClassInstance = Iden->getArgument(0);
 
   // Copy the two apply instructions into the two blocks.
   FullApplySite IdenAI = CloneApply(AI, IdenBuilder);
@@ -147,7 +150,8 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
 
   // Create a PHInode for returning the return value from both apply
   // instructions.
-  SILArgument *Arg = Continue->createBBArg(AI.getType());
+  SILArgument *Arg =
+      Continue->createPHIArgument(AI.getType(), ValueOwnershipKind::Owned);
   if (!isa<TryApplyInst>(AI)) {
     IdenBuilder.createBranch(AI.getLoc(), Continue,
                              ArrayRef<SILValue>(IdenAI.getInstruction()));
@@ -181,16 +185,18 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   // Split critical edges resulting from VirtAI.
   if (auto *TAI = dyn_cast<TryApplyInst>(VirtAI)) {
     auto *ErrorBB = TAI->getFunction()->createBasicBlock();
-    ErrorBB->createBBArg(TAI->getErrorBB()->getBBArg(0)->getType());
+    ErrorBB->createPHIArgument(TAI->getErrorBB()->getArgument(0)->getType(),
+                               ValueOwnershipKind::Owned);
     Builder.setInsertionPoint(ErrorBB);
     Builder.createBranch(TAI->getLoc(), TAI->getErrorBB(),
-                         {ErrorBB->getBBArg(0)});
+                         {ErrorBB->getArgument(0)});
 
     auto *NormalBB = TAI->getFunction()->createBasicBlock();
-    NormalBB->createBBArg(TAI->getNormalBB()->getBBArg(0)->getType());
+    NormalBB->createPHIArgument(TAI->getNormalBB()->getArgument(0)->getType(),
+                                ValueOwnershipKind::Owned);
     Builder.setInsertionPoint(NormalBB);
     Builder.createBranch(TAI->getLoc(), TAI->getNormalBB(),
-                        {NormalBB->getBBArg(0) });
+                         {NormalBB->getArgument(0)});
 
     Builder.setInsertionPoint(VirtAI.getInstruction());
     SmallVector<SILValue, 4> Args;
@@ -534,7 +540,7 @@ namespace {
   /// class is at the bottom of the class hierarchy.
   class SpeculativeDevirtualization : public SILFunctionTransform {
   public:
-    virtual ~SpeculativeDevirtualization() {}
+    ~SpeculativeDevirtualization() override {}
 
     void run() override {
       ClassHierarchyAnalysis *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();

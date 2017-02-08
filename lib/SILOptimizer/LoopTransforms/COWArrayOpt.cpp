@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -224,7 +224,7 @@ protected:
     }
   }
 };
-} // namespace
+} // end anonymous namespace
 
 // Do the two values \p A and \p B reference the same 'array' after potentially
 // looking through a load. To identify a common array address this functions
@@ -359,14 +359,14 @@ class COWArrayOpt {
   // make_mutable calls are required within the loop body for that array.
   llvm::SmallDenseMap<SILValue, ApplyInst*> ArrayMakeMutableMap;
 
-  // \brief Transient per-Array user set.
-  //
-  // Track all known array users with the exception of struct_extract users
-  // (checkSafeArrayElementUse prohibits struct_extract users from mutating the
-  // array). During analysis of retains/releases within the loop body, the
-  // users in this set are assumed to cover all possible mutating operations on
-  // the array. If the array escaped through an unknown use, the analysis must
-  // abort earlier.
+  /// \brief Transient per-Array user set.
+  ///
+  /// Track all known array users with the exception of struct_extract users
+  /// (checkSafeArrayElementUse prohibits struct_extract users from mutating the
+  /// array). During analysis of retains/releases within the loop body, the
+  /// users in this set are assumed to cover all possible mutating operations on
+  /// the array. If the array escaped through an unknown use, the analysis must
+  /// abort earlier.
   SmallPtrSet<SILInstruction*, 8> ArrayUserSet;
 
   // When matching retains to releases we must not match the same release twice.
@@ -410,7 +410,7 @@ protected:
       SILValue V, llvm::SmallSet<SILInstruction *, 16> &Releases);
   bool hoistInLoopWithOnlyNonArrayValueMutatingOperations();
 };
-} // namespace
+} // end anonymous namespace
 
 /// \return true of the given container is known to be a unique copy of the
 /// array with no aliases. Cases we check:
@@ -427,7 +427,7 @@ bool COWArrayOpt::checkUniqueArrayContainer(SILValue ArrayContainer) {
     // Check that the argument is passed as an inout type. This means there are
     // no aliases accessible within this function scope.
     auto Params = Function->getLoweredFunctionType()->getParameters();
-    ArrayRef<SILArgument*> FunctionArgs = Function->begin()->getBBArgs();
+    ArrayRef<SILArgument *> FunctionArgs = Function->begin()->getArguments();
     for (unsigned ArgIdx = 0, ArgEnd = Params.size();
          ArgIdx != ArgEnd; ++ArgIdx) {
       if (FunctionArgs[ArgIdx] != Arg)
@@ -466,8 +466,8 @@ SmallPtrSetImpl<SILBasicBlock*> &COWArrayOpt::getReachingBlocks() {
 }
 
 
-// \return true if the instruction is a call to a non-mutating array semantic
-// function.
+/// \return true if the instruction is a call to a non-mutating array semantic
+/// function.
 static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   ArraySemanticsCall Call(Inst);
   if (!Call)
@@ -491,6 +491,8 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kArrayUninitialized:
     return false;
   }
+
+  llvm_unreachable("Unhandled ArrayCallKind in switch.");
 }
 
 /// \return true if the given retain instruction is followed by a release on the
@@ -825,6 +827,8 @@ static bool mayChangeArrayValueToNonUniqueState(ArraySemanticsCall &Call) {
   case ArrayCallKind::kArrayUninitialized:
     return true;
   }
+
+  llvm_unreachable("Unhandled ArrayCallKind in switch.");
 }
 
 /// Check that the array value stored in \p ArrayStruct is released by \Inst.
@@ -907,7 +911,7 @@ bool COWArrayOpt::isArrayValueReleasedBeforeMutate(
 }
 
 static SILInstruction *getInstBefore(SILInstruction *I) {
-  auto It = SILBasicBlock::reverse_iterator(I->getIterator());
+  auto It = ++I->getIterator().getReverse();
   if (I->getParent()->rend() == It)
     return nullptr;
   return &*It;
@@ -939,8 +943,7 @@ stripValueProjections(SILValue V,
 /// by the array bounds check elimination pass.
 static SILInstruction *
 findPrecedingCheckSubscriptOrMakeMutable(ApplyInst *GetElementAddr) {
-  for (auto ReverseIt =
-           SILBasicBlock::reverse_iterator(GetElementAddr->getIterator()),
+  for (auto ReverseIt = ++GetElementAddr->getIterator().getReverse(),
             End = GetElementAddr->getParent()->rend();
        ReverseIt != End; ++ReverseIt) {
     auto Apply = dyn_cast<ApplyInst>(&*ReverseIt);
@@ -1601,7 +1604,7 @@ class COWArrayOptPass : public SILFunctionTransform {
 
   StringRef getName() override { return "SIL COW Array Optimization"; }
 };
-} // anonymous
+} // end anonymous namespace
 
 SILTransform *swift::createCOWArrayOpts() {
   return new COWArrayOptPass();
@@ -1819,13 +1822,14 @@ private:
       // Check that the argument is passed as an inout or by value type. This
       // means there are no aliases accessible within this function scope.
       auto Params = Fun->getLoweredFunctionType()->getParameters();
-      ArrayRef<SILArgument*> FunctionArgs = Fun->begin()->getBBArgs();
+      ArrayRef<SILArgument *> FunctionArgs = Fun->begin()->getArguments();
       for (unsigned ArgIdx = 0, ArgEnd = Params.size(); ArgIdx != ArgEnd;
            ++ArgIdx) {
         if (FunctionArgs[ArgIdx] != Arg)
           continue;
 
-        if (!Params[ArgIdx].isIndirectInOut() && Params[ArgIdx].isIndirect()) {
+        if (!Params[ArgIdx].isIndirectInOut()
+            && Params[ArgIdx].isFormalIndirect()) {
           DEBUG(llvm::dbgs()
                 << "    Skipping Array: Not an inout or by val argument!\n");
           return false;
@@ -1860,10 +1864,7 @@ private:
 
   bool isClassElementTypeArray(SILValue Arr) {
     auto Ty = Arr->getType().getSwiftRValueType();
-    auto Canonical = Ty.getCanonicalTypeOrNull();
-    if (Canonical.isNull())
-      return false;
-    auto *Struct = Canonical->getStructOrBoundGenericStruct();
+    auto *Struct = Ty->getStructOrBoundGenericStruct();
     assert(Struct && "Array must be a struct !?");
     if (Struct) {
       // No point in hoisting generic code.
@@ -1873,11 +1874,8 @@ private:
 
       // Check the array element type parameter.
       bool isClass = false;
-      for (auto TP : BGT->getGenericArgs()) {
-        auto EltTy = TP.getCanonicalTypeOrNull();
-        if (EltTy.isNull())
-          return false;
-        if (!EltTy.hasReferenceSemantics())
+      for (auto EltTy : BGT->getGenericArgs()) {
+        if (!EltTy->hasReferenceSemantics())
           return false;
         isClass = true;
       }
@@ -1930,7 +1928,7 @@ private:
     return true;
   }
 };
-} // End anonymous namespace.
+} // end anonymous namespace
 
 namespace {
 /// Clone a single exit multiple exit region starting at basic block and ending
@@ -1952,9 +1950,7 @@ public:
 
   SILBasicBlock *cloneRegion() {
     assert (DomTree.getNode(StartBB) != nullptr && "Can't cloned dead code");
-
     auto CurFun = StartBB->getParent();
-    auto &Mod = CurFun->getModule();
 
     // We don't want to visit blocks outside of the region. visitSILBasicBlocks
     // checks BBMap before it clones a block. So we mark exiting blocks as
@@ -1967,7 +1963,7 @@ public:
     // inside the cloned region. The SSAUpdater can't handle critical non
     // cond_br edges.
     for (auto *BB : OutsideBBs) {
-      SmallVector<SILBasicBlock*, 8> Preds(BB->getPreds());
+      SmallVector<SILBasicBlock *, 8> Preds(BB->getPredecessorBlocks());
       for (auto *Pred : Preds)
         if (!isa<CondBranchInst>(Pred->getTerminator()) &&
             !isa<BranchInst>(Pred->getTerminator()))
@@ -1975,13 +1971,13 @@ public:
     }
 
     // Create the cloned start basic block.
-    auto *ClonedStartBB = new (Mod) SILBasicBlock(CurFun);
+    auto *ClonedStartBB = CurFun->createBasicBlock();
     BBMap[StartBB] = ClonedStartBB;
 
     // Clone the arguments.
-    for (auto &Arg : StartBB->getBBArgs()) {
-      SILValue MappedArg =
-          new (Mod) SILArgument(ClonedStartBB, getOpType(Arg->getType()));
+    for (auto &Arg : StartBB->getArguments()) {
+      SILValue MappedArg = ClonedStartBB->createPHIArgument(
+          getOpType(Arg->getType()), ValueOwnershipKind::Owned);
       ValueMap.insert(std::make_pair(Arg, MappedArg));
     }
 
@@ -2091,7 +2087,7 @@ protected:
       auto *OrigBB = Entry.first;
 
       // Update outside used phi values.
-      for (auto *Arg : OrigBB->getBBArgs())
+      for (auto *Arg : OrigBB->getArguments())
         updateSSAForValue(OrigBB, Arg, SSAUp);
 
       // Update outside used instruction values.
@@ -2101,7 +2097,7 @@ protected:
     }
   }
 };
-} // End anonymous namespace.
+} // end anonymous namespace
 
 namespace {
 /// This class transforms a hoistable loop nest into a speculatively specialized
@@ -2122,13 +2118,14 @@ public:
 
   SILLoop *getLoop() {
     auto *LoopInfo = LoopAnalysis->get(HoistableLoopPreheader->getParent());
-    return LoopInfo->getLoopFor(HoistableLoopPreheader->getSingleSuccessor());
+    return LoopInfo->getLoopFor(
+        HoistableLoopPreheader->getSingleSuccessorBlock());
   }
 
 protected:
   void specializeLoopNest();
 };
-} // End anonymous namespace.
+} // end anonymous namespace
 
 static SILValue createStructExtract(SILBuilder &B, SILLocation Loc,
                                     SILValue Opd, unsigned FieldNo) {
@@ -2236,7 +2233,7 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
       HoistableLoopPreheader->getTerminator(), DomTree, nullptr);
 
   // Get the exit blocks of the original loop.
-  auto *Header = CheckBlock->getSingleSuccessor();
+  auto *Header = CheckBlock->getSingleSuccessorBlock();
   assert(Header);
 
   // Our loop info is not really completely valid anymore since the cloner does
@@ -2359,7 +2356,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
 
   StringRef getName() override { return "SIL Swift Array Optimization"; }
 };
-} // End anonymous namespace.
+} // end anonymous namespace
 
 SILTransform *swift::createSwiftArrayOpts() {
   return new SwiftArrayOptPass();

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -14,6 +14,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
@@ -32,10 +33,7 @@ static inline StringRef getUSRSpacePrefix() {
 
 bool ide::printTypeUSR(Type Ty, raw_ostream &OS) {
   assert(!Ty->hasArchetype() && "cannot have contextless archetypes mangled.");
-  using namespace Mangle;
-  Mangler Mangler(true);
-  Mangler.mangleTypeForDebugger(Ty->getRValueType(), nullptr);
-  Mangler.finalize(OS);
+  OS << NewMangling::mangleTypeForDebugger(Ty->getRValueType(), nullptr);
   return false;
 }
 
@@ -101,26 +99,22 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     auto &Importer = *D->getASTContext().getClangModuleLoader();
 
     auto ClangMacroInfo = ClangN.getAsMacro();
-    auto PPRecord = Importer.getClangPreprocessor().getPreprocessingRecord();
-    assert(PPRecord && "Clang importer should be created with "
-                       "-detailed-preprocessing-record option");
-    auto ClangMacroDef = PPRecord->findMacroDefinition(ClangMacroInfo);
-
-    bool Ignore = clang::index::generateUSRForMacro(
-        ClangMacroDef, Importer.getClangASTContext().getSourceManager(), Buf);
+    bool Ignore = clang::index::generateUSRForMacro(D->getNameStr(),
+        ClangMacroInfo->getDefinitionLoc(),
+        Importer.getClangASTContext().getSourceManager(), Buf);
     if (!Ignore)
       OS << Buf.str();
     return Ignore;
   }
 
-  if (!D->hasType())
+  if (!D->hasInterfaceType())
     return true;
 
   // FIXME: mangling 'self' in destructors crashes in mangler.
   if (isa<ParamDecl>(VD) && isa<DestructorDecl>(VD->getDeclContext()))
     return true;
 
-  OS << getUSRSpacePrefix();
+  std::string Old = getUSRSpacePrefix().str();
   Mangler Mangler;
 
   Mangler.bindGenericParameters(VD->getDeclContext());
@@ -139,7 +133,13 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     Mangler.mangleEntity(VD, /*uncurryingLevel=*/0);
   }
 
-  Mangler.finalize(OS);
+  Old += Mangler.finalize();
+
+  NewMangling::ASTMangler NewMangler;
+  std::string New = NewMangler.mangleDeclAsUSR(VD, getUSRSpacePrefix());
+
+  OS << NewMangling::selectMangling(Old, New);
+
   return false;
 }
 
@@ -160,10 +160,17 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
   // addressor.
 
   AbstractStorageDecl *SD = const_cast<AbstractStorageDecl*>(D);
-  OS << getUSRSpacePrefix();
+  std::string Old = getUSRSpacePrefix().str();
   Mangler Mangler;
   Mangler.mangleAccessorEntity(AccKind, AddressorKind::NotAddressor, SD);
-  Mangler.finalize(OS);
+  Old += Mangler.finalize();
+
+  NewMangling::ASTMangler NewMangler;
+  std::string New = NewMangler.mangleAccessorEntityAsUSR(AccKind,
+                          AddressorKind::NotAddressor, SD, getUSRSpacePrefix());
+
+  OS << NewMangling::selectMangling(Old, New);
+
   return false;
 }
 

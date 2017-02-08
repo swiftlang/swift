@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func foo(_ a: Int) {
   // expected-error @+1 {{invalid character in source file}} {{8-9= }}
@@ -31,8 +31,36 @@ func foo() {
 super.init() // expected-error {{'super' cannot be used outside of class members}}
 
 switch state { // expected-error {{use of unresolved identifier 'state'}}
-  let duration : Int = 0 // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} \
-                         // expected-error {{expected expression}}
+  let duration : Int = 0 // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}}
+  case 1:
+    break
+}
+
+func testNotCoveredCase(x: Int) {
+  switch x {
+    let y = "foo" // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}}
+    switch y {
+      case "bar":
+        blah blah // ignored
+    }
+  case "baz": // expected-error {{expression pattern of type 'String' cannot match values of type 'Int'}}
+    break
+  case 1:
+    break
+  default:
+    break
+  }
+
+  switch x {
+#if true // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}}
+  case 1:
+    break
+  case "foobar": // ignored
+    break
+  default:
+    break
+#endif
+  }
 }
 
 // rdar://18926814
@@ -67,8 +95,7 @@ SR698(1, b: 2,) // expected-error {{unexpected ',' separator}}
 func SR979a(a : inout inout Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{17-23=}}
 func SR979b(inout inout b: Int) {} // expected-error {{inout' before a parameter name is not allowed, place it before the parameter type instead}} {{13-18=}} {{28-28=inout }} 
 // expected-error@-1 {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{19-25=}}
-func SR979c(let a: inout Int) {}	 // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{13-16=}} 
-// expected-error @-1 {{'let' as a parameter attribute is not allowed}} {{13-16=}}
+func SR979c(let a: inout Int) {} // expected-error {{'let' as a parameter attribute is not allowed}} {{13-16=}}
 func SR979d(let let a: Int) {}  // expected-error {{'let' as a parameter attribute is not allowed}} {{13-16=}} 
 // expected-error @-1 {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{17-21=}}
 func SR979e(inout x: inout String) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{13-18=}}
@@ -117,6 +144,11 @@ prefix func %<T>(x: T) -> T { return x } // No error expected - the < is conside
 
 struct Weak<T: class> { // expected-error {{'class' constraint can only appear on protocol declarations}}
   // expected-note@-1 {{did you mean to constrain 'T' with the 'AnyObject' protocol?}} {{16-21=AnyObject}}
-  weak var value: T // expected-error {{'weak' may only be applied to class and class-bound protocol types}}
-  // expected-error@-1 {{use of undeclared type 'T'}}
+  weak var value: T // expected-error {{'weak' may not be applied to non-class-bound 'T'; consider adding a protocol conformance that has a class bound}}
 }
+
+let x: () = ()
+!() // expected-error {{missing argument for parameter #1 in call}}
+!(()) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
+!(x) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
+!x // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}

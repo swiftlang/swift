@@ -197,8 +197,8 @@ bb0:
 // CHECK: return
 sil @store_after_store : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
-  %1 = alloc_box $@box B
-  %1a = project_box %1 : $@box B, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <B>, 0
   %2 = store %0 to %1a : $*B
   %3 = store %0 to %1a : $*B
   %4 = tuple()
@@ -1119,7 +1119,7 @@ bb0(%0 : $*S7):
 
 /// We are not performing partial dead store for store %3 to %0#1 : $*S7,
 /// i.e. too many stores generated, but make sure we track the store correctly
-/// so that we can get rid of  store %56 to %57 : $*Int.
+/// so that we can get rid of store %56 to %57 : $*Int.
 ///
 /// CHECK-LABEL : partial_dead_store_bail_out_proper_propagation
 /// CHECK: bb0

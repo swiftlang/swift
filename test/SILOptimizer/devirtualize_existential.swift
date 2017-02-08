@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -O -emit-sil | %FileCheck %s
 
 protocol Pingable {
  func ping(_ x : Int);
@@ -8,7 +8,7 @@ class Foo : Pingable {
 }
 
 // Everything gets devirtualized, inlined, and promoted to the stack.
-//CHECK: @_TF24devirtualize_existential17interesting_stuffFT_T_
+//CHECK: @_T024devirtualize_existential17interesting_stuffyyF
 //CHECK-NOT: init_existential_addr
 //CHECK-NOT: apply
 //CHECK: return

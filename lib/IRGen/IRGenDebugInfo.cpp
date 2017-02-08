@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,7 +21,7 @@
 #include "Linking.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/Pattern.h"
@@ -29,6 +29,7 @@
 #include "swift/Basic/Punycode.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -134,12 +135,12 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   // Note that File + Dir need not result in a valid path.
   // Clang is doing the same thing here.
   TheCU = DBuilder.createCompileUnit(
-      Lang, AbsMainFile, Opts.DebugCompilationDir, Producer, IsOptimized,
-      Flags, MajorRuntimeVersion, SplitName,
+      Lang, DBuilder.createFile(AbsMainFile, Opts.DebugCompilationDir),
+      Producer, IsOptimized, Flags, MajorRuntimeVersion, SplitName,
       Opts.DebugInfoKind > IRGenDebugInfoKind::LineTables
           ? llvm::DICompileUnit::FullDebug
           : llvm::DICompileUnit::LineTablesOnly);
-  MainFile = getOrCreateFile(BumpAllocatedString(AbsMainFile).data());
+  MainFile = getOrCreateFile(BumpAllocatedString(AbsMainFile));
 
   // Because the swift compiler relies on Clang to setup the Module,
   // the clang CU is always created first.  Several dwarf-reading
@@ -161,22 +162,15 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   DBuilder.createImportedModule(MainFile, MainModule, 1);
 }
 
-static const char *getFilenameFromDC(const DeclContext *DC) {
-  if (auto LF = dyn_cast<LoadedFile>(DC)) {
-    // FIXME: Today, the subclasses of LoadedFile happen to return StringRefs
-    // that are backed by null-terminated strings, but that's certainly not
-    // guaranteed in the future.
-    StringRef Fn = LF->getFilename();
-    assert(((Fn.size() == 0) ||
-            (Fn.data()[Fn.size()] == '\0')) && "not a C string");
-    return Fn.data();
-  }
+static StringRef getFilenameFromDC(const DeclContext *DC) {
+  if (auto LF = dyn_cast<LoadedFile>(DC))
+    return LF->getFilename();
   if (auto SF = dyn_cast<SourceFile>(DC))
-    return SF->getFilename().data();
-  else if (auto M = dyn_cast<Module>(DC))
-    return M->getModuleFilename().data();
+    return SF->getFilename();
+  else if (auto M = dyn_cast<ModuleDecl>(DC))
+    return M->getModuleFilename();
   else
-    return nullptr;
+    return StringRef();
 }
 
 SILLocation::DebugLoc getDeserializedLoc(Pattern *) { return {}; }
@@ -185,7 +179,8 @@ SILLocation::DebugLoc getDeserializedLoc(Stmt *) { return {}; }
 SILLocation::DebugLoc getDeserializedLoc(Decl *D) {
   SILLocation::DebugLoc L;
   const DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
-  if (const char *Filename = getFilenameFromDC(DC))
+  StringRef Filename = getFilenameFromDC(DC);
+  if (!Filename.empty())
     L.Filename = Filename;
   return L;
 }
@@ -362,7 +357,7 @@ void IRGenDebugInfo::setEntryPointLoc(IRBuilder &Builder) {
 }
 
 llvm::DIScope *IRGenDebugInfo::getOrCreateScope(const SILDebugScope *DS) {
-  if (DS == 0)
+  if (DS == nullptr)
     return MainFile;
 
   // Try to find it in the cache first.
@@ -412,8 +407,8 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateScope(const SILDebugScope *DS) {
   return DScope;
 }
 
-llvm::DIFile *IRGenDebugInfo::getOrCreateFile(const char *Filename) {
-  if (!Filename)
+llvm::DIFile *IRGenDebugInfo::getOrCreateFile(StringRef Filename) {
+  if (Filename.empty())
     return MainFile;
 
   if (MainFile) {
@@ -540,22 +535,22 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     return getOrCreateContext(DC->getParent());
 
   case DeclContextKind::Module:
-    return getOrCreateModule({Module::AccessPathTy(), cast<ModuleDecl>(DC)});
+    return getOrCreateModule({ModuleDecl::AccessPathTy(), cast<ModuleDecl>(DC)});
   case DeclContextKind::FileUnit:
     // A module may contain multiple files.
     return getOrCreateContext(DC->getParent());
   case DeclContextKind::GenericTypeDecl: {
-    auto *TyDecl = cast<GenericTypeDecl>(DC);
-    auto *Ty = TyDecl->getDeclaredType().getPointer();
+    auto *NTD = cast<NominalTypeDecl>(DC);
+    auto *Ty = NTD->getDeclaredType().getPointer();
     if (auto *DITy = getTypeOrNull(Ty))
       return DITy;
 
     // Create a Forward-declared type.
-    auto Loc = getDebugLoc(SM, TyDecl);
+    auto Loc = getDebugLoc(SM, NTD);
     auto File = getOrCreateFile(Loc.Filename);
     auto Line = Loc.Line;
     auto FwdDecl = DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_structure_type, TyDecl->getName().str(),
+        llvm::dwarf::DW_TAG_structure_type, NTD->getName().str(),
         getOrCreateContext(DC->getParent()), File, Line,
         llvm::dwarf::DW_LANG_Swift, 0, 0);
     ReplaceMap.emplace_back(
@@ -571,8 +566,26 @@ void IRGenDebugInfo::createParameterType(
     llvm::SmallVectorImpl<llvm::Metadata *> &Parameters, SILType type,
     DeclContext *DeclCtx) {
   // FIXME: This use of getSwiftType() is extremely suspect.
-  DebugTypeInfo DbgTy(type.getSwiftType(), IGM.getTypeInfo(type), DeclCtx);
+  auto DbgTy = DebugTypeInfo::getFromTypeInfo(DeclCtx, type.getSwiftType(),
+                                              IGM.getTypeInfo(type));
   Parameters.push_back(getOrCreateType(DbgTy));
+}
+
+// This is different from SILFunctionType::getAllResultsType() in some subtle
+// ways.
+static SILType getResultTypeForDebugInfo(CanSILFunctionType fnTy) {
+  if (fnTy->getNumResults() == 1) {
+    return fnTy->getResults()[0].getSILStorageType();
+  } else if (!fnTy->getNumIndirectFormalResults()) {
+    return fnTy->getDirectFormalResultsType();
+  } else {
+    SmallVector<TupleTypeElt, 4> eltTys;
+    for (auto &result : fnTy->getResults()) {
+      eltTys.push_back(result.getType());
+    }
+    return SILType::getPrimitiveAddressType(
+      CanType(TupleType::get(eltTys, fnTy->getASTContext())));
+  }
 }
 
 llvm::DITypeRefArray
@@ -580,21 +593,6 @@ IRGenDebugInfo::createParameterTypes(SILType SILTy, DeclContext *DeclCtx) {
   if (!SILTy)
     return nullptr;
   return createParameterTypes(SILTy.castTo<SILFunctionType>(), DeclCtx);
-}
-
-static SILType getResultTypeForDebugInfo(CanSILFunctionType fnTy) {
-  if (fnTy->getNumAllResults() == 1) {
-    return fnTy->getAllResults()[0].getSILType();
-  } else if (!fnTy->getNumIndirectResults()) {
-    return fnTy->getSILResult();
-  } else {
-    SmallVector<TupleTypeElt, 4> eltTys;
-    for (auto &result : fnTy->getAllResults()) {
-      eltTys.push_back(result.getType());
-    }
-    return SILType::getPrimitiveAddressType(
-      CanType(TupleType::get(eltTys, fnTy->getASTContext())));
-  }
 }
 
 llvm::DITypeRefArray
@@ -611,7 +609,7 @@ IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
   // type. We currently represent a function with one n-tuple argument
   // as an n-ary function.
   for (auto Param : FnTy->getParameters())
-    createParameterType(Parameters, Param.getSILType(), DeclCtx);
+    createParameterType(Parameters, IGM.silConv.getSILType(Param), DeclCtx);
 
   return DBuilder.getOrCreateTypeArray(Parameters);
 }
@@ -676,7 +674,7 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
 
   // We know that main always comes from MainFile.
   if (LinkageName == SWIFT_ENTRY_POINT_FUNCTION) {
-    if (!L.Filename)
+    if (L.Filename.empty())
       File = MainFile;
     Line = 1;
     Name = LinkageName;
@@ -694,7 +692,7 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
   bool IsLocalToUnit = Fn ? Fn->hasInternalLinkage() : true;
   bool IsDefinition = true;
   bool IsOptimized = Opts.Optimize;
-  unsigned Flags = 0;
+  llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
 
   // Mark everything that is not visible from the source code (i.e.,
   // does not have a Swift name) as artificial, so the debugger can
@@ -744,7 +742,7 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
   if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return;
 
-  swift::Module *M = IGM.Context.getModule(D->getModulePath());
+  swift::ModuleDecl *M = IGM.Context.getModule(D->getModulePath());
   if (!M &&
       D->getModulePath()[0].first == IGM.Context.TheBuiltinModule->getName())
     M = IGM.Context.TheBuiltinModule;
@@ -759,8 +757,7 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
 
 llvm::DIModule *
 IRGenDebugInfo::getOrCreateModule(ModuleDecl::ImportedModule M) {
-  const char *fn = getFilenameFromDC(M.second);
-  StringRef Path(fn ? fn : "");
+  StringRef Path = getFilenameFromDC(M.second);
   if (M.first.empty()) {
     StringRef Name = M.second->getName().str();
     return getOrCreateModule(Name, TheCU, Name, Path);
@@ -819,9 +816,8 @@ TypeAliasDecl *IRGenDebugInfo::getMetadataType() {
   if (!MetadataTypeDecl) {
     MetadataTypeDecl = new (IGM.Context) TypeAliasDecl(
         SourceLoc(), IGM.Context.getIdentifier("$swift.type"), SourceLoc(),
-        TypeLoc::withoutLoc(IGM.Context.TheRawPointerType),
         /*genericparams*/nullptr, IGM.Context.TheBuiltinModule);
-    MetadataTypeDecl->computeType();
+    MetadataTypeDecl->setUnderlyingType(IGM.Context.TheRawPointerType);
   }
   return MetadataTypeDecl;
 }
@@ -833,9 +829,10 @@ void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF,
     return;
 
   auto TName = BumpAllocatedString(("$swift.type." + Name).str());
-  DebugTypeInfo DbgTy(getMetadataType(), Metadata->getType(),
-                      (Size)CI.getTargetInfo().getPointerWidth(0),
-                      (Alignment)CI.getTargetInfo().getPointerAlign(0));
+  auto DbgTy = DebugTypeInfo::getMetadata(
+      getMetadataType()->getDeclaredInterfaceType().getPointer(),
+      Metadata->getType(), Size(CI.getTargetInfo().getPointerWidth(0)),
+      Alignment(CI.getTargetInfo().getPointerAlign(0)));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
                           nullptr, TName, 0,
                           // swift.type is already a pointer type,
@@ -906,7 +903,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
   assert(DITy && "could not determine debug type of variable");
 
   unsigned Line = Loc.Line;
-  unsigned Flags = 0;
+  llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
 
@@ -951,7 +948,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
       assert(OffsetInBits+SizeInBits <= getSizeInBits(Var) && "pars > totum");
 
       // Add the piece DWARF expression.
-      Operands.push_back(llvm::dwarf::DW_OP_bit_piece);
+      Operands.push_back(llvm::dwarf::DW_OP_LLVM_fragment);
       Operands.push_back(OffsetInBits);
       Operands.push_back(SizeInBits);
     }
@@ -1023,8 +1020,8 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(
 
   // Emit it as global variable of the current module.
   auto *Expr = Var ? nullptr : DBuilder.createConstantValueExpression(0);
-  auto *GV = DBuilder.createGlobalVariable(MainModule, Name, LinkageName, File,
-                                           L.Line, Ty, IsLocalToUnit, Expr);
+  auto *GV = DBuilder.createGlobalVariableExpression(
+      MainModule, Name, LinkageName, File, L.Line, Ty, IsLocalToUnit, Expr);
   if (Var)
     Var->addDebugInfo(GV);
 }
@@ -1033,15 +1030,16 @@ StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
   if (MetadataTypeDecl && DbgTy.getDecl() == MetadataTypeDecl)
     return BumpAllocatedString(DbgTy.getDecl()->getName().str());
 
-  Mangle::Mangler M(/* DWARF */ true);
-  M.mangleTypeForDebugger(DbgTy.getType(), DbgTy.getDeclContext());
-  return BumpAllocatedString(M.finalize());
+  std::string Name = NewMangling::mangleTypeForDebugger(DbgTy.getType(),
+                                                        DbgTy.getDeclContext());
+  return BumpAllocatedString(Name);
 }
 
 llvm::DIDerivedType *
 IRGenDebugInfo::createMemberType(DebugTypeInfo DbgTy, StringRef Name,
                                  unsigned &OffsetInBits, llvm::DIScope *Scope,
-                                 llvm::DIFile *File, unsigned Flags) {
+                                 llvm::DIFile *File,
+                                 llvm::DINode::DIFlags Flags) {
   unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
   auto *Ty = getOrCreateType(DbgTy);
   auto *DITy = DBuilder.createMemberType(
@@ -1055,7 +1053,8 @@ IRGenDebugInfo::createMemberType(DebugTypeInfo DbgTy, StringRef Name,
 
 llvm::DINodeArray IRGenDebugInfo::getTupleElements(
     TupleType *TupleTy, llvm::DIScope *Scope, llvm::DIFile *File,
-    unsigned Flags, DeclContext *DeclContext, unsigned &SizeInBits) {
+    llvm::DINode::DIFlags Flags, DeclContext *DeclContext,
+    unsigned &SizeInBits) {
   SmallVector<llvm::Metadata *, 16> Elements;
   unsigned OffsetInBits = 0;
   auto genericSig = IGM.getSILTypes().getCurGenericContext();
@@ -1064,7 +1063,7 @@ llvm::DINodeArray IRGenDebugInfo::getTupleElements(
       IGM.getTypeInfoForUnlowered(AbstractionPattern(genericSig,
                                                   ElemTy->getCanonicalType()),
                                   ElemTy);
-    DebugTypeInfo DbgTy(ElemTy, elemTI, DeclContext);
+    auto DbgTy = DebugTypeInfo::getFromTypeInfo(DeclContext, ElemTy, elemTI);
     Elements.push_back(
         createMemberType(DbgTy, StringRef(), OffsetInBits, Scope, File, Flags));
   }
@@ -1075,17 +1074,18 @@ llvm::DINodeArray IRGenDebugInfo::getTupleElements(
 llvm::DINodeArray
 IRGenDebugInfo::getStructMembers(NominalTypeDecl *D, Type BaseTy,
                                  llvm::DIScope *Scope, llvm::DIFile *File,
-                                 unsigned Flags, unsigned &SizeInBits) {
+                                 llvm::DINode::DIFlags Flags,
+                                 unsigned &SizeInBits) {
   SmallVector<llvm::Metadata *, 16> Elements;
   unsigned OffsetInBits = 0;
   for (VarDecl *VD : D->getStoredProperties()) {
     auto memberTy =
         BaseTy->getTypeOfMember(IGM.getSwiftModule(), VD, nullptr);
-    DebugTypeInfo DbgTy(
-        VD->getType(),
+
+    auto DbgTy = DebugTypeInfo::getFromTypeInfo(
+        VD->getDeclContext(), VD->getInterfaceType(),
         IGM.getTypeInfoForUnlowered(IGM.getSILTypes().getAbstractionPattern(VD),
-                                    memberTy),
-        nullptr);
+                                    memberTy));
     Elements.push_back(createMemberType(DbgTy, VD->getName().str(),
                                         OffsetInBits, Scope, File, Flags));
   }
@@ -1097,7 +1097,7 @@ IRGenDebugInfo::getStructMembers(NominalTypeDecl *D, Type BaseTy,
 llvm::DICompositeType *IRGenDebugInfo::createStructType(
     DebugTypeInfo DbgTy, NominalTypeDecl *Decl, Type BaseTy,
     llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
-    unsigned SizeInBits, unsigned AlignInBits, unsigned Flags,
+    unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
     llvm::DIType *DerivedFrom, unsigned RuntimeLang, StringRef UniqueID) {
   StringRef Name = Decl->getName().str();
 
@@ -1111,7 +1111,8 @@ llvm::DICompositeType *IRGenDebugInfo::createStructType(
   if (UniqueID.empty())
     assert(!Name.empty() && "no mangled name and no human readable name given");
   else
-    assert(UniqueID.size() > 2 && UniqueID[0] == '_' && UniqueID[1] == 'T' &&
+    assert((UniqueID.startswith("_T") ||
+              UniqueID.startswith(MANGLING_PREFIX_STR)) &&
            "UID is not a mangled name");
 #endif
 
@@ -1129,47 +1130,49 @@ llvm::DINodeArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy,
                                                   EnumDecl *ED,
                                                   llvm::DIScope *Scope,
                                                   llvm::DIFile *File,
-                                                  unsigned Flags) {
+                                                  llvm::DINode::DIFlags Flags) {
   SmallVector<llvm::Metadata *, 16> Elements;
 
   for (auto *ElemDecl : ED->getAllElements()) {
     // FIXME <rdar://problem/14845818> Support enums.
     // Swift Enums can be both like DWARF enums and discriminated unions.
-    if (ElemDecl->hasType()) {
-      DebugTypeInfo ElemDbgTy;
-      if (ED->hasRawType())
-        // An enum with a raw type (enum E : Int {}), similar to a
-        // DWARF enum.
-        //
-        // The storage occupied by the enum may be smaller than the
-        // one of the raw type as long as it is large enough to hold
-        // all enum values. Use the raw type for the debug type, but
-        // the storage size from the enum.
-        ElemDbgTy = DebugTypeInfo(ED->getRawType(), DbgTy.StorageType,
-                                  DbgTy.size, DbgTy.align, ED);
-      else if (ElemDecl->hasArgumentType()) {
-        // A discriminated union. This should really be described as a
-        // DW_TAG_variant_type. For now only describing the data.
-        auto &TI = IGM.getTypeInfoForUnlowered(ElemDecl->getArgumentType());
-        ElemDbgTy = DebugTypeInfo(ElemDecl->getArgumentType(), TI, ED);
-      } else {
-        // Discriminated union case without argument. Fallback to Int
-        // as the element type; there is no storage here.
-        Type IntTy = IGM.Context.getIntDecl()->getDeclaredType();
-        ElemDbgTy = DebugTypeInfo(IntTy, DbgTy.StorageType, 0, 1, ED);
-      }
-      unsigned Offset = 0;
-      auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
-                                  Scope, File, Flags);
-      Elements.push_back(MTy);
+    DebugTypeInfo ElemDbgTy;
+    if (ED->hasRawType())
+      // An enum with a raw type (enum E : Int {}), similar to a
+      // DWARF enum.
+      //
+      // The storage occupied by the enum may be smaller than the
+      // one of the raw type as long as it is large enough to hold
+      // all enum values. Use the raw type for the debug type, but
+      // the storage size from the enum.
+      ElemDbgTy = DebugTypeInfo(ED, ED->getRawType(), DbgTy.StorageType,
+                                DbgTy.size, DbgTy.align);
+    else if (auto ArgTy = ElemDecl->getArgumentInterfaceType()) {
+      // A discriminated union. This should really be described as a
+      // DW_TAG_variant_type. For now only describing the data.
+      ArgTy = ElemDecl->getParentEnum()->mapTypeIntoContext(ArgTy);
+      auto &TI = IGM.getTypeInfoForUnlowered(ArgTy);
+      ElemDbgTy =
+          DebugTypeInfo::getFromTypeInfo(ED, ArgTy, TI);
+    } else {
+      // Discriminated union case without argument. Fallback to Int
+      // as the element type; there is no storage here.
+      Type IntTy = IGM.Context.getIntDecl()->getDeclaredType();
+      ElemDbgTy =
+          DebugTypeInfo(ED, IntTy, DbgTy.StorageType, Size(0), Alignment(1));
     }
+    unsigned Offset = 0;
+    auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
+                                Scope, File, Flags);
+    Elements.push_back(MTy);
   }
   return DBuilder.getOrCreateArray(Elements);
 }
 
 llvm::DICompositeType *IRGenDebugInfo::createEnumType(
     DebugTypeInfo DbgTy, EnumDecl *Decl, StringRef MangledName,
-    llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line, unsigned Flags) {
+    llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
+    llvm::DINode::DIFlags Flags) {
   unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
   unsigned SizeInBits = DbgTy.size.getValue() * SizeOfByte;
   unsigned AlignInBits = DbgTy.align.getValue() * SizeOfByte;
@@ -1196,8 +1199,8 @@ llvm::DICompositeType *IRGenDebugInfo::createEnumType(
 
 llvm::DIType *IRGenDebugInfo::getOrCreateDesugaredType(Type Ty,
                                                        DebugTypeInfo DbgTy) {
-  DebugTypeInfo BlandDbgTy(Ty, DbgTy.StorageType, DbgTy.size, DbgTy.align,
-                           DbgTy.getDeclContext());
+  DebugTypeInfo BlandDbgTy(DbgTy.getDeclContext(), Ty, DbgTy.StorageType,
+                           DbgTy.size, DbgTy.align);
   return getOrCreateType(BlandDbgTy);
 }
 
@@ -1219,7 +1222,7 @@ uint64_t IRGenDebugInfo::getSizeOfBasicType(DebugTypeInfo DbgTy) {
 
 llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
     llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File, unsigned Line,
-    unsigned Flags, StringRef MangledName) {
+    llvm::DINode::DIFlags Flags, StringRef MangledName) {
   if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes) {
     auto FwdDecl = DBuilder.createForwardDecl(
         llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
@@ -1236,7 +1239,8 @@ llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
 
 llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
     llvm::DIScope *Scope, StringRef Name, llvm::DIType *PointeeTy,
-    llvm::DIFile *File, unsigned Line, unsigned Flags, StringRef MangledName) {
+    llvm::DIFile *File, unsigned Line, llvm::DINode::DIFlags Flags,
+    StringRef MangledName) {
   unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
   unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
   auto PtrTy = DBuilder.createPointerType(PointeeTy, PtrSize, PtrAlign);
@@ -1252,7 +1256,8 @@ llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
 
 llvm::DIType *IRGenDebugInfo::createDoublePointerSizedStruct(
     llvm::DIScope *Scope, StringRef Name, llvm::DIType *PointeeTy,
-    llvm::DIFile *File, unsigned Line, unsigned Flags, StringRef MangledName) {
+    llvm::DIFile *File, unsigned Line, llvm::DINode::DIFlags Flags,
+    StringRef MangledName) {
   unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
   unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
   llvm::Metadata *Elements[] = {
@@ -1271,7 +1276,8 @@ llvm::DIType *IRGenDebugInfo::createDoublePointerSizedStruct(
 llvm::DIType *
 IRGenDebugInfo::createFunctionPointer(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
                                       unsigned SizeInBits, unsigned AlignInBits,
-                                      unsigned Flags, StringRef MangledName) {
+                                      llvm::DINode::DIFlags Flags,
+                                      StringRef MangledName) {
   auto FwdDecl = llvm::TempDINode(DBuilder.createReplaceableCompositeType(
       llvm::dwarf::DW_TAG_subroutine_type, MangledName, Scope, MainFile, 0,
       llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags, MangledName));
@@ -1286,8 +1292,7 @@ IRGenDebugInfo::createFunctionPointer(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
   // FIXME: Handling of generic parameters in SIL type lowering is in flux.
   // DebugInfo doesn't appear to care about the generic context, so just
   // throw it away before lowering.
-  else if (isa<GenericFunctionType>(BaseTy) ||
-           isa<PolymorphicFunctionType>(BaseTy)) {
+  else if (isa<GenericFunctionType>(BaseTy)) {
     auto *fTy = cast<AnyFunctionType>(BaseTy);
     auto *nongenericTy =
         FunctionType::get(fTy->getInput(), fTy->getResult(), fTy->getExtInfo());
@@ -1320,7 +1325,8 @@ IRGenDebugInfo::createFunctionPointer(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
 llvm::DIType *IRGenDebugInfo::createTuple(DebugTypeInfo DbgTy,
                                           llvm::DIScope *Scope,
                                           unsigned SizeInBits,
-                                          unsigned AlignInBits, unsigned Flags,
+                                          unsigned AlignInBits,
+                                          llvm::DINode::DIFlags Flags,
                                           StringRef MangledName) {
   TypeBase *BaseTy = DbgTy.getType();
   auto *TupleTy = BaseTy->castTo<TupleType>();
@@ -1350,7 +1356,8 @@ llvm::DIType *
 IRGenDebugInfo::createOpaqueStruct(llvm::DIScope *Scope, StringRef Name,
                                    llvm::DIFile *File, unsigned Line,
                                    unsigned SizeInBits, unsigned AlignInBits,
-                                   unsigned Flags, StringRef MangledName) {
+                                   llvm::DINode::DIFlags Flags,
+                                   StringRef MangledName) {
   return DBuilder.createStructType(
       Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
       /* DerivedFrom */ nullptr,
@@ -1371,7 +1378,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   uint64_t SizeInBits = DbgTy.size.getValue() * SizeOfByte;
   uint64_t AlignInBits = DbgTy.align.getValue() * SizeOfByte;
   unsigned Encoding = 0;
-  unsigned Flags = 0;
+  llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
 
   TypeBase *BaseTy = DbgTy.getType();
 
@@ -1600,9 +1607,11 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // Emit the protocols the archetypes conform to.
     SmallVector<llvm::Metadata *, 4> Protocols;
     for (auto *ProtocolDecl : Archetype->getConformsTo()) {
-      auto PTy = IGM.getLoweredType(ProtocolDecl->getType())
+      auto PTy = IGM.getLoweredType(ProtocolDecl->getInterfaceType())
                      .getSwiftRValueType();
-      auto PDbgTy = DebugTypeInfo(ProtocolDecl, IGM.getTypeInfoForLowered(PTy));
+      auto PDbgTy = DebugTypeInfo::getFromTypeInfo(
+          DbgTy.getDeclContext(), ProtocolDecl->getInterfaceType(),
+          IGM.getTypeInfoForLowered(PTy));
       auto PDITy = getOrCreateType(PDbgTy);
       Protocols.push_back(DBuilder.createInheritance(FwdDecl.get(),
                                                      PDITy, 0, Flags));
@@ -1631,7 +1640,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::SILFunction:
   case TypeKind::Function:
-  case TypeKind::PolymorphicFunction:
  case TypeKind::GenericFunction: {
     if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes)
       return createFunctionPointer(DbgTy, Scope, SizeInBits, AlignInBits, Flags,
@@ -1670,9 +1678,9 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::BuiltinVector: {
     (void)MangledName; // FIXME emit the name somewhere.
     auto *BuiltinVectorTy = BaseTy->castTo<BuiltinVectorType>();
-    DebugTypeInfo ElemDbgTy(BuiltinVectorTy->getElementType(),
-                            DbgTy.StorageType,
-                            DbgTy.size, DbgTy.align, DbgTy.getDeclContext());
+    DebugTypeInfo ElemDbgTy(DbgTy.getDeclContext(),
+                            BuiltinVectorTy->getElementType(),
+                            DbgTy.StorageType, DbgTy.size, DbgTy.align);
     auto Subscripts = nullptr;
     return DBuilder.createVectorType(BuiltinVectorTy->getNumElements(),
                                      AlignInBits, getOrCreateType(ElemDbgTy),
@@ -1698,19 +1706,14 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto *NameAliasTy = cast<NameAliasType>(BaseTy);
     auto *Decl = NameAliasTy->getDecl();
     auto L = getDebugLoc(SM, Decl);
-    auto AliasedTy = Decl->getUnderlyingType();
+    auto AliasedTy = NameAliasTy->getSinglyDesugaredType();
     auto File = getOrCreateFile(L.Filename);
     // For NameAlias types, the DeclContext for the aliasED type is
     // in the decl of the alias type.
-    DebugTypeInfo AliasedDbgTy(AliasedTy, DbgTy.StorageType,
-                               DbgTy.size, DbgTy.align, DbgTy.getDeclContext());
+    DebugTypeInfo AliasedDbgTy(DbgTy.getDeclContext(), AliasedTy,
+                               DbgTy.StorageType, DbgTy.size, DbgTy.align);
     return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
                                   File, L.Line, File);
-  }
-
-  case TypeKind::Substituted: {
-    auto OrigTy = cast<SubstitutedType>(BaseTy)->getReplacementType();
-    return getOrCreateDesugaredType(OrigTy, DbgTy);
   }
 
   case TypeKind::Paren: {
@@ -1746,7 +1749,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   // The following types exist primarily for internal use by the type
   // checker.
-  case TypeKind::AssociatedType:
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::LValue:
@@ -1760,14 +1762,12 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
           llvm::errs() << "\n");
     MangledName = "<unknown>";
   }
-  return DBuilder.createBasicType(MangledName, SizeInBits, AlignInBits,
-                                  Encoding);
+  return DBuilder.createBasicType(MangledName, SizeInBits, Encoding);
 }
 
 /// Determine if there exists a name mangling for the given type.
 static bool canMangle(TypeBase *Ty) {
   switch (Ty->getKind()) {
-  case TypeKind::PolymorphicFunction: // Mangler crashes.
   case TypeKind::GenericFunction:     // Not yet supported.
   case TypeKind::SILBlockStorage:     // Not supported at all.
   case TypeKind::SILBox:

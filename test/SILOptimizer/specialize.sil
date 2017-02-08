@@ -165,21 +165,21 @@ sil @_TF10specialize17getGenericClosureU__FT1tQ__FT_Q_ : $@convention(thin) <T> 
 bb0(%0 : $*T):
   debug_value_addr %0 : $*T, let, name "t" // id: %1
   // function_ref specialize.(getGenericClosure <A>(t : A) -> () -> A).(tmp #1) (())A
-  %2 = function_ref @_TFF10specialize17getGenericClosureU__FT1tQ__FT_Q_L_3tmpfT_Q_ : $@convention(thin) <τ_0_0> (@owned @box τ_0_0) -> @out τ_0_0 // user: %5
-  %3 = alloc_box $@box T                               // users: %4, %5, %5
-  %3a = project_box %3 : $@box T, 0
+  %2 = function_ref @_TFF10specialize17getGenericClosureU__FT1tQ__FT_Q_L_3tmpfT_Q_ : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0 // user: %5
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>                               // users: %4, %5, %5
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
   copy_addr %0 to [initialization] %3a : $*T     // id: %4
-  %5 = partial_apply %2<T>(%3) : $@convention(thin) <τ_0_0> (@owned @box τ_0_0) -> @out τ_0_0 // user: %7
+  %5 = partial_apply %2<T>(%3) : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0 // user: %7
   destroy_addr %0 : $*T                           // id: %6
   return %5 : $@callee_owned () -> @out T       // id: %7
 }
 
 // specialize.(getGenericClosure <A>(t : A) -> () -> A).(tmp #1) (())
-sil shared @_TFF10specialize17getGenericClosureU__FT1tQ__FT_Q_L_3tmpfT_Q_ : $@convention(thin) <T> (@owned @box T) -> @out T {
-bb0(%0 : $*T, %1 : $@box T):
-  %2 = project_box %1 : $@box T, 0
+sil shared @_TFF10specialize17getGenericClosureU__FT1tQ__FT_Q_L_3tmpfT_Q_ : $@convention(thin) <T> (@owned <τ_0_0> { var τ_0_0 } <T>) -> @out T {
+bb0(%0 : $*T, %1 : $<τ_0_0> { var τ_0_0 } <T>):
+  %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <T>, 0
   copy_addr %2 to [initialization] %0 : $*T       // id: %3
-  strong_release %1 : $@box T       // id: %4
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <T>       // id: %4
   %5 = tuple ()                                   // user: %6
   return %5 : $()                                 // id: %6
 }
@@ -295,19 +295,19 @@ sil hidden [noinline] @_TF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_ : $@convention(
 bb0(%0 : $*U):
   debug_value_addr %0 : $*U, let, name "y" // id: %1
   // function_ref test4.(boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32).(closure #1)
-  %2 = function_ref @_TFF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_U_FTS1_Q0__S1_ : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned @box τ_0_0) -> Int32 // user: %5
-  %3 = alloc_box $@box U                               // users: %4, %5, %5
-  %3a = project_box %3 : $@box U, 0
+  %2 = function_ref @_TFF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_U_FTS1_Q0__S1_ : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> Int32 // user: %5
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <U>                               // users: %4, %5, %5
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <U>, 0
   copy_addr %0 to [initialization] %3a : $*U     // id: %4
-  %5 = partial_apply %2<U, T>(%3) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned @box τ_0_0) -> Int32 // user: %7
+  %5 = partial_apply %2<U, T>(%3) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> Int32 // user: %7
   destroy_addr %0 : $*U                           // id: %6
   return %5 : $@callee_owned (Int32, @in T) -> Int32 // id: %7
 }
 
 // test4.(boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32).(closure #1)
-sil shared [noinline] @_TFF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_U_FTS1_Q0__S1_ : $@convention(thin) <U, T where U : P> (Int32, @in T, @owned @box U) -> Int32 {
-bb0(%0 : $Int32, %1 : $*T, %2 : $@box U):
-  %3 = project_box %2 : $@box U, 0
+sil shared [noinline] @_TFF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_U_FTS1_Q0__S1_ : $@convention(thin) <U, T where U : P> (Int32, @in T, @owned <τ_0_0> { var τ_0_0 } <U>) -> Int32 {
+bb0(%0 : $Int32, %1 : $*T, %2 : $<τ_0_0> { var τ_0_0 } <U>):
+  %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <U>, 0
   debug_value %0 : $Int32, let, name "x" // id: %4
   debug_value_addr %1 : $*T, let, name "z" // id: %5
   %6 = witness_method $U, #P.get!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %7
@@ -320,7 +320,7 @@ bb0(%0 : $Int32, %1 : $*T, %2 : $@box U):
   %13 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 1 // user: %14
   cond_fail %13 : $Builtin.Int1                   // id: %14
   %15 = struct $Int32 (%12 : $Builtin.Int32)      // user: %18
-  strong_release %2 : $@box U       // id: %16
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <U>       // id: %16
   destroy_addr %1 : $*T                           // id: %17
   return %15 : $Int32                             // id: %18
 }
@@ -373,19 +373,19 @@ sil hidden [noinline] @_TF5test44gen1US_1P__FQ_FVs5Int32S1_ : $@convention(thin)
 bb0(%0 : $*T):
   debug_value_addr %0 : $*T, let, name "x" // id: %1
   // function_ref test4.(gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32).(closure #1)
-  %2 = function_ref @_TFF5test44gen1US_1P__FQ_FVs5Int32S1_U_FS1_S1_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (Int32, @owned @box τ_0_0) -> Int32 // user: %5
-  %3 = alloc_box $@box T                               // users: %4, %5, %5
-  %3a = project_box %3 : $@box T, 0
+  %2 = function_ref @_TFF5test44gen1US_1P__FQ_FVs5Int32S1_U_FS1_S1_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (Int32, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> Int32 // user: %5
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>                               // users: %4, %5, %5
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
   copy_addr %0 to [initialization] %3a : $*T     // id: %4
-  %5 = partial_apply %2<T>(%3) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (Int32, @owned @box τ_0_0) -> Int32 // user: %7
+  %5 = partial_apply %2<T>(%3) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (Int32, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> Int32 // user: %7
   destroy_addr %0 : $*T                           // id: %6
   return %5 : $@callee_owned (Int32) -> Int32     // id: %7
 }
 
 // test4.(gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32).(closure #1)
-sil shared [noinline] @_TFF5test44gen1US_1P__FQ_FVs5Int32S1_U_FS1_S1_ : $@convention(thin) <T where T : P> (Int32, @owned @box T) -> Int32 {
-bb0(%0 : $Int32, %1 : $@box T):
-  %2 = project_box %1 : $@box T, 0
+sil shared [noinline] @_TFF5test44gen1US_1P__FQ_FVs5Int32S1_U_FS1_S1_ : $@convention(thin) <T where T : P> (Int32, @owned <τ_0_0> { var τ_0_0 } <T>) -> Int32 {
+bb0(%0 : $Int32, %1 : $<τ_0_0> { var τ_0_0 } <T>):
+  %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <T>, 0
   debug_value %0 : $Int32 , let, name "$0"              // id: %3
   %4 = witness_method $T, #P.get!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %5
   %5 = apply %4<T>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %6
@@ -397,7 +397,7 @@ bb0(%0 : $Int32, %1 : $@box T):
   %11 = tuple_extract %9 : $(Builtin.Int32, Builtin.Int1), 1 // user: %12
   cond_fail %11 : $Builtin.Int1                   // id: %12
   %13 = struct $Int32 (%10 : $Builtin.Int32)      // user: %15
-  strong_release %1 : $@box T       // id: %14
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <T>       // id: %14
   return %13 : $Int32                             // id: %15
 }
 
@@ -432,7 +432,7 @@ bb0(%0 : $Int32, %1 : $@box T):
 // CHECK: return
 
 // Check that there is a generic specialization of a closure from gen1
-// CHECK-LABEL: sil shared [noinline] @_TTSg5V4main1CS0_S_1PS____TFF5test44gen1US_1P__FQ_FVs5Int32S1_U_FS1_S1_ : $@convention(thin) (Int32, @owned @box C) -> Int32
+// CHECK-LABEL: sil shared [noinline] @_TTSg5V4main1CS0_S_1PS____TFF5test44gen1US_1P__FQ_FVs5Int32S1_U_FS1_S1_ : $@convention(thin) (Int32, @owned <τ_0_0> { var τ_0_0 } <C>) -> Int32
 // CHECK: return
 
 

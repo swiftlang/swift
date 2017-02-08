@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -622,7 +622,8 @@ findMatchingRetains(SILBasicBlock *BB) {
     // Did not find a retain in this block, try to go to its predecessors.
     if (Kind.first == FindRetainKind::None) {
       // We can not find a retain in a block with no predecessors.
-      if (R.first->getPreds().begin() == R.first->getPreds().end()) {
+      if (R.first->getPredecessorBlocks().begin() ==
+          R.first->getPredecessorBlocks().end()) {
         EpilogueRetainInsts.clear();
         return;
       }
@@ -632,11 +633,11 @@ findMatchingRetains(SILBasicBlock *BB) {
 
       // If this is a SILArgument of current basic block, we can split it up to
       // values in the predecessors.
-      SILArgument *SA = dyn_cast<SILArgument>(R.second);
+      auto *SA = dyn_cast<SILPHIArgument>(R.second);
       if (SA && SA->getParent() != R.first)
         SA = nullptr;
 
-      for (auto X : R.first->getPreds()) {
+      for (auto X : R.first->getPredecessorBlocks()) {
         if (HandledBBs.find(X) != HandledBBs.end())
           continue;
         // Try to use the predecessor edge-value.
@@ -813,21 +814,18 @@ collectMatchingReleases(SILBasicBlock *BB) {
     SILValue OrigOp = Target->getOperand(0);
     SILValue Op = RCFI->getRCIdentityRoot(OrigOp);
 
-    // Check whether this is a SILArgument.
-    auto *Arg = dyn_cast<SILArgument>(Op);
-    // If this is not a SILArgument, maybe it is a part of a SILArgument.
-    // This is possible after we expand release instructions in SILLowerAgg pass.
-    if (!Arg) {
-      Arg = dyn_cast<SILArgument>(stripValueProjections(OrigOp));
-    }
+    // Check whether this is a SILArgument or a part of a SILArgument. This is
+    // possible after we expand release instructions in SILLowerAgg pass.
+    auto *Arg = dyn_cast<SILFunctionArgument>(stripValueProjections(Op));
+    if (!Arg)
+      break;
 
     // If Op is not a consumed argument, we must break since this is not an Op
     // that is a part of a return sequence. We are being conservative here since
     // we could make this more general by allowing for intervening non-arg
     // releases in the sense that we do not allow for race conditions in between
     // destructors.
-    if (!Arg || !Arg->isFunctionArg() ||
-        !Arg->hasConvention(SILArgumentConvention::Direct_Owned))
+    if (!Arg->hasConvention(SILArgumentConvention::Direct_Owned))
       break;
 
     // Ok, we have a release on a SILArgument that is direct owned. Attempt to
@@ -875,7 +873,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn,
   // First populate a worklist of predecessors.
   llvm::SmallVector<SILBasicBlock *, 64> Worklist;
   for (auto *BB : LiveIn)
-    for (auto Pred : BB->getPreds())
+    for (auto Pred : BB->getPredecessorBlocks())
       Worklist.push_back(Pred);
 
   // Now propagate liveness backwards until we hit the alloc_box.
@@ -887,7 +885,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn,
     if (BB == DefBB || !LiveIn.insert(BB).second)
       continue;
 
-    for (auto Pred : BB->getPreds())
+    for (auto Pred : BB->getPredecessorBlocks())
       Worklist.push_back(Pred);
   }
 }
@@ -1136,8 +1134,7 @@ SILInstruction *swift::findReleaseToMatchUnsafeGuaranteedValue(
       RCFI.getRCIdentityRoot(UnsafeGuaranteedI->getOperand(0));
 
   // Look before the "unsafeGuaranteedEnd".
-  for (auto ReverseIt = SILBasicBlock::reverse_iterator(
-                UnsafeGuaranteedEndI->getIterator()),
+  for (auto ReverseIt = ++UnsafeGuaranteedEndI->getIterator().getReverse(),
             End = BB.rend();
        ReverseIt != End; ++ReverseIt) {
     SILInstruction &CurInst = *ReverseIt;

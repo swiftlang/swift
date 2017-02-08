@@ -3,7 +3,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -module-name local -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/local.swiftmodule -parse -emit-objc-header-path %t/local.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/local.swiftmodule -typecheck -emit-objc-header-path %t/local.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/local.h
 // RUN: %check-in-clang %t/local.h
 
@@ -35,7 +35,7 @@ class ANonObjCClass {}
 // CHECK-LABEL: @interface UseForward
 // CHECK-NEXT: - (void)definedAlready:(AFullyDefinedClass * _Nonnull)a;
 // CHECK-NEXT: - (void)a:(ZForwardClass1 * _Nonnull)a;
-// CHECK-NEXT: - (ZForwardClass2 * _Nonnull)b;
+// CHECK-NEXT: - (ZForwardClass2 * _Nonnull)b SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (void)c:(ZForwardAliasClass * _Nonnull)c;
 // CHECK-NEXT: - (void)d:(id <ZForwardProtocol1> _Nonnull)d;
 // CHECK-NEXT: - (void)e:(Class <ZForwardProtocol2> _Nonnull)e;

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // The first function argument does not have a label; the others do.
 func f1(_ a: Int, b: Int) { }

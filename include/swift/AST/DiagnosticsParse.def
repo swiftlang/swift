@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -202,7 +202,7 @@ ERROR(enum_case_dot_prefix,none,
 
 // Variable getters/setters
 ERROR(static_var_decl_global_scope,none,
-      "%select{ERROR|static properties|class properties}0 may only be declared on a type",
+      "%select{%error|static properties|class properties}0 may only be declared on a type",
       (StaticSpellingKind))
 ERROR(computed_property_no_accessors, none,
       "computed property must have accessors specified", ())
@@ -222,7 +222,7 @@ ERROR(conflicting_property_addressor,none,
       "%select{variable|subscript}0 already has a "
       "%select{addressor|mutable addressor}1", (unsigned, unsigned))
 ERROR(expected_accessor_name,none,
-      "expected %select{GETTER|setter|willSet|didSet}0 parameter name",
+      "expected %select{%error|setter|willSet|didSet}0 parameter name",
       (unsigned))
 ERROR(expected_rparen_set_name,none,
       "expected ')' after setter parameter name",())
@@ -292,7 +292,7 @@ ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
 ERROR(func_decl_without_paren,PointsToFirstBadToken,
       "expected '(' in argument list of function declaration", ())
 ERROR(static_func_decl_global_scope,none,
-      "%select{ERROR|static methods|class methods}0 may only be declared on a type",
+      "%select{%error|static methods|class methods}0 may only be declared on a type",
       (StaticSpellingKind))
 ERROR(func_decl_expected_arrow,none,
       "expected '->' after function parameter tuple", ())
@@ -338,6 +338,8 @@ ERROR(subscript_decl_wrong_scope,none,
       "'subscript' functions may only be declared within a type", ())
 ERROR(expected_lparen_subscript,PointsToFirstBadToken,
       "expected '(' for subscript parameters", ())
+ERROR(subscript_has_name,PointsToFirstBadToken,
+      "subscripts cannot have a name", ())
 ERROR(expected_arrow_subscript,PointsToFirstBadToken,
       "expected '->' for subscript element type", ())
 ERROR(expected_type_subscript,PointsToFirstBadToken,
@@ -360,12 +362,17 @@ ERROR(initializer_decl_wrong_scope,none,
       "initializers may only be declared within a type", ())
 ERROR(expected_lparen_initializer,PointsToFirstBadToken,
       "expected '(' for initializer parameters", ())
+ERROR(initializer_has_name,PointsToFirstBadToken,
+      "initializers cannot have a name", ())
 
 // Destructor
 ERROR(destructor_decl_outside_class,none,
       "deinitializers may only be declared within a class", ())
 ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
+ERROR(destructor_has_name,PointsToFirstBadToken,
+      "deinitializers cannot have a name", ())
+
 ERROR(opened_destructor_expected_rparen,none,
       "expected ')' to close parameter list", ())
 ERROR(destructor_params,none,
@@ -508,7 +515,8 @@ ERROR(sil_member_lookup_bad_type,none,
 ERROR(sil_member_decl_type_mismatch,none,
       "member defined with mismatching type %0 (expected %1)", (Type, Type))
 ERROR(sil_substitution_mismatch,none,
-      "substitution conformances don't match archetype", ())
+      "substitution replacement type %0 does not conform to protocol %1",
+      (Type, DeclName))
 ERROR(sil_missing_substitutions,none,
       "missing substitutions", ())
 ERROR(sil_too_many_substitutions,none,
@@ -619,8 +627,9 @@ ERROR(expected_type_function_result,PointsToFirstBadToken,
       "expected type for function result", ())
 ERROR(generic_non_function,PointsToFirstBadToken,
       "only syntactic function types can be generic", ())
-ERROR(rethrowing_function_type,PointsToFirstBadToken,
-      "only function declarations may be marked 'rethrows'", ())
+ERROR(rethrowing_function_type,none,
+      "only function declarations may be marked 'rethrows'; "
+      "did you mean 'throws'?", ())
 ERROR(throws_in_wrong_position,none,
       "'throws' may only occur before '->'", ())
 ERROR(rethrows_in_wrong_position,none,
@@ -680,6 +689,27 @@ WARNING(deprecated_protocol_composition_single,none,
         "'protocol<...>' composition syntax is deprecated and not needed here", ())
 WARNING(deprecated_any_composition,none,
         "'protocol<>' syntax is deprecated; use 'Any' instead", ())
+
+// SIL box Types
+ERROR(sil_box_expected_var_or_let,none,
+      "expected 'var' or 'let' to introduce SIL box field type", ())
+ERROR(sil_box_expected_r_brace,none,
+      "expected '}' to complete SIL box field type list", ())
+ERROR(sil_box_expected_r_angle,none,
+      "expected '>' to complete SIL box generic argument list", ())
+
+//------------------------------------------------------------------------------
+// Layout constraint diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(layout_size_should_be_positive,none,
+      "expected non-negative size to be specified in layout constraint", ())
+ERROR(layout_alignment_should_be_positive,none,
+      "expected non-negative alignment to be specified in layout constraint", ())
+ERROR(expected_rparen_layout_constraint,none,
+      "expected ')' to complete layout constraint", ())
+ERROR(layout_constraints_only_inside_specialize_attr,none,
+      "layout constraints are only allowed inside '_specialize' attributes", ())
 
 //------------------------------------------------------------------------------
 // Pattern parsing diagnostics
@@ -761,6 +791,9 @@ ERROR(parameter_curry_syntax_removed,none,
 ERROR(initializer_as_typed_pattern,none,
       "unexpected initializer in pattern; did you mean to use '='?", ())
 
+WARNING(unlabeled_parameter_following_variadic_parameter,none,
+        "a parameter following a variadic parameter requires a label", ())
+
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
 //------------------------------------------------------------------------------
@@ -773,16 +806,11 @@ ERROR(illegal_top_level_expr,none,
 ERROR(illegal_semi_stmt,none,
       "';' statements are not allowed", ())
 ERROR(statement_begins_with_closure,none,
-      "statement cannot begin with a closure expression", ())
+      "top-level statement cannot begin with a closure expression", ())
 ERROR(statement_same_line_without_semi,none,
       "consecutive statements on a line must be separated by ';'", ())
-ERROR(brace_stmt_invalid,none,
-      "braced block of statements is an unused closure", ())
 ERROR(invalid_label_on_stmt,none,
       "labels are only valid on loops, if, and switch statements", ())
-
-NOTE(discard_result_of_closure,none,
-     "explicitly discard the result of the closure by assigning to '_'", ())
 
 ERROR(snake_case_deprecated,none,
       "%0 has been replaced with %1 in Swift 3",
@@ -853,6 +881,10 @@ ERROR(expected_lbrace_after_if,PointsToFirstBadToken,
       "expected '{' after 'if' condition", ())
 ERROR(expected_lbrace_after_else,PointsToFirstBadToken,
       "expected '{' after 'else'", ())
+ERROR(unexpected_else_after_if,none,
+      "unexpected 'else' immediately following 'if' condition", ())
+NOTE(suggest_removing_else,none,
+     "remove 'else' to execute the braced block of statements when the condition is true", ())
 
 // Guard Statement
 ERROR(expected_condition_guard,PointsToFirstBadToken,
@@ -1003,6 +1035,9 @@ ERROR(anon_closure_arg_not_in_closure,none,
 ERROR(anon_closure_arg_in_closure_with_args,none,
       "anonymous closure arguments cannot be used inside a closure that has "
       "explicit arguments", ())
+ERROR(anon_closure_arg_in_closure_with_args_typo,none,
+      "anonymous closure arguments cannot be used inside a closure that has "
+      "explicit arguments; did you mean '%0'?", (StringRef))
 ERROR(expected_closure_parameter_name,none,
       "expected the name of a closure parameter", ())
 ERROR(expected_capture_specifier,none,
@@ -1025,10 +1060,10 @@ ERROR(unexpected_tokens_before_closure_in,none,
 ERROR(expected_closure_rbrace,none,
       "expected '}' at end of closure", ())
 
-WARNING(trailing_closure_excess_newlines,none,
-        "trailing closure is separated from call site by multiple newlines", ())
-NOTE(trailing_closure_call_here,none,
-     "parsing trailing closure for this call", ())
+WARNING(trailing_closure_after_newlines,none,
+        "braces here form a trailing closure separated from its callee by multiple newlines", ())
+NOTE(trailing_closure_callee_here,none,
+     "callee is here", ())
 
 ERROR(string_literal_no_atsign,none,
       "string literals in Swift are not preceded by an '@' sign", ())
@@ -1284,6 +1319,28 @@ ERROR(attr_warn_unused_result_expected_rparen,none,
 ERROR(attr_escaping_conflicts_noescape,none,
       "@escaping conflicts with @noescape", ())
 
+// _specialize
+ERROR(attr_specialize_missing_colon,none,
+      "missing ':' after %0 in '_specialize' attribute", (StringRef))
+
+ERROR(attr_specialize_missing_comma,none,
+      "missing ',' in '_specialize' attribute", ())
+
+ERROR(attr_specialize_unknown_parameter_name,none,
+      "unknown parameter %0 in '_specialize attribute'", (StringRef))
+
+ERROR(attr_specialize_expected_bool_value,none,
+      "expected a boolean true or false value in '_specialize' attribute", ())
+
+ERROR(attr_specialize_missing_parameter_label_or_where_clause,none,
+      "expected a parameter label or a where clause in '_specialize' attribute", ())
+
+ERROR(attr_specialize_parameter_already_defined,none,
+      "parameter '%0' was already defined in '_specialize' attribute", (StringRef))
+
+ERROR(attr_specialize_expected_partial_or_full,none,
+      "expected 'partial' or 'full' as values of the 'kind' parameter in '_specialize' attribute", ())
+
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1325,7 +1382,8 @@ ERROR(unsupported_conditional_compilation_binary_expression,none,
 ERROR(unsupported_conditional_compilation_unary_expression,none,
       "expected unary '!' expression", ())
 ERROR(unsupported_platform_condition_expression,none,
-      "unexpected platform condition (expected 'os', 'arch', or 'swift')",
+      "unexpected platform condition "
+      "(expected 'os', 'arch', or 'swift')",
       ())
 ERROR(platform_condition_expected_one_argument,none,
       "expected only one argument to platform condition",
@@ -1341,6 +1399,9 @@ ERROR(unexpected_version_comparison_operator,none,
       ())
 ERROR(unsupported_conditional_compilation_expression_type,none,
       "invalid conditional compilation expression", ())
+WARNING(swift3_unsupported_conditional_compilation_expression_type,none,
+        "ignoring invalid conditional compilation expression, "
+        "which will be rejected in future version of Swift", ())
 ERROR(unsupported_conditional_compilation_integer,none,
       "'%0' is not a valid conditional compilation expression, use '%1'",
       (StringRef, StringRef))

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -73,9 +73,7 @@ Driver::Driver(StringRef DriverExecutable,
   parseDriverKind(Args.slice(1));
 }
 
-Driver::~Driver() {
-  llvm::DeleteContainerSeconds(ToolChains);
-}
+Driver::~Driver() = default;
 
 void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   // The default driver kind is determined by Name.
@@ -160,6 +158,39 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
   }
 }
 
+/// Creates an appropriate ToolChain for a given driver and target triple.
+///
+/// This uses a std::unique_ptr instead of returning a toolchain by value
+/// because ToolChain has virtual methods.
+static std::unique_ptr<const ToolChain>
+makeToolChain(Driver &driver, const llvm::Triple &target) {
+  switch (target.getOS()) {
+  case llvm::Triple::Darwin:
+  case llvm::Triple::MacOSX:
+  case llvm::Triple::IOS:
+  case llvm::Triple::TvOS:
+  case llvm::Triple::WatchOS:
+    return llvm::make_unique<toolchains::Darwin>(driver, target);
+    break;
+  case llvm::Triple::Linux:
+    if (target.isAndroid()) {
+      return llvm::make_unique<toolchains::Android>(driver, target);
+    } else {
+      return llvm::make_unique<toolchains::GenericUnix>(driver, target);
+    }
+    break;
+  case llvm::Triple::FreeBSD:
+    return llvm::make_unique<toolchains::GenericUnix>(driver, target);
+    break;
+  case llvm::Triple::Win32:
+    return llvm::make_unique<toolchains::Cygwin>(driver, target);
+    break;
+  default:
+    return nullptr;
+  }
+}
+
+
 static void computeArgsHash(SmallString<32> &out, const DerivedArgList &args) {
   SmallVector<const Arg *, 32> interestingArgs;
   interestingArgs.reserve(args.size());
@@ -194,6 +225,20 @@ class Driver::InputInfoMap
 };
 using InputInfoMap = Driver::InputInfoMap;
 
+static bool failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
+                                     StringRef buildRecordPath,
+                                     StringRef reason = "") {
+  if (ShowIncrementalBuildDecisions) {
+    llvm::outs() << "Incremental compilation has been disabled due to "
+                 << "malformed build record file '" << buildRecordPath << "'.";
+    if (!reason.empty()) {
+      llvm::outs() << " " << reason;
+    }
+    llvm::outs() << "\n";
+  }
+  return true;
+}
+
 static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
                                  const InputFileList &inputs,
                                  StringRef buildRecordPath,
@@ -211,11 +256,13 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
 
   auto I = stream.begin();
   if (I == stream.end() || !I->getRoot())
-    return true;
+    return failedToReadOutOfDateMap(ShowIncrementalBuildDecisions,
+                                    buildRecordPath);
 
   auto *topLevelMap = dyn_cast<yaml::MappingNode>(I->getRoot());
   if (!topLevelMap)
-    return true;
+    return failedToReadOutOfDateMap(ShowIncrementalBuildDecisions,
+                                    buildRecordPath);
   SmallString<64> scratch;
 
   llvm::StringMap<InputInfo> previousInputs;
@@ -223,7 +270,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
   bool optionsMatch = true;
 
   auto readTimeValue = [&scratch](yaml::Node *node,
-                                  llvm::sys::TimeValue &timeValue) -> bool {
+                                  llvm::sys::TimePoint<> &timeValue) -> bool {
     auto *seq = dyn_cast<yaml::SequenceNode>(node);
     if (!seq)
       return true;
@@ -235,7 +282,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     auto *secondsRaw = dyn_cast<yaml::ScalarNode>(&*seqI);
     if (!secondsRaw)
       return true;
-    llvm::sys::TimeValue::SecondsType parsedSeconds;
+    std::time_t parsedSeconds;
     if (secondsRaw->getValue(scratch).getAsInteger(10, parsedSeconds))
       return true;
 
@@ -246,7 +293,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     auto *nanosecondsRaw = dyn_cast<yaml::ScalarNode>(&*seqI);
     if (!nanosecondsRaw)
       return true;
-    llvm::sys::TimeValue::NanoSecondsType parsedNanoseconds;
+    std::chrono::system_clock::rep parsedNanoseconds;
     if (nanosecondsRaw->getValue(scratch).getAsInteger(10, parsedNanoseconds))
       return true;
 
@@ -254,8 +301,8 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     if (seqI != seqE)
       return true;
 
-    timeValue.seconds(parsedSeconds);
-    timeValue.nanoseconds(parsedNanoseconds);
+    timeValue = llvm::sys::TimePoint<>(std::chrono::seconds(parsedSeconds));
+    timeValue += std::chrono::nanoseconds(parsedNanoseconds);
     return false;
   };
 
@@ -269,8 +316,12 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     using compilation_record::TopLevelKey;
     if (keyStr == compilation_record::getName(TopLevelKey::Version)) {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
-      if (!value)
-        return true;
+      if (!value) {
+        auto reason = ("Malformed value for key '" + keyStr + "'.")
+          .toStringRef(scratch);
+        return failedToReadOutOfDateMap(ShowIncrementalBuildDecisions,
+                                        buildRecordPath, reason);
+      }
 
       // NB: We check against
       // swift::version::Version::getCurrentLanguageVersion() here because any
@@ -289,17 +340,25 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
 
     } else if (keyStr == compilation_record::getName(TopLevelKey::BuildTime)) {
       auto *value = dyn_cast<yaml::SequenceNode>(i->getValue());
-      if (!value)
-        return true;
-      llvm::sys::TimeValue timeVal;
+      if (!value) {
+        auto reason = ("Malformed value for key '" + keyStr + "'.")
+          .toStringRef(scratch);
+        return failedToReadOutOfDateMap(ShowIncrementalBuildDecisions,
+                                        buildRecordPath, reason);
+      }
+      llvm::sys::TimePoint<> timeVal;
       if (readTimeValue(i->getValue(), timeVal))
         return true;
       map[nullptr] = { InputInfo::NeedsCascadingBuild, timeVal };
 
     } else if (keyStr == compilation_record::getName(TopLevelKey::Inputs)) {
       auto *inputMap = dyn_cast<yaml::MappingNode>(i->getValue());
-      if (!inputMap)
-        return true;
+      if (!inputMap) {
+        auto reason = ("Malformed value for key '" + keyStr + "'.")
+          .toStringRef(scratch);
+        return failedToReadOutOfDateMap(ShowIncrementalBuildDecisions,
+                                        buildRecordPath, reason);
+      }
 
       // FIXME: LLVM's YAML support does incremental parsing in such a way that
       // for-range loops break.
@@ -318,7 +377,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
         if (!previousBuildState)
           return true;
 
-        llvm::sys::TimeValue timeValue;
+        llvm::sys::TimePoint<> timeValue;
         if (readTimeValue(value, timeValue))
           return true;
 
@@ -394,7 +453,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     ArrayRef<const char *> Args) {
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
 
-  llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
+  llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
 
   std::unique_ptr<InputArgList> ArgList(parseArgStrings(Args.slice(1)));
   if (Diags.hadAnyError())
@@ -413,9 +472,22 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   bool ShowIncrementalBuildDecisions =
     ArgList->hasArg(options::OPT_driver_show_incremental);
 
-  bool Incremental = ArgList->hasArg(options::OPT_incremental) &&
-    !ArgList->hasArg(options::OPT_whole_module_optimization) &&
-    !ArgList->hasArg(options::OPT_embed_bitcode);
+  bool Incremental = ArgList->hasArg(options::OPT_incremental);
+  if (ArgList->hasArg(options::OPT_whole_module_optimization)) {
+    if (Incremental && ShowIncrementalBuildDecisions) {
+      llvm::outs() << "Incremental compilation has been disabled, because it "
+                   << "is not compatible with whole module optimization.";
+    }
+    Incremental = false;
+  }
+  if (ArgList->hasArg(options::OPT_embed_bitcode)) {
+    if (Incremental && ShowIncrementalBuildDecisions) {
+      llvm::outs() << "Incremental compilation has been disabled, because it "
+                   << "is not currently compatible with embedding LLVM IR "
+                   << "bitcode.";
+    }
+    Incremental = false;
+  }
 
   bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
   bool ContinueBuildingAfterErrors =
@@ -434,7 +506,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   if (Diags.hadAnyError())
     return nullptr;
   
-  const ToolChain *TC = getToolChain(*ArgList);
+  std::unique_ptr<const ToolChain> TC =
+      makeToolChain(*this, llvm::Triple(DefaultTargetTriple));
   if (!TC) {
     Diags.diagnose(SourceLoc(), diag::error_unknown_target,
                    ArgList->getLastArg(options::OPT_target)->getValue());
@@ -1000,7 +1073,13 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = types::TY_LLVM_BC;
       break;
 
+    case options::OPT_emit_pch:
+      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
+      OI.CompilerOutputType = types::TY_PCH;
+      break;
+
     case options::OPT_parse:
+    case options::OPT_typecheck:
     case options::OPT_dump_parse:
     case options::OPT_dump_ast:
     case options::OPT_print_ast:
@@ -1130,6 +1209,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                         [&OI](sys::ProcessId PID,
                               int returnCode,
                               StringRef output,
+                              StringRef errors,
                               void *unused) -> sys::TaskFinishedResponse {
             if (returnCode == 0) {
               output = output.rtrim();
@@ -1191,6 +1271,26 @@ void Driver::buildActions(const ToolChain &TC,
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::UpdateCode: {
+
+    // If the user is importing a textual (.h) bridging header and we're in
+    // standard-compile (non-WMO) mode, we take the opportunity to precompile
+    // the header into a temporary PCH, and replace the import argument with the
+    // PCH in the subsequent frontend jobs.
+    JobAction *PCH = nullptr;
+    if (Args.hasFlag(options::OPT_enable_bridging_pch,
+                     options::OPT_disable_bridging_pch,
+                     true)) {
+      if (Arg *A = Args.getLastArg(options::OPT_import_objc_header)) {
+        StringRef Value = A->getValue();
+        auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
+        if (Ty == types::TY_ObjCHeader) {
+          std::unique_ptr<Action> HeaderInput(new InputAction(*A, Ty));
+          PCH = new GeneratePCHJobAction(HeaderInput.release());
+          Actions.push_back(PCH);
+        }
+      }
+    }
+
     for (const InputPair &Input : Inputs) {
       types::ID InputType = Input.first;
       const Arg *InputArg = Input.second;
@@ -1205,7 +1305,7 @@ void Driver::buildActions(const ToolChain &TC,
 
         CompileJobAction::InputInfo previousBuildState = {
           CompileJobAction::InputInfo::NeedsCascadingBuild,
-          llvm::sys::TimeValue::MinTime()
+          llvm::sys::TimePoint<>::min()
         };
         if (OutOfDateMap)
           previousBuildState = OutOfDateMap->lookup(InputArg);
@@ -1221,6 +1321,21 @@ void Driver::buildActions(const ToolChain &TC,
                                              OI.CompilerOutputType,
                                              previousBuildState));
           AllModuleInputs.push_back(Current.get());
+        }
+        if (PCH) {
+          // FIXME: When we have a PCH job, it's officially owned by the Actions
+          // array; but it's also a secondary input to each of the current
+          // JobActions, which means that we need to flip the "owns inputs" bit
+          // on the JobActions so they don't try to free it. That in turn means
+          // we need to transfer ownership of all the JobActions' existing
+          // inputs to the Actions array, since the JobActions either own or
+          // don't own _all_ of their inputs. Ownership can't vary
+          // input-by-input.
+          auto *job = cast<JobAction>(Current.get());
+          auto inputs = job->getInputs();
+          Actions.append(inputs.begin(), inputs.end());
+          job->setOwnsInputs(false);
+          job->addInput(PCH);
         }
         AllLinkerInputs.push_back(Current.release());
         break;
@@ -1254,6 +1369,7 @@ void Driver::buildActions(const ToolChain &TC,
       case types::TY_ClangModuleFile:
       case types::TY_SwiftDeps:
       case types::TY_Remapping:
+      case types::TY_PCH:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -1474,6 +1590,12 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
     unsigned NumOutputs = 0;
     for (const Action *A : Actions) {
       types::ID Type = A->getType();
+
+      // Skip any GeneratePCHJobActions or InputActions incidentally stored in
+      // Actions (for ownership), as a result of PCH-generation.
+      if (isa<GeneratePCHJobAction>(A) || isa<InputAction>(A))
+        continue;
+
       // Only increment NumOutputs if this is an output which must have its
       // path specified using -o.
       // (Module outputs can be specified using -module-output-path, or will
@@ -1500,8 +1622,10 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
   }
 
   for (const Action *A : Actions) {
-    (void)buildJobsForAction(C, cast<JobAction>(A), OI, OFM, TC,
-                             /*TopLevel*/true, JobCache);
+    if (auto *JA = dyn_cast<JobAction>(A)) {
+      (void)buildJobsForAction(C, JA, OI, OFM, TC,
+                               /*TopLevel*/true, JobCache);
+    }
   }
 }
 
@@ -1560,6 +1684,13 @@ static StringRef getOutputFilename(Compilation &C,
     return Buffer.str();
   }
 
+  // FIXME: Treat GeneratePCHJobAction as non-top-level (to get tempfile and not
+  // use the -o arg) even though, based on ownership considerations within the
+  // driver, it is stored as a "top level" JobAction.
+  if (isa<GeneratePCHJobAction>(JA)) {
+    AtTopLevel = false;
+  }
+
   // We don't have an output from an Action-specific command line option,
   // so figure one out using the defaults.
   if (AtTopLevel) {
@@ -1580,8 +1711,8 @@ static StringRef getOutputFilename(Compilation &C,
 
   // We don't yet have a name, assign one.
   if (!AtTopLevel) {
-    // We should output to a temporary file, since we're not at
-    // the top level.
+    // We should output to a temporary file, since we're not at the top level
+    // (or are generating a bridging PCH, which is currently always a temp).
     StringRef Stem = llvm::sys::path::stem(BaseName);
     StringRef Suffix = types::getTypeTempSuffix(JA->getType());
     std::error_code EC =
@@ -2085,41 +2216,4 @@ void Driver::printHelp(bool ShowHidden) const {
 
   getOpts().PrintHelp(llvm::outs(), Name.c_str(), "Swift compiler",
                       IncludedFlagsBitmask, ExcludedFlagsBitmask);
-}
-
-static llvm::Triple computeTargetTriple(StringRef DefaultTargetTriple) {
-  return llvm::Triple(DefaultTargetTriple); 
-}
-
-const ToolChain *Driver::getToolChain(const ArgList &Args) const {
-  llvm::Triple Target = computeTargetTriple(DefaultTargetTriple);
-
-  ToolChain *&TC = ToolChains[Target.str()];
-  if (!TC) {
-    switch (Target.getOS()) {
-    case llvm::Triple::Darwin:
-    case llvm::Triple::MacOSX:
-    case llvm::Triple::IOS:
-    case llvm::Triple::TvOS:
-    case llvm::Triple::WatchOS:
-      TC = new toolchains::Darwin(*this, Target);
-      break;
-    case llvm::Triple::Linux:
-      if (Target.isAndroid()) {
-        TC = new toolchains::Android(*this, Target);
-      } else {
-        TC = new toolchains::GenericUnix(*this, Target);
-      }
-      break;
-    case llvm::Triple::FreeBSD:
-      TC = new toolchains::GenericUnix(*this, Target);
-      break;
-    case llvm::Triple::Win32:
-      TC = new toolchains::Cygwin(*this, Target);
-      break;
-    default:
-      TC = nullptr;
-    }
-  }
-  return TC;
 }

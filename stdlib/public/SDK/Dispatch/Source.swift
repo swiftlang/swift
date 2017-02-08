@@ -2,16 +2,16 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
 // import Foundation
-import SwiftShims
+import _SwiftDispatchOverlayShims
 
 public extension DispatchSourceProtocol {
 	typealias DispatchSourceHandler = @convention(block) () -> Void
@@ -153,56 +153,56 @@ public extension DispatchSource {
 
 	public class func makeMachSendSource(port: mach_port_t, eventMask: MachSendEvent, queue: DispatchQueue? = nil) -> DispatchSourceMachSend {
 		return __dispatch_source_create(
-			_swift_dispatch_source_type_mach_send(), UInt(port), eventMask.rawValue, queue) as DispatchSourceMachSend
+			_swift_dispatch_source_type_MACH_SEND(), UInt(port), eventMask.rawValue, queue) as DispatchSourceMachSend
 	}
 
 	public class func makeMachReceiveSource(port: mach_port_t, queue: DispatchQueue? = nil) -> DispatchSourceMachReceive {
 		return __dispatch_source_create(
-			_swift_dispatch_source_type_mach_recv(), UInt(port), 0, queue) as DispatchSourceMachReceive
+			_swift_dispatch_source_type_MACH_RECV(), UInt(port), 0, queue) as DispatchSourceMachReceive
 	}
 
 	public class func makeMemoryPressureSource(eventMask: MemoryPressureEvent, queue: DispatchQueue? = nil) -> DispatchSourceMemoryPressure {
 		return __dispatch_source_create(
-			_swift_dispatch_source_type_memorypressure(), 0, eventMask.rawValue, queue) as DispatchSourceMemoryPressure
+			_swift_dispatch_source_type_MEMORYPRESSURE(), 0, eventMask.rawValue, queue) as DispatchSourceMemoryPressure
 	}
 
 	public class func makeProcessSource(identifier: pid_t, eventMask: ProcessEvent, queue: DispatchQueue? = nil) -> DispatchSourceProcess {
 		return __dispatch_source_create(
-			_swift_dispatch_source_type_proc(), UInt(identifier), eventMask.rawValue, queue) as DispatchSourceProcess
+			_swift_dispatch_source_type_PROC(), UInt(identifier), eventMask.rawValue, queue) as DispatchSourceProcess
 	}
 
 	public class func makeReadSource(fileDescriptor: Int32, queue: DispatchQueue? = nil) -> DispatchSourceRead {
 		return __dispatch_source_create(
-			_swift_dispatch_source_type_read(), UInt(fileDescriptor), 0, queue) as DispatchSourceRead
+			_swift_dispatch_source_type_READ(), UInt(fileDescriptor), 0, queue) as DispatchSourceRead
 	}
 
 	public class func makeSignalSource(signal: Int32, queue: DispatchQueue? = nil) -> DispatchSourceSignal {
 		return __dispatch_source_create(
-			_swift_dispatch_source_type_signal(), UInt(signal), 0, queue) as DispatchSourceSignal
+			_swift_dispatch_source_type_SIGNAL(), UInt(signal), 0, queue) as DispatchSourceSignal
 	}
 
 	public class func makeTimerSource(flags: TimerFlags = [], queue: DispatchQueue? = nil) -> DispatchSourceTimer {
-		return __dispatch_source_create(_swift_dispatch_source_type_timer(), 0, flags.rawValue, queue) as DispatchSourceTimer
+		return __dispatch_source_create(_swift_dispatch_source_type_TIMER(), 0, flags.rawValue, queue) as DispatchSourceTimer
 	}
 
 	public class func makeUserDataAddSource(queue: DispatchQueue? = nil) -> DispatchSourceUserDataAdd {
-		return __dispatch_source_create(_swift_dispatch_source_type_data_add(), 0, 0, queue) as DispatchSourceUserDataAdd
+		return __dispatch_source_create(_swift_dispatch_source_type_DATA_ADD(), 0, 0, queue) as DispatchSourceUserDataAdd
 	}
 
 	public class func makeUserDataOrSource(queue: DispatchQueue? = nil) -> DispatchSourceUserDataOr {
-		return __dispatch_source_create(_swift_dispatch_source_type_data_or(), 0, 0, queue) as DispatchSourceUserDataOr
+		return __dispatch_source_create(_swift_dispatch_source_type_DATA_OR(), 0, 0, queue) as DispatchSourceUserDataOr
 	}
 
 	public class func makeFileSystemObjectSource(
 		fileDescriptor: Int32, eventMask: FileSystemEvent, queue: DispatchQueue? = nil) -> DispatchSourceFileSystemObject 
 	{
 		return __dispatch_source_create(
-			_swift_dispatch_source_type_vnode(), UInt(fileDescriptor), eventMask.rawValue, queue) as DispatchSourceFileSystemObject
+			_swift_dispatch_source_type_VNODE(), UInt(fileDescriptor), eventMask.rawValue, queue) as DispatchSourceFileSystemObject
 	}
 
 	public class func makeWriteSource(fileDescriptor: Int32, queue: DispatchQueue? = nil) -> DispatchSourceWrite {
 		return __dispatch_source_create(
-			_swift_dispatch_source_type_write(), UInt(fileDescriptor), 0, queue) as DispatchSourceWrite
+			_swift_dispatch_source_type_WRITE(), UInt(fileDescriptor), 0, queue) as DispatchSourceWrite
 	}
 }
 
@@ -331,36 +331,3 @@ public extension DispatchSourceUserDataOr {
 		__dispatch_source_merge_data(self as! DispatchSource, data)
 	}
 }
-
-@_silgen_name("_swift_dispatch_source_type_DATA_ADD")
-internal func _swift_dispatch_source_type_data_add() -> __dispatch_source_type_t
-
-@_silgen_name("_swift_dispatch_source_type_DATA_OR")
-internal func _swift_dispatch_source_type_data_or() -> __dispatch_source_type_t
-
-@_silgen_name("_swift_dispatch_source_type_MACH_SEND")
-internal func _swift_dispatch_source_type_mach_send() -> __dispatch_source_type_t
-
-@_silgen_name("_swift_dispatch_source_type_MACH_RECV")
-internal func _swift_dispatch_source_type_mach_recv() -> __dispatch_source_type_t
-
-@_silgen_name("_swift_dispatch_source_type_MEMORYPRESSURE")
-internal func _swift_dispatch_source_type_memorypressure() -> __dispatch_source_type_t
-
-@_silgen_name("_swift_dispatch_source_type_PROC")
-internal func _swift_dispatch_source_type_proc() -> __dispatch_source_type_t
-
-@_silgen_name("_swift_dispatch_source_type_READ")
-internal func _swift_dispatch_source_type_read() -> __dispatch_source_type_t
-
-@_silgen_name("_swift_dispatch_source_type_SIGNAL")
-internal func _swift_dispatch_source_type_signal() -> __dispatch_source_type_t
-
-@_silgen_name("_swift_dispatch_source_type_TIMER")
-internal func _swift_dispatch_source_type_timer() -> __dispatch_source_type_t
-
-@_silgen_name("_swift_dispatch_source_type_VNODE")
-internal func _swift_dispatch_source_type_vnode() -> __dispatch_source_type_t
-
-@_silgen_name("_swift_dispatch_source_type_WRITE")
-internal func _swift_dispatch_source_type_write() -> __dispatch_source_type_t

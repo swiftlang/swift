@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -verify %s
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 // FIXME: No simd module on linux rdar://problem/20795411
 // XFAIL: linux

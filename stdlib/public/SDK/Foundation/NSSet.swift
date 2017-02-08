@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -76,8 +76,7 @@ extension Set : _ObjectiveCBridgeable {
     // `Set<Element>` where `Element` is a value type may not be backed by
     // an NSSet.
     var builder = _SetBuilder<Element>(count: s.count)
-    s.enumerateObjects({
-      (anyMember: Any, stop: UnsafeMutablePointer<ObjCBool>) in
+    s.enumerateObjects({ (anyMember: Any, _) in
       builder.add(member: Swift._forceBridgeFromObjectiveC(
         anyMember as AnyObject, Element.self))
     })
@@ -116,8 +115,7 @@ extension Set : _ObjectiveCBridgeable {
     // `Set<Element>` where `Element` is a value type may not be backed by
     // an NSSet.
     var builder = _SetBuilder<Element>(count: s!.count)
-    s!.enumerateObjects({
-      (anyMember: Any, stop: UnsafeMutablePointer<ObjCBool>) in
+    s!.enumerateObjects({ (anyMember: Any, _) in
       builder.add(member: Swift._forceBridgeFromObjectiveC(
         anyMember as AnyObject, Element.self))
     })

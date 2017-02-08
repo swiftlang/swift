@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func foo(x: Int = 0) {}
 let bar = foo  // expected-note {{'bar' declared here}}

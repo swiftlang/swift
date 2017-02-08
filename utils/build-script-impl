@@ -3,11 +3,11 @@
 #
 ## This source file is part of the Swift.org open source project
 ##
-## Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+## Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 ## Licensed under Apache License v2.0 with Runtime Library Exception
 ##
-## See http://swift.org/LICENSE.txt for license information
-## See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+## See https://swift.org/LICENSE.txt for license information
+## See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 #===------------------------------------------------------------------------===#
 
@@ -47,6 +47,7 @@ KNOWN_SETTINGS=(
     build-dir                   ""               "out-of-tree build directory; default is in-tree. **This argument is required**"
     host-cc                     ""               "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
     host-cxx                    ""               "the path to CXX, the 'clang++' compiler for the host platform. **This argument is required**"
+    host-lipo                   ""               "the path to lipo for creating universal binaries on Darwin"
     darwin-xcrun-toolchain      "default"        "the name of the toolchain to use on Darwin"
     ninja-bin                   ""               "the path to Ninja tool"
     cmark-build-type            "Debug"          "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
@@ -63,7 +64,7 @@ KNOWN_SETTINGS=(
     swift-analyze-code-coverage "not-merged"     "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
     swift-tools-enable-lto      ""               "enable LTO compilation of Swift tools. *NOTE* This does not include the swift standard library and runtime. Must be set to one of 'thin' or 'full'"
     llvm-enable-lto             ""               "Must be set to one of 'thin' or 'full'"
-    llvm-enable-modules         "1"              "enable building llvm using modules"
+    llvm-enable-modules         "0"              "enable building llvm using modules"
     swift-tools-num-parallel-lto-link-jobs ""    "The number of parallel link jobs to use when compiling swift tools"
     llvm-num-parallel-lto-link-jobs ""           "The number of parallel link jobs to use when compiling llvm"
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
@@ -74,15 +75,17 @@ KNOWN_SETTINGS=(
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
     foundation-build-type       "Debug"          "the build variant for Foundation"
     libdispatch-build-type      "Debug"          "the build variant for libdispatch"
+    libicu-build-type           "Debug"          "the build variant for libicu"
     playgroundlogger-build-type "Debug"          "the build variant for PlaygroundLogger"
     playgroundsupport-build-type "Debug"         "the build variant for PlaygroundSupport"
     xctest-build-type           "Debug"          "the build variant for xctest"
+    swiftpm-build-type          "Debug"          "the build variant for swiftpm"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
     enable-asan                 ""               "enable Address Sanitizer"
     cmake                       ""               "path to the cmake binary"
     distcc                      ""               "use distcc in pump mode"
     distcc-pump                 ""               "the path to distcc pump executable. This argument is required if distcc is set."
-    build-runtime-with-host-compiler   "1"       "use the host c++ compiler to build everything"
+    build-runtime-with-host-compiler   ""        "use the host c++ compiler to build everything"
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of 'cmake --help' for choices"
     verbose-build               ""               "print the commands executed during the build"
     install-prefix              ""               "installation prefix"
@@ -117,6 +120,7 @@ KNOWN_SETTINGS=(
     skip-build-xctest           ""               "set to skip building xctest"
     skip-build-foundation       ""               "set to skip building foundation"
     skip-build-libdispatch      ""               "set to skip building libdispatch"
+    skip-build-libicu           ""               "set to skip building libicu"
     skip-build-benchmarks       ""               "set to skip building Swift Benchmark Suite"
     skip-build-playgroundlogger ""               "set to skip building PlaygroundLogger"
     skip-build-playgroundsupport ""              "set to skip building PlaygroundSupport"
@@ -128,6 +132,7 @@ KNOWN_SETTINGS=(
     skip-test-xctest            ""               "set to skip testing xctest"
     skip-test-foundation        ""               "set to skip testing foundation"
     skip-test-libdispatch       ""               "set to skip testing libdispatch"
+    skip-test-libicu            ""               "set to skip testing libicu"
     skip-test-playgroundlogger  ""               "set to skip testing PlaygroundLogger"
     skip-test-playgroundsupport ""               "set to skip testing PlaygroundSupport"
     skip-test-linux             ""               "set to skip testing Swift stdlibs for Linux"
@@ -166,8 +171,8 @@ KNOWN_SETTINGS=(
     native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
     native-swift-tools-path     ""               "directory that contains Swift tools that are executable on the build machine"
     compiler-vendor             "none"           "compiler vendor name [none,apple]"
-    clang-user-visible-version  "3.8.0"          "user-visible version of the embedded Clang and LLVM compilers"
-    swift-user-visible-version  "3.0"            "user-visible version of the Swift language"
+    clang-user-visible-version  "4.0.0"          "user-visible version of the embedded Clang and LLVM compilers"
+    swift-user-visible-version  "3.1"            "user-visible version of the Swift language"
     swift-compiler-version      ""               "string that indicates a compiler version for Swift"
     clang-compiler-version      ""               "string that indicates a compiler version for Clang"
     embed-bitcode-section       "0"              "embed an LLVM bitcode section in stdlib/overlay binaries for supported platforms"
@@ -181,6 +186,7 @@ KNOWN_SETTINGS=(
     install-xctest              ""               "whether to install xctest"
     install-foundation          ""               "whether to install foundation"
     install-libdispatch         ""               "whether to install libdispatch"
+    install-libicu              ""               "whether to install libicu"
     install-playgroundlogger    ""               "whether to install PlaygroundLogger"
     install-playgroundsupport   ""               "whether to install PlaygroundSupport"
     darwin-install-extract-symbols ""            "whether to extract symbols with dsymutil during installations"
@@ -209,6 +215,8 @@ KNOWN_SETTINGS=(
     darwin-toolchain-application-cert  ""        "Application Cert name to codesign xctoolchain"
     darwin-toolchain-installer-cert    ""        "Installer Cert name to create installer pkg"
     darwin-toolchain-installer-package ""        "The path to installer pkg"
+    darwin-sdk-deployment-targets      "xctest-ios-8.0"        "semicolon-separated list of triples like 'fookit-ios-9.0;barkit-watchos-9.0'"
+    darwin-overlay-target              ""        "single overlay target to build, dependencies are computed later"
     build-jobs                         ""        "The number of parallel build jobs to use"
     darwin-toolchain-alias             ""        "Swift alias for toolchain"
     android-ndk                        ""        "An absolute path to the NDK that will be used as a libc implementation for Android builds"
@@ -225,6 +233,7 @@ KNOWN_SETTINGS=(
     ninja-cmake-options                ""        "CMake options used for all ninja targets"
     foundation-cmake-options           ""        "CMake options used for all foundation targets"
     libdispatch-cmake-options          ""        "CMake options used for all libdispatch targets"
+    libicu-cmake-options               ""        "CMake options used for all libicu targets"
     llbuild-cmake-options              ""        "CMake options used for all llbuild targets"
     lldb-cmake-options                 ""        "CMake options used for all lldb targets"
     llvm-cmake-options                 ""        "CMake options used for all llvm targets"
@@ -408,9 +417,10 @@ function set_build_options_for_host() {
             SWIFT_HOST_VARIANT="freebsd"
             SWIFT_HOST_VARIANT_SDK="FREEBSD"
             SWIFT_HOST_VARIANT_ARCH="x86_64"
+            USE_GOLD_LINKER=1
             ;;
         cygwin-x86_64)
-            SWIFT_HOST_VARIANT="windows"
+            SWIFT_HOST_VARIANT="cygwin"
             SWIFT_HOST_VARIANT_SDK="CYGWIN"
             SWIFT_HOST_VARIANT_ARCH="x86_64"
             ;;
@@ -642,6 +652,18 @@ function set_build_options_for_host() {
                     ;;
             esac
 
+            if [[ "${DARWIN_SDK_DEPLOYMENT_TARGETS}" != "" ]]; then
+                local IFS=";"; DARWIN_SDK_DEPLOYMENT_TARGETS=($DARWIN_SDK_DEPLOYMENT_TARGETS)
+
+                for target in "${DARWIN_SDK_DEPLOYMENT_TARGETS[@]}"; do
+                    local IFS="-"; triple=($target)
+                    sdk_target=$(toupper ${triple[0]}_${triple[1]})
+                    swift_cmake_options+=(
+                        "-DSWIFTLIB_DEPLOYMENT_VERSION_${sdk_target}=${triple[2]}"
+                    )
+                done
+            fi
+
             llvm_cmake_options=(
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
@@ -701,6 +723,7 @@ function set_build_options_for_host() {
     llvm_cmake_options+=(
         -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
         -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
+        -DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING:BOOL=TRUE
     )
 
     # If we are asked to not generate test targets for LLVM and or Swift,
@@ -1182,6 +1205,7 @@ SWIFTPM_SOURCE_DIR="${WORKSPACE}/swiftpm"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
+LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 PLAYGROUNDLOGGER_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundLogger"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundSupport"
 
@@ -1212,6 +1236,11 @@ fi
 
 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" && ! -d ${LIBDISPATCH_SOURCE_DIR} ]]; then
     echo "Couldn't find libdispatch source directory."
+    exit 1
+fi
+
+if [[ ! "${SKIP_BUILD_LIBICU}" && ! -d ${LIBICU_SOURCE_DIR} ]]; then
+    echo "Couldn't find libicu source directory."
     exit 1
 fi
 
@@ -1246,7 +1275,11 @@ if [ -e "${WORKSPACE}/compiler-rt" ] ; then
     fi
 fi
 
-PRODUCTS=(cmark llvm swift)
+PRODUCTS=(cmark llvm)
+if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" libicu)
+fi
+PRODUCTS=("${PRODUCTS[@]}" swift)
 if [[ ! "${SKIP_BUILD_LLDB}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" lldb)
 fi
@@ -1558,6 +1591,8 @@ function build_directory_bin() {
             libdispatch)
                 echo "${root}/${LIBDISPATCH_BUILD_TYPE}/bin"
                 ;;
+            libicu)
+                ;;
             playgroundlogger)
                 # FIXME: var name for build type
                 echo "${root}/${PLAYGROUNDLOGGER_BUILD_TYPE}/bin"
@@ -1686,6 +1721,8 @@ function cmake_config_opt() {
                 ;;            
             libdispatch)
                 ;;
+            libicu)
+                ;;
             playgroundlogger)
                 # FIXME: var name
                 echo "--config ${PLAYGROUNDLOGGER_BUILD_TYPE}"
@@ -1710,6 +1747,9 @@ function set_swiftpm_bootstrap_command() {
             LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
             LIBDISPATCH_BUILD_ARGS="--libdispatch-source-dir=${LIBDISPATCH_SOURCE_DIR} --libdispatch-build-dir=${LIBDISPATCH_BUILD_DIR}"
         fi
+        if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
+            LIBICU_BUILD_DIR="$(build_directory ${host} libicu)"
+        fi
         if [[ ! "${SKIP_BUILD_XCTEST}" ]] ; then
             XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
         fi
@@ -1719,6 +1759,10 @@ function set_swiftpm_bootstrap_command() {
         exit 1
     fi
     swiftpm_bootstrap_command=("${SWIFTPM_SOURCE_DIR}/Utilities/bootstrap" "${swiftpm_bootstrap_options[@]}")
+    # Add --release if we have to build in release mode.
+    if [[ "${SWIFTPM_BUILD_TYPE}" ==  "Release" ]] ; then
+        swiftpm_bootstrap_command+=(--release)
+    fi
     if [[ "${VERBOSE_BUILD}" ]] ; then
         swiftpm_bootstrap_command+=(-v)
     fi
@@ -1976,7 +2020,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCLANG_TOOL_ARCMT_TEST_BUILD=NO
                     -DCLANG_TOOL_C_ARCMT_TEST_BUILD=NO
                     -DCLANG_TOOL_C_INDEX_TEST_BUILD=NO
-                    -DCLANG_TOOL_DRIVER_BUILD=NO
+                    -DCLANG_TOOL_DRIVER_BUILD=$(false_true "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
                     -DCLANG_TOOL_DIAGTOOL_BUILD=NO
                     -DCLANG_TOOL_SCAN_BUILD_BUILD=NO
                     -DCLANG_TOOL_SCAN_VIEW_BUILD=NO
@@ -2029,6 +2073,18 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
+                if [[ "${DARWIN_OVERLAY_TARGET}" != "" ]]; then
+                    # Split LOCAL_HOST into a pair ``arch-sdk``
+                    # Example LOCAL_HOST: macosx-x86_64
+                    [[ ${LOCAL_HOST} =~ (.*)-(.*) ]]
+                    overlay_target_closure_cmd="${SWIFT_SOURCE_DIR}/utils/find-overlay-deps-closure.sh ${DARWIN_OVERLAY_TARGET} ${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+                    overlay_target_closure=$($overlay_target_closure_cmd)
+                    swift_cmake_options=(
+                        "${swift_cmake_options[@]}"
+                        "-DSWIFT_OVERLAY_TARGETS:STRING=${overlay_target_closure}"
+                    )
+                fi
+
                 native_llvm_tools_path=""
                 native_clang_tools_path=""
                 native_swift_tools_path=""
@@ -2062,6 +2118,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DLLVM_TOOLS_BINARY_DIR:PATH=/tmp/dummy
+                    )
+                fi
+
+                if [ "${HOST_LIPO}" ] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_LIPO:PATH="${HOST_LIPO}"
                     )
                 fi
 
@@ -2129,6 +2192,14 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH="${LIBDISPATCH_SOURCE_DIR}"
                     -DSWIFT_PATH_TO_LIBDISPATCH_BUILD:PATH="$(build_directory ${host} libdispatch)"
                 )
+
+                if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_PATH_TO_LIBICU_SOURCE:PATH="${LIBICU_SOURCE_DIR}"
+                        -DSWIFT_PATH_TO_LIBICU_BUILD:PATH="$(build_directory ${host} libicu)"
+                    )
+                fi
 
                 if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
                     cmake_options=(
@@ -2418,6 +2489,58 @@ for host in "${ALL_HOSTS[@]}"; do
                     call make build-tests
 
                 # libdispatch builds itself and doesn't use cmake
+                continue
+                ;;
+            libicu)
+                SWIFT_BUILD_PATH=$(build_directory ${host} swift)
+                LIBICU_BUILD_DIR=$(build_directory ${host} ${product})
+                ICU_TMPINSTALL=$LIBICU_BUILD_DIR/tmp_install
+                ICU_TMPLIBDIR="${SWIFT_BUILD_PATH}/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                if [[ "${RECONFIGURE}" || ! -f "${LIBICU_BUILD_DIR}"/config.status ]]; then
+                    echo "Reconfiguring libicu"
+                    if [[ "$LIBICU_BUILD_TYPE" == "Release" ]] ; then
+                        icu_build_variant_arg="--enable-release"
+                    elif [[ "$LIBICU_BUILD_TYPE" == "RelWithDebInfo" ]]; then
+                        icu_build_variant_arg="--enable-release"
+                    else
+                        icu_build_variant_arg="--enable-debug"
+                    fi
+                    call mkdir -p "${LIBICU_BUILD_DIR}"
+                    with_pushd "${LIBICU_BUILD_DIR}" \
+                        call "${LIBICU_SOURCE_DIR}"/source/configure \
+                        ${icu_build_variant_arg} --prefix=${ICU_TMPINSTALL} \
+                        --libdir=${ICU_TMPLIBDIR} \
+                        --enable-shared --enable-static \
+                        --enable-strict --disable-icuio \
+                        --disable-plugins --disable-dyload --disable-extras \
+                        --disable-samples --with-data-packaging=auto
+                else
+                    echo "Skipping reconfiguration of libicu"
+                fi
+                with_pushd "${LIBICU_BUILD_DIR}" \
+                    call make install
+                ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                ICU_LIBDIR_STATIC="$(build_directory ${host} swift)/lib/swift_static/${SWIFT_HOST_VARIANT}"
+                ICU_LIBDIR_STATIC_ARCH="$(build_directory ${host} swift)/lib/swift_static/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                mkdir -p "${ICU_LIBDIR_STATIC_ARCH}"
+                # Copy the static libs into the swift_static directory
+                for l in uc i18n data
+                do
+                    lib="${ICU_LIBDIR}/libicu${l}.a"
+                    cp "${lib}" "${ICU_LIBDIR_STATIC}"
+                    cp "${lib}" "${ICU_LIBDIR_STATIC_ARCH}"
+                done
+
+                # Set the PKG_CONFIG_PATH so that core-foundation can find the libraries and
+                # header files
+                export PKG_CONFIG_PATH="${ICU_TMPLIBDIR}/pkgconfig"
+                swift_cmake_options=(
+                    "${swift_cmake_options[@]}"
+                    -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_ICU_UC_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
+                    -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_ICU_I18N_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
+                    -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_ICU_STATICLIB:BOOL=TRUE
+                )
+                # libicu builds itself and doesn't use cmake
                 continue
                 ;;
             playgroundlogger)
@@ -2741,6 +2864,17 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
+            libicu)
+                if [[ "${SKIP_TEST_LIBICU}" ]]; then
+                    continue
+                fi
+                LIBICU_BUILD_DIR=$(build_directory ${host} ${product})
+                echo "--- Running tests for ${product} ---"
+                with_pushd "${LIBICU_BUILD_DIR}/test" \
+                    call make
+                echo "--- Finished tests for ${product} ---"
+                continue
+                ;;
            playgroundlogger)
                SWIFT_DYLIB_PATH=$(build_directory ${host} swift)/lib/swift/macosx/
                PLAYGROUNDLOGGER_FRAMEWORK_PATH=$(build_directory ${host} ${product})
@@ -2979,6 +3113,32 @@ for host in "${ALL_HOSTS[@]}"; do
                     call make install
 
                 # As libdispatch installation is self-contained, we break early here.
+                continue
+                ;;
+            libicu)
+                if [[ -z "${INSTALL_LIBICU}" ]]; then
+                    continue
+                fi
+                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
+                    echo "--install-destdir is required to install products."
+                    exit 1
+                fi
+                echo "--- Installing ${product} ---"
+                LIBICU_BUILD_DIR=$(build_directory ${host} ${product})
+                ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                LIBICU_DEST_DIR="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})lib/swift/${SWIFT_HOST_VARIANT}"
+                LIBICU_DEST_DIR_STATIC="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})lib/swift_static/${SWIFT_HOST_VARIANT}"
+                mkdir -p ${LIBICU_DEST_DIR}
+                mkdir -p ${LIBICU_DEST_DIR_STATIC}
+                for l in uc i18n data
+                do
+                    lib=${ICU_LIBDIR}/libicu${l}
+                    echo "${lib} => ${LIBICU_DEST_DIR}"
+                    cp -d ${lib}.so ${lib}.so.* ${LIBICU_DEST_DIR}
+                    cp -d ${lib}.so ${lib}.so.* ${LIBICU_DEST_DIR}
+                    cp -d ${lib}.a ${LIBICU_DEST_DIR_STATIC}
+                    cp -d ${lib}.a ${LIBICU_DEST_DIR_STATIC}
+                done
                 continue
                 ;;
             playgroundlogger)
@@ -3232,7 +3392,13 @@ if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]]; then
     
     echo "--- Merging and running lipo ---"
     
-    call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=$(xcrun_find_tool lipo) --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
+    # Allow passing lipo with --host-lipo
+    if [[ -z "${HOST_LIPO}" ]] ; then
+        LIPO_PATH=$(xcrun_find_tool lipo)
+    else
+        LIPO_PATH="${HOST_LIPO}"
+    fi
+    call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=${LIPO_PATH} --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
 
     # Build and test the lipo-ed package.
     build_and_test_installable_package ${mergedHost}

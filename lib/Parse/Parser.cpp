@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -41,7 +41,7 @@ namespace {
     Parser &P;
   public:
     PrettyStackTraceParser(Parser &P) : P(P) {}
-    void print(llvm::raw_ostream &out) const {
+    void print(llvm::raw_ostream &out) const override {
       out << "With parser at source location: ";
       P.Tok.getLoc().print(out, P.Context.SourceMgr);
       out << '\n';
@@ -92,6 +92,7 @@ private:
     }
     if (!Parsed && ParserState.hasFunctionBodyState(AFD))
       TheParser.parseAbstractFunctionBodyDelayed(AFD);
+
     if (CodeCompletion)
       CodeCompletion->doneParsing();
   }
@@ -170,7 +171,7 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
                                 int BufID, std::vector<Token> &Toks) {
   assert(Tok.is(tok::string_literal));
   SmallVector<Lexer::StringSegment, 4> Segments;
-  Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/0);
+  Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/nullptr);
   for (unsigned i = 0, e = Segments.size(); i != e; ++i) {
     Lexer::StringSegment &Seg = Segments[i];
     bool isFirst = i == 0;
@@ -364,7 +365,8 @@ SourceLoc Parser::consumeStartingCharacterOfCurrentToken() {
 
   // ... or a multi-character token with the first character being the one that
   // we want to consume as a separate token.
-  restoreParserPosition(getParserPositionAfterFirstCharacter(Tok));
+  restoreParserPosition(getParserPositionAfterFirstCharacter(Tok),
+                        /*enableDiagnostics=*/true);
   return PreviousLoc;
 }
 
@@ -554,18 +556,23 @@ Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
 bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
                              const Diagnostic &D) {
   switch (Tok.getKind()) {
+  case tok::kw_throws:
   case tok::kw_rethrows:
+    if (!Context.isSwiftVersion3())
+      break;
+    // Swift3 accepts 'throws' and 'rethrows'
+    SWIFT_FALLTHROUGH;
   case tok::kw_self:
   case tok::kw_Self:
-  case tok::kw_throws:
   case tok::identifier:
     Loc = consumeIdentifier(&Result);
     return false;
   default:
-    checkForInputIncomplete();
-    diagnose(Tok, D);
-    return true;
+    break;
   }
+  checkForInputIncomplete();
+  diagnose(Tok, D);
+  return true;
 }
 
 bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,
@@ -651,9 +658,8 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
 
 ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
-                  tok SeparatorK, bool OptionalSep, bool AllowSepAfterLast,
-                  Diag<> ErrorDiag, std::function<ParserStatus()> callback) {
-  assert(SeparatorK == tok::comma || SeparatorK == tok::semi);
+                  bool AllowSepAfterLast, Diag<> ErrorDiag,
+                  std::function<ParserStatus()> callback) {
 
   if (Tok.is(RightK)) {
     RightLoc = consumeToken(RightK);
@@ -662,9 +668,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
   ParserStatus Status;
   while (true) {
-    while (Tok.is(SeparatorK)) {
-      diagnose(Tok, diag::unexpected_separator,
-               SeparatorK == tok::comma ? "," : ";")
+    while (Tok.is(tok::comma)) {
+      diagnose(Tok, diag::unexpected_separator, ",")
         .fixItRemove(SourceRange(Tok.getLoc()));
       consumeToken();
     }
@@ -682,23 +687,22 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     // If we haven't made progress, or seeing any error, skip ahead.
     if (Tok.getLoc() == StartLoc || Status.isError()) {
       assert(Status.isError() && "no progress without error");
-      skipUntilDeclRBrace(RightK, SeparatorK);
-      if (Tok.is(RightK) || (!OptionalSep && Tok.isNot(SeparatorK)))
+      skipUntilDeclRBrace(RightK, tok::comma);
+      if (Tok.is(RightK) || Tok.isNot(tok::comma))
         break;
     }
-    if (consumeIf(SeparatorK)) {
+    if (consumeIf(tok::comma)) {
       if (Tok.isNot(RightK))
         continue;
       if (!AllowSepAfterLast) {
-        diagnose(Tok, diag::unexpected_separator,
-                 SeparatorK == tok::comma ? "," : ";")
+        diagnose(Tok, diag::unexpected_separator, ",")
           .fixItRemove(SourceRange(PreviousLoc));
       }
       break;
     }
     // If we're in a comma-separated list, the next token is at the
     // beginning of a new line and can never start an element, break.
-    if (SeparatorK == tok::comma && Tok.isAtStartOfLine() &&
+    if (Tok.isAtStartOfLine() &&
         (Tok.is(tok::r_brace) || isStartOfDecl() || isStartOfStmt())) {
       break;
     }
@@ -707,12 +711,10 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       IsInputIncomplete = true;
       break;
     }
-    if (!OptionalSep) {
-      StringRef Separator = (SeparatorK == tok::comma ? "," : ";");
-      diagnose(Tok, diag::expected_separator, Separator)
-        .fixItInsertAfter(PreviousLoc, Separator);
-      Status.setIsParseError();
-    }
+
+    diagnose(Tok, diag::expected_separator, ",")
+      .fixItInsertAfter(PreviousLoc, ",");
+    Status.setIsParseError();
   }
 
   if (Status.isError()) {
@@ -749,7 +751,7 @@ struct ParserUnit::Implementation {
       Diags(SM),
       Ctx(LangOpts, SearchPathOpts, SM, Diags),
       SF(new (Ctx) SourceFile(
-            *Module::create(Ctx.getIdentifier(ModuleName), Ctx),
+            *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
             SourceFileKind::Main, BufferID,
             SourceFile::ImplicitModuleImportKind::None)) {
   }
@@ -803,14 +805,14 @@ ConditionalCompilationExprState
 swift::operator&&(ConditionalCompilationExprState lhs,
                   ConditionalCompilationExprState rhs) {
   return {lhs.isConditionActive() && rhs.isConditionActive(),
-          ConditionalCompilationExprKind::Binary};
+    ConditionalCompilationExprKind::Binary};
 }
 
 ConditionalCompilationExprState
 swift::operator||(ConditionalCompilationExprState lhs,
                   ConditionalCompilationExprState rhs) {
   return {lhs.isConditionActive() || rhs.isConditionActive(),
-          ConditionalCompilationExprKind::Binary};
+    ConditionalCompilationExprKind::Binary};
 }
 
 ConditionalCompilationExprState

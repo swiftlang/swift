@@ -7,18 +7,18 @@ set(swift_platform_sources
     tgmath.swift.gyb)
 
 add_swift_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-    Darwin.swift
+    Darwin.swift.gyb
     ${swift_platform_sources}
     POSIXError.swift
     MachError.swift
 
     SWIFT_COMPILE_FLAGS -Xfrontend -disable-objc-attr-requires-foundation-module "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-    TARGET_SDKS IOS IOS_SIMULATOR OSX TVOS TVOS_SIMULATOR WATCHOS WATCHOS_SIMULATOR
+    TARGET_SDKS ALL_APPLE_PLATFORMS
     API_NOTES_NON_OVERLAY)
 
 add_swift_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-    Glibc.swift
+    Glibc.swift.gyb
     ${swift_platform_sources}
 
     SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"

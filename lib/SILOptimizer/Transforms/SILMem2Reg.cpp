@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -86,18 +86,18 @@ public:
   /// C'tor.
   StackAllocationPromoter(AllocStackInst *Asi, DominanceInfo *Di,
                           DomTreeLevelMap &DomTreeLevels, SILBuilder &B)
-      : ASI(Asi), DSI(0), DT(Di), DomTreeLevels(DomTreeLevels), B(B) {
-        // Scan the users in search of a deallocation instruction.
-        for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI)
-          if (DeallocStackInst *D = dyn_cast<DeallocStackInst>(UI->getUser())) {
-            // Don't record multiple dealloc instructions.
-            if (DSI) {
-              DSI = 0;
-              break;
-            }
-            // Record the deallocation instruction.
-            DSI = D;
-          }
+      : ASI(Asi), DSI(nullptr), DT(Di), DomTreeLevels(DomTreeLevels), B(B) {
+    // Scan the users in search of a deallocation instruction.
+    for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI)
+      if (DeallocStackInst *D = dyn_cast<DeallocStackInst>(UI->getUser())) {
+        // Don't record multiple dealloc instructions.
+        if (DSI) {
+          DSI = nullptr;
+          break;
+        }
+        // Record the deallocation instruction.
+        DSI = D;
+      }
       }
 
   /// Promote the Allocation.
@@ -173,7 +173,7 @@ public:
   bool run();
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 /// Returns true if \p I is an address of a LoadInst, skipping struct and
 /// tuple address projections. Sets \p singleBlock to null if the load (or
@@ -505,16 +505,23 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
         break;
       }
     }
+
+    // Remove dead address instructions that may be uses of the allocation.
+    while (Inst->use_empty() && (isa<StructElementAddrInst>(Inst) ||
+                                 isa<TupleElementAddrInst>(Inst))) {
+      SILValue Next = Inst->getOperand(0);
+      Inst->eraseFromParent();
+      NumInstRemoved++;
+      Inst = cast<SILInstruction>(Next);
+    }
   }
 }
 
 void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
   DEBUG(llvm::dbgs() << "*** Adding new block arguments.\n");
 
-  SILModule &M = ASI->getModule();
-
-  for (auto Block : PhiBlocks)
-    new (M) SILArgument(Block, ASI->getElementType());
+  for (auto *Block : PhiBlocks)
+    Block->createPHIArgument(ASI->getElementType(), ValueOwnershipKind::Owned);
 }
 
 SILValue
@@ -537,7 +544,7 @@ StackAllocationPromoter::getLiveOutValue(BlockSet &PhiBlocks,
     if (PhiBlocks.count(BB)) {
       // Return the dummy instruction that represents the new value that we will
       // add to the basic block.
-      SILValue Phi = BB->getBBArg(BB->getNumBBArg()-1);
+      SILValue Phi = BB->getArgument(BB->getNumArguments() - 1);
       DEBUG(llvm::dbgs() << "*** Found a dummy Phi def " << *Phi);
       return Phi;
     }
@@ -558,7 +565,7 @@ StackAllocationPromoter::getLiveInValue(BlockSet &PhiBlocks,
   // chain.
   if (PhiBlocks.count(BB)) {
     DEBUG(llvm::dbgs() << "*** Found a local Phi definition.\n");
-    return BB->getBBArg(BB->getNumBBArg()-1);
+    return BB->getArgument(BB->getNumArguments() - 1);
   }
 
   if (BB->pred_empty() || !DT->getNode(BB))
@@ -644,8 +651,9 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
   // For each Block with a new Phi argument:
   for (auto Block : PhiBlocks) {
     // Fix all predecessors.
-    for (auto PBBI = Block->getPreds().begin(), E = Block->getPreds().end();
-        PBBI != E;) {
+    for (auto PBBI = Block->getPredecessorBlocks().begin(),
+              E = Block->getPredecessorBlocks().end();
+         PBBI != E;) {
       auto *PBB = *PBBI;
       ++PBBI;
       assert(PBB && "Invalid block!");

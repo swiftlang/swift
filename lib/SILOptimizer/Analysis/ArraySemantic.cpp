@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -99,8 +99,9 @@ bool swift::ArraySemanticsCall::isValidSignature() {
     return true;
   }
   case ArrayCallKind::kWithUnsafeMutableBufferPointer: {
-    if (SemanticsCall->getOrigCalleeType()->getNumIndirectResults() != 1 ||
-        SemanticsCall->getNumArguments() != 3)
+    SILFunctionConventions origConv(SemanticsCall->getOrigCalleeType(), Mod);
+    if (origConv.getNumIndirectSILResults() != 1
+        || SemanticsCall->getNumArguments() != 3)
       return false;
     auto SelfConvention = FnTy->getSelfParameter().getConvention();
     return SelfConvention == ParameterConvention::Indirect_Inout;
@@ -198,7 +199,7 @@ bool swift::ArraySemanticsCall::hasGetElementDirectResult() const {
   assert(getKind() == ArrayCallKind::kGetElement &&
          "must be an array.get_element call");
   bool DirectResult =
-    (SemanticsCall->getOrigCalleeType()->getNumIndirectResults() == 0);
+      (SemanticsCall->getOrigCalleeConv().getNumIndirectSILResults() == 0);
   assert((DirectResult && SemanticsCall->getNumArguments() == 4 ||
           !DirectResult && SemanticsCall->getNumArguments() == 5) &&
          "wrong number of array.get_element call arguments");
@@ -545,11 +546,7 @@ bool swift::ArraySemanticsCall::mayHaveBridgedObjectElementType() const {
   assert(hasSelf() && "Need self parameter");
 
   auto Ty = getSelf()->getType().getSwiftRValueType();
-  auto Canonical = Ty.getCanonicalTypeOrNull();
-  if (Canonical.isNull())
-    return true;
-
-  auto *Struct = Canonical->getStructOrBoundGenericStruct();
+  auto *Struct = Ty->getStructOrBoundGenericStruct();
   assert(Struct && "Array must be a struct !?");
   if (Struct) {
     auto BGT = dyn_cast<BoundGenericType>(Ty);
@@ -558,10 +555,7 @@ bool swift::ArraySemanticsCall::mayHaveBridgedObjectElementType() const {
 
     // Check the array element type parameter.
     bool isClass = true;
-    for (auto TP : BGT->getGenericArgs()) {
-      auto EltTy = TP.getCanonicalTypeOrNull();
-      if (EltTy.isNull())
-        return true;
+    for (auto EltTy : BGT->getGenericArgs()) {
       if (EltTy->isBridgeableObjectType())
         return true;
       isClass = false;
@@ -586,7 +580,9 @@ SILValue swift::ArraySemanticsCall::getInitializationCount() const {
 
   if (getKind() == ArrayCallKind::kArrayInit &&
       SemanticsCall->getNumArguments() == 3)
-    return SemanticsCall->getArgument(0);
+    // Repeated-value array initializer. Arguments are the value to
+    // repeat, the count, and the value's type.
+    return SemanticsCall->getArgument(1);
 
   return SILValue();
 }

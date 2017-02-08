@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // -------------------------------------------------------------------------
 // Restrictions on where required can appear

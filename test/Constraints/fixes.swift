@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func f1() -> Int { }
 func f2(_: Int = 5) -> Int { }

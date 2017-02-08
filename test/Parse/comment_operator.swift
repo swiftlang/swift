@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -verify -module-name main %s
+// RUN: %target-swift-frontend -typecheck -verify -module-name main %s
 
 // Tests for interaction between comments & operators from SE-0037
 // which defined comments to be whitespace for operator arity rules.
@@ -17,11 +17,11 @@ _ = 1 +/*hi*/2
 func test1() { _ = foo/* */?.description }    // expected-error {{expected ':' after '? ...' in ternary expression}}
 func test2() { _ = foo/* */! }                // expected-error {{expected expression after operator}}
 func test3() { _ = 1/**/+2 }                  // expected-error {{consecutive statements on a line must be separated by ';'}} expected-error {{ambiguous use of operator '+'}}
-func test4() { _ = 1+/**/2 }                  // expected-error {{'+' is not a postfix unary operator}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
+func test4() { _ = 1+/**/2 }                  // expected-error {{'+' is not a postfix unary operator}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-warning {{integer literal is unused}}
 
 // Continue to be errors
 func test5() { _ = !/* */foo }                // expected-error {{unary operator cannot be separated from its operand}}
-func test6() { _ = 1+/* */2 }                 // expected-error {{'+' is not a postfix unary operator}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
+func test6() { _ = 1+/* */2 }                 // expected-error {{'+' is not a postfix unary operator}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-warning {{integer literal is unused}}
 
 // Continue to work
 _ = foo!// this is dangerous

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Intentionally has lower precedence than assignments and ?:
 infix operator %%%% : LowPrecedence

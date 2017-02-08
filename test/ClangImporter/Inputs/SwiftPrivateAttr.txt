@@ -8,17 +8,10 @@ class Foo : NSObject, __PrivProto {
   func __noArgs()
   func __oneArg(_ arg: Int32)
   func __twoArgs(_ arg: Int32, other arg2: Int32)
-  class func __foo() -> Self!
   class func __withNoArgs() -> Self!
   convenience init!(__oneArg arg: Int32)
-  @available(*, unavailable, message: "use object construction 'Foo(__oneArg:)'")
-  class func __withOneArg(_ arg: Int32) -> Self!
   convenience init!(__twoArgs arg: Int32, other arg2: Int32)
-  @available(*, unavailable, message: "use object construction 'Foo(__twoArgs:other:)'")
-  class func __withTwoArgs(_ arg: Int32, other arg2: Int32) -> Self!
   convenience init!(__ arg: Int32)
-  @available(*, unavailable, message: "use object construction 'Foo(__:)'")
-  class func __foo(_ arg: Int32) -> Self!
   func objectForKeyedSubscript(_ index: Any!) -> Any!
   func __setObject(_ object: Any!, forKeyedSubscript index: Any!)
   func __objectAtIndexedSubscript(_ index: Int32) -> Any!

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -550,17 +550,19 @@ static DtorKind analyzeDestructor(Value *P) {
   // ones, or places
   // Also, make sure we have a definitive initializer for the global.
   GlobalVariable *GV = dyn_cast<GlobalVariable>(P->stripPointerCasts());
-  if (GV == 0 || !GV->hasDefinitiveInitializer())
+  if (GV == nullptr || !GV->hasDefinitiveInitializer())
     return DtorKind::Unknown;
 
   ConstantStruct *CS = dyn_cast_or_null<ConstantStruct>(GV->getInitializer());
-  if (CS == 0 || CS->getNumOperands() == 0) return DtorKind::Unknown;
+  if (CS == nullptr || CS->getNumOperands() == 0)
+    return DtorKind::Unknown;
 
   // FIXME: Would like to abstract the dtor slot (#0) out from this to somewhere
   // unified.
   enum { DTorSlotOfHeapMetadata = 0 };
   Function *DtorFn =dyn_cast<Function>(CS->getOperand(DTorSlotOfHeapMetadata));
-  if (DtorFn == 0 || DtorFn->isInterposable() || DtorFn->hasExternalLinkage())
+  if (DtorFn == nullptr || DtorFn->isInterposable() ||
+      DtorFn->hasExternalLinkage())
     return DtorKind::Unknown;
 
   // Okay, we have a body, and we can trust it.  If the function is marked

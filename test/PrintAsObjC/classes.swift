@@ -14,7 +14,7 @@
 
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -I %S/Inputs/custom-modules -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/classes.swiftmodule -parse -I %S/Inputs/custom-modules -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/classes.swiftmodule -typecheck -I %S/Inputs/custom-modules -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/classes.h
 // RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
 // RUN: %check-in-clang -I %S/Inputs/custom-modules/ %t/classes.h
@@ -48,8 +48,8 @@ import SingleGenericClass
 @objc class B1 : A1 {}
 
 // CHECK-LABEL: @interface BridgedTypes
-// CHECK-NEXT: - (NSDictionary * _Nonnull)dictBridge:(NSDictionary * _Nonnull)x;
-// CHECK-NEXT: - (NSSet * _Nonnull)setBridge:(NSSet * _Nonnull)x;
+// CHECK-NEXT: - (NSDictionary * _Nonnull)dictBridge:(NSDictionary * _Nonnull)x SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (NSSet * _Nonnull)setBridge:(NSSet * _Nonnull)x SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class BridgedTypes {
@@ -90,8 +90,8 @@ class ClassWithCustomNameSub : ClassWithCustomName {}
 
 // CHECK-LABEL: @interface ClassWithNSObjectProtocol <NSObject>
 // CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * _Nonnull description;
-// CHECK-NEXT: - (BOOL)conformsToProtocol:(Protocol * _Nonnull)_;
-// CHECK-NEXT: - (BOOL)isKindOfClass:(Class _Nonnull)aClass;
+// CHECK-NEXT: - (BOOL)conformsToProtocol:(Protocol * _Nonnull)_ SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (BOOL)isKindOfClass:(Class _Nonnull)aClass SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 @objc class ClassWithNSObjectProtocol : NSObjectProtocol {
@@ -103,12 +103,24 @@ class ClassWithCustomNameSub : ClassWithCustomName {}
   func isKind(of aClass: AnyClass) -> Bool { return false }
 }
 
+// CHECK-LABEL: @interface DiscardableResult : NSObject
+// CHECK-NEXT: - (NSInteger)nonDiscardable:(NSInteger)x SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (NSInteger)discardable:(NSInteger)x;
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: @end
+class DiscardableResult : NSObject {
+  func nonDiscardable(_ x: Int) -> Int { return x }
+  @discardableResult func discardable(_ x: Int) -> Int { return x }
+}
+
 // CHECK-LABEL: @interface Initializers
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)initWithInt:(NSInteger)_;
 // CHECK-NEXT: - (nonnull instancetype)initWithFloat:(float)f;
 // CHECK-NEXT: - (nonnull instancetype)initWithString:(NSString * _Nonnull)s boolean:(BOOL)b;
 // CHECK-NEXT: - (nullable instancetype)initWithBoolean:(BOOL)b;
+// CHECK-NEXT: - (nonnull instancetype)foo_initWithInt:(NSInteger)_ SWIFT_METHOD_FAMILY(init);
+// CHECK-NEXT: - (nonnull instancetype)initializeWithX:(NSInteger)_ SWIFT_METHOD_FAMILY(init);
 // CHECK-NEXT: - (nonnull instancetype)initForFun OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)initWithMoreFun OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)initWithEvenMoreFun OBJC_DESIGNATED_INITIALIZER;
@@ -122,6 +134,9 @@ class ClassWithCustomNameSub : ClassWithCustomName {}
   convenience init(string s: String, boolean b: ObjCBool) { self.init() }
 
   convenience init?(boolean b: ObjCBool) { self.init() }
+
+  @objc(foo_initWithInt:) convenience init(foo_int _: Int) { self.init() }
+  @objc(initializeWithX:) convenience init(X _: Int) { self.init() }
 
   init(forFun: ()) { }
 
@@ -165,7 +180,7 @@ class NotObjC {}
 // CHECK-LABEL: @interface Methods{{$}}
 // CHECK-NEXT: - (void)test;
 // CHECK-NEXT: + (void)test2;
-// CHECK-NEXT: - (void * _Nonnull)testPrimitives:(BOOL)b i:(NSInteger)i f:(float)f d:(double)d u:(NSUInteger)u;
+// CHECK-NEXT: - (void * _Nonnull)testPrimitives:(BOOL)b i:(NSInteger)i f:(float)f d:(double)d u:(NSUInteger)u SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (void)testString:(NSString * _Nonnull)s;
 // CHECK-NEXT: - (void)testSelector:(SEL _Nonnull)sel boolean:(BOOL)b;
 // CHECK-NEXT: - (void)testCSignedTypes:(signed char)a b:(short)b c:(int)c d:(long)d e:(long long)e;
@@ -176,13 +191,13 @@ class NotObjC {}
 // CHECK-NEXT: - (void)testSizedSignedTypes:(int8_t)a b:(int16_t)b c:(int32_t)c d:(int64_t)d;
 // CHECK-NEXT: - (void)testSizedUnsignedTypes:(uint8_t)a b:(uint16_t)b c:(uint32_t)c d:(uint64_t)d;
 // CHECK-NEXT: - (void)testSizedFloats:(float)a b:(double)b;
-// CHECK-NEXT: - (nonnull instancetype)getDynamicSelf;
-// CHECK-NEXT: + (SWIFT_METATYPE(Methods) _Nonnull)getSelf;
-// CHECK-NEXT: - (Methods * _Nullable)maybeGetSelf;
-// CHECK-NEXT: + (SWIFT_METATYPE(Methods) _Nullable)maybeGetSelf;
-// CHECK-NEXT: - (Methods * _Null_unspecified)uncheckedGetSelf;
-// CHECK-NEXT: + (SWIFT_METATYPE(Methods) _Null_unspecified)uncheckedGetSelf;
-// CHECK-NEXT: + (SWIFT_METATYPE(CustomName) _Nonnull)getCustomNameType;
+// CHECK-NEXT: - (nonnull instancetype)getDynamicSelf SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: + (SWIFT_METATYPE(Methods) _Nonnull)getSelf SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (Methods * _Nullable)maybeGetSelf SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: + (SWIFT_METATYPE(Methods) _Nullable)maybeGetSelf SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (Methods * _Null_unspecified)uncheckedGetSelf SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: + (SWIFT_METATYPE(Methods) _Null_unspecified)uncheckedGetSelf SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: + (SWIFT_METATYPE(CustomName) _Nonnull)getCustomNameType SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (void)testParens:(NSInteger)a;
 // CHECK-NEXT: - (void)testIgnoredParam:(NSInteger)_;
 // CHECK-NEXT: - (void)testIgnoredParams:(NSInteger)_ again:(NSInteger)_;
@@ -196,9 +211,10 @@ class NotObjC {}
 // CHECK-NEXT: - (IBAction)actionMethod:(id _Nonnull)_;
 // CHECK-NEXT: - (void)methodWithReservedParameterNames:(id _Nonnull)long_ protected:(id _Nonnull)protected_;
 // CHECK-NEXT: - (void)honorRenames:(CustomName * _Nonnull)_;
-// CHECK-NEXT: - (Methods * _Nullable __unsafe_unretained)unmanaged:(id _Nonnull __unsafe_unretained)_;
+// CHECK-NEXT: - (Methods * _Nullable __unsafe_unretained)unmanaged:(id _Nonnull __unsafe_unretained)_ SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (void)initAllTheThings SWIFT_METHOD_FAMILY(none);
 // CHECK-NEXT: - (void)initTheOtherThings SWIFT_METHOD_FAMILY(none);
+// CHECK-NEXT: - (void)initializeEvenMoreThings;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Methods {
@@ -257,6 +273,7 @@ class NotObjC {}
 
   func initAllTheThings() {}
   @objc(initTheOtherThings) func setUpOtherThings() {}
+  func initializeEvenMoreThings() {}
 }
 
 typealias AliasForNSRect = NSRect
@@ -264,17 +281,17 @@ typealias AliasForNSRect = NSRect
 // CHECK-LABEL: @class NSURL;
 // NEGATIVE-NOT: @class CFTree
 // CHECK-LABEL: @interface MethodsWithImports
-// CHECK-NEXT: - (NSPoint)getOrigin:(NSRect)r;
-// CHECK-NEXT: - (CGFloat)getOriginX:(NSRect)r;
-// CHECK-NEXT: - (CGFloat)getOriginY:(CGRect)r;
-// CHECK-NEXT: - (NSArray * _Nonnull)emptyArray;
-// CHECK-NEXT: - (NSArray * _Nullable)maybeArray;
-// CHECK-NEXT: - (NSRuncingMode)someEnum;
-// CHECK-NEXT: - (Class <NSCoding> _Nullable)protocolClass;
-// CHECK-NEXT: - (struct _NSZone * _Nullable)zone;
-// CHECK-NEXT: - (CFTypeRef _Nullable)cf:(CFTreeRef _Nonnull)x str:(CFStringRef _Nonnull)str str2:(CFMutableStringRef _Nonnull)str2 obj:(CFAliasForTypeRef _Nonnull)obj;
+// CHECK-NEXT: - (NSPoint)getOrigin:(NSRect)r SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (CGFloat)getOriginX:(NSRect)r SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (CGFloat)getOriginY:(CGRect)r SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (NSArray * _Nonnull)emptyArray SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (NSArray * _Nullable)maybeArray SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (NSRuncingMode)someEnum SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (Class <NSCoding> _Nullable)protocolClass SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (struct _NSZone * _Nullable)zone SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (CFTypeRef _Nullable)cf:(CFTreeRef _Nonnull)x str:(CFStringRef _Nonnull)str str2:(CFMutableStringRef _Nonnull)str2 obj:(CFAliasForTypeRef _Nonnull)obj SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (void)appKitInImplementation;
-// CHECK-NEXT: - (NSURL * _Nullable)returnsURL;
+// CHECK-NEXT: - (NSURL * _Nullable)returnsURL SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class MethodsWithImports {
@@ -300,7 +317,7 @@ typealias AliasForNSRect = NSRect
 }
 
 // CHECK-LABEL: @interface MethodsWithPointers
-// CHECK-NEXT: - (id _Nonnull * _Nonnull)test:(NSInteger * _Nonnull)a;
+// CHECK-NEXT: - (id _Nonnull * _Nonnull)test:(NSInteger * _Nonnull)a SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (void)testNested:(NSInteger * _Nonnull * _Nonnull)a;
 // CHECK-NEXT: - (void)testBridging:(NSInteger const * _Nonnull)a b:(NSInteger * _Nonnull)b c:(Methods * _Nonnull * _Nonnull)c;
 // CHECK-NEXT: - (void)testBridgingVoid:(void * _Nonnull)a b:(void const * _Nonnull)b;
@@ -426,10 +443,10 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, readonly) double pi;
 // CHECK-NEXT: @property (nonatomic) NSInteger computed;
 // CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, strong) Properties * _Nonnull shared;)
-// CHECK-NEXT: + (Properties * _Nonnull)shared;
+// CHECK-NEXT: + (Properties * _Nonnull)shared SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: + (void)setShared:(Properties * _Nonnull)newValue;
 // CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly, strong) Properties * _Nonnull sharedRO;)
-// CHECK-NEXT: + (Properties * _Nonnull)sharedRO;
+// CHECK-NEXT: + (Properties * _Nonnull)sharedRO SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: @property (nonatomic, weak) Properties * _Nullable weakOther;
 // CHECK-NEXT: @property (nonatomic, assign) Properties * _Nonnull unownedOther;
 // CHECK-NEXT: @property (nonatomic, unsafe_unretained) Properties * _Nonnull unmanagedOther;
@@ -459,14 +476,14 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * _Nullable outletCollectionAnyObject;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray<id <NSObject>> * _Nullable outletCollectionProto;
 // CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) NSInteger staticInt;)
-// CHECK-NEXT: + (NSInteger)staticInt;
+// CHECK-NEXT: + (NSInteger)staticInt SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, copy) NSString * _Nonnull staticString;)
-// CHECK-NEXT: + (NSString * _Nonnull)staticString;
+// CHECK-NEXT: + (NSString * _Nonnull)staticString SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: + (void)setStaticString:(NSString * _Nonnull)value;
 // CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) double staticDouble;)
-// CHECK-NEXT: + (double)staticDouble;
+// CHECK-NEXT: + (double)staticDouble SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly, copy) NSDictionary<NSString *, NSString *> * _Nonnull staticDictionary;)
-// CHECK-NEXT: + (NSDictionary<NSString *, NSString *> * _Nonnull)staticDictionary;
+// CHECK-NEXT: + (NSDictionary<NSString *, NSString *> * _Nonnull)staticDictionary SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: @property (nonatomic, strong) Properties * _Nullable wobble;
 // CHECK-NEXT: @property (nonatomic, getter=isEnabled, setter=setIsEnabled:) BOOL enabled;
 // CHECK-NEXT: @property (nonatomic) BOOL isAnimated;
@@ -475,17 +492,17 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger privateSetter;
 // CHECK-NEXT: @property (nonatomic, readonly, getter=customGetterNameForPrivateSetter) BOOL privateSetterCustomNames;
 // CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) NSInteger privateSetter;)
-// CHECK-NEXT: + (NSInteger)privateSetter;
+// CHECK-NEXT: + (NSInteger)privateSetter SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly, getter=customGetterNameForPrivateSetter) BOOL privateSetterCustomNames;)
-// CHECK-NEXT: + (BOOL)customGetterNameForPrivateSetter;
+// CHECK-NEXT: + (BOOL)customGetterNameForPrivateSetter SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) NSInteger sharedConstant;)
-// CHECK-NEXT: + (NSInteger)sharedConstant;
+// CHECK-NEXT: + (NSInteger)sharedConstant SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: @property (nonatomic) NSInteger initContext;
-// CHECK-NEXT: - (NSInteger)initContext SWIFT_METHOD_FAMILY(none);
+// CHECK-NEXT: - (NSInteger)initContext SWIFT_METHOD_FAMILY(none) SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger initContextRO;
-// CHECK-NEXT: - (NSInteger)initContextRO SWIFT_METHOD_FAMILY(none);
+// CHECK-NEXT: - (NSInteger)initContextRO SWIFT_METHOD_FAMILY(none) SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: @property (nonatomic, getter=initGetter) BOOL getterIsInit;
-// CHECK-NEXT: - (BOOL)initGetter SWIFT_METHOD_FAMILY(none);
+// CHECK-NEXT: - (BOOL)initGetter SWIFT_METHOD_FAMILY(none) SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: @property (nonatomic, setter=initSetter:) BOOL setterIsInit;
 // CHECK-NEXT: - (void)initSetter:(BOOL)newValue SWIFT_METHOD_FAMILY(none);
 // CHECK-NEXT: @property (nonatomic, copy) NSURL * _Nullable customValueTypeProp;
@@ -626,8 +643,8 @@ public class NonObjCClass { }
 
 
 // CHECK-LABEL: @interface Subscripts1
-// CHECK-NEXT: - (Subscripts1 * _Nonnull)objectAtIndexedSubscript:(NSInteger)i;
-// CHECK-NEXT: - (Subscripts1 * _Nonnull)objectForKeyedSubscript:(Subscripts1 * _Nonnull)o;
+// CHECK-NEXT: - (Subscripts1 * _Nonnull)objectAtIndexedSubscript:(NSInteger)i SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (Subscripts1 * _Nonnull)objectForKeyedSubscript:(Subscripts1 * _Nonnull)o SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Subscripts1 {
@@ -641,9 +658,9 @@ public class NonObjCClass { }
 }
 
 // CHECK-LABEL: @interface Subscripts2
-// CHECK-NEXT: - (Subscripts2 * _Nonnull)objectAtIndexedSubscript:(int16_t)i;
+// CHECK-NEXT: - (Subscripts2 * _Nonnull)objectAtIndexedSubscript:(int16_t)i SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (void)setObject:(Subscripts2 * _Nonnull)newValue atIndexedSubscript:(int16_t)i;
-// CHECK-NEXT: - (NSObject * _Nonnull)objectForKeyedSubscript:(NSObject * _Nonnull)o;
+// CHECK-NEXT: - (NSObject * _Nonnull)objectForKeyedSubscript:(NSObject * _Nonnull)o SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (void)setObject:(NSObject * _Nonnull)newValue forKeyedSubscript:(NSObject * _Nonnull)o;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray<NSString *> * _Nonnull cardPaths;
 // CHECK-NEXT: init
@@ -672,7 +689,7 @@ public class NonObjCClass { }
 }
 
 // CHECK-LABEL: @interface Subscripts3
-// CHECK-NEXT: - (Subscripts3 * _Nonnull)objectAtIndexedSubscript:(unsigned long)_;
+// CHECK-NEXT: - (Subscripts3 * _Nonnull)objectAtIndexedSubscript:(unsigned long)_ SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Subscripts3 {
@@ -687,9 +704,9 @@ public class NonObjCClass { }
 
 // CHECK-LABEL: @interface Throwing1
 // CHECK-NEXT: - (BOOL)method1AndReturnError:(NSError * _Nullable * _Nullable)error;
-// CHECK-NEXT: - (Throwing1 * _Nullable)method2AndReturnError:(NSError * _Nullable * _Nullable)error;
-// CHECK-NEXT: - (NSArray<NSString *> * _Nullable)method3:(NSInteger)x error:(NSError * _Nullable * _Nullable)error;
-// CHECK-NEXT: - (nullable instancetype)method4AndReturnError:(NSError * _Nullable * _Nullable)error;
+// CHECK-NEXT: - (Throwing1 * _Nullable)method2AndReturnError:(NSError * _Nullable * _Nullable)error SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (NSArray<NSString *> * _Nullable)method3:(NSInteger)x error:(NSError * _Nullable * _Nullable)error SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (nullable instancetype)method4AndReturnError:(NSError * _Nullable * _Nullable)error SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: - (nullable instancetype)initAndReturnError:(NSError * _Nullable * _Nullable)error OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nullable instancetype)initWithString:(NSString * _Nonnull)string error:(NSError * _Nullable * _Nullable)error OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nullable instancetype)initAndReturnError:(NSError * _Nullable * _Nullable)error fn:(SWIFT_NOESCAPE NSInteger (^ _Nonnull)(NSInteger))fn OBJC_DESIGNATED_INITIALIZER;
@@ -709,13 +726,13 @@ public class NonObjCClass { }
 
 // CHECK-LABEL: @interface UsesImportedGenerics
 @objc class UsesImportedGenerics {
-  // CHECK: - (GenericClass<id> * _Nonnull)takeAndReturnGenericClass:(GenericClass<NSString *> * _Nullable)x;
+  // CHECK: - (GenericClass<id> * _Nonnull)takeAndReturnGenericClass:(GenericClass<NSString *> * _Nullable)x SWIFT_WARN_UNUSED_RESULT;
   @objc func takeAndReturnGenericClass(_ x: GenericClass<NSString>?) -> GenericClass<AnyObject> { fatalError("") }
-  // CHECK: - (FungibleContainer<id <Fungible>> * _Null_unspecified)takeAndReturnFungibleContainer:(FungibleContainer<Spoon *> * _Nonnull)x;
+  // CHECK: - (FungibleContainer<id <Fungible>> * _Null_unspecified)takeAndReturnFungibleContainer:(FungibleContainer<Spoon *> * _Nonnull)x SWIFT_WARN_UNUSED_RESULT;
   @objc func takeAndReturnFungibleContainer(_ x: FungibleContainer<Spoon>) -> FungibleContainer<Fungible>! { fatalError("") }
 
   typealias Dipper = Spoon
-  // CHECK: - (FungibleContainer<FungibleObject> * _Nonnull)fungibleContainerWithAliases:(FungibleContainer<Spoon *> * _Nullable)x;
+  // CHECK: - (FungibleContainer<FungibleObject> * _Nonnull)fungibleContainerWithAliases:(FungibleContainer<Spoon *> * _Nullable)x SWIFT_WARN_UNUSED_RESULT;
   @objc func fungibleContainerWithAliases(_ x: FungibleContainer<Dipper>?) -> FungibleContainer<FungibleObject> { fatalError("") }
 
   // CHECK: - (void)referenceSingleGenericClass:(SingleImportedObjCGeneric<id> * _Nullable)_;

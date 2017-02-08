@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -I %S/Inputs -enable-source-import
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-source-import
 
 import diag_values_of_module_type_foo
 

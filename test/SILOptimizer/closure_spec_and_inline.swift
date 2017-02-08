@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -O -module-name=test %s -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -parse-as-library -O -module-name=test %s -emit-sil | %FileCheck %s
 
 func closure(_ a: Int, b: Int) -> Bool {
   return a < b
@@ -7,7 +7,7 @@ func closure(_ a: Int, b: Int) -> Bool {
 // Check that closure() is inlined into call_closure after call_closure is
 // specialized for it.
 
-// CHECK-LABEL: sil shared [noinline] @_TTSf1n_n_cl27_TF4test7closureFTSi1bSi_Sb___TF4test12call_closureFTSiSiFTSiSi_Sb_Sb
+// CHECK-LABEL: sil shared [noinline] @_T04test12call_closureSbSi_SiSbSi_SitctF27_T04test7closureSbSi_Si1btFTf1nnc_n
 // CHECK-NOT: apply
 // CHECK: builtin "cmp_slt_Int
 // CHECK-NOT: apply

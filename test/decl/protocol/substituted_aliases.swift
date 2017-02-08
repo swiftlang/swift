@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct Q<T: Collection> : Sequence {
   func makeIterator() -> T.Iterator {

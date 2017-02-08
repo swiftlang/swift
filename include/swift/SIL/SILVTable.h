@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -42,7 +42,28 @@ class SILVTable : public llvm::ilist_node<SILVTable>,
 public:
   // TODO: Entry should include substitutions needed to invoke an overridden
   // generic base class method.
-  using Pair = std::pair<SILDeclRef, SILFunction*>;
+  struct Entry {
+
+    Entry() : Implementation(nullptr), Linkage(SILLinkage::Private) { }
+
+    Entry(SILDeclRef Method, SILFunction *Implementation, SILLinkage Linkage) :
+      Method(Method), Implementation(Implementation), Linkage(Linkage) { }
+
+    /// The declaration reference to the least-derived method visible through
+    /// the class.
+    SILDeclRef Method;
+
+    /// The function which implements the method for the class.
+    SILFunction *Implementation;
+
+    /// The linkage of the implementing function.
+    ///
+    /// This is usually the same as
+    ///   stripExternalFromLinkage(Implementation->getLinkage())
+    /// except if Implementation is a thunk (which has private or shared
+    /// linkage).
+    SILLinkage Linkage;
+  };
 
   // Disallow copying into temporary objects.
   SILVTable(const SILVTable &other) = delete;
@@ -56,10 +77,10 @@ private:
   unsigned NumEntries;
 
   /// Tail-allocated SILVTable entries.
-  Pair Entries[1];
+  Entry Entries[1];
 
   /// Private constructor. Create SILVTables by calling SILVTable::create.
-  SILVTable(ClassDecl *c, ArrayRef<Pair> entries);
+  SILVTable(ClassDecl *c, ArrayRef<Entry> entries);
 
 public:
   ~SILVTable();
@@ -68,13 +89,13 @@ public:
   /// The SILDeclRef keys should reference the most-overridden members available
   /// through the class.
   static SILVTable *create(SILModule &M, ClassDecl *Class,
-                           ArrayRef<Pair> Entries);
+                           ArrayRef<Entry> Entries);
 
   /// Return the class that the vtable represents.
   ClassDecl *getClass() const { return Class; }
 
   /// Return all of the method entries.
-  ArrayRef<Pair> getEntries() const { return {Entries, NumEntries}; }
+  ArrayRef<Entry> getEntries() const { return {Entries, NumEntries}; }
 
   /// Look up the implementation function for the given method.
   SILFunction *getImplementation(SILModule &M, SILDeclRef method) const;
@@ -82,10 +103,10 @@ public:
   /// Removes entries from the vtable.
   /// \p predicate Returns true if the passed entry should be removed.
   template <typename Predicate> void removeEntries_if(Predicate predicate) {
-    Pair *end = std::remove_if(Entries, Entries + NumEntries,
-                               [&](Pair &entry) -> bool {
+    Entry *end = std::remove_if(Entries, Entries + NumEntries,
+                                [&](Entry &entry) -> bool {
       if (predicate(entry)) {
-        entry.second->decrementRefCount();
+        entry.Implementation->decrementRefCount();
         removeFromVTableCache(entry);
         return true;
       }
@@ -102,7 +123,7 @@ public:
   void dump() const;
 
 private:
-  void removeFromVTableCache(Pair &entry);
+  void removeFromVTableCache(Entry &entry);
 };
 
 } // end swift namespace
@@ -118,18 +139,6 @@ struct ilist_traits<::swift::SILVTable> :
 public ilist_default_traits<::swift::SILVTable> {
   typedef ::swift::SILVTable SILVTable;
 
-private:
-  mutable ilist_half_node<SILVTable> Sentinel;
-
-public:
-  SILVTable *createSentinel() const {
-    return static_cast<SILVTable*>(&Sentinel);
-  }
-  void destroySentinel(SILVTable *) const {}
-
-  SILVTable *provideInitialHead() const { return createSentinel(); }
-  SILVTable *ensureHead(SILVTable*) const { return createSentinel(); }
-  static void noteHead(SILVTable*, SILVTable*) {}
   static void deleteNode(SILVTable *VT) { VT->~SILVTable(); }
 
 private:

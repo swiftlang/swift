@@ -1,9 +1,9 @@
-// RUN: %target-swift-frontend -emit-ir -g %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-ir -g %s -o - | %FileCheck %s
 //
 // A top-level closure is expected to have the main module as scope and not the
 // top_level_code function.
 //
-// CHECK: define {{.*}}@_TF4mainU_FT_Si() {{.*}} !dbg ![[CLOSURE:[0-9]+]] {
+// CHECK: define {{.*}}@_T04mainSiycfU_() {{.*}} !dbg ![[CLOSURE:[0-9]+]] {
 // CHECK: ![[MOD:[0-9]+]] = !DIModule(scope: null, name: "main"
 // CHECK: ![[CLOSURE]] = distinct !DISubprogram({{.*}}scope: ![[MOD]],
 let closure = { 42 }

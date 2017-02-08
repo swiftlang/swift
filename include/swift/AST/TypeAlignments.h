@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -22,7 +22,7 @@
 #ifndef SWIFT_TYPEALIGNMENTS_H
 #define SWIFT_TYPEALIGNMENTS_H
 
-#include "llvm/Support/AlignOf.h"
+#include <cstddef>
 
 namespace swift {
   class AbstractStorageDecl;
@@ -34,6 +34,7 @@ namespace swift {
   class DeclContext;
   class Expr;
   class ExtensionDecl;
+  class GenericEnvironment;
   class GenericTypeParamDecl;
   class NormalProtocolConformance;
   class OperatorDecl;
@@ -97,8 +98,9 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::Expr, swift::ExprAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ProtocolConformance, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::NormalProtocolConformance,
                             swift::DeclAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::GenericEnvironment,
+                            swift::DeclAlignInBits)
 
-static_assert(llvm::AlignOf<void*>::Alignment >= 2,
-              "pointer alignment is too small");
+static_assert(alignof(void*) >= 2, "pointer alignment is too small");
 
 #endif

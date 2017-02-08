@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s -o - | %FileCheck %s
 
 func someValidPointer<T>() -> UnsafeMutablePointer<T> { fatalError() }
 
@@ -12,7 +12,7 @@ class TestHeapStorage<T> : HeapStorage<CountAndCapacity,T> {
   deinit {
     withUnsafeMutablePointerToElements {
       // Don't crash when mangling this closure's name.
-      // CHECK: _TFFC4main15TestHeapStoragedU_FGSpQ__T_
+      // CHECK: _T04main15TestHeapStorageCfdySpyxGcfU_
       //         ---> main.TestHeapStorage.deinit.(closure #1)
       (p: UnsafeMutablePointer<T>) -> () in
     }

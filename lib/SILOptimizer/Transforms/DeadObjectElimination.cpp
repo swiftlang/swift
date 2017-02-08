@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -101,9 +101,9 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
     return true;
 
   // A destructor only has one argument, self.
-  assert(Fn->begin()->getNumBBArg() == 1 &&
+  assert(Fn->begin()->getNumArguments() == 1 &&
          "Destructor should have only one argument, self.");
-  SILArgument *Self = Fn->begin()->getBBArg(0);
+  SILArgument *Self = Fn->begin()->getArgument(0);
 
   DEBUG(llvm::dbgs() << "    Analyzing destructor.\n");
 
@@ -319,7 +319,7 @@ public:
 
   ArrayRef<IndexTrieNode*> getChildren() const { return Children; }
 };
-}
+} // end anonymous namespace
 
 namespace {
 /// Determine if an object is dead. Compute its original lifetime. Find the
@@ -378,7 +378,7 @@ private:
   template<typename Visitor>
   void visitStoreLocations(Visitor visitor, IndexTrieNode *AddressNode);
 };
-}
+} // end anonymous namespace
 
 // Record a store into this object.
 void DeadObjectAnalysis::

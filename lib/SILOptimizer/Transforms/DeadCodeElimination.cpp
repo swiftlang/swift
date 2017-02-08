@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -345,13 +345,13 @@ void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
   for (Operand *DU : getDebugUses(Arg))
     markValueLive(DU->getUser());
 
-  if (Arg->isFunctionArg())
+  if (isa<SILFunctionArgument>(Arg))
     return;
 
   auto *Block = Arg->getParent();
   auto ArgIndex = Arg->getIndex();
 
-  for (auto Pred : Block->getPreds())
+  for (auto Pred : Block->getPredecessorBlocks())
     markTerminatorArgsLive(Pred, Block, ArgIndex);
 }
 
@@ -430,10 +430,10 @@ void DCE::replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block) {
          "Unexpected dead terminator kind!");
 
   SILInstruction *Branch;
-  if (!Block->bbarg_empty()) {
+  if (!Block->args_empty()) {
     std::vector<SILValue> Args;
-    auto E = Block->bbarg_end();
-    for (auto A = Block->bbarg_begin(); A != E; ++A) {
+    auto E = Block->args_end();
+    for (auto A = Block->args_begin(); A != E; ++A) {
       assert(!LiveValues.count(*A) && "Unexpected live block argument!");
       Args.push_back(SILUndef::get((*A)->getType(), (*A)->getModule()));
     }
@@ -452,7 +452,7 @@ bool DCE::removeDead(SILFunction &F) {
   bool Changed = false;
 
   for (auto &BB : F) {
-    for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ) {
+    for (auto I = BB.args_begin(), E = BB.args_end(); I != E;) {
       auto Inst = *I++;
       if (LiveValues.count(Inst))
         continue;
@@ -582,7 +582,7 @@ void DCE::computePredecessorDependence(SILFunction &F) {
     assert(ControllingInfoMap.find(&BB) != ControllingInfoMap.end()
            && "Expected to already have a map entry for block!");
 
-    for (auto Pred : BB.getPreds())
+    for (auto Pred : BB.getPredecessorBlocks())
       if (!PDT->properlyDominates(&BB, Pred)) {
         assert(ControllingInfoMap.find(Pred) != ControllingInfoMap.end() &&
                "Expected to already have a map entry for block!");

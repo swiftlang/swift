@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -parse -parse-as-library -verify %s %S/Inputs/objc_nsmanaged_other.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -parse -parse-as-library -verify -primary-file %s %S/Inputs/objc_nsmanaged_other.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -typecheck -parse-as-library -verify %s %S/Inputs/objc_nsmanaged_other.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -typecheck -parse-as-library -verify -primary-file %s %S/Inputs/objc_nsmanaged_other.swift
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -emit-silgen -parse-as-library -o /dev/null -DNO_ERROR %s %S/Inputs/objc_nsmanaged_other.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -emit-silgen -parse-as-library -o /dev/null -DNO_ERROR -primary-file %s %S/Inputs/objc_nsmanaged_other.swift

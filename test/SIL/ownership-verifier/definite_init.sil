@@ -1,0 +1,577 @@
+// RUN: %target-sil-opt -module-name Swift -enable-sil-ownership -enable-sil-verify-all=0 -o /dev/null 2>&1 %s
+// REQUIRES: asserts
+
+sil_stage raw
+
+import Builtin
+
+enum Optional<T> {
+case some(T)
+case none
+}
+
+struct Bool {
+  var value: Builtin.Int1
+}
+
+// This file is meant to contain tests that previously the verifier treated
+// incorrectly. This is important to ensure that the verifier does not
+// regress. It should only deal with use matching in a DI context.
+//
+// *NOTE* This was originally a test file for definite_init.sil that looked
+// interesting from an ownership perspective. So I took it and reused it to get
+// coverage here.
+
+sil @takes_Int_inout : $@convention(thin) (@inout Builtin.Int32) -> ()
+sil @makesInt : $@convention(thin) () -> Builtin.Int32
+
+// func used_by_inout(a : Builtin.Int32) -> (Builtin.Int32, Builtin.Int32) {
+//  var t = a
+//  takes_Int_inout(&a)
+//  return (t, a)
+//}
+sil @used_by_inout : $@convention(thin) (Builtin.Int32) -> (Builtin.Int32, Builtin.Int32) {
+bb0(%0 : @trivial $Builtin.Int32):
+  %91 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  %91a = project_box %91 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
+  %1 = mark_uninitialized [var] %91a : $*Builtin.Int32
+  %2 = store %0 to [trivial] %1 : $*Builtin.Int32
+  %3 = load [trivial] %1 : $*Builtin.Int32
+  %5 = function_ref @takes_Int_inout : $@convention(thin) (@inout Builtin.Int32) -> ()
+  %6 = apply %5(%1) : $@convention(thin) (@inout Builtin.Int32) -> ()
+  %7 = load [trivial] %1 : $*Builtin.Int32
+  %8 = tuple (%3 : $Builtin.Int32, %7 : $Builtin.Int32)
+  destroy_value %91 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  return %8 : $(Builtin.Int32, Builtin.Int32)
+}
+
+struct AddressOnlyStruct {
+  var a : Any
+  var b : Builtin.Int32
+}
+
+/// returns_generic_struct - This returns a struct by reference.
+sil @returns_generic_struct : $@convention(thin) () -> @out AddressOnlyStruct
+
+// There should be no error in this function.
+sil @call_struct_return_function : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <AddressOnlyStruct>
+  %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <AddressOnlyStruct>, 0
+  %1 = mark_uninitialized [var] %0a : $*AddressOnlyStruct
+  %2 = function_ref @returns_generic_struct : $@convention(thin) () -> @out AddressOnlyStruct
+  %3 = apply %2(%1) : $@convention(thin) () -> @out AddressOnlyStruct
+  %4 = struct_element_addr %1 : $*AddressOnlyStruct, #AddressOnlyStruct.b
+  %5 = load [trivial] %4 : $*Builtin.Int32
+  destroy_value %0 : $<τ_0_0> { var τ_0_0 } <AddressOnlyStruct>
+  return %5 : $Builtin.Int32
+}
+
+sil @copy_addr1 : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : @trivial $*T, %1 : @trivial $*T):
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
+  %4 = mark_uninitialized [var] %3a : $*T
+  copy_addr [take] %1 to [initialization] %4 : $*T
+  copy_addr %4 to [initialization] %0 : $*T
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <T>
+  %9 = tuple ()
+  return %9 : $()
+}
+
+class SomeClass {}
+
+sil @getSomeClass : $@convention(thin) () -> @owned SomeClass
+sil @getSomeOptionalClass : $@convention(thin) () -> Optional<SomeClass>
+
+sil @assign_test_trivial : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : @trivial $Builtin.Int32):
+  %7 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  %7a = project_box %7 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
+  %1 = mark_uninitialized [var] %7a : $*Builtin.Int32
+
+  // These assigns are a mix of init + store forms, but because Int is trivial,
+  // they all turn into stores.
+  assign %0 to %1 : $*Builtin.Int32
+  assign %0 to %1 : $*Builtin.Int32
+  assign %0 to %1 : $*Builtin.Int32
+
+  %2 = load [trivial] %1 : $*Builtin.Int32
+  destroy_value %7 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+
+  return %2 : $Builtin.Int32
+}
+
+sil @assign_test_nontrivial : $@convention(thin) () -> () {
+bb0:
+  // Assignments of nontrivial types.  The first becomes an initialize (i.e.,
+  // lone store), the second becomes an assignment (retain/release dance).
+
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <SomeClass>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <SomeClass>, 0
+  %c = mark_uninitialized [var] %ba : $*SomeClass
+  %f = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
+  %4 = apply %f() : $@convention(thin) () -> @owned SomeClass
+  assign %4 to %c : $*SomeClass
+  %8 = apply %f() : $@convention(thin) () -> @owned SomeClass
+  assign %8 to %c : $*SomeClass
+  destroy_addr %c : $*SomeClass
+  dealloc_box %b : $<τ_0_0> { var τ_0_0 } <SomeClass>
+  %11 = tuple ()
+  return %11 : $()
+}
+
+
+sil @assign_test_addressonly : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : @trivial $*T, %1 : @trivial $*T):
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <T>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <T>, 0
+  %2 = mark_uninitialized [var] %ba : $*T
+  copy_addr %1 to %2 : $*T
+  copy_addr [take] %1 to %2 : $*T
+  copy_addr %2 to [initialization] %0 : $*T
+  destroy_value %b : $<τ_0_0> { var τ_0_0 } <T>
+  %9 = tuple ()
+  return %9 : $()
+}
+
+sil @assign_test_unowned : $@convention(thin) () -> () {
+bb0:
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <@sil_unowned SomeClass>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <@sil_unowned SomeClass>, 0
+  %c = mark_uninitialized [var] %ba : $*@sil_unowned SomeClass
+
+  %f = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
+
+  %4 = apply %f() : $@convention(thin) () -> @owned SomeClass
+  %5 = ref_to_unowned %4 : $SomeClass to $@sil_unowned SomeClass
+  %6 = copy_value %5 : $@sil_unowned SomeClass
+  assign %6 to %c : $*@sil_unowned SomeClass
+  destroy_value %4 : $SomeClass
+  %8 = apply %f() : $@convention(thin) () -> @owned SomeClass
+  %9 = ref_to_unowned %8 : $SomeClass to $@sil_unowned SomeClass
+  %10 = copy_value %9 : $@sil_unowned SomeClass
+  assign %10 to %c : $*@sil_unowned SomeClass
+
+  destroy_value %8 : $SomeClass
+  destroy_addr %c : $*@sil_unowned SomeClass
+  dealloc_box %b : $<τ_0_0> { var τ_0_0 } <@sil_unowned SomeClass>
+
+  %11 = tuple ()
+  return %11 : $()
+}
+
+
+
+struct ContainsNativeObject {
+  var x : Builtin.Int32
+  var y : Builtin.NativeObject
+}
+
+sil @test_struct : $@convention(thin) (@inout ContainsNativeObject) -> () {
+bb0(%0 : @trivial $*ContainsNativeObject):
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <ContainsNativeObject>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <ContainsNativeObject>, 0
+  %c = mark_uninitialized [var] %ba : $*ContainsNativeObject
+  %1 = load [copy] %0 : $*ContainsNativeObject
+  assign %1 to %c : $*ContainsNativeObject
+
+  destroy_value %b : $<τ_0_0> { var τ_0_0 } <ContainsNativeObject>
+  %x = tuple ()
+  return %x : $()
+}
+
+sil @non_box_assign_trivial : $@convention(thin) (@inout Bool, Bool) -> () {
+bb0(%0 : @trivial $*Bool, %1 : @trivial $Bool):
+  assign %1 to %0 : $*Bool
+  %9 = tuple ()
+  return %9 : $()
+}
+sil @non_box_assign : $@convention(thin) (@inout SomeClass, @owned SomeClass) -> () {
+bb0(%0 : @trivial $*SomeClass, %1 : @owned $SomeClass):
+  assign %1 to %0 : $*SomeClass
+  %9 = tuple ()
+  return %9 : $()
+}
+
+sil_global @int_global : $Builtin.Int32
+
+// CHECK-LABEL: sil @test_tlc
+// CHECK-NOT: mark_uninitialized
+// CHECK: return
+sil @test_tlc : $() -> () {
+  %0 = global_addr @int_global : $*Builtin.Int32
+  %1 = mark_uninitialized [var] %0 : $*Builtin.Int32
+
+  %9 = tuple ()
+  return %9 : $()
+}
+
+
+struct XYStruct { var x, y : Builtin.Int32 }
+sil @init_xy_struct : $@convention(thin) () -> XYStruct
+
+
+
+protocol P {}
+class C : P {}
+
+sil @use : $@convention(thin) (@in P) -> ()
+
+
+sil @release_not_constructed : $@convention(thin) () -> () {
+bb0:
+  %3 = alloc_stack $SomeClass
+  %c = mark_uninitialized [var] %3 : $*SomeClass
+  destroy_addr %c : $*SomeClass
+  dealloc_stack %3 : $*SomeClass
+  %15 = tuple ()
+  return %15 : $()
+}
+
+sil @release_some_constructed : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  %b = alloc_stack $(SomeClass, SomeClass)
+  %1 = mark_uninitialized [var] %b : $*(SomeClass, SomeClass)
+  %2 = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
+  %3 = apply %2() : $@convention(thin) () -> @owned SomeClass
+  %4 = tuple_element_addr %1 : $*(SomeClass, SomeClass), 0
+  store %3 to [init] %4 : $*SomeClass
+  destroy_addr %1 : $*(SomeClass, SomeClass)
+  dealloc_stack %b : $*(SomeClass, SomeClass)
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil @init_existential_with_class : $@convention(thin) (@inout C) -> () {
+entry(%a : @trivial $*C):
+  %p = alloc_stack $P
+  %b = mark_uninitialized [var] %p : $*P
+  %q = init_existential_addr %b : $*P, $C
+  copy_addr %a to [initialization] %q : $*C
+  %u = function_ref @use : $@convention(thin) (@in P) -> ()
+  %v = apply %u(%b) : $@convention(thin) (@in P) -> ()
+  dealloc_stack %p : $*P
+  %z = tuple ()
+  return %z : $()
+}
+
+sil @conditional_init : $@convention(thin) (Bool) -> () {
+bb0(%0 : @trivial $Bool):
+  %2 = alloc_stack $SomeClass
+  %3 = mark_uninitialized [var] %2 : $*SomeClass
+  %5 = integer_literal $Builtin.Int1, 1
+  cond_br %5, bb1, bb2
+
+bb1:
+  %f = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
+  %6 = apply %f() : $@convention(thin) () -> @owned SomeClass
+  assign %6 to %3 : $*SomeClass
+  br bb2
+
+bb2:
+  destroy_addr %3 : $*SomeClass
+  dealloc_stack %2 : $*SomeClass
+  %14 = tuple ()
+  return %14 : $()
+}
+
+sil @conditionalInitOrAssign : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : @trivial $Builtin.Int1):
+  %5 = alloc_stack $SomeClass
+  %6 = mark_uninitialized [var] %5 : $*SomeClass
+  cond_br %0, bb1, bb2
+
+bb1:
+  %2 = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
+  %12 = apply %2() : $@convention(thin) () -> @owned SomeClass
+  assign %12 to %6 : $*SomeClass                // id: %13
+  br bb2                                          // id: %14
+
+bb2:
+  %3 = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
+  %17 = apply %3() : $@convention(thin) () -> @owned SomeClass
+  assign %17 to %6 : $*SomeClass                // id: %18
+  destroy_addr %6 : $*SomeClass                 // id: %19
+  dealloc_stack %5 : $*SomeClass // id: %20
+  %23 = tuple ()                                  // user: %24
+  return %23 : $()                                // id: %24
+}
+
+class RootClassWithIVars {
+  var x: Builtin.Int32
+  var y: Builtin.Int32
+  var z: (Builtin.Int32, Builtin.Int32)
+  init()
+}
+
+/// Root class tests.
+sil @rootclass_test1 : $@convention(method) (@owned RootClassWithIVars, Builtin.Int32) -> @owned RootClassWithIVars {
+bb0(%0 : @owned $RootClassWithIVars, %1 : @trivial $Builtin.Int32):
+  %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
+  %4 = begin_borrow %3 : $RootClassWithIVars
+  %10 = ref_element_addr %4 : $RootClassWithIVars, #RootClassWithIVars.x
+  assign %1 to %10 : $*Builtin.Int32
+
+  %11 = ref_element_addr %4 : $RootClassWithIVars, #RootClassWithIVars.y
+  assign %1 to %11 : $*Builtin.Int32
+
+  %12 = ref_element_addr %4 : $RootClassWithIVars, #RootClassWithIVars.z
+  %13 = tuple_element_addr %12 : $*(Builtin.Int32, Builtin.Int32), 0
+  assign %1 to %13 : $*Builtin.Int32
+  %14 = tuple_element_addr %12 : $*(Builtin.Int32, Builtin.Int32), 1
+  assign %1 to %14 : $*Builtin.Int32
+  end_borrow %4 from %3 : $RootClassWithIVars, $RootClassWithIVars
+  return %3 : $RootClassWithIVars
+}
+
+class DerivedClassWithIVars : RootClassWithIVars {
+  var a: Builtin.Int32
+  override init()
+}
+
+sil @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+
+
+sil @derived_test1 : $@convention(method) (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
+bb0(%0 : @owned $DerivedClassWithIVars):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
+  %3 = mark_uninitialized [derivedself] %1a : $*DerivedClassWithIVars
+  store %0 to [init] %3 : $*DerivedClassWithIVars
+
+  // Get an int
+  %5 = function_ref @makesInt : $@convention(thin) () -> Builtin.Int32
+  %7 = apply %5() : $@convention(thin) () -> Builtin.Int32
+
+  // Initialize the 'a' ivar with the int.
+  %8 = load_borrow %3 : $*DerivedClassWithIVars
+  %9 = ref_element_addr %8 : $DerivedClassWithIVars, #DerivedClassWithIVars.a
+  assign %7 to %9 : $*Builtin.Int32
+  end_borrow %8 from %3 : $DerivedClassWithIVars, $*DerivedClassWithIVars
+
+  %11 = load [take] %3 : $*DerivedClassWithIVars
+  %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars
+  %14 = function_ref @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+  %15 = apply %14(%13) : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+  %16 = unconditional_checked_cast %15 : $RootClassWithIVars to $DerivedClassWithIVars
+  assign %16 to %3 : $*DerivedClassWithIVars
+
+  %18 = load [copy] %3 : $*DerivedClassWithIVars
+  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  return %18 : $DerivedClassWithIVars
+}
+
+struct MyStruct : P {}
+
+sil @self_init_assert_instruction : $@convention(thin) (Builtin.Int32, @thin MyStruct.Type) -> MyStruct {
+bb0(%0 : @trivial $Builtin.Int32, %1 : @trivial $@thin MyStruct.Type):
+  %2 = alloc_stack $MyStruct, var, name "sf"
+  %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct
+  %6 = function_ref @selfinit : $@convention(thin) () -> MyStruct
+  %7 = apply %6() : $@convention(thin) () -> MyStruct
+  assign %7 to %3 : $*MyStruct
+  %9 = load [trivial] %3 : $*MyStruct
+  dealloc_stack %2 : $*MyStruct
+  return %9 : $MyStruct
+}
+
+sil @selfinit : $@convention(thin) () -> MyStruct
+
+struct MyStruct2 {
+  var x: P
+    init(delegate: ())
+    init()
+}
+
+sil @selfinit_delegate : $@convention(thin) (@thin MyStruct2.Type) -> @out MyStruct2
+
+sil @self_init_copyaddr : $@convention(thin) (@thin MyStruct2.Type) -> @out MyStruct2 {
+bb0(%0 : @trivial $*MyStruct2, %1 : @trivial $@thin MyStruct2.Type):
+  %2 = alloc_stack $MyStruct2, var, name "sf"
+  %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct2
+  %6 = metatype $@thin MyStruct2.Type
+  %7 = function_ref @selfinit_delegate : $@convention(thin) (@thin MyStruct2.Type) -> @out MyStruct2
+  %8 = alloc_stack $MyStruct2
+  apply %7(%8, %6) : $@convention(thin) (@thin MyStruct2.Type) -> @out MyStruct2
+  copy_addr [take] %8 to %3 : $*MyStruct2
+  dealloc_stack %8 : $*MyStruct2
+  copy_addr [take] %3 to [initialization] %0 : $*MyStruct2
+  dealloc_stack %2 : $*MyStruct2
+  %13 = tuple ()
+  return %13 : $()
+}
+
+class RootClassWithNontrivialStoredProperties {
+  var x, y: SomeClass
+  init()
+}
+
+class DerivedClassWithNontrivialStoredProperties : RootClassWithNontrivialStoredProperties {
+  var a, b: SomeClass
+  override init()
+}
+
+sil @test_root_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
+  %4 = mark_uninitialized [rootself] %0 : $RootClassWithNontrivialStoredProperties
+  destroy_value %4 : $RootClassWithNontrivialStoredProperties
+  %13 = tuple ()
+  return %13 : $()
+}
+
+sil @test_root_partial_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
+  %4 = mark_uninitialized [rootself] %0 : $RootClassWithNontrivialStoredProperties
+  %1 = alloc_ref $SomeClass
+  %5 = begin_borrow %4 : $RootClassWithNontrivialStoredProperties
+  %2 = ref_element_addr %5 : $RootClassWithNontrivialStoredProperties, #RootClassWithNontrivialStoredProperties.x
+  assign %1 to %2 : $*SomeClass
+  end_borrow %5 from %4 : $RootClassWithNontrivialStoredProperties, $RootClassWithNontrivialStoredProperties
+  destroy_value %4 : $RootClassWithNontrivialStoredProperties
+  %13 = tuple ()
+  return %13 : $()
+}
+
+sil @test_derived_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
+  %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties
+  %4 = mark_uninitialized [derivedself] %1 : $*DerivedClassWithNontrivialStoredProperties
+  store %0 to [init] %4 : $*DerivedClassWithNontrivialStoredProperties
+  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties
+  dealloc_stack %1 : $*DerivedClassWithNontrivialStoredProperties
+  %13 = tuple ()
+  return %13 : $()
+}
+
+sil @test_derived_partial_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
+  %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties
+  %4 = mark_uninitialized [derivedself] %1 : $*DerivedClassWithNontrivialStoredProperties
+  store %0 to [init] %4 : $*DerivedClassWithNontrivialStoredProperties
+
+  %8 = alloc_ref $SomeClass
+
+  %9 = load_borrow %4 : $*DerivedClassWithNontrivialStoredProperties
+  %10 = ref_element_addr %9 : $DerivedClassWithNontrivialStoredProperties, #DerivedClassWithNontrivialStoredProperties.a
+  assign %8 to %10 : $*SomeClass
+  end_borrow %9 from %4 : $DerivedClassWithNontrivialStoredProperties, $*DerivedClassWithNontrivialStoredProperties
+
+  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties
+  dealloc_stack %1 : $*DerivedClassWithNontrivialStoredProperties
+  %13 = tuple ()
+  return %13 : $()
+}
+
+sil @test_delegating_box_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>, 0
+  %4 = mark_uninitialized [delegatingself] %2a : $*RootClassWithNontrivialStoredProperties
+  store %0 to [init] %4 : $*RootClassWithNontrivialStoredProperties
+  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
+  %13 = tuple ()
+  return %13 : $()
+}
+
+sil @test_delegating_rvalue_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>, 0
+  %4 = mark_uninitialized [delegatingself] %2a : $*RootClassWithNontrivialStoredProperties
+  store %0 to [init] %4 : $*RootClassWithNontrivialStoredProperties
+  %6 = load [take] %4 : $*RootClassWithNontrivialStoredProperties
+  destroy_value %6 : $RootClassWithNontrivialStoredProperties
+  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
+  %13 = tuple ()
+  return %13 : $()
+}
+
+sil @test_delegating_derived_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
+  %2 = alloc_stack $DerivedClassWithNontrivialStoredProperties
+  %4 = mark_uninitialized [delegatingself] %2 : $*DerivedClassWithNontrivialStoredProperties
+  store %0 to [init] %4 : $*DerivedClassWithNontrivialStoredProperties
+  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties
+  dealloc_stack %2 : $*DerivedClassWithNontrivialStoredProperties
+  %13 = tuple ()
+  return %13 : $()
+}
+
+sil @super_init_out_of_order :  $@convention(method) (@owned DerivedClassWithIVars, Builtin.Int32) -> @owned DerivedClassWithIVars {
+bb0(%0 : @owned $DerivedClassWithIVars, %i : @trivial $Builtin.Int32):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
+  %3 = mark_uninitialized [derivedself] %1a : $*DerivedClassWithIVars
+  store %0 to [init] %3 : $*DerivedClassWithIVars
+
+  %8 = load_borrow %3 : $*DerivedClassWithIVars
+  %9 = ref_element_addr %8 : $DerivedClassWithIVars, #DerivedClassWithIVars.a
+  assign %i to %9 : $*Builtin.Int32
+  end_borrow %8 from %3 : $DerivedClassWithIVars, $*DerivedClassWithIVars
+
+  %a = load [take] %3 : $*DerivedClassWithIVars
+  %b = upcast %a : $DerivedClassWithIVars to $RootClassWithIVars
+  %borrowed_b = begin_borrow %b : $RootClassWithIVars
+  %c = ref_element_addr %borrowed_b : $RootClassWithIVars, #RootClassWithIVars.x
+  load [trivial] %c : $*Builtin.Int32
+  end_borrow %borrowed_b from %b : $RootClassWithIVars, $RootClassWithIVars
+  %14 = function_ref @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+  %15 = apply %14(%b) : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
+
+  %16 = unconditional_checked_cast %15 : $RootClassWithIVars to $DerivedClassWithIVars
+  assign %16 to %3 : $*DerivedClassWithIVars
+  %18 = load [copy] %3 : $*DerivedClassWithIVars
+  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
+  return %18 : $DerivedClassWithIVars
+}
+
+
+struct MyStruct3 {
+  @sil_stored var c: C
+}
+sil @selfinit_mystruct3 : $@convention(thin) () -> @owned MyStruct3
+
+sil hidden @test_conditional_destroy_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : @trivial $Builtin.Int1):
+  %2 = alloc_stack $MyStruct3
+  %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct3
+  cond_br %0, bb1, bb2
+
+bb1:
+  %9 = function_ref @selfinit_mystruct3 : $@convention(thin) () -> @owned MyStruct3
+  %10 = apply %9() : $@convention(thin) () -> @owned MyStruct3
+  assign %10 to %3 : $*MyStruct3
+  br bb2
+
+bb2:
+  destroy_addr %3 : $*MyStruct3
+  dealloc_stack %2 : $*MyStruct3
+  %15 = tuple ()
+  return %15 : $()
+}
+
+class MyClass3 {
+}
+sil @selfinit_myclass3 : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
+
+sil hidden @test_conditional_destroy_class_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : @trivial $Builtin.Int1):
+  %2 = alloc_stack $MyClass3
+  %3 = mark_uninitialized [delegatingself] %2 : $*MyClass3
+  cond_br %0, bb1, bb2
+
+bb1:
+  %4 = load [take] %3 : $*MyClass3
+  %5 = function_ref @selfinit_myclass3 : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
+  %6 = apply %5(%4) : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
+  store %6 to [init] %3 : $*MyClass3
+  br bb2
+
+bb2:
+  destroy_addr %3 : $*MyClass3
+  dealloc_stack %2 : $*MyClass3
+  %7 = tuple ()
+  return %7 : $()
+}

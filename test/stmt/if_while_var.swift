@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct NonOptionalStruct {}
 enum NonOptionalEnum { case foo }
@@ -57,8 +57,8 @@ if let x = foo() {
 
 var opt: Int? = .none
 
-if let x = opt {}
-if var x = opt {}
+if let x = opt {} // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}}
+if var x = opt {} // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}}
 
 // <rdar://problem/20800015> Fix error message for invalid if-let
 let someInteger = 1
@@ -67,21 +67,21 @@ if case let y? = someInteger {}  // expected-error {{'?' pattern cannot match va
 
 // Test multiple clauses on "if let".
 if let x = opt, let y = opt, x != y,
-   let a = opt, var b = opt {
+   let a = opt, var b = opt { // expected-warning {{immutable value 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
 }
 
 // Leading boolean conditional.
 if 1 != 2, let x = opt,
    y = opt,  // expected-error {{expected 'let' in conditional}} {{4-4=let }}
    x != y,
-   let a = opt, var b = opt {
+   let a = opt, var b = opt { // expected-warning {{immutable value 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
 }
 
 // <rdar://problem/20457938> typed pattern is not allowed on if/let condition
-if 1 != 2, let x : Int? = opt {}
+if 1 != 2, let x : Int? = opt {} // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
 // expected-warning @-1 {{explicitly specified type 'Int?' adds an additional level of optional to the initializer, making the optional check always succeed}} {{20-26=Int}}
 
-if 1 != 2, case let x? : Int? = 42 {}
+if 1 != 2, case let x? : Int? = 42 {} // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
 // expected-warning @-1 {{non-optional expression of type 'Int' used in a check for optionals}}
 
 
@@ -91,11 +91,11 @@ if 1 != 2, case let x? : Int? = 42 {}
 if 1 != 2, { // expected-error {{'() -> ()' is not convertible to 'Bool'}}
 } // expected-error {{expected '{' after 'if' condition}}
 if 1 != 2, 4 == 57 {}
-if 1 != 2, 4 == 57, let x = opt {}
+if 1 != 2, 4 == 57, let x = opt {} // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
 
 // Test that these don't cause the parser to crash.
-if true { if a == 0; {} }   // expected-error {{expected '{' after 'if' condition}} expected-error 3{{}}
-if a == 0, where b == 0 {}  // expected-error 4{{}} expected-note {{}} {{25-25=_ = }}
+if true { if a == 0; {} }   // expected-error {{expected '{' after 'if' condition}} expected-error 2{{}} expected-note 1{{}}
+if a == 0, where b == 0 {}  // expected-error 3{{}} expected-note {{}} {{25-25=do }}
 
 
 

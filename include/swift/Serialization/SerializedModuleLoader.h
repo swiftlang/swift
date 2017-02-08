@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -48,6 +48,13 @@ public:
   SerializedModuleLoader &operator=(const SerializedModuleLoader &) = delete;
   SerializedModuleLoader &operator=(SerializedModuleLoader &&) = delete;
 
+  /// \brief Check whether the module with a given name can be imported without
+  /// importing it.
+  ///
+  /// Note that even if this check succeeds, errors may still occur if the
+  /// module is loaded in full.
+  virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) override;
+
   /// \brief Import a module with the given module path.
   ///
   /// \param importLoc The location of the 'import' keyword.
@@ -57,7 +64,7 @@ public:
   ///
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns a FailedImportModule object.
-  virtual Module *
+  virtual ModuleDecl *
   loadModule(SourceLoc importLoc,
              ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
 
@@ -65,7 +72,7 @@ public:
   ///
   /// If the AST cannot be loaded and \p diagLoc is present, a diagnostic is
   /// printed. (Note that \p diagLoc is allowed to be invalid.)
-  FileUnit *loadAST(Module &M, Optional<SourceLoc> diagLoc,
+  FileUnit *loadAST(ModuleDecl &M, Optional<SourceLoc> diagLoc,
                     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
                     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
                     bool isFramework = false);
@@ -97,24 +104,25 @@ public:
 class SerializedASTFile final : public LoadedFile {
   friend class SerializedModuleLoader;
   friend class SerializedSILLoader;
+  friend class ModuleFile;
 
   ModuleFile &File;
   bool IsSIB;
 
   ~SerializedASTFile() = default;
 
-  SerializedASTFile(Module &M, ModuleFile &file, bool isSIB = false)
+  SerializedASTFile(ModuleDecl &M, ModuleFile &file, bool isSIB = false)
     : LoadedFile(FileUnitKind::SerializedAST, M), File(file), IsSIB(isSIB) {}
 
   void
-  collectLinkLibrariesFromImports(Module::LinkLibraryCallback callback) const;
+  collectLinkLibrariesFromImports(ModuleDecl::LinkLibraryCallback callback) const;
 
 public:
   bool isSIB() const { return IsSIB; }
 
   virtual bool isSystemModule() const override;
 
-  virtual void lookupValue(Module::AccessPathTy accessPath,
+  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath,
                            DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
@@ -126,15 +134,15 @@ public:
   virtual PrecedenceGroupDecl *
   lookupPrecedenceGroup(Identifier name) const override;
 
-  virtual void lookupVisibleDecls(Module::AccessPathTy accessPath,
+  virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer,
                                   NLKind lookupKind) const override;
 
-  virtual void lookupClassMembers(Module::AccessPathTy accessPath,
+  virtual void lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer) const override;
 
   virtual void
-  lookupClassMember(Module::AccessPathTy accessPath, DeclName name,
+  lookupClassMember(ModuleDecl::AccessPathTy accessPath, DeclName name,
                     SmallVectorImpl<ValueDecl*> &decls) const override;
 
   /// Find all Objective-C methods with the given selector.
@@ -163,11 +171,11 @@ public:
   virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const override;
 
   virtual void
-  getImportedModules(SmallVectorImpl<Module::ImportedModule> &imports,
-                     Module::ImportFilter filter) const override;
+  getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
+                     ModuleDecl::ImportFilter filter) const override;
 
   virtual void
-  collectLinkLibraries(Module::LinkLibraryCallback callback) const override;
+  collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
 

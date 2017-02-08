@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name TestModule -parse -verify %s
+// RUN: %target-swift-frontend -module-name TestModule -typecheck -verify %s
 
 // Test non-overloaded global function references.
 func f1(a: Int, b: Int) -> Int { }

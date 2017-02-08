@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 typealias rgb = Int32 // expected-note {{declared here}}
 var rgb : rgb? // expected-error {{invalid redeclaration of 'rgb'}}
@@ -7,7 +7,7 @@ var rgb : rgb? // expected-error {{invalid redeclaration of 'rgb'}}
 // type, but arguably that is incorrect, since we are referencing a
 // different 'rgba'.
 struct Color {
-    var rgba : rgba? { // expected-error {{'rgba' used within its own type}}
+    var rgba : rgba? {
         return nil
     }
 

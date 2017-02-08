@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -31,6 +32,35 @@ Type Type::join(Type type1, Type type2) {
   // If the types are equivalent, the join is obvious.
   if (type1->isEqual(type2))
     return type1;
+
+  // If both are class metatypes, compute the join of the instance type and
+  // wrap the result in a metatype.
+  if (auto *metatype1 = type1->getAs<MetatypeType>()) {
+    if (auto *metatype2 = type2->getAs<MetatypeType>()) {
+      auto instance1 = metatype1->getInstanceType();
+      auto instance2 = metatype2->getInstanceType();
+      if (instance1->mayHaveSuperclass() &&
+          instance2->mayHaveSuperclass()) {
+        auto result = Type::join(instance1, instance2);
+        if (!result)
+          return result;
+        return MetatypeType::get(result);
+      }
+    }
+  }
+
+  // If both are existential metatypes, compute the join of the instance type
+  // and wrap the result in an existential metatype.
+  if (auto *metatype1 = type1->getAs<ExistentialMetatypeType>()) {
+    if (auto *metatype2 = type2->getAs<ExistentialMetatypeType>()) {
+      auto instance1 = metatype1->getInstanceType();
+      auto instance2 = metatype2->getInstanceType();
+      auto result = Type::join(instance1, instance2);
+      if (!result)
+        return result;
+      return ExistentialMetatypeType::get(result);
+    }
+  }
 
   // If both are class types or opaque types that potentially have superclasses,
   // find the common superclass.

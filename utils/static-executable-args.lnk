@@ -1,0 +1,13 @@
+-static
+-lswiftCore
+-lswiftImageInspectionStatic
+-Xlinker
+--defsym=__import_pthread_self=pthread_self
+-Xlinker
+--defsym=__import_pthread_once=pthread_once
+-Xlinker
+--defsym=__import_pthread_key_create=pthread_key_create
+-lpthread
+-licui18n
+-licuuc
+-licudata

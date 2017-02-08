@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // Warn about non-trailing closures followed by parameters with
 // default arguments.

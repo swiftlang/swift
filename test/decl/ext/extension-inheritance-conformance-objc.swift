@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -import-objc-header %S/Inputs/extension-inheritance-conformance-objc.h -parse -verify %s
+// RUN: %target-swift-frontend -import-objc-header %S/Inputs/extension-inheritance-conformance-objc.h -typecheck -verify %s
 
 // REQUIRES: objc_interop
 

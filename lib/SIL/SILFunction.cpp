@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -16,7 +16,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/CFG.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/CommandLine.h"
@@ -25,33 +24,41 @@
 using namespace swift;
 using namespace Lowering;
 
-SILSpecializeAttr::SILSpecializeAttr(ArrayRef<Substitution> subs)
-  : numSubs(subs.size()) {
-  std::copy(subs.begin(), subs.end(), getTrailingObjects<Substitution>());
+ArrayRef<Requirement> SILSpecializeAttr::getRequirements() const {
+  return {const_cast<SILSpecializeAttr *>(this)->getRequirementsData(),
+          numRequirements};
+}
+
+SILSpecializeAttr::SILSpecializeAttr(ArrayRef<Requirement> requirements,
+                                     bool exported, SpecializationKind kind)
+    : numRequirements(requirements.size()), kind(kind), exported(exported) {
+  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
 }
 
 SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
-                                             ArrayRef<Substitution> subs) {
+                                             ArrayRef<Requirement> requirements,
+                                             bool exported,
+                                             SpecializationKind kind) {
   unsigned size =
-    sizeof(SILSpecializeAttr) + (subs.size() * sizeof(Substitution));
+      sizeof(SILSpecializeAttr) + sizeof(Requirement) * requirements.size();
   void *buf = M.allocate(size, alignof(SILSpecializeAttr));
-  return ::new (buf) SILSpecializeAttr(subs);
+  return ::new (buf) SILSpecializeAttr(requirements, exported, kind);
 }
 
-SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
-                                 StringRef name,
-                                 CanSILFunctionType loweredType,
-                                 GenericEnvironment *genericEnv,
-                                 Optional<SILLocation> loc,
-                                 IsBare_t isBareSILFunction,
-                                 IsTransparent_t isTrans,
-                                 IsFragile_t isFragile,
-                                 IsThunk_t isThunk,
-                                 ClassVisibility_t classVisibility,
-                                 Inline_t inlineStrategy, EffectsKind E,
-                                 SILFunction *insertBefore,
-                                 const SILDebugScope *debugScope,
-                                 DeclContext *DC) {
+void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
+  if (getLoweredFunctionType()->getGenericSignature()) {
+    Attr->F = this;
+    SpecializeAttrSet.push_back(Attr);
+  }
+}
+
+SILFunction *SILFunction::create(
+    SILModule &M, SILLinkage linkage, StringRef name,
+    CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
+    Optional<SILLocation> loc, IsBare_t isBareSILFunction,
+    IsTransparent_t isTrans, IsFragile_t isFragile, IsThunk_t isThunk,
+    ClassVisibility_t classVisibility, Inline_t inlineStrategy, EffectsKind E,
+    SILFunction *insertBefore, const SILDebugScope *debugScope) {
   // Get a StringMapEntry for the function.  As a sop to error cases,
   // allow the name to have an empty string.
   llvm::StringMapEntry<SILFunction*> *entry = nullptr;
@@ -61,11 +68,10 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
     name = entry->getKey();
   }
 
-  auto fn = new (M) SILFunction(M, linkage, name,
-                                loweredType, genericEnv, loc,
-                                isBareSILFunction, isTrans, isFragile, isThunk,
-                                classVisibility, inlineStrategy, E,
-                                insertBefore, debugScope, DC);
+  auto fn = new (M)
+      SILFunction(M, linkage, name, loweredType, genericEnv, loc,
+                  isBareSILFunction, isTrans, isFragile, isThunk,
+                  classVisibility, inlineStrategy, E, insertBefore, debugScope);
 
   if (entry) entry->setValue(fn);
   return fn;
@@ -79,11 +85,11 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          IsThunk_t isThunk, ClassVisibility_t classVisibility,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
-                         const SILDebugScope *DebugScope, DeclContext *DC)
+                         const SILDebugScope *DebugScope)
     : Module(Module), Name(Name), LoweredType(LoweredType),
-      GenericEnv(genericEnv), DeclCtx(DC), DebugScope(DebugScope),
-      Bare(isBareSILFunction), Transparent(isTrans), Fragile(isFragile),
-      Thunk(isThunk), ClassVisibility(classVisibility), GlobalInitFlag(false),
+      GenericEnv(genericEnv), DebugScope(DebugScope), Bare(isBareSILFunction),
+      Transparent(isTrans), Fragile(isFragile), Thunk(isThunk),
+      ClassVisibility(classVisibility), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
       KeepAsPublic(false), EffectsKindAttr(E) {
   if (InsertBefore)
@@ -124,25 +130,6 @@ SILFunction::~SILFunction() {
          "Function cannot be deleted while function_ref's still exist");
 }
 
-void SILFunction::setDeclContext(Decl *D) {
-  if (!D)
-    return;
-  switch (D->getKind()) {
-  // These four dual-inherit from DeclContext.
-  case DeclKind::Func:        DeclCtx = cast<FuncDecl>(D); break;
-  case DeclKind::Constructor: DeclCtx = cast<ConstructorDecl>(D); break;
-  case DeclKind::Extension:   DeclCtx = cast<ExtensionDecl>(D);   break;
-  case DeclKind::Destructor:  DeclCtx = cast<DestructorDecl>(D);  break;
-  default:
-    DeclCtx = D->getDeclContext();
-  }
-  assert(DeclCtx);
-}
-
-void SILFunction::setDeclContext(Expr *E) {
-  DeclCtx = dyn_cast_or_null<AbstractClosureExpr>(E);
-}
-
 bool SILFunction::hasForeignBody() const {
   if (!hasClangNode()) return false;
   return SILDeclRef::isClangGenerated(getClangNode());
@@ -152,7 +139,7 @@ void SILFunction::numberValues(llvm::DenseMap<const ValueBase*,
                                unsigned> &ValueToNumberMap) const {
   unsigned idx = 0;
   for (auto &BB : *this) {
-    for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
+    for (auto I = BB.args_begin(), E = BB.args_end(); I != E; ++I)
       ValueToNumberMap[*I] = idx++;
     
     for (auto &I : BB)
@@ -172,9 +159,8 @@ bool SILFunction::shouldOptimize() const {
 }
 
 Type SILFunction::mapTypeIntoContext(Type type) const {
-  return ArchetypeBuilder::mapTypeIntoContext(getModule().getSwiftModule(),
-                                              getGenericEnvironment(),
-                                              type);
+  return GenericEnvironment::mapTypeIntoContext(
+      getGenericEnvironment(), type);
 }
 
 namespace {
@@ -225,7 +211,7 @@ struct SubstDependentSILType
       }));
 
     SmallVector<SILResultInfo, 4> results;
-    for (auto &result : t->getAllResults())
+    for (auto &result : t->getResults())
       results.push_back(result.map([&](CanType pt) -> CanType {
         return visit(pt);
       }));
@@ -267,16 +253,19 @@ SILType SILFunction::mapTypeIntoContext(SILType type) const {
     type);
 }
 
-SILType ArchetypeBuilder::substDependentType(SILModule &M, SILType type) {
+SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
+                                               SILType type) const {
   return doSubstDependentSILType(M,
-    [&](CanType t) { return substDependentType(t)->getCanonicalType(); },
+    [&](CanType t) {
+      return mapTypeIntoContext(t)->getCanonicalType();
+    },
     type);
 }
 
 Type SILFunction::mapTypeOutOfContext(Type type) const {
-  return ArchetypeBuilder::mapTypeOutOfContext(getModule().getSwiftModule(),
-                                               getGenericEnvironment(),
-                                               type);
+  return GenericEnvironment::mapTypeOutOfContext(
+      getGenericEnvironment(),
+      type);
 }
 
 bool SILFunction::isNoReturnFunction() const {
@@ -286,6 +275,10 @@ bool SILFunction::isNoReturnFunction() const {
 
 SILBasicBlock *SILFunction::createBasicBlock() {
   return new (getModule()) SILBasicBlock(this);
+}
+
+SILBasicBlock *SILFunction::createBasicBlock(SILBasicBlock *AfterBlock) {
+  return new (getModule()) SILBasicBlock(this, AfterBlock);
 }
 
 //===----------------------------------------------------------------------===//
@@ -311,8 +304,7 @@ LLBehavior("view-cfg-long-line-behavior",
                clEnumValN(LongLineBehavior::None, "none", "Print everything"),
                clEnumValN(LongLineBehavior::Truncate, "truncate",
                           "Truncate long lines"),
-               clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines"),
-               clEnumValEnd));
+               clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines")));
 
 static llvm::cl::opt<bool>
 RemoveUseListComments("view-cfg-remove-use-list-comments",
@@ -460,7 +452,7 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
     return "";
   }
 };
-} // end llvm namespace
+} // namespace llvm
 #endif
 
 #ifndef NDEBUG
@@ -484,11 +476,11 @@ void SILFunction::viewCFG() const {
 /// Returns true if this function has either a self metadata argument or
 /// object from which Self metadata may be obtained.
 bool SILFunction::hasSelfMetadataParam() const {
-  auto paramTypes = getLoweredFunctionType()->getParameterSILTypes();
+  auto paramTypes = getConventions().getParameterSILTypes();
   if (paramTypes.empty())
     return false;
 
-  auto silTy = paramTypes.back();
+  auto silTy = *std::prev(paramTypes.end());
   if (!silTy.isClassOrClassMetatype())
     return false;
 
@@ -539,7 +531,7 @@ void SILFunction::convertToDeclaration() {
   getBlocks().clear();
 }
 
-ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
+SubstitutionList SILFunction::getForwardingSubstitutions() {
   if (ForwardingSubs)
     return *ForwardingSubs;
 
@@ -547,8 +539,14 @@ ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
   if (!env)
     return {};
 
-  auto *M = getModule().getSwiftModule();
-  ForwardingSubs = env->getForwardingSubstitutions(M);
-
+  ForwardingSubs = env->getForwardingSubstitutions();
   return *ForwardingSubs;
+}
+
+const TypeLowering &SILFunction::getTypeLowering(SILType InputType) const {
+  CanSILFunctionType FuncType = getLoweredFunctionType();
+  auto &TypeConverter = getModule().Types;
+  GenericContextScope GCS(TypeConverter, FuncType->getGenericSignature());
+  const TypeLowering &Result = TypeConverter.getTypeLowering(InputType);
+  return Result;
 }

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -201,20 +201,7 @@ struct ilist_traits<::swift::SILGlobalVariable> :
 public ilist_default_traits<::swift::SILGlobalVariable> {
   typedef ::swift::SILGlobalVariable SILGlobalVariable;
 
-private:
-  mutable ilist_half_node<SILGlobalVariable> Sentinel;
-
 public:
-  SILGlobalVariable *createSentinel() const {
-    return static_cast<SILGlobalVariable*>(&Sentinel);
-  }
-  void destroySentinel(SILGlobalVariable *) const {}
-
-  SILGlobalVariable *provideInitialHead() const { return createSentinel(); }
-  SILGlobalVariable *ensureHead(SILGlobalVariable*) const {
-    return createSentinel();
-  }
-  static void noteHead(SILGlobalVariable*, SILGlobalVariable*) {}
   static void deleteNode(SILGlobalVariable *V) {}
   
 private:

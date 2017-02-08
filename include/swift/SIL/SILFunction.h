@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -32,28 +32,63 @@ namespace swift {
 class ASTContext;
 class SILInstruction;
 class SILModule;
+namespace Lowering {
+class TypeLowering;
+} // namespace Lowering
 
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
 enum Inline_t { InlineDefault, NoInline, AlwaysInline };
 enum IsThunk_t { IsNotThunk, IsThunk, IsReabstractionThunk };
 
-class SILSpecializeAttr final :
-    private llvm::TrailingObjects<SILSpecializeAttr, Substitution> {
-  friend TrailingObjects;
-
-  unsigned numSubs;
-  
-  SILSpecializeAttr(ArrayRef<Substitution> subs);
-
+class SILSpecializeAttr final {
+  friend SILFunction;
 public:
-  static SILSpecializeAttr *create(SILModule &M, ArrayRef<Substitution> subs);
+  enum class SpecializationKind {
+    Full,
+    Partial
+  };
 
-  ArrayRef<Substitution> getSubstitutions() const {
-    return { getTrailingObjects<Substitution>(), numSubs };
+  static SILSpecializeAttr *create(SILModule &M,
+                                   ArrayRef<Requirement> requirements,
+                                   bool exported, SpecializationKind kind);
+
+  ArrayRef<Requirement> getRequirements() const;
+
+  bool isExported() const {
+    return exported;
   }
-  
+
+  bool isFullSpecialization() const {
+    return kind == SpecializationKind::Full;
+  }
+
+  bool isPartialSpecialization() const {
+    return kind == SpecializationKind::Partial;
+  }
+
+  SpecializationKind getSpecializationKind() const {
+    return kind;
+  }
+
+  SILFunction *getFunction() const {
+    return F;
+  }
+
   void print(llvm::raw_ostream &OS) const;
+
+private:
+  unsigned numRequirements;
+  SpecializationKind kind;
+  bool exported;
+  SILFunction *F;
+
+  SILSpecializeAttr(ArrayRef<Requirement> requirements, bool exported,
+                    SpecializationKind kind);
+
+  Requirement *getRequirementsData() {
+    return reinterpret_cast<Requirement *>(this+1);
+  }
 };
 
 /// SILFunction - A function body that has been lowered to SIL. This consists of
@@ -95,14 +130,11 @@ private:
   GenericEnvironment *GenericEnv;
 
   /// The forwarding substitutions, lazily computed.
-  Optional<ArrayRef<Substitution>> ForwardingSubs;
+  Optional<SubstitutionList> ForwardingSubs;
 
   /// The collection of all BasicBlocks in the SILFunction. Empty for external
   /// function references.
   BlockListType BlockList;
-
-  /// The declcontext of this function.
-  DeclContext *DeclCtx;
 
   /// The owning declaration of this function's clang node, if applicable.
   ValueDecl *ClangNodeOwner = nullptr;
@@ -183,35 +215,25 @@ private:
   /// after the pass runs, we only see a semantic-arc world.
   bool HasQualifiedOwnership = true;
 
-  SILFunction(SILModule &module, SILLinkage linkage,
-              StringRef mangledName, CanSILFunctionType loweredType,
-              GenericEnvironment *genericEnv,
-              Optional<SILLocation> loc,
-              IsBare_t isBareSILFunction,
-              IsTransparent_t isTrans,
-              IsFragile_t isFragile,
-              IsThunk_t isThunk,
-              ClassVisibility_t classVisibility,
-              Inline_t inlineStrategy, EffectsKind E,
-              SILFunction *insertBefore,
-              const SILDebugScope *debugScope,
-              DeclContext *DC);
+  SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
+              CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
+              Optional<SILLocation> loc, IsBare_t isBareSILFunction,
+              IsTransparent_t isTrans, IsFragile_t isFragile, IsThunk_t isThunk,
+              ClassVisibility_t classVisibility, Inline_t inlineStrategy,
+              EffectsKind E, SILFunction *insertBefore,
+              const SILDebugScope *debugScope);
 
-  static SILFunction *create(SILModule &M, SILLinkage linkage, StringRef name,
-                             CanSILFunctionType loweredType,
-                             GenericEnvironment *genericEnv,
-                             Optional<SILLocation> loc,
-                             IsBare_t isBareSILFunction,
-                             IsTransparent_t isTrans,
-                             IsFragile_t isFragile,
-                             IsThunk_t isThunk = IsNotThunk,
-                             ClassVisibility_t classVisibility = NotRelevant,
-                             Inline_t inlineStrategy = InlineDefault,
-                             EffectsKind EffectsKindAttr =
-                               EffectsKind::Unspecified,
-                             SILFunction *InsertBefore = nullptr,
-                             const SILDebugScope *DebugScope = nullptr,
-                             DeclContext *DC = nullptr);
+  static SILFunction *
+  create(SILModule &M, SILLinkage linkage, StringRef name,
+         CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
+         Optional<SILLocation> loc, IsBare_t isBareSILFunction,
+         IsTransparent_t isTrans, IsFragile_t isFragile,
+         IsThunk_t isThunk = IsNotThunk,
+         ClassVisibility_t classVisibility = NotRelevant,
+         Inline_t inlineStrategy = InlineDefault,
+         EffectsKind EffectsKindAttr = EffectsKind::Unspecified,
+         SILFunction *InsertBefore = nullptr,
+         const SILDebugScope *DebugScope = nullptr);
 
 public:
   ~SILFunction();
@@ -223,6 +245,9 @@ public:
   }
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType;
+  }
+  SILFunctionConventions getConventions() const {
+    return SILFunctionConventions(LoweredType, getModule());
   }
 
   bool isNoReturnFunction() const;
@@ -323,8 +348,8 @@ public:
   }
 
   // Returns true if the function has indirect out parameters.
-  bool hasIndirectResults() const {
-    return getLoweredFunctionType()->getNumIndirectResults() > 0;
+  bool hasIndirectFormalResults() const {
+    return getLoweredFunctionType()->hasIndirectFormalResults();
   }
 
   /// Returns true if this function either has a self metadata argument or
@@ -401,10 +426,9 @@ public:
   bool isExternallyUsedSymbol() const;
 
   /// Get the DeclContext of this function. (Debug info only).
-  DeclContext *getDeclContext() const { return DeclCtx; }
-  void setDeclContext(Decl *D);
-  void setDeclContext(Expr *E);
-  void setDeclCtx(DeclContext *D) { DeclCtx = D; }
+  DeclContext *getDeclContext() const {
+    return getLocation().getAsDeclContext();
+  }
 
   /// \returns True if the function is marked with the @_semantics attribute
   /// and has special semantics that the optimizer can use to optimize the
@@ -452,9 +476,7 @@ public:
   /// Removes all specialize attributes from this function.
   void clearSpecializeAttrs() { SpecializeAttrSet.clear(); }
 
-  void addSpecializeAttr(SILSpecializeAttr *attr) {
-    SpecializeAttrSet.push_back(attr);
-  }
+  void addSpecializeAttr(SILSpecializeAttr *Attr);
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),
   ///          or is raw SIL (so that the mandatory passes still run).
@@ -577,6 +599,10 @@ public:
     GenericEnv = env;
   }
 
+  /// Returns the type lowering for the \p Type given the generic signature of
+  /// the current function.
+  const Lowering::TypeLowering &getTypeLowering(SILType Type) const;
+
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
@@ -596,7 +622,7 @@ public:
 
   /// Return the identity substitutions necessary to forward this call if it is
   /// generic.
-  ArrayRef<Substitution> getForwardingSubstitutions();
+  SubstitutionList getForwardingSubstitutions();
 
   //===--------------------------------------------------------------------===//
   // Block List Access
@@ -618,7 +644,11 @@ public:
   SILBasicBlock &front() { return *begin(); }
   const SILBasicBlock &front() const { return *begin(); }
 
+  SILBasicBlock *getEntryBlock() { return &front(); }
+  const SILBasicBlock *getEntryBlock() const { return &front(); }
+
   SILBasicBlock *createBasicBlock();
+  SILBasicBlock *createBasicBlock(SILBasicBlock *After);
 
   /// Splice the body of \p F into this function at end.
   void spliceBody(SILFunction *F) {
@@ -671,29 +701,29 @@ public:
 
   SILArgument *getArgument(unsigned i) {
     assert(!empty() && "Cannot get argument of a function without a body");
-    return begin()->getBBArg(i);
+    return begin()->getArgument(i);
   }
 
   const SILArgument *getArgument(unsigned i) const {
     assert(!empty() && "Cannot get argument of a function without a body");
-    return begin()->getBBArg(i);
+    return begin()->getArgument(i);
   }
 
   ArrayRef<SILArgument *> getArguments() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
-    return begin()->getBBArgs();
+    return begin()->getArguments();
   }
 
   ArrayRef<SILArgument *> getIndirectResults() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
-    return begin()->getBBArgs().slice(0,
-                            getLoweredFunctionType()->getNumIndirectResults());
+    return begin()->getArguments().slice(
+        0, getConventions().getNumIndirectSILResults());
   }
 
   ArrayRef<SILArgument *> getArgumentsWithoutIndirectResults() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
-    return begin()->getBBArgs().slice(
-                            getLoweredFunctionType()->getNumIndirectResults());
+    return begin()->getArguments().slice(
+        getConventions().getNumIndirectSILResults());
   }
 
   const SILArgument *getSelfArgument() const {
@@ -774,18 +804,7 @@ struct ilist_traits<::swift::SILFunction> :
 public ilist_default_traits<::swift::SILFunction> {
   typedef ::swift::SILFunction SILFunction;
 
-private:
-  mutable ilist_half_node<SILFunction> Sentinel;
-
 public:
-  SILFunction *createSentinel() const {
-    return static_cast<SILFunction*>(&Sentinel);
-  }
-  void destroySentinel(SILFunction *) const {}
-
-  SILFunction *provideInitialHead() const { return createSentinel(); }
-  SILFunction *ensureHead(SILFunction*) const { return createSentinel(); }
-  static void noteHead(SILFunction*, SILFunction*) {}
   static void deleteNode(SILFunction *V) { V->~SILFunction(); }
 
 private:

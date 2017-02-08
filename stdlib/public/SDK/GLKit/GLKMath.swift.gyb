@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // GLKit overlays for Swift
@@ -19,16 +19,6 @@
 // still doesn't know yet how to natively expose the elements of these types.
 // This overlay generates Swift accessors for the GLKit matrix and vector
 // types.
-
-%{
-# Each element of the array is a tuple of the element labels and the minimum
-# vector length at which to apply them.
-vectorElementNames = [
-  (['x', 'y', 'z', 'w'], 2),
-  (['s', 't', 'p', 'q'], 2),
-  (['r', 'g', 'b', 'a'], 3),
-]
-}%
 
 // Do dirty pointer manipulations to index an opaque struct like an array.
 @inline(__always)
@@ -58,69 +48,15 @@ def defineSubscript(Type, limit):
 % for size in [2, 3, 4]:
 
 extension GLKMatrix${size} {
-  public typealias _Tuple = (${ ', '.join(['Float'] * (size * size)) })
-  public var _tuple: _Tuple {
-    @inline(__always) get { return unsafeBitCast(self, to: _Tuple.self) }
-  }
-  % for i in xrange(0, size):
-  %   for j in xrange(0, size):
-  public var m${i}${j}: Float {
-    @inline(__always) get { return _tuple.${i * size + j} }
-  }
-  %   end
-  % end
-
   ${ defineSubscript("GLKMatrix" + str(size), size * size) }
 }
 
 extension GLKVector${size} {
-  public typealias _Tuple = (${ ', '.join(['Float'] * size) })
-  public var _tuple: _Tuple {
-    @inline(__always) get { return unsafeBitCast(self, to: _Tuple.self) }
-  }
-
-  % for (names, minSize) in vectorElementNames:
-  %   for i in xrange(0, size if size >= minSize else 0):
-  public var ${names[i]}: Float {
-    @inline(__always) get { return _tuple.${i} }
-  }
-  %   end
-  % end
-
   ${ defineSubscript("GLKVector" + str(size), size) }
 }
 
 % end
 
 extension GLKQuaternion {
-  public typealias _Tuple = (Float, Float, Float, Float)
-  public var _tuple: _Tuple {
-    @inline(__always) get { return unsafeBitCast(self, to: _Tuple.self) }
-  }
-
-  public var v: GLKVector3 {
-    @inline(__always) get {
-      let (i, j, k, _) = _tuple
-      return GLKVector3Make(i, j, k)
-    }
-  }
-
-  public var s: Float {
-    @inline(__always) get { return _tuple.3 }
-  }
-
-  public var x: Float {
-    @inline(__always) get { return _tuple.0 }
-  }
-  public var y: Float {
-    @inline(__always) get { return _tuple.1 }
-  }
-  public var z: Float {
-    @inline(__always) get { return _tuple.2 }
-  }
-  public var w: Float {
-    @inline(__always) get { return _tuple.3 }
-  }
-
   ${ defineSubscript("GLKQuaternion", 4) }
 }

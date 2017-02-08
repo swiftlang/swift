@@ -55,3 +55,10 @@ void useRenamedEnumObjC(RenamedEnumObjC);
 
 @interface AnotherClass (EnumProtoConformance) <EnumProto>
 @end
+
+@protocol AnotherProto
+@end
+@protocol ExtendsTwoProtosOneOfWhichIsFromSwift <BaseProto, AnotherProto>
+@end
+@interface ExtendsTwoProtosImpl : NSObject <ExtendsTwoProtosOneOfWhichIsFromSwift>
+@end

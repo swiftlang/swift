@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // <rdar://problem/20872721> QoI: warn about unused variables
 // <rdar://problem/15975935> warning that you can use 'let' not 'var'
@@ -251,4 +251,20 @@ func test2() {
   var ( b ) = 6 // expected-warning {{initialization of variable 'b' was never used; consider replacing with assignment to '_' or removing it}} {{3-12=_}}
   var c: Int = 4 // expected-warning {{variable 'c' was never used; consider replacing with '_' or removing it}} {{7-8=_}}
   let (d): Int = 9 // expected-warning {{immutable value 'd' was never used; consider replacing with '_' or removing it}} {{8-9=_}}
+}
+
+let optionalString: String? = "check"
+if let string = optionalString {}  // expected-warning {{value 'string' was defined but never used; consider replacing with boolean test}} {{4-17=}} {{31-31= != nil}}
+
+let optionalAny: Any? = "check"
+if let string = optionalAny as? String {} // expected-warning {{value 'string' was defined but never used; consider replacing with boolean test}} {{4-17=(}} {{39-39=) != nil}}
+
+// Due to the complexities of global variable tracing, these will not generate warnings
+let unusedVariable = ""
+var unNeededVar = false
+if unNeededVar {}
+guard let foo = optionalAny else {}
+
+for i in 0..<10 { // expected-warning {{immutable value 'i' was never used; consider replacing with '_' or removing it}} {{5-6=_}}
+   print("")
 }

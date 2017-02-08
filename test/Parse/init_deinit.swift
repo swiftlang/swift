@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 struct FooStructConstructorA {
   init // expected-error {{expected '('}}
@@ -11,12 +11,15 @@ struct FooStructConstructorB {
 struct FooStructConstructorC {
   init {} // expected-error {{expected '('}}{{7-7=()}}
   init<T> {} // expected-error {{expected '('}} {{10-10=()}}
+	// expected-error@-1{{generic parameter 'T' is not used in function signature}}
   init? { self.init() } // expected-error {{expected '('}} {{8-8=()}}
 }
 
 
 struct FooStructDeinitializerA {
   deinit // expected-error {{expected '{' for deinitializer}}
+  deinit x // expected-error {{deinitializers cannot have a name}} {{10-12=}}
+  deinit x() // expected-error {{deinitializers cannot have a name}} {{10-11=}}
 }
 
 struct FooStructDeinitializerB {

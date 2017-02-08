@@ -1,4 +1,4 @@
-// RUN: not %target-build-swift -parse %s 2>&1 | %FileCheck -check-prefix=CHECK-%target-os -check-prefix=CHECK-BOTH %s
+// RUN: not %target-build-swift -typecheck %s 2>&1 | %FileCheck -check-prefix=CHECK-%target-os -check-prefix=CHECK-BOTH %s
 // REQUIRES: executable_test
 
 struct IntWrapper {

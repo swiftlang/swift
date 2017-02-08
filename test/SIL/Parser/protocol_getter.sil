@@ -12,7 +12,7 @@ protocol TestP : class {
 sil @test : $@convention(method) (TestP) -> () {
 bb0(%0 : $TestP):
   %1 = open_existential_ref %0 : $TestP to $@opened("01234567-89ab-cdef-0123-000000000000") TestP
-  // CHECK: witness_method $@opened({{.*}}) TestP, #TestP.count!getter, %{{.*}} : $@opened({{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : TestP> (τ_0_0) -> Int
+  // CHECK: witness_method $@opened({{.*}}) TestP, #TestP.count!getter : {{.*}}, %{{.*}} : $@opened({{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : TestP> (τ_0_0) -> Int
   %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") TestP, #TestP.count!getter, %1 : $@opened("01234567-89ab-cdef-0123-000000000000") TestP : $@convention(witness_method) <T: TestP> (T) -> Int
   %3 = tuple ()
   return %3 : $()

@@ -37,7 +37,7 @@ func arrelt(s: inout S) {
 }
 
 
-class ArrayInClass {
+class Array_in_class {
   final var A : [Int]
   final var B : [Int]
   final var C : [[Int]]

@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -21,6 +21,7 @@
 #define SWIFT_INITIALIZER_H
 
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/Decl.h"
 
 namespace swift {
 class PatternBindingDecl;
@@ -147,16 +148,26 @@ class DefaultArgumentInitializer : public Initializer {
 public:
   explicit DefaultArgumentInitializer(DeclContext *parent, unsigned index)
       : Initializer(InitializerKind::DefaultArgument, parent) {
-    SpareBits = index;
+    SpareBits = (unsigned(ResilienceExpansion::Maximal) | index << 1);
   }
 
-  unsigned getIndex() const { return SpareBits; }
+  unsigned getIndex() const { return SpareBits >> 1; }
+
+  ResilienceExpansion getResilienceExpansion() const {
+    return ResilienceExpansion(SpareBits & 1);
+  }
 
   /// Change the parent of this context.  This is necessary because
   /// the function signature is parsed before the function
   /// declaration/expression itself is built.
   void changeFunction(AbstractFunctionDecl *parent);
-  
+
+  /// Change the resilience expansion of this context, necessary
+  /// for the same reason as above.
+  void changeResilienceExpansion(ResilienceExpansion expansion) {
+    SpareBits = (SpareBits & ~1) | unsigned(expansion);
+  }
+
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))
       return classof(init);

@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-objc-attr-requires-foundation-module -parse %s -emit-fixits-path %t.remap
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-objc-attr-requires-foundation-module -typecheck %s -emit-fixits-path %t.remap
 // RUN: c-arcmt-test %t.remap | arcmt-test -verify-transformed-files %s.result
 import ObjectiveC
 

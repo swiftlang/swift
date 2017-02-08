@@ -18,22 +18,22 @@ struct A {
 // CHECK-LABEL: sil @_TFCSo1XcfMS_FT1aV11peer_method1A_S_
 sil @_TFCSo1XcfMS_FT1aV11peer_method1A_S_ : $@convention(method) (A, @owned X) -> @owned X {
 bb0(%0 : $A, %1 : $X):
-  %2 = alloc_box $@box X
-  %2a = project_box %2 : $@box X, 0
-  %3 = alloc_box $@box A
-  %3a = project_box %3 : $@box A, 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <X>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <X>, 0
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <A>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <A>, 0
   store %0 to [trivial] %3a : $*A
   %5 = mark_uninitialized [delegatingself] %1 : $X
   store %5 to [init] %2a : $*X
   %7 = load [copy] %2a : $*X
-  // CHECK: class_method [volatile] %{{[0-9]+}} : $X, #X.init!initializer.1.foreign : (X.Type) -> (A, A) -> X , $@convention(objc_method) (A, A, @owned X) -> @owned X
-  %9 = class_method [volatile] %7 : $X, #X.init!initializer.1.foreign : (X.Type) -> (A, A) -> X , $@convention(objc_method) (A, A, @owned X) -> @owned X
+  // CHECK: class_method [volatile] %{{[0-9]+}} : $X, #X.init!initializer.1.foreign : (X.Type) -> (A, A) -> X, $@convention(objc_method) (A, A, @owned X) -> @owned X
+  %9 = class_method [volatile] %7 : $X, #X.init!initializer.1.foreign : (X.Type) -> (A, A) -> X, $@convention(objc_method) (A, A, @owned X) -> @owned X
   %10 = load [trivial] %3a : $*A
   %11 = load [trivial] %3a : $*A
   %12 = apply %9(%10, %11, %7) : $@convention(objc_method) (A, A, @owned X) -> @owned X
   assign %12 to %2a : $*X
-  destroy_value %3 : $@box A
+  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <A>
   %15 = load [copy] %2a : $*X
-  destroy_value %2 : $@box X
+  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <X>
   return %15 : $X
 }

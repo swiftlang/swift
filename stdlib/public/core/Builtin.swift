@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -72,22 +72,6 @@ internal func _roundUp(_ offset: Int, toAlignment alignment: Int) -> Int {
   return Int(_roundUpImpl(UInt(bitPattern: offset), toAlignment: alignment))
 }
 
-// This function takes a raw pointer and returns a typed pointer. It implicitly
-// assumes that memory at the returned pointer is bound to `Destination` type.
-@_versioned
-internal func _roundUp<DestinationType>(
-  _ pointer: UnsafeMutableRawPointer,
-  toAlignmentOf destinationType: DestinationType.Type
-) -> UnsafeMutablePointer<DestinationType> {
-  // Note: unsafe unwrap is safe because this operation can only increase the
-  // value, and can not produce a null pointer.
-  return UnsafeMutablePointer<DestinationType>(
-    bitPattern: _roundUpImpl(
-      UInt(bitPattern: pointer),
-      toAlignment: MemoryLayout<DestinationType>.alignment)
-  ).unsafelyUnwrapped
-}
-
 /// Returns a tri-state of 0 = no, 1 = yes, 2 = maybe.
 @_transparent
 public // @testable
@@ -95,14 +79,36 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
   return Int8(Builtin.canBeClass(T.self))
 }
 
-/// Returns the bits of `x`, interpreted as having type `U`.
+/// Returns the bits of the given instance, interpreted as having the specified
+/// type.
 ///
-/// - Warning: Breaks the guarantees of Swift's type system; use
-///   with extreme care.  There's almost always a better way to do
-///   anything.
+/// Only use this function to convert the instance passed as `x` to a
+/// layout-compatible type when the conversion is not possible through other
+/// means. Common conversions that are supported by the standard library
+/// include the following:
 ///
+/// - To convert an integer value from one type to another, use an initializer
+///   or the `numericCast(_:)` function.
+/// - To perform a bitwise conversion of an integer value to a different type,
+///   use an `init(bitPattern:)` or `init(truncatingBitPattern:)` initializer.
+/// - To convert between a pointer and an integer value with that bit pattern,
+///   or vice versa, use the `init(bitPattern:)` initializer for the
+///   destination type.
+/// - To perform a reference cast, use the casting operators (`as`, `as!`, or
+///   `as?`) or the `unsafeDowncast(_:to:)` function. Do not use
+///   `unsafeBitCast(_:to:)` with class or pointer types; doing so may
+///   introduce undefined behavior.
+///
+/// - Warning: Calling this function breaks the guarantees of Swift's type
+///   system; use with extreme care.
+///
+/// - Parameters:
+///   - x: The instance to cast to `type`.
+///   - type: The type to cast `x` to. `type` and the type of `x` must have the
+///     same size of memory representation and compatible memory layout.
+/// - Returns: A new instance of type `U`, cast from `x`.
 @_transparent
-public func unsafeBitCast<T, U>(_ x: T, to: U.Type) -> U {
+public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   _precondition(MemoryLayout<T>.size == MemoryLayout<U>.size,
     "can't unsafeBitCast between types of different sizes")
   return Builtin.reinterpretCast(x)
@@ -219,7 +225,7 @@ public func _unsafeReferenceCast<T, U>(_ x: T, to: U.Type) -> U {
 ///   performed to ensure that `x` actually has dynamic type `T`.
 ///
 /// - Warning: Trades safety for performance.  Use `unsafeDowncast`
-///   only when `x as T` has proven to be a performance problem and you
+///   only when `x as! T` has proven to be a performance problem and you
 ///   are confident that, always, `x is T`.  It is better than an
 ///   `unsafeBitCast` because it's more restrictive, and because
 ///   checking is still performed in debug builds.
@@ -383,15 +389,19 @@ internal var _objCTaggedPointerBits: UInt {
     @inline(__always) get { return 0 }
 }
 #elseif arch(s390x)
+@_versioned
 internal var _objectPointerSpareBits: UInt {
   @inline(__always) get { return 0x0000_0000_0000_0007 }
 }
+@_versioned
 internal var _objectPointerIsObjCBit: UInt {
   @inline(__always) get { return 0x0000_0000_0000_0002 }
 }
+@_versioned
 internal var _objectPointerLowSpareBitShift: UInt {
   @inline(__always) get { return 0 }
 }
+@_versioned
 internal var _objCTaggedPointerBits: UInt {
   @inline(__always) get { return 0 }
 }
@@ -600,3 +610,222 @@ internal func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
   return any as! AnyObject
 #endif
 }
+
+// Game the SIL diagnostic pipeline by inlining this into the transparent
+// definitions below after the stdlib's diagnostic passes run, so that the
+// `staticReport`s don't fire while building the standard library, but do
+// fire if they ever show up in code that uses the standard library.
+@inline(__always)
+public // internal with availability
+func _trueAfterDiagnostics() -> Builtin.Int1 {
+  return true._value
+}
+
+/// Returns the dynamic type of a value.
+///
+/// You can use the `type(of:)` function to find the dynamic type of a value,
+/// particularly when the dynamic type is different from the static type. The
+/// *static type* of a value is the known, compile-time type of the value. The
+/// *dynamic type* of a value is the value's actual type at run-time, which
+/// may be nested inside its concrete type.
+///
+/// In the following code, the `count` variable has the same static and dynamic
+/// type: `Int`. When `count` is passed to the `printInfo(_:)` function,
+/// however, the `value` parameter has a static type of `Any`, the type
+/// declared for the parameter, and a dynamic type of `Int`.
+///
+///     func printInfo(_ value: Any) {
+///         let type = type(of: value)
+///         print("'\(value)' of type '\(type)'")
+///     }
+///
+///     let count: Int = 5
+///     printInfo(count)
+///     // '5' of type 'Int'
+///
+/// The dynamic type returned from `type(of:)` is a *concrete metatype*
+/// (`T.Type`) for a class, structure, enumeration, or other non-protocol type
+/// `T`, or an *existential metatype* (`P.Type`) for a protocol or protocol
+/// composition `P`. When the static type of the value passed to `type(of:)`
+/// is constrained to a class or protocol, you can use that metatype to access
+/// initializers or other static members of the class or protocol.
+///
+/// For example, the parameter passed as `value` to the `printSmileyInfo(_:)`
+/// function in the example below is an instance of the `Smiley` class or one
+/// of its subclasses. The function uses `type(of:)` to find the dynamic type
+/// of `value`, which itself is an instance of the `Smiley.Type` metatype.
+///
+///     class Smiley {
+///         class var text: String {
+///             return ":)"
+///         }
+///     }
+///
+///     class EmojiSmiley : Smiley {
+///          override class var text: String {
+///             return "😀"
+///         }
+///     }
+///
+///     func printSmileyInfo(_ value: Smiley) {
+///         let smileyType = type(of: value)
+///         print("Smile!", smileyType.text)
+///     }
+///
+///     let emojiSmiley = EmojiSmiley()
+///     printSmileyInfo(emojiSmiley)
+///     // Smile! 😀
+///
+/// In this example, accessing the `text` property of the `smileyType` metatype
+/// retrieves the overriden value from the `EmojiSmiley` subclass, instead of
+/// the `Smiley` class's original definition.
+///
+/// Normally, you don't need to be aware of the difference between concrete and
+/// existential metatypes, but calling `type(of:)` can yield unexpected
+/// results in a generic context with a type parameter bound to a protocol. In
+/// a case like this, where a generic parameter `T` is bound to a protocol
+/// `P`, the type parameter is not statically known to be a protocol type in
+/// the body of the generic function, so `type(of:)` can only produce the
+/// concrete metatype `P.Protocol`.
+///
+/// The following example defines a `printGenericInfo(_:)` function that takes
+/// a generic parameter and declares the `String` type's conformance to a new
+/// protocol `P`. When `printGenericInfo(_:)` is called with a string that has
+/// `P` as its static type, the call to `type(of:)` returns `P.self` instead
+/// of the dynamic type inside the parameter, `String.self`.
+///
+///     func printGenericInfo<T>(_ value: T) {
+///         let type = type(of: value)
+///         print("'\(value)' of type '\(type)'")
+///     }
+///
+///     protocol P {}
+///     extension String: P {}
+///
+///     let stringAsP: P = "Hello!"
+///     printGenericInfo(stringAsP)
+///     // 'Hello!' of type 'P'
+///
+/// This unexpected result occurs because the call to `type(of: value)` inside
+/// `printGenericInfo(_:)` must return a metatype that is an instance of
+/// `T.Type`, but `String.self` (the expected dynamic type) is not an instance
+/// of `P.Type` (the concrete metatype of `value`. To get the dynamic type
+/// inside `value` in this generic context, cast the parameter to `Any` when
+/// calling `type(of:)`.
+///
+///     func betterPrintGenericInfo<T>(_ value: T) {
+///         let type = type(of: value as Any)
+///         print("'\(value)' of type '\(type)'")
+///     }
+///
+///     betterPrintGenericInfo(stringAsP)
+///     // 'Hello!' of type 'String'
+///
+/// - Parameter value: The value to find the dynamic type of.
+/// - Returns: The dynamic type, which is a value of metatype type.
+@_transparent
+@_semantics("typechecker.type(of:)")
+public func type<T, Metatype>(of value: T) -> Metatype {
+  // This implementation is never used, since calls to `Swift.type(of:)` are
+  // resolved as a special case by the type checker.
+  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+    ("internal consistency error: 'type(of:)' operation failed to resolve"
+     as StaticString).utf8Start._rawValue)
+  Builtin.unreachable()
+}
+
+/// Allows a nonescaping closure to temporarily be used as if it were allowed
+/// to escape.
+///
+/// You can use this function to call an API that takes an escaping closure in
+/// a way that doesn't allow the closure to escape in practice. The examples
+/// below demonstrate how to use `withoutActuallyEscaping(_:do:)` in
+/// conjunction with two common APIs that use escaping closures: lazy
+/// collection views and asynchronous operations.
+///
+/// The following code declares an `allValues(in:match:)` function that checks
+/// whether all the elements in an array match a predicate. The function won't
+/// compile as written, because a lazy collection's `filter(_:)` method
+/// requires an escaping closure. The lazy collection isn't persisted, so the
+/// `predicate` closure won't actually escape the body of the function, but
+/// even so it can't be used in this way.
+///
+///     func allValues(in array: [Int], match predicate: (Int) -> Bool) -> Bool {
+///         return array.lazy.filter { !predicate($0) }.isEmpty
+///     }
+///     // error: closure use of non-escaping parameter 'predicate'...
+///
+/// `withoutActuallyEscaping(_:do:)` provides a temporarily-escapable copy of
+/// `predicate` that _can_ be used in a call to the lazy view's `filter(_:)`
+/// method. The second version of `allValues(in:match:)` compiles without
+/// error, with the compiler guaranteeing that the `escapablePredicate`
+/// closure doesn't last beyond the call to `withoutActuallyEscaping(_:do:)`.
+///
+///     func allValues(in array: [Int], match predicate: (Int) -> Bool) -> Bool {
+///         return withoutActuallyEscaping(predicate) { escapablePredicate in
+///             array.lazy.filter { !escapablePredicate($0) }.isEmpty
+///         }
+///     }
+///
+/// Asynchronous calls are another type of API that typically escape their
+/// closure arguments. The following code declares a
+/// `perform(_:simultaneouslyWith:)` function that uses a dispatch queue to
+/// execute two closures concurrently.
+///
+///     func perform(_ f: () -> Void, simultaneouslyWith g: () -> Void) {
+///         let queue = DispatchQueue(label: "perform", attributes: .concurrent)
+///         queue.async(execute: f)
+///         queue.async(execute: g)
+///         queue.sync(flags: .barrier) {}
+///     }
+///     // error: passing non-escaping parameter 'f'...
+///     // error: passing non-escaping parameter 'g'...
+///
+/// The `perform(_:simultaneouslyWith:)` function ends with a call to the
+/// `sync(flags:execute:)` method using the `.barrier` flag, which forces the
+/// function to wait until both closures have completed running before
+/// returning. Even though the barrier guarantees that neither closure will
+/// escape the function, the `async(execute:)` method still requires that the
+/// closures passed be marked as `@escaping`, so the first version of the
+/// function does not compile. To resolve this, you can use
+/// `withoutActuallyEscaping(_:do:)` to get copies of `f` and `g` that can be
+/// passed to `async(execute:)`.
+///
+///     func perform(_ f: () -> Void, simultaneouslyWith g: () -> Void) {
+///         withoutActuallyEscaping(f) { escapableF in
+///             withoutActuallyEscaping(g) { escapableG in
+///                 let queue = DispatchQueue(label: "perform", attributes: .concurrent)
+///                 queue.async(execute: escapableF)
+///                 queue.async(execute: escapableG)
+///                 queue.sync(flags: .barrier) {}
+///             }
+///         }
+///     }
+///
+/// - Important: The escapable copy of `closure` passed as `body` is only valid
+///   during the call to `withoutActuallyEscaping(_:do:)`. It is undefined
+///   behavior for the escapable closure to be stored, referenced, or executed
+///   after the function returns.
+///
+/// - Parameter closure: A non-escaping closure value that will be made
+///   escapable for the duration of the execution of the `body` closure. If
+///   `body` has a return value, it is used as the return value for the
+///   `withoutActuallyEscaping(_:do:)` function.
+/// - Parameter body: A closure that will be immediately executed, receiving an
+///   escapable copy of `closure` as an argument.
+/// - Returns: The return value of the `body` closure, if any.
+@_transparent
+@_semantics("typechecker.withoutActuallyEscaping(_:do:)")
+public func withoutActuallyEscaping<ClosureType, ResultType>(
+  _ closure: ClosureType,
+  do body: (_ escapingClosure: ClosureType) throws -> ResultType
+) rethrows -> ResultType {
+  // This implementation is never used, since calls to
+  // `Swift.withoutActuallyEscaping(_:do:)` are resolved as a special case by
+  // the type checker.
+  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+    ("internal consistency error: 'withoutActuallyEscaping(_:do:)' operation failed to resolve"
+     as StaticString).utf8Start._rawValue)
+  Builtin.unreachable()
+}
+

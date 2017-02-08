@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func simple_ret(_ s: String, i: Int) -> String {
   return "A string \"\(s)\" and an int \(i)"

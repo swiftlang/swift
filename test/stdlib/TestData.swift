@@ -1,8 +1,8 @@
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -12,7 +12,7 @@
 // RUN: %target-clang %S/Inputs/FoundationBridge/FoundationBridge.m -c -o %t/FoundationBridgeObjC.o -g
 // RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -Xlinker %t/FoundationBridgeObjC.o -o %t/TestData
 
-// RUN: %target-run %t/TestData > %t.txt
+// RUN: %target-run %t/TestData
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
@@ -442,7 +442,7 @@ class TestData : TestDataSuper {
         var deallocatorCalled = false
         
         // Scope the data to a block to control lifecycle
-        do {
+        autoreleasepool {
             let buffer = malloc(16)!
             let bytePtr = buffer.bindMemory(to: UInt8.self, capacity: 16)
             var data = Data(bytesNoCopy: bytePtr, count: 16, deallocator: .custom({ (ptr, size) in
@@ -451,7 +451,7 @@ class TestData : TestDataSuper {
             }))
             // Use the data
             data[0] = 1
-        }
+         }
         
         expectTrue(deallocatorCalled, "Custom deallocator was never called")
     }
@@ -719,22 +719,6 @@ class TestData : TestDataSuper {
         free(underlyingBuffer)
     }
 
-    func expectOverride<T: _ObjectiveCBridgeable>(_ convertible: T, _ selector: String) {
-        expectNotEqual(class_getMethodImplementation(T._ObjectiveCType.self, sel_getUid(selector)), class_getMethodImplementation(object_getClass(convertible._bridgeToObjectiveC()), sel_getUid(selector)), "The bridge of \(T.self) should override \(selector)")
-    }
-
-    func test_bridgeOverrides() {
-        let d = "Hello Bridge".data(using: .utf8)!
-        // required for immutable data
-        expectOverride(d, "length")
-        expectOverride(d, "bytes")
-        // extras (for perf)
-        expectOverride(d, "subdataWithRange:")
-        expectOverride(d, "getBytes:length:")
-        expectOverride(d, "getBytes:range:")
-        expectOverride(d, "isEqualToData:")
-    }
-
     func test_basicDataMutation() {
         let object = ImmutableDataVerifier()
 
@@ -745,14 +729,14 @@ class TestData : TestDataSuper {
 
         object.verifier.reset()
         expectTrue(data.count == object.length)
-        assert(!object.verifier.wasCopied)
+        expectFalse(object.verifier.wasCopied)
 
         object.verifier.reset()
         data.append("test", count: 4)
         expectTrue(object.verifier.wasMutableCopied)
 
         let preservedObjectness = (data as NSData) is MutableDataVerifier
-        expectFalse(preservedObjectness)
+        expectTrue(preservedObjectness)
     }
 
     func test_basicMutableDataMutation() {
@@ -772,12 +756,12 @@ class TestData : TestDataSuper {
         expectTrue(object.verifier.wasMutableCopied)
         
         let preservedObjectness = (data as NSData) is MutableDataVerifier
-        expectFalse(preservedObjectness)
+        expectTrue(preservedObjectness)
     }
 
     func test_roundTrip() {
         let data = returnsData()
-        expectFalse(identityOfData(data))
+        expectTrue(identityOfData(data))
     }
 
     func test_passing() {
@@ -895,6 +879,48 @@ class TestData : TestDataSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
+
+    func test_noCopyBehavior() {
+        let ptr = UnsafeMutableRawPointer(bitPattern: 0x1)!
+        
+        var deallocated = false
+        autoreleasepool {
+            let data = Data(bytesNoCopy: ptr, count: 1, deallocator: .custom({ (bytes, length) in
+                deallocated = true
+            }))
+            expectFalse(deallocated)
+            let equal = data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Bool in
+                return ptr == UnsafeMutableRawPointer(mutating: bytes)
+            }
+            
+            expectTrue(equal)
+        }
+        
+        expectTrue(deallocated)
+    }
+
+    func test_doubleDeallocation() {
+        let data = "12345679".data(using: .utf8)!
+        let len = data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Int in
+            let slice = Data(bytesNoCopy: UnsafeMutablePointer(mutating: bytes), count: 1, deallocator: .none)
+            return slice.count
+        }
+        expectEqual(len, 1)
+    }
+
+    func test_repeatingValueInitialization() {
+        var d = Data(repeating: 0x01, count: 3)
+        let elements = repeatElement(UInt8(0x02), count: 3) // ensure we fall into the sequence case
+        d.append(contentsOf: elements)
+
+        expectEqual(d[0], 0x01)
+        expectEqual(d[1], 0x01)
+        expectEqual(d[2], 0x01)
+
+        expectEqual(d[3], 0x02)
+        expectEqual(d[4], 0x02)
+        expectEqual(d[5], 0x02)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -928,7 +954,6 @@ DataTests.test("test_dataHash") { TestData().test_dataHash() }
 DataTests.test("test_discontiguousEnumerateBytes") { TestData().test_discontiguousEnumerateBytes() }
 DataTests.test("test_basicReadWrite") { TestData().test_basicReadWrite() }
 DataTests.test("test_writeFailure") { TestData().test_writeFailure() }
-DataTests.test("test_bridgeOverrides") { TestData().test_bridgeOverrides() }
 DataTests.test("test_genericBuffers") { TestData().test_genericBuffers() }
 DataTests.test("test_basicDataMutation") { TestData().test_basicDataMutation() }
 DataTests.test("test_basicMutableDataMutation") { TestData().test_basicMutableDataMutation() }
@@ -938,6 +963,9 @@ DataTests.test("test_bufferSizeCalculation") { TestData().test_bufferSizeCalcula
 DataTests.test("test_classForCoder") { TestData().test_classForCoder() }
 DataTests.test("test_AnyHashableContainingData") { TestData().test_AnyHashableContainingData() }
 DataTests.test("test_AnyHashableCreatedFromNSData") { TestData().test_AnyHashableCreatedFromNSData() }
+DataTests.test("test_noCopyBehavior") { TestData().test_noCopyBehavior() }
+DataTests.test("test_doubleDeallocation") { TestData().test_doubleDeallocation() }
+DataTests.test("test_repeatingValueInitialization") { TestData().test_repeatingValueInitialization() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {

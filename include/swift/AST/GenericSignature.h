@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -18,7 +18,7 @@
 #define SWIFT_AST_GENERIC_SIGNATURE_H
 
 #include "swift/AST/Requirement.h"
-#include "swift/AST/Substitution.h"
+#include "swift/AST/SubstitutionList.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -77,6 +77,8 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
   /// Retrieve the archetype builder for the given generic signature.
   ArchetypeBuilder *getArchetypeBuilder(ModuleDecl &mod);
 
+  friend class ArchetypeType;
+
 public:
   /// Create a new generic signature with the given type parameters and
   /// requirements.
@@ -100,6 +102,19 @@ public:
   /// array of the generic parameters for the innermost generic type.
   ArrayRef<GenericTypeParamType *> getInnermostGenericParams() const;
 
+  /// Create a text string that describes the bindings of generic parameters
+  /// that are relevant to the given set of types, e.g.,
+  /// "[with T = Bar, U = Wibble]".
+  ///
+  /// \param types The types that will be scanned for generic type parameters,
+  /// which will be used in the resulting type.
+  ///
+  /// \param substitutions The generic parameter -> generic argument
+  /// substitutions that will have been applied to these types.
+  /// These are used to produce the "parameter = argument" bindings in the test.
+  std::string gatherGenericParamBindingsText(
+      ArrayRef<Type> types, const TypeSubstitutionMap &substitutions) const;
+
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const {
     return const_cast<GenericSignature *>(this)->getRequirementsBuffer();
@@ -120,26 +135,34 @@ public:
 
   /// Build an interface type substitution map from a vector of Substitutions
   /// that correspond to the generic parameters in this generic signature.
-  SubstitutionMap getSubstitutionMap(ArrayRef<Substitution> args) const;
+  SubstitutionMap getSubstitutionMap(SubstitutionList args) const;
 
-  /// Same as above, but updates an existing map.
-  void getSubstitutionMap(ArrayRef<Substitution> args,
-                          SubstitutionMap &subMap) const;
+  /// Build an interface type substitution map from a type substitution function
+  /// and conformance lookup function.
+  SubstitutionMap
+  getSubstitutionMap(TypeSubstitutionFn subs,
+                     LookupConformanceFn lookupConformance) const;
 
-  using LookupConformanceFn =
-      llvm::function_ref<ProtocolConformanceRef(CanType, Type, ProtocolType *)>;
+  using GenericFunction = auto(CanType canType, Type conformingReplacementType,
+    ProtocolType *conformedProtocol)
+    ->Optional<ProtocolConformanceRef>;
+  using LookupConformanceFn = llvm::function_ref<GenericFunction>;
 
   /// Build an array of substitutions from an interface type substitution map,
   /// using the given function to look up conformances.
-  void getSubstitutions(ModuleDecl &mod,
-                        const TypeSubstitutionMap &subMap,
+  void getSubstitutions(TypeSubstitutionFn substitution,
                         LookupConformanceFn lookupConformance,
                         SmallVectorImpl<Substitution> &result) const;
 
   /// Build an array of substitutions from an interface type substitution map,
   /// using the given function to look up conformances.
-  void getSubstitutions(ModuleDecl &mod,
-                        const SubstitutionMap &subMap,
+  void getSubstitutions(const TypeSubstitutionMap &subMap,
+                        LookupConformanceFn lookupConformance,
+                        SmallVectorImpl<Substitution> &result) const;
+
+  /// Build an array of substitutions from an interface type substitution map,
+  /// using the given function to look up conformances.
+  void getSubstitutions(const SubstitutionMap &subMap,
                         SmallVectorImpl<Substitution> &result) const;
 
   /// Return a range that iterates through all of the types that require
@@ -167,6 +190,11 @@ public:
   /// Canonicalize the components of a generic signature.
   CanGenericSignature getCanonicalSignature() const;
 
+  /// Create a new generic environment that provides fresh contextual types
+  /// (archetypes) that correspond to the interface types in this generic
+  /// signature.
+  GenericEnvironment *createGenericEnvironment(ModuleDecl &mod);
+
   /// Uniquing for the ASTContext.
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericParams(), getRequirements());
@@ -191,10 +219,10 @@ public:
   /// constraint.
   Type getConcreteType(Type type, ModuleDecl &mod);
 
-  /// Return the preferred representative of the given type parameter within
-  /// this generic signature.  This may yield a concrete type or a
-  /// different type parameter.
-  Type getRepresentative(Type type, ModuleDecl &mod);
+  /// Return the layout constraint that the given dependent type is constrained
+  /// to, or the null LayoutConstraint if it is not the subject of layout
+  /// constraint.
+  LayoutConstraint getLayoutConstraint(Type type, ModuleDecl &mod);
 
   /// Return whether two type parameters represent the same type under this
   /// generic signature.
@@ -206,6 +234,11 @@ public:
   /// signature.
   CanType getCanonicalTypeInContext(Type type, ModuleDecl &mod);
   bool isCanonicalTypeInContext(Type type, ModuleDecl &mod);
+
+  /// Return the canonical version of the given type under this generic
+  /// signature.
+  CanType getCanonicalTypeInContext(Type type, ArchetypeBuilder &builder);
+  bool isCanonicalTypeInContext(Type type, ArchetypeBuilder &builder);
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,

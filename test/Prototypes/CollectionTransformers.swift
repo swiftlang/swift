@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-stdlib-swift
@@ -99,9 +99,9 @@ public protocol CollectionBuilder {
   /// Complexity: amortized O(n), where `n` is equal to `count(elements)`.
   mutating func append<
     C : Collection
-    where
-    C.Iterator.Element == Element
-  >(contentsOf elements: C)
+  >(contentsOf elements: C)    
+  where C.Iterator.Element == Element
+
 
   /// Append elements from `otherBuilder` to `self`, emptying `otherBuilder`.
   ///
@@ -155,9 +155,8 @@ public struct ArrayBuilder<T> : CollectionBuilder {
 
   public mutating func append<
     C : Collection
-    where
-    C.Iterator.Element == T
-  >(contentsOf elements: C) {
+  >(contentsOf elements: C)
+  where C.Iterator.Element == T {
     _resultTail.append(contentsOf: elements)
   }
 
@@ -760,9 +759,8 @@ final public class ForkJoinPool {
 
   internal func _submitTasksToRandomWorkers<
     C : Collection
-    where
-    C.Iterator.Element == ForkJoinTaskBase
-  >(_ tasks: C) {
+  >(_ tasks: C)
+  where C.Iterator.Element == ForkJoinTaskBase {
     if tasks.isEmpty {
       return
     }
@@ -840,14 +838,14 @@ internal protocol _CollectionTransformerStepProtocol /*: class*/ {
   func transform<
     InputCollection : Collection,
     Collector : _ElementCollector
-    where
-    InputCollection.Iterator.Element == PipelineInputElement,
-    Collector.Element == OutputElement
   >(
     _ c: InputCollection,
     _ range: Range<InputCollection.Index>,
     _ collector: inout Collector
   )
+  where
+  InputCollection.Iterator.Element == PipelineInputElement,
+  Collector.Element == OutputElement
 }
 
 internal class _CollectionTransformerStep<PipelineInputElement_, OutputElement_>
@@ -876,11 +874,11 @@ internal class _CollectionTransformerStep<PipelineInputElement_, OutputElement_>
 
   func collectTo<
     C : BuildableCollectionProtocol
-    where
-    C.Builder.Destination == C,
-    C.Builder.Element == C.Iterator.Element,
-    C.Iterator.Element == OutputElement
-  >(_: C.Type) -> _CollectionTransformerFinalizer<PipelineInputElement, C> {
+  >(_: C.Type) -> _CollectionTransformerFinalizer<PipelineInputElement, C>
+  where
+  C.Builder.Destination == C,
+  C.Builder.Element == C.Iterator.Element,
+  C.Iterator.Element == OutputElement {
 
     fatalError("abstract method")
   }
@@ -888,14 +886,14 @@ internal class _CollectionTransformerStep<PipelineInputElement_, OutputElement_>
   func transform<
     InputCollection : Collection,
     Collector : _ElementCollector
-    where
-    InputCollection.Iterator.Element == PipelineInputElement,
-    Collector.Element == OutputElement
   >(
     _ c: InputCollection,
     _ range: Range<InputCollection.Index>,
     _ collector: inout Collector
-  ) {
+  )
+  where
+  InputCollection.Iterator.Element == PipelineInputElement,
+  Collector.Element == OutputElement {
     fatalError("abstract method")
   }
 }
@@ -930,11 +928,11 @@ final internal class _CollectionTransformerStepCollectionSource<
 
   override func collectTo<
     C : BuildableCollectionProtocol
-    where
-    C.Builder.Destination == C,
-    C.Builder.Element == C.Iterator.Element,
-    C.Iterator.Element == OutputElement
-  >(_ c: C.Type) -> _CollectionTransformerFinalizer<PipelineInputElement, C> {
+  >(_ c: C.Type) -> _CollectionTransformerFinalizer<PipelineInputElement, C>
+  where
+  C.Builder.Destination == C,
+  C.Builder.Element == C.Iterator.Element,
+  C.Iterator.Element == OutputElement {
 
     return _CollectionTransformerFinalizerCollectTo(self, c)
   }
@@ -942,14 +940,14 @@ final internal class _CollectionTransformerStepCollectionSource<
   override func transform<
     InputCollection : Collection,
     Collector : _ElementCollector
-    where
-    InputCollection.Iterator.Element == PipelineInputElement,
-    Collector.Element == OutputElement
   >(
     _ c: InputCollection,
     _ range: Range<InputCollection.Index>,
     _ collector: inout Collector
-  ) {
+  )
+  where
+  InputCollection.Iterator.Element == PipelineInputElement,
+  Collector.Element == OutputElement {
     var i = range.lowerBound
     while i != range.upperBound {
       let e = c[i]
@@ -963,9 +961,8 @@ final internal class _CollectionTransformerStepOneToMaybeOne<
   PipelineInputElement,
   OutputElement,
   InputStep : _CollectionTransformerStepProtocol
-  where
-  InputStep.PipelineInputElement == PipelineInputElement
-> : _CollectionTransformerStep<PipelineInputElement, OutputElement> {
+> : _CollectionTransformerStep<PipelineInputElement, OutputElement>
+where InputStep.PipelineInputElement == PipelineInputElement {
 
   typealias _Self = _CollectionTransformerStepOneToMaybeOne
   typealias InputElement = InputStep.OutputElement
@@ -1015,11 +1012,11 @@ final internal class _CollectionTransformerStepOneToMaybeOne<
 
   override func collectTo<
     C : BuildableCollectionProtocol
-    where
-    C.Builder.Destination == C,
-    C.Builder.Element == C.Iterator.Element,
-    C.Iterator.Element == OutputElement
-  >(_ c: C.Type) -> _CollectionTransformerFinalizer<PipelineInputElement, C> {
+  >(_ c: C.Type) -> _CollectionTransformerFinalizer<PipelineInputElement, C>
+  where
+  C.Builder.Destination == C,
+  C.Builder.Element == C.Iterator.Element,
+  C.Iterator.Element == OutputElement {
 
     return _CollectionTransformerFinalizerCollectTo(self, c)
   }
@@ -1027,14 +1024,14 @@ final internal class _CollectionTransformerStepOneToMaybeOne<
   override func transform<
     InputCollection : Collection,
     Collector : _ElementCollector
-    where
-    InputCollection.Iterator.Element == PipelineInputElement,
-    Collector.Element == OutputElement
   >(
     _ c: InputCollection,
     _ range: Range<InputCollection.Index>,
     _ collector: inout Collector
-  ) {
+  )
+  where
+  InputCollection.Iterator.Element == PipelineInputElement,
+  Collector.Element == OutputElement {
     var collectorWrapper =
       _ElementCollectorOneToMaybeOne(collector, _transform)
     _input.transform(c, range, &collectorWrapper)
@@ -1069,9 +1066,8 @@ struct _ElementCollectorOneToMaybeOne<
 
   mutating func append<
     C : Collection
-    where
-    C.Iterator.Element == Element
-  >(contentsOf elements: C) {
+  >(contentsOf elements: C)
+  where C.Iterator.Element == Element {
     for e in elements {
       append(e)
     }
@@ -1087,17 +1083,15 @@ protocol _ElementCollector {
 
   mutating func append<
     C : Collection
-    where
-    C.Iterator.Element == Element
   >(contentsOf elements: C)
+  where C.Iterator.Element == Element
 }
 
 class _CollectionTransformerFinalizer<PipelineInputElement, Result> {
   func transform<
     InputCollection : Collection
-    where
-    InputCollection.Iterator.Element == PipelineInputElement
-  >(_ c: InputCollection) -> Result {
+  >(_ c: InputCollection) -> Result
+  where InputCollection.Iterator.Element == PipelineInputElement {
     fatalError("implement")
   }
 }
@@ -1107,10 +1101,10 @@ final class _CollectionTransformerFinalizerReduce<
   U,
   InputElementTy,
   InputStep : _CollectionTransformerStepProtocol
-  where
-  InputStep.OutputElement == InputElementTy,
-  InputStep.PipelineInputElement == PipelineInputElement
-> : _CollectionTransformerFinalizer<PipelineInputElement, U> {
+> : _CollectionTransformerFinalizer<PipelineInputElement, U>
+where
+InputStep.OutputElement == InputElementTy,
+InputStep.PipelineInputElement == PipelineInputElement {
 
   var _input: InputStep
   var _initial: U
@@ -1124,9 +1118,8 @@ final class _CollectionTransformerFinalizerReduce<
 
   override func transform<
     InputCollection : Collection
-    where
-    InputCollection.Iterator.Element == PipelineInputElement
-  >(_ c: InputCollection) -> U {
+  >(_ c: InputCollection) -> U
+  where InputCollection.Iterator.Element == PipelineInputElement {
     var collector = _ElementCollectorReduce(_initial, _combine)
     _input.transform(c, c.startIndex..<c.endIndex, &collector)
     return collector.takeResult()
@@ -1152,9 +1145,8 @@ struct _ElementCollectorReduce<Element_, Result> : _ElementCollector {
 
   mutating func append<
     C : Collection
-    where
-    C.Iterator.Element == Element
-  >(contentsOf elements: C) {
+  >(contentsOf elements: C)
+  where C.Iterator.Element == Element {
     for e in elements {
       append(e)
     }
@@ -1170,13 +1162,13 @@ final class _CollectionTransformerFinalizerCollectTo<
   U : BuildableCollectionProtocol,
   InputElementTy,
   InputStep : _CollectionTransformerStepProtocol
-  where
-  InputStep.OutputElement == InputElementTy,
-  InputStep.PipelineInputElement == PipelineInputElement,
-  U.Builder.Destination == U,
-  U.Builder.Element == U.Iterator.Element,
-  U.Iterator.Element == InputStep.OutputElement
-> : _CollectionTransformerFinalizer<PipelineInputElement, U> {
+> : _CollectionTransformerFinalizer<PipelineInputElement, U>
+where
+InputStep.OutputElement == InputElementTy,
+InputStep.PipelineInputElement == PipelineInputElement,
+U.Builder.Destination == U,
+U.Builder.Element == U.Iterator.Element,
+U.Iterator.Element == InputStep.OutputElement {
 
   var _input: InputStep
 
@@ -1186,9 +1178,8 @@ final class _CollectionTransformerFinalizerCollectTo<
 
   override func transform<
     InputCollection : Collection
-    where
-    InputCollection.Iterator.Element == PipelineInputElement
-  >(_ c: InputCollection) -> U {
+  >(_ c: InputCollection) -> U
+  where InputCollection.Iterator.Element == PipelineInputElement {
     var collector = _ElementCollectorCollectTo<U>()
     _input.transform(c, c.startIndex..<c.endIndex, &collector)
     return collector.takeResult()
@@ -1197,10 +1188,10 @@ final class _CollectionTransformerFinalizerCollectTo<
 
 struct _ElementCollectorCollectTo<
   BuildableCollection : BuildableCollectionProtocol
-  where
-  BuildableCollection.Builder.Destination == BuildableCollection,
-  BuildableCollection.Builder.Element == BuildableCollection.Iterator.Element
-> : _ElementCollector {
+> : _ElementCollector
+where
+BuildableCollection.Builder.Destination == BuildableCollection,
+BuildableCollection.Builder.Element == BuildableCollection.Iterator.Element {
 
   typealias Element = BuildableCollection.Iterator.Element
 
@@ -1220,9 +1211,8 @@ struct _ElementCollectorCollectTo<
 
   mutating func append<
     C : Collection
-    where
-    C.Iterator.Element == Element
-  >(contentsOf elements: C) {
+  >(contentsOf elements: C)
+  where C.Iterator.Element == Element {
     _builder.append(contentsOf: elements)
   }
 
@@ -1285,11 +1275,11 @@ public struct CollectionTransformerPipeline<
 
   public func collectTo<
     C : BuildableCollectionProtocol
-    where
-    C.Builder.Destination == C,
-    C.Iterator.Element == T,
-    C.Builder.Element == T
-  >(_ c: C.Type) -> C {
+  >(_ c: C.Type) -> C
+  where
+  C.Builder.Destination == C,
+  C.Iterator.Element == T,
+  C.Builder.Element == T {
     return _runCollectionTransformer(_input, _step.collectTo(c))
   }
 

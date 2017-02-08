@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,21 +22,14 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Basic/Fallthrough.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+
 using namespace swift;
-
-void ValueBase::replaceAllUsesWith(ValueBase *RHS) {
-  assert(this != RHS && "Cannot RAUW a value with itself");
-  while (!use_empty()) {
-    Operand *Op = *use_begin();
-    Op->set(RHS);
-  }
-}
-
 
 SILUndef *SILUndef::get(SILType Ty, SILModule *M) {
   // Unique these.
@@ -76,6 +69,8 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
     // access these symbols.
     return FormalLinkage::HiddenUnique;
   }
+
+  llvm_unreachable("Unhandled Accessibility in switch.");
 }
 
 FormalLinkage swift::getTypeLinkage(CanType type) {
@@ -88,9 +83,6 @@ FormalLinkage swift::getTypeLinkage(CanType type) {
     // For any nominal type reference, look at the type declaration.
     if (auto nominal = type->getAnyNominal())
       result ^= getDeclLinkage(nominal);
-
-    assert(!isa<PolymorphicFunctionType>(type) &&
-           "Don't expect a polymorphic function type here");
 
     return false; // continue searching
   });
@@ -138,14 +130,9 @@ swift::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
       && conformanceModule == typeUnit->getParentModule())
     return SILLinkage::Shared;
 
-  // If we're building with -sil-serialize-all, give the conformance public
-  // linkage.
-  if (conformanceModule->getResilienceStrategy()
-      == ResilienceStrategy::Fragile)
-    return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
-
-  // FIXME: This should be using std::min(protocol's access, type's access).
-  switch (C->getProtocol()->getEffectiveAccess()) {
+  Accessibility accessibility = std::min(C->getProtocol()->getEffectiveAccess(),
+                                         typeDecl->getEffectiveAccess());
+  switch (accessibility) {
     case Accessibility::Private:
     case Accessibility::FilePrivate:
       return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);

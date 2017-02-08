@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 class Container {
   private func foo() {} // expected-note * {{declared here}}
@@ -191,6 +191,7 @@ extension Container {
   fileprivate enum PrivateRawValue: VeryPrivateStruct {} // expected-warning {{enum should not be declared fileprivate because its raw type uses a private type}} {{none}}
   // expected-error@-1 {{raw type 'Container.VeryPrivateStruct' is not expressible by any literal}}
   // expected-error@-2 {{'Container.PrivateRawValue' declares raw type 'Container.VeryPrivateStruct', but does not conform to RawRepresentable and conformance could not be synthesized}}
+  // expected-error@-3 {{RawRepresentable conformance cannot be synthesized because raw type 'Container.VeryPrivateStruct' is not Equatable}}
   fileprivate enum PrivatePayload {
     case A(VeryPrivateStruct) // expected-warning {{enum case in an internal enum uses a private type}} {{none}}
   }
@@ -198,8 +199,6 @@ extension Container {
   private class PrivateInnerClass {} // expected-note * {{declared here}}
   fileprivate class PrivateSuperClass: PrivateInnerClass {} // expected-warning {{class should not be declared fileprivate because its superclass is private}} {{none}}
   fileprivate class PrivateGenericUser<T> where T: PrivateInnerClass {} // expected-warning {{generic class should not be declared fileprivate because its generic requirement uses a private type}} {{none}}
-  // expected-error@-1 {{type 'PrivateGenericUser' cannot be nested in extension of generic type 'Container'}}
-  // FIXME expected-error@-2 {{cannot conform to class protocol 'AnyObject'}}
 }
 
 fileprivate struct SR2579 {

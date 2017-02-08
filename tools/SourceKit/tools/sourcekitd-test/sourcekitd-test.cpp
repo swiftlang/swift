@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,6 +15,7 @@
 #include "TestOptions.h"
 #include "SourceKit/Support/Concurrency.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -90,12 +91,14 @@ static sourcekitd_uid_t KeyOffset;
 static sourcekitd_uid_t KeySourceFile;
 static sourcekitd_uid_t KeyModuleName;
 static sourcekitd_uid_t KeyGroupName;
+static sourcekitd_uid_t KeyActionName;
 static sourcekitd_uid_t KeySynthesizedExtension;
 static sourcekitd_uid_t KeyName;
 static sourcekitd_uid_t KeyNames;
 static sourcekitd_uid_t KeyFilePath;
 static sourcekitd_uid_t KeyModuleInterfaceName;
 static sourcekitd_uid_t KeyLength;
+static sourcekitd_uid_t KeyActionable;
 static sourcekitd_uid_t KeySourceText;
 static sourcekitd_uid_t KeyUSR;
 static sourcekitd_uid_t KeyOriginalUSR;
@@ -203,12 +206,14 @@ static int skt_main(int argc, const char **argv) {
   KeySourceFile = sourcekitd_uid_get_from_cstr("key.sourcefile");
   KeyModuleName = sourcekitd_uid_get_from_cstr("key.modulename");
   KeyGroupName = sourcekitd_uid_get_from_cstr("key.groupname");
+  KeyActionName = sourcekitd_uid_get_from_cstr("key.actionname");
   KeySynthesizedExtension = sourcekitd_uid_get_from_cstr("key.synthesizedextensions");
   KeyName = sourcekitd_uid_get_from_cstr("key.name");
   KeyNames = sourcekitd_uid_get_from_cstr("key.names");
   KeyFilePath = sourcekitd_uid_get_from_cstr("key.filepath");
   KeyModuleInterfaceName = sourcekitd_uid_get_from_cstr("key.module_interface_name");
   KeyLength = sourcekitd_uid_get_from_cstr("key.length");
+  KeyActionable = sourcekitd_uid_get_from_cstr("key.actionable");
   KeySourceText = sourcekitd_uid_get_from_cstr("key.sourcetext");
   KeyUSR = sourcekitd_uid_get_from_cstr("key.usr");
   KeyOriginalUSR = sourcekitd_uid_get_from_cstr("key.original_usr");
@@ -1098,6 +1103,17 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
                                                              KeyAnnotatedDecl));
   }
 
+  std::vector<const char *> AvailableActions;
+  sourcekitd_variant_t ActionsObj =
+  sourcekitd_variant_dictionary_get_value(Info, KeyActionable);
+  for (unsigned i = 0, e = sourcekitd_variant_array_get_count(ActionsObj);
+       i != e; ++i) {
+    sourcekitd_variant_t Entry =
+    sourcekitd_variant_array_get_value(ActionsObj, i);
+    AvailableActions.push_back(sourcekitd_variant_dictionary_get_string(Entry,
+                                                                KeyActionName));
+  }
+
   OS << Kind << " (";
   if (Offset.hasValue()) {
     if (Filename != FilePath)
@@ -1147,6 +1163,10 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   for (auto Group : GroupNames)
     OS << Group << '\n';
   OS << "MODULE GROUPS END\n";
+  OS << "ACTIONS BEGIN\n";
+  for (auto Action : AvailableActions)
+    OS << Action << '\n';
+  OS << "ACTIONS END\n";
 }
 
 static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
@@ -1344,7 +1364,7 @@ static void prepareDemangleRequest(sourcekitd_object_t Req,
     llvm::StringRef inputContents = input.get()->getBuffer();
 
     // This doesn't handle Unicode symbols, but maybe that's okay.
-    llvm::Regex maybeSymbol("_T[_a-zA-Z0-9$]+");
+    llvm::Regex maybeSymbol("(_T|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
     llvm::SmallVector<llvm::StringRef, 1> matches;
     while (maybeSymbol.match(inputContents, &matches)) {
       addName(matches.front());
@@ -1473,8 +1493,10 @@ static void expandPlaceholders(llvm::MemoryBuffer *SourceBuf,
                                                                    nullptr, 0);
     sourcekitd_request_dictionary_set_uid(Exp, KeyRequest,
                                           RequestEditorExpandPlaceholder);
-    sourcekitd_request_dictionary_set_string(Exp, KeyName,
-                                             SourceBuf->getBufferIdentifier());
+    auto SourceBufID = SourceBuf->getBufferIdentifier();
+    sourcekitd_request_dictionary_set_stringbuf(Exp, KeyName,
+                                                SourceBufID.data(),
+                                                SourceBufID.size());
     sourcekitd_request_dictionary_set_string(Exp, KeySourceText, "");
     sourcekitd_request_dictionary_set_int64(Exp, KeyOffset, Offset);
     sourcekitd_request_dictionary_set_int64(Exp, KeyLength, Length);

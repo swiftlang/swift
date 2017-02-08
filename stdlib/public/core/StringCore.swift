@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -103,12 +103,12 @@ public struct _StringCore {
         src: srcStart,
         size: UInt(count << (srcElementWidth - 1)))
     }
-    else if (srcElementWidth < dstElementWidth) {
+    else if srcElementWidth < dstElementWidth {
       // Widening ASCII to UTF-16; we need to copy the bytes manually
       var dest = dstStart.assumingMemoryBound(to: UTF16.CodeUnit.self)
       var src = srcStart.assumingMemoryBound(to: UTF8.CodeUnit.self)
       let srcEnd = src + count
-      while (src != srcEnd) {
+      while src != srcEnd {
         dest.pointee = UTF16.CodeUnit(src.pointee)
         dest += 1
         src += 1
@@ -119,7 +119,7 @@ public struct _StringCore {
       var dest = dstStart.assumingMemoryBound(to: UTF8.CodeUnit.self)
       var src = srcStart.assumingMemoryBound(to: UTF16.CodeUnit.self)
       let srcEnd = src + count
-      while (src != srcEnd) {
+      while src != srcEnd {
         dest.pointee = UTF8.CodeUnit(src.pointee)
         dest += 1
         src += 1

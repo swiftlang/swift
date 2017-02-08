@@ -1,4 +1,4 @@
-// RUN: not %swift -parse -target %target-triple %s -emit-fixits-path %t.remap -I %S/Inputs
+// RUN: not %swift -typecheck -target %target-triple %s -emit-fixits-path %t.remap -I %S/Inputs
 // RUN: c-arcmt-test %t.remap | arcmt-test -verify-transformed-files %s.result
 
 class Base {}

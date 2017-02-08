@@ -1,3 +1,15 @@
+//===--- CheckedCastBrJumpThreading.cpp -----------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 #define DEBUG_TYPE "sil-simplify-cfg"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -168,8 +180,8 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
     if (Value == DomValue)
       return Value;
 
-    // We know how to propagate through BBArgs only.
-    auto *V = dyn_cast<SILArgument>(Value);
+    // We know how to propagate through phi arguments only.
+    auto *V = dyn_cast<SILPHIArgument>(Value);
     if (!V)
       return SILValue();
 
@@ -308,19 +320,23 @@ modifyCFGForSuccessPreds(Optional<BasicBlockCloner> &Cloner) {
 /// Handle a special case, where ArgBB is the entry block.
 bool CheckedCastBrJumpThreading::handleArgBBIsEntryBlock(SILBasicBlock *ArgBB,
                                                 CheckedCastBranchInst *DomCCBI) {
-  if (ArgBB->getPreds().begin() == ArgBB->getPreds().end()) {
-    // It must be the entry block
-    // See if it is reached over Success or Failure path.
-    bool SuccessDominates = DomCCBI->getSuccessBB() == BB;
-    bool FailureDominates = DomCCBI->getFailureBB() == BB;
+  if (!ArgBB->pred_empty())
+    return false;
 
-    if (BlocksToEdit.count(ArgBB) != 0)
-      return false;
+  // It must be the entry block
+  //
+  // TODO: Is this a correct assumption? Do we know that at this point that
+  // ArgBB can not be unreachable?
+  //
+  // See if it is reached over Success or Failure path.
+  bool SuccessDominates = DomCCBI->getSuccessBB() == BB;
+  bool FailureDominates = DomCCBI->getFailureBB() == BB;
 
-    classifyPredecessor(ArgBB, SuccessDominates, FailureDominates);
-    return true;
-  }
-  return false;
+  if (BlocksToEdit.count(ArgBB) != 0)
+    return false;
+
+  classifyPredecessor(ArgBB, SuccessDominates, FailureDominates);
+  return true;
 }
 
 // Returns false if cloning required by jump threading cannot
@@ -359,7 +375,7 @@ bool CheckedCastBrJumpThreading::checkCloningConstraints() {
 bool CheckedCastBrJumpThreading::
 areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
                                       SILValue DomCondition) {
-  auto *Arg = dyn_cast<SILArgument>(Condition);
+  auto *Arg = dyn_cast<SILPHIArgument>(Condition);
   if (!Arg)
     return false;
 
@@ -381,7 +397,7 @@ areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
   if (!handleArgBBIsEntryBlock(ArgBB, DomCCBI)) {
     // ArgBB is not the entry block and has predecessors.
     unsigned idx = 0;
-    for (auto *PredBB : ArgBB->getPreds()) {
+    for (auto *PredBB : ArgBB->getPredecessorBlocks()) {
 
       // We must avoid that we are going to change a block twice.
       if (BlocksToEdit.count(PredBB) != 0)
@@ -444,7 +460,7 @@ areEquivalentConditionsAlongPaths(CheckedCastBranchInst *DomCCBI) {
 
     // Figure out for each predecessor which branch of
     // the dominating checked_cast_br is used to reach it.
-    for (auto *PredBB : BB->getPreds()) {
+    for (auto *PredBB : BB->getPredecessorBlocks()) {
       // All predecessors should either unconditionally branch
       // to the current BB or be another checked_cast_br instruction.
       if (!isa<CheckedCastBranchInst>(PredBB->getTerminator()) &&
@@ -457,7 +473,8 @@ areEquivalentConditionsAlongPaths(CheckedCastBranchInst *DomCCBI) {
 
       // Don't allow critical edges from PredBB to BB. This ensures that
       // splitAllCriticalEdges() will not invalidate our predecessor lists.
-      if (!BB->getSinglePredecessor() && !PredBB->getSingleSuccessor())
+      if (!BB->getSinglePredecessorBlock() &&
+          !PredBB->getSingleSuccessorBlock())
         return false;
 
       SILBasicBlock *DomSuccessBB = DomCCBI->getSuccessBB();
@@ -598,10 +615,9 @@ bool CheckedCastBrJumpThreading::trySimplify(CheckedCastBranchInst *CCBI) {
     // We have to generate new dedicated BBs as landing BBs for all
     // FailurePreds and all SuccessPreds.
 
-    // Since we are going to change the BB,
-    // add its successors and predecessors
+    // Since we are going to change the BB, add its successors and predecessors
     // for re-processing.
-    for (auto *B : BB->getPreds()) {
+    for (auto *B : BB->getPredecessorBlocks()) {
       BlocksForWorklist.push_back(B);
     }
     for (auto *B : BB->getSuccessorBlocks()) {
@@ -618,8 +634,8 @@ bool CheckedCastBrJumpThreading::trySimplify(CheckedCastBranchInst *CCBI) {
 
     // Record what we want to change.
     Edit *edit = new (EditAllocator.Allocate())
-      Edit(BB, InvertSuccess, SuccessPreds, FailurePreds, numUnknownPreds != 0,
-           DomCCBI->getSuccessBB()->getBBArg(0));
+        Edit(BB, InvertSuccess, SuccessPreds, FailurePreds,
+             numUnknownPreds != 0, DomCCBI->getSuccessBB()->getArgument(0));
     Edits.push_back(edit);
 
     return true;

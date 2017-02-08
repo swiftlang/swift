@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 /* block comments */
 /* /* nested too */ */
@@ -30,8 +30,8 @@ func funcdecl5(_ a: Int, y: Int) {
   if (x != 0) {
     if (x != 0 || f3() != 0) {
       // while with and without a space after it.
-      while(true) { 4; 2; 1 } // expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
-      while (true) { 4; 2; 1 } // expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}} expected-warning {{result of call to 'init(_builtinIntegerLiteral:)' is unused}}
+      while(true) { 4; 2; 1 } // expected-warning 3 {{integer literal is unused}}
+      while (true) { 4; 2; 1 } // expected-warning 3 {{integer literal is unused}}
     }
   }
 
@@ -159,7 +159,7 @@ func missing_semicolons() {
   var w = 321
   func g() {}
   g() w += 1             // expected-error{{consecutive statements}} {{6-6=;}}
-  var z = w"hello"    // expected-error{{consecutive statements}} {{12-12=;}} expected-warning {{expression of type 'String' is unused}}
+  var z = w"hello"    // expected-error{{consecutive statements}} {{12-12=;}} expected-warning {{string literal is unused}}
   class  C {}class  C2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   struct S {}struct S2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   func j() {}func k() {}  // expected-error{{consecutive statements}} {{14-14=;}}
@@ -346,6 +346,13 @@ class SomeTestClass {
   }
 }
 
+class SomeDerivedClass: SomeTestClass {
+  override init() {
+    defer {
+      super.init() // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+    }
+  }
+}
 
 func test_guard(_ x : Int, y : Int??, cond : Bool) {
   
@@ -491,6 +498,11 @@ func fn(x: Int) {
   }
 }
 
+func bad_if() {
+  if 1 {} // expected-error {{'Int' is not convertible to 'Bool'}}
+  if (x: false) {} // expected-error {{'(x: Bool)' is not convertible to 'Bool'}}
+  if (x: 1) {} // expected-error {{'(x: Int)' is not convertible to 'Bool'}}
+}
 
 // Errors in case syntax
 class

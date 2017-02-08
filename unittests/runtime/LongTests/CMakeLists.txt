@@ -32,6 +32,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     # from the swiftCore dylib, so we need to link to both the runtime archive
     # and the stdlib.
     $<TARGET_OBJECTS:swiftRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}>
+    ${swift_runtime_test_extra_sources}
     )
 
   # FIXME: cross-compile for all variants.

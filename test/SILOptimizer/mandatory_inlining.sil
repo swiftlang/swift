@@ -27,8 +27,8 @@ sil @fromLiteral : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int6
 // CHECK-LABEL: sil [transparent] @test_add : $@convention(thin) (Int64) -> Int64 {
 sil [transparent] @test_add : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):
-  %1 = alloc_box $@box Int64
-  %1a = project_box %1 : $@box Int64, 0
+  %1 = alloc_box ${ var Int64 }
+  %1a = project_box %1 : ${ var Int64 }, 0
   store %0 to %1a : $*Int64
   %3 = function_ref @plus : $@convention(thin) (Int64, Int64) -> Int64
   %4 = load %1a : $*Int64
@@ -37,14 +37,14 @@ bb0(%0 : $Int64):
   %7 = integer_literal $Builtin.Int128, 20
   %8 = apply %5(%7, %6) : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
   %9 = apply %3(%4, %8) : $@convention(thin) (Int64, Int64) -> Int64
-  strong_release %1 : $@box Int64
+  strong_release %1 : ${ var Int64 }
   return %9 : $Int64
 }
 
 // CHECK-LABEL: sil @inline_test_add : $@convention(thin) (Int64) -> Int64 {
 sil @inline_test_add : $@convention(thin) (Int64) -> Int64 {
 // CHECK: [[BB0:.*]]([[VAL0:%.*]] : $Int64):
-  // CHECK: [[VAL1:%.*]] = alloc_box $@box Int64
+  // CHECK: [[VAL1:%.*]] = alloc_box ${ var Int64 }
   // CHECK: [[PB1:%.*]] = project_box [[VAL1]]
   // CHECK: store [[VAL0]] to [[PB1]]
   // CHECK: [[VAL3:%.*]] = function_ref @plus
@@ -55,7 +55,7 @@ sil @inline_test_add : $@convention(thin) (Int64) -> Int64 {
   // CHECK: [[VAL8:%.*]] = integer_literal $Builtin.Int128, 10
   // CHECK: [[VAL9:%.*]] = apply [[VAL6]]([[VAL8]], [[VAL7]])
   // CHECK: [[VAL10:%.*]] = apply [[VAL4]]([[VAL5]], [[VAL9]])
-  // CHECK: [[VAL11:%.*]] = alloc_box $@box Int64
+  // CHECK: [[VAL11:%.*]] = alloc_box ${ var Int64 }
   // CHECK: [[PB11:%.*]] = project_box [[VAL11]]
   // CHECK: store [[VAL10]] to [[PB11]]
   // CHECK: [[VAL13:%.*]] = function_ref @plus
@@ -75,8 +75,8 @@ sil @inline_test_add : $@convention(thin) (Int64) -> Int64 {
   // CHECK: return [[VAL25]]
 
 bb0(%0 : $Int64):
-  %1 = alloc_box $@box Int64
-  %1a = project_box %1 : $@box Int64, 0
+  %1 = alloc_box ${ var Int64 }
+  %1a = project_box %1 : ${ var Int64 }, 0
   store %0 to %1a : $*Int64
   %3 = function_ref @plus : $@convention(thin) (Int64, Int64) -> Int64
   %4 = function_ref @test_add : $@convention(thin) (Int64) -> Int64
@@ -93,14 +93,14 @@ bb0(%0 : $Int64):
   %15 = integer_literal $Builtin.Int128, 30
   %16 = apply %13(%15, %14) : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
   %17 = apply %3(%12, %16) : $@convention(thin) (Int64, Int64) -> Int64
-  strong_release %1 : $@box Int64
+  strong_release %1 : ${ var Int64 }
   return %17 : $Int64
 }
 
 // CHECK-LABEL: sil @inline_twice_test_add : $@convention(thin) (Int64) -> Int64 {
 sil @inline_twice_test_add : $@convention(thin) (Int64) -> Int64 {
 // CHECK: [[BB0:.*]]([[VAL0:%.*]] : $Int64):
-  // CHECK: [[VAL1:%.*]] = alloc_box $@box Int64
+  // CHECK: [[VAL1:%.*]] = alloc_box ${ var Int64 }
   // CHECK: [[PB1:%.*]] = project_box [[VAL1]]
   // CHECK: store [[VAL0]] to [[PB1]]
   // CHECK: [[VAL3:%.*]] = function_ref @plus
@@ -111,7 +111,7 @@ sil @inline_twice_test_add : $@convention(thin) (Int64) -> Int64 {
   // CHECK: [[VAL8:%.*]] = integer_literal $Builtin.Int128, 10
   // CHECK: [[VAL9:%.*]] = apply [[VAL6]]([[VAL8]], [[VAL7]])
   // CHECK: [[VAL10:%.*]] = apply [[VAL4]]([[VAL5]], [[VAL9]])
-  // CHECK: [[VAL11:%.*]] = alloc_box $@box Int64
+  // CHECK: [[VAL11:%.*]] = alloc_box ${ var Int64 }
   // CHECK: [[PB11:%.*]] = project_box [[VAL11]]
   // CHECK: store [[VAL10]] to [[PB11]]
   // CHECK: [[VAL13:%.*]] = function_ref @plus
@@ -122,7 +122,7 @@ sil @inline_twice_test_add : $@convention(thin) (Int64) -> Int64 {
   // CHECK: [[VAL18:%.*]] = apply [[VAL15]]([[VAL17]], [[VAL16]])
   // CHECK: [[VAL19:%.*]] = apply [[VAL13]]([[VAL14]], [[VAL18]])
   // CHECK: strong_release [[VAL11]]
-  // CHECK: [[VAL21:%.*]] = alloc_box $@box Int64
+  // CHECK: [[VAL21:%.*]] = alloc_box ${ var Int64 }
   // CHECK: [[PB21:%.*]] = project_box [[VAL21]]
   // CHECK: store [[VAL19]] to [[PB21]]
   // CHECK: [[VAL23:%.*]] = function_ref @plus
@@ -142,8 +142,8 @@ sil @inline_twice_test_add : $@convention(thin) (Int64) -> Int64 {
   // CHECK: return [[VAL35]]
 
 bb0(%0 : $Int64):
-  %1 = alloc_box $@box Int64
-  %1a = project_box %1 : $@box Int64, 0
+  %1 = alloc_box ${ var Int64 }
+  %1a = project_box %1 : ${ var Int64 }, 0
   store %0 to %1a : $*Int64
   %3 = function_ref @plus : $@convention(thin) (Int64, Int64) -> Int64
   %4 = function_ref @test_add : $@convention(thin) (Int64) -> Int64
@@ -162,7 +162,7 @@ bb0(%0 : $Int64):
   %17 = integer_literal $Builtin.Int128, 30
   %18 = apply %15(%17, %16) : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
   %19 = apply %3(%14, %18) : $@convention(thin) (Int64, Int64) -> Int64
-  strong_release %1 : $@box Int64
+  strong_release %1 : ${ var Int64 }
   return %19 : $Int64
 }
 
@@ -172,22 +172,22 @@ protocol SomeProtocol {
 // CHECK-LABEL: sil [transparent] @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
 sil [transparent] @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type {
 bb0(%0 : $*SomeProtocol):
-  %1 = alloc_box $@box SomeProtocol
-  %1a = project_box %1 : $@box SomeProtocol, 0
+  %1 = alloc_box ${ var SomeProtocol }
+  %1a = project_box %1 : ${ var SomeProtocol }, 0
   copy_addr [take] %0 to [initialization] %1a : $*SomeProtocol
   %4 = alloc_stack $SomeProtocol
   copy_addr %1a to [initialization] %4 : $*SomeProtocol
   %6 = existential_metatype $@thick SomeProtocol.Type, %4 : $*SomeProtocol
   destroy_addr %4 : $*SomeProtocol
   dealloc_stack %4 : $*SomeProtocol
-  strong_release %1 : $@box SomeProtocol
+  strong_release %1 : ${ var SomeProtocol }
   return %6 : $@thick SomeProtocol.Type
 }
 
 // CHECK-LABEL: sil @inline_test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
 sil @inline_test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type {
 // CHECK: [[BB0:.*]]([[VAL0:%.*]] : $*SomeProtocol):
-  // CHECK: [[VAL1:%.*]] = alloc_box $@box SomeProtocol
+  // CHECK: [[VAL1:%.*]] = alloc_box ${ var SomeProtocol }
   // CHECK: [[PB1:%.*]] = project_box [[VAL1]]
   // CHECK: copy_addr [take] %0 to [initialization] [[PB1]]
   // CHECK: [[VAL4:%.*]] = alloc_stack $SomeProtocol
@@ -221,10 +221,10 @@ sil @bar : $@convention(thin) (Float32) -> Bool
 // CHECK-LABEL: sil [transparent] @test_control_flow : $@convention(thin) (Float, Float) -> Float
 sil [transparent] @test_control_flow : $@convention(thin) (Float, Float) -> Float {
 bb0(%0 : $Float, %1 : $Float):
-  %2 = alloc_box $@box Float
-  %2a = project_box %2 : $@box Float, 0
-  %3 = alloc_box $@box Float
-  %3a = project_box %3 : $@box Float, 0
+  %2 = alloc_box ${ var Float }
+  %2a = project_box %2 : ${ var Float }, 0
+  %3 = alloc_box ${ var Float }
+  %3a = project_box %3 : ${ var Float }, 0
   store %0 to %2a : $*Float
   store %1 to %3a : $*Float
   %6 = function_ref @get_logic_value : $@convention(method) (@inout Bool) -> Builtin.Int1
@@ -272,8 +272,8 @@ bb5:
   br bb6(%37 : $Float)
 
 bb6(%39 : $Float):
-  strong_release %3 : $@box Float
-  strong_release %2 : $@box Float
+  strong_release %3 : ${ var Float }
+  strong_release %2 : ${ var Float }
   return %39 : $Float
 }
 
@@ -281,7 +281,7 @@ bb6(%39 : $Float):
 sil @inline_test_control_flow : $@convention(thin) (Float) -> Float {
 
 // CHECK: [[BB0:.*]]([[VAL0:%.*]] : $Float):
-  // CHECK: [[VAL1:%.*]] = alloc_box $@box Float
+  // CHECK: [[VAL1:%.*]] = alloc_box ${ var Float }
   // CHECK: [[PB1:%.*]] = project_box [[VAL1]]
   // CHECK: store [[VAL0]] to [[PB1]]
   // CHECK: [[VAL3:%.*]] = function_ref @sub_floats
@@ -296,9 +296,9 @@ sil @inline_test_control_flow : $@convention(thin) (Float) -> Float {
   // CHECK: [[VAL12:%.*]] = metatype $@thin Float.Type
   // CHECK: [[VAL13:%.*]] = float_literal $Builtin.FPIEEE64, 0x4000000000000000
   // CHECK: [[VAL14:%.*]] = apply [[VAL11]]([[VAL13]], [[VAL12]])
-  // CHECK: [[VAL15:%.*]] = alloc_box $@box Float
+  // CHECK: [[VAL15:%.*]] = alloc_box ${ var Float }
   // CHECK: [[PB15:%.*]] = project_box [[VAL15]]
-  // CHECK: [[VAL16:%.*]] = alloc_box $@box Float
+  // CHECK: [[VAL16:%.*]] = alloc_box ${ var Float }
   // CHECK: [[PB16:%.*]] = project_box [[VAL16]]
   // CHECK: store [[VAL10]] to [[PB15]]
   // CHECK: store [[VAL14]] to [[PB16]]
@@ -361,8 +361,8 @@ sil @inline_test_control_flow : $@convention(thin) (Float) -> Float {
   // CHECK: return [[VAL61]]
 
 bb0(%0 : $Float):
-  %1 = alloc_box $@box Float
-  %1a = project_box %1 : $@box Float, 0
+  %1 = alloc_box ${ var Float }
+  %1a = project_box %1 : ${ var Float }, 0
   store %0 to %1a : $*Float
   %3 = function_ref @sub_floats : $@convention(thin) (Float, Float) -> Float
   %4 = function_ref @test_control_flow : $@convention(thin) (Float, Float) -> Float
@@ -383,7 +383,7 @@ bb0(%0 : $Float):
   %19 = float_literal $Builtin.FPIEEE64, 0x4008000000000000
   %20 = apply %17(%19, %18) : $@convention(thin) (Builtin.FPIEEE64, @thin Float.Type) -> Float
   %21 = apply %3(%16, %20) : $@convention(thin) (Float, Float) -> Float
-  strong_release %1 : $@box Float
+  strong_release %1 : ${ var Float }
   return %21 : $Float
 }
 
@@ -453,10 +453,10 @@ sil @true_getter : $@convention(thin) () -> Bool
 
 sil [transparent] @short_circuit_or : $@convention(thin) (Bool, @callee_owned () -> Bool) -> Bool {
 bb0(%0 : $Bool, %1 : $@callee_owned () -> Bool):
-  %2 = alloc_box $@box Bool
-  %2a = project_box %2 : $@box Bool, 0
-  %3 = alloc_box $@box @callee_owned () -> Bool
-  %3a = project_box %3 : $@box @callee_owned () -> Bool, 0
+  %2 = alloc_box ${ var Bool }
+  %2a = project_box %2 : ${ var Bool }, 0
+  %3 = alloc_box ${ var @callee_owned () -> Bool }
+  %3a = project_box %3 : ${ var @callee_owned () -> Bool }, 0
   store %0 to %2a : $*Bool
   store %1 to %3a : $*@callee_owned () -> Bool
   %6 = function_ref @get_logic_value : $@convention(method) (@inout Bool) -> Builtin.Int1
@@ -476,17 +476,17 @@ bb2:
   br bb3(%14 : $Bool)
 
 bb3(%16 : $Bool):
-  strong_release %3 : $@box @callee_owned () -> Bool
-  strong_release %2 : $@box Bool
+  strong_release %3 : ${ var @callee_owned () -> Bool } 
+  strong_release %2 : ${ var Bool }
   return %16 : $Bool
 }
 
-sil private [transparent] @closure0 : $@convention(thin) (@owned @box Bool) -> Bool {
-bb0(%0 : $@box Bool):
-  %1 = project_box %0 : $@box Bool, 0
+sil private [transparent] @closure0 : $@convention(thin) (@owned { var Bool }) -> Bool {
+bb0(%0 : ${ var Bool }):
+  %1 = project_box %0 : ${ var Bool }, 0
   %2 = tuple ()
   %3 = load %1 : $*Bool
-  strong_release %0 : $@box Bool
+  strong_release %0 : ${ var Bool }
   return %3 : $Bool
 }
 
@@ -500,35 +500,38 @@ sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
   // CHECK: br [[BB2:.*]](
 
 // CHECK: [[BB2]](
-  // CHECK: br [[BB4:.*]](
+  // CHECK: br [[BB5:.*]](
 
-// CHECK: [[BB3]]:
-  // CHECK: strong_retain [[VAL3:%[0-9]*]]
-  // CHECK: [[ADDR3:%.*]] = project_box [[VAL3]]
+// CHECK: bb3:
+  // CHECK: br bb4
+
+// CHECK: [[BB4]]:
+  // CHECK: strong_retain [[VAL4:%[0-9]*]]
+  // CHECK: [[ADDR4:%.*]] = project_box [[VAL4]]
   // CHECK: {{%.*}} = tuple ()
-  // CHECK: {{%.*}} = load [[ADDR3]]
-  // CHECK: strong_release [[VAL3]]
+  // CHECK: {{%.*}} = load [[ADDR4]]
+  // CHECK: strong_release [[VAL4]]
   // CHECK: br [[BB2]](
 
-// CHECK: [[BB4]](
-  // CHECK: strong_release [[VAL3]]
+// CHECK: [[BB5]](
+  // CHECK: strong_release [[VAL4]]
   // CHECK: return {{.*}}
 
 bb0(%0 : $Bool, %1 : $Bool):
-  %2 = alloc_box $@box Bool
-  %2a = project_box %2 : $@box Bool, 0
-  %3 = alloc_box $@box Bool
-  %3a = project_box %3 : $@box Bool, 0
+  %2 = alloc_box ${ var Bool }
+  %2a = project_box %2 : ${ var Bool }, 0
+  %3 = alloc_box ${ var Bool }
+  %3a = project_box %3 : ${ var Bool }, 0
   store %0 to %2a : $*Bool
   store %1 to %3a : $*Bool
   %6 = function_ref @short_circuit_or : $@convention(thin) (Bool, @callee_owned () -> Bool) -> Bool
   %7 = load %2a : $*Bool
-  %8 = function_ref @closure0 : $@convention(thin) (@owned @box Bool) -> Bool
-  strong_retain %3 : $@box Bool
-  %10 = partial_apply %8(%3) : $@convention(thin) (@owned @box Bool) -> Bool
+  %8 = function_ref @closure0 : $@convention(thin) (@owned { var Bool }) -> Bool
+  strong_retain %3 : ${ var Bool }
+  %10 = partial_apply %8(%3) : $@convention(thin) (@owned { var Bool }) -> Bool
   %11 = apply %6(%7, %10) : $@convention(thin) (Bool, @callee_owned () -> Bool) -> Bool
-  strong_release %3 : $@box Bool
-  strong_release %2 : $@box Bool
+  strong_release %3 : ${ var Bool }
+  strong_release %2 : ${ var Bool }
   return %11 : $Bool
 }
 
@@ -542,38 +545,41 @@ sil @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
   // CHECK: br [[BB2:.*]](
 
 // CHECK: [[BB2]](
-  // CHECK: br [[BB4:.*]](
+  // CHECK: br [[BB5:.*]](
 
-// CHECK: [[BB3]]:
-  // CHECK: strong_retain [[VAL3:%[0-9]*]]
-  // CHECK: [[ADDR3:%.*]] = project_box [[VAL3]]
+// CHECK: bb3:
+  // CHECK: br bb4
+
+// CHECK: [[BB4]]:
+  // CHECK: strong_retain [[VAL4:%[0-9]*]]
+  // CHECK: [[ADDR4:%.*]] = project_box [[VAL4]]
   // CHECK: {{%.*}} = tuple ()
-  // CHECK: {{%.*}} = load [[ADDR3]]
-  // CHECK: strong_release [[VAL3]]
+  // CHECK: {{%.*}} = load [[ADDR4]]
+  // CHECK: strong_release [[VAL4]]
   // CHECK: br [[BB2]](
 
-// CHECK: [[BB4]](
+// CHECK: [[BB5]](
   // CHECK: strong_release [[VAL3]]
   // CHECK: return {{.*}}
 
 bb0(%0 : $Bool, %1 : $Bool):
-  %2 = alloc_box $@box Bool
-  %2a = project_box %2 : $@box Bool, 0
-  %3 = alloc_box $@box Bool
-  %3a = project_box %3 : $@box Bool, 0
+  %2 = alloc_box ${ var Bool }
+  %2a = project_box %2 : ${ var Bool }, 0
+  %3 = alloc_box ${ var Bool }
+  %3a = project_box %3 : ${ var Bool }, 0
   store %0 to %2a : $*Bool
   store %1 to %3a : $*Bool
   %6 = function_ref @short_circuit_or : $@convention(thin) (Bool, @callee_owned () -> Bool) -> Bool
   %7 = load %2a : $*Bool
-  %8 = function_ref @closure0 : $@convention(thin) (@owned @box Bool) -> Bool
-  strong_retain %3 : $@box Bool
-  %10 = partial_apply %8(%3) : $@convention(thin) (@owned @box Bool) -> Bool
+  %8 = function_ref @closure0 : $@convention(thin) (@owned { var Bool }) -> Bool
+  strong_retain %3 : ${ var Bool }
+  %10 = partial_apply %8(%3) : $@convention(thin) (@owned { var Bool }) -> Bool
   strong_retain %10 : $@callee_owned () -> Bool
   %12 = tuple ()
 
   %11 = apply %6(%7, %10) : $@convention(thin) (Bool, @callee_owned () -> Bool) -> Bool
-  strong_release %3 : $@box Bool
-  strong_release %2 : $@box Bool
+  strong_release %3 : ${ var Bool }
+  strong_release %2 : ${ var Bool }
   return %11 : $Bool
 }
 
@@ -590,14 +596,14 @@ bb0(%0 : $Builtin.Int2048, %1 : $@thin Int64.Type):
 sil @test_with_dead_argument : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
-  %1 = alloc_box $@box Int64
-  %1a = project_box %1 : $@box Int64, 0
+  %1 = alloc_box ${ var Int64 }
+  %1a = project_box %1 : ${ var Int64 }, 0
   %2 = function_ref @convertFromBuiltinIntegerLiteral : $@convention(thin) (Builtin.Int2048, @thin Int64.Type) -> Int64
   %3 = metatype $@thin Int64.Type
   %4 = integer_literal $Builtin.Int2048, 1
   %5 = apply %2(%4, %3) : $@convention(thin) (Builtin.Int2048, @thin Int64.Type) -> Int64
   store %5 to %1a : $*Int64
-  strong_release %1 : $@box Int64
+  strong_release %1 : ${ var Int64 }
   %8 = tuple ()
   return %8 : $()
 }
@@ -732,7 +738,7 @@ bb0(%0 : $Foo):
   %2 = function_ref @protocolConstrained : $@convention(thin) <τ_0_0 where τ_0_0 : Foo> (@owned τ_0_0) -> ()
   strong_retain %0 : $Foo
   // CHECK-NOT: apply
-  // CHECK: [[METHOD:%[a-zA-Z0-9]+]] = witness_method [volatile] $Foo, #Foo.foo!1.foreign : $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
+  // CHECK: [[METHOD:%[a-zA-Z0-9]+]] = witness_method [volatile] $Foo, #Foo.foo!1.foreign : {{.*}} : $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
   // CHECK: apply [[METHOD]]<Foo>(%0) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Foo> (τ_0_0) -> ()
   %4 = apply %2<Foo>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : Foo> (@owned τ_0_0) -> ()
   strong_release %0 : $Foo
@@ -843,6 +849,8 @@ bb0(%0 : $@callee_owned () -> Builtin.Int8):
 // CHECK-LABEL: sil @testouter_transparent
 sil @testouter_transparent : $@convention(thin) (Builtin.Int8) -> Builtin.Int8 {
 // CHECK: bb0
+// CHECK-NEXT: br bb1
+// CHECK: bb1
 // CHECK-NEXT: return
 bb0(%0 : $Builtin.Int8):
   %2 = function_ref @outer_transparent : $@convention(thin) (@owned @callee_owned () -> Builtin.Int8) -> Builtin.Int8
@@ -883,7 +891,7 @@ bb0(%0 : $*Self):
 // uses the opened archetype from the caller.
 // CHECK-LABEL: sil hidden @L_start
 // CHECK: open_existential_addr{{.*}}$*@[[OPENED_ARCHETYPE:opened\("[A-Z0-9-]+"\) P2]]
-// CHECK: witness_method $@[[OPENED_ARCHETYPE]], #P2.c!getter.1, %{{[0-9]+}} : $*@[[OPENED_ARCHETYPE]]
+// CHECK: witness_method $@[[OPENED_ARCHETYPE]], #P2.c!getter.1 : {{.*}}, %{{[0-9]+}} : $*@[[OPENED_ARCHETYPE]]
 // CHECK: return
 sil hidden @L_start : $@convention(method) (@in_guaranteed L) -> Int32 {
 bb0(%0 : $*L):

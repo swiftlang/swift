@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func `protocol`() {}
 
@@ -19,3 +19,7 @@ var applyGet: Int {
   `get` { }
   return 0
 }
+
+enum `switch` {}
+
+typealias `Self` = Int

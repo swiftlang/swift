@@ -45,3 +45,13 @@
 // CHECK-BOTH-DAG: func setAccessorsOnlyWithNewType(_ accessorsOnlyWithNewType: Base)
 
 // CHECK-BOTH: {{^}$}}
+
+// CHECK-SWIFT-3-DAG: func renamedAndRetyped() -> Any{{$}}
+// CHECK-SWIFT-3-DAG: func setRenamedAndRetyped(_ accessorsOnlyRenamedRetyped: Any?)
+// CHECK-SWIFT-4-DAG: var accessorsOnlyRenamedRetyped: Any!
+
+// CHECK-SWIFT-3-DAG: class func renamedAndRetypedClass() -> Any{{$}}
+// CHECK-SWIFT-3-DAG: class func setRenamedAndRetypedClass(_ accessorsOnlyRenamedRetypedClass: Any?)
+// CHECK-SWIFT-4-DAG: class var accessorsOnlyRenamedRetypedClass: Any!
+
+// CHECK-BOTH: {{^}$}}

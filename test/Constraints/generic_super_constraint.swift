@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -parse -verify
+// RUN: %target-swift-frontend %s -typecheck -verify
 
 class Base<T> { }
 class Derived: Base<Int> { }

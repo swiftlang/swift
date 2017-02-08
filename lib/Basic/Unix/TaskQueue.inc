@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -35,7 +35,10 @@
 #if !defined(__APPLE__)
 extern char **environ;
 #else
-#include <crt_externs.h> // for _NSGetEnviron
+extern "C" {
+  // _NSGetEnviron is from crt_externs.h which is missing in the iOS SDK.
+  extern char ***_NSGetEnviron(void);
+}
 #endif
 
 namespace swift {
@@ -55,11 +58,17 @@ class Task {
   /// Context which should be associated with this task.
   void *Context;
 
+  /// True if the errors of the Task should be stored in Errors instead of Output.
+  bool SeparateErrors;
+
   /// The pid of this Task when executing.
   pid_t Pid;
 
   /// A pipe for reading output from the child process.
   int Pipe;
+
+  /// A pipe for reading errors from the child prcess, if SeparateErrors is true.
+  int ErrorPipe;
 
   /// The current state of the Task.
   enum {
@@ -71,11 +80,16 @@ class Task {
   /// Once the Task has finished, this contains the buffered output of the Task.
   std::string Output;
 
+  /// Once the Task has finished, if SeparateErrors is true, this contains the errors
+  /// from the Task.
+  std::string Errors;
+
 public:
   Task(const char *ExecPath, ArrayRef<const char *> Args,
-       ArrayRef<const char *> Env, void *Context)
+       ArrayRef<const char *> Env, void *Context, bool SeparateErrors)
       : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context),
-        Pid(-1), Pipe(-1), State(Preparing) {
+        SeparateErrors(SeparateErrors), Pid(-1), Pipe(-1), ErrorPipe(-1),
+        State(Preparing) {
     assert((Env.empty() || Env.back() == nullptr) &&
            "Env must either be empty or null-terminated!");
   }
@@ -83,17 +97,19 @@ public:
   const char *getExecPath() const { return ExecPath; }
   ArrayRef<const char *> getArgs() const { return Args; }
   StringRef getOutput() const { return Output; }
+  StringRef getErrors() const { return Errors; }
   void *getContext() const { return Context; }
   pid_t getPid() const { return Pid; }
   int getPipe() const { return Pipe; }
+  int getErrorPipe() const { return ErrorPipe; }
 
   /// \brief Begins execution of this Task.
   /// \returns true on error, false on success
   bool execute();
 
-  /// \brief Reads data from the pipe, if any is available.
+  /// \brief Reads data from the pipes, if any is available.
   /// \returns true on error, false on success
-  bool readFromPipe();
+  bool readFromPipes();
 
   /// \brief Performs any post-execution work for this Task, such as reading
   /// piped output and closing the pipe.
@@ -118,6 +134,12 @@ bool Task::execute() {
   pipe(FullPipe);
   Pipe = FullPipe[0];
 
+  int FullErrorPipe[2];
+  if (SeparateErrors) {
+    pipe(FullErrorPipe);
+    ErrorPipe = FullErrorPipe[0];
+  }
+
   // Get the environment to pass down to the subtask.
   const char *const *envp = Env.empty() ? nullptr : Env.data();
   if (!envp) {
@@ -135,8 +157,19 @@ bool Task::execute() {
   posix_spawn_file_actions_init(&FileActions);
 
   posix_spawn_file_actions_adddup2(&FileActions, FullPipe[1], STDOUT_FILENO);
-  posix_spawn_file_actions_adddup2(&FileActions, STDOUT_FILENO, STDERR_FILENO);
+
+  if (SeparateErrors) {
+    posix_spawn_file_actions_adddup2(&FileActions, FullErrorPipe[1],
+                                     STDERR_FILENO);
+  } else {
+    posix_spawn_file_actions_adddup2(&FileActions, STDOUT_FILENO,
+                                     STDERR_FILENO);
+  }
+
   posix_spawn_file_actions_addclose(&FileActions, FullPipe[0]);
+  if (SeparateErrors) {
+    posix_spawn_file_actions_addclose(&FileActions, FullErrorPipe[0]);
+  }
 
   // Spawn the subtask.
   int spawnErr = posix_spawn(&Pid, ExecPath, &FileActions, nullptr,
@@ -145,9 +178,15 @@ bool Task::execute() {
 
   posix_spawn_file_actions_destroy(&FileActions);
   close(FullPipe[1]);
+  if (SeparateErrors) {
+    close(FullErrorPipe[1]);
+  }
 
   if (spawnErr != 0 || Pid == 0) {
     close(FullPipe[0]);
+    if (SeparateErrors) {
+      close(FullErrorPipe[0]);
+    }
     State = Finished;
     return true;
   }
@@ -156,6 +195,9 @@ bool Task::execute() {
   switch (Pid) {
   case -1: {
     close(FullPipe[0]);
+    if (SeparateErrors) {
+      close(FullErrorPipe[0]);
+    }
     State = Finished;
     Pid = 0;
     break;
@@ -163,8 +205,15 @@ bool Task::execute() {
   case 0: {
     // Child process: Execute the program.
     dup2(FullPipe[1], STDOUT_FILENO);
-    dup2(STDOUT_FILENO, STDERR_FILENO);
+    if (SeparateErrors) {
+      dup2(FullErrorPipe[1], STDERR_FILENO);
+    } else {
+      dup2(STDOUT_FILENO, STDERR_FILENO);
+    }
     close(FullPipe[0]);
+    if (SeparateErrors) {
+      close(FullErrorPipe[0]);
+    }
     execve(ExecPath, const_cast<char **>(argvp), const_cast<char **>(envp));
 
     // If the execve() failed, we should exit. Follow Unix protocol and
@@ -181,6 +230,9 @@ bool Task::execute() {
   }
 
   close(FullPipe[1]);
+  if (SeparateErrors) {
+    close(FullErrorPipe[1]);
+  }
 
   if (Pid == 0)
     return true;
@@ -189,7 +241,7 @@ bool Task::execute() {
   return false;
 }
 
-bool Task::readFromPipe() {
+static bool readFromAPipe(int Pipe, std::string &Output) {
   char outputBuffer[1024];
   ssize_t readBytes = 0;
   while ((readBytes = read(Pipe, outputBuffer, sizeof(outputBuffer))) != 0) {
@@ -206,6 +258,14 @@ bool Task::readFromPipe() {
   return false;
 }
 
+bool Task::readFromPipes() {
+  bool Ret = readFromAPipe(Pipe, Output);
+  if (SeparateErrors) {
+    Ret |= readFromAPipe(ErrorPipe, Errors);
+  }
+  return Ret;
+}
+
 void Task::finishExecution() {
   assert(State == Executing &&
          "This Task must be executing to finish execution!");
@@ -213,9 +273,12 @@ void Task::finishExecution() {
   State = Finished;
 
   // Read the output of the command, so we can use it later.
-  readFromPipe();
+  readFromPipes();
 
   close(Pipe);
+  if (SeparateErrors) {
+    close(ErrorPipe);
+  }
 }
 
 bool TaskQueue::supportsBufferingOutput() {
@@ -236,8 +299,10 @@ unsigned TaskQueue::getNumberOfParallelTasks() const {
 }
 
 void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
-                        ArrayRef<const char *> Env, void *Context) {
-  std::unique_ptr<Task> T(new Task(ExecPath, Args, Env, Context));
+                        ArrayRef<const char *> Env, void *Context,
+                        bool SeparateErrors) {
+  std::unique_ptr<Task> T(
+      new Task(ExecPath, Args, Env, Context, SeparateErrors));
   QueuedTasks.push(std::move(T));
 }
 
@@ -276,6 +341,8 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       }
 
       PollFds.push_back({ T->getPipe(), POLLIN | POLLPRI | POLLHUP, 0 });
+      // We should also poll T->getErrorPipe(), but this introduces timing
+      // issues with shutting down the task after reading getPipe().
       ExecutingTasks[Pid] = std::move(T);
     }
 
@@ -296,7 +363,7 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       if (fd.revents & POLLIN || fd.revents & POLLPRI || fd.revents & POLLHUP ||
           fd.revents & POLLERR) {
         // An event which we care about occurred. Find the appropriate Task.
-        auto predicate = [&fd] (PidToTaskMap::value_type &value) -> bool {
+        auto predicate = [&fd](PidToTaskMap::value_type &value) -> bool {
           return value.second->getPipe() == fd.fd;
         };
 
@@ -307,7 +374,7 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
         Task &T = *iter->second;
         if (fd.revents & POLLIN || fd.revents & POLLPRI) {
           // There's data available to read.
-          T.readFromPipe();
+          T.readFromPipes();
         }
 
         if (fd.revents & POLLHUP || fd.revents & POLLERR) {
@@ -336,7 +403,7 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
               // If we have a TaskFinishedCallback, only set SubtaskFailed to
               // true if the callback returns StopExecution.
               SubtaskFailed = Finished(T.getPid(), Result, T.getOutput(),
-                                       T.getContext()) ==
+                                       T.getErrors(), T.getContext()) ==
                   TaskFinishedResponse::StopExecution;
             } else if (Result != 0) {
               // Since we don't have a TaskFinishedCallback, treat a subtask
@@ -350,9 +417,9 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
             StringRef ErrorMsg = strsignal(Signal);
 
             if (Signalled) {
-              TaskFinishedResponse Response = Signalled(T.getPid(), ErrorMsg,
-                                                        T.getOutput(),
-                                                        T.getContext());
+              TaskFinishedResponse Response =
+                  Signalled(T.getPid(), ErrorMsg, T.getOutput(), T.getErrors(),
+                            T.getContext(), Signal);
               if (Response == TaskFinishedResponse::StopExecution)
                 // If we have a TaskCrashedCallback, only set SubtaskFailed to
                 // true if the callback returns StopExecution.

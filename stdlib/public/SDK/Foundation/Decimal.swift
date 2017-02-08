@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -178,28 +178,20 @@ extension Decimal : Hashable, Comparable {
             switch index {
             case 0:
                 d = d * 65536 + Double(_mantissa.0)
-                break
             case 1:
                 d = d * 65536 + Double(_mantissa.1)
-                break
             case 2:
                 d = d * 65536 + Double(_mantissa.2)
-                break
             case 3:
                 d = d * 65536 + Double(_mantissa.3)
-                break
             case 4:
                 d = d * 65536 + Double(_mantissa.4)
-                break
             case 5:
                 d = d * 65536 + Double(_mantissa.5)
-                break
             case 6:
                 d = d * 65536 + Double(_mantissa.6)
-                break
             case 7:
                 d = d * 65536 + Double(_mantissa.7)
-                break
             default:
                 fatalError("conversion overflow")
             }
@@ -315,28 +307,20 @@ extension Decimal {
                 switch i {
                     case 0:
                         _mantissa.0 = UInt16(mantissa & 0xffff)
-                        break
                     case 1:
                         _mantissa.1 = UInt16(mantissa & 0xffff)
-                        break
                     case 2:
                         _mantissa.2 = UInt16(mantissa & 0xffff)
-                        break
                     case 3:
                         _mantissa.3 = UInt16(mantissa & 0xffff)
-                        break
                     case 4:
                         _mantissa.4 = UInt16(mantissa & 0xffff)
-                        break
                     case 5:
                         _mantissa.5 = UInt16(mantissa & 0xffff)
-                        break
                     case 6:
                         _mantissa.6 = UInt16(mantissa & 0xffff)
-                        break
                     case 7:
                         _mantissa.7 = UInt16(mantissa & 0xffff)
-                        break
                     default:
                         fatalError("initialization overflow")
                 }

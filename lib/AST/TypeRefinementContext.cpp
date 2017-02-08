@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -190,6 +190,103 @@ SourceLoc TypeRefinementContext::getIntroductionLoc() const {
   case Reason::Root:
     return SourceLoc();
   }
+
+  llvm_unreachable("Unhandled Reason in switch.");
+}
+
+static SourceRange
+getAvailabilityConditionVersionSourceRange(const PoundAvailableInfo *PAI,
+                                           PlatformKind Platform,
+                                           const clang::VersionTuple &Version) {
+  SourceRange Range;
+  for (auto *S : PAI->getQueries()) {
+    if (auto *V = dyn_cast<PlatformVersionConstraintAvailabilitySpec>(S)) {
+      if (V->getPlatform() == Platform && V->getVersion() == Version) {
+        // More than one: return invalid range, no unique choice.
+        if (Range.isValid())
+          return SourceRange();
+        else
+          Range = V->getVersionSrcRange();
+      }
+    }
+  }
+  return Range;
+}
+
+static SourceRange
+getAvailabilityConditionVersionSourceRange(
+    const MutableArrayRef<StmtConditionElement> &Conds,
+    PlatformKind Platform,
+    const clang::VersionTuple &Version) {
+  SourceRange Range;
+  for (auto const& C : Conds) {
+    if (C.getKind() == StmtConditionElement::CK_Availability) {
+      SourceRange R = getAvailabilityConditionVersionSourceRange(
+        C.getAvailability(), Platform, Version);
+      // More than one: return invalid range.
+      if (Range.isValid())
+        return SourceRange();
+      else
+        Range = R;
+    }
+  }
+  return Range;
+}
+
+static SourceRange
+getAvailabilityConditionVersionSourceRange(const DeclAttributes &DeclAttrs,
+                                           PlatformKind Platform,
+                                           const clang::VersionTuple &Version) {
+  SourceRange Range;
+  for (auto *Attr : DeclAttrs) {
+    if (auto *AA = dyn_cast<AvailableAttr>(Attr)) {
+      if (AA->Introduced.hasValue() &&
+          AA->Introduced.getValue() == Version &&
+          AA->Platform == Platform) {
+
+        // More than one: return invalid range.
+        if (Range.isValid())
+          return SourceRange();
+        else
+          Range = AA->IntroducedRange;
+      }
+    }
+  }
+  return Range;
+}
+
+SourceRange
+TypeRefinementContext::getAvailabilityConditionVersionSourceRange(
+    PlatformKind Platform,
+    const clang::VersionTuple &Version) const {
+  switch (getReason()) {
+  case Reason::Decl:
+    return ::getAvailabilityConditionVersionSourceRange(
+      Node.getAsDecl()->getAttrs(), Platform, Version);
+
+  case Reason::IfStmtThenBranch:
+  case Reason::IfStmtElseBranch:
+    return ::getAvailabilityConditionVersionSourceRange(
+      Node.getAsIfStmt()->getCond(), Platform, Version);
+
+  case Reason::ConditionFollowingAvailabilityQuery:
+    return ::getAvailabilityConditionVersionSourceRange(
+      Node.getAsPoundAvailableInfo(), Platform, Version);
+
+  case Reason::GuardStmtFallthrough:
+  case Reason::GuardStmtElseBranch:
+    return ::getAvailabilityConditionVersionSourceRange(
+      Node.getAsGuardStmt()->getCond(), Platform, Version);
+
+  case Reason::WhileStmtBody:
+    return ::getAvailabilityConditionVersionSourceRange(
+      Node.getAsWhileStmt()->getCond(), Platform, Version);
+
+  case Reason::Root:
+    return SourceRange();
+  }
+
+  llvm_unreachable("Unhandled Reason in switch.");
 }
 
 void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
@@ -253,4 +350,6 @@ StringRef TypeRefinementContext::getReasonName(Reason R) {
   case Reason::WhileStmtBody:
     return "while_body";
   }
+
+  llvm_unreachable("Unhandled Reason in switch.");
 }

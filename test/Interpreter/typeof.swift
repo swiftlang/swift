@@ -85,5 +85,5 @@ print(boxedExistentialMetatype(Meltdown()))
 print(boxedExistentialMetatype(GrilledCheese()))
 // CHECK: GrilledCheese
 print(boxedExistentialMetatype(GrilledCheese() as Meltdown))
-// CHECK: (x: Int, y: Int, Double)
+// CHECK: (x : Int, y : Int, Double)
 print(type(of: labeledTuple()))

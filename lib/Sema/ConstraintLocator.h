@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -91,8 +91,6 @@ public:
     SubscriptIndex,
     /// \brief The result of a subscript expression.
     SubscriptResult,
-    /// \brief An argument to string interpolation.
-    InterpolationArgument,
     /// \brief The lookup for a constructor member.
     ConstructorMember,
     /// \brief Rvalue adjustment.
@@ -155,7 +153,6 @@ public:
       return 0;
 
     case GenericArgument:
-    case InterpolationArgument:
     case NamedTupleElement:
     case TupleElement:
       return 1;
@@ -163,6 +160,8 @@ public:
     case ApplyArgToParam:
       return 2;
     }
+
+    llvm_unreachable("Unhandled PathElementKind in switch.");
   }
 
   /// Flags for efficiently recording certain information about a path.
@@ -202,7 +201,6 @@ public:
     case Archetype:
     case AssociatedType:
     case GenericArgument:
-    case InterpolationArgument:
     case NamedTupleElement:
     case TupleElement:
     case Requirement:
@@ -213,7 +211,8 @@ public:
     case FunctionResult:
       return IsFunctionConversion;
     }
-    llvm_unreachable("bad path element kind");
+
+    llvm_unreachable("Unhandled PathElementKind in switch.");
   }
 
   template<unsigned N> struct incomplete;
@@ -332,12 +331,6 @@ public:
       return PathElement(GenericArgument, position);
     }
 
-    /// \brief Retrieve a path element for an argument to string
-    /// interpolation.
-    static PathElement getInterpolationArgument(unsigned position) {
-      return PathElement(InterpolationArgument, position);
-    }
-
     /// \brief Retrieve the kind of path element.
     PathElementKind getKind() const {
       switch (static_cast<StoredKind>(storedKind)) {
@@ -354,6 +347,8 @@ public:
       case StoredKindAndValue:
         return decodeStorage(storage).first;
       }
+
+      llvm_unreachable("Unhandled StoredKind in switch.");
     }
 
     /// \brief Retrieve the value associated with this path element,
@@ -615,6 +610,7 @@ public:
   }
 };
 
-} } // end namespace swift::constraints
+} // end namespace constraints
+} // end namespace swift
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINTLOCATOR_H

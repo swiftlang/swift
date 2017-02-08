@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,6 +15,7 @@
 #include "Scope.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/SIL/FormalLinkage.h"
 
 using namespace swift;
@@ -32,7 +33,12 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   } else {
     Mangler mangler;
     mangler.mangleGlobalVariableFull(gDecl);
-    mangledName = mangler.finalize();
+    std::string Old = mangler.finalize();
+
+    NewMangling::ASTMangler NewMangler;
+    std::string New = NewMangler.mangleGlobalVariableFull(gDecl);
+
+    mangledName = NewMangling::selectMangling(Old, New);
   }
 
   // Check if it is already created, and update linkage if necessary.
@@ -95,14 +101,13 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
     (void)accessorTy;
     assert(!accessorTy->isPolymorphic()
            && "generic global variable accessors not yet implemented");
-    SILValue addr = B.createApply(loc, accessor, accessor->getType(),
-                              accessor->getType().castTo<SILFunctionType>()
-                                      ->getSingleResult().getSILType(),
-                              {}, {});
+    SILValue addr = B.createApply(
+        loc, accessor, accessor->getType(),
+        accessorFn->getConventions().getSingleSILResultType(), {}, {});
     // FIXME: It'd be nice if the result of the accessor was natively an
     // address.
     addr = B.createPointerToAddress(
-      loc, addr, getLoweredType(var->getType()).getAddressType(),
+      loc, addr, getLoweredType(var->getInterfaceType()).getAddressType(),
       /*isStrict*/ true);
     return ManagedValue::forLValue(addr);
   }
@@ -196,12 +201,8 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
                                             unsigned pbdEntry) {
   // Generic and dynamic static properties require lazy initialization, which
   // isn't implemented yet.
-  if (pd->isStatic()) {
-    auto theType = pd->getDeclContext()->getDeclaredTypeInContext();
-    assert(!theType->is<BoundGenericType>()
-           && "generic static properties not implemented");
-    (void)theType;
-  }
+  if (pd->isStatic())
+    assert(!pd->getDeclContext()->isGenericContext());
 
   // Emit the lazy initialization token for the initialization expression.
   auto counter = anonymousSymbolCounter++;
@@ -219,7 +220,11 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   {
     Mangler tokenMangler;
     tokenMangler.mangleGlobalInit(varDecl, counter, false);
-    onceTokenBuffer = tokenMangler.finalize();
+    std::string Old = tokenMangler.finalize();
+
+    NewMangling::ASTMangler NewMangler;
+    std::string New = NewMangler.mangleGlobalInit(varDecl, counter, false);
+    onceTokenBuffer = NewMangling::selectMangling(Old, New);
   }
 
   auto onceTy = BuiltinIntegerType::getWordType(M.getASTContext());
@@ -238,8 +243,12 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   {
     Mangler funcMangler;
     funcMangler.mangleGlobalInit(varDecl, counter, true);
-    onceFuncBuffer = funcMangler.finalize();
-  }
+    std::string Old = funcMangler.finalize();
+
+    NewMangling::ASTMangler NewMangler;
+    std::string New = NewMangler.mangleGlobalInit(varDecl, counter, true);
+    onceFuncBuffer = NewMangling::selectMangling(Old, New);
+}
 
   SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncBuffer, pd,
                                                     pbdEntry);
@@ -310,7 +319,7 @@ void SILGenFunction::emitGlobalGetter(VarDecl *global,
   auto *silG = SGM.getSILGlobalVariable(global, NotForDefinition);
   SILValue addr = B.createGlobalAddr(global, silG);
 
-  auto refType = global->getType()->getCanonicalType();
+  auto refType = global->getInterfaceType()->getCanonicalType();
   ManagedValue value = emitLoad(global, addr, getTypeLowering(refType),
                                 SGFContext(), IsNotTake);
   SILValue result = value.forward(*this);

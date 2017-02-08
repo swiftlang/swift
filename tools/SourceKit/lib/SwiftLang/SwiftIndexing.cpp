@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,15 +31,8 @@ using namespace swift::index;
 static UIdent KindImportModuleClang("source.lang.swift.import.module.clang");
 static UIdent KindImportModuleSwift("source.lang.swift.import.module.swift");
 
-static UIdent getUIDForDependencyKind(SymbolKind depKind) {
-  switch (depKind) {
-  case SymbolKind::Module:
-    return KindImportModuleSwift;
-  case SymbolKind::ClangModule:
-    return KindImportModuleClang;
-  default:
-    return UIdent();
-  }
+static UIdent getUIDForDependencyKind(bool isClangModule) {
+  return isClangModule ? KindImportModuleClang : KindImportModuleSwift;
 }
 
 class SKIndexDataConsumer : public IndexDataConsumer {
@@ -61,32 +54,51 @@ private:
     return impl.recordHash(hash, isKnown);
   }
 
-  bool startDependency(SymbolKind kind, StringRef name, StringRef path,
+  bool startDependency(StringRef name, StringRef path, bool isClangModule,
                        bool isSystem, StringRef hash) override {
-    auto kindUID = getUIDForDependencyKind(kind);
+    auto kindUID = getUIDForDependencyKind(isClangModule);
     return impl.startDependency(kindUID, name, path, isSystem, hash);
   }
 
-  bool finishDependency(SymbolKind kind) override {
-    return impl.finishDependency(getUIDForDependencyKind(kind));
+  bool finishDependency(bool isClangModule) override {
+    return impl.finishDependency(getUIDForDependencyKind(isClangModule));
   }
 
-  bool startSourceEntity(const IndexSymbol &symbol) override {
-    return withEntityInfo(symbol, [this](const EntityInfo &info) {
-      return impl.startSourceEntity(info);
-    });
+  Action startSourceEntity(const IndexSymbol &symbol) override {
+
+    // report any parent relations to this reference
+    if (symbol.roles & (SymbolRoleSet)SymbolRole::RelationBaseOf) {
+      withEntityInfo(symbol, [this](const EntityInfo &info) {
+        return impl.recordRelatedEntity(info);
+      });
+    }
+
+    // filter out references with invalid locations
+    if (symbol.roles & (SymbolRoleSet)SymbolRole::Reference &&
+        (symbol.line == 0 || symbol.column == 0))
+      return Skip;
+
+
+    // start the entity (ref or def)
+    if(!withEntityInfo(symbol, [this](const EntityInfo &info) {
+        return impl.startSourceEntity(info);
+    })) return Abort;
+
+
+    // report relations this occurrence has
+    for (auto Relation: symbol.Relations) {
+      if (Relation.roles & (SymbolRoleSet)SymbolRole::RelationOverrideOf) {
+        if (!withEntityInfo(Relation, [this](const EntityInfo &info) {
+          return impl.recordRelatedEntity(info);
+        })) return Abort;
+      }
+    }
+    return Continue;
   }
 
-  bool recordRelatedEntity(const IndexSymbol &symbol) override {
-    return withEntityInfo(symbol, [this](const EntityInfo &info) {
-      return impl.recordRelatedEntity(info);
-    });
-  }
-
-  bool finishSourceEntity(SymbolKind kind, SymbolSubKindSet subKinds,
-                          SymbolRoleSet roles) override {
+  bool finishSourceEntity(SymbolInfo symInfo, SymbolRoleSet roles) override {
     bool isRef = roles & (unsigned)SymbolRole::Reference;
-    auto UID = SwiftLangSupport::getUIDForSymbol(kind, subKinds, isRef);
+    auto UID = SwiftLangSupport::getUIDForSymbol(symInfo, isRef);
     return impl.finishSourceEntity(UID);
   }
 
@@ -94,20 +106,41 @@ private:
   bool withEntityInfo(const IndexSymbol &symbol, F func) {
     EntityInfo info;
     bool isRef = symbol.roles & (unsigned)SymbolRole::Reference;
-    info.Kind = SwiftLangSupport::getUIDForSymbol(symbol.kind, symbol.subKinds,
-                                                  isRef);
-    info.Name = symbol.name;
+    bool isImplicit = symbol.roles & (unsigned)SymbolRole::Implicit;
+
+    info.Kind = SwiftLangSupport::getUIDForSymbol(symbol.symInfo, isRef);
+    info.Name = isImplicit? "" : symbol.name;
     info.USR = symbol.USR;
     info.Group = symbol.group;
     info.Line = symbol.line;
     info.Column = symbol.column;
-    info.ReceiverUSR = symbol.receiverUSR;
+    info.ReceiverUSR = symbol.getReceiverUSR();
     info.IsDynamic = symbol.roles & (unsigned)SymbolRole::Dynamic;
-    info.IsTestCandidate = symbol.subKinds & SymbolSubKind::UnitTest;
+    info.IsTestCandidate = symbol.symInfo.Properties & SymbolProperty::UnitTest;
     std::vector<UIdent> uidAttrs;
     if (!isRef) {
       uidAttrs =
         SwiftLangSupport::UIDsFromDeclAttributes(symbol.decl->getAttrs());
+      info.Attrs = uidAttrs;
+    }
+    return func(info);
+  }
+
+  template <typename F>
+  bool withEntityInfo(const IndexRelation &relation, F func) {
+    EntityInfo info;
+    bool isRef = (relation.roles & (unsigned)SymbolRole::Reference) ||
+      (relation.roles & (unsigned)SymbolRole::RelationOverrideOf);
+    info.Kind = SwiftLangSupport::getUIDForSymbol(relation.symInfo, isRef);
+    info.Name = relation.name;
+    info.USR = relation.USR;
+    info.Group = relation.group;
+    info.IsDynamic = relation.roles & (unsigned)SymbolRole::Dynamic;
+    info.IsTestCandidate = relation.symInfo.Properties & SymbolProperty::UnitTest;
+    std::vector<UIdent> uidAttrs;
+    if (!isRef) {
+      uidAttrs =
+      SwiftLangSupport::UIDsFromDeclAttributes(relation.decl->getAttrs());
       info.Attrs = uidAttrs;
     }
     return func(info);
@@ -137,7 +170,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
 
   ASTContext &Ctx = CI.getASTContext();
   std::unique_ptr<SerializedModuleLoader> Loader;
-  Module *Mod = nullptr;
+  ModuleDecl *Mod = nullptr;
   if (ModuleName == Ctx.StdlibModuleName.str()) {
     Mod = Ctx.getModule({ {Ctx.StdlibModuleName, SourceLoc()} });
   } else {
@@ -148,7 +181,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
 
     // FIXME: These APIs allocate memory on the ASTContext, meaning it may not
     // be freed for a long time.
-    Mod = Module::create(Ctx.getIdentifier(ModuleName), Ctx);
+    Mod = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
     // Indexing is not using documentation now, so don't open the module
     // documentation file.
     // FIXME: refactor the frontend to provide an easy way to figure out the

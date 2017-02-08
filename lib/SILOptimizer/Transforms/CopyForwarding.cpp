@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -92,9 +92,7 @@ static llvm::cl::opt<bool> EnableDestroyHoisting("enable-destroyhoisting",
 ///
 /// (2) A local alloc_stack variable.
 static bool isIdentifiedSourceValue(SILValue Def) {
-  if (SILArgument *Arg = dyn_cast<SILArgument>(Def)) {
-    if (!Arg->isFunctionArg())
-      return false;
+  if (auto *Arg = dyn_cast<SILFunctionArgument>(Def)) {
     // Check that the argument is passed as an in type. This means there are
     // no aliases accessible within this function scope.
     SILArgumentConvention Conv =  Arg->getArgumentConvention();
@@ -107,7 +105,8 @@ static bool isIdentifiedSourceValue(SILValue Def) {
       return false;
     }
   }
-  else if (isa<AllocStackInst>(Def))
+
+  if (isa<AllocStackInst>(Def))
     return true;
 
   return false;
@@ -120,9 +119,7 @@ static bool isIdentifiedSourceValue(SILValue Def) {
 ///
 /// (2) A local alloc_stack variable.
 static bool isIdentifiedDestValue(SILValue Def) {
-  if (SILArgument *Arg = dyn_cast<SILArgument>(Def)) {
-    if (!Arg->isFunctionArg())
-      return false;
+  if (auto *Arg = dyn_cast<SILFunctionArgument>(Def)) {
     // Check that the argument is passed as an out type. This means there are
     // no aliases accessible within this function scope.
     SILArgumentConvention Conv =  Arg->getArgumentConvention();
@@ -135,7 +132,8 @@ static bool isIdentifiedDestValue(SILValue Def) {
       return false;
     }
   }
-  else if (isa<AllocStackInst>(Def))
+
+  if (isa<AllocStackInst>(Def))
     return true;
 
   return false;
@@ -149,13 +147,13 @@ static SILArgumentConvention getAddressArgConvention(ApplyInst *Apply,
                                                      SILValue Address,
                                                      Operand *&Oper) {
   Oper = nullptr;
-  SILArgumentConvention Conv;
   auto Args = Apply->getArgumentOperands();
+  llvm::Optional<unsigned> FoundArgIdx;
   for (auto ArgIdx : indices(Args)) {
     if (Args[ArgIdx].get() != Address)
       continue;
 
-    Conv = Apply->getArgumentConvention(ArgIdx);
+    FoundArgIdx = ArgIdx;
     assert(!Oper && "Address can only be passed once as an indirection.");
     Oper = &Args[ArgIdx];
 #ifndef NDEBUG
@@ -163,7 +161,7 @@ static SILArgumentConvention getAddressArgConvention(ApplyInst *Apply,
 #endif
   }
   assert(Oper && "Address value not passed as an argument to this call.");
-  return Conv;
+  return Apply->getArgumentConvention(FoundArgIdx.getValue());
 }
 
 //===----------------------------------------------------------------------===//
@@ -439,7 +437,7 @@ protected:
   bool areCopyDestUsersDominatedBy(CopyAddrInst *,
                                    SmallVectorImpl<Operand *> &);
 };
-} // namespace
+} // end anonymous namespace
 
 /// Gather all instructions that use CurrentDef:
 /// - DestroyPoints records 'destroy'
@@ -459,9 +457,10 @@ bool CopyForwarding::collectUsers() {
       /// object. However, we can rely on a subsequent mark_dependent
       /// instruction to take that object as an operand, causing it to escape
       /// for the purpose of this analysis.
-      assert(isIndirectConvention(
-                Apply->getSubstCalleeType()->getSILArgumentConvention(
-                    UI->getOperandNumber() - Apply->getArgumentOperandNumber()))
+      assert(Apply->getSubstCalleeConv()
+                 .getSILArgumentConvention(UI->getOperandNumber()
+                                           - Apply->getArgumentOperandNumber())
+                 .isIndirectConvention()
              && "copy_addr location should be passed indirect");
       SrcUserInsts.insert(Apply);
       continue;
@@ -1100,11 +1099,11 @@ static bool canNRVO(CopyAddrInst *CopyInst) {
   // dominate all uses of the source. Worse, it may be aliased. This
   // optimization will early-initialize the copy dest, so we can't allow aliases
   // to be accessed between the initialization and the return.
-  auto OutArg = dyn_cast<SILArgument>(CopyInst->getDest());
+  auto OutArg = dyn_cast<SILFunctionArgument>(CopyInst->getDest());
   if (!OutArg)
     return false;
 
-  if (!OutArg->isFunctionArg() || !OutArg->isIndirectResult())
+  if (!OutArg->isIndirectResult())
     return false;
 
   SILBasicBlock *BB = CopyInst->getParent();
@@ -1212,7 +1211,7 @@ class CopyForwardingPass : public SILFunctionTransform
 
   StringRef getName() override { return "Copy Forwarding"; }
 };
-} // anonymous
+} // end anonymous namespace
 
 SILTransform *swift::createCopyForwarding() {
   return new CopyForwardingPass();

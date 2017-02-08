@@ -52,7 +52,7 @@ func genericMetatypeFromGenericMetatype<T>(_ x: GenericMetatype<T>)-> T.Type {
   return x.value
 }
 // CHECK-LABEL: sil hidden @_TFs34dynamicMetatypeFromGenericMetatypeFGVs15GenericMetatypeCs1C_MS0_
-// CHECK:         [[XBOX:%[0-9]+]] = alloc_box $@box GenericMetatype<C>
+// CHECK:         [[XBOX:%[0-9]+]] = alloc_box ${ var GenericMetatype<C> }
 // CHECK:         [[PX:%[0-9]+]] = project_box [[XBOX]]
 // CHECK:         [[ADDR:%.*]] = struct_element_addr [[PX]] : $*GenericMetatype<C>, #GenericMetatype.value
 // CHECK:         [[META:%.*]] = load [trivial] [[ADDR]] : $*@thick C.Type
@@ -88,7 +88,7 @@ func dynamicMetatypeToGeneric(_ x: C.Type) {
   takeGeneric(x)
 }
 // CHECK-LABEL: sil hidden @_TFs32dynamicMetatypeToGenericMetatypeFMCs1CT_
-// CHECK:         [[XBOX:%[0-9]+]] = alloc_box $@box (@thick C.Type)
+// CHECK:         [[XBOX:%[0-9]+]] = alloc_box ${ var @thick C.Type }
 // CHECK:         [[PX:%[0-9]+]] = project_box [[XBOX]]
 // CHECK:         [[META:%.*]] = load [trivial] [[PX]] : $*@thick C.Type
 // CHECK:         apply {{%.*}}<C>([[META]]) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> ()

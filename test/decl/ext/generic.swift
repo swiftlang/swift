@@ -1,13 +1,13 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 protocol P1 { associatedtype AssocType }
 protocol P2 : P1 { }
 protocol P3 { }
 
 struct X<T : P1, U : P2, V> { 
-  struct Inner<A, B : P3> { } // expected-error{{generic type 'Inner' cannot be nested in type 'X'}}
+  struct Inner<A, B : P3> { }
 
-  struct NonGenericInner { } // expected-error{{nested in generic type}}
+  struct NonGenericInner { }
 }
 
 extension Int : P1 {
@@ -151,4 +151,10 @@ struct S4<Q>: P4 {
   init(_: Q) { }
 }
 
-extension S4 where T : P5 {} // expected-FIXME-error{{type 'T' in conformance requirement does not refer to a generic parameter or associated type}}
+extension S4 where T : P5 {}
+
+struct S5<Q> {
+  init(_: Q) { }
+}
+
+extension S5 : P4 {}

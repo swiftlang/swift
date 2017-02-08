@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -18,21 +18,21 @@ bb0(%0 : $@thick Outer.Inner.Type):
 }
 // CHECK-LABEL: define{{ | protected }}%swift.type* @test0(%swift.type*)
 //   TODO: it would be more efficient to get this type from the parent metadata field
-// CHECK:      [[T0:%.*]] = call %swift.type* @_TMaC12nested_types5Outer()
+// CHECK:      [[T0:%.*]] = call %swift.type* @_T012nested_types5OuterCMa()
 // CHECK-NEXT: ret %swift.type* [[T0]]
 
-// CHECK-LABEL: define hidden %swift.type* @_TMaVC12nested_types5Outer5Inner()
-// CHECK:      [[T0:%.*]] = load %swift.type*, %swift.type** @_TMLVC12nested_types5Outer5Inner
+// CHECK-LABEL: define hidden %swift.type* @_T012nested_types5OuterC5InnerVMa()
+// CHECK:      [[T0:%.*]] = load %swift.type*, %swift.type** @_T012nested_types5OuterC5InnerVML
 // CHECK-NEXT: [[T1:%.*]] = icmp eq %swift.type* [[T0]], null
 // CHECK-NEXT: br i1 [[T1]]
-// CHECK:      call void @swift_once({{.*}}* @_TMaVC12nested_types5Outer5Inner.once_token, i8* bitcast (void (i8*)* @initialize_metadata_Inner to i8*))
-// CHECK-NEXT: [[T2:%.*]] = load %swift.type*, %swift.type** @_TMLVC12nested_types5Outer5Inner
+// CHECK:      call void @swift_once({{.*}}* @_T012nested_types5OuterC5InnerVMa.once_token, i8* bitcast (void (i8*)* @initialize_metadata_Inner to i8*))
+// CHECK-NEXT: [[T2:%.*]] = load %swift.type*, %swift.type** @_T012nested_types5OuterC5InnerVML
 // CHECK-NEXT: br label
 // CHECK:      [[T4:%.*]] = phi %swift.type* [ [[T0]], {{.*}} ], [ [[T2]], {{.*}} ]
 // CHECK-NEXT: ret %swift.type* [[T4]]
 
 // CHECK-LABEL: define private void @initialize_metadata_Inner
-// CHECK:      [[T0:%.*]] = call %swift.type* @_TMaC12nested_types5Outer()
-// CHECK-NEXT: store %swift.type* [[T0]], %swift.type** getelementptr inbounds (%swift.type*, %swift.type** bitcast ({{.*}} @_TMfVC12nested_types5Outer5Inner{{.*}}, [[INT:i[0-9]+]] 2), align
-// CHECK-NEXT: store atomic %swift.type* bitcast ({{.*}} @_TMfVC12nested_types5Outer5Inner{{.*}} to %swift.type*), %swift.type** @_TMLVC12nested_types5Outer5Inner release, align
+// CHECK:      [[T0:%.*]] = call %swift.type* @_T012nested_types5OuterCMa()
+// CHECK-NEXT: store %swift.type* [[T0]], %swift.type** getelementptr inbounds (%swift.type*, %swift.type** bitcast ({{.*}} @_T012nested_types5OuterC5InnerVMf{{.*}}, [[INT:i[0-9]+]] 2), align
+// CHECK-NEXT: store atomic %swift.type* bitcast ({{.*}} @_T012nested_types5OuterC5InnerVMf{{.*}} to %swift.type*), %swift.type** @_T012nested_types5OuterC5InnerVML release, align
 // CHECK-NEXT: ret void

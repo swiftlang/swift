@@ -53,6 +53,9 @@ typedef struct {
   unsigned b[];
 } StructWithFlexibleArray;
 
+#include <stdarg.h>
+extern void hasVaList(va_list args);
+
 //===---
 // Tag decls and typedefs.
 //===---
@@ -265,6 +268,11 @@ typedef struct ModRM {
 // Arrays
 //===---
 void useArray(char x[4], char y[], char z[][8]);
+void staticBoundsArray(const char x[static 4]);
+
+typedef const int FourConstInts[4];
+void nonnullArrayParameters(const char x[_Nonnull], void * const _Nullable y[_Nonnull], _Nonnull FourConstInts z);
+void nullableArrayParameters(const char x[_Nullable], void * const _Nullable y[_Nullable], _Nullable FourConstInts z);
 
 typedef double real_t __attribute__((availability(swift,unavailable,message="use double")));
 

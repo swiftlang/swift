@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -108,27 +108,9 @@ static inline char encodeSpecializationPass(SpecializationPass Pass) {
 }
 
 enum class ValueWitnessKind {
-  AllocateBuffer,
-  AssignWithCopy,
-  AssignWithTake,
-  DeallocateBuffer,
-  Destroy,
-  DestroyBuffer,
-  InitializeBufferWithCopyOfBuffer,
-  InitializeBufferWithCopy,
-  InitializeWithCopy,
-  InitializeBufferWithTake,
-  InitializeWithTake,
-  ProjectBuffer,
-  InitializeBufferWithTakeOfBuffer,
-  DestroyArray,
-  InitializeArrayWithCopy,
-  InitializeArrayWithTakeFrontToBack,
-  InitializeArrayWithTakeBackToFront,
-  StoreExtraInhabitant,
-  GetExtraInhabitantIndex,
-  GetEnumTag,
-  DestructiveProjectEnumData,
+#define VALUE_WITNESS(MANGLING, NAME) \
+  NAME,
+#include "swift/Basic/ValueWitnessMangling.def"
 };
 
 enum class Directness {
@@ -224,6 +206,15 @@ public:
     addChild(std::move(child2));
   }
 };
+
+/// Returns true if the mangledName starts with the swift mangling prefix.
+bool isSwiftSymbol(const char *mangledName, size_t mangledNameLength);
+
+/// Returns true if the mangledName refers to a thunk function.
+///
+/// Thunk functions are either (ObjC) partial apply forwarder, swift-as-ObjC or
+/// ObjC-as-swift thunks.
+bool isThunkSymbol(const char *mangledName, size_t mangledNameLength);
 
 /// \brief Demangle the given string as a Swift symbol.
 ///
@@ -334,6 +325,14 @@ void mangleIdentifier(const char *data, size_t length,
 /// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(const NodePointer &root);
 
+std::string mangleNodeNew(const NodePointer &root);
+
+inline std::string mangleNode(const NodePointer &root, bool NewMangling) {
+  if (NewMangling)
+    return mangleNodeNew(root);
+  return mangleNode(root);
+}
+
 /// \brief Transform the node structure to a string.
 ///
 /// Typical usage:
@@ -404,10 +403,19 @@ public:
   }
   
   std::string &&str() && { return std::move(Stream); }
-  
+
+  llvm::StringRef getStringRef() const { return Stream; }
+
+  /// Returns a mutable reference to the last character added to the printer.
+  char &lastChar() { return Stream.back(); }
+
 private:
   std::string Stream;
 };
+
+bool mangleStandardSubstitution(Node *node, DemanglerPrinter &Out);
+bool isSpecialized(Node *node);
+NodePointer getUnspecialized(Node *node);
 
 /// Is a character considered a digit by the demangling grammar?
 ///
@@ -418,6 +426,14 @@ static inline bool isDigit(int c) {
 }
   
 } // end namespace Demangle
+
+
+/// Returns true if the new mangling scheme should be used.
+///
+/// TODO: remove this function when the old mangling is removed.
+bool useNewMangling(Demangle::NodePointer Node);
+
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_DEMANGLE_H

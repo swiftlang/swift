@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -O %s | %FileCheck %s
 
 class S<T> {
   func f<U>(_ x: T, _ y: U) -> T { return x }
@@ -10,7 +10,7 @@ class S<T> {
 // No remaining class_method or apply instructions
 // should be present after optimizations are applied.
 
-// CHECK-LABEL: sil @_TF33devirt_method_with_generic_params38testDevirtMethodWithItsOwnGenericParamFT_Si
+// CHECK-LABEL: sil @_T033devirt_method_with_generic_params38testDevirtMethodWithItsOwnGenericParamSiyF
 // CHECK-NOT: class_method
 // CHECK-NOT: apply
 // CHECK: return

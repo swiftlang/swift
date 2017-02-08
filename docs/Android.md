@@ -30,7 +30,7 @@ Swift-to-Java bridging.
 To follow along with this guide, you'll need:
 
 1. A Linux environment capable of building Swift from source, specifically
-   Ubuntu 15.10 (Ubuntu 14.04 is [not currently supported](Swift Android libicuuc link step fails on Ubuntu 14.04)).
+   Ubuntu 15.10 (Ubuntu 14.04 is [not currently supported](https://bugs.swift.org/browse/SR-1321), [nor is 16.04](https://bugs.swift.org/browse/SR-1321)).
    The stdlib is currently only buildable for Android from a Linux environment.
    Before attempting to build for Android, please make sure you are able to build
    for Linux by following the instructions in the Swift project README.

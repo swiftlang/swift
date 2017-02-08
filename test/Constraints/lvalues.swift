@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 func f0(_ x: inout Int) {}
 func f1<T>(_ x: inout T) {}
@@ -159,9 +159,9 @@ func testInOut(_ arg: inout Int) {
 }
 
 // Don't infer inout types.
-var ir = &i // expected-error{{type 'inout Int' of variable is not materializable}} \
+var ir = &i // expected-error{{variable has type 'inout Int' which includes nested inout parameters}} \
             // expected-error{{'&' can only appear immediately in a call argument list}}
-var ir2 = ((&i)) // expected-error{{type 'inout Int' of variable is not materializable}} \
+var ir2 = ((&i)) // expected-error{{variable has type 'inout Int' which includes nested inout parameters}} \
                  // expected-error{{'&' can only appear immediately in a call argument list}}
 
 // <rdar://problem/17133089>

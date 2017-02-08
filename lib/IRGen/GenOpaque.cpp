@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -433,6 +433,44 @@ llvm::Value *irgen::emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
   call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
   return call;
+}
+
+/// Emit a dynamic alloca call to allocate enough memory to hold an object of
+/// type 'T' and an optional llvm.stackrestore point if 'isInEntryBlock' is
+/// false.
+DynamicAlloca irgen::emitDynamicAlloca(IRGenFunction &IGF, SILType T,
+                                       bool isInEntryBlock) {
+  llvm::Value *stackRestorePoint = nullptr;
+
+  // Save the stack pointer if we are not in the entry block (we could be
+  // executed more than once).
+  if (!isInEntryBlock) {
+    auto *stackSaveFn = llvm::Intrinsic::getDeclaration(
+        &IGF.IGM.Module, llvm::Intrinsic::ID::stacksave);
+
+    stackRestorePoint =  IGF.Builder.CreateCall(stackSaveFn, {}, "spsave");
+  }
+
+  // Emit the dynamic alloca.
+  llvm::Value *size = emitLoadOfSize(IGF, T);
+  auto *alloca = IGF.Builder.CreateAlloca(IGF.IGM.Int8Ty, size, "alloca");
+  alloca->setAlignment(16);
+  assert(!isInEntryBlock ||
+         IGF.getActiveDominancePoint().isUniversal() &&
+             "Must be in entry block if we insert dynamic alloca's without "
+             "stackrestores");
+  return {alloca, stackRestorePoint};
+}
+
+/// Deallocate dynamic alloca's memory if requested by restoring the stack
+/// location before the dynamic alloca's call.
+void irgen::emitDeallocateDynamicAlloca(IRGenFunction &IGF,
+                                        StackAddress address) {
+  if (!address.needsSPRestore())
+    return;
+  auto *stackRestoreFn = llvm::Intrinsic::getDeclaration(
+      &IGF.IGM.Module, llvm::Intrinsic::ID::stackrestore);
+  IGF.Builder.CreateCall(stackRestoreFn, address.getSavedSP());
 }
 
 /// Emit a call to do an 'allocateBuffer' operation.

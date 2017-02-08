@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -17,6 +17,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "gtest/gtest.h"
 #include <map>
@@ -254,7 +255,7 @@ bool CtorTesterSet::hasLiveTesters() const {
 }
 
 bool CtorTesterSet::numLiveTesters() const {
-  return count_if(Constructed, [](CtorTester *T) -> bool {
+  return llvm::count_if(Constructed, [](CtorTester *T) -> bool {
     assert(T);
     return !T->isIgnorableTester();
   });
@@ -328,7 +329,7 @@ public:
     EXPECT_TRUE(!ConstructedTesters->hasLiveTesters());
   }
 
-  ~BlotMapVectorTest() {
+  ~BlotMapVectorTest() override {
     ConstructedTesters->verifyTesters();
     llvm::outs() << "Destroying Fixture\n";
     ConstructedTesters->finalize();

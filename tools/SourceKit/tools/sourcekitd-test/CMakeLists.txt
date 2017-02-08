@@ -17,7 +17,7 @@ add_sourcekit_executable(sourcekitd-test
   TestOptions.cpp
   DEPENDS ${SOURCEKITD_TEST_DEPEND} SourceKitSupport
     clangRewrite clangLex clangBasic
-  LLVM_COMPONENT_DEPENDS core support option
+  LLVM_COMPONENT_DEPENDS core support option coverage lto
 )
 
 add_dependencies(sourcekitd-test sourcekitdTestOptionsTableGen)

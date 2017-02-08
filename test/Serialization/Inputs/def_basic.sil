@@ -17,8 +17,8 @@ sil_global @staticProp : $Int
 sil [fragile] @globalinit_func0 : $@convention(thin) () -> ()
 
 // We should not serialize this.
-// CHECK-NOT: sil public_external @_TFV18lazy_global_access4Type10staticPropSia : $@convention(thin) () -> Builtin.RawPointer {
-sil @_TFV18lazy_global_access4Type10staticPropSia : $@convention(thin) () -> Builtin.RawPointer {
+// CHECK-NOT: sil public_external @_T018lazy_global_access4TypeV10staticProp3IntsFa : $@convention(thin) () -> Builtin.RawPointer {
+sil @_T018lazy_global_access4TypeV10staticProp3IntsFa : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   %1 = global_addr @globalinit_token0 : $*Builtin.Word
   %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
@@ -30,8 +30,8 @@ bb0:
 }
 
 // This references a public global so we *SHOULD* deserialize this.
-// CHECK-LABEL: sil public_external [fragile] @_TFV18lazy_global_access4Type10staticPropSia_public : $@convention(thin) () -> Builtin.RawPointer {
-sil [fragile] @_TFV18lazy_global_access4Type10staticPropSia_public : $@convention(thin) () -> Builtin.RawPointer {
+// CHECK-LABEL: sil public_external [fragile] @_T018lazy_global_access4TypeV10staticProp3IntsFa_public : $@convention(thin) () -> Builtin.RawPointer {
+sil [fragile] @_T018lazy_global_access4TypeV10staticProp3IntsFa_public : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   // CHECK: alloc_global @public_global
   alloc_global @public_global
@@ -68,7 +68,7 @@ bb0:                                  // CHECK: bb0:
   %0 = tuple ()                       // CHECK:   %0 = tuple ()
   br bb1                              // CHECK:   br bb1
 bb1:
-  %b = alloc_box $@box Int
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %c = integer_literal $Builtin.Word, 1
   return %0 : $()                     // CHECK:   return %0 : $()
 }
@@ -86,13 +86,13 @@ bb0(%0 : $Int):
 bb1:
   // Forward reference MRVs.
   store %0 to %7 : $*Int
-  strong_release %6 : $@box Int
+  strong_release %6 : $<τ_0_0> { var τ_0_0 } <Int>
 
   return %5 : $()
 bb2:
   %5 = tuple ()
-  %6 = alloc_box $@box Int
-  %7 = project_box %6 : $@box Int, 0
+  %6 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %7 = project_box %6 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   br bb1
 }
 
@@ -134,8 +134,8 @@ bb0(%0 : $() -> Int):
 
 sil [fragile] @return_constant : $@convention(thin) () -> Int {  // CHECK-LABEL: @return_constant
 bb0:                                         // CHECK: bb0:
-  // CHECK: function_ref @_TFSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
-  %1 = function_ref @_TFSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
+  // CHECK: function_ref @_T0Si25convertFromIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
+  %1 = function_ref @_T0Si25convertFromIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
 
   // CHECK: metatype $@thin Int.Type
   %2 = metatype $@thin Int.Type
@@ -149,12 +149,12 @@ bb0:                                         // CHECK: bb0:
   %5 = return %4 : $Int
 }
 
-sil [fragile] @_TFSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
+sil [fragile] @_T0Si25convertFromIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
 
 // Parse SIL generated from the following swift program:
 // func x(_ a : Bool) -> Int { if a { return 4 } else {return 5} }
-sil [fragile] @_TFSb13getLogicValuefRSbFT_Bi1_ : $@convention(method) (@inout Bool) -> Builtin.Int1
-sil [fragile] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
+sil [fragile] @_T0Sb13getLogicValueBi1_ycSbzF : $@convention(method) (@inout Bool) -> Builtin.Int1
+sil [fragile] @_T0Si33_convertFromBuiltinIntegerLiteralSiBi128_3val_tcSimF : $@convention(thin) (Builtin.Int128, @thin Int.Type) -> Int
 
 
 protocol P {
@@ -248,11 +248,11 @@ protocol Runcible {
 protocol Bendable { }
 
 // CHECK-LABEL: $@convention(thin) (@in Bendable & Runcible) -> @out Runcible
-sil [fragile] @_TF4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@in Bendable & Runcible) -> (@out Runcible) {
+sil [fragile] @_T04todo18erasure_from_protoAA8Runcible_pAaC_AA8Bendablep1x_tF : $@convention(thin) (@in Bendable & Runcible) -> (@out Runcible) {
 bb0(%0 : $*Runcible, %1 : $*Bendable & Runcible):
   // CHECK: alloc_box
-  %2 = alloc_box $@box (Bendable & Runcible)
-  %2a = project_box %2 : $@box Bendable & Runcible, 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Bendable & Runcible)>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Bendable & Runcible>, 0
   // CHECK: copy_addr [take] {{.*}} to [initialization] {{.*}} : $*Bendable & Runcible
   %3 = copy_addr [take] %1 to [initialization] %2a : $*Bendable & Runcible
   // CHECK: alloc_stack
@@ -264,7 +264,7 @@ bb0(%0 : $*Runcible, %1 : $*Bendable & Runcible):
   %8 = destroy_addr %4 : $*Bendable & Runcible
   // CHECK: dealloc_stack
   %9 = dealloc_stack %4 : $*Bendable & Runcible
-  %10 = strong_release %2 : $@box Bendable & Runcible
+  %10 = strong_release %2 : $<τ_0_0> { var τ_0_0 } <Bendable & Runcible>
   // CHECK: return
   %11 = return %7 : $()
 }
@@ -273,11 +273,11 @@ protocol ClassBound : class {
   func classBoundMethod()
 }
 
-// CHECK-LABEL: @_TF4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@convention(thin) (@owned ClassBound) -> ()
-sil [fragile] @_TF4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@convention(thin) (@owned ClassBound) -> () {
+// CHECK-LABEL: @_T04todo18class_bound_methodyAA10ClassBound_p1x_tF : $@convention(thin) (@owned ClassBound) -> ()
+sil [fragile] @_T04todo18class_bound_methodyAA10ClassBound_p1x_tF : $@convention(thin) (@owned ClassBound) -> () {
 bb0(%0 : $ClassBound):
-  %1 = alloc_box $@box ClassBound
-  %1a = project_box %1 : $@box ClassBound, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <ClassBound>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <ClassBound>, 0
   %2 = store %0 to %1a : $*ClassBound
   %3 = load %1a : $*ClassBound
   %4 = strong_retain %3 : $ClassBound              // CHECK: strong_retain
@@ -287,14 +287,14 @@ bb0(%0 : $ClassBound):
   %6 = witness_method $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound, #ClassBound.classBoundMethod!1, %5 : $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound : $@convention(witness_method) <T: ClassBound> (T) -> ()
   %7 = apply %6<@opened("01234567-89ab-cdef-0123-111111111111") ClassBound>(%5) : $@convention(witness_method) <T: ClassBound> (T) -> ()
   %8 = tuple ()
-  %9 = strong_release %1 : $@box ClassBound
+  %9 = strong_release %1 : $<τ_0_0> { var τ_0_0 } <ClassBound>
   %10 = return %8 : $()
 }
 
 struct Val {
 }
 
-//sil @_TFV4todo3ValCfMS0_FT_S0_ : $@convention(thin) (@thin Val.Type) -> Val {
+//sil @_T04todo3ValVACycACmcfC : $@convention(thin) (@thin Val.Type) -> Val {
 //bb0(%0 : $@thin Val.Type):
   //%1 = alloc_stack $Val
   //%3 = load %1#1 : $*Val
@@ -308,20 +308,20 @@ struct Aleph {
   var b:Val
 }
 
-// CHECK-LABEL: @_TFV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph
-sil [fragile] @_TFV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph {
+// CHECK-LABEL: @_T06struct5AlephVAcA3RefC1a_AA3ValV1btcACmcfC : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph
+sil [fragile] @_T06struct5AlephVAcA3RefC1a_AA3ValV1btcACmcfC : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph {
 bb0(%0 : $Ref, %1 : $Val, %2 : $@thin Aleph.Type):
   // CHECK: struct $Aleph ({{%.*}} : $Ref, {{%.*}} : $Val)
   %3 = struct $Aleph (%0 : $Ref, %1 : $Val)
   %4 = return %3 : $Aleph  // CHECK: return
 }
 
-// CHECK-LABEL: @_TFV6struct5AlephCfMS0_FT_S0_ : $@convention(thin) (@thin Aleph.Type) -> Aleph
-sil [fragile] @_TFV6struct5AlephCfMS0_FT_S0_ : $@convention(thin) (@thin Aleph.Type) -> Aleph {
+// CHECK-LABEL: @_T06struct5AlephVACycACmcfC : $@convention(thin) (@thin Aleph.Type) -> Aleph
+sil [fragile] @_T06struct5AlephVACycACmcfC : $@convention(thin) (@thin Aleph.Type) -> Aleph {
 bb0(%0 : $@thin Aleph.Type):
   %1 = tuple ()
-  %2 = alloc_box $@box Aleph       // CHECK: alloc_box
-  %2a = project_box %2 : $@box Aleph, 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Aleph>       // CHECK: alloc_box
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Aleph>, 0
   // CHECK: struct_element_addr {{.*}} : $*Aleph, #Aleph.a
   %5 = struct_element_addr %2a : $*Aleph, #Aleph.a
   %6 = load %5 : $*Ref
@@ -330,7 +330,7 @@ bb0(%0 : $@thin Aleph.Type):
   // CHECK: struct_extract {{%.*}} : $Aleph, #Aleph.a
   %15 = struct_extract %14 : $Aleph, #Aleph.a
   %16 = strong_retain %15 : $Ref
-  %17 = strong_release %2 : $@box Aleph
+  %17 = strong_release %2 : $<τ_0_0> { var τ_0_0 } <Aleph>
   %18 = return %14 : $Aleph
 }
 
@@ -382,14 +382,14 @@ bb0(%0 : $*Gimel, %1 : $*Q):
   return %t : $()
 }
 
-sil [fragile] @_TF5tuple5floatFT1xSf_T_ : $@convention(thin) (Float32) -> ()
-sil [fragile] @_TF5tuple5tupleFT_TSiSf_ : $@convention(thin) () -> (Int, Float32)
+sil [fragile] @_T05tuple5floatySf1x_tF : $@convention(thin) (Float32) -> ()
+sil [fragile] @_T05tupleAASi_SftyF : $@convention(thin) () -> (Int, Float32)
 
-// CHECK-LABEL: @_TF5tuple13tuple_elementFT1xTSiSf__T_ : $@convention(thin) (Int, Float) -> ()
-sil [fragile] @_TF5tuple13tuple_elementFT1xTSiSf__T_ : $@convention(thin) (Int, Float) -> () {
+// CHECK-LABEL: @_T05tuple0A8_elementySi_Sft1x_tF : $@convention(thin) (Int, Float) -> ()
+sil [fragile] @_T05tuple0A8_elementySi_Sft1x_tF : $@convention(thin) (Int, Float) -> () {
 bb0(%0 : $Int, %1 : $Float32):
-  %2 = alloc_box $@box (Int, Float32)
-  %2a = project_box %2 : $@box (Int, Float32), 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Int, Float32)>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <(Int, Float32)>, 0
   %3 = tuple (%0 : $Int, %1 : $Float32)
   %4 = store %3 to %2a : $*(Int, Float32)
   // CHECK: tuple_element_addr {{%.*}} : $*(Int, Float), 0
@@ -399,17 +399,17 @@ bb0(%0 : $Int, %1 : $Float32):
   %10 = tuple_element_addr %2a : $*(Int, Float), 1
   %11 = load %10 : $*Float32
   // CHECK: function_ref
-  %14 = function_ref @_TF5tuple5tupleFT_TSiSf_ : $@convention(thin) () -> (Int, Float32)
+  %14 = function_ref @_T05tupleAASi_SftyF : $@convention(thin) () -> (Int, Float32)
   // CHECK: apply
   %15 = apply %14() : $@convention(thin) () -> (Int, Float32)
   // CHECK: function_ref
-  %19 = function_ref @_TF5tuple5floatFT1xSf_T_ : $@convention(thin) (Float32) -> ()
+  %19 = function_ref @_T05tuple5floatySf1x_tF : $@convention(thin) (Float32) -> ()
   // CHECK: tuple_extract {{%.*}} : $(Int, Float), 1
   %17 = tuple_extract %15 : $(Int, Float), 1
   // CHECK: apply
   %24 = apply %19(%17) : $@convention(thin) (Float32) -> ()
   %25 = tuple ()
-  %26 = strong_release %2 : $@box (Int, Float32)
+  %26 = strong_release %2 : $<τ_0_0> { var τ_0_0 } <(Int, Float32)>
   %27 = return %25 : $()
 }
 
@@ -418,14 +418,14 @@ class M {
   init()
 }
 
-// CHECK-LABEL: @_TFC3ref1C3foofS0_FT1xSi_T_ : $@convention(method) (Int, @guaranteed M) -> ()
-sil [fragile] @_TFC3ref1C3foofS0_FT1xSi_T_ : $@convention(method) (Int, @guaranteed M) -> () {
+// CHECK-LABEL: @_T03ref1CC3fooySi1x_tcACF : $@convention(method) (Int, @guaranteed M) -> ()
+sil [fragile] @_T03ref1CC3fooySi1x_tcACF : $@convention(method) (Int, @guaranteed M) -> () {
 bb0(%0 : $Int, %1 : $M):
-  %2 = alloc_box $@box Int
-  %2a = project_box %2 : $@box Int, 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %3 = store %0 to %2a : $*Int
-  %4 = alloc_box $@box M
-  %4a = project_box %4 : $@box M, 0
+  %4 = alloc_box $<τ_0_0> { var τ_0_0 } <M>
+  %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <M>, 0
   %5 = store %1 to %4a : $*M
   %6 = load %2a : $*Int
   %7 = load %4a : $*M
@@ -435,19 +435,19 @@ bb0(%0 : $Int, %1 : $M):
   %10 = store %6 to %9 : $*Int
   %11 = strong_release %7 : $M
   %12 = tuple ()
-  %13 = strong_release %4 : $@box M
-  %14 = strong_release %2 : $@box Int
+  %13 = strong_release %4 : $<τ_0_0> { var τ_0_0 } <M>
+  %14 = strong_release %2 : $<τ_0_0> { var τ_0_0 } <Int>
   %15 = return %12 : $()
 }
 
 class B { }
 class E : B { }
 
-// CHECK-LABEL: @_TF4null3isaFT1bCS_1B_Sb : $@convention(thin) (B) -> Builtin.Int1
-sil [fragile] @_TF4null3isaFT1bCS_1B_Sb : $@convention(thin) (B) -> Builtin.Int1 {
+// CHECK-LABEL: @_T04null3isaSbAA1BC1b_tF : $@convention(thin) (B) -> Builtin.Int1
+sil [fragile] @_T04null3isaSbAA1BC1b_tF : $@convention(thin) (B) -> Builtin.Int1 {
 bb0(%0 : $B):
-  %1 = alloc_box $@box B
-  %1a = project_box %1 : $@box B, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <B>, 0
   %2 = store %0 to %1a : $*B
   %3 = load %1a : $*B
   %4 = strong_retain %3 : $B
@@ -460,30 +460,30 @@ no:
   br isa(%n : $Builtin.Int1)
 isa(%6 : $Builtin.Int1):
   %7 = strong_release %3 : $B
-  %8 = strong_release %1 : $@box B
+  %8 = strong_release %1 : $<τ_0_0> { var τ_0_0 } <B>
   %9 = return %6 : $Builtin.Int1
 }
 
-sil [fragile] @_TF7literal8literalsFT_T_ : $@convention(thin) () -> ()
+sil [fragile] @_T07literal8literalsyyF : $@convention(thin) () -> ()
 
-sil [fragile] @_TFSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@convention(thin) (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
-sil [fragile] @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp17utf8CodeUnitCountBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
+sil [fragile] @_T0Sd31_convertFromBuiltinFloatLiteralSdBf64_5value_tcSdmF : $@convention(thin) (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
+sil [fragile] @_T0SS32_convertFromBuiltinStringLiteralSSBp5value_Bi64_17utf8CodeUnitCountBi1_7isASCIItcSSmF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
 
-// CHECK-LABEL: @_TF5index5gep64FT1pBp1iBi64__Bp : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
-sil [fragile] @_TF5index5gep64FT1pBp1iBi64__Bp : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+// CHECK-LABEL: @_T05index5gep64BpBp1p_Bi64_1itF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+sil [fragile] @_T05index5gep64BpBp1p_Bi64_1itF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
-  %2 = alloc_box $@box Builtin.RawPointer
-  %2a = project_box %2 : $@box Builtin.RawPointer, 0
-  %3 = alloc_box $@box Builtin.Word
-  %3a = project_box %3 : $@box Builtin.Word, 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>, 0
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Word>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Word>, 0
   %4 = store %0 to %2a : $*Builtin.RawPointer
   %5 = store %1 to %3a : $*Builtin.Word
   %7 = load %2a : $*Builtin.RawPointer
   %8 = load %3a : $*Builtin.Word
   // CHECK: index_raw_pointer {{%.*}} : $Builtin.RawPointer, {{%.*}} : $Builtin.Word
   %9 = index_raw_pointer %7 : $Builtin.RawPointer, %8 : $Builtin.Word
-  %10 = strong_release %3 : $@box Builtin.Word
-  %11 = strong_release %2 : $@box Builtin.RawPointer
+  %10 = strong_release %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Word>
+  %11 = strong_release %2 : $<τ_0_0> { var τ_0_0 } <Builtin.RawPointer>
   %12 = return %9 : $Builtin.RawPointer
 }
 
@@ -513,10 +513,10 @@ class SomeSubclass : SomeClass {}
 // CHECK-LABEL: @test_class_metatype : $@convention(thin) (SomeClass, SomeSubclass) -> (@thick SomeClass.Type, @thick SomeClass.Type) {
 sil [fragile] @test_class_metatype : $@convention(thin) (SomeClass, SomeSubclass) -> (@thick SomeClass.Type, @thick SomeClass.Type) {
 bb0(%0 : $SomeClass, %1 : $SomeSubclass):
-  %2 = alloc_box $@box SomeClass
-  %2a = project_box %2 : $@box SomeClass, 0
-  %3 = alloc_box $@box SomeSubclass
-  %3a = project_box %3 : $@box SomeSubclass, 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <SomeClass>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <SomeClass>, 0
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <SomeSubclass>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <SomeSubclass>, 0
   %4 = store %0 to %2a : $*SomeClass
   %5 = store %1 to %3a : $*SomeSubclass
   %7 = load %2a : $*SomeClass
@@ -534,16 +534,16 @@ bb0(%0 : $SomeClass, %1 : $SomeSubclass):
   %15 = tuple (%9 : $@thick SomeClass.Type, %14 : $@thick SomeClass.Type)
   %16 = strong_release %11 : $SomeSubclass
   %17 = strong_release %7 : $SomeClass
-  %18 = strong_release %3 : $@box SomeSubclass
-  %19 = strong_release %2 : $@box SomeClass
+  %18 = strong_release %3 : $<τ_0_0> { var τ_0_0 } <SomeSubclass>
+  %19 = strong_release %2 : $<τ_0_0> { var τ_0_0 } <SomeClass>
   %20 = return %15 : $(@thick SomeClass.Type, @thick SomeClass.Type)
 }
 
 // CHECK-LABEL: @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type {
 sil [fragile] @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type {
 bb0(%0 : $*SomeProtocol):
-  %1 = alloc_box $@box SomeProtocol
-  %1a = project_box %1 : $@box SomeProtocol, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <SomeProtocol>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <SomeProtocol>, 0
   // CHECK: copy_addr [take] %0 to [initialization] %{{.*}} : $*SomeProtocol
   %2 = copy_addr [take] %0 to [initialization] %1a : $*SomeProtocol
   // CHECK: alloc_stack
@@ -554,7 +554,7 @@ bb0(%0 : $*SomeProtocol):
   %6 = existential_metatype $@thick SomeProtocol.Type, %4 : $*SomeProtocol
   %7 = destroy_addr %4 : $*SomeProtocol
   %8 = dealloc_stack %4 : $*SomeProtocol
-  %9 = strong_release %1 : $@box SomeProtocol
+  %9 = strong_release %1 : $<τ_0_0> { var τ_0_0 } <SomeProtocol>
   %10 = return %6 : $@thick SomeProtocol.Type
 }
 
@@ -614,18 +614,18 @@ bb3(%4 : $Int):
 // CHECK-LABEL: sil public_external [fragile] @test_builtin_func_ref
 sil [fragile] @test_builtin_func_ref : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
-  %2 = alloc_box $@box Builtin.Int1
-  %2a = project_box %2 : $@box Builtin.Int1, 0
-  %3 = alloc_box $@box Builtin.Int1
-  %3a = project_box %3 : $@box Builtin.Int1, 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Builtin.Int1>, 0
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int1>, 0
   store %0 to %2a : $*Builtin.Int1
   store %1 to %3a : $*Builtin.Int1
   %8 = load %2a : $*Builtin.Int1
   %9 = load %3a : $*Builtin.Int1
   // CHECK: builtin "cmp_eq_Int1"({{%.*}} : $Builtin.Int1, {{%.*}} : $Builtin.Int1) : $Builtin.Int1
   %10 = builtin "cmp_eq_Int1"(%8 : $Builtin.Int1, %9 : $Builtin.Int1) : $Builtin.Int1
-  strong_release %3 : $@box Builtin.Int1
-  strong_release %2 : $@box Builtin.Int1
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
   return %10 : $Builtin.Int1
 }
 
@@ -651,8 +651,8 @@ bb0:
 // CHECK-LABEL: sil public_external [fragile] @test_dealloc_box
 sil [fragile] @test_dealloc_box : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_box $@box Class1
-  dealloc_box %0 : $@box Class1
+  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <Class1>
+  dealloc_box %0 : $<τ_0_0> { var τ_0_0 } <Class1>
   %2 = tuple ()
   return %2 : $()
 }
@@ -702,19 +702,19 @@ bb0(%0 : $Class1, %1 : $Builtin.Word):
 
 // CHECK-LABEL: @closure_test
 sil [fragile] @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-sil [fragile] @closure0 : $@convention(thin) (@box Int, @inout Int) -> ()
+sil [fragile] @closure0 : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, @inout Int) -> ()
 
 sil [fragile] @closure_test : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_box $@box Int                           // users: %10, %8, %8, %7, %4
-  %0a = project_box %0 : $@box Int, 0
+  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>                           // users: %10, %8, %8, %7, %4
+  %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
 
   %5 = function_ref @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-  %6 = function_ref @closure0 : $@convention(thin) (@box Int, @inout Int) -> ()
-  strong_retain %0 : $@box Int
-  //%8 = partial_apply %6(%0, %0a) : $@convention(thin) (@box Int, @inout Int) -> ()
+  %6 = function_ref @closure0 : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, @inout Int) -> ()
+  strong_retain %0 : $<τ_0_0> { var τ_0_0 } <Int>
+  //%8 = partial_apply %6(%0, %0a) : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, @inout Int) -> ()
   //%9 = apply %5(%8) : $@convention(thin) (@callee_owned () -> ()) -> ()
-  //strong_release %0 : $@box Int
+  //strong_release %0 : $<τ_0_0> { var τ_0_0 } <Int>
 
   %11 = tuple ()
   return %11 : $()
@@ -727,15 +727,15 @@ enum MaybePair {
   case Left(Int)
 }
 
-sil [fragile] @_TF6switch1aFT_T_ : $@convention(thin) () -> ()
-sil [fragile] @_TF6switch1bFT_T_ : $@convention(thin) () -> ()
-sil [fragile] @_TF6switch1cFT_T_ : $@convention(thin) () -> ()
+sil [fragile] @_T06switch1ayyF : $@convention(thin) () -> ()
+sil [fragile] @_T06switch1byyF : $@convention(thin) () -> ()
+sil [fragile] @_T06switch1cyyF : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil public_external [fragile] @test_switch_union : $@convention(thin) (MaybePair) -> ()
 sil [fragile] @test_switch_union : $@convention(thin) (MaybePair) -> () {
 bb0(%0 : $MaybePair):
-  %1 = alloc_box $@box MaybePair
-  %1a = project_box %1 : $@box MaybePair, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <MaybePair>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <MaybePair>, 0
   store %0 to %1a : $*MaybePair
   %3 = load %1a : $*MaybePair
   %4 = tuple ()
@@ -746,7 +746,7 @@ bb1:
   br bb2
 
 bb2:
-  %7 = function_ref @_TF6switch1aFT_T_ : $@convention(thin) () -> ()
+  %7 = function_ref @_T06switch1ayyF : $@convention(thin) () -> ()
   %8 = apply %7() : $@convention(thin) () -> ()
   br bb5
 
@@ -757,14 +757,14 @@ bb3(%10 : $Int):
   // CHECK: br
 
 bb4(%y : $Int):
-  %12 = function_ref @_TF6switch1bFT_T_ : $@convention(thin) () -> ()
+  %12 = function_ref @_T06switch1byyF : $@convention(thin) () -> ()
   %13 = apply %12() : $@convention(thin) () -> ()
   br bb5                                                  // CHECK: br
 
 bb5:
-  %15 = function_ref @_TF6switch1cFT_T_ : $@convention(thin) () -> ()
+  %15 = function_ref @_T06switch1cyyF : $@convention(thin) () -> ()
   %16 = apply %15() : $@convention(thin) () -> ()
-  strong_release %1 : $@box MaybePair
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <MaybePair>
   %18 = tuple ()
   return %18 : $()                                        // CHECK: return
 }
@@ -802,12 +802,12 @@ bb0(%0 : $Builtin.Word):
   switch_value %0 : $Builtin.Word, case %1: bb1, case %2: bb2
 
 bb1:
-  %7 = function_ref @_TF6switch1aFT_T_ : $@convention(thin) () -> () // CHECK: function_ref
+  %7 = function_ref @_T06switch1ayyF : $@convention(thin) () -> () // CHECK: function_ref
   %8 = apply %7() : $@convention(thin) () -> ()
   br bb3
 
 bb2:
-  %12 = function_ref @_TF6switch1bFT_T_ : $@convention(thin) () -> () // CHECK: function_ref
+  %12 = function_ref @_T06switch1byyF : $@convention(thin) () -> () // CHECK: function_ref
   %13 = apply %12() : $@convention(thin) () -> ()
   br bb3
 
@@ -824,8 +824,8 @@ struct Spoon : Bendable {
 // CHECK-LABEL: sil public_external [fragile] @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable
 sil [fragile] @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable {
 bb0(%0 : $*Bendable, %1 : $Spoon):
-  %2 = alloc_box $@box Spoon
-  %2a = project_box %2 : $@box Spoon, 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Spoon>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Spoon>, 0
   store %1 to %2a : $*Spoon
   // CHECK: init_existential_addr %{{.*}} : $*Bendable, $Spoon
   %4 = init_existential_addr %0 : $*Bendable, $Spoon
@@ -833,7 +833,7 @@ bb0(%0 : $*Bendable, %1 : $Spoon):
   deinit_existential_addr %0 : $*Bendable
   %5 = load %2a : $*Spoon
   store %5 to %4 : $*Spoon
-  strong_release %2 : $@box Spoon
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <Spoon>
   %8 = tuple ()
   return %8 : $()
 }
@@ -841,14 +841,14 @@ bb0(%0 : $*Bendable, %1 : $Spoon):
 // CHECK-LABEL: sil public_external [fragile] @test_existential_ref : $@convention(thin) (ConcreteClass) -> ClassP
 sil [fragile] @test_existential_ref : $@convention(thin) (ConcreteClass) -> ClassP {
 bb0(%0 : $ConcreteClass):
-  %1 = alloc_box $@box ConcreteClass
-  %1a = project_box %1 : $@box ConcreteClass, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <ConcreteClass>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <ConcreteClass>, 0
   store %0 to %1a : $*ConcreteClass
   %3 = load %1a : $*ConcreteClass
   strong_retain %3 : $ConcreteClass
   // CHECK: init_existential_ref %{{.*}} : $ConcreteClass : $ConcreteClass, $ClassP
   %5 = init_existential_ref %3 : $ConcreteClass : $ConcreteClass, $ClassP
-  strong_release %1 : $@box ConcreteClass
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <ConcreteClass>
   return %5 : $ClassP
 }
 
@@ -879,7 +879,7 @@ bb0:
 // CHECK-LABEL: [noinline] @noinline_callee
 sil [fragile] [noinline] @noinline_callee : $@convention(thin) () -> Int {
 bb0:
-  %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+  %0 = function_ref @_T0Si33_convertFromBuiltinIntegerLiteralSiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type
   %2 = integer_literal $Builtin.Int2048, 0
   %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
@@ -888,13 +888,13 @@ bb0:
 // CHECK-LABEL: [always_inline] @always_inline_callee
 sil [fragile] [always_inline] @always_inline_callee : $@convention(thin) () -> Int {
 bb0:
-  %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+  %0 = function_ref @_T0Si33_convertFromBuiltinIntegerLiteralSiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type
   %2 = integer_literal $Builtin.Int2048, 0
   %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
   return %3 : $Int
 }
-sil [fragile] [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+sil [fragile] [transparent] @_T0Si33_convertFromBuiltinIntegerLiteralSiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
 
 // CHECK-LABEL: [_semantics "foo"] @test_semantics : $@convention(thin) () -> ()
 sil [fragile] [_semantics "foo"] @test_semantics : $@convention(thin) () -> () {
@@ -923,10 +923,10 @@ class X {
 // CHECK-LABEL: sil public_external [fragile] @test_dynamic_lookup_br : $@convention(thin) (AnyObject) -> ()
 sil [fragile] @test_dynamic_lookup_br : $@convention(thin) (AnyObject) -> () {
 bb0(%0 : $AnyObject):
-  %1 = alloc_box $@box AnyObject
-  %1a = project_box %1 : $@box AnyObject, 0
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
   store %0 to %1a : $*AnyObject
-  %3 = alloc_box $@box Optional<() -> ()>
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<() -> ()>>
   %4 = load %1a : $*AnyObject
   strong_retain %4 : $AnyObject
   // CHECK: open_existential_ref %{{.*}} : $AnyObject to $@opened({{.*}}) AnyObject
@@ -947,10 +947,10 @@ bb3:
 
 // CHECK-LABEL: sil public_external [fragile] @test_mark_fn_escape
 sil [fragile] @test_mark_fn_escape : $@convention(thin) () -> () {
-  %b = alloc_box $@box Int
-  %ba = project_box %b : $@box Int, 0
-  %c = alloc_box $@box Int
-  %ca = project_box %c : $@box Int, 0
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  %c = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %ca = project_box %c : $<τ_0_0> { var τ_0_0 } <Int>, 0
 
   //mark_function_escape %ba : $*Int
   //mark_function_escape %ba : $*Int, %ca : $*Int
@@ -1079,18 +1079,18 @@ bb0(%0 : $@convention(thin) () -> @error Error):
   return %2 : $()
 }
 
-// CHECK-LABEL: sil public_external [fragile] @box_type : $@convention(thin) (@box Int, Int) -> () {
-sil [fragile] @box_type : $@convention(thin) (@box Int, Int) -> () {
-// CHECK: bb0(%0 : $@box Int, %1 : $Int):
-bb0(%0 : $@box Int, %1 : $Int):
-  // CHECK-NEXT: strong_retain %0 : $@box Int
-  strong_retain %0 : $@box Int
-  // CHECK-NEXT: %3 = project_box %0 : $@box Int, 0
-  %3 = project_box %0 : $@box Int, 0
+// CHECK-LABEL: sil public_external [fragile] @box_type : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, Int) -> () {
+sil [fragile] @box_type : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, Int) -> () {
+// CHECK: bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>, %1 : $Int):
+bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>, %1 : $Int):
+  // CHECK-NEXT: strong_retain %0 : $<τ_0_0> { var τ_0_0 } <Int>
+  strong_retain %0 : $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK-NEXT: %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  %3 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   // CHECK-NEXT: store %1 to %3 : $*Int
   store %1 to %3 : $*Int
-  // CHECK-NEXT: strong_release %0 : $@box Int
-  strong_release %0 : $@box Int
+  // CHECK-NEXT: strong_release %0 : $<τ_0_0> { var τ_0_0 } <Int>
+  strong_release %0 : $<τ_0_0> { var τ_0_0 } <Int>
   return undef : $()
 }
 
@@ -1222,9 +1222,9 @@ class Foo {
   init()
 }
 
-// CHECK-LABEL: sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@convention(method) (Int, Int, @guaranteed Foo) -> Int32
-// CHECK_DECL-LABEL: sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@convention(method) (Int, Int, @guaranteed Foo) -> Int32{{$}}
-sil [fragile] @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@convention(method) (Int, Int, @guaranteed Foo) -> Int32 {
+// CHECK-LABEL: sil [fragile] @_T03tmp3FooC9subscriptSiSi1x_Si1ytcfg : $@convention(method) (Int, Int, @guaranteed Foo) -> Int32
+// CHECK_DECL-LABEL: sil [fragile] @_T03tmp3FooC9subscriptSiSi1x_Si1ytcfg : $@convention(method) (Int, Int, @guaranteed Foo) -> Int32{{$}}
+sil [fragile] @_T03tmp3FooC9subscriptSiSi1x_Si1ytcfg : $@convention(method) (Int, Int, @guaranteed Foo) -> Int32 {
 bb0(%0 : $Int, %1 : $Int, %2 : $Foo):
   %3 = tuple ()
   %4 = alloc_stack $Int  // var x               // users: %17, %6
@@ -1243,9 +1243,9 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Foo):
   return %13 : $Int32
 }
 
-// CHECK-LABEL: sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@convention(method) (Int32, Int, Int, @guaranteed Foo) -> ()
-// CHECK_DECL-LABEL: sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@convention(method) (Int32, Int, Int, @guaranteed Foo) -> (){{$}}
-sil [fragile] @_TFC3tmp3Foos9subscriptFT1xSi1ySi_Si : $@convention(method) (Int32, Int, Int, @guaranteed Foo) -> () {
+// CHECK-LABEL: sil [fragile] @_T03tmp3FooC9subscriptSiSi1x_Si1ytcfs : $@convention(method) (Int32, Int, Int, @guaranteed Foo) -> ()
+// CHECK_DECL-LABEL: sil [fragile] @_T03tmp3FooC9subscriptSiSi1x_Si1ytcfs : $@convention(method) (Int32, Int, Int, @guaranteed Foo) -> (){{$}}
+sil [fragile] @_T03tmp3FooC9subscriptSiSi1x_Si1ytcfs : $@convention(method) (Int32, Int, Int, @guaranteed Foo) -> () {
 bb0(%0 : $Int32, %1 : $Int, %2 : $Int, %3 : $Foo):
   %4 = alloc_stack $Int32  // var value         // users: %16, %5
   store %0 to %4 : $*Int32
@@ -1266,16 +1266,16 @@ bb0(%0 : $Int32, %1 : $Int, %2 : $Int, %3 : $Foo):
 
 
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFT1xSi1ySi_Si
-// CHECK: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFT1xSi1ySi_Si
+// CHECK: #Foo.subscript!getter.1: {{.*}} : _T03tmp3FooC9subscriptSiSi1x_Si1ytcfg
+// CHECK: #Foo.subscript!setter.1: {{.*}} : _T03tmp3FooC9subscriptSiSi1x_Si1ytcfs
 // CHECK: }
 // CHECK_DECL-LABEL: sil_vtable Foo {
-// CHECK_DECL: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFT1xSi1ySi_Si
-// CHECK_DECL: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFT1xSi1ySi_Si
+// CHECK_DECL: #Foo.subscript!getter.1: {{.*}} : _T03tmp3FooC9subscriptSiSi1x_Si1ytcfg
+// CHECK_DECL: #Foo.subscript!setter.1: {{.*}} : _T03tmp3FooC9subscriptSiSi1x_Si1ytcfs
 // CHECK_DECL: }
 sil_vtable Foo {
-  #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFT1xSi1ySi_Si
-  #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFT1xSi1ySi_Si
+  #Foo.subscript!getter.1: _T03tmp3FooC9subscriptSiSi1x_Si1ytcfg
+  #Foo.subscript!setter.1: _T03tmp3FooC9subscriptSiSi1x_Si1ytcfs
 }
 
 protocol AssocReqt {
@@ -1286,7 +1286,7 @@ struct ConformingAssoc : AssocReqt {
   func requiredMethod()
 }
 
-sil [fragile] @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@convention(method) (@guaranteed ConformingAssoc) -> () {
+sil [fragile] @_T014witness_tables15ConformingAssocV14requiredMethodyycACF : $@convention(method) (@guaranteed ConformingAssoc) -> () {
 bb0(%0 : $ConformingAssoc):
   debug_value %0 : $ConformingAssoc
   %2 = tuple ()
@@ -1296,14 +1296,14 @@ bb0(%0 : $ConformingAssoc):
 sil [fragile] @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_ : $@convention(witness_method) (@inout ConformingAssoc) -> () {
 bb0(%0 : $*ConformingAssoc):
   %1 = load %0 : $*ConformingAssoc
-  %2 = function_ref @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@convention(method) (@guaranteed ConformingAssoc) -> ()
+  %2 = function_ref @_T014witness_tables15ConformingAssocV14requiredMethodyycACF : $@convention(method) (@guaranteed ConformingAssoc) -> ()
   %3 = apply %2(%1) : $@convention(method) (@guaranteed ConformingAssoc) -> ()
   return %3 : $()
 }
 
 
 // CHECK-LABEL: sil_witness_table public_external ConformingAssoc: AssocReqt module
-// CHECK: #AssocReqt.requiredMethod!1: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
+// CHECK: #AssocReqt.requiredMethod!1: {{.*}} : @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
 // CHECK: }
 sil_witness_table ConformingAssoc: AssocReqt module def_basic {
   method #AssocReqt.requiredMethod!1: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
@@ -1344,10 +1344,10 @@ sil_witness_table InheritedConformance: AnyProtocol module witness_tables {
   associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 }
 
-sil [fragile] [transparent] @_TF9def_basic13serialize_allFT_T_ : $@convention(thin) () -> () {
+sil [fragile] [transparent] @_T09def_basic13serialize_allyyF : $@convention(thin) () -> () {
 bb0:
-  %0 = function_ref @_TFV18lazy_global_access4Type10staticPropSia_public : $@convention(thin) () -> Builtin.RawPointer
-  %1 = function_ref @_TFV18lazy_global_access4Type10staticPropSia : $@convention(thin) () -> Builtin.RawPointer
+  %0 = function_ref @_T018lazy_global_access4TypeV10staticProp3IntsFa_public : $@convention(thin) () -> Builtin.RawPointer
+  %1 = function_ref @_T018lazy_global_access4TypeV10staticProp3IntsFa : $@convention(thin) () -> Builtin.RawPointer
   %2 = function_ref @test1 : $@convention(thin) () -> ()
   %4 = function_ref @test2 : $@convention(thin) (Int) -> ()
   %6 = function_ref @named_tuple : $@convention(thin) () -> (Builtin.Word, Builtin.Word)
@@ -1356,23 +1356,23 @@ bb0:
   %13 = function_ref @return_constant : $@convention(thin) () -> Int
   %23 = function_ref @existentials : $@convention(thin) (@in P) -> ()
   %25 = function_ref @classes : $@convention(thin) () -> ()
-  %27 = function_ref @_TF4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@in Bendable & Runcible) -> @out Runcible
-  %29 = function_ref @_TF4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@convention(thin) (@owned ClassBound) -> ()
-  %31 = function_ref @_TFV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph
-  %33 = function_ref @_TFV6struct5AlephCfMS0_FT_S0_ : $@convention(thin) (@thin Aleph.Type) -> Aleph
+  %27 = function_ref @_T04todo18erasure_from_protoAA8Runcible_pAaC_AA8Bendablep1x_tF : $@convention(thin) (@in Bendable & Runcible) -> @out Runcible
+  %29 = function_ref @_T04todo18class_bound_methodyAA10ClassBound_p1x_tF : $@convention(thin) (@owned ClassBound) -> ()
+  %31 = function_ref @_T06struct5AlephVAcA3RefC1a_AA3ValV1btcACmcfC : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph
+  %33 = function_ref @_T06struct5AlephVACycACmcfC : $@convention(thin) (@thin Aleph.Type) -> Aleph
   %35 = function_ref @test_union_empty_case : $@convention(thin) () -> Beth
   %37 = function_ref @test_union_data_case : $@convention(thin) Int -> Beth
   %39 = function_ref @test_union_addr_empty_case : $@convention(thin) () -> @out Gimel
   %41 = function_ref @test_union_addr_data_case : $@convention(thin) (@in Q) -> @out Gimel
-  %43 = function_ref @_TF5tuple5floatFT1xSf_T_ : $@convention(thin) (Float32) -> ()
-  %45 = function_ref @_TF5tuple5tupleFT_TSiSf_ : $@convention(thin) () -> (Int, Float32)
-  %47 = function_ref @_TF5tuple13tuple_elementFT1xTSiSf__T_ : $@convention(thin) (Int, Float32) -> ()
-  %49 = function_ref @_TFC3ref1C3foofS0_FT1xSi_T_ : $@convention(method) (Int, @guaranteed M) -> ()
-  %51 = function_ref @_TF4null3isaFT1bCS_1B_Sb : $@convention(thin) (B) -> Builtin.Int1
-  %53 = function_ref @_TFSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $@convention(thin) (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
-  %55 = function_ref @_TFSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp17utf8CodeUnitCountBi64_7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
-  %57 = function_ref @_TF7literal8literalsFT_T_ : $@convention(thin) () -> ()
-  %59 = function_ref @_TF5index5gep64FT1pBp1iBi64__Bp : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
+  %43 = function_ref @_T05tuple5floatySf1x_tF : $@convention(thin) (Float32) -> ()
+  %45 = function_ref @_T05tupleAASi_SftyF : $@convention(thin) () -> (Int, Float32)
+  %47 = function_ref @_T05tuple0A8_elementySi_Sft1x_tF : $@convention(thin) (Int, Float32) -> ()
+  %49 = function_ref @_T03ref1CC3fooySi1x_tcACF : $@convention(method) (Int, @guaranteed M) -> ()
+  %51 = function_ref @_T04null3isaSbAA1BC1b_tF : $@convention(thin) (B) -> Builtin.Int1
+  %53 = function_ref @_T0Sd31_convertFromBuiltinFloatLiteralSdBf64_5value_tcSdmF : $@convention(thin) (Builtin.FPIEEE64, @thin Float64.Type) -> Float64
+  %55 = function_ref @_T0SS32_convertFromBuiltinStringLiteralSSBp5value_Bi64_17utf8CodeUnitCountBi1_7isASCIItcSSmF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> String
+  %57 = function_ref @_T07literal8literalsyyF : $@convention(thin) () -> ()
+  %59 = function_ref @_T05index5gep64BpBp1p_Bi64_1itF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
   %60 = function_ref @global_code : $@convention(thin) () -> ()
   %63 = function_ref @test_class_metatype : $@convention(thin) (SomeClass, SomeSubclass) -> (@thick SomeClass.Type, @thick SomeClass.Type)
   %67 = function_ref @test_existential_metatype : $@convention(thin) (@in SomeProtocol) -> @thick SomeProtocol.Type
@@ -1415,7 +1415,7 @@ bb0:
   %127 = function_ref @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int)
   %133 = function_ref @test_try_apply : $@convention(thin) (@convention(thin) () -> @error Error) -> @error Error
   %135 = function_ref @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error Error) -> ()
-  %134 = function_ref @box_type : $@convention(thin) (@box Int, Int) -> ()
+  %134 = function_ref @box_type : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, Int) -> ()
   %140 = function_ref @test_forward_ref : $@convention(thin) (UInt8, UInt8) -> UInt8
   %141 = function_ref @partial_apply : $@convention(thin) (@convention(thin) (Int) -> @out Int, Int) -> Int
   %142 = function_ref @partial_apply_with_closure : $@convention(thin) (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> ()

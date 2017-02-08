@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -134,7 +134,7 @@ public:
   /// Returns the identifier for the buffer with the given ID.
   ///
   /// \p BufferID must be a valid buffer ID.
-  const char *getIdentifierForBuffer(unsigned BufferID) const;
+  StringRef getIdentifierForBuffer(unsigned BufferID) const;
 
   /// \brief Returns a SourceRange covering the entire specified buffer.
   ///
@@ -167,9 +167,9 @@ public:
   /// location.
   ///
   /// This respects #line directives.
-  const char *getBufferIdentifierForLoc(SourceLoc Loc) const {
+  StringRef getBufferIdentifierForLoc(SourceLoc Loc) const {
     if (auto VFile = getVirtualFile(Loc))
-      return VFile->Name.c_str();
+      return VFile->Name;
     else
       return getIdentifierForBuffer(findBufferContainingLoc(Loc));
   }

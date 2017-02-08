@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -parse -I %S/Inputs %s 2>%t.txt
+// RUN: not %target-swift-frontend -typecheck -I %S/Inputs %s 2>%t.txt
 // RUN: %FileCheck %s < %t.txt
 // RUN: %FileCheck %s -check-prefix=NEGATIVE < %t.txt
 

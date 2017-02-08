@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -53,6 +53,8 @@ bool IterativeTypeChecker::isSatisfied(TypeCheckRequest request) {
 
 #include "swift/Sema/TypeCheckRequestKinds.def"
   }
+
+  llvm_unreachable("Unhandled TypeCheckRequestKind in switch.");
 }
 
 bool IterativeTypeChecker::breakCycle(TypeCheckRequest request) {
@@ -62,7 +64,9 @@ bool IterativeTypeChecker::breakCycle(TypeCheckRequest request) {
     return breakCycleFor##Request(request.get##PayloadName##Payload());
 
 #include "swift/Sema/TypeCheckRequestKinds.def"
-  }  
+  }
+
+  llvm_unreachable("Unhandled TypeCheckRequestKind in switch.");
 }
 
 void IterativeTypeChecker::satisfy(TypeCheckRequest request) {
@@ -146,17 +150,11 @@ void IterativeTypeChecker::diagnoseCircularReference(
   }
 
   // Now try to break the cycle.
-#ifndef NDEBUG
   bool brokeCycle = false;
-#endif
   for (const auto &request : reverse(requests)) {
-    if (breakCycle(request)) {
-#ifndef NDEBUG
-      brokeCycle = true;
-#endif
-      break;
-    }
+    brokeCycle |= breakCycle(request);
   }
 
   assert(brokeCycle && "Will the cycle be unbroken?");
+  (void) brokeCycle;
 }

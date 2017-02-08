@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -O %s | %FileCheck %s
 
 protocol P { func p() -> Any.Type }
 protocol Q: P { }
@@ -10,9 +10,9 @@ func p<T: Q>(_ x: T) { sink(x.p()) }
 class Foo<T>: Q { func p() -> Any.Type { return T.self } }
 class Bar<T>: Foo<T> {}
 
-// CHECK-LABEL: sil @_TF48specialize_class_inherits_base_inherits_protocol3fooFT_T_
+// CHECK-LABEL: sil @_T0031specialize_class_inherits_base_C9_protocol3fooyyF
 public func foo() {
-  // CHECK: function_ref @_TTSf4d___TTSg5PMP____TF48specialize_class_inherits_base_inherits_protocol4sinkurFxT_
+  // CHECK: function_ref @_T0031specialize_class_inherits_base_C9_protocol4sinkyxlFypXp_Tg5Tf4d_n
   p(Bar<Int>())
 }
 

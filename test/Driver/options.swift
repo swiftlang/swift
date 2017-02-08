@@ -20,7 +20,7 @@
 // RUN: %target-swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" -parse-stdlib -###
 // STDLIB_MODULE: error: module name "Swift" is reserved for the standard library{{$}}
 
-// RUN: not %target-swift-frontend -parse -emit-module %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_MODULE %s
+// RUN: not %target-swift-frontend -typecheck -emit-module %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_MODULE %s
 // PARSE_NO_MODULE: error: this mode does not support emitting modules{{$}}
 
 // RUN: not %target-swift-frontend -dump-ast -emit-dependencies %s 2>&1 | %FileCheck -check-prefix=DUMP_NO_DEPS %s
@@ -29,7 +29,7 @@
 // Should not fail with non-zero exit code.
 // RUN: %target-swift-frontend -emit-silgen %S/Inputs/invalid-module-name.swift > /dev/null
 // RUN: %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift -module-name foo > /dev/null
-// RUN: %target-swift-frontend -parse -parse-as-library %S/Inputs/invalid-module-name.swift -module-name foo
+// RUN: %target-swift-frontend -typecheck -parse-as-library %S/Inputs/invalid-module-name.swift -module-name foo
 
 // RUN: not %swiftc_driver -crazy-option-that-does-not-exist %s 2>&1 | %FileCheck -check-prefix=INVALID_OPTION %s
 // RUN: not %swift_driver -crazy-option-that-does-not-exist 2>&1 | %FileCheck -check-prefix=INVALID_OPTION %s
