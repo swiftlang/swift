@@ -1191,8 +1191,7 @@ matchWitness(TypeChecker &tc,
     auto reqGenericEnv = reqEnvironment.getSyntheticEnvironment();
     Type selfTy = proto->getSelfInterfaceType().subst(reqSubs);
     if (reqGenericEnv)
-      selfTy = reqGenericEnv->mapTypeIntoContext(dc->getParentModule(),
-                                                 selfTy);
+      selfTy = reqGenericEnv->mapTypeIntoContext(selfTy);
 
         // Open up the type of the requirement.
     reqLocator = cs->getConstraintLocator(
@@ -1220,8 +1219,7 @@ matchWitness(TypeChecker &tc,
         continue;
 
       if (reqGenericEnv) {
-        replacedInReq = reqGenericEnv->mapTypeIntoContext(dc->getParentModule(),
-                                                          replacedInReq);
+        replacedInReq = reqGenericEnv->mapTypeIntoContext(replacedInReq);
       }
 
       cs->addConstraint(ConstraintKind::Bind, replacement.second, replacedInReq,

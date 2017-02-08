@@ -44,9 +44,7 @@ static SILType applyContextArchetypes(IRGenFunction &IGF,
 
   auto substType =
     IGF.IGM.getGenericEnvironment()->mapTypeIntoContext(
-                                                    IGF.getSwiftModule(),
-                                                    type.getSwiftRValueType())
-
+        type.getSwiftRValueType())
       ->getCanonicalType();
   return SILType::getPrimitiveType(substType, type.getCategory());
 }

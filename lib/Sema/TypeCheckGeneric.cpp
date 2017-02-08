@@ -99,14 +99,12 @@ Type GenericTypeToArchetypeResolver::resolveSelfAssociatedType(
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
   return GenericEnvironment::mapTypeIntoContext(
-      dc->getParentModule(), GenericEnv,
-      dc->getSelfInterfaceType());
+      GenericEnv, dc->getSelfInterfaceType());
 }
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
   return GenericEnvironment::mapTypeIntoContext(
-      decl->getDeclContext()->getParentModule(), GenericEnv,
-      decl->getDeclaredInterfaceType());
+      GenericEnv, decl->getDeclaredInterfaceType());
 }
 
 bool GenericTypeToArchetypeResolver::areSameType(Type type1, Type type2) {

@@ -564,8 +564,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
     ASTContext &ctx = getContext();
     Type conformingType = getType(conformingTypeID);
     if (genericEnv) {
-      conformingType = genericEnv->mapTypeIntoContext(getAssociatedModule(),
-                                                      conformingType);
+      conformingType = genericEnv->mapTypeIntoContext(conformingType);
     }
 
     PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
@@ -599,8 +598,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
     ASTContext &ctx = getContext();
     Type conformingType = getType(conformingTypeID);
     if (genericEnv) {
-      conformingType = genericEnv->mapTypeIntoContext(getAssociatedModule(),
-                                                      conformingType);
+      conformingType = genericEnv->mapTypeIntoContext(conformingType);
     }
 
     PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
@@ -761,8 +759,7 @@ ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor,
 
   auto replacementTy = getType(replacementID);
   if (genericEnv) {
-    replacementTy = genericEnv->mapTypeIntoContext(getAssociatedModule(),
-                                                   replacementTy);
+    replacementTy = genericEnv->mapTypeIntoContext(replacementTy);
   }
 
   SmallVector<ProtocolConformanceRef, 4> conformanceBuf;
