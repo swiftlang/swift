@@ -81,14 +81,6 @@ void DependentGenericTypeResolver::recordParamType(ParamDecl *decl, Type type) {
 
 Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
                                        GenericTypeParamType *gp) {
-  auto gpDecl = gp->getDecl();
-  assert(gpDecl && "Missing generic parameter declaration");
-
-  // Hack: See parseGenericParameters(). When the issue there is fixed,
-  // we won't need the isInvalid() check anymore.
-  if (gpDecl->isInvalid() || !GenericEnv)
-    return ErrorType::get(gpDecl->getASTContext());
-
   return GenericEnv->mapTypeIntoContext(gp);
 }
 
