@@ -9,7 +9,6 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-from multiprocessing import Pool
 import argparse
 import logging
 import multiprocessing
@@ -18,6 +17,7 @@ import pipes
 import subprocess
 import sys
 import timeit
+from multiprocessing import Pool
 
 NUM_CORES = multiprocessing.cpu_count()
 
