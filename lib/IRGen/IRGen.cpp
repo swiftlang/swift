@@ -1068,9 +1068,6 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   case llvm::Triple::MachO:
     Section = std::string(MachOASTSegmentName) + "," + MachOASTSectionName;
     break;
-  case llvm::Triple::Wasm:
-    llvm_unreachable("web assembly object format is not supported.");
-    break;
   }
   ASTSym->setSection(Section);
   ASTSym->setAlignment(8);
