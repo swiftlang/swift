@@ -4139,8 +4139,9 @@ public:
 
     // FIXME: if we're missing 'override', but have the decl introducer we
     // should delete it and re-add both in the correct order.
-    bool missingOverride = Reason == DeclVisibilityKind::MemberOfSuper &&
-                           !hasOverride;
+    bool missingOverride =
+      !hasOverride && Reason == DeclVisibilityKind::MemberOfSuper &&
+      !CurrDeclContext->getAsProtocolOrProtocolExtensionContext();
     if (!hasDeclIntroducer && missingOverride)
       Builder.addOverrideKeyword();
 
@@ -4192,6 +4193,7 @@ public:
       addAccessControl(CD, Builder);
 
     if (!hasOverride && Reason == DeclVisibilityKind::MemberOfSuper &&
+        !CurrDeclContext->getAsProtocolOrProtocolExtensionContext() &&
         CD->isDesignatedInit() && !CD->isRequired())
       Builder.addOverrideKeyword();
 
@@ -4332,6 +4334,8 @@ public:
 
   void getOverrideCompletions(SourceLoc Loc) {
     if (!CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext())
+      return;
+    if (isa<ProtocolDecl>(CurrDeclContext))
       return;
 
     Type CurrTy = CurrDeclContext->getDeclaredTypeInContext();
