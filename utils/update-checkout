@@ -39,8 +39,8 @@ def confirm_tag_in_repo(tag, repo_name):
     tag_exists = shell.capture(['git', 'ls-remote', '--tags',
                                 'origin', tag], echo=False)
     if not tag_exists:
-        print("Tag '" + tag + "' does not exist for '"
-              + repo_name + "', just updating regularly")
+        print("Tag '" + tag + "' does not exist for '" +
+              repo_name + "', just updating regularly")
         tag = None
     return tag
 
@@ -85,15 +85,15 @@ def update_single_repository(args):
                 checkout_target, cross_repo = get_branch_for_repo(
                     config, repo_name, scheme_name, scheme_map, cross_repos_pr)
 
-            # The clean option should restore a repository to pristine condition.
+            # The clean option restores a repository to pristine condition.
             if should_clean:
                 shell.run(['git', 'clean', '-fdx'], echo=True)
                 shell.run(['git', 'submodule', 'foreach', '--recursive', 'git',
-                            'clean', '-fdx'], echo=True)
+                           'clean', '-fdx'], echo=True)
                 shell.run(['git', 'submodule', 'foreach', '--recursive', 'git',
-                            'reset', '--hard', 'HEAD'], echo=True)
+                           'reset', '--hard', 'HEAD'], echo=True)
                 shell.run(['git', 'reset', '--hard', 'HEAD'], echo=True)
-                # It is possible to reset --hard and still be in the middle of a rebase.
+                # It is possible to reset --hard and still be mid-rebase.
                 try:
                     shell.run(['git', 'rebase', '--abort'], echo=True)
                 except:
@@ -101,19 +101,19 @@ def update_single_repository(args):
 
             if checkout_target:
                 shell.run(['git', 'status', '--porcelain', '-uno'],
-                                       echo=False)
+                          echo=False)
                 shell.run(['git', 'checkout', checkout_target], echo=True)
 
             # It's important that we checkout, fetch, and rebase, in order.
-            # .git/FETCH_HEAD updates the not-for-merge attributes based on which
-            # branch was checked out during the fetch.
+            # .git/FETCH_HEAD updates the not-for-merge attributes based on
+            # which branch was checked out during the fetch.
             shell.run(["git", "fetch", "--recurse-submodules=yes"], echo=True)
 
             # If we were asked to reset to the specified branch, do the hard
             # reset and return.
             if checkout_target and reset_to_remote and not cross_repo:
-                shell.run(['git', 'reset', '--hard', "origin/%s" % checkout_target],
-                           echo=True)
+                shell.run(['git', 'reset', '--hard',
+                           "origin/%s" % checkout_target], echo=True)
                 return
 
             # Query whether we have a "detached HEAD", which will mean that
@@ -143,7 +143,8 @@ def update_single_repository(args):
                 shell.run(["git", "rebase", "FETCH_HEAD"], echo=True)
             elif detached_head:
                 print(repo_path,
-                      "\nDetached HEAD; probably checked out a tag. No need to rebase.\n")
+                      "\nDetached HEAD; probably checked out a tag. No need "
+                      "to rebase.\n")
 
             shell.run(["git", "submodule", "update", "--recursive"], echo=True)
     except:
@@ -178,10 +179,13 @@ def update_all_repositories(args, config, scheme_name, cross_repos_pr):
                    cross_repos_pr]
         pool_args.append(my_args)
 
-    return shell.run_parallel(update_single_repository, pool_args, args.n_processes)
+    return shell.run_parallel(update_single_repository, pool_args,
+                              args.n_processes)
+
 
 def obtain_additional_swift_sources(pool_args):
-    args, repo_name, repo_info, repo_branch, remote, with_ssh, scheme_name, skip_history, skip_repository_list = pool_args
+    (args, repo_name, repo_info, repo_branch, remote, with_ssh, scheme_name,
+     skip_history, skip_repository_list) = pool_args
 
     with shell.pushd(SWIFT_SOURCE_ROOT, dry_run=False, echo=False):
 
@@ -189,32 +193,35 @@ def obtain_additional_swift_sources(pool_args):
 
         if skip_history:
             shell.run(['git', 'clone', '--recursive', '--depth', '1',
-                        remote, repo_name], echo=True)
+                       remote, repo_name], echo=True)
         else:
             shell.run(['git', 'clone', '--recursive', remote,
-                        repo_name], echo=True)
+                       repo_name], echo=True)
         if scheme_name:
             src_path = os.path.join(SWIFT_SOURCE_ROOT, repo_name, ".git")
             shell.run(['git', '--git-dir', src_path, '--work-tree',
-                        os.path.join(SWIFT_SOURCE_ROOT, repo_name),
-                        'checkout', repo_branch], echo=False)
+                       os.path.join(SWIFT_SOURCE_ROOT, repo_name),
+                       'checkout', repo_branch], echo=False)
     with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
                      dry_run=False, echo=False):
         shell.run(["git", "submodule", "update", "--recursive"],
-                   echo=False)
+                  echo=False)
 
-def obtain_all_additional_swift_sources(
-    args, config, with_ssh, scheme_name, skip_history, skip_repository_list):
+
+def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
+                                        skip_history, skip_repository_list):
 
     pool_args = []
     with shell.pushd(SWIFT_SOURCE_ROOT, dry_run=False, echo=False):
         for repo_name, repo_info in config['repos'].items():
             if repo_name in skip_repository_list:
-                print("Skipping clone of '" + repo_name + "', requested by user")
+                print("Skipping clone of '" + repo_name + "', requested by "
+                      "user")
                 continue
 
             if os.path.isdir(os.path.join(repo_name, ".git")):
-                print("Skipping clone of '" + repo_name + "', directory already exists")
+                print("Skipping clone of '" + repo_name + "', directory "
+                      "already exists")
                 continue
 
             # If we have a url override, use that url instead of
@@ -239,13 +246,16 @@ def obtain_all_additional_swift_sources(
                 else:
                     repo_branch = scheme_name
 
-            pool_args.append([args, repo_name, repo_info, repo_branch, remote, with_ssh, scheme_name, skip_history, skip_repository_list])
+            pool_args.append([args, repo_name, repo_info, repo_branch, remote,
+                              with_ssh, scheme_name, skip_history,
+                              skip_repository_list])
 
     if not pool_args:
         print("Not cloning any repositories.")
         return
 
-    return shell.run_parallel(obtain_additional_swift_sources, pool_args, args.n_processes)
+    return shell.run_parallel(obtain_additional_swift_sources, pool_args,
+                              args.n_processes)
 
 
 def dump_repo_hashes(config):
@@ -260,6 +270,7 @@ def dump_repo_hashes(config):
             h = shell.capture(["git", "log", "--oneline", "-n", "1"],
                               echo=False).strip()
             print(fmt.format(repo_name, h))
+
 
 def dump_hashes_config(args, config):
     branch_scheme_name = args.dump_hashes_config
@@ -280,6 +291,7 @@ def dump_hashes_config(args, config):
             repos[repo_name] = str(h)
     print(json.dumps(new_config, indent=4))
 
+
 def validate_config(config):
     # Make sure that our branch-names are unique.
     scheme_names = config['branch-schemes'].keys()
@@ -290,9 +302,9 @@ def validate_config(config):
     # This guarantees sensible behavior of update_repository_to_scheme when
     # the branch-scheme is passed as the scheme name
     for scheme_name in config['branch-schemes'].keys():
-        if not scheme_name in config['branch-schemes'][scheme_name]['aliases']:
-            raise RuntimeError('branch-scheme name: "{0}" must be an alias too.'
-                .format(scheme_name))
+        if scheme_name not in config['branch-schemes'][scheme_name]['aliases']:
+            raise RuntimeError('branch-scheme name: "{0}" must be an alias '
+                               'too.'.format(scheme_name))
 
     # Then make sure the alias names used by our branches are unique.
     #
@@ -308,6 +320,7 @@ def validate_config(config):
         return
     raise RuntimeError('Configuration file has schemes with duplicate '
                        'aliases?!')
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -365,7 +378,8 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         help='Dump the git hashes of all repositories being tracked')
     parser.add_argument(
         '--dump-hashes-config',
-        help='Dump the git hashes of all repositories packaged into update-checkout-config.json',
+        help='Dump the git hashes of all repositories packaged into '
+             'update-checkout-config.json',
         metavar='BRANCH-SCHEME-NAME')
     parser.add_argument(
         "--tag",
@@ -380,7 +394,8 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     args = parser.parse_args()
 
     if args.reset_to_remote and not args.scheme:
-        print("update-checkout usage error: --reset-to-remote must specify --scheme=foo")
+        print("update-checkout usage error: --reset-to-remote must specify "
+              "--scheme=foo")
         exit(1)
 
     clone = args.clone
@@ -416,11 +431,17 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         if scheme is None:
             scheme = config['default-branch-scheme']
 
+        skip_repo_list = args.skip_repository_list
         clone_results = obtain_all_additional_swift_sources(args, config,
-                    clone_with_ssh, scheme, skip_history, args.skip_repository_list)
+                                                            clone_with_ssh,
+                                                            scheme,
+                                                            skip_history,
+                                                            skip_repo_list)
 
-    update_results = update_all_repositories(args, config, scheme, cross_repos_pr)
+    update_results = update_all_repositories(args, config, scheme,
+                                             cross_repos_pr)
     return (clone_results, update_results)
+
 
 if __name__ == "__main__":
     freeze_support()
