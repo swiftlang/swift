@@ -368,10 +368,10 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
             continue;
           }
           // This substitution is not a concrete type.
-          if (IsGeneric && CalleeSubstMap.getMap().empty()) {
+          if (IsGeneric && CalleeSubstMap.empty()) {
             CalleeSubstMap =
                 Callee->getGenericEnvironment()->getSubstitutionMap(
-                    AI.getModule().getSwiftModule(), AI.getSubstitutions());
+                    AI.getSubstitutions());
           }
           auto NewSub = Sub.subst(AI.getModule().getSwiftModule(), CalleeSubstMap);
           NewSubs.push_back(NewSub);
