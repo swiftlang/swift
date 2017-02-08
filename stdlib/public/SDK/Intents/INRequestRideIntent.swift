@@ -25,7 +25,7 @@ extension INRequestRideIntent {
     paymentMethod: INPaymentMethod? = nil,
     scheduledPickupTime: INDateComponentsRange? = nil
   ) {
-    if #available(iOS 10.3, watchOS 3.2, *) {
+    if #available(iOS 10.3, *) {
       self.init(__pickupLocation: pickupLocation,
         dropOffLocation: dropOffLocation,
         rideOptionName: rideOptionName,
