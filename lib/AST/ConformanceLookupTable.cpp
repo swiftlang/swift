@@ -859,7 +859,8 @@ void ConformanceLookupTable::addSynthesizedConformance(NominalTypeDecl *nominal,
 }
 
 void ConformanceLookupTable::registerProtocolConformance(
-       ProtocolConformance *conformance) {
+       ProtocolConformance *conformance,
+       bool synthesized) {
   auto protocol = conformance->getProtocol();
   auto dc = conformance->getDeclContext();
   auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
@@ -879,8 +880,9 @@ void ConformanceLookupTable::registerProtocolConformance(
   // Otherwise, add a new entry.
   auto inherited = dyn_cast<InheritedProtocolConformance>(conformance);
   ConformanceSource source
-    = inherited ? ConformanceSource::forInherited(cast<ClassDecl>(nominal))
-                : ConformanceSource::forExplicit(dc);
+    = inherited   ? ConformanceSource::forInherited(cast<ClassDecl>(nominal)) :
+      synthesized ? ConformanceSource::forSynthesized(nominal) :
+                    ConformanceSource::forExplicit(dc);
 
   ASTContext &ctx = nominal->getASTContext();
   ConformanceEntry *entry = new (ctx) ConformanceEntry(SourceLoc(),
