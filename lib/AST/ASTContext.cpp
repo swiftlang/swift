@@ -259,6 +259,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
     llvm::FoldingSet<ProtocolType> ProtocolTypes;
+    llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
 
     llvm::DenseMap<std::pair<TypeBase *, DeclContext *>,
                    SubstitutionList>
@@ -4060,4 +4061,37 @@ CanSILBoxType SILBoxType::get(CanType boxedType) {
   return get(boxedType->getASTContext(), layout, Substitution(boxedType, {}));
 }
 
+LayoutConstraint
+LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind,
+                                      ASTContext &C) {
+  return getLayoutConstraint(Kind, 0, 0, C);
+}
+
+LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind,
+                                                      unsigned SizeInBits,
+                                                      unsigned Alignment,
+                                                      ASTContext &C) {
+  // Check to see if we've already seen this tuple before.
+  llvm::FoldingSetNodeID ID;
+  LayoutConstraintInfo::Profile(ID, Kind, SizeInBits, Alignment);
+
+  void *InsertPos = nullptr;
+  if (LayoutConstraintInfo *Layout =
+          C.Impl.getArena(AllocationArena::Permanent)
+              .LayoutConstraints.FindNodeOrInsertPos(ID, InsertPos))
+    return LayoutConstraint(Layout);
+
+  LayoutConstraintInfo *New =
+      LayoutConstraintInfo::isTrivial(Kind)
+          ? new (C, AllocationArena::Permanent)
+                LayoutConstraintInfo(Kind, SizeInBits, Alignment)
+          : new (C, AllocationArena::Permanent) LayoutConstraintInfo(Kind);
+  C.Impl.getArena(AllocationArena::Permanent)
+      .LayoutConstraints.InsertNode(New, InsertPos);
+  return LayoutConstraint(New);
+}
+
+LayoutConstraint LayoutConstraint::getUnknownLayout(ASTContext &C) {
+  return getLayoutConstraint(LayoutConstraintKind::UnknownLayout, 0, 0, C);
+}
 
