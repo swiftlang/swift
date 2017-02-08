@@ -6,6 +6,7 @@
   "String": [
     "CString.swift",
     "Character.swift",
+    "ICU.swift",
     "StaticString.swift",
     "String.swift",
     "StringBridge.swift",
