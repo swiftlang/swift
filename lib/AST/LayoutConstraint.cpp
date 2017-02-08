@@ -22,21 +22,25 @@ namespace swift {
 
 /// This helper function is typically used by the parser to
 /// map a type name to a corresponding layout constraint if possible.
-LayoutConstraintInfo getLayoutConstraintInfo(Identifier ID, ASTContext &Ctx) {
+LayoutConstraint getLayoutConstraint(Identifier ID, ASTContext &Ctx) {
   if (ID == Ctx.Id_TrivialLayout)
-    return LayoutConstraintInfo(LayoutConstraintKind::TrivialOfExactSize, 0, 0);
+    return LayoutConstraint::getLayoutConstraint(
+        LayoutConstraintKind::TrivialOfExactSize, 0, 0, Ctx);
 
   if (ID == Ctx.Id_TrivialAtMostLayout)
-    return LayoutConstraintInfo(LayoutConstraintKind::TrivialOfAtMostSize, 0,
-                                0);
+    return LayoutConstraint::getLayoutConstraint(
+        LayoutConstraintKind::TrivialOfAtMostSize, 0, 0, Ctx);
 
   if (ID == Ctx.Id_RefCountedObjectLayout)
-    return LayoutConstraintInfo(LayoutConstraintKind::RefCountedObject);
+    return LayoutConstraint::getLayoutConstraint(
+        LayoutConstraintKind::RefCountedObject, Ctx);
 
   if (ID == Ctx.Id_NativeRefCountedObjectLayout)
-    return LayoutConstraintInfo(LayoutConstraintKind::NativeRefCountedObject);
+    return LayoutConstraint::getLayoutConstraint(
+        LayoutConstraintKind::NativeRefCountedObject, Ctx);
 
-  return LayoutConstraintInfo(LayoutConstraintKind::UnknownLayout);
+  return LayoutConstraint::getLayoutConstraint(
+      LayoutConstraintKind::UnknownLayout, Ctx);
 }
 
 StringRef LayoutConstraintInfo::getName() const {
@@ -60,6 +64,52 @@ StringRef LayoutConstraintInfo::getName(LayoutConstraintKind Kind) {
   }
 
   llvm_unreachable("Unhandled LayoutConstraintKind in switch.");
+}
+
+/// Uniquing for the LayoutConstraintInfo.
+void LayoutConstraintInfo::Profile(llvm::FoldingSetNodeID &ID,
+                                   LayoutConstraintKind Kind,
+                                   unsigned SizeInBits,
+                                   unsigned Alignment) {
+  ID.AddInteger((unsigned)Kind);
+  ID.AddInteger(SizeInBits);
+  ID.AddInteger(Alignment);
+}
+
+bool LayoutConstraintInfo::isKnownLayout(LayoutConstraintKind Kind) {
+  return Kind != LayoutConstraintKind::UnknownLayout;
+}
+
+bool LayoutConstraintInfo::isFixedSizeTrivial(LayoutConstraintKind Kind) {
+  return Kind == LayoutConstraintKind::TrivialOfExactSize;
+}
+
+bool LayoutConstraintInfo::isKnownSizeTrivial(LayoutConstraintKind Kind) {
+  return Kind > LayoutConstraintKind::UnknownLayout &&
+         Kind < LayoutConstraintKind::Trivial;
+}
+
+bool LayoutConstraintInfo::isAddressOnlyTrivial(LayoutConstraintKind Kind) {
+  return Kind == LayoutConstraintKind::Trivial;
+}
+
+bool LayoutConstraintInfo::isTrivial(LayoutConstraintKind Kind) {
+  return Kind > LayoutConstraintKind::UnknownLayout &&
+         Kind <= LayoutConstraintKind::Trivial;
+}
+
+bool LayoutConstraintInfo::isRefCountedObject(LayoutConstraintKind Kind) {
+  return Kind == LayoutConstraintKind::RefCountedObject;
+}
+
+bool LayoutConstraintInfo::isNativeRefCountedObject(LayoutConstraintKind Kind) {
+  return Kind == LayoutConstraintKind::NativeRefCountedObject;
+}
+
+void *LayoutConstraintInfo::operator new(size_t bytes, const ASTContext &ctx,
+                                         AllocationArena arena,
+                                         unsigned alignment) {
+  return ctx.Allocate(bytes, alignment, arena);
 }
 
 SourceRange LayoutConstraintLoc::getSourceRange() const { return getLoc(); }

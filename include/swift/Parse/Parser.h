@@ -869,7 +869,7 @@ public:
                                          bool HandleCodeCompletion = true);
 
   /// \brief Parse layout constraint.
-  LayoutConstraintInfo parseLayoutConstraint(Identifier LayoutConstraintID);
+  LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
 
   bool parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
                              SourceLoc &LAngleLoc,

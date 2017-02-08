@@ -934,7 +934,7 @@ void ModuleFile::readGenericRequirements(
                                           size, alignment);
 
       auto first = getType(rawTypeID);
-      LayoutConstraintInfo layoutInfo;
+      LayoutConstraint layout;
       LayoutConstraintKind kind = LayoutConstraintKind::UnknownLayout;
       switch (rawKind) {
       default: {
@@ -968,13 +968,13 @@ void ModuleFile::readGenericRequirements(
       }
       }
 
+      ASTContext &ctx = getContext();
       if (kind != LayoutConstraintKind::TrivialOfAtMostSize &&
           kind != LayoutConstraintKind::TrivialOfExactSize)
-        layoutInfo = LayoutConstraintInfo(kind);
+        layout = LayoutConstraint::getLayoutConstraint(kind, ctx);
       else
-        layoutInfo = LayoutConstraintInfo(kind, size, alignment);
-
-      auto layout = getContext().AllocateObjectCopy(layoutInfo);
+        layout =
+            LayoutConstraint::getLayoutConstraint(kind, size, alignment, ctx);
 
       requirements.push_back(
           Requirement(RequirementKind::Layout, first, layout));
