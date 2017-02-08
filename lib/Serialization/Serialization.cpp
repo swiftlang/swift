@@ -3185,7 +3185,9 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[GenericTypeParamTypeLayout::Code];
     DeclID declIDOrDepth;
     unsigned indexPlusOne;
-    if (genericParam->getDecl()) {
+    if (genericParam->getDecl() &&
+        !(genericParam->getDecl()->getDeclContext()->isModuleScopeContext() &&
+          isDeclXRef(genericParam->getDecl()))) {
       declIDOrDepth = addDeclRef(genericParam->getDecl());
       indexPlusOne = 0;
     } else {
