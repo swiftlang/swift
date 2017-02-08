@@ -221,6 +221,13 @@ public:
 /// in "Notification", or it there would be nothing left.
 StringRef stripNotification(StringRef name);
 
+struct PreferredName {
+  StringRef BaseName;
+  ArrayRef<StringRef> SelectorPieces;
+  PreferredName(StringRef BaseName, ArrayRef<StringRef> SelectorPieces) :
+    BaseName(BaseName), SelectorPieces(SelectorPieces) {}
+};
+
 /// Class to determine the Swift name of foreign entities. Currently fairly
 /// stateless and borrows from the ClangImporter::Implementation, but in the
 /// future will be more self-contained and encapsulated.
@@ -250,7 +257,8 @@ public:
 
   /// Determine the Swift name for a Clang decl
   ImportedName importName(const clang::NamedDecl *decl,
-                          ImportNameVersion version);
+                          ImportNameVersion version,
+                          Optional<PreferredName> givenName = None);
 
   /// Imports the name of the given Clang macro into Swift.
   Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
@@ -313,7 +321,8 @@ private:
                                                   ImportNameVersion version);
 
   ImportedName importNameImpl(const clang::NamedDecl *,
-                              ImportNameVersion version);
+                              ImportNameVersion version,
+                              Optional<PreferredName> givenName);
 };
 
 }

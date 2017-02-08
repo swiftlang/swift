@@ -1073,7 +1073,8 @@ static bool suppressFactoryMethodAsInit(const clang::ObjCMethodDecl *method,
 }
 
 ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
-                                          ImportNameVersion version) {
+                                          ImportNameVersion version,
+                                          Optional<PreferredName> givenName) {
   ImportedName result;
 
   /// Whether we want a Swift 3 or later name
@@ -1112,7 +1113,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
     method->getOverriddenMethods(overriddenMethods);
     for (auto overridden : overriddenMethods) {
-      const auto overriddenName = importName(overridden, version);
+      const auto overriddenName = importName(overridden, version, givenName);
       if (overriddenName.getDeclName())
         overriddenNames.push_back({overridden, overriddenName});
     }
@@ -1144,7 +1145,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         if (!knownProperties.insert(overriddenProperty).second)
           continue;
 
-        const auto overriddenName = importName(overriddenProperty, version);
+        const auto overriddenName = importName(overriddenProperty, version,
+                                               givenName);
         if (overriddenName.getDeclName())
           overriddenNames.push_back({overriddenProperty, overriddenName});
       }
@@ -1293,6 +1295,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     // Map the identifier.
     baseName = D->getDeclName().getAsIdentifierInfo()->getName();
 
+    if (givenName.hasValue())
+      baseName = givenName.getValue().BaseName;
+
     // For Objective-C BOOL properties, use the name of the getter
     // which, conventionally, has an "is" prefix.
     if (swift3OrLaterName) {
@@ -1322,7 +1327,16 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     // Map the Objective-C selector directly.
     auto selector = D->getDeclName().getObjCSelector();
+
     baseName = selector.getNameForSlot(0);
+
+    // Respect the given name.
+    if (givenName.hasValue()) {
+      if (givenName.getValue().SelectorPieces.size() != selector.getNumArgs()) {
+        return ImportedName();
+      }
+      baseName = givenName.getValue().SelectorPieces[0];
+    }
 
     // We don't support methods with empty first selector pieces.
     if (baseName.empty())
@@ -1358,6 +1372,11 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         argumentNames.push_back(StringRef());
       } else {
         StringRef argName = selector.getNameForSlot(index);
+
+        // Respect given name.
+        if (givenName.hasValue()) {
+          argName = givenName.getValue().SelectorPieces[index];
+        }
         argumentNames.push_back(argName);
       }
     }
@@ -1366,6 +1385,17 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (isInitializer) {
       // Skip over the prefix.
       auto argName = selector.getNameForSlot(0).substr(initializerPrefixLen);
+
+      // Respect the given name.
+      if (givenName.hasValue()) {
+        argName = givenName.getValue().SelectorPieces[0];
+        if (initializerPrefixLen) {
+          if (argName.startswith("init"))
+            argName = argName.substr(initializerPrefixLen);
+          else
+            return ImportedName();
+        }
+      }
 
       // Drop "With" if present after the "init".
       bool droppedWith = false;
@@ -1611,14 +1641,15 @@ NameImporter::importMacroName(const clang::IdentifierInfo *clangIdentifier,
 }
 
 ImportedName NameImporter::importName(const clang::NamedDecl *decl,
-                                      ImportNameVersion version) {
+                                      ImportNameVersion version,
+                                      Optional<PreferredName> givenName) {
   CacheKeyType key(decl, version);
   if (importNameCache.count(key)) {
     ++ImportNameNumCacheHits;
     return importNameCache[key];
   }
   ++ImportNameNumCacheMisses;
-  auto res = importNameImpl(decl, version);
+  auto res = importNameImpl(decl, version, givenName);
   res.setVersion(version);
   importNameCache[key] = res;
   return res;

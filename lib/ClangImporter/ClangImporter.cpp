@@ -2889,3 +2889,15 @@ void ClangImporter::Implementation::dumpSwiftLookupTables() {
   llvm::errs() << "<<Bridging header lookup table>>\n";
   BridgingHeaderLookupTable->dump();
 }
+
+DeclName ClangImporter::
+analyzeImportedName(const clang::NamedDecl *ClangDecl,
+                    StringRef BaseName, ArrayRef<StringRef> SelectorPieces,
+                    version::Version version) {
+  swift::importer::PreferredName Name(BaseName, SelectorPieces);
+  swift::importer::ImportNameVersion Ver =
+    swift::importer::ImportNameVersion::Swift4;
+  if (version.isVersion3())
+    Ver = swift::importer::ImportNameVersion::Swift3;
+  return Impl.nameImporter->importName(ClangDecl, Ver, Name).getDeclName();
+}

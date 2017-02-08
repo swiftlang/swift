@@ -41,7 +41,7 @@ namespace clang {
 }
 
 namespace swift {
-
+namespace version { class Version; }
 class ASTContext;
 class ClangImporterOptions;
 class ClangModuleUnit;
@@ -267,13 +267,13 @@ public:
   void getMangledName(raw_ostream &os, const clang::NamedDecl *clangDecl) const;
 
   using ClangModuleLoader::addDependency;
-  
+
   // Print statistics from the Clang AST reader.
   void printStatistics() const override;
 
   /// Dump Swift lookup tables.
   void dumpSwiftLookupTables();
-  
+
   /// Given the path of a Clang module, collect the names of all its submodules.
   /// Calling this function does not load the module.
   void collectSubModuleNames(
@@ -282,6 +282,11 @@ public:
 
   /// Given a Clang module, decide whether this module is imported already.
   static bool isModuleImported(const clang::Module *M);
+
+  DeclName analyzeImportedName(const clang::NamedDecl *ClangDecl,
+                               StringRef BaseName,
+                               ArrayRef<StringRef> SelectorPieces,
+                               version::Version version);
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
