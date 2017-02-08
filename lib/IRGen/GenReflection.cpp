@@ -801,6 +801,9 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
            "Mach-O section name length must be <= 16 characters");
     OS << "__TEXT,__swift3_" << LongName << ", regular, no_dead_strip";
     break;
+  case llvm::Triple::Wasm:
+    llvm_unreachable("web assembly object format is not supported.");
+    break;
   }
   return OS.str();
 }
