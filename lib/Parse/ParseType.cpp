@@ -59,20 +59,20 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
   return ty;
 }
 
-LayoutConstraintInfo
-Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
-  LayoutConstraintInfo layoutConstraint =
-      getLayoutConstraintInfo(LayoutConstraintID, Context);
-  assert(layoutConstraint.isKnownLayout() &&
+LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
+  LayoutConstraint layoutConstraint =
+      getLayoutConstraint(LayoutConstraintID, Context);
+  assert(layoutConstraint->isKnownLayout() &&
          "Expected layout constraint definition");
 
-  if (!layoutConstraint.isTrivial())
+  if (!layoutConstraint->isTrivial())
     return layoutConstraint;
 
   SourceLoc LParenLoc;
   if (!consumeIf(tok::l_paren, LParenLoc)) {
     // It is a trivial without any size constraints.
-    return LayoutConstraintInfo(LayoutConstraintKind::Trivial);
+    return LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Trivial,
+                                                 Context);
   }
 
   int size = 0;
@@ -110,29 +110,30 @@ Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
     // There was an error during parsing.
     skipUntil(tok::r_paren);
     consumeIf(tok::r_paren);
-    return LayoutConstraintInfo::getUnknownLayout();
+    return LayoutConstraint::getUnknownLayout(Context);
   }
 
   if (!consumeIf(tok::r_paren)) {
     // Expected a closing r_paren.
     diagnose(Tok.getLoc(), diag::expected_rparen_layout_constraint);
     consumeToken();
-    return LayoutConstraintInfo::getUnknownLayout();
+    return LayoutConstraint::getUnknownLayout(Context);
   }
 
   if (size < 0) {
     diagnose(Tok.getLoc(), diag::layout_size_should_be_positive);
-    return LayoutConstraintInfo::getUnknownLayout();
+    return LayoutConstraint::getUnknownLayout(Context);
   }
 
   if (alignment < 0) {
     diagnose(Tok.getLoc(), diag::layout_alignment_should_be_positive);
-    return LayoutConstraintInfo::getUnknownLayout();
+    return LayoutConstraint::getUnknownLayout(Context);
   }
 
   // Otherwise it is a trivial layout constraint with
   // provided size and alignment.
-  return LayoutConstraintInfo(layoutConstraint.getKind(), size, alignment);
+  return LayoutConstraint::getLayoutConstraint(layoutConstraint->getKind(), size,
+                                               alignment, Context);
 }
 
 ParserResult<TypeRepr> Parser::parseTypeSimple() {
