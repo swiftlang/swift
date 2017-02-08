@@ -614,6 +614,9 @@ public:
   /// Retrieve the source of the same-type constraint that maps this potential
   /// archetype to a concrete type.
   const RequirementSource &getConcreteTypeSource() const {
+    if (Representative != this)
+      return Representative->getConcreteTypeSource();
+
     return *ConcreteTypeSource;
   }
 
