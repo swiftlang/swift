@@ -559,7 +559,7 @@ const TypeRef *TypeConverter::getThinFunctionTypeRef() {
   if (ThinFunctionTR != nullptr)
     return ThinFunctionTR;
 
-  ThinFunctionTR = BuiltinTypeRef::create(Builder, "yyXf");
+  ThinFunctionTR = BuiltinTypeRef::create(Builder, "XfT_T_");
   return ThinFunctionTR;
 }
 
@@ -567,7 +567,7 @@ const TypeRef *TypeConverter::getAnyMetatypeTypeRef() {
   if (AnyMetatypeTR != nullptr)
     return AnyMetatypeTR;
 
-  AnyMetatypeTR = BuiltinTypeRef::create(Builder, "ypXp");
+  AnyMetatypeTR = BuiltinTypeRef::create(Builder, "PMP_");
   return AnyMetatypeTR;
 }
 

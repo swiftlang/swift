@@ -117,7 +117,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         llvm::errs() << "Can't de-mangle " << name << '\n';
         exit(1);
       }
-      std::string remangled = swift::Demangle::mangleNode(pointer);
+      std::string remangled = swift::Demangle::mangleNodeNew(pointer);
       llvm::outs() << remangled;
       return;
     }
