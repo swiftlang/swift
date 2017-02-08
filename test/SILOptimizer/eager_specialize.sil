@@ -1,5 +1,6 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer -new-mangling-for-tests  %s | %FileCheck %s
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer -sil-deadfuncelim -new-mangling-for-tests  %s | %FileCheck --check-prefix=CHECK-DEADFUNCELIM %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer -new-mangling-for-tests  %s -o %t.sil && %target-swift-frontend -assume-parsing-unqualified-ownership-sil -module-name=eager_specialize -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IRGEN %s
 
 sil_stage canonical
 
@@ -641,3 +642,52 @@ bb0(%0 : $*T, %1 : $*S):
 // CHECK:   %19 = unchecked_trivial_bit_cast %18 : $() to $()
 // CHECK:   br bb2
 // CHECK: } // end sil function '_T016eager_specialize34checkExplicitPartialSpecializationyx_q_tr0_lF'
+
+////////////////////////////////////////////////////////////////////
+// Check that IRGen generates efficient code for fixed-size Trivial
+// constraints.
+////////////////////////////////////////////////////////////////////
+
+// Check that a specialization for _Trivial(32) uses direct loads and stores
+// instead of value witness functions to load and store the value of a generic type.
+// CHECK-IRGEN-LABEL: define linkonce_odr hidden void @_T016eager_specialize18copyValueAndReturnxx_xz1stlFxxxRlze31_lItilr_Tp5(i32* noalias nocapture sret, i32* noalias nocapture dereferenceable(4), i32* nocapture dereferenceable(4), %swift.type* %"\CF\84_0_0")
+// CHECK-IRGEN: entry:
+// CHECK-IRGEN-NEXT:  %3 = load i32, i32* %2, align 4
+// CHECK-IRGEN-NEXT:  store i32 %3, i32* %0, align 4
+// CHECK-IRGEN-NEXT:  ret void
+// CHECK-IRGEN-NEXT:}
+
+// Check that a specialization for _Trivial(64) uses direct loads and stores
+// instead of value witness functions to load and store the value of a generic type.
+// CHECK-IRGEN-LABEL: define linkonce_odr hidden void @_T016eager_specialize18copyValueAndReturnxx_xz1stlFxxxRlze63_lItilr_Tp5(i64* noalias nocapture sret, i64* noalias nocapture dereferenceable(8), i64* nocapture dereferenceable(8), %swift.type* %"\CF\84_0_0")
+// CHECK-IRGEN: entry:
+// CHECK-IRGEN-NEXT:   %3 = load i64, i64* %2, align 8
+// CHECK-IRGEN-NEXT:   store i64 %3, i64* %0, align 8
+// CHECK-IRGEN-NEXT:   ret void
+// CHECK-IRGEN-NEXT: }
+
+// Check that a specialization for _Trivial does not call the 'destroy' value witness,
+// because it is known that the object is Trivial, i.e. contains no references.
+// CHECK-IRGEN-LABEL: define linkonce_odr hidden void @_T016eager_specialize19copyValueAndReturn2xx_xz1stlFxxxRlzTlItilr_Tp5(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.opaque* nocapture, %swift.type* %"\CF\84_0_0")
+// CHECK-IRGEN-NEXT: entry:
+// CHECK-IRGEN-NEXT:   %3 = bitcast %swift.type* %"\CF\84_0_0" to i8***
+// CHECK-IRGEN-NEXT:   %4 = getelementptr inbounds i8**, i8*** %3, i64 -1
+// CHECK-IRGEN-NEXT:   %"\CF\84_0_0.valueWitnesses" = load i8**, i8*** %4, align 8, !invariant.load !11, !dereferenceable !12
+// CHECK-IRGEN-NEXT:   %5 = getelementptr inbounds i8*, i8** %"\CF\84_0_0.valueWitnesses", i32 6
+// CHECK-IRGEN-NEXT:   %6 = load i8*, i8** %5, align 8, !invariant.load !11
+// CHECK-IRGEN-NEXT:   %initializeWithCopy = bitcast i8* %6 to %swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)*
+// CHECK-IRGEN-NEXT:   %7 = call %swift.opaque* %initializeWithCopy(%swift.opaque* %0, %swift.opaque* %2, %swift.type* %"\CF\84_0_0") #3
+// CHECK-IRGEN-NEXT:   ret void
+// CHECK-IRGEN-NEXT: }
+
+// Check that a specialization for _RefCountedObject just copies the fixed-size reference,
+// and call retain/release directly, instead of calling the value witness functions.
+// CHECK-IRGEN-LABEL: define linkonce_odr hidden void @_T016eager_specialize19copyValueAndReturn3xx_xz1stlFxxxRlzRlItilr_Tp5(%objc_object** noalias nocapture sret, %objc_object** noalias nocapture dereferenceable(8), %objc_object** nocapture dereferenceable(8), %swift.type* %"\CF\84_0_0")
+// CHECK-IRGEN: entry:
+// CHECK-IRGEN-NEXT:   %3 = load %objc_object*, %objc_object** %2, align 8
+// CHECK-IRGEN-NEXT:   call void @swift_unknownRetain(%objc_object* %3) #3
+// CHECK-IRGEN-NEXT:   store %objc_object* %3, %objc_object** %0, align 8
+// CHECK-IRGEN-NEXT:   %toDestroy = load %objc_object*, %objc_object** %1, align 8
+// CHECK-IRGEN-NEXT:   call void @swift_unknownRelease(%objc_object* %toDestroy) #3
+// CHECK-IRGEN-NEXT:   ret void
+// CHECK-IRGEN-NEXT: }
