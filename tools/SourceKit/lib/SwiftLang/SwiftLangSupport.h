@@ -380,6 +380,11 @@ public:
                      ArrayRef<const char *> Args,
                      std::function<void(const CursorInfo &)> Receiver) override;
 
+  void getNameInfo(StringRef Filename, unsigned Offset,
+                   NameTranslatingInfo Input,
+                   ArrayRef<const char *> Args,
+                   std::function<void(const NameTranslatingInfo &)> Receiver) override;
+
   void getRangeInfo(StringRef Filename, unsigned Offset, unsigned Length,
                     ArrayRef<const char *> Args,
                     std::function<void(const RangeInfo&)> Receiver) override;
@@ -411,7 +416,7 @@ namespace trace {
   void initTraceInfo(trace::SwiftInvocation &SwiftArgs,
                      StringRef InputFile,
                      ArrayRef<const char *> Args);
-  
+
   void initTraceFiles(trace::SwiftInvocation &SwiftArgs,
                       swift::CompilerInstance &CI);
 }

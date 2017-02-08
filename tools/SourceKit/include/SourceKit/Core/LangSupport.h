@@ -223,7 +223,7 @@ public:
                                                  unsigned Length) = 0;
 
   virtual bool recordAffectedRange(unsigned Offset, unsigned Length) = 0;
-  
+
   virtual bool recordAffectedLineRange(unsigned Line, unsigned Length) = 0;
 
   virtual bool recordFormattedText(StringRef Text) = 0;
@@ -289,6 +289,13 @@ struct RangeInfo {
   UIdent RangeKind;
   StringRef ExprType;
   StringRef RangeContent;
+};
+
+struct NameTranslatingInfo {
+  bool IsCancelled = false;
+  UIdent NameKind;
+  StringRef BaseName;
+  ArrayRef<StringRef> ArgNames;
 };
 
 struct RelatedIdentsInfo {
@@ -460,6 +467,12 @@ public:
                              unsigned Length, bool Actionables,
                              ArrayRef<const char *> Args,
                           std::function<void(const CursorInfo &)> Receiver) = 0;
+
+
+  virtual void getNameInfo(StringRef Filename, unsigned Offset,
+                           NameTranslatingInfo Input,
+                           ArrayRef<const char *> Args,
+                std::function<void(const NameTranslatingInfo &)> Receiver) = 0;
 
   virtual void getRangeInfo(StringRef Filename, unsigned Offset, unsigned Length,
                             ArrayRef<const char *> Args,

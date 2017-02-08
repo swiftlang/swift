@@ -853,6 +853,14 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   return false;
 }
 
+/// Returns true for failure to resolve.
+static bool passNameInfoForDecl(const ValueDecl *VD,
+                    std::function<void(const NameTranslatingInfo &)> Receiver) {
+
+
+  return false;
+}
+
 class CursorRangeInfoConsumer : public SwiftASTConsumer {
 protected:
   SwiftLangSupport &Lang;
@@ -1028,6 +1036,95 @@ static void resolveCursor(SwiftLangSupport &Lang,
   Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), &OncePerASTToken);
 }
 
+static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
+                        unsigned Offset, SwiftInvocationRef Invok,
+                        bool TryExistingAST,
+                        NameTranslatingInfo Input,
+                        std::function<void(const NameTranslatingInfo &)> Receiver) {
+  assert(Invok);
+
+  class NameInfoConsumer : public CursorRangeInfoConsumer {
+    NameTranslatingInfo Input;
+    std::function<void(const NameTranslatingInfo &)> Receiver;
+
+  public:
+    NameInfoConsumer(StringRef InputFile, unsigned Offset,
+                     SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
+                     bool TryExistingAST, NameTranslatingInfo Input,
+                     std::function<void(const NameTranslatingInfo &)> Receiver)
+    : CursorRangeInfoConsumer(InputFile, Offset, 0, Lang, ASTInvok,
+                              TryExistingAST), Input(Input),
+      Receiver(std::move(Receiver)){ }
+
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      auto &CompIns = AstUnit->getCompilerInstance();
+
+      unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
+      SourceLoc Loc =
+        Lexer::getLocForStartOfToken(CompIns.getSourceMgr(), BufferID, Offset);
+      if (Loc.isInvalid()) {
+        Receiver({});
+        return;
+      }
+
+      trace::TracedOperation TracedOp;
+      if (trace::enabled()) {
+        trace::SwiftInvocation SwiftArgs;
+        ASTInvok->raw(SwiftArgs.Args.Args, SwiftArgs.Args.PrimaryFile);
+        trace::initTraceFiles(SwiftArgs, CompIns);
+        TracedOp.start(trace::OperationKind::CursorInfoForSource, SwiftArgs,
+                       {std::make_pair("Offset", std::to_string(Offset))});
+      }
+
+      SemaLocResolver Resolver(AstUnit->getPrimarySourceFile());
+      SemaToken SemaTok = Resolver.resolve(Loc);
+      if (SemaTok.isInvalid()) {
+        Receiver({});
+        return;
+      }
+
+      CompilerInvocation CompInvok;
+      ASTInvok->applyTo(CompInvok);
+
+      if (SemaTok.Mod) {
+
+      } else {
+        ValueDecl *VD = SemaTok.CtorTyRef ? SemaTok.CtorTyRef : SemaTok.ValueD;
+        bool Failed = passNameInfoForDecl(VD, Receiver);
+        if (Failed) {
+          if (!getPreviousASTSnaps().empty()) {
+            // Attempt again using the up-to-date AST.
+            resolveName(Lang, InputFile, Offset, ASTInvok,
+                        /*TryExistingAST=*/false, Input, Receiver);
+          } else {
+            Receiver({});
+          }
+        }
+      }
+    }
+
+    void cancelled() override {
+      NameTranslatingInfo Info;
+      Info.IsCancelled = true;
+      Receiver(Info);
+    }
+
+    void failed(StringRef Error) override {
+      LOG_WARN_FUNC("name info failed: " << Error);
+      Receiver({});
+    }
+  };
+
+  auto Consumer = std::make_shared<NameInfoConsumer>(
+    InputFile, Offset, Lang, Invok, TryExistingAST, Input, Receiver);
+
+  /// FIXME: When request cancellation is implemented and Xcode adopts it,
+  /// don't use 'OncePerASTToken'.
+  static const char OncePerASTToken = 0;
+  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer),
+                                       &OncePerASTToken);
+}
+
 static void resolveRange(SwiftLangSupport &Lang,
                           StringRef InputFile, unsigned Offset, unsigned Length,
                           SwiftInvocationRef Invok,
@@ -1105,7 +1202,6 @@ static void resolveRange(SwiftLangSupport &Lang,
   Lang.getASTManager().processASTAsync(Invok, std::move(Consumer),
                                        &OncePerASTToken);
 }
-
 
 void SwiftLangSupport::getCursorInfo(
     StringRef InputFile, unsigned Offset, unsigned Length, bool Actionables,
@@ -1185,6 +1281,58 @@ getRangeInfo(StringRef InputFile, unsigned Offset, unsigned Length,
   }
   resolveRange(*this, InputFile, Offset, Length, Invok, /*TryExistingAST=*/true,
                 Receiver);
+}
+
+void SwiftLangSupport::
+getNameInfo(StringRef InputFile, unsigned Offset, NameTranslatingInfo Input,
+            ArrayRef<const char *> Args,
+            std::function<void(const NameTranslatingInfo &)> Receiver) {
+
+  if (auto IFaceGenRef = IFaceGenContexts.get(InputFile)) {
+    trace::TracedOperation TracedOp;
+    if (trace::enabled()) {
+      trace::SwiftInvocation SwiftArgs;
+      trace::initTraceInfo(SwiftArgs, InputFile, Args);
+      // Do we need to record any files? If yes -- which ones?
+      trace::StringPairs OpArgs {
+        std::make_pair("DocumentName", IFaceGenRef->getDocumentName()),
+        std::make_pair("ModuleOrHeaderName", IFaceGenRef->getModuleOrHeaderName()),
+        std::make_pair("Offset", std::to_string(Offset))};
+      TracedOp.start(trace::OperationKind::CursorInfoForIFaceGen,
+                     SwiftArgs, OpArgs);
+    }
+
+    IFaceGenRef->accessASTAsync([this, IFaceGenRef, Offset, Receiver] {
+      SwiftInterfaceGenContext::ResolvedEntity Entity;
+      Entity = IFaceGenRef->resolveEntityForOffset(Offset);
+      if (Entity.isResolved()) {
+        CompilerInvocation Invok;
+        IFaceGenRef->applyTo(Invok);
+        if (Entity.Mod) {
+          // Module is ignored
+        } else {
+          // FIXME: Should pass the main module for the interface but currently
+          // it's not necessary.
+          passNameInfoForDecl(Entity.Dcl, Receiver);
+        }
+      } else {
+        Receiver({});
+      }
+    });
+    return;
+  }
+
+  std::string Error;
+  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, InputFile, Error);
+  if (!Invok) {
+    // FIXME: Report it as failed request.
+    LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
+    Receiver({});
+    return;
+  }
+
+  resolveName(*this, InputFile, Offset, Invok, /*TryExistingAST=*/true, Input,
+              Receiver);
 }
 
 static void

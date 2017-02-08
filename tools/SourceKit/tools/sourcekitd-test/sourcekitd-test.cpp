@@ -132,6 +132,12 @@ static sourcekitd_uid_t KeyContainerTypeUsr;
 static sourcekitd_uid_t KeyModuleGroups;
 static sourcekitd_uid_t KeySimplified;
 static sourcekitd_uid_t KeyRangeContent;
+static sourcekitd_uid_t KeyBaseName;
+static sourcekitd_uid_t KeyArgNames;
+static sourcekitd_uid_t KeySelectorPieces;
+static sourcekitd_uid_t KeyNameKind;
+static sourcekitd_uid_t KeyNameKindObjc;
+static sourcekitd_uid_t KeyNameKindSwift;
 
 static sourcekitd_uid_t RequestProtocolVersion;
 static sourcekitd_uid_t RequestDemangle;
@@ -159,6 +165,7 @@ static sourcekitd_uid_t RequestEditorFindUSR;
 static sourcekitd_uid_t RequestEditorFindInterfaceDoc;
 static sourcekitd_uid_t RequestDocInfo;
 static sourcekitd_uid_t RequestModuleGroups;
+static sourcekitd_uid_t RequestNameTranslation;
 
 static sourcekitd_uid_t SemaDiagnosticStage;
 
@@ -250,6 +257,13 @@ static int skt_main(int argc, const char **argv) {
   KeySimplified = sourcekitd_uid_get_from_cstr("key.simplified");
   KeyRangeContent = sourcekitd_uid_get_from_cstr("key.rangecontent");
 
+  KeyBaseName = sourcekitd_uid_get_from_cstr("key.basename");
+  KeyArgNames = sourcekitd_uid_get_from_cstr("key.argnames");
+  KeySelectorPieces = sourcekitd_uid_get_from_cstr("key.selectorpieces");
+  KeyNameKind = sourcekitd_uid_get_from_cstr("key.namekind");
+  KeyNameKindObjc = sourcekitd_uid_get_from_cstr("key.namekind.objc");
+  KeyNameKindSwift = sourcekitd_uid_get_from_cstr("key.namekind.swift");
+
   SemaDiagnosticStage = sourcekitd_uid_get_from_cstr("source.diagnostic.stage.swift.sema");
 
   NoteDocUpdate = sourcekitd_uid_get_from_cstr("source.notification.editor.documentupdate");
@@ -280,6 +294,7 @@ static int skt_main(int argc, const char **argv) {
   RequestEditorFindInterfaceDoc = sourcekitd_uid_get_from_cstr("source.request.editor.find_interface_doc");
   RequestDocInfo = sourcekitd_uid_get_from_cstr("source.request.docinfo");
   RequestModuleGroups = sourcekitd_uid_get_from_cstr("source.request.module.groups");
+  RequestNameTranslation = sourcekitd_uid_get_from_cstr("source.request.name.translation");
 
   // A test invocation may initialize the options to be used for subsequent
   // invocations.
@@ -587,7 +602,7 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSubStructure, false);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
-      
+
   case SourceKitRequest::ExpandPlaceholder:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
     sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
@@ -918,7 +933,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
           sourcekitd_request_dictionary_set_value(Fmt, KeyFormatOptions, FO);
           sourcekitd_request_release(FO);
         }
-        
+
         sourcekitd_response_t FmtResp = sourcekitd_send_request_sync(Fmt);
         sourcekitd_response_description_dump_filedesc(FmtResp, STDOUT_FILENO);
         sourcekitd_response_dispose(FmtResp);
