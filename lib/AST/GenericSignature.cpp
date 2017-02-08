@@ -40,6 +40,24 @@ GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,
     reqtsBuffer[i] = requirements[i];
   }
 
+#ifndef NDEBUG
+  // Make sure generic parameters are in the right order, and
+  // none are missing.
+  unsigned depth = 0;
+  unsigned count = 0;
+  for (auto param : params) {
+    if (param->getDepth() != depth) {
+      assert(param->getDepth() > depth &&
+             "Generic parameter depth mismatch");
+      depth = param->getDepth();
+      count = 0;
+    }
+    assert(param->getIndex() == count &&
+           "Generic parameter index mismatch");
+    count++;
+  }
+#endif
+
   if (isKnownCanonical)
     CanonicalSignatureOrASTContext = &getASTContext(params, requirements);
 }
