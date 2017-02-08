@@ -160,9 +160,7 @@ bool SILFunction::shouldOptimize() const {
 
 Type SILFunction::mapTypeIntoContext(Type type) const {
   return GenericEnvironment::mapTypeIntoContext(
-      getModule().getSwiftModule(),
-      getGenericEnvironment(),
-      type);
+      getGenericEnvironment(), type);
 }
 
 namespace {
@@ -259,7 +257,7 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
                                                SILType type) const {
   return doSubstDependentSILType(M,
     [&](CanType t) {
-      return mapTypeIntoContext(M.getSwiftModule(), t)->getCanonicalType();
+      return mapTypeIntoContext(t)->getCanonicalType();
     },
     type);
 }

@@ -452,7 +452,7 @@ namespace {
       if (Sig && type->hasTypeParameter()) {
         type = Sig->getCanonicalSignature()
           .getGenericEnvironment(*M.getSwiftModule())
-          ->mapTypeIntoContext(M.getSwiftModule(), type)
+          ->mapTypeIntoContext(type)
           ->getCanonicalType();
       }
 
@@ -2467,11 +2467,10 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
   auto contextBoxTy = boxTy;
   if (signature) {
     auto env = signature.getGenericEnvironment(*M.getSwiftModule());
-    loweredContextType = env->mapTypeIntoContext(M.getSwiftModule(),
-                                                 loweredContextType)
+    loweredContextType = env->mapTypeIntoContext(loweredContextType)
                             ->getCanonicalType();
     contextBoxTy = cast<SILBoxType>(
-      env->mapTypeIntoContext(M.getSwiftModule(), contextBoxTy)
+      env->mapTypeIntoContext(contextBoxTy)
          ->getCanonicalType());
   }
   assert(contextBoxTy->getLayout()->getFields().size() == 1
@@ -2502,7 +2501,7 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
                                                isMutable);
   if (env)
     boxType = cast<SILBoxType>(
-      env->mapTypeIntoContext(M.getSwiftModule(), boxType)
+      env->mapTypeIntoContext(boxType)
          ->getCanonicalType());
   
   return boxType;

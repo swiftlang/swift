@@ -2051,7 +2051,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
 
     auto *genericEnv = decl->getGenericEnvironmentOfContext();
     return GenericEnvironment::mapTypeIntoContext(
-        decl->getModuleContext(), genericEnv, interfaceType);
+        genericEnv, interfaceType);
   }
 
   // Get the parent type.

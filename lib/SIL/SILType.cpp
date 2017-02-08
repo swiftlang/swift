@@ -577,7 +577,7 @@ SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
       .getGenericEnvironment(*M.getSwiftModule());
     auto substMap =
       env->getSubstitutionMap(getGenericArgs());
-    fieldTy = env->mapTypeIntoContext(M.getSwiftModule(), fieldTy)
+    fieldTy = env->mapTypeIntoContext(fieldTy)
       ->getCanonicalType();
     
     fieldTy = SILType::getPrimitiveObjectType(fieldTy)

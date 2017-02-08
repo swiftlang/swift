@@ -2961,8 +2961,8 @@ LookUpConformanceInModule::operator()(CanType dependentType,
     return ProtocolConformanceRef(conformedProtocol->getDecl());
 
   return M->lookupConformance(conformingReplacementType,
-                  conformedProtocol->getDecl(),
-                  conformingReplacementType->getASTContext().getLazyResolver());
+                              conformedProtocol->getDecl(),
+                              M->getASTContext().getLazyResolver());
 }
 
 Optional<ProtocolConformanceRef>
@@ -2980,6 +2980,21 @@ MakeAbstractConformanceForGenericType::operator()(CanType dependentType,
           || conformingReplacementType->is<DependentMemberType>())
          && "replacement requires looking up a concrete conformance");
   return ProtocolConformanceRef(conformedProtocol->getDecl());
+}
+
+Optional<ProtocolConformanceRef>
+LookUpConformanceInSignature::operator()(CanType dependentType,
+                                         Type conformingReplacementType,
+                                         ProtocolType *conformedProtocol) const {
+  // FIXME: Actually implement this properly.
+  auto *M = conformedProtocol->getDecl()->getParentModule();
+
+  if (conformingReplacementType->isTypeParameter())
+    return ProtocolConformanceRef(conformedProtocol->getDecl());
+
+  return M->lookupConformance(conformingReplacementType,
+                              conformedProtocol->getDecl(),
+                              M->getASTContext().getLazyResolver());
 }
 
 Type DependentMemberType::substBaseType(ModuleDecl *module,

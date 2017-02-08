@@ -1206,7 +1206,7 @@ void CallEmission::emitToMemory(Address addr,
 
   if (origResultType->hasTypeParameter())
     origResultType = IGF.IGM.getGenericEnvironment()
-      ->mapTypeIntoContext(IGF.getSwiftModule(), origResultType)
+      ->mapTypeIntoContext(origResultType)
       ->getCanonicalType();
 
   if (origResultType != substResultType) {
