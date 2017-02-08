@@ -376,8 +376,10 @@ typedef enum __swift_stdlib_UBreakIteratorType {
 typedef struct __swift_stdlib_UBreakIterator
   __swift_stdlib_UBreakIterator;
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
 void __swift_stdlib_ubrk_close(__swift_stdlib_UBreakIterator *bi);
     
+SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_stdlib_UBreakIterator *__swift_stdlib_ubrk_open(
     __swift_stdlib_UBreakIteratorType type,
     const char *__null_unspecified locale,
@@ -386,11 +388,15 @@ __swift_stdlib_UBreakIterator *__swift_stdlib_ubrk_open(
     __swift_stdlib_UErrorCode *status
     );
     
+SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_int32_t
 __swift_stdlib_ubrk_preceding(__swift_stdlib_UBreakIterator *bi,
            __swift_int32_t offset);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_int32_t __swift_stdlib_ubrk_following(__swift_stdlib_UBreakIterator *bi,
            __swift_int32_t offset);
+SWIFT_RUNTIME_STDLIB_INTERFACE
 void
 __swift_stdlib_ubrk_setUText(__swift_stdlib_UBreakIterator* bi,
              __swift_stdlib_UText*          text,

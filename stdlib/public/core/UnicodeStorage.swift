@@ -12,8 +12,18 @@
 
 import SwiftShims
 
+public var _debugLogging = false
+public func _debugLog(_ arg: @autoclosure ()->Any) {
+  guard _debugLogging == true else { return }
+  print(arg())
+}
+public func _debugLog(_ arg0: @autoclosure ()->Any, _ arg1: @autoclosure ()->Any) {
+  guard _debugLogging else { return }
+  print(arg0(), arg1())
+}
+
 /// A collection of `CodeUnit`s to be interpreted by some `Encoding`
-struct UnicodeStorage<
+public struct UnicodeStorage<
   CodeUnits : RandomAccessCollection,
   Encoding : UnicodeEncoding
 >
@@ -23,11 +33,11 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
 
-  init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
+  public init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
     self.codeUnits = codeUnits
   }
   
-  let codeUnits: CodeUnits
+  public let codeUnits: CodeUnits
 }
 
 
@@ -38,7 +48,7 @@ extension UnicodeStorage {
   public struct EncodedScalars {
     let codeUnits: CodeUnits
     
-    init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
+    public init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
       self.codeUnits = codeUnits
     }
   }
@@ -138,7 +148,7 @@ extension UnicodeStorage {
   /// Given `CodeUnits` representing text that has been encoded with
   /// `FromEncoding`, provides a collection of `ToEncoding.CodeUnit`s
   /// representing the same text.
-  struct TranscodedView<ToEncoding : UnicodeEncoding> : BidirectionalCollection {
+  public struct TranscodedView<ToEncoding : UnicodeEncoding> : BidirectionalCollection {
     typealias FromEncoding = Encoding
     
     // We could just be a generic typealias as this type, but it turns
@@ -178,7 +188,7 @@ extension UnicodeStorage {
     public func index(before i: Base.Index) -> Base.Index {
       return base.index(before: i)
     }
-    typealias SubSequence = BidirectionalSlice<TranscodedView>
+    public typealias SubSequence = BidirectionalSlice<TranscodedView>
   }
 }
 
@@ -208,14 +218,14 @@ extension UnicodeStorage : _UTextable {
     _ deep: Bool, _ status: UnsafeMutablePointer<_UErrorCode>?
   ) ->  UnsafeMutablePointer<_UText> {
     UnsafeMutablePointer(mutating: src)[0].validate()
-    // debugLog("_clone with dst = \(String(describing: dst))")
-    // debugLog("src: \(src[0])")
+    // _debugLog("_clone with dst = \(String(describing: dst))")
+    // _debugLog("src: \(src[0])")
     let r = dst
       ?? UnsafeMutablePointer.allocate(capacity: MemoryLayout<_UText>.size)
     r[0] = src[0]
     r[0].setup()
     r[0].validate()
-    // debugLog("clone result: \(r[0])")
+    // _debugLog("clone result: \(r[0])")
     return r
   }
 
@@ -223,7 +233,7 @@ extension UnicodeStorage : _UTextable {
     _ u: inout _UText, _ nativeTargetIndex: Int64, _ forward: Bool
   ) -> Bool {
 
-    // debugLog("_access(u: \(u), nativeTargetIndex: \(nativeTargetIndex), forward: \(forward))")
+    // _debugLog("_access(u: \(u), nativeTargetIndex: \(nativeTargetIndex), forward: \(forward))")
     u.validate()
     u.chunkOffset = 0
 
@@ -240,7 +250,7 @@ extension UnicodeStorage : _UTextable {
       }
       return true
     }
-    // debugLog("_access: filling buffer")
+    // _debugLog("_access: filling buffer")
     
     guard (0...codeUnits.count^).contains(nativeTargetIndex)
     else { return false }
@@ -258,7 +268,7 @@ extension UnicodeStorage : _UTextable {
           // don't overfill the buffer
           if newChunkLength > buffer.count^ { break }
           for unit in scalar.utf16 {
-            // debugLog("# unit: \(String(unit, radix: 16))")
+            // _debugLog("# unit: \(String(unit, radix: 16))")
             buffer[u.chunkLength^] = unit
             u.chunkLength += 1
           }
@@ -288,7 +298,7 @@ extension UnicodeStorage : _UTextable {
         b[..<buffer.index(atOffset: u.chunkLength)].reverse()
       }
     }
-    // debugLog("_access filled buffer, u = \(u)")
+    // _debugLog("_access filled buffer, u = \(u)")
     return true
   }
   
@@ -298,7 +308,7 @@ extension UnicodeStorage : _UTextable {
     _ destination: UnsafeMutableBufferPointer<__swift_stdlib_UChar>,
     _ error: UnsafeMutablePointer<_UErrorCode>?
   ) -> Int32 {
-    // debugLog("_extract: \(u)")
+    // _debugLog("_extract: \(u)")
     u.validate()
 
     let s = nativeStart.clamped(to: 0...codeUnits.count^)
@@ -350,7 +360,7 @@ extension UnicodeStorage : _UTextable {
   }
   
   internal func _mapNativeIndexToUTF16(_ u: UnsafePointer<_UText>, _ nativeIndex: Int64) -> Int32 {
-    // debugLog("_mapNativeIndexToUTF16: \(u)")
+    // _debugLog("_mapNativeIndexToUTF16: \(u)")
     UnsafeMutablePointer(mutating: u)[0].validate()
     
     if u[0].chunkNativeStart == nativeIndex { return 0 }
@@ -374,7 +384,7 @@ extension UnicodeStorage {
 
 extension UnicodeStorage {
   
-  struct CharacterView<
+  public struct CharacterView<
     CodeUnits : RandomAccessCollection,
     Encoding : UnicodeEncoding
   > : BidirectionalCollection
@@ -384,51 +394,51 @@ extension UnicodeStorage {
     CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
     CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
 
-    init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
+    public init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
       self.storage = UnicodeStorage<CodeUnits,Encoding>(codeUnits)
     }
 
     internal let storage: UnicodeStorage<CodeUnits, Encoding>
 
-    typealias SubSequence = BidirectionalSlice<CharacterView>
+    public typealias SubSequence = BidirectionalSlice<CharacterView>
 
-    typealias Index = CodeUnits.Index
+    public typealias Index = CodeUnits.Index
 
     public var startIndex: Index { return storage.codeUnits.startIndex }
     public var endIndex: Index { return storage.codeUnits.endIndex }
 
-    subscript(i: Index) -> Character {
-      // debugLog("subscript: i=\(i)")
+    public subscript(i: Index) -> Character {
+      // _debugLog("subscript: i=\(i)")
       let j = index(after: i)
-      // debugLog("subscript: j=\(j)")
+      // _debugLog("subscript: j=\(j)")
       let scalars = UnicodeStorage<CodeUnits.SubSequence, Encoding>(
         storage.codeUnits[i..<j], Encoding.self
       ).scalars
-      // debugLog("scalars: \(Array(scalars))")
+      // _debugLog("scalars: \(Array(scalars))")
       return Character(scalars.lazy.map { UnicodeScalar($0) })
     }    
 
-    func index(after i: Index) -> Index {
+    public func index(after i: Index) -> Index {
       // FIXME: there is always a grapheme break between two scalars that are both
       // < U+0300.  Use that to optimize.  Can we make a stronger statement, that
       // there's always a break before any scalar < U+0300?
-      // debugLog("index(after: \(i))")
+      // _debugLog("index(after: \(i))")
       let nextOffset = _withUBreakIterator(at: i) {
         __swift_stdlib_ubrk_following($0, storage.codeUnits.offset(of: i)^)
       }
-      // debugLog("  index(after: \(i)): \(nextOffset)")
+      // _debugLog("  index(after: \(i)): \(nextOffset)")
       return storage.codeUnits.index(atOffset: nextOffset)
     }
 
-    func index(before i: Index) -> Index {
+    public func index(before i: Index) -> Index {
       // FIXME: there is always a grapheme break between two scalars that are both
       // < U+0300.  Use that to optimize.  Can we make a stronger statement, that
       // there's always a break before any scalar < U+0300?
-      // debugLog("index(before: \(i))")
+      // _debugLog("index(before: \(i))")
       let previousOffset = _withUBreakIterator(at: i) {
         __swift_stdlib_ubrk_preceding($0, storage.codeUnits.offset(of: i)^)
       }
-      // debugLog("  -> \(previousOffset)")
+      // _debugLog("  -> \(previousOffset)")
       return storage.codeUnits.index(atOffset: previousOffset)
     }
     internal func _withUBreakIterator<R>(
@@ -436,19 +446,20 @@ extension UnicodeStorage {
     ) -> R {
       var err = __swift_stdlib_U_ZERO_ERROR;
 
-      // debugLog("ubrk_open")
+      // _debugLog("ubrk_open")
       let bi = __swift_stdlib_ubrk_open(
         /*type:*/ __swift_stdlib_UBRK_CHARACTER, /*locale:*/ nil,
         /*text:*/ nil, /*textLength:*/ 0, /*status:*/ &err)
-      precondition(err.isSuccess, "unexpected ubrk_open failure, \(err)")
+      _precondition(err.isSuccess, "unexpected ubrk_open failure")
       defer { __swift_stdlib_ubrk_close(bi) }
 
       return storage._withUText { u in
-        //let access = u[0].pFuncs[0].access(u, storage.codeUnits.offset(of: i)^, 1)
-        //// debugLog("access result:", access)
-        // debugLog("ubrk_setUText")
+        let access = u[0].pFuncs[0].access(u, storage.codeUnits.offset(of: i)^, 1)
+        // _debugLog("access result:", access)
+        // _debugLog("ubrk_setUText(breakIterator: \(bi), u: \(u)")
+        // _debugLog("u: \(u.pointee)")
         __swift_stdlib_ubrk_setUText(bi, u, &err)
-        precondition(err.isSuccess, "unexpected ubrk_setUText failure: \(err)")
+        _precondition(err.isSuccess, "unexpected ubrk_setUText failure")
         return body(bi)
       }
     }  

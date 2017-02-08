@@ -40,7 +40,7 @@ extension _UText {
   
   mutating func validate() {
     let base = self.withBuffer { $0.baseAddress! }
-    assert(chunkContents == base, "UText moved!")
+    _debugPrecondition(chunkContents == base, "UText moved!")
   }
 
   mutating func setup() {
@@ -74,7 +74,10 @@ internal protocol _UTextable {
 extension _UTextable {
   internal func _withUText<R>(_ body: (UnsafeMutablePointer<_UText>)->R) -> R {
 
-    var copy = self, scratch = 0 as _UChar
+    // _debugLog("_withUText(self: \(self))")
+    var copy: _UTextable = self
+    var scratch = 0 as _UChar
+    // _debugLog("copy: \(copy)")
 
     return withUnsafePointer(to: &copy) { pSelf in
       withUnsafeMutablePointer(to: &scratch) { pScratch in 
@@ -82,23 +85,27 @@ extension _UTextable {
           tableSize: Int32(MemoryLayout<__swift_stdlib_UTextFuncs>.stride),
           reserved1: 0, reserved2: 0, reserved3: 0,
           clone: { dst, u, deep, err in
-            // debugLog("clone(\(dst!), \(u!), \(deep), \(String(describing: err)))")
+            // _debugLog("clone(destination: \(dst), u: \(u), deep: \(deep)))")
+            // _debugLog("u: \(u.pointee))")            
             let _self = u[0].context.assumingMemoryBound(
               to: _UTextable.self)[0]
+            // _debugLog("_self: \(_self))")
+            
             return _self._clone(dst, u, deep != 0, err)
           },
 
           nativeLength: { u in
-            // debugLog("nativeLength(\(u!))")
+            // _debugLog("nativeLength(\(u))")
             let _self = u[0].context.assumingMemoryBound(
               to: _UTextable.self)[0]
             let r = _self._nativeLength(&u[0])
-            // debugLog("# nativeLength: \(r)")
+            // _debugLog("# nativeLength: \(r)")
             return r
           },
 
           access: { u, nativeIndex, forward in
-            // debugLog("access(\(u!), \(nativeIndex), \(forward))")
+            // _debugLog("access(u: \(u), nativeIndex: \(nativeIndex), forward: \(forward))")
+            // _debugLog("u: \(u.pointee))")
             let _self = u[0].context.assumingMemoryBound(
               to: _UTextable.self)[0]
             return _self._access(&u[0], nativeIndex, forward != 0) 
@@ -106,7 +113,7 @@ extension _UTextable {
           },
 
           extract: { u, nativeStart, nativeLimit, dest, destCapacity, status in
-            // debugLog("extract(\(u!), \(nativeStart), \(nativeLimit), \(dest!), \(destCapacity), \(String(describing: status)))")
+            // _debugLog("extract(\(u), \(nativeStart), \(nativeLimit), \(dest), \(destCapacity), \(String(describing: status)))")
             let _self = u[0].context.assumingMemoryBound(
               to: _UTextable.self)[0]
 
@@ -121,27 +128,29 @@ extension _UTextable {
           copy: nil,
 
           mapOffsetToNative: { u in 
-            // debugLog("mapOffsetToNative(\(u![0].chunkOffset))")
+            // _debugLog("mapOffsetToNative(\(u[0].chunkOffset))")
             let _self = u[0].context.assumingMemoryBound(
               to: _UTextable.self)[0]
             let r = _self._mapOffsetToNative(u)
-            // debugLog("# mapOffsetToNative: \(r)")
+            // _debugLog("# mapOffsetToNative: \(r)")
             return r
           },
 
           mapNativeIndexToUTF16: { u, nativeIndex in 
-            // debugLog("mapNativeIndexToUTF16(nativeIndex: \(nativeIndex), u: \(u![0]))")
+            // _debugLog("mapNativeIndexToUTF16(nativeIndex: \(nativeIndex), u: \(u[0]))")
             let _self = u[0].context.assumingMemoryBound(
               to: _UTextable.self)[0]
             let r = _self._mapNativeIndexToUTF16(u, nativeIndex)
-            // debugLog("# mapNativeIndexToUTF16: \(r)")
+            // _debugLog("# mapNativeIndexToUTF16: \(r)")
             return r
           },
           close: nil,
           spare1: nil, spare2: nil, spare3: nil)
 
         let rawScratch = UnsafeMutableRawPointer(pScratch)
-        
+
+        // _debugLog("pSelf: \(pSelf)")
+        // _debugLog("pSelf[0]: \(pSelf[0])")
         var u = _UText(
           magic: UInt32(__swift_stdlib_UTEXT_MAGIC),
           flags: 0,
