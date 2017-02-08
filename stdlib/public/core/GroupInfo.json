@@ -6,6 +6,7 @@
   "String": [
     "CString.swift",
     "Character.swift",
+    "ICU.swift",
     "StaticString.swift",
     "String.swift",
     "StringBridge.swift",
@@ -25,6 +26,7 @@
     "Unicode.swift",
     "Unicode2.swift",
     "UnicodeScalar.swift",
+    "UnicodeStorage.swift",
     "UnicodeTrie.swift",
     "UnavailableStringAPIs.swift"
   ],

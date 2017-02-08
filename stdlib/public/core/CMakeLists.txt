@@ -66,6 +66,7 @@ set(SWIFTLIB_ESSENTIAL
   HashedCollectionsAnyHashableExtensions.swift.gyb
   Hashing.swift
   HeapBuffer.swift
+  ICU.swift
   ImplicitlyUnwrappedOptional.swift
   Index.swift
   Indices.swift.gyb
@@ -132,6 +133,7 @@ set(SWIFTLIB_ESSENTIAL
   Unicode.swift
   Unicode2.swift
   UnicodeScalar.swift
+  UnicodeStorage.swift
   UnicodeTrie.swift.gyb
   Unmanaged.swift
   UnsafeBitMap.swift
@@ -167,6 +169,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   list(APPEND swift_core_link_flags "-all_load")
   list(APPEND swift_core_framework_depends Foundation)
   list(APPEND swift_core_framework_depends CoreFoundation)
+  list(APPEND swift_core_private_link_libraries -licucore)
 else()
   # With the GNU linker the equivalent of -all_load is to tell the linker
   # --whole-archive before the archive and --no-whole-archive after (without
