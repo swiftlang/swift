@@ -5,17 +5,17 @@
 // REQUIRES: objc_interop
 // REQUIRES: CPU=x86_64
 
-12TypeLowering14FunctionStructV
+V12TypeLowering14FunctionStruct
 // CHECK:      (struct TypeLowering.FunctionStruct)
 // CHECK-NEXT: (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647
 // CHECK-NEXT:   (field name=blockFunction offset=0
 // CHECK-NEXT:     (reference kind=strong refcounting=unknown)))
 
-12TypeLowering14HasObjCClassesC
+C12TypeLowering14HasObjCClasses
 // CHECK: (class TypeLowering.HasObjCClasses)
 // CHECK-NEXT: (reference kind=strong refcounting=native)
 
-12TypeLowering16NSObjectSubclassC
+C12TypeLowering16NSObjectSubclass
 // CHECK: (class TypeLowering.NSObjectSubclass)
 // CHECK-NEXT: (reference kind=strong refcounting=unknown)
 

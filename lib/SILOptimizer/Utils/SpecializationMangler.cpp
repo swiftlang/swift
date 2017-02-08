@@ -47,7 +47,7 @@ std::string SpecializationMangler::finalize() {
            FuncChild->getText() == "merged");
     TopLevel->addChild(FuncChild);
   }
-  return Demangle::mangleNode(TopLevel);
+  return Demangle::mangleNodeNew(TopLevel);
 }
 
 //===----------------------------------------------------------------------===//
