@@ -258,9 +258,6 @@ public:
   /// \brief Build the generic signature.
   GenericSignature *getGenericSignature();
 
-  /// \brief Build the generic environment.
-  GenericEnvironment *getGenericEnvironment(GenericSignature *signature);
-
   /// Infer requirements from the given type, recursively.
   ///
   /// This routine infers requirements from a type that occurs within the

@@ -807,7 +807,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
   }
 
   // Form the generic environment.
-  return builder.getGenericEnvironment(sig);
+  return sig->createGenericEnvironment(*module);
 }
 
 static void revertDependentTypeLoc(TypeLoc &tl) {

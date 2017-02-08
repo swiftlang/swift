@@ -1317,6 +1317,8 @@ static void checkDefaultArguments(TypeChecker &tc,
 
 bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                                      SourceLoc EndTypeCheckLoc) {
+  validateDecl(AFD);
+
   if (!AFD->getBody())
     return false;
 
