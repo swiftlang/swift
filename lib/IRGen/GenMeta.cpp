@@ -51,6 +51,7 @@
 #include "StructMetadataLayout.h"
 #include "StructLayout.h"
 #include "EnumMetadataLayout.h"
+#include "IRGenMangler.h"
 
 #include "GenMeta.h"
 
@@ -122,10 +123,9 @@ static Address createPointerSizedGEP(IRGenFunction &IGF,
 // It should be removed when fixed. rdar://problem/22674524
 static llvm::Constant *getMangledTypeName(IRGenModule &IGM, CanType type,
                                       bool willBeRelativelyAddressed = false) {
-  auto name = LinkEntity::forTypeMangling(type);
-  llvm::SmallString<32> mangling;
-  name.mangle(mangling);
-  return IGM.getAddrOfGlobalString(mangling, willBeRelativelyAddressed);
+  IRGenMangler Mangler;
+  std::string Name = Mangler.mangleTypeForMetadata(type);
+  return IGM.getAddrOfGlobalString(Name, willBeRelativelyAddressed);
 }
 
 llvm::Value *irgen::emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
@@ -2022,7 +2022,6 @@ llvm::Value *IRGenFunction::emitTypeLayoutRef(SILType type) {
 void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::UnknownObjectFormat:
-  case llvm::Triple::Wasm:
     llvm_unreachable("unknown object format");
   case llvm::Triple::MachO:
     var->setSection("__TEXT,__const");
@@ -2032,6 +2031,9 @@ void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
     break;
   case llvm::Triple::COFF:
     var->setSection(".rdata");
+    break;
+  case llvm::Triple::Wasm:
+    llvm_unreachable("web assembly object format is not supported.");
     break;
   }
 }

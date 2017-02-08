@@ -121,46 +121,33 @@ ArchetypeBuilder::PotentialArchetype::~PotentialArchetype() {
   }
 }
 
-void ArchetypeBuilder::PotentialArchetype::buildFullName(
-       bool forDebug,
-       SmallVectorImpl<char> &result) const {
-  if (auto parent = getParent()) {
-    parent->buildFullName(forDebug, result);
-
-    // When building the name for debugging purposes, include the
-    // protocol into which the associated type was resolved.
-    if (forDebug) {
-      if (auto assocType = getResolvedAssociatedType()) {
-        result.push_back('[');
-        result.push_back('.');
-        result.append(assocType->getProtocol()->getName().str().begin(), 
-                      assocType->getProtocol()->getName().str().end());
-        result.push_back(']');
-      }
-    }
-
-    result.push_back('.');
-  }
-  result.append(getName().str().begin(), getName().str().end());
-}
-
-Identifier ArchetypeBuilder::PotentialArchetype::getName() const { 
-  if (auto assocType = NameOrAssociatedType.dyn_cast<AssociatedTypeDecl *>())
-    return assocType->getName();
-  if (auto typeAlias = NameOrAssociatedType.dyn_cast<TypeAliasDecl *>())
-    return typeAlias->getName();
-  return NameOrAssociatedType.get<Identifier>();
-}
-
-std::string ArchetypeBuilder::PotentialArchetype::getFullName() const {
-  llvm::SmallString<64> result;
-  buildFullName(false, result);
-  return result.str().str();
-}
-
 std::string ArchetypeBuilder::PotentialArchetype::getDebugName() const {
   llvm::SmallString<64> result;
-  buildFullName(true, result);
+
+  auto parent = getParent();
+  if (!parent) {
+    return GenericTypeParamType::get(getGenericParamKey().Depth,
+                                     getGenericParamKey().Index,
+                                     getBuilder()->getASTContext())->getName()
+             .str();
+  }
+
+  // Nested types.
+  result += parent->getDebugName();
+
+  // When building the name for debugging purposes, include the
+  // protocol into which the associated type was resolved.
+  if (auto assocType = getResolvedAssociatedType()) {
+    result.push_back('[');
+    result.push_back('.');
+    result.append(assocType->getProtocol()->getName().str().begin(),
+                  assocType->getProtocol()->getName().str().end());
+    result.push_back(']');
+  }
+
+  result.push_back('.');
+  result.append(getNestedName().str().begin(), getNestedName().str().end());
+
   return result.str().str();
 }
 
@@ -174,10 +161,10 @@ unsigned ArchetypeBuilder::PotentialArchetype::getNestingDepth() const {
 void ArchetypeBuilder::PotentialArchetype::resolveAssociatedType(
        AssociatedTypeDecl *assocType,
        ArchetypeBuilder &builder) {
-  assert(!NameOrAssociatedType.is<AssociatedTypeDecl *>() &&
-         "associated type is already resolved");
-  NameOrAssociatedType = assocType;
-  assert(assocType->getName() == getName());
+  assert(!getResolvedAssociatedType() && "associated type is already resolved");
+  isUnresolvedNestedType = false;
+  identifier.assocTypeOrAlias = assocType;
+  assert(assocType->getName() == getNestedName());
   assert(builder.Impl->NumUnresolvedNestedTypes > 0 &&
          "Mismatch in number of unresolved nested types");
   --builder.Impl->NumUnresolvedNestedTypes;
@@ -382,7 +369,8 @@ static int compareDependentTypes(
     return compareBases;
 
   // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
-  if (int compareNames = a->getName().str().compare(b->getName().str()))
+  if (int compareNames = a->getNestedName().str().compare(
+                                                      b->getNestedName().str()))
     return compareNames;
 
   if (auto *aa = a->getResolvedAssociatedType()) {
@@ -483,7 +471,7 @@ static ArchetypeBuilder::PotentialArchetype*rebuildPotentialArchetypeAnchor(
     if (auto assocType = pa->getResolvedAssociatedType())
       return parentAnchor->getNestedType(assocType, builder);
 
-    return parentAnchor->getNestedType(pa->getName(), builder);
+    return parentAnchor->getNestedType(pa->getNestedName(), builder);
   }
 
   return pa;
@@ -728,7 +716,7 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 
     // Check whether the parent already has a nested type with this name. If
     // so, return it directly.
-    if (auto nested = ParentArchetype->getNestedTypeIfKnown(getName()))
+    if (auto nested = ParentArchetype->getNestedTypeIfKnown(getNestedName()))
       return *nested;
 
     // We will build the archetype below.
@@ -797,7 +785,7 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
                                  superclass, layout);
 
     // Register this archetype with its parent.
-    ParentArchetype->registerNestedType(getName(), arch);
+    ParentArchetype->registerNestedType(getNestedName(), arch);
   } else {
     // Create a top-level archetype.
     Identifier name =
@@ -846,27 +834,29 @@ Type ArchetypeBuilder::PotentialArchetype::getDependentType(
       return ErrorType::get(getDependentType(genericParams,
                                              /*allowUnresolved=*/true));
 
-    return DependentMemberType::get(parentType, getName());
+    return DependentMemberType::get(parentType, getNestedName());
   }
   
   assert(isGenericParam() && "Not a generic parameter?");
 
+  unsigned index = getGenericParamKey().findIndexIn(genericParams);
+
   // FIXME: This is a temporary workaround.
   if (genericParams.empty()) {
-    return getGenericParam();
+    return getBuilder()->Impl->GenericParams[index];
   }
 
-  return genericParams[getGenericParamKey().findIndexIn(genericParams)];
+  return genericParams[index];
 }
 
 void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
                                                 SourceManager *SrcMgr,
                                                 unsigned Indent) {
   // Print name.
-  if (Indent == 0)
+  if (Indent == 0 || isGenericParam())
     Out << getDebugName();
   else
-    Out.indent(Indent) << getName();
+    Out.indent(Indent) << getNestedName();
 
   // Print superclass.
   if (Superclass) {
@@ -895,7 +885,7 @@ void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
   }
 
   if (Representative != this) {
-    Out << " [represented by " << getRepresentative()->getFullName() << "]";
+    Out << " [represented by " << getRepresentative()->getDebugName() << "]";
   }
 
   if (EquivalenceClass.size() > 1) {
@@ -972,28 +962,9 @@ auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
   return nullptr;
 }
 
-auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
-                                           Identifier ParamName)
-       -> PotentialArchetype *
-{
-  GenericParamKey Key(GenericParam);
-  assert(Impl->GenericParams.empty() ||
-         ((Key.Depth == Impl->GenericParams.back()->getDepth() &&
-           Key.Index == Impl->GenericParams.back()->getIndex() + 1) ||
-          (Key.Depth > Impl->GenericParams.back()->getDepth() &&
-           Key.Index == 0)));
-
-  // Create a potential archetype for this type parameter.
-  auto PA = new PotentialArchetype(GenericParam, ParamName);
-  Impl->GenericParams.push_back(GenericParam);
-  Impl->PotentialArchetypes.push_back(PA);
-  return PA;
-}
-
 void ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
   addGenericParameter(
-       GenericParam->getDeclaredInterfaceType()->castTo<GenericTypeParamType>(),
-       GenericParam->getName());
+     GenericParam->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
 }
 
 bool ArchetypeBuilder::addGenericParameterRequirements(GenericTypeParamDecl *GenericParam) {
@@ -1008,13 +979,17 @@ bool ArchetypeBuilder::addGenericParameterRequirements(GenericTypeParamDecl *Gen
 }
 
 void ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
-  auto name = GenericParam->getName();
-  // Trim '$' so that archetypes are more readily discernible from abstract
-  // parameters.
-  if (name.str().startswith("$"))
-    name = Context.getIdentifier(name.str().slice(1, name.str().size()));
-  
-  addGenericParameter(GenericParam, name);
+  GenericParamKey Key(GenericParam);
+  assert(Impl->GenericParams.empty() ||
+         ((Key.Depth == Impl->GenericParams.back()->getDepth() &&
+           Key.Index == Impl->GenericParams.back()->getIndex() + 1) ||
+          (Key.Depth > Impl->GenericParams.back()->getDepth() &&
+           Key.Index == 0)));
+
+  // Create a potential archetype for this type parameter.
+  auto PA = new PotentialArchetype(this, GenericParam);
+  Impl->GenericParams.push_back(GenericParam);
+  Impl->PotentialArchetypes.push_back(PA);
 }
 
 bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
@@ -1193,7 +1168,8 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
     // constraint.
     } else if (!Superclass->isExactSuperclassOf(T->Superclass, nullptr)) {
       Diags.diagnose(Source.getLoc(),
-                     diag::requires_superclass_conflict, T->getName(),
+                     diag::requires_superclass_conflict,
+                     T->getDependentType(/*FIXME: */{ }, true),
                      T->Superclass, Superclass)
         .highlight(T->SuperclassSource->getLoc());
       return true;
@@ -1257,9 +1233,9 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   
   if (concrete1 && concrete2) {
     if (!concrete1->isEqual(concrete2)) {
-      StringRef Name = T1->getFullName();
       Diags.diagnose(Source.getLoc(), diag::requires_same_type_conflict,
-                     Name, concrete1, concrete2);
+                     T1->getDependentType(/*FIXME: */{ }, true), concrete1,
+                     concrete2);
       return true;
       
     }
@@ -1331,9 +1307,9 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   // problem.
   if (auto oldConcrete = T->getConcreteType()) {
     if (!oldConcrete->isEqual(Concrete)) {
-      StringRef Name = T->getFullName();
       Diags.diagnose(Source.getLoc(), diag::requires_same_type_conflict,
-                     Name, oldConcrete, Concrete);
+                     T->getDependentType(/*FIXME: */{ }, true), oldConcrete,
+                     Concrete);
       return true;
     }
     return false;
@@ -1647,10 +1623,7 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
     PotentialArchetype *pa = resolveArchetype(req.getFirstType());
     if (!pa) return;
 
-    bool invalid = addLayoutRequirement(pa, req.getLayoutConstraint(), source);
-    assert(!invalid && "Re-introducing invalid requirement");
-    (void)invalid;
-
+    (void)addLayoutRequirement(pa, req.getLayoutConstraint(), source);
     return;
   }
 
@@ -1659,15 +1632,11 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
     if (!pa) return;
 
     SmallVector<ProtocolDecl *, 4> conformsTo;
-    bool existential = req.getSecondType()->isExistentialType(conformsTo);
-    assert(existential && "Re-introducing invalid requirement");
-    (void)existential;
+    (void)req.getSecondType()->isExistentialType(conformsTo);
 
     // Add each of the protocols.
     for (auto proto : conformsTo) {
-      bool invalid = addConformanceRequirement(pa, proto, source);
-      assert(!invalid && "Re-introducing invalid requirement");
-      (void)invalid;
+      (void)addConformanceRequirement(pa, proto, source);
     }
 
     return;
@@ -1831,7 +1800,7 @@ void ArchetypeBuilder::inferRequirements(ParameterList *params,
 /// corrected name (if successful).
 static Identifier typoCorrectNestedType(
                     ArchetypeBuilder::PotentialArchetype *pa) {
-  StringRef name = pa->getName().str();
+  StringRef name = pa->getNestedName().str();
 
   // Look through all of the associated types of all of the protocols
   // to which the parent conforms.
@@ -2042,7 +2011,8 @@ ArchetypeBuilder::finalize(SourceLoc loc,
 
         Diags.diagnose(Source->getLoc(),
                        diag::requires_generic_param_made_equal_to_concrete,
-                       rep->getName());
+                       rep->getDependentType(genericParams,
+                                             /*allowUnresolved=*/true));
         continue;
       }
 
@@ -2071,7 +2041,8 @@ ArchetypeBuilder::finalize(SourceLoc loc,
 
         Diags.diagnose(constraintLoc,
                        diag::requires_generic_params_made_equal,
-                       pa->getName(), other->getName());
+                       pa->getDependentType(genericParams, true),
+                       other->getDependentType(genericParams, true));
         break;
       }
     }
@@ -2119,7 +2090,7 @@ bool ArchetypeBuilder::diagnoseRemainingRenames(
     Diags.diagnose(loc, diag::invalid_member_type_suggest,
                    pa->getParent()->getDependentType(genericParams,
                                                      /*allowUnresolved=*/true),
-                   pa->getOriginalName(), pa->getName());
+                   pa->getOriginalName(), pa->getNestedName());
     invalid = true;
   }
 
@@ -2565,21 +2536,5 @@ void ArchetypeBuilder::expandGenericEnvironment(GenericEnvironment *env) {
     });
   }
 #endif
-}
-
-GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
-                                                  GenericSignature *signature) {
-  assert(Impl->finalized && "Must finalize builder first");
-
-  // Create the generic environment, which will be lazily populated with
-  // archetypes.
-  auto genericEnv = GenericEnvironment::getIncomplete(signature, this);
-
-  // Force the creation of all of the archetypes.
-  expandGenericEnvironment(genericEnv);
-  genericEnv->clearArchetypeBuilder();
-
-
-  return genericEnv;
 }
 

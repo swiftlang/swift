@@ -322,13 +322,15 @@ endfunction()
 # We migth be using the wrong version of a command, so record them all.
 function(print_versions)
   find_version("cmake" "--version" TRUE)
-  find_version(${CMAKE_COMMAND} "--version" FALSE)
 
-  if(CMAKE_MAKE_PROGRAM MATCHES "ninja")
-    find_version("ninja" "--version" TRUE)
-    find_version(${CMAKE_MAKE_PROGRAM} "--version" FALSE)
-  elseif(CMAKE_MAKE_PROGRAM MATCHES "make")
-    find_version("make" "--version" TRUE)
+  message(STATUS "Finding version for: ${CMAKE_COMMAND}")
+  message(STATUS "Found version: ${CMAKE_VERSION}")
+  message(STATUS "")
+
+  get_filename_component(CMAKE_MAKE_PROGRAM_BN "${CMAKE_MAKE_PROGRAM}" NAME_WE)
+  if(${CMAKE_MAKE_PROGRAM_BN} STREQUAL "ninja" OR
+     ${CMAKE_MAKE_PROGRAM_BN} STREQUAL "make")
+    find_version(${CMAKE_MAKE_PROGRAM_BN} "--version" TRUE)
     find_version(${CMAKE_MAKE_PROGRAM} "--version" FALSE)
   endif()
 
@@ -412,7 +414,11 @@ endif()
 # lipo is used to create universal binaries.
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   include(SwiftDarwin)
-  find_toolchain_tool(LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
+  if(SWIFT_LIPO)
+    set(LIPO ${SWIFT_LIPO})
+  else()
+    find_toolchain_tool(LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
+  endif()
 endif()
 
 if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")

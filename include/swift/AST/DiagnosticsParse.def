@@ -806,16 +806,11 @@ ERROR(illegal_top_level_expr,none,
 ERROR(illegal_semi_stmt,none,
       "';' statements are not allowed", ())
 ERROR(statement_begins_with_closure,none,
-      "statement cannot begin with a closure expression", ())
+      "top-level statement cannot begin with a closure expression", ())
 ERROR(statement_same_line_without_semi,none,
       "consecutive statements on a line must be separated by ';'", ())
-ERROR(brace_stmt_invalid,none,
-      "braced block of statements is an unused closure", ())
 ERROR(invalid_label_on_stmt,none,
       "labels are only valid on loops, if, and switch statements", ())
-
-NOTE(discard_result_of_closure,none,
-     "explicitly discard the result of the closure by assigning to '_'", ())
 
 ERROR(snake_case_deprecated,none,
       "%0 has been replaced with %1 in Swift 3",
@@ -1040,6 +1035,9 @@ ERROR(anon_closure_arg_not_in_closure,none,
 ERROR(anon_closure_arg_in_closure_with_args,none,
       "anonymous closure arguments cannot be used inside a closure that has "
       "explicit arguments", ())
+ERROR(anon_closure_arg_in_closure_with_args_typo,none,
+      "anonymous closure arguments cannot be used inside a closure that has "
+      "explicit arguments; did you mean '%0'?", (StringRef))
 ERROR(expected_closure_parameter_name,none,
       "expected the name of a closure parameter", ())
 ERROR(expected_capture_specifier,none,
@@ -1062,10 +1060,10 @@ ERROR(unexpected_tokens_before_closure_in,none,
 ERROR(expected_closure_rbrace,none,
       "expected '}' at end of closure", ())
 
-WARNING(trailing_closure_excess_newlines,none,
-        "trailing closure is separated from call site by multiple newlines", ())
-NOTE(trailing_closure_call_here,none,
-     "parsing trailing closure for this call", ())
+WARNING(trailing_closure_after_newlines,none,
+        "braces here form a trailing closure separated from its callee by multiple newlines", ())
+NOTE(trailing_closure_callee_here,none,
+     "callee is here", ())
 
 ERROR(string_literal_no_atsign,none,
       "string literals in Swift are not preceded by an '@' sign", ())

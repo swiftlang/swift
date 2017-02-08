@@ -1928,8 +1928,6 @@ public:
 
   void fillObjCRepresentableTypeCache(const DeclContext *DC);
 
-  ArchetypeBuilder createArchetypeBuilder(ModuleDecl *mod);
-
   /// \name Resilience diagnostics
 
   void diagnoseInlineableLocalType(const NominalTypeDecl *NTD);

@@ -1058,7 +1058,6 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   std::string Section;
   switch (IGM.TargetInfo.OutputObjectFormat) {
   case llvm::Triple::UnknownObjectFormat:
-  case llvm::Triple::Wasm:
     llvm_unreachable("unknown object format");
   case llvm::Triple::COFF:
     Section = COFFASTSectionName;
@@ -1068,6 +1067,9 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
     break;
   case llvm::Triple::MachO:
     Section = std::string(MachOASTSegmentName) + "," + MachOASTSectionName;
+    break;
+  case llvm::Triple::Wasm:
+    llvm_unreachable("web assembly object format is not supported.");
     break;
   }
   ASTSym->setSection(Section);

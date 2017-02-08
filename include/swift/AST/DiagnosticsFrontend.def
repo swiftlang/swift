@@ -168,6 +168,9 @@ ERROR(error_formatting_multiple_file_ranges,none,
 ERROR(error_formatting_invalid_range,none,
   "file range is invalid", ())
 
+WARNING(stats_disabled,none,
+  "compiler was not built with support for collecting statistics", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

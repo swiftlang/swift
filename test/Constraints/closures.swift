@@ -66,24 +66,88 @@ func test13811882() {
 // <rdar://problem/21544303> QoI: "Unexpected trailing closure" should have a fixit to insert a 'do' statement
 // <https://bugs.swift.org/browse/SR-3671>
 func r21544303() {
-  let val = true
-  var inSubcall = val
-  {   // expected-error {{expected 'do' keyword to designate a block of statements}} {{3-3=do }}
-  }
+  var inSubcall = true
+  {
+  }  // expected-error {{computed property must have accessors specified}}
   inSubcall = false
 
   // This is a problem, but isn't clear what was intended.
-  var somethingElse = val { // expected-error {{cannot call value of non-function type 'Bool'}}
-  }
+  var somethingElse = true {
+  }  // expected-error {{computed property must have accessors specified}}
   inSubcall = false
 
   var v2 : Bool = false
-  v2 = val
-  {  // expected-error {{expected 'do' keyword to designate a block of statements}}
+  v2 = inSubcall
+  {  // expected-error {{cannot call value of non-function type 'Bool'}} expected-note {{did you mean to use a 'do' statement?}} {{3-3=do }}
   }
 }
 
 
+// <https://bugs.swift.org/browse/SR-3671>
+func SR3671() {
+  let n = 42
+  func consume(_ x: Int) {}
+
+  { consume($0) }(42)
+  ;
+
+  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+
+  { print(42) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-note {{did you mean to use a 'do' statement?}} {{3-3=do }} expected-error {{cannot call value of non-function type '()'}}
+  ;
+
+  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+
+  { print($0) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-error {{cannot call value of non-function type '()'}}
+  ;
+
+  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+
+  { [n] in print(42) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-error {{cannot call value of non-function type '()'}}
+  ;
+
+  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+
+  { consume($0) }(42)  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-error {{cannot call value of non-function type '()'}}
+  ;
+
+  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+
+  { (x: Int) in consume(x) }(42)  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-error {{cannot call value of non-function type '()'}}
+  ;
+
+  // This is technically a valid call, so nothing goes wrong until (42)
+
+  { $0(3) }
+  { consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  ;
+  ({ $0(42) })
+  { consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  ;
+  { $0(3) }
+  { [n] in consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  ;
+  ({ $0(42) })
+  { [n] in consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  ;
+
+  // Equivalent but more obviously unintended.
+
+  { $0(3) }  // expected-note {{callee is here}}
+
+  { consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  // expected-warning@-1 {{braces here form a trailing closure separated from its callee by multiple newlines}}
+
+  ({ $0(3) })  // expected-note {{callee is here}}
+
+  { consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  // expected-warning@-1 {{braces here form a trailing closure separated from its callee by multiple newlines}}
+  ;
+
+  // Also a valid call (!!)
+  { $0 { $0 } } { $0 { 1 } }  // expected-error {{expression resolves to an unused function}}
+  consume(111)
+}
 
 
 // <rdar://problem/22162441> Crash from failing to diagnose nonexistent method access inside closure

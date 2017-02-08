@@ -27,6 +27,12 @@
 using namespace swift;
 using swift::Demangle::FunctionSigSpecializationParamKind;
 
+[[noreturn]]
+static void demangler_unreachable(const char *Message) {
+  fprintf(stderr, "fatal error: %s\n", Message);
+  std::abort();
+}
+
 namespace {
 
 static bool isDeclName(Node::Kind kind) {
@@ -116,16 +122,9 @@ NodePointer Demangler::demangleTopLevel() {
 
   NodePointer topLevel = NodeFactory::create(Node::Kind::Global);
 
-  int Idx = 0;
-  while (!Text.empty()) {
-    NodePointer Node = demangleOperator();
-    if (!Node)
-      break;
-    pushNode(Node);
-    Idx++;
-  }
+  parseAndPushNodes();
 
-  // Let a trailing '_' be part of the not demangled suffix. 
+  // Let a trailing '_' be part of the not demangled suffix.
   popNode(Node::Kind::FirstElementMarker);
 
   size_t EndPos = (NodeStack.empty() ? 0 : NodeStack.back().Pos);
@@ -165,6 +164,26 @@ NodePointer Demangler::demangleTopLevel() {
   }
 
   return topLevel;
+}
+
+NodePointer Demangler::demangleType() {
+  parseAndPushNodes();
+
+  if (NodePointer Result = popNode())
+    return Result;
+
+  return NodeFactory::create(Node::Kind::Suffix, Text);
+}
+
+void Demangler::parseAndPushNodes() {
+  int Idx = 0;
+  while (!Text.empty()) {
+    NodePointer Node = demangleOperator();
+    if (!Node)
+      break;
+    pushNode(Node);
+    Idx++;
+  }
 }
 
 NodePointer Demangler::changeKind(NodePointer Node, Node::Kind NewKind) {
@@ -1644,7 +1663,7 @@ NodePointer Demangler::demangleGenericRequirement() {
         return nullptr;
       name = "m";
     } else {
-      llvm_unreachable("Unknown layout constraint");
+      demangler_unreachable("Unknown layout constraint");
     }
 
     auto NameNode = NodeFactory::create(Node::Kind::Identifier, name);
@@ -1658,7 +1677,7 @@ NodePointer Demangler::demangleGenericRequirement() {
   }
   }
 
-  llvm_unreachable("Unhandled TypeKind in switch.");
+  demangler_unreachable("Unhandled TypeKind in switch.");
 }
 
 NodePointer Demangler::demangleGenericType() {

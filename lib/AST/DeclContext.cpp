@@ -278,7 +278,7 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
 
 Type DeclContext::mapTypeIntoContext(Type type) const {
   return GenericEnvironment::mapTypeIntoContext(
-      getParentModule(), getGenericEnvironmentOfContext(), type);
+      getGenericEnvironmentOfContext(), type);
 }
 
 Type DeclContext::mapTypeOutOfContext(Type type) const {

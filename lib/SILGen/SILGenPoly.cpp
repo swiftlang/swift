@@ -2513,7 +2513,7 @@ buildThunkSignature(SILGenFunction &gen,
     contextSubs = calleeGenericEnv->getSubstitutionMap(
       [&](SubstitutableType *type) -> Type {
         auto depTy = calleeGenericEnv->mapTypeOutOfContext(type);
-        return genericEnv->mapTypeIntoContext(mod, depTy);
+        return genericEnv->mapTypeIntoContext(depTy);
       },
       MakeAbstractConformanceForGenericType());
   }

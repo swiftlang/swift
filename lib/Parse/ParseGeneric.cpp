@@ -95,7 +95,8 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     // Semantic analysis fills in the depth when it processes the generic
     // parameter list.
     auto Param = new (Context) GenericTypeParamDecl(CurDeclContext, Name,
-                                                    NameLoc, /*depth=*/0,
+                                                    NameLoc,
+                                                    /*Bogus depth=*/0xFFFF,
                                                     GenericParams.size());
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));
@@ -257,18 +258,19 @@ ParserStatus Parser::parseGenericWhereClause(
       SourceLoc ColonLoc = consumeToken();
 
       if (Tok.is(tok::identifier) &&
-          getLayoutConstraintInfo(Context.getIdentifier(Tok.getText()),
-                                  Context)) {
+          getLayoutConstraint(Context.getIdentifier(Tok.getText()), Context)
+              ->isKnownLayout()) {
         // Parse a layout constraint.
         auto LayoutName = Context.getIdentifier(Tok.getText());
         auto LayoutLoc = consumeToken();
         auto LayoutInfo = parseLayoutConstraint(LayoutName);
-        if (!LayoutInfo.isKnownLayout()) {
+        if (!LayoutInfo->isKnownLayout()) {
           // There was a bug in the layout constraint.
           Status.setIsParseError();
         }
-        auto Layout = LayoutConstraint(Context.AllocateObjectCopy(LayoutInfo));
-        if (!AllowLayoutConstraints) {
+        auto Layout = LayoutInfo;
+        // Types in SIL mode may contain layout constraints.
+        if (!AllowLayoutConstraints && !isInSILMode()) {
           diagnose(LayoutLoc,
                    diag::layout_constraints_only_inside_specialize_attr);
         } else {

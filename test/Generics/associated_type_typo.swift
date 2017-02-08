@@ -37,9 +37,9 @@ func typoAssoc4<T : P2>(_: T) where T.Assocp2.assoc : P3 {}
 
 // CHECK-GENERIC-LABEL: .typoAssoc4@
 // CHECK-GENERIC-NEXT: Requirements:
-// CHECK-GENERIC-NEXT:   T : P2 [inferred]
-// CHECK-GENERIC-NEXT:   T[.P2].AssocP2 : P1 [protocol
-// CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc : P3 [explicit
+// CHECK-GENERIC-NEXT:   τ_0_0 : P2 [inferred]
+// CHECK-GENERIC-NEXT:   τ_0_0[.P2].AssocP2 : P1 [protocol
+// CHECK-GENERIC-NEXT:   τ_0_0[.P2].AssocP2[.P1].Assoc : P3 [explicit
 // CHECK-GENERIC-NEXT: Potential archetypes
 
 // <rdar://problem/19620340>

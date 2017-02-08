@@ -115,7 +115,6 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   friend class ArchetypeBuilder;
   
   ArchetypeBuilder *getArchetypeBuilder() const { return Builder; }
-  void clearArchetypeBuilder() { Builder = nullptr; }
 
   /// Query function suitable for use as a \c TypeSubstitutionFn that queries
   /// the mapping of interface types to archetypes.
@@ -196,8 +195,7 @@ public:
   }
 
   /// Map an interface type to a contextual type.
-  static Type mapTypeIntoContext(ModuleDecl *M,
-                                 GenericEnvironment *genericEnv,
+  static Type mapTypeIntoContext(GenericEnvironment *genericEnv,
                                  Type type);
 
   /// Map a contextual type to an interface type.
@@ -208,7 +206,7 @@ public:
   Type mapTypeOutOfContext(Type type) const;
 
   /// Map an interface type to a contextual type.
-  Type mapTypeIntoContext(ModuleDecl *M, Type type) const;
+  Type mapTypeIntoContext(Type type) const;
 
   /// Map an interface type to a contextual type.
   Type mapTypeIntoContext(Type type,

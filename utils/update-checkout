@@ -74,11 +74,35 @@ def update_single_repository(args):
                            echo=True)
                 return
 
+            # Query whether we have a "detached HEAD", which will mean that
+            # we previously checked out a tag rather than a branch.
+            detached_head = False
+            try:
+                # This git command returns error code 1 if HEAD is detached.
+                # Otherwise there was some other error, and we need to handle
+                # it like other command errors.
+                shell.run(["git", "symbolic-ref", "-q", "HEAD"], echo=False)
+            except Exception as e:
+                if e.ret == 1:
+                    detached_head = True
+                else:
+                    raise  # Pass this error up the chain.
+
+            # If we have a detached HEAD in this repository, we don't want
+            # to rebase. With a detached HEAD, the fetch will have marked
+            # all the branches in FETCH_HEAD as not-for-merge, and the
+            # "git rebase FETCH_HEAD" will try to rebase the tree from the
+            # default branch's current head, making a mess.
+
             # Prior to Git 2.6, this is the way to do a "git pull
             # --rebase" that respects rebase.autostash.  See
             # http://stackoverflow.com/a/30209750/125349
-            if not cross_repo:
+            if not cross_repo and not detached_head:
                 shell.run(["git", "rebase", "FETCH_HEAD"], echo=True)
+            elif detached_head:
+                print(repo_path,
+                      "\nDetached HEAD; probably checked out a tag. No need to rebase.\n")
+
             shell.run(["git", "submodule", "update", "--recursive"], echo=True)
     except:
         (type, value, tb) = sys.exc_info()

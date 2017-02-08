@@ -81,14 +81,6 @@ void DependentGenericTypeResolver::recordParamType(ParamDecl *decl, Type type) {
 
 Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
                                        GenericTypeParamType *gp) {
-  auto gpDecl = gp->getDecl();
-  assert(gpDecl && "Missing generic parameter declaration");
-
-  // Hack: See parseGenericParameters(). When the issue there is fixed,
-  // we won't need the isInvalid() check anymore.
-  if (gpDecl->isInvalid() || !GenericEnv)
-    return ErrorType::get(gpDecl->getASTContext());
-
   return GenericEnv->mapTypeIntoContext(gp);
 }
 
@@ -107,14 +99,12 @@ Type GenericTypeToArchetypeResolver::resolveSelfAssociatedType(
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
   return GenericEnvironment::mapTypeIntoContext(
-      dc->getParentModule(), GenericEnv,
-      dc->getSelfInterfaceType());
+      GenericEnv, dc->getSelfInterfaceType());
 }
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
   return GenericEnvironment::mapTypeIntoContext(
-      decl->getDeclContext()->getParentModule(), GenericEnv,
-      decl->getDeclaredInterfaceType());
+      GenericEnv, decl->getDeclaredInterfaceType());
 }
 
 bool GenericTypeToArchetypeResolver::areSameType(Type type1, Type type2) {
@@ -157,7 +147,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   // If this potential archetype was renamed due to typo correction,
   // complain and fix it.
   if (nestedPA->wasRenamed()) {
-    auto newName = nestedPA->getName();
+    auto newName = nestedPA->getNestedName();
     TC.diagnose(ref->getIdLoc(), diag::invalid_member_type_suggest,
                 baseTy, ref->getIdentifier(), newName)
       .fixItReplace(ref->getIdLoc(), newName.str());
@@ -477,7 +467,8 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   addGenericParamTypes(gp, allGenericParams);
 
   // Create the archetype builder.
-  ArchetypeBuilder builder = createArchetypeBuilder(func->getParentModule());
+  ArchetypeBuilder builder(Context,
+                           LookUpConformanceInModule(func->getParentModule()));
 
   // Type check the function declaration, treating all generic type
   // parameters as dependent, unresolved.
@@ -738,7 +729,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
 
   // Create the archetype builder.
   ModuleDecl *module = dc->getParentModule();
-  ArchetypeBuilder builder = createArchetypeBuilder(module);
+  ArchetypeBuilder builder(Context, LookUpConformanceInModule(module));
 
   // Type check the generic parameters, treating all generic type
   // parameters as dependent, unresolved.
@@ -806,7 +797,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
   }
 
   // Form the generic environment.
-  return builder.getGenericEnvironment(sig);
+  return sig->createGenericEnvironment(*module);
 }
 
 static void revertDependentTypeLoc(TypeLoc &tl) {

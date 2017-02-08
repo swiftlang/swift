@@ -26,7 +26,6 @@
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/Basic/Fallthrough.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/IR/CallSite.h"
 
@@ -1207,7 +1206,7 @@ void CallEmission::emitToMemory(Address addr,
 
   if (origResultType->hasTypeParameter())
     origResultType = IGF.IGM.getGenericEnvironment()
-      ->mapTypeIntoContext(IGF.getSwiftModule(), origResultType)
+      ->mapTypeIntoContext(origResultType)
       ->getCanonicalType();
 
   if (origResultType != substResultType) {

@@ -85,7 +85,7 @@ struct FloatElement : HasElt {
   typealias Element = Float
 }
 @_specialize(where T == FloatElement)
-@_specialize(where T == IntElement) // expected-error{{generic parameter T.Element cannot be equal to both 'Float' and 'IntElement.Element' (aka 'Int')}}
+@_specialize(where T == IntElement) // expected-error{{generic parameter 'T.Element' cannot be equal to both 'Float' and 'IntElement.Element' (aka 'Int')}}
 func sameTypeRequirement<T : HasElt>(_ t: T) where T.Element == Float {}
 
 @_specialize(where T == Sub)
