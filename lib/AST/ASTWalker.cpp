@@ -660,8 +660,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return nullptr;
     }
 
-    Expr *body = expr->getClosureBody();
-    if ((body = doIt(body)))
+    ClosureExpr *body = expr->getClosureBody();
+    if ((body = cast_or_null<ClosureExpr>(doIt(body))))
       expr->setClosureBody(body);
     else
       return nullptr;
