@@ -375,14 +375,19 @@ func convClassBoundArchetypeUpcast<T : Parent>(_ f1: @escaping (Parent) -> (T, T
 }
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T019function_conversion6ParentCxAA7TrivialVIxxod_xAcESgIxxod_ACRbzlTR : $@convention(thin) <T where T : Parent> (@owned T, @owned @callee_owned (@owned Parent) -> (@owned T, Trivial)) -> (@owned Parent, Optional<Trivial>)
-// CHECK:         upcast %0 : $T to $Parent
-// CHECK-NEXT:    apply
-// CHECK-NEXT:    tuple_extract
-// CHECK-NEXT:    tuple_extract
-// CHECK-NEXT:    upcast {{.*}} : $T to $Parent
-// CHECK-NEXT:    enum $Optional<Trivial>
-// CHECK-NEXT:    tuple
-// CHECK-NEXT:    return
+// CHECK: bb0([[ARG:%.*]] : $T, [[CLOSURE:%.*]] : $@callee_owned (@owned Parent) -> (@owned T, Trivial)):
+// CHECK:    [[CASTED_ARG:%.*]] = upcast [[ARG]] : $T to $Parent
+// CHECK:    [[RESULT:%.*]] = apply [[CLOSURE]]([[CASTED_ARG]])
+// CHECK:    [[BORROWED_RESULT:%.*]] = begin_borrow [[RESULT]] : $(T, Trivial)
+// CHECK:    [[FIRST_RESULT:%.*]] = tuple_extract [[BORROWED_RESULT]] : $(T, Trivial), 0
+// CHECK:    [[COPIED_FIRST_RESULT:%.*]] = copy_value [[FIRST_RESULT]]
+// CHECK:    tuple_extract [[BORROWED_RESULT]] : $(T, Trivial), 1
+// CHECK:    end_borrow [[BORROWED_RESULT]] from [[RESULT]]
+// CHECK:    destroy_value [[RESULT]]
+// CHECK:    [[CAST_COPIED_FIRST_RESULT:%.*]] = upcast [[COPIED_FIRST_RESULT]] : $T to $Parent
+// CHECK:    enum $Optional<Trivial>
+// CHECK:    [[RESULT:%.*]] = tuple ([[CAST_COPIED_FIRST_RESULT]] : $Parent, {{.*}} : $Optional<Trivial>)
+// CHECK:    return [[RESULT]]
 
 // CHECK-LABEL: sil hidden @_T019function_conversion37convClassBoundMetatypeArchetypeUpcast{{[_0-9a-zA-Z]*}}F
 func convClassBoundMetatypeArchetypeUpcast<T : Parent>(_ f1: @escaping (Parent.Type) -> (T.Type, Trivial)) {

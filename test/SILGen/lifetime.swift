@@ -212,12 +212,17 @@ func tuple_with_ref_ignore_return() {
   tuple_with_ref_elements()
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T08lifetime23tuple_with_ref_elementsAA3ValV_AA3RefC_ADtAFtyF
   // CHECK: [[TUPLE:%[0-9]+]] = apply [[FUNC]]
-  // CHECK: [[T0:%[0-9]+]] = tuple_extract [[TUPLE]] : {{.*}}, 0
-  // CHECK: [[T1_0:%[0-9]+]] = tuple_extract [[TUPLE]] : {{.*}}, 1
-  // CHECK: [[T1_1:%[0-9]+]] = tuple_extract [[TUPLE]] : {{.*}}, 2
-  // CHECK: [[T2:%[0-9]+]] = tuple_extract [[TUPLE]] : {{.*}}, 3
-  // CHECK: destroy_value [[T2]]
-  // CHECK: destroy_value [[T1_0]]
+  // CHECK: [[BORROWED_TUPLE:%.*]] = begin_borrow [[TUPLE]]
+  // CHECK: [[T0:%[0-9]+]] = tuple_extract [[BORROWED_TUPLE]] : {{.*}}, 0
+  // CHECK: [[T1_0:%[0-9]+]] = tuple_extract [[BORROWED_TUPLE]] : {{.*}}, 1
+  // CHECK: [[T1_0_COPY:%.*]] = copy_value [[T1_0]]
+  // CHECK: [[T1_1:%[0-9]+]] = tuple_extract [[BORROWED_TUPLE]] : {{.*}}, 2
+  // CHECK: [[T2:%[0-9]+]] = tuple_extract [[BORROWED_TUPLE]] : {{.*}}, 3
+  // CHECK: [[T2_COPY:%.*]] = copy_value [[T2]]
+  // CHECK: end_borrow [[BORROWED_TUPLE]] from [[TUPLE]]
+  // CHECK: destroy_value [[TUPLE]]
+  // CHECK: destroy_value [[T2_COPY]]
+  // CHECK: destroy_value [[T1_0_COPY]]
   // CHECK: return
 }
 
@@ -694,18 +699,25 @@ func tuple_explosion() {
   int(tuple().0)
   // CHECK: [[F:%[0-9]+]] = function_ref @_T08lifetime5tupleSi_AA3RefCtyF
   // CHECK: [[TUPLE:%[0-9]+]] = apply [[F]]()
-  // CHECK: [[T1:%[0-9]+]] = tuple_extract [[TUPLE]] : {{.*}}, 1
-  // CHECK: destroy_value [[T1]]
+  // CHECK: [[BORROWED_TUPLE:%.*]] = begin_borrow [[TUPLE]]
+  // CHECK: [[T1:%[0-9]+]] = tuple_extract [[BORROWED_TUPLE]] : {{.*}}, 1
+  // CHECK: [[T1_COPY:%.*]] = copy_value [[T1]]
+  // CHECK: end_borrow [[BORROWED_TUPLE]] from [[TUPLE]]
+  // CHECK: destroy_value [[T1_COPY]]
   // CHECK-NOT: tuple_extract [[TUPLE]] : {{.*}}, 1
   // CHECK-NOT: destroy_value
 
   ref(tuple().1)
   // CHECK: [[F:%[0-9]+]] = function_ref @_T08lifetime5tupleSi_AA3RefCtyF
   // CHECK: [[TUPLE:%[0-9]+]] = apply [[F]]()
-  // CHECK: [[T1:%[0-9]+]] = tuple_extract [[TUPLE]] : {{.*}}, 1
+  // CHECK: [[BORROWED_TUPLE:%.*]] = begin_borrow [[TUPLE]]
+  // CHECK: [[T1:%[0-9]+]] = tuple_extract [[BORROWED_TUPLE]] : {{.*}}, 1
+  // CHECK: [[T1_COPY:%.*]] = copy_value [[T1]]
+  // CHECK: end_borrow [[BORROWED_TUPLE]] from [[TUPLE]]
+  // CHECK: destroy_value [[TUPLE]]
   // CHECK-NOT: destroy_value [[T1]]
   // CHECK-NOT: tuple_extract [[TUPLE]] : {{.*}}, 1
-  // CHECK-NOT: destroy_value
+  // CHECK-NOT: destroy_value [[TUPLE]]
 }
 
 class C {
