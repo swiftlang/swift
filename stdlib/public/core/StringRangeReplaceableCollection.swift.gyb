@@ -10,6 +10,98 @@
 //
 //===----------------------------------------------------------------------===//
 
+public struct Substring : RangeReplaceableCollection {
+  public typealias Index = String.CharacterView.Index
+  public typealias IndexDistance = String.CharacterView.IndexDistance
+
+  internal let base: String
+  internal var bounds: Range<Index>
+
+
+  public init() {
+    let s = ""
+    self.init(s, s.startIndex..<s.endIndex)
+  }
+
+  internal init(_ base: String, _ bounds: Range<Index>) {
+    self.base = base
+    self.bounds = bounds
+  }
+
+  internal init(_ base: String, _ bounds: ClosedRange<Index>) {
+    self.init(base, base._makeHalfOpen(bounds))
+  }
+
+  public var startIndex: Index { return bounds.lowerBound }
+
+  public var endIndex: Index { return bounds.upperBound }
+
+  public func index(after i: Index) -> Index {
+    _precondition(i < bounds.upperBound, "Cannot increment beyond endIndex")
+    _precondition(i >= bounds.lowerBound, "Cannot increment beyond startIndex")
+    return base.characters.index(after: i)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  public func index(before i: Index) -> Index {
+    _precondition(i <= bounds.upperBound, "Cannot decrement an invalid index")
+    _precondition(i > bounds.lowerBound, "Cannot decrement beyond startIndex")
+    return base.characters.index(before: i)
+  }
+
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    let result = base.characters.index(i, offsetBy: n)
+    _precondition(bounds.contains(result),
+      "Operation results in an invalid index")
+    return result
+  }
+
+  public func index(
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    let result =  base.characters.index(i, offsetBy: n, limitedBy: limit)
+    _precondition(result.map { bounds.contains($0) } ?? true,
+      "Operation results in an invalid index")
+    return result
+  }
+
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    return base.characters.distance(from: start, to: end)
+  }
+
+  public subscript(i: Index) -> Character {
+    _precondition(bounds.contains(i), "Invalid index")
+    return base.characters[i]
+  }
+
+  public subscript(bounds: Range<Index>) -> Substring {
+    // FIXME(strings): add checks
+    return Substring(base, bounds)
+  }
+
+  public subscript(bounds: ClosedRange<Index>) -> Substring {
+    // FIXME(strings): add checks
+    return Substring(base, bounds)
+  }
+
+% for Range in ['Range', 'ClosedRange']:
+
+  public mutating func replaceSubrange<C>(
+    _ bounds: ${Range}<Index>,
+    with newElements: C
+  ) where C : Collection, C.Iterator.Element == Character {
+    fatalError()
+  }
+
+  public mutating func replaceSubrange(
+    _ bounds: ${Range}<Index>, with newElements: Substring
+  ) {
+    replaceSubrange(bounds, with: newElements.base.characters)
+  }
+
+% end
+}
+
 extension String : RangeReplaceableCollection {
   /// The index type for subscripting a string.
   public typealias Index = CharacterView.Index
