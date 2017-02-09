@@ -213,20 +213,7 @@ class TypeMatcher {
     TRIVIAL_CASE(DynamicSelfType)
     TRIVIAL_CASE(ArchetypeType)
     TRIVIAL_CASE(GenericTypeParamType)
-
-    bool visitDependentMemberType(CanDependentMemberType firstDepMember,
-                                  Type secondType) {
-      if (auto secondDepMember = secondType->getAs<DependentMemberType>()) {
-        if (firstDepMember->getAssocType() != secondDepMember->getAssocType() ||
-            firstDepMember->getName() != secondDepMember->getName())
-          return mismatch(firstDepMember.getPointer(), secondDepMember);
-
-        return this->visit(firstDepMember.getBase(),
-                           secondDepMember->getBase());
-      }
-
-      return mismatch(firstDepMember.getPointer(), secondType);
-    }
+    TRIVIAL_CASE(DependentMemberType)
 
     /// FIXME: Split this out into cases?
     bool visitAnyFunctionType(CanAnyFunctionType firstFunc, Type secondType) {
