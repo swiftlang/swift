@@ -3355,6 +3355,8 @@ public:
     return getExtInfo().isPseudogeneric();
   }
 
+  bool isNoReturnFunction(); // Defined in SILType.cpp
+
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       SubstitutionList subs);
   CanSILFunctionType substGenericArgs(SILModule &silModule,
