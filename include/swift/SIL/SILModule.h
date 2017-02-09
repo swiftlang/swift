@@ -623,6 +623,9 @@ public:
   /// \returns Returns builtin info of BuiltinValueKind::None kind if the
   /// declaration is not a builtin.
   const BuiltinInfo &getBuiltinInfo(Identifier ID);
+
+  /// Returns true if the builtin or intrinsic is no-return.
+  bool isNoReturnBuiltinOrIntrinsic(Identifier Name);
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
