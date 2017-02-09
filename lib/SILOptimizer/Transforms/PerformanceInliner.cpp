@@ -254,8 +254,9 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
   return Callee;
 }
 
-static bool canSpecializeGeneric(SILFunction *F, ArrayRef<Substitution> Subs) {
-  ReabstractionInfo ReInfo(F, Subs);
+static bool canSpecializeGeneric(ApplySite AI, SILFunction *F,
+                                 SubstitutionList Subs) {
+  ReabstractionInfo ReInfo(AI, F, Subs);
   if (!ReInfo.getSpecializedType())
     return false;
   return true;
@@ -270,7 +271,7 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
 
   // Bail out if this generic call can be optimized by means of
   // the generic specialization.
-  if (IsGeneric && canSpecializeGeneric(Callee, AI.getSubstitutions()))
+  if (IsGeneric && canSpecializeGeneric(AI, Callee, AI.getSubstitutions()))
     return false;
 
   SILLoopInfo *LI = LA->get(Callee);
@@ -392,7 +393,7 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
         // Check if a generic specialization would be possible.
         if (isa<FunctionRefInst>(def)) {
           auto CalleeF = FAI.getCalleeFunction();
-          if (!canSpecializeGeneric(CalleeF, NewSubs))
+          if (!canSpecializeGeneric(FAI, CalleeF, NewSubs))
             continue;
           DEBUG(llvm::dbgs() << "Generic specialization will be possible after "
                                 "inlining for the call:\n";
