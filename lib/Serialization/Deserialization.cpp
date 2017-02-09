@@ -89,7 +89,7 @@ namespace {
           os << IDAndKind{DeclOrOffset.get(), ID};
         }
       }
-      os << "in '" << getNameOfModule(MF) << "'\n";
+      os << " in '" << getNameOfModule(MF) << "'\n";
     }
   };
 
