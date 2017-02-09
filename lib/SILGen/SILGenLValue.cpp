@@ -36,85 +36,30 @@ using namespace Lowering;
 
 //===----------------------------------------------------------------------===//
 
-/// A pending writeback.
-namespace swift {
-namespace Lowering {
+namespace {
 
-struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
-  SILLocation loc;
-  std::unique_ptr<LogicalPathComponent> component;
-  ManagedValue base;
-  MaterializedLValue materialized;
-  CleanupHandle cleanup;
+struct LValueWritebackCleanup : Cleanup {
+  FormalEvaluationContext::stable_iterator Depth;
 
-  ~LValueWriteback() {}
-  LValueWriteback(LValueWriteback&&) = default;
-  LValueWriteback &operator=(LValueWriteback&&) = default;
+  LValueWritebackCleanup() : Depth() {}
 
-  LValueWriteback() = default;
-  LValueWriteback(SILLocation loc,
-                  std::unique_ptr<LogicalPathComponent> &&comp,
-                  ManagedValue base,
-                  MaterializedLValue materialized,
-                  CleanupHandle cleanup)
-    : loc(loc), component(std::move(comp)),
-      base(base), materialized(materialized),
-      cleanup(cleanup) { }
-
-  void diagnoseConflict(const LValueWriteback &rhs, SILGenFunction &SGF) const {
-    // If the two writebacks we're comparing are of different kinds (e.g.
-    // ownership conversion vs a computed property) then they aren't the
-    // same and thus cannot conflict.
-    if (component->getKind() != rhs.component->getKind())
-      return;
-
-    // If the lvalues don't have the same base value, then they aren't the same.
-    // Note that this is the primary source of false negative for this
-    // diagnostic.
-    if (base.getValue() != rhs.base.getValue())
-      return;
-
-    component->diagnoseWritebackConflict(rhs.component.get(), loc, rhs.loc,SGF);
+  void emit(SILGenFunction &gen, CleanupLocation loc) override {
+    auto &evaluation = *gen.FormalEvalContext.find(Depth);
+    assert(evaluation.getKind() == FormalEvaluation::Exclusive);
+    auto &lvalue = static_cast<LValueWriteback &>(evaluation);
+    lvalue.performWriteback(gen, /*isFinal*/ false);
   }
 
-  void performWriteback(SILGenFunction &gen, bool isFinal) {
-    Scope S(gen.Cleanups, CleanupLocation::get(loc));
-    component->writeback(gen, loc, base, materialized, isFinal);
+  void dump() const override {
+#ifndef NDEBUG
+    llvm::errs() << "LValueWritebackCleanup\n"
+                 << "State: " << getState() << "Depth: " << Depth.getDepth()
+                 << "\n";
+#endif
   }
 };
-} // namespace Lowering
-} // namespace swift
 
-namespace {
-  class LValueWritebackCleanup : public Cleanup {
-    unsigned Depth;
-  public:
-    LValueWritebackCleanup(unsigned depth) : Depth(depth) {}
-    void emit(SILGenFunction &gen, CleanupLocation loc) override {
-      gen.getWritebackStack()[Depth].performWriteback(gen, /*isFinal*/ false);
-    }
-
-    void dump() const override {
-#ifndef NDEBUG
-      llvm::errs() << "LValueWritebackCleanup\n"
-                   << "State: " << getState() << "Depth: " << Depth << "\n";
-#endif
-    }
-  };
 } // end anonymous namespace
-
-std::vector<LValueWriteback> &SILGenFunction::getWritebackStack() {
-  if (!WritebackStack)
-    WritebackStack = new std::vector<LValueWriteback>();
-
-  return *WritebackStack;
-}
-
-void SILGenFunction::freeWritebackStack() {
-  assert((!WritebackStack || WritebackStack->empty()) &&
-         "entries remaining on writeback stack at end of function!");
-  delete WritebackStack;
-}
 
 /// Push a writeback onto the current LValueWriteback stack.
 static void pushWriteback(SILGenFunction &gen,
@@ -125,11 +70,14 @@ static void pushWriteback(SILGenFunction &gen,
   assert(gen.InWritebackScope);
 
   // Push a cleanup to execute the writeback consistently.
-  auto &stack = gen.getWritebackStack();
-  gen.Cleanups.pushCleanup<LValueWritebackCleanup>(stack.size());
-  auto cleanup = gen.Cleanups.getTopCleanup();
+  auto &context = gen.FormalEvalContext;
+  LValueWritebackCleanup &cleanup =
+      gen.Cleanups.pushCleanup<LValueWritebackCleanup>();
+  CleanupHandle handle = gen.Cleanups.getTopCleanup();
 
-  stack.emplace_back(loc, std::move(comp), base, materialized, cleanup);
+  context.push<LValueWriteback>(loc, std::move(comp), base, materialized,
+                                handle);
+  cleanup.Depth = context.stable_begin();
 }
 
 //===----------------------------------------------------------------------===//
@@ -283,70 +231,6 @@ void LogicalPathComponent::writeback(SILGenFunction &gen, SILLocation loc,
     (isFinal ? nullptr : clone(gen, loc));
   LogicalPathComponent *component = (isFinal ? this : &*clonedComponent);
   std::move(*component).set(gen, loc, std::move(rvalue), base);
-}
-
-WritebackScope::WritebackScope(SILGenFunction &g)
-  : gen(&g), wasInWritebackScope(g.InWritebackScope),
-    savedDepth(g.getWritebackStack().size())
-{
-  // If we're in an inout conversion scope, disable nested writeback scopes.
-  if (g.InInOutConversionScope) {
-    gen = nullptr;
-    return;
-  }
-  g.InWritebackScope = true;
-}
-
-void WritebackScope::popImpl() {
-  // Pop the InWritebackScope bit.
-  gen->InWritebackScope = wasInWritebackScope;
-
-  // Check to see if there is anything going on here.
-  
-  auto &stack = gen->getWritebackStack();
-  size_t depthAtPop = stack.size();
-  if (depthAtPop == savedDepth) return;
-
-  size_t prevIndex = depthAtPop;
-  while (prevIndex-- > savedDepth) {
-    auto index = prevIndex;
-
-    // Deactivate the cleanup.
-    gen->Cleanups.setCleanupState(stack[index].cleanup, CleanupState::Dead);
-
-    // Attempt to diagnose problems where obvious aliasing introduces illegal
-    // code.  We do a simple N^2 comparison here to detect this because it is
-    // extremely unlikely more than a few writebacks are active at once.
-    for (auto j = index; j > savedDepth; --j)
-      stack[index].diagnoseConflict(stack[j-1], *gen);
-
-    // Claim the address of each and then perform the writeback from the
-    // temporary allocation to the source we copied from.
-    //
-    // This evaluates arbitrary code, so it's best to be paranoid
-    // about iterators on the stack.
-    stack[index].performWriteback(*gen, /*isFinal*/ true);
-  }
-
-  assert(depthAtPop == stack.size() &&
-         "more writebacks left on stack during writeback scope pop?");
-  stack.erase(stack.begin() + savedDepth, stack.end());
-}
-
-WritebackScope::WritebackScope(WritebackScope &&o)
-  : gen(o.gen),
-    wasInWritebackScope(o.wasInWritebackScope),
-    savedDepth(o.savedDepth)
-{
-  o.gen = nullptr;
-}
-
-WritebackScope &WritebackScope::operator=(WritebackScope &&o) {
-  gen = o.gen;
-  wasInWritebackScope = o.wasInWritebackScope;
-  savedDepth = o.savedDepth;
-  o.gen = nullptr;
-  return *this;
 }
 
 InOutConversionScope::InOutConversionScope(SILGenFunction &gen)
@@ -2456,7 +2340,7 @@ static PathComponent &&drillToLastComponent(SILGenFunction &SGF,
 RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
                                         SGFContext C, bool isGuaranteedValid) {
   // Any writebacks should be scoped to after the load.
-  WritebackScope scope(*this);
+  FormalEvaluationScope scope(*this);
 
   ManagedValue addr;
   PathComponent &&component =
@@ -2490,7 +2374,7 @@ ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
 
 void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
                                         LValue &&dest) {
-  WritebackScope scope(*this);
+  FormalEvaluationScope scope(*this);
 
   // Peephole: instead of materializing and then assigning into a
   // translation component, untransform the value first.

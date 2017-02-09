@@ -2,6 +2,7 @@ add_swift_library(swiftSILGen STATIC
   ArgumentSource.cpp
   Cleanup.cpp
   Condition.cpp
+  FormalEvaluation.cpp
   ManagedValue.cpp
   RValue.cpp
   SILGen.cpp

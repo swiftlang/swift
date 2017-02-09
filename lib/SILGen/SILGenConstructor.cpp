@@ -775,7 +775,7 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(pattern);
     // Form the lvalue referencing this member.
-    WritebackScope scope(SGF);
+    FormalEvaluationScope scope(SGF);
     LValue memberRef = emitLValueForMemberInit(SGF, pattern, selfDecl,
                                                named->getDecl());
 
