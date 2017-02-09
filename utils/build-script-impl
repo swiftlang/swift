@@ -48,6 +48,7 @@ KNOWN_SETTINGS=(
     host-cc                     ""               "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
     host-cxx                    ""               "the path to CXX, the 'clang++' compiler for the host platform. **This argument is required**"
     host-lipo                   ""               "the path to lipo for creating universal binaries on Darwin"
+    host-libtool                ""               "the path to libtool"
     darwin-xcrun-toolchain      "default"        "the name of the toolchain to use on Darwin"
     ninja-bin                   ""               "the path to Ninja tool"
     cmark-build-type            "Debug"          "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
@@ -1985,6 +1986,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     # We can't skip the build completely because the standalone
                     # build of Swift depend on these.
                     build_targets=(llvm-tblgen clang-headers)
+                fi
+
+                if [ "${HOST_LIBTOOL}" ] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DCMAKE_LIBTOOL:PATH="${HOST_LIBTOOL}"
+                    )
                 fi
 
                 # Note: we set the variable:

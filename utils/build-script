@@ -784,6 +784,11 @@ class BuildScriptInvocation(object):
                 "--host-lipo", toolchain.lipo,
             ]
 
+        if toolchain.libtool is not None:
+            impl_args += [
+                "--host-libtool", toolchain.libtool,
+            ]
+
         # If we have extra_swift_args, combine all of them together and then
         # add them as one command.
         if args.extra_swift_args:
@@ -1938,6 +1943,11 @@ iterations with -O",
         type=arguments.type.executable,
         metavar="PATH")
     parser.add_argument(
+        "--host-libtool",
+        help="the absolute path to libtool. Default is auto detected.",
+        type=arguments.type.executable,
+        metavar="PATH")
+    parser.add_argument(
         "--distcc",
         help="use distcc in pump mode",
         action=arguments.action.optional_bool)
@@ -2116,6 +2126,8 @@ iterations with -O",
         toolchain.cxx = args.host_cxx
     if args.host_lipo is not None:
         toolchain.lipo = args.host_lipo
+    if args.host_libtool is not None:
+        toolchain.libtool = args.host_libtool
     if args.cmake is not None:
         toolchain.cmake = args.cmake
 
