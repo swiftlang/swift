@@ -4330,6 +4330,11 @@ Type ModuleFile::getType(TypeID TID) {
     return nullptr;
   }
 
+#ifndef NDEBUG
+  PrettyStackTraceType(ctx, "deserializing", typeOrOffset.get());
+  assert(!typeOrOffset.get()->hasError());
+#endif
+
   // Invoke the callback on the deserialized type.
   DeserializedTypeCallback(typeOrOffset);
 
