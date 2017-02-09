@@ -195,3 +195,17 @@ func SR3817(_ d: [String : Any], _ s: String, _ t: String) -> Any {
     return 0
   }
 }
+
+// Overloading with mismatched labels.
+func f6<T>(foo: T) { }
+func f6<T: P1>(bar: T) { }
+
+struct X6 {
+	init<T>(foo: T) { }
+	init<T: P1>(bar: T) { }
+}
+
+func test_f6() {
+	let _: (X1a) -> Void = f6
+	let _: (X1a) -> X6 = X6.init
+}
