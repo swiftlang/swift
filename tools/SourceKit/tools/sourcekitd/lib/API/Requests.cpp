@@ -1468,7 +1468,6 @@ static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec
   Rec(RespBuilder.createResponse());
 }
 
-
 //===----------------------------------------------------------------------===//
 // FindRelatedIdents
 //===----------------------------------------------------------------------===//
