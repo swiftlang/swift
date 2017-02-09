@@ -59,8 +59,10 @@ func setFoo(_ f: Foo, s: String) {
 // CHECK:   select_enum [[OPT_NATIVE]]
 // CHECK:   [[NATIVE:%.*]] = unchecked_enum_data [[OPT_NATIVE]]
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
-// CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[NATIVE]])
+// CHECK:   [[BORROWED_NATIVE:%.*]] = begin_borrow [[NATIVE]]
+// CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_NATIVE]])
 // CHECK:    = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
+// CHECK:   end_borrow [[BORROWED_NATIVE]] from [[NATIVE]]
 // CHECK:   bb3([[OPT_BRIDGED:%.*]] : $Optional<NSString>):
 // CHECK:   apply [[SET_FOO]]([[OPT_BRIDGED]], %0)
 // CHECK:   destroy_value [[OPT_BRIDGED]]
@@ -177,8 +179,10 @@ func callSetBar(_ s: String) {
 // CHECK:   select_enum [[OPT_NATIVE]]
 // CHECK:   [[NATIVE:%.*]] = unchecked_enum_data [[OPT_NATIVE]]
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
-// CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[NATIVE]])
+// CHECK:   [[BORROWED_NATIVE:%.*]] = begin_borrow [[NATIVE]]
+// CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_NATIVE]])
 // CHECK:    = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
+// CHECK:   end_borrow [[BORROWED_NATIVE]] from [[NATIVE]]
 // CHECK: bb3([[OPT_BRIDGED:%.*]] : $Optional<NSString>):
 // CHECK:   apply [[SET_BAR]]([[OPT_BRIDGED]])
 // CHECK:   destroy_value [[OPT_BRIDGED]]
