@@ -407,8 +407,12 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK:         [[N:%.*]] = integer_literal $Builtin.Word, 4
 // CHECK:         [[T0:%.*]] = function_ref @_TFs27_allocateUninitializedArray
 // CHECK:         [[T1:%.*]] = apply [[T0]]<Cat>([[N]])
-// CHECK:         [[ARRAY:%.*]] = tuple_extract [[T1]] :  $(Array<Cat>, Builtin.RawPointer), 0
-// CHECK:         [[T2:%.*]] = tuple_extract [[T1]] :  $(Array<Cat>, Builtin.RawPointer), 1
+// CHECK:         [[BORROWED_T1:%.*]] = begin_borrow [[T1]]
+// CHECK:         [[BORROWED_ARRAY:%.*]] = tuple_extract [[BORROWED_T1]] :  $(Array<Cat>, Builtin.RawPointer), 0
+// CHECK:         [[ARRAY:%.*]] = copy_value [[BORROWED_ARRAY]]
+// CHECK:         [[T2:%.*]] = tuple_extract [[BORROWED_T1]] :  $(Array<Cat>, Builtin.RawPointer), 1
+// CHECK:         end_borrow [[BORROWED_T1]] from [[T1]]
+// CHECK:         destroy_value [[T1]]
 // CHECK:         [[ELT0:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Cat
 //   Element 0.
 // CHECK:         [[T0:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error Error)
@@ -643,8 +647,12 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[ADDRESSOR:%.*]] = function_ref @_TFV6errors11OwnedBridgeaO9subscriptFSSVS_5Pylon :
 // CHECK-NEXT: [[T0:%.*]] = apply [[ADDRESSOR]]([[ARG2_COPY]], [[ARG1]])
-// CHECK-NEXT: [[T1:%.*]] = tuple_extract [[T0]] : {{.*}}, 0
-// CHECK-NEXT: [[OWNER:%.*]] = tuple_extract [[T0]] : {{.*}}, 1
+// CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
+// CHECK-NEXT: [[T1:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 0
+// CHECK-NEXT: [[BORROWED_OWNER:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 1
+// CHECK-NEXT: [[OWNER:%.*]] = copy_value [[BORROWED_OWNER]]
+// CHECK-NEXT: end_borrow [[BORROWED_T0]] from [[T0]]
+// CHECK-NEXT: destroy_value [[T0]]
 // CHECK-NEXT: [[T3:%.*]] = struct_extract [[T1]]
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
@@ -677,8 +685,12 @@ func supportStructure(_ b: inout PinnedBridge, name: String) throws {
 // CHECK-NEXT:   // function_ref
 // CHECK-NEXT:   [[ADDRESSOR:%.*]] = function_ref @_TFV6errors12PinnedBridgeap9subscriptFSSVS_5Pylon :
 // CHECK-NEXT:   [[T0:%.*]] = apply [[ADDRESSOR]]([[ARG2_COPY]], [[ARG1]])
-// CHECK-NEXT:   [[T1:%.*]] = tuple_extract [[T0]] : {{.*}}, 0
-// CHECK-NEXT:   [[OWNER:%.*]] = tuple_extract [[T0]] : {{.*}}, 1
+// CHECK-NEXT:   [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
+// CHECK-NEXT:   [[T1:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 0
+// CHECK-NEXT:   [[BORROWED_OWNER:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 1
+// CHECK-NEXT:   [[OWNER:%.*]] = copy_value [[BORROWED_OWNER]]
+// CHECK-NEXT:   end_borrow [[BORROWED_T0]] from [[T0]]
+// CHECK-NEXT:   destroy_value [[T0]]
 // CHECK-NEXT:   [[T3:%.*]] = struct_extract [[T1]]
 // CHECK-NEXT:   [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT:   [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]

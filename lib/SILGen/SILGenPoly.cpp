@@ -2200,9 +2200,22 @@ SILValue ResultPlanner::execute(SILValue innerResult) {
   if (!innerResultTupleType) {
     innerDirectResults.push_back(innerResult);
   } else {
-    for (auto eltIndex : indices(innerResultTupleType.getElementTypes())) {
-      auto elt = Gen.B.createTupleExtract(Loc, innerResult, eltIndex);
-      innerDirectResults.push_back(elt);
+    {
+      Scope S(Gen.Cleanups, CleanupLocation::get(Loc));
+
+      // First create a rvalue cleanup for our direct result.
+      assert(innerResult.getOwnershipKind() == ValueOwnershipKind::Owned ||
+             innerResult.getOwnershipKind() == ValueOwnershipKind::Trivial);
+      ManagedValue ownedInnerResult = Gen.emitManagedRValueWithCleanup(innerResult);
+      // Then borrow the managed direct result.
+      ManagedValue borrowedInnerResult = ownedInnerResult.borrow(Gen, Loc);
+      // Then create unmanaged copies of the direct result and forward the
+      // result as expected by addManageDirectResult.
+      for (unsigned i : indices(innerResultTupleType.getElementTypes())) {
+        ManagedValue elt = Gen.B.createTupleExtract(Loc, borrowedInnerResult, i);
+        innerDirectResults.push_back(elt.copyUnmanaged(Gen, Loc).forward(Gen));
+      }
+      // Then allow the cleanups to be emitted in the proper reverse order.
     }
   }
 
