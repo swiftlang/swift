@@ -1488,7 +1488,8 @@ bool ArchetypeBuilder::addSameTypeRequirement(
       : builder(builder), source(source), basePA(basePA),
         diagnoseMismatch(diagnoseMismatch) { }
 
-    bool mismatch(TypeBase *firstType, TypeBase *secondType) {
+    bool mismatch(TypeBase *firstType, TypeBase *secondType,
+                  Type sugaredFirstType) {
       // Find the potential archetypes.
       PotentialArchetype *pa1 = builder.resolveArchetype(firstType, basePA);
       PotentialArchetype *pa2 = builder.resolveArchetype(secondType, basePA);
@@ -1503,10 +1504,10 @@ bool ArchetypeBuilder::addSameTypeRequirement(
         return !builder.addSameTypeRequirementToConcrete(pa1, secondType,
                                                          source);
       if (pa2)
-        return !builder.addSameTypeRequirementToConcrete(pa2, firstType,
+        return !builder.addSameTypeRequirementToConcrete(pa2, sugaredFirstType,
                                                          source);
 
-      diagnoseMismatch(firstType, secondType);
+      diagnoseMismatch(sugaredFirstType, secondType);
       return false;
     }
   } matcher(*this, source, basePA, diagnoseMismatch);
