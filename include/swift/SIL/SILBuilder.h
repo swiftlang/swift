@@ -1086,6 +1086,16 @@ public:
     return I;
   }
 
+  OpenExistentialOpaqueInst *createOpenExistentialOpaque(SILLocation Loc,
+                                                         SILValue Operand,
+                                                         SILType SelfTy) {
+    auto *I = insert(new (F.getModule()) OpenExistentialOpaqueInst(
+        getSILDebugLocation(Loc), Operand, SelfTy));
+    if (OpenedArchetypesTracker)
+      OpenedArchetypesTracker->registerOpenedArchetypes(I);
+    return I;
+  }
+
   OpenExistentialMetatypeInst *createOpenExistentialMetatype(SILLocation Loc,
                                                              SILValue operand,
                                                              SILType selfTy) {
