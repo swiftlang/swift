@@ -778,3 +778,22 @@ void SILModule::notifyDeleteHandlers(ValueBase *V) {
     Handler->handleDeleteNotification(V);
   }
 }
+
+// TODO: We should have an "isNoReturn" bit on Swift's BuiltinInfo, but for
+// now, let's recognize noreturn intrinsics and builtins specially here.
+bool SILModule::isNoReturnBuiltinOrIntrinsic(Identifier Name) {
+  const auto &IntrinsicInfo = getIntrinsicInfo(Name);
+  if (IntrinsicInfo.ID != llvm::Intrinsic::not_intrinsic) {
+    return IntrinsicInfo.hasAttribute(llvm::Attribute::NoReturn);
+  }
+  const auto &BuiltinInfo = getBuiltinInfo(Name);
+  switch (BuiltinInfo.ID) {
+  default:
+    return false;
+  case BuiltinValueKind::Unreachable:
+  case BuiltinValueKind::CondUnreachable:
+  case BuiltinValueKind::UnexpectedError:
+  case BuiltinValueKind::ErrorInMain:
+    return true;
+  }
+}
