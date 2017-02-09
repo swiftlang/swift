@@ -73,9 +73,7 @@ bool SILType::isReferenceCounted(SILModule &M) const {
 
 bool SILType::isNoReturnFunction() const {
   if (auto funcTy = dyn_cast<SILFunctionType>(getSwiftRValueType()))
-    return funcTy->getDirectFormalResultsType()
-        .getSwiftRValueType()
-        ->isUninhabited();
+    return funcTy->isNoReturnFunction();
 
   return false;
 }
@@ -626,4 +624,8 @@ bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
     return type.isAddressOnly(M);
 
   return false;
+}
+
+bool SILFunctionType::isNoReturnFunction() {
+  return getDirectFormalResultsType().getSwiftRValueType()->isUninhabited();
 }
