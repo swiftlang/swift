@@ -224,6 +224,12 @@ func structuralSameType2<A: P1, B: P1, T, U, V, W>(_: A, _: B, _: T, _: U, _: V,
 // expected-error@-3{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
 // expected-error@-4{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
 
+func structuralSameType3<T, U, V, W>(_: T, _: U, _: V, _: W)
+  where X1<T, U> == X1<V, W> { }
+// expected-error@-1{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
+// expected-error@-2{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
+// expected-error@-3{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
+// expected-error@-4{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
 
 protocol P2 {
   associatedtype Assoc1
