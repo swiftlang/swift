@@ -24,6 +24,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
@@ -1316,7 +1317,7 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   
   if (concrete1 && concrete2) {
     bool mismatch =
-      addSameTypeRequirement(concrete1, concrete2, Source,
+      addSameTypeRequirement(concrete1, concrete2, Source, nullptr,
         [&](Type type1, Type type2) {
           Diags.diagnose(Source.getLoc(),
                          diag::requires_same_type_conflict,
@@ -1394,7 +1395,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   // problem.
   if (auto oldConcrete = T->getConcreteType()) {
     bool mismatch =
-      addSameTypeRequirement(oldConcrete, Concrete, Source,
+      addSameTypeRequirement(oldConcrete, Concrete, Source, nullptr,
         [&](Type type1, Type type2) {
           Diags.diagnose(Source.getLoc(),
                          diag::requires_same_type_conflict,
@@ -1468,29 +1469,49 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
 }
 
 bool ArchetypeBuilder::addSameTypeRequirement(
-                        Type Reqt1, Type Reqt2,
-                        RequirementSource Source,
+                        Type type1, Type type2,
+                        RequirementSource source,
                         PotentialArchetype *basePA,
                         llvm::function_ref<void(Type, Type)> diagnoseMismatch) {
-  // Find the potential archetypes.
-  PotentialArchetype *T1 = resolveArchetype(Reqt1, basePA);
-  PotentialArchetype *T2 = resolveArchetype(Reqt2, basePA);
-  
-  // If both sides of the requirement are type parameters, equate them.
-  if (T1 && T2)
-    return addSameTypeRequirementBetweenArchetypes(T1, T2, Source);
-  
-  // If just one side is a type parameter, map it to a concrete type.
-  if (T1)
-    return addSameTypeRequirementToConcrete(T1, Reqt2, Source);
-  if (T2)
-    return addSameTypeRequirementToConcrete(T2, Reqt1, Source);
+  // Local class to handle matching the two sides of the same-type constraint.
+  class ReqTypeMatcher : public TypeMatcher<ReqTypeMatcher> {
+    ArchetypeBuilder &builder;
+    RequirementSource source;
+    PotentialArchetype *basePA;
+    llvm::function_ref<void(Type, Type)> diagnoseMismatch;
 
-  // Otherwise, the types should be equal.
-  if (Reqt1->isEqual(Reqt2)) return false;
+  public:
+    ReqTypeMatcher(ArchetypeBuilder &builder,
+                   RequirementSource source,
+                   PotentialArchetype *basePA,
+                   llvm::function_ref<void(Type, Type)> diagnoseMismatch)
+      : builder(builder), source(source), basePA(basePA),
+        diagnoseMismatch(diagnoseMismatch) { }
 
-  diagnoseMismatch(Reqt1, Reqt2);
-  return true;
+    bool mismatch(TypeBase *firstType, TypeBase *secondType) {
+      // Find the potential archetypes.
+      PotentialArchetype *pa1 = builder.resolveArchetype(firstType, basePA);
+      PotentialArchetype *pa2 = builder.resolveArchetype(secondType, basePA);
+
+      // If both sides of the requirement are type parameters, equate them.
+      if (pa1 && pa2)
+        return !builder.addSameTypeRequirementBetweenArchetypes(pa1, pa2,
+                                                                source);
+
+      // If just one side is a type parameter, map it to a concrete type.
+      if (pa1)
+        return !builder.addSameTypeRequirementToConcrete(pa1, secondType,
+                                                         source);
+      if (pa2)
+        return !builder.addSameTypeRequirementToConcrete(pa2, firstType,
+                                                         source);
+
+      diagnoseMismatch(firstType, secondType);
+      return false;
+    }
+  } matcher(*this, source, basePA, diagnoseMismatch);
+
+  return !matcher.match(type1, type2);
 }
 
 // Local function to mark the given associated type as recursive,
