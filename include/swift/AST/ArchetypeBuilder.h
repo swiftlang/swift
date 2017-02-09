@@ -169,10 +169,15 @@ private:
                                 Type Superclass,
                                 RequirementSource Source);
 
-  /// \brief Add a new same-type requirement specifying that the given potential
-  /// archetypes should map to the equivalent archetype.
-  bool addSameTypeRequirement(Type T1, Type T2, RequirementSource Source,
-                              PotentialArchetype *basePA = nullptr);
+  /// \brief Add a new same-type requirement specifying that the given two
+  /// types should be the same.
+  ///
+  /// \param diagnoseMismatch Callback invoked when the types in the same-type
+  /// requirement mismatch.
+  bool addSameTypeRequirement(
+                        Type T1, Type T2, RequirementSource Source,
+                        PotentialArchetype *basePA,
+                        llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
   /// Add the requirements placed on the given abstract type parameter
   /// to the given potential archetype.
@@ -251,9 +256,12 @@ public:
   ///
   /// Adding an already-checked requirement cannot fail. This is used to
   /// re-inject requirements from outer contexts.
-  void addRequirement(const Requirement &req, RequirementSource source);
+  ///
+  /// \returns true if this requirement makes the set of requirements
+  /// inconsistent, in which case a diagnostic will have been issued.
+  bool addRequirement(const Requirement &req, RequirementSource source);
 
-  void addRequirement(const Requirement &req, RequirementSource source,
+  bool addRequirement(const Requirement &req, RequirementSource source,
                       PotentialArchetype *basePA,
                       llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
 

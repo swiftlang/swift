@@ -3270,7 +3270,8 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
       : Conformance(conformance), Inferred(inferred) { }
 
     /// Structural mismatches imply that the witness cannot match.
-    bool mismatch(TypeBase *firstType, TypeBase *secondType) {
+    bool mismatch(TypeBase *firstType, TypeBase *secondType,
+                  Type sugaredFirstType) {
       // If either type hit an error, don't stop yet.
       if (firstType->hasError() || secondType->hasError())
         return true;
@@ -3281,7 +3282,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
 
     /// Deduce associated types from dependent member types in the witness.
     bool mismatch(DependentMemberType *firstDepMember,
-                  TypeBase *secondType) {
+                  TypeBase *secondType, Type sugaredFirstType) {
       // If the second type is an error, don't look at it further.
       if (secondType->hasError())
         return true;
@@ -3298,7 +3299,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
 
     /// FIXME: Recheck the type of Self against the second type?
     bool mismatch(GenericTypeParamType *selfParamType,
-                  TypeBase *secondType) {
+                  TypeBase *secondType, Type sugaredFirstType) {
       return true;
     }
   };
