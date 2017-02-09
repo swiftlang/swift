@@ -1691,9 +1691,10 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
   }
 
   case RequirementReprKind::SameType:
-    // Require that at least one side of the requirement be a type parameter.
-    if (!Req.getFirstType()->isTypeParameter() &&
-        !Req.getSecondType()->isTypeParameter()) {
+    // Require that at least one side of the requirement contain a type
+    // parameter.
+    if (!Req.getFirstType()->hasTypeParameter() &&
+        !Req.getSecondType()->hasTypeParameter()) {
       Diags.diagnose(Req.getEqualLoc(), diag::requires_no_same_type_archetype)
         .highlight(Req.getFirstTypeLoc().getSourceRange())
         .highlight(Req.getSecondTypeLoc().getSourceRange());
