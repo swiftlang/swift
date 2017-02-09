@@ -83,7 +83,7 @@ public final class _DataStorage {
         var dest = dest_
         var source = source_
         var num = num_
-        if _DataStorage.vmOpsThreshold <= num && ((unsafeBitCast(source, to: Int.self) | unsafeBitCast(dest, to: Int.self)) & (NSPageSize() - 1)) == 0 {
+        if _DataStorage.vmOpsThreshold <= num && ((unsafeBitCast(source, to: Int.self) | Int(bitPattern: dest)) & (NSPageSize() - 1)) == 0 {
             let pages = NSRoundDownToMultipleOfPageSize(num)
             NSCopyMemoryPages(source!, dest, pages)
             source = source!.advanced(by: pages)

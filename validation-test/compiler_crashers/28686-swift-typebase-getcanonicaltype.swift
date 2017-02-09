@@ -5,11 +5,9 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: deterministc-behavior
-
+// REQUIRES: deterministic-behavior
 // RUN: not --crash %target-swift-frontend %s -emit-ir
-class C{}@&{
-func b(UInt=1 + 1 + 1 as?Int){
-f=a=Aay=b
-class C
-struct P{}
+protocol A.{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{let f&(a=a?Int){{{{{{{{{{{{{{{{{{{{{{{{{{{(_
+}
+}func b(UInt=1 + 1 + 1 + 1 as?Int){{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{(_{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{
+{{{{{{{{{{{{{{{{{{{{{{{{

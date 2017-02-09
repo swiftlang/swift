@@ -3686,10 +3686,11 @@ static Type isRawRepresentable(Type fromType,
   if (!conformance)
     return Type();
 
-  Type rawTy = ProtocolConformance::getTypeWitnessByName(fromType,
-                                                         *conformance,
-                                              CS->getASTContext().Id_RawValue,
-                                                         &CS->TC);
+  Type rawTy = ProtocolConformanceRef::getTypeWitnessByName(
+      fromType,
+      *conformance,
+      CS->getASTContext().Id_RawValue,
+      &CS->TC);
   return rawTy;
 }
 
@@ -4056,9 +4057,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
                                   ConformanceCheckFlags::InExpression)) {
         Type errorCodeType = expr->getType();
         Type errorType =
-          ProtocolConformance::getTypeWitnessByName(errorCodeType, *conformance,
-                                                    TC.Context.Id_ErrorType,
-                                                    &TC)->getCanonicalType();
+          ProtocolConformanceRef::getTypeWitnessByName(errorCodeType, *conformance,
+                                                       TC.Context.Id_ErrorType,
+                                                       &TC)->getCanonicalType();
         if (errorType) {
           auto diag = diagnose(expr->getLoc(), diag::cannot_throw_error_code,
                                errorCodeType, errorType);
@@ -6698,12 +6699,12 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
       return true;
     }
 
-    contextualElementType = ProtocolConformance::getTypeWitnessByName(
-                                                 contextualType,
-                                                 *Conformance,
-                                                 CS->getASTContext().Id_Element,
-                                                 &CS->TC)
-                              ->getDesugaredType();
+    contextualElementType = ProtocolConformanceRef::getTypeWitnessByName(
+        contextualType,
+        *Conformance,
+        CS->getASTContext().Id_Element,
+        &CS->TC)
+      ->getDesugaredType();
     elementTypePurpose = CTP_ArrayElement;
   }
 
@@ -6749,17 +6750,17 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
     }
 
     contextualKeyType =
-      ProtocolConformance::getTypeWitnessByName(contextualType,
-                                                *Conformance,
-                                                CS->getASTContext().Id_Key,
-                                                &CS->TC)
+      ProtocolConformanceRef::getTypeWitnessByName(contextualType,
+                                                   *Conformance,
+                                                   CS->getASTContext().Id_Key,
+                                                   &CS->TC)
         ->getDesugaredType();
 
     contextualValueType =
-      ProtocolConformance::getTypeWitnessByName(contextualType,
-                                                *Conformance,
-                                                CS->getASTContext().Id_Value,
-                                                &CS->TC)
+      ProtocolConformanceRef::getTypeWitnessByName(contextualType,
+                                                   *Conformance,
+                                                   CS->getASTContext().Id_Value,
+                                                   &CS->TC)
         ->getDesugaredType();
 
     assert(contextualKeyType && contextualValueType &&

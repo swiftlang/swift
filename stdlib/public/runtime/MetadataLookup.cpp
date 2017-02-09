@@ -203,7 +203,7 @@ _classByName(const llvm::StringRef typeName) {
   NodePointer ClassNd = NodeFactory::create(Node::Kind::Class);
   NodePointer ModuleNd = NodeFactory::create(Node::Kind::Module,
                                              typeName.substr(0, DotPos));
-  NodePointer NameNd = NodeFactory::create(Node::Kind::Module,
+  NodePointer NameNd = NodeFactory::create(Node::Kind::Identifier,
                                            typeName.substr(DotPos + 1));
   ClassNd->addChildren(ModuleNd, NameNd);
 

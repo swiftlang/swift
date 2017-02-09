@@ -456,6 +456,7 @@ FORWARD_ANY_OWNERSHIP_INST(RefToBridgeObject)
 FORWARD_ANY_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARD_ANY_OWNERSHIP_INST(MarkUninitialized)
+FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.
@@ -482,7 +483,6 @@ FORWARD_ANY_OWNERSHIP_INST(MarkUninitialized)
   }
 FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, TupleExtract)
 FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, StructExtract)
-FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, false, UncheckedEnumData)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 OwnershipUseCheckerResult
@@ -577,7 +577,7 @@ OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
   if (Iter == Results.end())
     llvm_unreachable("Should have already checked a trivial type?!");
 
-  ValueOwnershipKind Base = Iter->getOwnershipKind(M);
+  ValueOwnershipKind Base = Iter->getOwnershipKind(M, Sig);
 
   for (const SILResultInfo &ResultInfo :
        SILFunctionConventions::DirectSILResultRange(std::next(Iter),

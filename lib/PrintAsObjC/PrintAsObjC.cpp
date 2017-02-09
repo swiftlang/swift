@@ -1101,7 +1101,7 @@ private:
 
     // Dig out the Objective-C type.
     auto conformance = conformances.front();
-    Type objcType = ProtocolConformance::getTypeWitnessByName(
+    Type objcType = ProtocolConformanceRef::getTypeWitnessByName(
                       nominal->getDeclaredType(),
                       ProtocolConformanceRef(conformance),
                       ctx.Id_ObjectiveCType,

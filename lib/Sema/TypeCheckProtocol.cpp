@@ -5095,7 +5095,7 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
     // Hack: If we've used a conformance to the _BridgedStoredNSError
     // protocol, also use the RawRepresentable and _ErrorCodeProtocol
     // conformances on the Code associated type witness.
-    if (auto codeType = ProtocolConformance::getTypeWitnessByName(
+    if (auto codeType = ProtocolConformanceRef::getTypeWitnessByName(
                           type, *conformance, Context.Id_Code, this)) {
       (void)conformsToProtocol(codeType, errorCodeProto, dc,
                                ConformanceCheckFlags::Used);
@@ -5110,7 +5110,7 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
                      (ConformanceCheckFlags::SuppressDependencyTracking|
                       ConformanceCheckFlags::Used));
   if (conformance && conformance->isConcrete()) {
-    if (Type errorType = ProtocolConformance::getTypeWitnessByName(
+    if (Type errorType = ProtocolConformanceRef::getTypeWitnessByName(
           type, *conformance, Context.Id_ErrorType, this)) {
       (void)conformsToProtocol(errorType, bridgedStoredNSError, dc,
                                ConformanceCheckFlags::Used);

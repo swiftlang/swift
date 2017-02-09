@@ -104,13 +104,9 @@ class F: D {
 
 // CHECK: [[SOME_BB]]:
 // CHECK:   [[UNWRAP_Y:%.*]] = unchecked_enum_data [[Y]]
-// SEMANTIC SIL TODO: The copy on the next line is not needed and should be
-//                    removed when we use switch enum arguments.
-// CHECK:   [[COPIED_UNWRAP_Y:%.*]] = copy_value [[UNWRAP_Y]]
 // CHECK:   [[THUNK_FUNC:%.*]] = function_ref @_T013vtable_thunks1DC3iuo{{.*}}
-// CHECK:   [[RES:%.*]] = apply [[THUNK_FUNC]]([[WRAP_X]], [[COPIED_UNWRAP_Y]], [[Z]], [[W]])
+// CHECK:   [[RES:%.*]] = apply [[THUNK_FUNC]]([[WRAP_X]], [[UNWRAP_Y]], [[Z]], [[W]])
 // CHECK:   [[WRAP_RES:%.*]] = enum $Optional<B>, {{.*}} [[RES]]
-// CHECK:   destroy_value [[UNWRAP_Y]]
 // CHECK:   return [[WRAP_RES]]
 
 // CHECK-LABEL: sil private @_T013vtable_thunks1DC1g{{[_0-9a-zA-Z]*}}FTV

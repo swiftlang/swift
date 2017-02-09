@@ -2968,7 +2968,7 @@ public:
 
   ValueOwnershipKind
   getOwnershipKind(SILModule &,
-                   CanGenericSignature sig = nullptr) const; // in SILType.cpp
+                   CanGenericSignature sig) const; // in SILType.cpp
 
   bool operator==(SILResultInfo rhs) const {
     return TypeAndConvention == rhs.TypeAndConvention;

@@ -267,6 +267,8 @@ void TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
       builder->addGenericParameter(param);
   }
 
+  unsigned depth = genericParams->getDepth();
+
   // Now, check the inheritance clauses of each parameter.
   for (auto param : *genericParams) {
     checkInheritanceClause(param, resolver);
@@ -276,7 +278,9 @@ void TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
 
       // Infer requirements from the inherited types.
       for (const auto &inherited : param->getInherited()) {
-        builder->inferRequirements(inherited, genericParams);
+        builder->inferRequirements(inherited,
+                                   /*minDepth=*/depth,
+                                   /*maxDepth=*/depth);
       }
     }
   }
@@ -393,8 +397,12 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
       }
 
       // Infer requirements from it.
-      if (builder && fn->getBodyResultTypeLoc().getTypeRepr()) {
-        builder->inferRequirements(fn->getBodyResultTypeLoc(), genericParams);
+      if (builder && genericParams &&
+          fn->getBodyResultTypeLoc().getTypeRepr()) {
+        unsigned depth = genericParams->getDepth();
+        builder->inferRequirements(fn->getBodyResultTypeLoc(),
+                                   /*minDepth=*/depth,
+                                   /*maxDepth=*/depth);
       }
     }
   }
@@ -980,8 +988,8 @@ Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
                                  ProtocolConformanceRef conformance,
                                  Identifier name,
                                  Diag<> brokenProtocolDiag) {
-  Type ty = ProtocolConformance::getTypeWitnessByName(type, conformance,
-                                                      name, this);
+  Type ty = ProtocolConformanceRef::getTypeWitnessByName(type, conformance,
+                                                         name, this);
   if (!ty &&
       !(conformance.isConcrete() && conformance.getConcrete()->isInvalid()))
     diagnose(protocol->getLoc(), brokenProtocolDiag);

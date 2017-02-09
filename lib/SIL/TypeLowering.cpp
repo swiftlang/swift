@@ -152,7 +152,10 @@ enum class LoweredTypeKind {
   AggWithReference,
 
   /// Non-trivial and not loadable.
-  AddressOnly
+  AddressOnly,
+
+  /// Trivial and not loadable.
+  TrivialAddressOnly
 };
 
 static LoweredTypeKind classifyType(CanType type, SILModule &M,
@@ -178,6 +181,7 @@ namespace {
     //   RetTy handleAddressOnly(CanType);
     //   RetTy handleReference(CanType);
     //   RetTy handleTrivial(CanType);
+    //   RetTy handleTrivialAddressOnly(CanType);
     // In addition, if it does not override visitTupleType
     // and visitAnyStructType, it should also implement:
     //   RetTy handleAggWithReference(CanType);
@@ -317,9 +321,22 @@ namespace {
     RetTy visitArchetypeType(CanArchetypeType type) {
       if (type->requiresClass()) {
         return asImpl().handleReference(type);
-      } else {
-        return asImpl().handleAddressOnly(type);
       }
+
+      auto LayoutInfo = type->getLayoutConstraint();
+      if (LayoutInfo) {
+        if (LayoutInfo->isFixedSizeTrivial()) {
+          return asImpl().handleTrivial(type);
+        }
+
+        if (LayoutInfo->isAddressOnlyTrivial()) {
+          return asImpl().handleTrivialAddressOnly(type);
+        }
+
+        if (LayoutInfo->isRefCountedObject())
+          return asImpl().handleReference(type);
+      }
+      return asImpl().handleAddressOnly(type);
     }
 
     RetTy visitExistentialType(CanType type) {
@@ -371,6 +388,8 @@ namespace {
         switch (classifyType(eltType, M, Sig, Expansion)) {
         case LoweredTypeKind::Trivial:
           continue;
+        case LoweredTypeKind::TrivialAddressOnly:
+          return asImpl().handleTrivialAddressOnly(type);
         case LoweredTypeKind::AddressOnly:
           return asImpl().handleAddressOnly(type);
         case LoweredTypeKind::Reference:
@@ -414,9 +433,16 @@ namespace {
     LoweredTypeKind handleAggWithReference(CanType type) {
       return LoweredTypeKind::AggWithReference;
     }
-    LoweredTypeKind handleTrivial(CanType type) {
+    LoweredTypeKind
+    handleTrivial(CanType type) {
       return LoweredTypeKind::Trivial;
     }
+
+    LoweredTypeKind
+    handleTrivialAddressOnly(CanType type) {
+      return LoweredTypeKind::TrivialAddressOnly;
+    }
+
     LoweredTypeKind handleAddressOnly(CanType type) {
       return LoweredTypeKind::AddressOnly;
     }
@@ -1134,6 +1160,71 @@ namespace {
     }
   };
 
+  /// A class for trivial, address-only types.
+  class AddressOnlyTrivialTypeLowering : public TypeLowering {
+  public:
+    AddressOnlyTrivialTypeLowering(SILType type)
+      : TypeLowering(type, IsTrivial, IsAddressOnly, IsNotReferenceCounted)
+    {}
+
+    void emitCopyInto(SILBuilder &B, SILLocation loc,
+                      SILValue src, SILValue dest, IsTake_t isTake,
+                      IsInitialization_t isInit) const override {
+      B.createCopyAddr(loc, src, dest, isTake, isInit);
+    }
+
+    SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
+                            SILValue addr, IsTake_t isTake) const override {
+      llvm_unreachable("calling emitLoadOfCopy on non-loadable type");
+    }
+
+    void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
+                         SILValue newValue, SILValue addr,
+                         IsInitialization_t isInit) const override {
+      llvm_unreachable("calling emitStoreOfCopy on non-loadable type");
+    }
+
+    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      llvm_unreachable("calling emitStore on non-loadable type");
+    }
+
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      llvm_unreachable("calling emitLoad on non-loadable type");
+    }
+
+    void emitDestroyAddress(SILBuilder &B, SILLocation loc,
+                            SILValue addr) const override {
+    }
+
+    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+    }
+
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      llvm_unreachable("type is not loadable!");
+    }
+
+    SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  LoweringStyle style) const override {
+      llvm_unreachable("type is not loadable!");
+    }
+
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
+      llvm_unreachable("type is not loadable!");
+    }
+
+    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
+                                 LoweringStyle style) const override {
+      llvm_unreachable("type is not loadable!");
+    }
+  };
+
+
   /// Build the appropriate TypeLowering subclass for the given type,
   /// which is assumed to already have been lowered.
   class LowerType
@@ -1147,11 +1238,18 @@ namespace {
       : TypeClassifierBase(TC.M, Sig, Expansion),
         TC(TC), Dependent(Dependent) {}
 
-    const TypeLowering *handleTrivial(CanType type) {
+    const TypeLowering *
+    handleTrivial(CanType type) {
       auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC, Dependent) TrivialTypeLowering(silType);
     }
-  
+
+    const TypeLowering *
+    handleTrivialAddressOnly(CanType type) {
+      auto silType = SILType::getPrimitiveObjectType(type);
+      return new (TC, Dependent) AddressOnlyTrivialTypeLowering(silType);
+    }
+
     const TypeLowering *handleReference(CanType type) {
       auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC, Dependent) ReferenceTypeLowering(silType);
@@ -1208,6 +1306,7 @@ namespace {
           structType->getTypeOfMember(D->getModuleContext(), field, nullptr);
         switch (classifyType(substFieldType->getCanonicalType(),
                              M, Sig, Expansion)) {
+        case LoweredTypeKind::TrivialAddressOnly:
         case LoweredTypeKind::AddressOnly:
           return handleAddressOnly(structType);
         case LoweredTypeKind::AggWithReference:
@@ -1260,6 +1359,7 @@ namespace {
           ->getCanonicalType();
         
         switch (classifyType(substEltType, M, Sig, Expansion)) {
+        case LoweredTypeKind::TrivialAddressOnly:
         case LoweredTypeKind::AddressOnly:
           return handleAddressOnly(enumType);
         case LoweredTypeKind::AggWithReference:

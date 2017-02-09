@@ -3015,11 +3015,6 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
     if (isElse) {
       ConfigState.setConditionActive(!foundActive);
     } else {
-      if (Tok.isAtStartOfLine()) {
-        diagnose(ClauseLoc, diag::expected_conditional_compilation_expression,
-                 !Clauses.empty());
-      }
-
       // Evaluate the condition.
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
                                                     /*isBasic*/true,

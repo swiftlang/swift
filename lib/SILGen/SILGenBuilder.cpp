@@ -223,3 +223,16 @@ ManagedValue SILGenBuilder::createAllocRefDynamic(SILLocation Loc, ManagedValue 
                                       ElementTypes, ElementCountOperands);
   return gen.emitManagedRValueWithCleanup(ARDI);
 }
+
+ManagedValue SILGenBuilder::createTupleExtract(SILLocation Loc, ManagedValue Base, unsigned Index,
+                                               SILType Type) {
+  ManagedValue BorrowedBase = gen.emitManagedBeginBorrow(Loc, Base.getValue());
+  SILValue TupleExtract =
+    SILBuilder::createTupleExtract(Loc, BorrowedBase.getValue(), Index, Type);
+  return ManagedValue::forUnmanaged(TupleExtract);
+}
+
+ManagedValue SILGenBuilder::createTupleExtract(SILLocation Loc, ManagedValue Value, unsigned Index) {
+  SILType Type = Value.getType().getTupleElementType(Index);
+  return createTupleExtract(Loc, Value, Index, Type);
+}

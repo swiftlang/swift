@@ -1784,11 +1784,6 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
     if (isElse) {
       ConfigState.setConditionActive(!foundActive);
     } else {
-      if (Tok.isAtStartOfLine()) {
-        diagnose(ClauseLoc, diag::expected_conditional_compilation_expression,
-                 !Clauses.empty());
-      }
-
       // Evaluate the condition.
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
                                                     /*basic*/true,

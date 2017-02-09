@@ -52,10 +52,17 @@ NOTE(opening_angle,none,
 ERROR(extra_rbrace,none,
       "extraneous '}' at top level", ())
 
+ERROR(structure_overflow,Fatal,
+      "structure nesting level exceeded maximum of %0", (unsigned))
+
+ERROR(expected_close_to_if_directive,none,
+      "expected #else or #endif at end of conditional compilation block", ())
+ERROR(expected_close_after_else_directive,none,
+      "further conditions after #else are unreachable", ())
 ERROR(unexpected_conditional_compilation_block_terminator,none,
       "unexpected conditional compilation block terminator", ())
-ERROR(expected_conditional_compilation_expression,none,
-      "expected a condition to follow %select{#if|#elseif}0", (bool))
+ERROR(incomplete_conditional_compilation_directive,none,
+      "incomplete condition in conditional compilation directive", ())
 ERROR(extra_tokens_conditional_compilation_directive,none,
       "extra tokens following conditional compilation directive", ())
 
@@ -824,12 +831,6 @@ ERROR(expected_expr_assignment,none,
 // Brace Statement
 ERROR(expected_rbrace_in_brace_stmt,none,
       "expected '}' at end of brace statement", ())
-
-/// #if Statement
-ERROR(expected_close_to_if_directive,none,
-      "expected #else or #endif at end of conditional compilation block", ())
-ERROR(expected_close_after_else_directive,none,
-      "further conditions after #else are unreachable", ())
 
 /// Associatedtype Statement
 ERROR(typealias_inside_protocol_without_type,none,

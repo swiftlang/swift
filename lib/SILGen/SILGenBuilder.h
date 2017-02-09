@@ -130,6 +130,11 @@ public:
   ManagedValue createAllocRefDynamic(SILLocation Loc, ManagedValue Operand, SILType RefType, bool objc,
                                      ArrayRef<SILType> ElementTypes,
                                      ArrayRef<ManagedValue> ElementCountOperands);
+
+  using SILBuilder::createTupleExtract;
+  ManagedValue createTupleExtract(SILLocation Loc, ManagedValue Value, unsigned Index,
+                                  SILType Type);
+  ManagedValue createTupleExtract(SILLocation Loc, ManagedValue Value, unsigned Index);
 };
 
 } // namespace Lowering

@@ -18,7 +18,6 @@
 
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -159,12 +158,6 @@ public:
   std::pair<const Substitution &, TypeDecl *>
   getTypeWitnessSubstAndDecl(AssociatedTypeDecl *assocType,
                              LazyResolver *resolver) const;
-
-  static Type
-  getTypeWitnessByName(Type type,
-                       ProtocolConformanceRef conformance,
-                       Identifier name,
-                       LazyResolver *resolver);
 
   /// Apply the given function object to each type witness within this
   /// protocol conformance.
