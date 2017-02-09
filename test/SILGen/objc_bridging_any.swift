@@ -346,9 +346,12 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   // CHECK: cond_br
   // CHECK: [[STRING_DATA:%.*]] = unchecked_enum_data [[OPT_STRING_COPY]]
   // CHECK: [[BRIDGE_STRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveC
-  // CHECK: [[BRIDGED:%.*]] = apply [[BRIDGE_STRING]]([[STRING_DATA]])
+  // CHECK: [[BORROWED_STRING_DATA:%.*]] = begin_borrow [[STRING_DATA]]
+  // CHECK: [[BRIDGED:%.*]] = apply [[BRIDGE_STRING]]([[BORROWED_STRING_DATA]])
   // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref [[BRIDGED]] : $NSString : $NSString, $AnyObject
   // CHECK: [[OPT_ANYOBJECT:%.*]] = enum {{.*}} [[ANYOBJECT]]
+  // CHECK: end_borrow [[BORROWED_STRING_DATA]] from [[STRING_DATA]]
+  // CHECK: destroy_value [[STRING_DATA]]
   // CHECK: br [[JOIN:bb.*]]([[OPT_ANYOBJECT]]
   // CHECK: [[JOIN]]([[PHI:%.*]] : $Optional<AnyObject>):
   // CHECK: apply [[METHOD]]([[PHI]], [[SELF]])
