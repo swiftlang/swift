@@ -94,6 +94,40 @@ ProtocolConformanceRef::getInherited(ProtocolDecl *parent) const {
   llvm_unreachable("unhandled ProtocolConformanceRef");
 }
 
+Type
+ProtocolConformanceRef::getTypeWitnessByName(Type type,
+                                             ProtocolConformanceRef conformance,
+                                             Identifier name,
+                                             LazyResolver *resolver) {
+  // For an archetype, retrieve the nested type with the appropriate
+  // name. There are no conformance tables.
+  if (auto archetype = type->getAs<ArchetypeType>()) {
+    return archetype->getNestedType(name);
+  }
+
+  // Find the named requirement.
+  AssociatedTypeDecl *assocType = nullptr;
+  auto members = conformance.getRequirement()->lookupDirect(name);
+  for (auto member : members) {
+    assocType = dyn_cast<AssociatedTypeDecl>(member);
+    if (assocType)
+      break;
+  }
+
+  // FIXME: Shouldn't this be a hard error?
+  if (!assocType)
+    return nullptr;
+
+  if (conformance.isAbstract())
+    return DependentMemberType::get(type, assocType);
+
+  auto concrete = conformance.getConcrete();
+  if (!concrete->hasTypeWitness(assocType, resolver)) {
+    return nullptr;
+  }
+  return concrete->getTypeWitness(assocType, resolver).getReplacement();
+}
+
 void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
                                         AllocationArena arena,
                                         unsigned alignment) {
@@ -152,40 +186,6 @@ const Substitution &
 ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType, 
                                     LazyResolver *resolver) const {
   return getTypeWitnessSubstAndDecl(assocType, resolver).first;
-}
-
-Type
-ProtocolConformance::getTypeWitnessByName(Type type,
-                                          ProtocolConformanceRef conformance,
-                                          Identifier name,
-                                          LazyResolver *resolver) {
-  // For an archetype, retrieve the nested type with the appropriate
-  // name. There are no conformance tables.
-  if (auto archetype = type->getAs<ArchetypeType>()) {
-    return archetype->getNestedType(name);
-  }
-
-  // Find the named requirement.
-  AssociatedTypeDecl *assocType = nullptr;
-  auto members = conformance.getRequirement()->lookupDirect(name);
-  for (auto member : members) {
-    assocType = dyn_cast<AssociatedTypeDecl>(member);
-    if (assocType)
-      break;
-  }
-
-  // FIXME: Shouldn't this be a hard error?
-  if (!assocType)
-    return nullptr;
-
-  if (conformance.isAbstract())
-    return DependentMemberType::get(type, assocType);
-
-  auto concrete = conformance.getConcrete();
-  if (!concrete->hasTypeWitness(assocType, resolver)) {
-    return nullptr;
-  }
-  return concrete->getTypeWitness(assocType, resolver).getReplacement();
 }
 
 Witness ProtocolConformance::getWitness(ValueDecl *requirement,
