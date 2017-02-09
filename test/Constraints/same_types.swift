@@ -91,7 +91,7 @@ func test7<T: Barrable>(_ t: T) -> (Y, X) where T.Bar == Y, T.Bar.Foo == X {
 func fail4<T: Barrable>(_ t: T) -> (Y, Z)
   where
   T.Bar == Y,
-  T.Bar.Foo == Z { // expected-error{{generic parameter 'T.Bar.Foo' cannot be equal to both 'X' and 'Z'}}
+  T.Bar.Foo == Z { // expected-error{{generic parameter 'T.Bar.Foo' cannot be equal to both 'Y.Foo' (aka 'X') and 'Z'}}
   return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Z'}}
 }
 

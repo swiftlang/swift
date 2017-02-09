@@ -1186,11 +1186,13 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
     GenericVisitor(DeclContext *dc, TypeSubstitutionMap &archetypesMap)
       : dc(dc), archetypesMap(archetypesMap) {}
     
-    bool mismatch(TypeBase *paramType, TypeBase *argType) {
+    bool mismatch(TypeBase *paramType, TypeBase *argType,
+                  Type sugaredFirstType) {
       return paramType->isEqual(argType);
     }
     
-    bool mismatch(SubstitutableType *paramType, TypeBase *argType) {
+    bool mismatch(SubstitutableType *paramType, TypeBase *argType,
+                  Type sugaredFirstType) {
       Type type = paramType;
       if (type->is<GenericTypeParamType>()) {
         assert(dc);
