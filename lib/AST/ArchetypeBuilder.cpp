@@ -1315,13 +1315,17 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   Type concrete2 = T2->getConcreteType();
   
   if (concrete1 && concrete2) {
-    if (!concrete1->isEqual(concrete2)) {
-      Diags.diagnose(Source.getLoc(), diag::requires_same_type_conflict,
-                     T1->getDependentType(/*FIXME: */{ }, true), concrete1,
-                     concrete2);
-      return true;
-      
-    }
+    bool mismatch =
+      addSameTypeRequirement(concrete1, concrete2, Source,
+        [&](Type type1, Type type2) {
+          Diags.diagnose(Source.getLoc(),
+                         diag::requires_same_type_conflict,
+                         T1->getDependentType(/*FIXME: */{ }, true), type1,
+                         type2);
+
+        });
+
+    if (mismatch) return true;
   } else if (concrete1) {
     assert(!T2->ConcreteType
            && "already formed archetype for concrete-constrained parameter");
@@ -1389,12 +1393,17 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   // If we've already been bound to a type, we're either done, or we have a
   // problem.
   if (auto oldConcrete = T->getConcreteType()) {
-    if (!oldConcrete->isEqual(Concrete)) {
-      Diags.diagnose(Source.getLoc(), diag::requires_same_type_conflict,
-                     T->getDependentType(/*FIXME: */{ }, true), oldConcrete,
-                     Concrete);
-      return true;
-    }
+    bool mismatch =
+      addSameTypeRequirement(oldConcrete, Concrete, Source,
+        [&](Type type1, Type type2) {
+          Diags.diagnose(Source.getLoc(),
+                         diag::requires_same_type_conflict,
+                         T->getDependentType(/*FIXME: */{ }, true), type1,
+                         type2);
+
+        });
+
+    if (mismatch) return true;
     return false;
   }
   
