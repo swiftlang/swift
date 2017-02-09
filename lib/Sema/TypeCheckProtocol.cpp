@@ -1783,6 +1783,9 @@ namespace {
            ValueDecl *requirement, bool isError,
            std::function<void(NormalProtocolConformance *)> fn);
 
+    void
+    addUsedConformances(ProtocolConformance *conformance,
+                        llvm::SmallPtrSetImpl<ProtocolConformance *> &visited);
     void addUsedConformances(ProtocolConformance *conformance);
 
   public:
@@ -4399,7 +4402,15 @@ static void recordConformanceDependency(DeclContext *DC,
                          DC->isCascadingContextForLookup(InExpression));
 }
 
-void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
+void ConformanceChecker::addUsedConformances(
+    ProtocolConformance *conformance,
+    llvm::SmallPtrSetImpl<ProtocolConformance *> &visited) {
+  // This deduplication cannot be implemented by just checking UsedConformance,
+  // because conformances can be added to UsedConformances outside this
+  // function, meaning their type witness conformances may not be tracked.
+  if (!visited.insert(conformance).second)
+    return;
+
   auto normalConf = conformance->getRootNormalConformance();
 
   if (normalConf->isIncomplete())
@@ -4411,10 +4422,15 @@ void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
                                                TypeDecl *witness) -> bool {
     for (auto nestedConformance : sub.getConformances())
       if (nestedConformance.isConcrete())
-        addUsedConformances(nestedConformance.getConcrete());
+        addUsedConformances(nestedConformance.getConcrete(), visited);
 
     return false;
   });
+}
+
+void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
+  llvm::SmallPtrSet<ProtocolConformance *, 8> visited;
+  addUsedConformances(conformance, visited);
 }
 
 #pragma mark Protocol conformance checking
