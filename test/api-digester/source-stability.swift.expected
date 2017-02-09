@@ -12,7 +12,6 @@ Protocol IndexableBase has been removed (deprecated)
 Protocol MutableIndexable has been removed (deprecated)
 Protocol RandomAccessIndexable has been removed (deprecated)
 Protocol RangeReplaceableIndexable has been removed (deprecated)
-Constructor String.init(stringInterpolationSegment:) has been removed
 Func Array.append(contentsOf:) has been removed
 Func ArraySlice.append(contentsOf:) has been removed
 Func ContiguousArray.append(contentsOf:) has been removed
@@ -35,7 +34,6 @@ Constructor RangeReplaceableBidirectionalSlice.init(base:bounds:) has 2nd parame
 Constructor RangeReplaceableRandomAccessSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<RangeReplaceableRandomAccessSlice.Index>
 Constructor RangeReplaceableSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<RangeReplaceableSlice.Index>
 Constructor Slice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<Slice.Index>
-Constructor String.init(stringInterpolationSegment:) has 1st parameter type change from String to T
 Func AnyBidirectionalCollection.makeIterator() has return type change from AnyIterator<Element> to AnyBidirectionalCollection.Iterator
 Func AnyCollection.makeIterator() has return type change from AnyIterator<Element> to AnyCollection.Iterator
 Func AnyRandomAccessCollection.makeIterator() has return type change from AnyIterator<Element> to AnyRandomAccessCollection.Iterator
