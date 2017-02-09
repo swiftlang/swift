@@ -127,7 +127,8 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
 
     if (Classify) {
       std::string Classifications;
-      if (!swift::Demangle::isSwiftSymbol(name.data(), name.size()))
+      std::string cName = name.str();
+      if (!swift::Demangle::isSwiftSymbol(cName.c_str()))
         Classifications += 'N';
       if (swift::Demangle::isThunkSymbol(name.data(), name.size()))
         Classifications += 'T';

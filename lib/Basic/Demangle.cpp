@@ -2337,19 +2337,21 @@ private:
 
 
 bool
-swift::Demangle::isSwiftSymbol(const char *mangledName,
-                               size_t mangledNameLength) {
-  StringRef Name(mangledName, mangledNameLength);
+swift::Demangle::isSwiftSymbol(const char *mangledName) {
   // The old mangling.
-  if (Name.startswith("_T"))
+  if (mangledName[0] == '_' && mangledName[1] == 'T')
     return true;
 
 #ifndef NO_NEW_DEMANGLING
   // The new mangling.
-  if (Name.startswith(MANGLING_PREFIX_STR))
-    return true;
-#endif // !NO_NEW_DEMANGLING
+  for (unsigned i = 0; i < sizeof(MANGLING_PREFIX_STR) - 1; i++) {
+    if (mangledName[i] != MANGLING_PREFIX_STR[i])
+      return false;
+  }
+  return true;
+#else // !NO_NEW_DEMANGLING
   return false;
+#endif // !NO_NEW_DEMANGLING
 }
 
 bool
