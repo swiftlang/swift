@@ -1458,27 +1458,30 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   return false;
 }
 
-bool ArchetypeBuilder::addSameTypeRequirement(Type Reqt1, Type Reqt2,
-                                              RequirementSource Source,
-                                              PotentialArchetype *basePA) {
+bool ArchetypeBuilder::addSameTypeRequirement(
+                        Type Reqt1, Type Reqt2,
+                        RequirementSource Source,
+                        PotentialArchetype *basePA,
+                        llvm::function_ref<void(Type, Type)> diagnoseMismatch) {
   // Find the potential archetypes.
   PotentialArchetype *T1 = resolveArchetype(Reqt1, basePA);
   PotentialArchetype *T2 = resolveArchetype(Reqt2, basePA);
-
-  // Require that at least one side of the requirement be a potential archetype.
-  if (!T1 && !T2) {
-    Diags.diagnose(Source.getLoc(), diag::requires_no_same_type_archetype);
-    return true;
-  }
   
-  // If both sides of the requirement are open archetypes, combine them.
+  // If both sides of the requirement are type parameters, equate them.
   if (T1 && T2)
     return addSameTypeRequirementBetweenArchetypes(T1, T2, Source);
   
-  // Otherwise, we're binding an open archetype.
+  // If just one side is a type parameter, map it to a concrete type.
   if (T1)
     return addSameTypeRequirementToConcrete(T1, Reqt2, Source);
-  return addSameTypeRequirementToConcrete(T2, Reqt1, Source);
+  if (T2)
+    return addSameTypeRequirementToConcrete(T2, Reqt1, Source);
+
+  // Otherwise, the types should be equal.
+  if (Reqt1->isEqual(Reqt2)) return false;
+
+  diagnoseMismatch(Reqt1, Reqt2);
+  return true;
 }
 
 // Local function to mark the given associated type as recursive,
@@ -1623,46 +1626,57 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
   }
 
   case RequirementReprKind::SameType:
-    return addSameTypeRequirement(Req.getFirstType(), 
-                                  Req.getSecondType(),
-                                  RequirementSource(RequirementSource::Explicit,
-                                                    Req.getEqualLoc()));
+    // Require that at least one side of the requirement be a type parameter.
+    if (!Req.getFirstType()->isTypeParameter() &&
+        !Req.getSecondType()->isTypeParameter()) {
+      Diags.diagnose(Req.getEqualLoc(), diag::requires_no_same_type_archetype)
+        .highlight(Req.getFirstTypeLoc().getSourceRange())
+        .highlight(Req.getSecondTypeLoc().getSourceRange());
+      return true;
+    }
+
+    return addRequirement(Requirement(RequirementKind::SameType,
+                                      Req.getFirstType(),
+                                      Req.getSecondType()),
+                          RequirementSource(RequirementSource::Explicit,
+                                            Req.getEqualLoc()));
   }
 
   llvm_unreachable("Unhandled requirement?");
 }
 
-void ArchetypeBuilder::addRequirement(const Requirement &req, 
+bool ArchetypeBuilder::addRequirement(const Requirement &req,
                                       RequirementSource source) {
   llvm::SmallPtrSet<ProtocolDecl *, 8> Visited;
-  addRequirement(req, source, nullptr, Visited);
+  return addRequirement(req, source, nullptr, Visited);
 }
 
-void ArchetypeBuilder::addRequirement(
+bool ArchetypeBuilder::addRequirement(
     const Requirement &req, RequirementSource source,
     PotentialArchetype *basePA,
     llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited) {
   switch (req.getKind()) {
   case RequirementKind::Superclass: {
+    // FIXME: Diagnose this.
     PotentialArchetype *pa = resolveArchetype(req.getFirstType(), basePA);
-    if (!pa) return;
+    if (!pa) return false;
 
     assert(req.getSecondType()->getClassOrBoundGenericClass());
-    addSuperclassRequirement(pa, req.getSecondType(), source);
-    return;
+    return addSuperclassRequirement(pa, req.getSecondType(), source);
   }
 
   case RequirementKind::Layout: {
+    // FIXME: Diagnose this.
     PotentialArchetype *pa = resolveArchetype(req.getFirstType(), basePA);
-    if (!pa) return;
+    if (!pa) return false;
 
-    (void)addLayoutRequirement(pa, req.getLayoutConstraint(), source);
-    return;
+    return addLayoutRequirement(pa, req.getLayoutConstraint(), source);
   }
 
   case RequirementKind::Conformance: {
+    // FIXME: Diagnose this.
     PotentialArchetype *pa = resolveArchetype(req.getFirstType(), basePA);
-    if (!pa) return;
+    if (!pa) return false;
 
     SmallVector<ProtocolDecl *, 4> conformsTo;
     (void)req.getSecondType()->isExistentialType(conformsTo);
@@ -1673,16 +1687,21 @@ void ArchetypeBuilder::addRequirement(
         markPotentialArchetypeRecursive(pa, proto, source);
         continue;
       }
-      (void)addConformanceRequirement(pa, proto, source, Visited);
+      if (addConformanceRequirement(pa, proto, source, Visited)) return true;
     }
 
-    return;
+    return false;
   }
 
   case RequirementKind::SameType:
-    addSameTypeRequirement(req.getFirstType(), req.getSecondType(), source,
-                           basePA);
-    return;
+    return addSameTypeRequirement(
+             req.getFirstType(), req.getSecondType(), source, basePA,
+             [&](Type type1, Type type2) {
+               if (source.getLoc().isValid())
+                 Diags.diagnose(source.getLoc(),
+                                diag::requires_same_concrete_type, type1,
+                                type2);
+             });
   }
 
   llvm_unreachable("Unhandled requirement?");
