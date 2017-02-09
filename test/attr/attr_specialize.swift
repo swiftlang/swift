@@ -85,7 +85,7 @@ struct FloatElement : HasElt {
   typealias Element = Float
 }
 @_specialize(where T == FloatElement)
-@_specialize(where T == IntElement) // expected-error{{generic parameter 'T.Element' cannot be equal to both 'Float' and 'IntElement.Element' (aka 'Int')}}
+@_specialize(where T == IntElement) // expected-error{{generic parameter 'T.Element' cannot be equal to both 'Float' and 'Int'}}
 func sameTypeRequirement<T : HasElt>(_ t: T) where T.Element == Float {}
 
 @_specialize(where T == Sub)
@@ -219,4 +219,30 @@ public func copy3<S>(_ s: S) -> S {
 }
 
 public func funcWithWhereClause<T>(t: T) where T:P, T: _Trivial(64) { // expected-error{{layout constraints are only allowed inside '_specialize' attributes}}
+}
+
+// rdar://problem/29333056
+public protocol P1 {
+  associatedtype DP1
+  associatedtype DP11
+}
+
+public protocol P2 {
+  associatedtype DP2 : P1
+}
+
+public struct H<T> {
+}
+
+public struct MyStruct3 : P1 {
+  public typealias DP1 = Int
+  public typealias DP11 = H<Int>
+}
+
+public struct MyStruct4 : P2 {
+  public typealias DP2 = MyStruct3
+}
+
+@_specialize(where T==MyStruct4)
+public func foo<T: P2>(_ t: T) where T.DP2.DP11 == H<T.DP2.DP1> {
 }
