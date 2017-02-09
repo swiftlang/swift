@@ -271,7 +271,7 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(TypeLoc type, GenericParamList *genericParams);
+  void inferRequirements(TypeLoc type, unsigned minDepth, unsigned maxDepth);
 
   /// Infer requirements from the given pattern, recursively.
   ///

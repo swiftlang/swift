@@ -4812,7 +4812,10 @@ public:
 
       // Infer requirements from the result type.
       if (!FD->getBodyResultTypeLoc().isNull()) {
-        builder.inferRequirements(FD->getBodyResultTypeLoc(), gp);
+        unsigned depth = gp->getDepth();
+        builder.inferRequirements(FD->getBodyResultTypeLoc(),
+                                  /*minDepth=*/depth,
+                                  /*maxDepth=*/depth);
       }
 
       // Revert the types within the signature so it can be type-checked with
@@ -7368,15 +7371,9 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
 
   // Local function used to infer requirements from the extended type.
   auto inferExtendedTypeReqs = [&](ArchetypeBuilder &builder) {
-    // Find the outermost generic parameter list. This tricks the inference
-    // into performing inference for all levels of generic parameters.
-    // FIXME: This is a hack. The inference shouldn't arbitrarily limit what it
-    // can infer.
-    GenericParamList *outermostList = genericParams;
-    while (auto next = outermostList->getOuterParameters())
-      outermostList = next;
-
-    builder.inferRequirements(TypeLoc::withoutLoc(extInterfaceType), outermostList);
+    builder.inferRequirements(TypeLoc::withoutLoc(extInterfaceType),
+                              /*minDepth=*/0,
+                              /*maxDepth=*/genericParams->getDepth());
   };
 
   // Validate the generic type signature.
