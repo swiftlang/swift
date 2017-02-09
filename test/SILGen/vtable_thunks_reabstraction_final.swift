@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
 protocol Fooable {
   func foo(_ x: Int) -> Int?
@@ -21,7 +21,7 @@ class NongenericSub: GenericSuper<Int>, Fooable {
   }
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC33vtable_thunks_reabstraction_final13NongenericSubS_7FooableS_FS1_3foo
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T033vtable_thunks_reabstraction_final13NongenericSubCAA7FooableAaaDP3foo{{[_0-9a-zA-Z]*}}FTW
 // CHECK:         class_method {{%.*}} : $NongenericSub, #NongenericSub.foo!1 {{.*}}, $@convention(method) (@in Int, @guaranteed NongenericSub) -> @out Optional<Int>
 
 class GenericSub<U: AnyObject>: GenericSuper<U>, Barrable {
@@ -30,12 +30,12 @@ class GenericSub<U: AnyObject>: GenericSuper<U>, Barrable {
   }
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWuRxs9AnyObjectrGC33vtable_thunks_reabstraction_final10GenericSubx_S0_8BarrableS0_FS2_3foofwx3BarGSqwxS3__
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T033vtable_thunks_reabstraction_final10GenericSubCyxGAA8BarrableAAs9AnyObjectRzlAaDP3foo3BarQzSgAIFTW
 // CHECK:         class_method {{%.*}} : $GenericSub<τ_0_0>, #GenericSub.foo!1 {{.*}}, $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (@in τ_0_0, @guaranteed GenericSub<τ_0_0>) -> @out Optional<τ_0_0>
 
 class C {}
 
-// CHECK-LABEL: sil hidden @_TF33vtable_thunks_reabstraction_final4testFT_T_
+// CHECK-LABEL: sil hidden @_T033vtable_thunks_reabstraction_final4testyyF
 func test() {
   // CHECK: class_method {{%.*}} : $NongenericSub, #NongenericSub.foo!1 {{.*}}, $@convention(method) (@in Int, @guaranteed NongenericSub) -> @out Optional<Int>
   NongenericSub().foo(0)

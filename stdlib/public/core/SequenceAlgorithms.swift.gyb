@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -188,7 +188,7 @@ ${orderingExplanation}
 %   else:
   /// Returns the maximum element in the sequence.
   ///
-  /// This example finds the smallest value in an array of height measurements.
+  /// This example finds the largest value in an array of height measurements.
   ///
   ///     let heights = [67.5, 65.7, 64.3, 61.1, 58.5, 60.3, 64.9]
   ///     let greatestHeight = heights.max()

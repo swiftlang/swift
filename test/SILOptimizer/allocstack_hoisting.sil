@@ -1,0 +1,232 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -alloc-stack-hoisting | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -alloc-stack-hoisting -sil-merge-stack-slots=false | %FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+protocol P {
+}
+
+struct Generic<T> {
+  var x : T
+}
+
+struct FixedSize {
+  var x : Builtin.Int8
+}
+
+// CHECK-LABEL: sil @hoist_generic
+// CHECK: bb0({{.*}}):
+// CHECK: [[AS:%.*]] = alloc_stack $T
+// CHECK: bb1:
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: dealloc_stack
+// CHECK: bb2
+// CHECK: bb3:
+// CHECK: dealloc_stack [[AS]]
+// CHECK:   return
+
+sil @hoist_generic : $@convention(thin) <T> (@in T, Builtin.Int1) -> () {
+bb0(%0 : $*T, %1: $Builtin.Int1):
+  cond_br %1, bb1, bb2
+bb1:
+  %2 = alloc_stack $T
+  copy_addr [take] %0 to [initialization] %2 : $*T
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  br bb3
+bb2:
+  destroy_addr %0 : $*T
+  br bb3
+bb3:
+  %3 = tuple ()
+  return %3 : $()
+}
+
+sil @throwing_fun : $@convention(thin) () -> @error Error
+
+// CHECK-LABEL: sil @hoist_generic
+// CHECK: bb0({{.*}}):
+// CHECK: [[AS:%.*]] = alloc_stack $T
+// CHECK: bb1:
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: dealloc_stack
+// CHECK: bb2
+// CHECK: bb3:
+// CHECK:   try_apply
+// CHECK: bb4({{.*}}:
+// CHECK:   dealloc_stack [[AS]]
+// CHECK:   return
+// CHECK: bb5({{.*}}):
+// CHECK:   dealloc_stack [[AS]]
+// CHECK:   throw
+
+sil @hoist_generic_throwing : $@convention(thin) <T> (@in T, Builtin.Int1) -> @error Error {
+bb0(%0 : $*T, %1: $Builtin.Int1):
+  cond_br %1, bb1, bb2
+bb1:
+  %2 = alloc_stack $T
+  copy_addr [take] %0 to [initialization] %2 : $*T
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  br bb3
+bb2:
+  destroy_addr %0 : $*T
+  br bb3
+bb3:
+  %3 = function_ref @throwing_fun : $@convention(thin) () -> @error Error
+  try_apply %3() : $@convention(thin) () -> @error Error, normal bb4, error bb5
+
+bb4(%6: $()):
+  %4 = tuple ()
+  return %4 : $()
+
+bb5(%5: $Error):
+  throw  %5: $Error
+}
+
+// CHECK-LABEL: sil @hoist_generic
+// CHECK: bb0({{.*}}):
+// CHECK: [[AS:%.*]] = alloc_stack $Generic<T>
+// CHECK: bb1:
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: dealloc_stack
+// CHECK: bb2
+// CHECK: bb3:
+// CHECK: dealloc_stack [[AS]]
+// CHECK:   return
+
+sil @hoist_generic_type : $@convention(thin) <T> (@in Generic<T>, Builtin.Int1) -> () {
+bb0(%0 : $*Generic<T>, %1: $Builtin.Int1):
+  cond_br %1, bb1, bb2
+bb1:
+  %2 = alloc_stack $Generic<T>
+  copy_addr [take] %0 to [initialization] %2 : $*Generic<T>
+  destroy_addr %2 : $*Generic<T>
+  dealloc_stack %2 : $*Generic<T>
+  br bb3
+bb2:
+  destroy_addr %0 : $*Generic<T>
+  br bb3
+bb3:
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @hoist_generic_nesting
+// CHECK: bb0({{.*}}):
+// CHECK: [[AS:%.*]] = alloc_stack $T
+// CHECK: [[AS2:%.*]] = alloc_stack $T
+// CHECK: [[FIXED:%.*]] = alloc_stack $FixedSize
+// CHECK: bb1:
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: dealloc_stack
+// CHECK: bb2
+// CHECK: bb3:
+// CHECK  dealloc_stack [[FIXED]]
+// CHECK: dealloc_stack [[AS2]]
+// CHECK: dealloc_stack [[AS]]
+// CHECK:   return
+
+sil @hoist_generic_nesting : $@convention(thin) <T> (@in T, Builtin.Int1) -> () {
+bb0(%0 : $*T, %1: $Builtin.Int1):
+  %2 = alloc_stack $FixedSize
+  cond_br %1, bb1, bb2
+bb1:
+  %3 = alloc_stack $T
+  %4 = alloc_stack $T
+  copy_addr [take] %0 to [initialization] %3 : $*T
+  destroy_addr %3 : $*T
+  dealloc_stack %4: $*T
+  dealloc_stack %3 : $*T
+  br bb3
+bb2:
+  destroy_addr %0 : $*T
+  br bb3
+bb3:
+  dealloc_stack %2: $*FixedSize
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil @dont_hoist_opened_generic
+// CHECK: bb0({{.*}}):
+// CHECK-NOT: alloc_stack
+// CHECK: bb1:
+// CHECK: alloc_stack
+// CHECK: bb2:
+// CHECK: bb3:
+// CHECK-NOT: dealloc_stack
+// CHECK:   return
+
+sil @dont_hoist_opened_generic : $@convention(thin) (@in P, Builtin.Int1) -> () {
+bb0(%0 : $*P, %1: $Builtin.Int1):
+  cond_br %1, bb1, bb2
+bb1:
+  %2 = open_existential_addr %0 : $*P to $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") P
+  %3 = alloc_stack $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") P
+	copy_addr [take] %2 to [initialization] %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") P
+  destroy_addr %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") P
+  dealloc_stack %3 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") P
+  br bb3
+bb2:
+  destroy_addr %0 : $*P
+  br bb3
+bb3:
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil @dont_hoist_protocol
+// CHECK: bb0({{.*}}):
+// CHECK-NOT: alloc_stack
+// CHECK: bb1:
+// CHECK: alloc_stack
+// CHECK: bb2:
+// CHECK: bb3:
+// CHECK-NOT: dealloc_stack
+// CHECK:   return
+
+sil @dont_hoist_protocol : $@convention(thin) (@in P, Builtin.Int1) -> () {
+bb0(%0 : $*P, %1: $Builtin.Int1):
+  cond_br %1, bb1, bb2
+bb1:
+  %2 = alloc_stack $P
+	copy_addr [take] %0 to [initialization] %2 : $*P
+  destroy_addr %2 : $*P
+  dealloc_stack %2 : $*P
+  br bb3
+bb2:
+  destroy_addr %0 : $*P
+  br bb3
+bb3:
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @dont_crash_on_unreachable
+// CHECK: bb0({{.*}}):
+// CHECK: alloc_stack
+// CHECK: bb1:
+// CHECK-NOT: alloc_stack
+// CHECK: bb2:
+// CHECK: bb3:
+// CHECK:   unreachable
+
+sil @dont_crash_on_unreachable : $@convention(thin) <T> (@in T, Builtin.Int1) -> Never {
+bb0(%0 : $*T, %1: $Builtin.Int1):
+  cond_br %1, bb1, bb2
+bb1:
+  %2 = alloc_stack $T
+  copy_addr [take] %0 to [initialization] %2 : $*T
+  destroy_addr %2 : $*T
+  br bb3
+bb2:
+  destroy_addr %0 : $*T
+  br bb3
+bb3:
+  %3 = builtin "int_trap"() : $()
+  unreachable
+}

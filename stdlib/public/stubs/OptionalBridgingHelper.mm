@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -89,7 +89,6 @@ static id getSentinelForDepth(unsigned depth) {
 /// Return the sentinel object to use to represent `nil` for a given Optional
 /// type.
 SWIFT_RUNTIME_STDLIB_INTERFACE SWIFT_CC(swift)
-extern "C"
 id _swift_Foundation_getOptionalNilSentinelObject(const Metadata *Wrapped) {
   // Figure out the depth of optionality we're working with.
   unsigned depth = 1;

@@ -104,6 +104,11 @@ class OuterGenericClass<T> {
       super.init()
     }
   }
+
+  class Middle {
+    class Inner1<T> {}
+    class Inner2<T> : Middle where T: Inner1<Int> {}
+  }
 }
 
 // <rdar://problem/12895793>
@@ -297,4 +302,62 @@ typealias OuterGenericMidGeneric<T> = OuterGeneric<T>.MidGeneric
 
 extension OuterGenericMidGeneric {
 
+}
+
+class BaseClass {
+  struct T {}
+
+  func m1() -> T {}
+  func m2() -> BaseClass.T {}
+  func m3() -> DerivedClass.T {}
+}
+
+func f1() -> DerivedClass.T {
+  return BaseClass.T()
+}
+
+func f2() -> BaseClass.T {
+  return DerivedClass.T()
+}
+
+func f3() -> DerivedClass.T {
+  return DerivedClass.T()
+}
+
+class DerivedClass : BaseClass {
+  override func m1() -> DerivedClass.T {
+    return f2()
+  }
+
+  override func m2() -> BaseClass.T {
+    return f3()
+  }
+
+  override func m3() -> T {
+    return f2()
+  }
+}
+
+// https://bugs.swift.org/browse/SR-3847: Resolve members in inner types.
+// This first extension isn't necessary; we could have put 'originalValue' in
+// the original declaration.
+extension OuterNonGenericClass.InnerNonGenericBase {
+  static let originalValue = 0
+}
+// Each of these two cases used to crash.
+extension OuterNonGenericClass.InnerNonGenericBase {
+  static let propUsingMember = originalValue
+}
+extension OuterNonGenericClass.InnerNonGenericClass1 {
+  static let anotherPropUsingMember = originalValue
+}
+
+// rdar://problem/30353095: Extensions of nested types with generic
+// requirements placed on type parameters
+struct OuterWithConstraint<T : HasAssocType> {
+  struct InnerWithConstraint<U : HasAssocType> { }
+}
+
+extension OuterWithConstraint.InnerWithConstraint {
+  func foo<V>(v: V) where T.FirstAssocType == U.SecondAssocType {}
 }

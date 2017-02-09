@@ -54,3 +54,28 @@ extension Sub {
   override func baseFoo() {
   }
 }
+
+
+@objc class FinalTests {}
+
+extension FinalTests {
+  // CHECK:  @objc final func foo
+  final func foo() { }
+
+  // CHECK: @objc final var prop: Super
+  final var prop: Super {
+    // CHECK: @objc final get
+    get { return Super() }
+    // CHECK: @objc final set
+    set { }
+  }
+
+  // CHECK: @objc final subscript(sup: Super) -> Super
+  final subscript(sup: Super) -> Super {
+    // CHECK: @objc final get
+    get { return sup }
+    // CHECK: @objc final set
+    set { }
+  }
+}
+

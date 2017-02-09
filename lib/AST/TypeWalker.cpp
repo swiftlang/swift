@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -90,6 +90,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
       switch (req.getKind()) {
       case RequirementKind::SameType:
       case RequirementKind::Conformance:
+      case RequirementKind::Layout:
       case RequirementKind::Superclass:
         if (doIt(req.getSecondType()))
           return true;
@@ -104,7 +105,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
     for (auto param : ty->getParameters())
       if (doIt(param.getType()))
         return true;
-    for (auto result : ty->getAllResults())
+    for (auto result : ty->getResults())
       if (doIt(result.getType()))
         return true;
     if (ty->hasErrorResult())
@@ -203,7 +204,7 @@ public:
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 bool Type::walk(TypeWalker &walker) const {
   return Traversal(walker).doIt(*this);

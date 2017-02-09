@@ -38,7 +38,7 @@ bb0:
   strong_retain %69 : $Hash
   // CHECK: function_ref @_TFC4test3MD54hashfS0_FT3MsgVs5UInt8_T_ : $@convention(method) (@guaranteed MD5) -> ()
   // CHECK: apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@guaranteed MD5) -> ()
-  %134 = class_method %69 : $Hash, #Hash.hash!1 : (Hash) -> () -> () , $@convention(method) (@guaranteed Hash) -> ()
+  %134 = class_method %69 : $Hash, #Hash.hash!1 : (Hash) -> () -> (), $@convention(method) (@guaranteed Hash) -> ()
   %135 = apply %134(%69) : $@convention(method) (@guaranteed Hash) -> ()
   strong_release %2 : $MD5
   %17 = tuple ()
@@ -54,7 +54,7 @@ bb0:
   %61 = upcast %21 : $MD5 to $Hash
   // CHECK: function_ref @_TFC9hash2_new4Hash6updatefS0_FT3MsgVs5UInt83CntSi_T_ : $@convention(method) (@guaranteed Hash) -> ()
   // CHECK: apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@guaranteed Hash) -> ()
-  %62 = class_method %61 : $Hash, #Hash.update!1 : (Hash) -> () -> () , $@convention(method) (@guaranteed Hash) -> ()
+  %62 = class_method %61 : $Hash, #Hash.update!1 : (Hash) -> () -> (), $@convention(method) (@guaranteed Hash) -> ()
   %135 = apply %62(%61) : $@convention(method) (@guaranteed Hash) -> ()
   %17 = tuple ()
   // CHECK: return
@@ -115,7 +115,7 @@ bb0:
   %0 = alloc_ref $E
   %1 = upcast %0 : $E to $C
   %2 = unconditional_checked_cast %1 : $C to $D
-  %3 = class_method %2 : $D, #D.doIt!1 : (D) -> () -> () , $@convention(method) (@guaranteed D) -> ()
+  %3 = class_method %2 : $D, #D.doIt!1 : (D) -> () -> (), $@convention(method) (@guaranteed D) -> ()
   %4 = apply %3(%2) : $@convention(method) (@guaranteed D) -> ()
   %5 = tuple ()
 // CHECK: return

@@ -100,7 +100,7 @@ struct Tester {
   }
 };
 
-}
+} // end anonymous namespace
 
 TEST(PrefixMapTest, Insert) {
   PrefixMap<char, int> map;

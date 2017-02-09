@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -247,9 +247,6 @@ if True:
 ///
 ///     print(emptyDoubles[0])
 ///     // Triggers runtime error: Index out of range
-///
-/// See the `Sequence`, `Collection`, and `RangeReplaceableCollection`
-/// protocols for more methods available to arrays.
 ///
 /// Adding and Removing Elements
 /// ============================
@@ -553,9 +550,8 @@ public struct ${Self}<Element>
   ///     print(numbers[i])
   ///     // Prints "50"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
@@ -564,8 +560,6 @@ public struct ${Self}<Element>
   ///   this is the same value as the result of `n` calls to `index(after:)`.
   ///   If `n` is negative, this is the same value as the result of `-n` calls
   ///   to `index(before:)`.
-  ///
-  /// - Complexity: O(1)
   public func index(_ i: Int, offsetBy n: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for Array performance.  The optimizer is not
@@ -584,10 +578,11 @@ public struct ${Self}<Element>
   /// value, so it succeeds.
   ///
   ///     let numbers = [10, 20, 30, 40, 50]
-  ///     let i = numbers.index(numbers.startIndex,
-  ///                           offsetBy: 4,
-  ///                           limitedBy: numbers.endIndex)
-  ///     print(numbers[i])
+  ///     if let i = numbers.index(numbers.startIndex,
+  ///                              offsetBy: 4,
+  ///                              limitedBy: numbers.endIndex) {
+  ///         print(numbers[i])
+  ///     }
   ///     // Prints "50"
   ///
   /// The next example attempts to retrieve an index ten positions from
@@ -600,9 +595,9 @@ public struct ${Self}<Element>
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection, unless the index passed as `limit` prevents offsetting
+  /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
@@ -615,7 +610,6 @@ public struct ${Self}<Element>
   ///   the method returns `nil`.
   ///
   /// - SeeAlso: `index(_:offsetBy:)`, `formIndex(_:offsetBy:limitedBy:)`
-  /// - Complexity: O(1)
   public func index(
     _ i: Int, offsetBy n: Int, limitedBy limit: Int
   ) -> Int? {
@@ -789,6 +783,8 @@ public struct ${Self}<Element>
   }
 
   // FIXME(ABI)#12 : move to an initializer on _Buffer.
+  // Make sure the compiler does not inline _copyBuffer to reduce code size.
+  @inline(never)
   static internal func _copyBuffer(_ buffer: inout _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
@@ -1210,6 +1206,55 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// greater than the requested capacity. Use the array's `capacity` property
   /// to determine the size of the new storage.
   ///
+  /// Preserving an Array's Geometric Growth Strategy
+  /// ===============================================
+  ///
+  /// If you implement a custom data structure backed by an array that grows
+  /// dynamically, naively calling the `reserveCapacity(_:)` method can lead
+  /// to worse than expected performance. Arrays need to follow a geometric
+  /// allocation pattern for appending elements to achieve amortized
+  /// constant-time performance. The `Array` type's `append(_:)` and
+  /// `append(contentsOf:)` methods take care of this detail for you, but
+  /// `reserveCapacity(_:)` allocates only as much space as you tell it to
+  /// (padded to a round value), and no more. This avoids over-allocation, but
+  /// can result in insertion not having amortized constant-time performance.
+  ///
+  /// The following code declares `values`, an array of integers, and the
+  /// `addTenQuadratic()` function, which adds ten more values to the `values`
+  /// array on each call.
+  ///
+  ///       var values: [Int] = [0, 1, 2, 3]
+  ///
+  ///       // Don't use 'reserveCapacity(_:)' like this
+  ///       func addTenQuadratic() {
+  ///           let newCount = values.count + 10
+  ///           values.reserveCapacity(newCount)
+  ///           for n in values.count..<newCount {
+  ///               values.append(n)
+  ///           }
+  ///       }
+  ///
+  /// The call to `reserveCapacity(_:)` increases the `values` array's capacity
+  /// by exactly 10 elements on each pass through `addTenQuadratic()`, which
+  /// is linear growth. Instead of having constant time when averaged over
+  /// many calls, the function may decay to performance that is linear in
+  /// `values.count`. This is almost certainly not what you want.
+  ///
+  /// In cases like this, the simplest fix is often to simply remove the call
+  /// to `reserveCapacity(_:)`, and let the `append(_:)` method grow the array
+  /// for you.
+  ///
+  ///       func addTen() {
+  ///           let newCount = values.count + 10
+  ///           for n in values.count..<newCount {
+  ///               values.append(n)
+  ///           }
+  ///       }
+  ///
+  /// If you need more control over the capacity of your array, implement your
+  /// own geometric growth strategy, passing the size you compute to
+  /// `reserveCapacity(_:)`.
+  ///
   /// - Parameter minimumCapacity: The requested number of elements to store.
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the array.
@@ -1301,7 +1346,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
 
   /// Adds the elements of a sequence to the end of the array.
   ///
-  /// Use this method to append the elements of a sequence to the end of an
+  /// Use this method to append the elements of a sequence to the end of this
   /// array. This example appends the elements of a `Range<Int>` instance
   /// to an array of integers.
   ///
@@ -1315,53 +1360,40 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// - Complexity: O(*n*), where *n* is the length of the resulting array.
   public mutating func append<S : Sequence>(contentsOf newElements: S)
     where S.Iterator.Element == Element {
-    let oldCount = self.count
-    let capacity = self.capacity
-    let newCount = oldCount + newElements.underestimatedCount
 
-    if newCount > capacity {
-      self.reserveCapacity(
-        Swift.max(newCount, _growArrayCapacity(capacity)))
-      }
-    _buffer._arrayAppendSequence(newElements)
-  }
-
-  // An overload of `append(contentsOf:)` that uses the += that is optimized for
-  // collections.
-  // FIXME(ABI)#13 (Performance): remove this entrypoint.  The overload for `Sequence` should be
-  // made optimal for this case, too.
-  /// Adds the elements of a collection to the end of the array.
-  ///
-  /// Use this method to append the elements of a collection to the end of this
-  /// array. This example appends the elements of a `Range<Int>` instance
-  /// to an array of integers.
-  ///
-  ///     var numbers = [1, 2, 3, 4, 5]
-  ///     numbers.append(contentsOf: 10...15)
-  ///     print(numbers)
-  ///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
-  ///
-  /// - Parameter newElements: The elements to append to the array.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the resulting array.
-  public mutating func append<C : Collection>(contentsOf newElements: C)
-    where C.Iterator.Element == Element {
-
-    let newElementsCount = numericCast(newElements.count) as Int
+    let newElementsCount = newElements.underestimatedCount
 
     let oldCount = self.count
-    let capacity = self.capacity
+    let oldCapacity = self.capacity
     let newCount = oldCount + newElementsCount
 
     // Ensure uniqueness, mutability, and sufficient storage.  Note that
     // for consistency, we need unique self even if newElements is empty.
     self.reserveCapacity(
-      newCount > capacity ?
-      Swift.max(newCount, _growArrayCapacity(capacity))
+      newCount > oldCapacity ?
+      Swift.max(newCount, _growArrayCapacity(oldCapacity))
       : newCount)
 
-    (self._buffer.firstElementAddress + oldCount).initialize(from: newElements)
-    self._buffer.count = newCount
+    let startNewElements = _buffer.firstElementAddress + oldCount
+    let buf = UnsafeMutableBufferPointer(
+                start: startNewElements, 
+                count: self.capacity - oldCount)
+
+    let (remainder,writtenUpTo) = buf.initialize(from: newElements)
+    
+    // trap on underflow from the sequence's underestimate:
+    let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
+    _precondition(newElementsCount <= writtenCount, 
+      "newElements.underestimatedCount was an overestimate")
+    // can't check for overflow as sequences can underestimate
+
+    _buffer.count += writtenCount
+
+    if writtenUpTo == buf.endIndex {
+      // there may be elements that didn't fit in the existing buffer,
+      // append them in slow sequence-only mode
+      _buffer._arrayAppendSequence(IteratorSequence(remainder))
+    }
   }
 
 %if Self == 'ArraySlice':
@@ -1654,23 +1686,34 @@ extension ${Self} {
     return try body(&inoutBufferPointer)
   }
 
-  @discardableResult
   public func _copyContents(
-    initializing ptr: UnsafeMutablePointer<Element>
-  ) -> UnsafeMutablePointer<Element> {
-    if let s = self._baseAddressIfContiguous {
-      let count = self.count
-      ptr.initialize(from: s, count: count)
+    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+
+    guard !self.isEmpty else { return (makeIterator(),buffer.startIndex) }
+
+    // It is not OK for there to be no pointer/not enough space, as this is
+    // a precondition and Array never lies about its count.
+    guard var p = buffer.baseAddress
+      else { _preconditionFailure("Attempt to copy contents into nil buffer pointer") }
+    _precondition(self.count <= buffer.count, 
+      "Insufficient space allocated to copy array contents")
+
+    if let s = _baseAddressIfContiguous {
+      p.initialize(from: s, count: self.count)
+      // Need a _fixLifetime bracketing the _baseAddressIfContiguous getter
+      // and all uses of the pointer it returns:
       _fixLifetime(self._owner)
-      return ptr + count
     } else {
-      var p = ptr
       for x in self {
         p.initialize(to: x)
         p += 1
       }
-      return p
     }
+
+    var it = IndexingIterator(_elements: self)
+    it._position = endIndex
+    return (it,buffer.index(buffer.startIndex, offsetBy: self.count))
   }
 }
 %end
@@ -1795,54 +1838,6 @@ extension ${Self} {
       _buffer._arrayOutOfPlaceReplace(subrange, with: newElements, count: insertCount)
     }
   }
-}
-
-// FIXME(ABI)#16 : remove this entrypoint.  The functionality should be provided by
-// a `+=` operator on `RangeReplaceableCollection`.
-/// Appends the elements of a sequence to ${a_Self}.
-///
-/// Use this operator to append the elements of a sequence to the end of
-/// ${a_Self} with same `Element` type. This example appends
-/// the elements of a `Range<Int>` instance to an array of integers.
-///
-///     var numbers = [1, 2, 3, 4, 5]
-///     numbers += 10...15
-///     print(numbers)
-///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
-///
-/// - Parameters:
-///   - lhs: The array to append to.
-///   - rhs: A collection or finite sequence.
-///
-/// - Complexity: O(*n*), where *n* is the length of the resulting array.
-public func += <
-  S : Sequence
->(lhs: inout ${Self}<S.Iterator.Element>, rhs: S) {
-  lhs.append(contentsOf: rhs)
-}
-
-// FIXME(ABI)#17 : remove this entrypoint.  The functionality should be provided by
-// a `+=` operator on `RangeReplaceableCollection`.
-/// Appends the elements of a collection to ${a_Self}.
-///
-/// Use this operator to append the elements of a collection to the end of
-/// ${a_Self} with same `Element` type. This example appends
-/// the elements of a `Range<Int>` instance to an array of integers.
-///
-///     var numbers = [1, 2, 3, 4, 5]
-///     numbers += 10...15
-///     print(numbers)
-///     // Prints "[1, 2, 3, 4, 5, 10, 11, 12, 13, 14, 15]"
-///
-/// - Parameters:
-///   - lhs: The array to append to.
-///   - rhs: A collection.
-///
-/// - Complexity: O(*n*), where *n* is the length of the resulting array.
-public func += <
-  C : Collection
->(lhs: inout ${Self}<C.Iterator.Element>, rhs: C) {
-  lhs.append(contentsOf: rhs)
 }
 % end
 
@@ -2006,53 +2001,42 @@ extension _ArrayBufferProtocol {
     _arrayOutOfPlaceUpdate(&newBuffer, bufferCount, 0, _IgnorePointer())
   }
 
-  internal mutating func _arrayReserve(_ minimumCapacity: Int) {
-
-    let oldCount = self.count
-    let requiredCapacity = Swift.max(count, minimumCapacity)
-
-    if _fastPath(
-        requestUniqueMutableBackingBuffer(
-          minimumCapacity: requiredCapacity) != nil
-    ) {
-      return
-    }
-
-    var newBuffer = _forceCreateUniqueMutableBuffer(
-      newCount: oldCount, requiredCapacity: requiredCapacity)
-
-    _arrayOutOfPlaceUpdate(&newBuffer, oldCount, 0, _IgnorePointer())
-  }
-
   /// Append items from `newItems` to a buffer.
   internal mutating func _arrayAppendSequence<S : Sequence>(
     _ newItems: S
   ) where S.Iterator.Element == Element {
+    
+    // this function is only ever called from append(contentsOf:)
+    // which should always have exhausted its capacity before calling
+    _sanityCheck(count == capacity)
+    var newCount = self.count
 
+    // there might not be any elements to append remaining,
+    // so check for nil element first, then increase capacity,
+    // then inner-loop to fill that capacity with elements
     var stream = newItems.makeIterator()
     var nextItem = stream.next()
+    while nextItem != nil {
 
-    if nextItem == nil {
-      return
-    }
+      // grow capacity, first time around and when filled
+      var newBuffer = _forceCreateUniqueMutableBuffer(
+        countForNewBuffer: newCount, 
+        // minNewCapacity handles the exponential growth, just
+        // need to request 1 more than current count/capacity
+        minNewCapacity: newCount + 1)
 
-    // This will force uniqueness
-    var newCount = self.count
-    _arrayReserve(newCount + 1)
-    while true {
+      _arrayOutOfPlaceUpdate(&newBuffer, newCount, 0, _IgnorePointer())
+
       let currentCapacity = self.capacity
       let base = self.firstElementAddress
 
-      while (nextItem != nil) && newCount < currentCapacity {
-        (base + newCount).initialize(to: nextItem!)
+      // fill while there is another item and spare capacity
+      while let next = nextItem, newCount < currentCapacity {
+        (base + newCount).initialize(to: next)
         newCount += 1
         nextItem = stream.next()
       }
       self.count = newCount
-      if nextItem == nil {
-        return
-      }
-      self._arrayReserve(_growArrayCapacity(currentCapacity))
     }
   }
 }

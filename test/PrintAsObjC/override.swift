@@ -23,6 +23,8 @@ import OverrideBase
 class A_Child : Base {
   // CHECK-NEXT: @property (nonatomic, readonly, getter=getProp) NSUInteger prop;
   override var prop: Int { return 0 }
+  // CHECK-NEXT: @property (nonatomic, readonly) NSInteger originalName;
+  override var renamedProp: Int { return 0 }
   // CHECK-NEXT: - (id _Nullable)objectAtIndexedSubscript:(NSUInteger)x SWIFT_WARN_UNUSED_RESULT;
   override subscript(x: Int) -> Any? { return nil }
 

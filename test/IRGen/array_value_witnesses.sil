@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 
 import Swift
@@ -20,36 +20,36 @@ struct SomeWeak {
   weak var y: C?
 }
 
-// CHECK-LABEL: @_TWVV21array_value_witnesses3POD =
-// CHECK-NOT:     @_TwXxV21array_value_witnesses3POD
+// CHECK-LABEL: @_T021array_value_witnesses3PODVWV =
+// CHECK-NOT:     @_T021array_value_witnesses3PODVwXx
 // CHECK:         @__swift_noop_void_return
-// CHECK-NOT:     @_TwCcV21array_value_witnesses3POD
+// CHECK-NOT:     @_T021array_value_witnesses3PODVwCc
 // CHECK-32:      @__swift_memcpy_array4_4
 // CHECK-64:      @__swift_memcpy_array8_8
-// CHECK-NOT:     @_TwTtV21array_value_witnesses3POD
+// CHECK-NOT:     @_T021array_value_witnesses3PODVwTt
 // CHECK-32:      @__swift_memmove_array4_4
 // CHECK-64:      @__swift_memmove_array8_8
-// CHECK-NOT:     @_TwtTV21array_value_witnesses3POD
-// CHECK-32:      @__swift_memmove_array4_4
-// CHECK-64:      @__swift_memmove_array8_8
-
-// CHECK-LABEL: @_TWVV21array_value_witnesses14BitwiseTakable =
-// CHECK:         @_TwXxV21array_value_witnesses14BitwiseTakable
-// CHECK:         @_TwCcV21array_value_witnesses14BitwiseTakable
-// CHECK-NOT:     @_TwTtV21array_value_witnesses14BitwiseTakable
-// CHECK-32:      @__swift_memmove_array4_4
-// CHECK-64:      @__swift_memmove_array8_8
-// CHECK-NOT:     @_TwtTV21array_value_witnesses14BitwiseTakable
+// CHECK-NOT:     @_T021array_value_witnesses3PODVwtT
 // CHECK-32:      @__swift_memmove_array4_4
 // CHECK-64:      @__swift_memmove_array8_8
 
-// CHECK-LABEL: @_TWVV21array_value_witnesses8SomeWeak =
-// CHECK:         @_TwXxV21array_value_witnesses8SomeWeak
-// CHECK:         @_TwCcV21array_value_witnesses8SomeWeak
-// CHECK:         @_TwTtV21array_value_witnesses8SomeWeak
-// CHECK:         @_TwtTV21array_value_witnesses8SomeWeak
+// CHECK-LABEL: @_T021array_value_witnesses14BitwiseTakableVWV =
+// CHECK:         @_T021array_value_witnesses14BitwiseTakableVwXx
+// CHECK:         @_T021array_value_witnesses14BitwiseTakableVwCc
+// CHECK-NOT:     @_T021array_value_witnesses14BitwiseTakableVwTt
+// CHECK-32:      @__swift_memmove_array4_4
+// CHECK-64:      @__swift_memmove_array8_8
+// CHECK-NOT:     @_T021array_value_witnesses14BitwiseTakableVwtT
+// CHECK-32:      @__swift_memmove_array4_4
+// CHECK-64:      @__swift_memmove_array8_8
 
-// CHECK-LABEL: define linkonce_odr hidden void @_TwXxV21array_value_witnesses8SomeWeak
+// CHECK-LABEL: @_T021array_value_witnesses8SomeWeakVWV =
+// CHECK:         @_T021array_value_witnesses8SomeWeakVwXx
+// CHECK:         @_T021array_value_witnesses8SomeWeakVwCc
+// CHECK:         @_T021array_value_witnesses8SomeWeakVwTt
+// CHECK:         @_T021array_value_witnesses8SomeWeakVwtT
+
+// CHECK-LABEL: define linkonce_odr hidden void @_T021array_value_witnesses8SomeWeakVwXx
 // CHECK:         (%swift.opaque* [[ARRAY_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %SomeWeak) {{.*}} {
 // CHECK:         [[BEGIN:%.*]] = bitcast %swift.opaque* [[ARRAY_PTR]] to [[SOMEWEAK:%V21array_value_witnesses8SomeWeak]]*
 // CHECK:         br label %iter
@@ -67,7 +67,7 @@ struct SomeWeak {
 // CHECK:       exit:
 // CHECK:         ret
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_TwCcV21array_value_witnesses8SomeWeak
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_T021array_value_witnesses8SomeWeakVwCc
 // CHECK:         (%swift.opaque* [[DEST_PTR:%.*]], %swift.opaque* [[SRC_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %SomeWeak) {{.*}} {
 // CHECK:         [[DEST_BEGIN:%.*]] = bitcast %swift.opaque* [[DEST_PTR]] to [[SOMEWEAK]]*
 // CHECK:         [[SRC_BEGIN:%.*]] = bitcast %swift.opaque* [[SRC_PTR]] to [[SOMEWEAK]]*
@@ -89,7 +89,7 @@ struct SomeWeak {
 // CHECK:       exit:
 // CHECK:         ret
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_TwTtV21array_value_witnesses8SomeWeak
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_T021array_value_witnesses8SomeWeakVwTt
 // CHECK:         (%swift.opaque* [[DEST_PTR:%.*]], %swift.opaque* [[SRC_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %SomeWeak) {{.*}} {
 // CHECK:         [[DEST_BEGIN:%.*]] = bitcast %swift.opaque* [[DEST_PTR]] to [[SOMEWEAK]]*
 // CHECK:         [[SRC_BEGIN:%.*]] = bitcast %swift.opaque* [[SRC_PTR]] to [[SOMEWEAK]]*
@@ -111,7 +111,7 @@ struct SomeWeak {
 // CHECK:       exit:
 // CHECK:         ret
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_TwtTV21array_value_witnesses8SomeWeak
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_T021array_value_witnesses8SomeWeakVwtT
 // CHECK:         (%swift.opaque* [[DEST_PTR:%.*]], %swift.opaque* [[SRC_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %SomeWeak) {{.*}} {
 // CHECK:         [[DEST_BEGIN:%.*]] = bitcast %swift.opaque* [[DEST_PTR]] to [[SOMEWEAK]]*
 // CHECK:         [[SRC_BEGIN:%.*]] = bitcast %swift.opaque* [[SRC_PTR]] to [[SOMEWEAK]]*

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -454,6 +454,9 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   ++NamesSeen[VD->getFullName()];
   SmallVector<ValueDecl *, 8> RelatedDecls;
 
+  if (isa<ParamDecl>(VD))
+    return; // Parameters don't have interesting related declarations.
+
   // FIXME: Extract useful related declarations, overloaded functions,
   // if VD is an initializer, we should extract other initializers etc.
   // For now we use UnqualifiedLookup to fetch other declarations with the same
@@ -606,7 +609,7 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
 
 /// Returns true for failure to resolve.
 static bool passCursorInfoForDecl(const ValueDecl *VD,
-                                  const Module *MainModule,
+                                  const ModuleDecl *MainModule,
                                   const Type Ty,
                                   const Type ContainerTy,
                                   bool IsRef,
@@ -856,6 +859,7 @@ protected:
   SwiftInvocationRef ASTInvok;
   StringRef InputFile;
   unsigned Offset;
+  unsigned Length;
 
 private:
   const bool TryExistingAST;
@@ -867,11 +871,11 @@ protected:
   }
 
 public:
-  CursorRangeInfoConsumer(StringRef InputFile, unsigned Offset,
+  CursorRangeInfoConsumer(StringRef InputFile, unsigned Offset, unsigned Length,
                           SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
                           bool TryExistingAST)
     : Lang(Lang), ASTInvok(ASTInvok),InputFile(InputFile), Offset(Offset),
-      TryExistingAST(TryExistingAST) { }
+      Length(Length), TryExistingAST(TryExistingAST) { }
 
   bool canUseASTWithSnapshots(ArrayRef<ImmutableTextSnapshotRef> Snapshots) override {
     if (!TryExistingAST) {
@@ -928,26 +932,30 @@ public:
 };
 static void resolveCursor(SwiftLangSupport &Lang,
                           StringRef InputFile, unsigned Offset,
+                          unsigned Length, bool Actionables,
                           SwiftInvocationRef Invok,
                           bool TryExistingAST,
                           std::function<void(const CursorInfo &)> Receiver) {
   assert(Invok);
 
   class CursorInfoConsumer : public CursorRangeInfoConsumer {
+    bool Actionables;
     std::function<void(const CursorInfo &)> Receiver;
 
   public:
     CursorInfoConsumer(StringRef InputFile, unsigned Offset,
+                       unsigned Length, bool Actionables,
                        SwiftLangSupport &Lang,
                        SwiftInvocationRef ASTInvok,
                        bool TryExistingAST,
                        std::function<void(const CursorInfo &)> Receiver)
-    : CursorRangeInfoConsumer(InputFile, Offset, Lang, ASTInvok, TryExistingAST),
+    : CursorRangeInfoConsumer(InputFile, Offset, Length, Lang, ASTInvok,
+                              TryExistingAST), Actionables(Actionables),
       Receiver(std::move(Receiver)){ }
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
-      Module *MainModule = CompIns.getMainModule();
+      ModuleDecl *MainModule = CompIns.getMainModule();
 
       unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
       SourceLoc Loc =
@@ -990,7 +998,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
         if (Failed) {
           if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
-            resolveCursor(Lang, InputFile, Offset, ASTInvok,
+            resolveCursor(Lang, InputFile, Offset, Length, Actionables, ASTInvok,
                           /*TryExistingAST=*/false, Receiver);
           } else {
             Receiver({});
@@ -1012,7 +1020,8 @@ static void resolveCursor(SwiftLangSupport &Lang,
   };
 
   auto Consumer = std::make_shared<CursorInfoConsumer>(
-      InputFile, Offset, Lang, Invok, TryExistingAST, Receiver);
+    InputFile, Offset, Length, Actionables, Lang, Invok, TryExistingAST,
+    Receiver);
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
@@ -1027,7 +1036,6 @@ static void resolveRange(SwiftLangSupport &Lang,
   assert(Invok);
 
   class RangeInfoConsumer : public CursorRangeInfoConsumer {
-    unsigned Length;
     std::function<void(const RangeInfo&)> Receiver;
 
   public:
@@ -1035,8 +1043,8 @@ static void resolveRange(SwiftLangSupport &Lang,
                        SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
                        bool TryExistingAST,
                        std::function<void(const RangeInfo&)> Receiver)
-    : CursorRangeInfoConsumer(InputFile, Offset, Lang, ASTInvok, TryExistingAST),
-      Length(Length), Receiver(std::move(Receiver)){ }
+    : CursorRangeInfoConsumer(InputFile, Offset, Length, Lang, ASTInvok,
+                              TryExistingAST), Receiver(std::move(Receiver)){ }
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       if (trace::enabled()) {
@@ -1100,7 +1108,7 @@ static void resolveRange(SwiftLangSupport &Lang,
 
 
 void SwiftLangSupport::getCursorInfo(
-    StringRef InputFile, unsigned Offset,
+    StringRef InputFile, unsigned Offset, unsigned Length, bool Actionables,
     ArrayRef<const char *> Args,
     std::function<void(const CursorInfo &)> Receiver) {
 
@@ -1150,8 +1158,8 @@ void SwiftLangSupport::getCursorInfo(
     return;
   }
 
-  resolveCursor(*this, InputFile, Offset, Invok, /*TryExistingAST=*/true,
-                Receiver);
+  resolveCursor(*this, InputFile, Offset, Length, Actionables, Invok,
+                /*TryExistingAST=*/true, Receiver);
 }
 
 void SwiftLangSupport::
@@ -1222,7 +1230,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &CompIns = AstUnit->getCompilerInstance();
-      Module *MainModule = CompIns.getMainModule();
+      ModuleDecl *MainModule = CompIns.getMainModule();
 
       unsigned BufferID =
           AstUnit->getPrimarySourceFile().getBufferID().getValue();
@@ -1367,7 +1375,8 @@ private:
     return true;
   }
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type T) override {
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+                          SemaReferenceKind Kind) override {
     if (Cancelled)
       return false;
     if (CtorTyRef)

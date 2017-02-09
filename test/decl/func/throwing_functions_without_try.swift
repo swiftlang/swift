@@ -22,7 +22,7 @@ doLazy(foo())
 
 // It doesn't include explicit closures.
 var closure: () -> () = {
-  var x = foo() // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  _ = foo() // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
   doLazy(foo()) // expected-error {{call can throw but is not marked with 'try'}}
 }
 

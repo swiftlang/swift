@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -52,18 +52,18 @@ static bool isResolvableScope(ScopeKind SK) {
   llvm_unreachable("Unhandled ScopeKind in switch.");
 }
 
-Scope::Scope(Parser *P, ScopeKind SC, bool IsStaticallyInactiveConfigBlock)
+Scope::Scope(Parser *P, ScopeKind SC, bool isInactiveConfigBlock)
   : SI(P->getScopeInfo()),
     HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : nullptr),
     PrevScope(SI.CurScope),
     PrevResolvableDepth(SI.ResolvableDepth),
     Kind(SC),
-    IsStaticallyInactiveConfigBlock(IsStaticallyInactiveConfigBlock) {
+    IsInactiveConfigBlock(isInactiveConfigBlock) {
   assert(PrevScope || Kind == ScopeKind::TopLevel);
   
   if (SI.CurScope) {
     Depth = SI.CurScope->Depth + 1;
-    IsStaticallyInactiveConfigBlock |= SI.CurScope->IsStaticallyInactiveConfigBlock;
+    IsInactiveConfigBlock |= SI.CurScope->IsInactiveConfigBlock;
   } else {
     Depth = 0;
   }
@@ -79,7 +79,7 @@ Scope::Scope(Parser *P, SavedScope &&SS):
     PrevResolvableDepth(SI.ResolvableDepth),
     Depth(SS.Depth),
     Kind(SS.Kind),
-    IsStaticallyInactiveConfigBlock(SS.IsStaticallyInactiveConfigBlock) {
+    IsInactiveConfigBlock(SS.IsInactiveConfigBlock) {
 
     SI.CurScope = this;
     if (!isResolvableScope(Kind))

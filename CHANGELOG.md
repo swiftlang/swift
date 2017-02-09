@@ -17,8 +17,118 @@ CHANGELOG
 
 </details>
 
+* More types of C macros which define integer constants are supported by the
+  importer. Specifically the `+, -, *, /, ^, >>, ==, <, <=, >, >=` operators
+  are now recognized, and the previously-supported `<<, &&, ||, &, |`
+  operators always look through importable macros on each side of the operator.
+  Logical AND and OR macros (`&&` and `||`) are now imported as Boolean
+  constants, rather than integers of value 0 or 1.
+
+  ```c
+  #define HIGHER    (5 + 5)
+  #define THE_EDGE  (INT64_MAX - 1)
+  #define FORTY_TWO (6 * 9)
+  #define SPLIT     (THE_EDGE / FORTY_TWO)
+
+  #define HALF_AND_HALF (UINT64_MAX ^ UINT32_MAX)
+
+  #define SMALL   (BITWIDTH == 32)
+  #define TINY    (BITWIDTH <= 16)
+  #define LIMITED (SMALL || TINY)   // now imported as Bool.
+  ```
+
+  **Add new entries to the top of this file, not here!**
+
 Swift 3.1
 ---------
+
+* [SE-0080][]:
+
+  Adds a new family of conversion initializers to all numeric types that
+  either complete successfully without loss of information or return nil.
+
+* Swift will now warn when an `NSObject` subclass attempts to override the
+  class `initialize` method. Swift doesn't guarantee that references to class
+  names trigger Objective-C class realization if they have no other
+  side effects, leading to bugs when Swift code attempted to override
+  `initialize`.
+
+* [SR-2394](https://bugs.swift.org/browse/SR-2394)
+
+  C functions that "return twice" are no longer imported into Swift. Instead,
+  they are explicitly made unavailable, so attempting to reference them will
+  result in a compilation error.
+
+  Examples of functions that "return twice" include `vfork` and `setjmp`.
+  These functions change the control flow of a program in ways that that Swift
+  has never supported. For example, definitive initialization of variables,
+  a core Swift language feature, could not be guaranteed when these functions
+  were used.
+
+  Swift code that references these functions will no longer compile. Although
+  this could be considered a source-breaking change, it's important to note that
+  any use of these functions would have most likely crashed at runtime. Now,
+  the compiler will prevent them from being used in the first place.
+
+* Indirect fields from C structures and unions are now always imported, while
+  they previously weren't imported if they belonged to a union. This is done by
+  naming anonymous fields. For example:
+
+  ```c
+  typedef struct foo_t {
+    union {
+      int a;
+      double b;
+    };
+  } foo_t;
+  ```
+
+  Get imported as:
+
+  ```swift
+  struct foo_t {
+    struct __Unnamed_union___Anonymous_field0 {
+      var a : Int { get set }
+      var b : Double { get set }
+    }
+    var __Anonymous_field0 : foo_t.__Unnamed_union___Anonymous_field0
+
+    // a and b are computed properties accessing the content of __Anonymous_field0
+    var a : Int { get set }
+    var b : Double { get set }
+  }
+  ```
+
+  Since new symbols are exposed from imported structure/unions, this may conflict
+  with existing code that extended C types in order to provide their own accessors
+  to the indirect fields.
+
+* The `withoutActuallyEscaping` function from [SE-0103][] has been implemented.
+  To pass off a non-escaping closure to an API that formally takes an
+  `@escaping` closure, but which is used in a way that will not in fact
+  escape it in practice, use `withoutActuallyEscaping` to get an escapable
+  copy of the closure and delimit its expected lifetime. For example:
+
+  ```swift
+  func doSimultaneously(_ f: () -> (), and g: () -> (), on q: DispatchQueue) {
+    // DispatchQueue.async normally has to be able to escape its closure
+    // since it may be called at any point after the operation is queued.
+    // By using a barrier, we ensure it does not in practice escape.
+    withoutActuallyEscaping(f) { escapableF in
+      withoutActuallyEscaping(g) { escapableG in
+        q.async(escapableF)
+        q.async(escapableG)
+        q.sync(flags: .barrier) {}
+      }
+    }
+    // `escapableF` and `escapableG` must be dequeued by the point
+    // `withoutActuallyEscaping` returns.
+  }
+  ```
+
+  The old workaround of using `unsafeBitCast` to cast to an `@escaping` type
+  is not guaranteed to work in future versions of Swift, and will
+  now raise a warning.
 
 * [SR-1446](https://bugs.swift.org/browse/SR-1446)
 
@@ -55,8 +165,6 @@ Swift 3.1
   satisfying a predicate.  `drop(while:)` requests the remaining
   subsequence after dropping the longest subsequence satisfying a
   predicate.
-
-**Add new entries to the top of this file, not here!**
 
 Swift 3.0
 ---------
@@ -300,8 +408,8 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   ```swift
   let a: Foo & Bar
   let b = value as? A & B & C
-  func foo<T : Foo & Bar>(x: T) { … }
-  func bar(x: Foo & Bar) { … }
+  func foo<T : Foo & Bar>(x: T) { ... }
+  func bar(x: Foo & Bar) { ... }
   typealias G = GenericStruct<Foo & Bar>
   ```
 
@@ -1079,7 +1187,7 @@ Swift 2.0
 * Public extensions of generic types are now permitted.
 
   ```swift
-  public extension Array { … }
+  public extension Array { ... }
   ```
 
   **(16974298)**
@@ -1239,8 +1347,8 @@ Swift 2.0
   For example:
 
   ```swift
-  func produceGizmoUsingTechnology() throws -> Gizmo { … }
-  func produceGizmoUsingMagic() throws -> Gizmo { … }
+  func produceGizmoUsingTechnology() throws -> Gizmo { ... }
+  func produceGizmoUsingMagic() throws -> Gizmo { ... }
 
   if let result = try? produceGizmoUsingTechnology() { return result }
   if let result = try? produceGizmoUsingMagic() { return result }
@@ -1413,7 +1521,7 @@ Swift 2.0
   function or initializer. For example:
 
   ```swift
-  func doSomethingToValues(values: Int... , options: MyOptions = [], fn: (Int) -&gt; Void) { … }
+  func doSomethingToValues(values: Int... , options: MyOptions = [], fn: (Int) -&gt; Void) { ... }
   ```
 
   **(20127197)**
@@ -1445,7 +1553,7 @@ Swift 2.0
   **(17227475)**
 
 * When delegating or chaining to a failable initializer (for example, with
-  `self.init(…)` or `super.init(…)`), one can now force-unwrap the result with
+  `self.init(...)` or `super.init(...)`), one can now force-unwrap the result with
   `!`. For example:
 
   ```swift
@@ -2152,7 +2260,7 @@ Swift 1.2
   }
 
   class MySomethingDelegate : SomethingDelegate {
-      @objc func didSomething() { … }
+      @objc func didSomething() { ... }
   }
   ```
 
@@ -6293,3 +6401,10 @@ Swift 1.0
 [SE-0138]: <https://github.com/apple/swift-evolution/blob/master/proposals/0138-unsaferawbufferpointer.md>
 [SE-0139]: <https://github.com/apple/swift-evolution/blob/master/proposals/0139-bridge-nsnumber-and-nsvalue.md>
 [SE-0140]: <https://github.com/apple/swift-evolution/blob/master/proposals/0140-bridge-optional-to-nsnull.md>
+[SE-0141]: <https://github.com/apple/swift-evolution/blob/master/proposals/0141-available-by-swift-version.md>
+[SE-0142]: <https://github.com/apple/swift-evolution/blob/master/proposals/0142-associated-types-constraints.md>
+[SE-0143]: <https://github.com/apple/swift-evolution/blob/master/proposals/0143-conditional-conformances.md>
+[SE-0144]: <https://github.com/apple/swift-evolution/blob/master/proposals/0144-allow-single-dollar-sign-as-valid-identifier.md>
+[SE-0145]: <https://github.com/apple/swift-evolution/blob/master/proposals/0145-package-manager-version-pinning.md>
+[SE-0146]: <https://github.com/apple/swift-evolution/blob/master/proposals/0146-package-manager-product-definitions.md>
+[SE-0147]: <https://github.com/apple/swift-evolution/blob/master/proposals/0147-move-unsafe-initialize-from.md>

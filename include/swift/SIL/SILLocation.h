@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -87,15 +87,15 @@ public:
   struct DebugLoc {
     unsigned Line;
     unsigned Column;
-    const char *Filename;
+    StringRef Filename;
 
     DebugLoc(unsigned Line = 0, unsigned Column = 0,
-             const char *Filename = nullptr)
+             StringRef Filename = StringRef())
         : Line(Line), Column(Column), Filename(Filename) {}
 
     inline bool operator==(const DebugLoc &R) const {
       return Line == R.Line && Column == R.Column &&
-             StringRef(Filename).equals(R.Filename);
+             Filename.equals(R.Filename);
     }
   };
 
@@ -265,7 +265,7 @@ public:
   bool isNull() const {
     switch (getStorageKind()) {
     case ASTNodeKind:   return Loc.ASTNode.Primary.isNull();
-    case DebugInfoKind: return Loc.DebugInfoLoc.Filename;
+    case DebugInfoKind: return Loc.DebugInfoLoc.Filename.empty();
     case SILFileKind:   return Loc.SILFileLoc.isInvalid();
     default:            return true;
     }
@@ -400,6 +400,9 @@ public:
     return getNodeAs<T>(Loc.ASTNode.ForDebugger);
   }
 
+  /// Return the location as a DeclContext or null.
+  DeclContext *getAsDeclContext() const;
+
   SourceLoc getDebugSourceLoc() const;
   SourceLoc getSourceLoc() const;
   SourceLoc getStartSourceLoc() const;
@@ -410,7 +413,7 @@ public:
   }
 
   /// Fingerprint a DebugLoc for use in a DenseMap.
-  typedef std::pair<std::pair<unsigned, unsigned>, const void *> DebugLocKey;
+  typedef std::pair<std::pair<unsigned, unsigned>, StringRef> DebugLocKey;
   struct DebugLocHash : public DebugLocKey {
     DebugLocHash(DebugLoc L) : DebugLocKey({{L.Line, L.Column}, L.Filename}) {}
   };

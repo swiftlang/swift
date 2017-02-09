@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,15 +26,46 @@
 using namespace swift;
 using namespace NewMangling;
 
-bool NewMangling::useNewMangling() {
+llvm::cl::opt<bool> NewManglingForTests(
+                       "new-mangling-for-tests", llvm::cl::init(false),
+                       llvm::cl::desc("Use new mangling for compiler tests"));
+
+#ifndef USE_NEW_MANGLING
+
+static bool containsNonSwiftModule(Demangle::NodePointer Nd) {
+  switch (Nd->getKind()) {
+    case Demangle::Node::Kind::Module:
+      if (Nd->getText() != "Swift")
+        return true;
+      break;
+    case Demangle::Node::Kind::ReabstractionThunk:
+    case Demangle::Node::Kind::ReabstractionThunkHelper:
+      return true;
+    default:
+      break;
+  }
+
+  for (auto Child : *Nd) {
+    if (containsNonSwiftModule(Child))
+      return true;
+  }
+  return false;
+}
+
+#endif // USE_NEW_MANGLING
+
+bool swift::useNewMangling(Demangle::NodePointer Node) {
 #ifdef USE_NEW_MANGLING
   return true;
 #else
+  if (NewManglingForTests && Node && containsNonSwiftModule(Node))
+    return true;
   return false;
 #endif
 }
 
 #ifndef NDEBUG
+
 llvm::cl::opt<bool> PrintSwiftManglingStats(
     "print-swift-mangling-stats", llvm::cl::init(false),
     llvm::cl::desc("Print statistics about Swift symbol mangling"));
@@ -104,12 +135,12 @@ static bool areTreesEqual(Demangle::NodePointer Old, Demangle::NodePointer New) 
   return true;
 }
 
-static bool containsDependentAssociatedTypeRef(Demangle::NodePointer Nd) {
-  if (Nd->getKind() == Demangle::Node::Kind::DependentAssociatedTypeRef)
+static bool treeContains(Demangle::NodePointer Nd, Demangle::Node::Kind Kind) {
+  if (Nd->getKind() == Kind)
     return true;
 
   for (auto Child : *Nd) {
-    if (containsDependentAssociatedTypeRef(Child))
+    if (treeContains(Child, Kind))
       return true;
   }
   return false;
@@ -154,17 +185,33 @@ void Mangler::recordOpStatImpl(StringRef op, size_t OldPos) {
 #endif // NDEBUG
 
 std::string NewMangling::selectMangling(const std::string &Old,
-                                          const std::string &New) {
+                                        const std::string &New,
+                                        bool compareTrees) {
+  using namespace Demangle;
+
+  NodePointer NewNode = demangleSymbolAsNode(New);
+
+  if (!NewNode && StringRef(New).startswith("s:")) {
+    std::string demangleStr = MANGLING_PREFIX_STR + New.substr(2);
+    NewNode = demangleSymbolAsNode(demangleStr);
+  }
+
 #ifndef NDEBUG
 #ifdef CHECK_MANGLING_AGAINST_OLD
 
   static int numCmp = 0;
-  using namespace Demangle;
 
-  NodePointer OldNode = demangleSymbolAsNode(Old);
-  NodePointer NewNode = demangleSymbolAsNode(New);
+  NodePointer OldNode;
+  if (compareTrees)
+    OldNode = demangleSymbolAsNode(Old);
 
-  if (OldNode) {
+  if (StringRef(New).startswith(MANGLING_PREFIX_STR) &&
+      (!NewNode || treeContains(NewNode, Demangle::Node::Kind::Suffix))) {
+    llvm::errs() << "Can't demangle " << New << '\n';
+    assert(false);
+  }
+
+  if (OldNode && !treeContains(OldNode, Demangle::Node::Kind::Suffix)) {
     if (!areTreesEqual(OldNode, NewNode)) {
       llvm::errs() << "Mangling differs at #" << numCmp << ":\n"
                       "old: " << Old << "\n"
@@ -180,10 +227,11 @@ std::string NewMangling::selectMangling(const std::string &Old,
       std::string Remangled = mangleNodeNew(NewNode);
       if (New != Remangled) {
         bool isEqual = false;
-        if (containsDependentAssociatedTypeRef(NewNode) ||
+        if (treeContains(NewNode,
+                         Demangle::Node::Kind::DependentAssociatedTypeRef) ||
             // Does the mangling contain an identifier which is the name of
             // an old-mangled function?
-            New.find("_T") != std::string::npos) {
+            New.find("_T", 2) != std::string::npos) {
           NodePointer RemangledNode = demangleSymbolAsNode(Remangled);
           isEqual = areTreesEqual(NewNode, RemangledNode);
         }
@@ -215,7 +263,7 @@ std::string NewMangling::selectMangling(const std::string &Old,
   }
 #endif // NDEBUG
 
-  return useNewMangling() ? New : Old;
+  return useNewMangling(NewNode) ? New : Old;
 }
 
 void NewMangling::printManglingStats() {
@@ -262,6 +310,11 @@ void NewMangling::printManglingStats() {
 }
 
 void Mangler::beginMangling() {
+  Storage.clear();
+  Substitutions.clear();
+  StringSubstitutions.clear();
+  lastSubstIdx = -2;
+  Words.clear();
   Buffer << MANGLING_PREFIX_STR;
 }
 

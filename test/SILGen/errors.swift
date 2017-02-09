@@ -167,8 +167,10 @@ class HasThrowingInit {
 }
 // CHECK-LABEL: sil hidden @_TFC6errors15HasThrowingInitc{{.*}} : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error Error) {
 // CHECK:      [[T0:%.*]] = mark_uninitialized [rootself] %1 : $HasThrowingInit
-// CHECK-NEXT: [[T1:%.*]] = ref_element_addr [[T0]] : $HasThrowingInit
+// CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
+// CHECK-NEXT: [[T1:%.*]] = ref_element_addr [[BORROWED_T0]] : $HasThrowingInit
 // CHECK-NEXT: assign %0 to [[T1]] : $*Int
+// CHECK-NEXT: end_borrow [[BORROWED_T0]] from [[T0]]
 // CHECK-NEXT: [[T0_RET:%.*]] = copy_value [[T0]]
 // CHECK-NEXT: destroy_value [[T0]]
 // CHECK-NEXT: return [[T0_RET]] : $HasThrowingInit
@@ -232,15 +234,18 @@ struct DoomedStruct : Doomed {
 // CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
 // CHECK:      [[SELF:%.*]] = load [take] [[TEMP]] : $*DoomedClass
-// CHECK:      [[T0:%.*]] = class_method [[SELF]] : $DoomedClass, #DoomedClass.check!1 : (DoomedClass) -> () throws -> () , $@convention(method) (@guaranteed DoomedClass) -> @error Error
-// CHECK-NEXT: try_apply [[T0]]([[SELF]])
+// CHECK:      [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+// CHECK:      [[T0:%.*]] = class_method [[BORROWED_SELF]] : $DoomedClass, #DoomedClass.check!1 : (DoomedClass) -> () throws -> (), $@convention(method) (@guaranteed DoomedClass) -> @error Error
+// CHECK-NEXT: try_apply [[T0]]([[BORROWED_SELF]])
 // CHECK:    bb1([[T0:%.*]] : $()):
 // CHECK:      [[T0:%.*]] = tuple ()
+// CHECK:      end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK:      destroy_value [[SELF]] : $DoomedClass
 // CHECK:      dealloc_stack [[TEMP]]
 // CHECK:      return [[T0]] : $()
 // CHECK:    bb2([[T0:%.*]] : $Error):
 // CHECK:      builtin "willThrow"([[T0]] : $Error)
+// CHECK:      end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK:      destroy_value [[SELF]] : $DoomedClass
 // CHECK:      dealloc_stack [[TEMP]]
 // CHECK:      throw [[T0]] : $Error
@@ -265,9 +270,11 @@ struct HappyStruct : Doomed {
 // CHECK:      [[TEMP:%.*]] = alloc_stack $HappyClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
 // CHECK:      [[SELF:%.*]] = load [take] [[TEMP]] : $*HappyClass
-// CHECK:      [[T0:%.*]] = class_method [[SELF]] : $HappyClass, #HappyClass.check!1 : (HappyClass) -> () -> () , $@convention(method) (@guaranteed HappyClass) -> ()
-// CHECK:      [[T1:%.*]] = apply [[T0]]([[SELF]])
+// CHECK:      [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+// CHECK:      [[T0:%.*]] = class_method [[BORROWED_SELF]] : $HappyClass, #HappyClass.check!1 : (HappyClass) -> () -> (), $@convention(method) (@guaranteed HappyClass) -> ()
+// CHECK:      [[T1:%.*]] = apply [[T0]]([[BORROWED_SELF]])
 // CHECK:      [[T1:%.*]] = tuple ()
+// CHECK:      end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK:      destroy_value [[SELF]] : $HappyClass
 // CHECK:      dealloc_stack [[TEMP]]
 // CHECK:      return [[T1]] : $()
@@ -370,7 +377,7 @@ func getHungryCat(_ food: CatFood) throws -> Cat {
     return try dont_make_a_cat()
   }
 }
-// errors.getHungryCat  throws (errors.CatFood) -> errors.Cat
+// errors.getHungryCat throws (errors.CatFood) -> errors.Cat
 // CHECK-LABEL: sil hidden @_TF6errors12getHungryCatFzOS_7CatFoodCS_3Cat : $@convention(thin) (CatFood) -> (@owned Cat, @error Error)
 // CHECK: bb0(%0 : $CatFood):
 // CHECK:   debug_value undef : $Error, var, name "$error", argno 2
@@ -400,8 +407,12 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK:         [[N:%.*]] = integer_literal $Builtin.Word, 4
 // CHECK:         [[T0:%.*]] = function_ref @_TFs27_allocateUninitializedArray
 // CHECK:         [[T1:%.*]] = apply [[T0]]<Cat>([[N]])
-// CHECK:         [[ARRAY:%.*]] = tuple_extract [[T1]] :  $(Array<Cat>, Builtin.RawPointer), 0
-// CHECK:         [[T2:%.*]] = tuple_extract [[T1]] :  $(Array<Cat>, Builtin.RawPointer), 1
+// CHECK:         [[BORROWED_T1:%.*]] = begin_borrow [[T1]]
+// CHECK:         [[BORROWED_ARRAY:%.*]] = tuple_extract [[BORROWED_T1]] :  $(Array<Cat>, Builtin.RawPointer), 0
+// CHECK:         [[ARRAY:%.*]] = copy_value [[BORROWED_ARRAY]]
+// CHECK:         [[T2:%.*]] = tuple_extract [[BORROWED_T1]] :  $(Array<Cat>, Builtin.RawPointer), 1
+// CHECK:         end_borrow [[BORROWED_T1]] from [[T1]]
+// CHECK:         destroy_value [[T1]]
 // CHECK:         [[ELT0:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Cat
 //   Element 0.
 // CHECK:         [[T0:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error Error)
@@ -477,7 +488,7 @@ class BaseThrowingInit : HasThrowingInit {
   }
 }
 // CHECK: sil hidden @_TFC6errors16BaseThrowingInitc{{.*}} : $@convention(method) (Int, Int, @owned BaseThrowingInit) -> (@owned BaseThrowingInit, @error Error)
-// CHECK:      [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <BaseThrowingInit>
+// CHECK:      [[BOX:%.*]] = alloc_box ${ var BaseThrowingInit }
 // CHECK:      [[PB:%.*]] = project_box [[BOX]]
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[PB]]
 //   Initialize subField.
@@ -636,8 +647,12 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[ADDRESSOR:%.*]] = function_ref @_TFV6errors11OwnedBridgeaO9subscriptFSSVS_5Pylon :
 // CHECK-NEXT: [[T0:%.*]] = apply [[ADDRESSOR]]([[ARG2_COPY]], [[ARG1]])
-// CHECK-NEXT: [[T1:%.*]] = tuple_extract [[T0]] : {{.*}}, 0
-// CHECK-NEXT: [[OWNER:%.*]] = tuple_extract [[T0]] : {{.*}}, 1
+// CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
+// CHECK-NEXT: [[T1:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 0
+// CHECK-NEXT: [[BORROWED_OWNER:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 1
+// CHECK-NEXT: [[OWNER:%.*]] = copy_value [[BORROWED_OWNER]]
+// CHECK-NEXT: end_borrow [[BORROWED_T0]] from [[T0]]
+// CHECK-NEXT: destroy_value [[T0]]
 // CHECK-NEXT: [[T3:%.*]] = struct_extract [[T1]]
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
@@ -670,8 +685,12 @@ func supportStructure(_ b: inout PinnedBridge, name: String) throws {
 // CHECK-NEXT:   // function_ref
 // CHECK-NEXT:   [[ADDRESSOR:%.*]] = function_ref @_TFV6errors12PinnedBridgeap9subscriptFSSVS_5Pylon :
 // CHECK-NEXT:   [[T0:%.*]] = apply [[ADDRESSOR]]([[ARG2_COPY]], [[ARG1]])
-// CHECK-NEXT:   [[T1:%.*]] = tuple_extract [[T0]] : {{.*}}, 0
-// CHECK-NEXT:   [[OWNER:%.*]] = tuple_extract [[T0]] : {{.*}}, 1
+// CHECK-NEXT:   [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
+// CHECK-NEXT:   [[T1:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 0
+// CHECK-NEXT:   [[BORROWED_OWNER:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 1
+// CHECK-NEXT:   [[OWNER:%.*]] = copy_value [[BORROWED_OWNER]]
+// CHECK-NEXT:   end_borrow [[BORROWED_T0]] from [[T0]]
+// CHECK-NEXT:   destroy_value [[T0]]
 // CHECK-NEXT:   [[T3:%.*]] = struct_extract [[T1]]
 // CHECK-NEXT:   [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT:   [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
@@ -721,7 +740,7 @@ func testOptionalTry() {
 
 // CHECK-LABEL: sil hidden @_TF6errors18testOptionalTryVarFT_T_
 // CHECK-NEXT: bb0:
-// CHECK-NEXT: [[BOX:%.+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<Cat>>
+// CHECK-NEXT: [[BOX:%.+]] = alloc_box ${ var Optional<Cat> }
 // CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<Cat>, #Optional.some!enumelt.1
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
@@ -731,7 +750,7 @@ func testOptionalTry() {
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<Cat>, #Optional.some!enumelt.1
 // CHECK-NEXT: br [[DONE:[^ ]+]],
 // CHECK: [[DONE]]:
-// CHECK-NEXT: destroy_value [[BOX]] : $<τ_0_0> { var τ_0_0 } <Optional<Cat>>
+// CHECK-NEXT: destroy_value [[BOX]] : ${ var Optional<Cat> }
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
 // CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : $Error):
@@ -777,7 +796,7 @@ func testOptionalTryAddressOnly<T>(_ obj: T) {
 
 // CHECK-LABEL: sil hidden @_TF6errors29testOptionalTryAddressOnlyVar
 // CHECK: bb0(%0 : $*T):
-// CHECK: [[BOX:%.+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<T>>
+// CHECK: [[BOX:%.+]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <T>
 // CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors11dont_return
@@ -789,7 +808,7 @@ func testOptionalTryAddressOnly<T>(_ obj: T) {
 // CHECK-NEXT: dealloc_stack [[ARG_BOX]] : $*T
 // CHECK-NEXT: br [[DONE:[^ ]+]],
 // CHECK: [[DONE]]:
-// CHECK-NEXT: destroy_value [[BOX]] : $<τ_0_0> { var τ_0_0 } <Optional<T>>
+// CHECK-NEXT: destroy_value [[BOX]] : $<τ_0_0> { var Optional<τ_0_0> } <T>
 // CHECK-NEXT: destroy_addr %0 : $*T
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
@@ -847,11 +866,11 @@ func testOptionalTryNeverFails() {
 
 // CHECK-LABEL: sil hidden @_TF6errors28testOptionalTryNeverFailsVarFT_T_
 // CHECK: bb0:
-// CHECK-NEXT:   [[BOX:%.+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<()>>
+// CHECK-NEXT:   [[BOX:%.+]] = alloc_box ${ var Optional<()> }
 // CHECK-NEXT:   [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:   = init_enum_data_addr [[PB]] : $*Optional<()>, #Optional.some!enumelt.1
 // CHECK-NEXT:   inject_enum_addr [[PB]] : $*Optional<()>, #Optional.some!enumelt.1
-// CHECK-NEXT:   destroy_value [[BOX]] : $<τ_0_0> { var τ_0_0 } <Optional<()>>
+// CHECK-NEXT:   destroy_value [[BOX]] : ${ var Optional<()> }
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()
 // CHECK-NEXT: } // end sil function '_TF6errors28testOptionalTryNeverFailsVarFT_T_'
@@ -877,12 +896,12 @@ func testOptionalTryNeverFailsAddressOnly<T>(_ obj: T) {
 
 // CHECK-LABEL: sil hidden @_TF6errors39testOptionalTryNeverFailsAddressOnlyVar
 // CHECK: bb0(%0 : $*T):
-// CHECK:   [[BOX:%.+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<T>>
+// CHECK:   [[BOX:%.+]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <T>
 // CHECK-NEXT:   [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:   [[BOX_DATA:%.+]] = init_enum_data_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-NEXT:   copy_addr %0 to [initialization] [[BOX_DATA]] : $*T
 // CHECK-NEXT:   inject_enum_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt.1
-// CHECK-NEXT:   destroy_value [[BOX]] : $<τ_0_0> { var τ_0_0 } <Optional<T>>
+// CHECK-NEXT:   destroy_value [[BOX]] : $<τ_0_0> { var Optional<τ_0_0> } <T>
 // CHECK-NEXT:   destroy_addr %0 : $*T
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()
@@ -895,12 +914,12 @@ class SomeErrorClass : Error { }
 
 // CHECK-LABEL: sil_vtable SomeErrorClass
 // CHECK-NEXT:   #SomeErrorClass.deinit!deallocator: _TFC6errors14SomeErrorClassD
-// CHECK-NEXT:   #SomeErrorClass.init!initializer.1: _TFC6errors14SomeErrorClasscfT_S0_
+// CHECK-NEXT:   #SomeErrorClass.init!initializer.1: {{.*}} : _TFC6errors14SomeErrorClasscfT_S0_
 // CHECK-NEXT: }
 
 class OtherErrorSub : OtherError { }
 
 // CHECK-LABEL: sil_vtable OtherErrorSub {
-// CHECK-NEXT:  #OtherError.init!initializer.1: _TFC6errors13OtherErrorSubcfT_S0_     // OtherErrorSub.init() -> OtherErrorSub
+// CHECK-NEXT:  #OtherError.init!initializer.1: {{.*}} : _TFC6errors13OtherErrorSubcfT_S0_     // OtherErrorSub.init() -> OtherErrorSub
 // CHECK-NEXT:  #OtherErrorSub.deinit!deallocator: _TFC6errors13OtherErrorSubD        // OtherErrorSub.__deallocating_deinit
 // CHECK-NEXT:}

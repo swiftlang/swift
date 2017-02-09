@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s --check-prefix=CHECK2
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s --check-prefix=CHECK2
 func use<T>(_ t: T) {}
 
 public func f(_ i : Int?)
 {
-  // CHECK: define {{.*}}@_TF4main1fFGSqSi_T_
+  // CHECK: define {{.*}}@_T04main1fySiSgF
   // CHECK: %[[PHI:.*]] = phi
   // The shadow copy store should not have a location.
   // CHECK: store {{(i32|i64)}} %[[PHI]], {{(i32|i64)}}* %val.addr, align {{(4|8)}}, !dbg ![[DBG0:.*]]
@@ -18,7 +18,7 @@ public func f(_ i : Int?)
 
 public func g(_ s : String?)
 {
-  // CHECK2: define {{.*}}@_TF4main1gFGSqSS_T_
+  // CHECK2: define {{.*}}@_T04main1gySSSgF
   // The shadow copy store should not have a location.
   // CHECK2: getelementptr inbounds {{.*}} %s.debug, {{.*}}, !dbg ![[DBG0:.*]]
   // CHECK2: ![[G:.*]] = distinct !DISubprogram(name: "g",

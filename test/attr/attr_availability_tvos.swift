@@ -59,8 +59,7 @@ if #available(iOS 9.3, *) {
 }
 
 if #available(iOS 9.3, tvOS 9.1, *) {
-  functionIntroducedOntvOS9_2() // expected-error {{'functionIntroducedOntvOS9_2()' is only available on tvOS 9.2 or newer}}
-      // expected-note@-1 {{add 'if #available' version check}}
+  functionIntroducedOntvOS9_2() // expected-error {{'functionIntroducedOntvOS9_2()' is only available on tvOS 9.2 or newer}} {{29-32=9.2}}
 }
 
 if #available(iOS 9.1, tvOS 9.2, *) {

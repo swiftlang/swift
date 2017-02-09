@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -382,7 +382,7 @@ public var SIG_HOLD: sighandler_t {
 }
 #elseif os(Windows)
 #if CYGWIN
-public typealias sighandler_t = __sighandler_t
+public typealias sighandler_t = _sig_func_ptr
 
 public var SIG_DFL: sighandler_t? { return nil }
 public var SIG_IGN: sighandler_t {
@@ -417,16 +417,9 @@ public var SEM_FAILED: UnsafeMutablePointer<sem_t>? {
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   // The value is ABI.  Value verified to be correct for OS X, iOS, watchOS, tvOS.
   return UnsafeMutablePointer<sem_t>(bitPattern: -1)
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || CYGWIN
   // The value is ABI.  Value verified to be correct on Glibc.
   return UnsafeMutablePointer<sem_t>(bitPattern: 0)
-#elseif os(Windows)
-#if CYGWIN
-  // The value is ABI.  Value verified to be correct on Glibc.
-  return UnsafeMutablePointer<sem_t>(bitPattern: 0)
-#else
-  _UnsupportedPlatformError()
-#endif
 #else
   _UnsupportedPlatformError()
 #endif

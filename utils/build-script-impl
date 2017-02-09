@@ -3,7 +3,7 @@
 #
 ## This source file is part of the Swift.org open source project
 ##
-## Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+## Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 ## Licensed under Apache License v2.0 with Runtime Library Exception
 ##
 ## See https://swift.org/LICENSE.txt for license information
@@ -47,6 +47,8 @@ KNOWN_SETTINGS=(
     build-dir                   ""               "out-of-tree build directory; default is in-tree. **This argument is required**"
     host-cc                     ""               "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
     host-cxx                    ""               "the path to CXX, the 'clang++' compiler for the host platform. **This argument is required**"
+    host-lipo                   ""               "the path to lipo for creating universal binaries on Darwin"
+    host-libtool                ""               "the path to libtool"
     darwin-xcrun-toolchain      "default"        "the name of the toolchain to use on Darwin"
     ninja-bin                   ""               "the path to Ninja tool"
     cmark-build-type            "Debug"          "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
@@ -78,6 +80,7 @@ KNOWN_SETTINGS=(
     playgroundlogger-build-type "Debug"          "the build variant for PlaygroundLogger"
     playgroundsupport-build-type "Debug"         "the build variant for PlaygroundSupport"
     xctest-build-type           "Debug"          "the build variant for xctest"
+    swiftpm-build-type          "Debug"          "the build variant for swiftpm"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
     enable-asan                 ""               "enable Address Sanitizer"
     cmake                       ""               "path to the cmake binary"
@@ -169,7 +172,7 @@ KNOWN_SETTINGS=(
     native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
     native-swift-tools-path     ""               "directory that contains Swift tools that are executable on the build machine"
     compiler-vendor             "none"           "compiler vendor name [none,apple]"
-    clang-user-visible-version  "3.8.0"          "user-visible version of the embedded Clang and LLVM compilers"
+    clang-user-visible-version  "4.0.0"          "user-visible version of the embedded Clang and LLVM compilers"
     swift-user-visible-version  "3.1"            "user-visible version of the Swift language"
     swift-compiler-version      ""               "string that indicates a compiler version for Swift"
     clang-compiler-version      ""               "string that indicates a compiler version for Clang"
@@ -213,7 +216,7 @@ KNOWN_SETTINGS=(
     darwin-toolchain-application-cert  ""        "Application Cert name to codesign xctoolchain"
     darwin-toolchain-installer-cert    ""        "Installer Cert name to create installer pkg"
     darwin-toolchain-installer-package ""        "The path to installer pkg"
-    darwin-sdk-deployment-targets      ""        "semicolon-separated list of triples like 'fookit-ios-9.0;barkit-watchos-9.0'"
+    darwin-sdk-deployment-targets      "xctest-ios-8.0"        "semicolon-separated list of triples like 'fookit-ios-9.0;barkit-watchos-9.0'"
     darwin-overlay-target              ""        "single overlay target to build, dependencies are computed later"
     build-jobs                         ""        "The number of parallel build jobs to use"
     darwin-toolchain-alias             ""        "Swift alias for toolchain"
@@ -415,9 +418,10 @@ function set_build_options_for_host() {
             SWIFT_HOST_VARIANT="freebsd"
             SWIFT_HOST_VARIANT_SDK="FREEBSD"
             SWIFT_HOST_VARIANT_ARCH="x86_64"
+            USE_GOLD_LINKER=1
             ;;
         cygwin-x86_64)
-            SWIFT_HOST_VARIANT="windows"
+            SWIFT_HOST_VARIANT="cygwin"
             SWIFT_HOST_VARIANT_SDK="CYGWIN"
             SWIFT_HOST_VARIANT_ARCH="x86_64"
             ;;
@@ -720,6 +724,7 @@ function set_build_options_for_host() {
     llvm_cmake_options+=(
         -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
         -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
+        -DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING:BOOL=TRUE
     )
 
     # If we are asked to not generate test targets for LLVM and or Swift,
@@ -1755,6 +1760,10 @@ function set_swiftpm_bootstrap_command() {
         exit 1
     fi
     swiftpm_bootstrap_command=("${SWIFTPM_SOURCE_DIR}/Utilities/bootstrap" "${swiftpm_bootstrap_options[@]}")
+    # Add --release if we have to build in release mode.
+    if [[ "${SWIFTPM_BUILD_TYPE}" ==  "Release" ]] ; then
+        swiftpm_bootstrap_command+=(--release)
+    fi
     if [[ "${VERBOSE_BUILD}" ]] ; then
         swiftpm_bootstrap_command+=(-v)
     fi
@@ -1979,6 +1988,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     build_targets=(llvm-tblgen clang-headers)
                 fi
 
+                if [ "${HOST_LIBTOOL}" ] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DCMAKE_LIBTOOL:PATH="${HOST_LIBTOOL}"
+                    )
+                fi
+
                 # Note: we set the variable:
                 #
                 # LLVM_TOOL_SWIFT_BUILD
@@ -2012,7 +2028,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCLANG_TOOL_ARCMT_TEST_BUILD=NO
                     -DCLANG_TOOL_C_ARCMT_TEST_BUILD=NO
                     -DCLANG_TOOL_C_INDEX_TEST_BUILD=NO
-                    -DCLANG_TOOL_DRIVER_BUILD=NO
+                    -DCLANG_TOOL_DRIVER_BUILD=$(false_true "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
                     -DCLANG_TOOL_DIAGTOOL_BUILD=NO
                     -DCLANG_TOOL_SCAN_BUILD_BUILD=NO
                     -DCLANG_TOOL_SCAN_VIEW_BUILD=NO
@@ -2110,6 +2126,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DLLVM_TOOLS_BINARY_DIR:PATH=/tmp/dummy
+                    )
+                fi
+
+                if [ "${HOST_LIPO}" ] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_LIPO:PATH="${HOST_LIPO}"
                     )
                 fi
 
@@ -3377,7 +3400,13 @@ if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]]; then
     
     echo "--- Merging and running lipo ---"
     
-    call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=$(xcrun_find_tool lipo) --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
+    # Allow passing lipo with --host-lipo
+    if [[ -z "${HOST_LIPO}" ]] ; then
+        LIPO_PATH=$(xcrun_find_tool lipo)
+    else
+        LIPO_PATH="${HOST_LIPO}"
+    fi
+    call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=${LIPO_PATH} --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
 
     # Build and test the lipo-ed package.
     build_and_test_installable_package ${mergedHost}

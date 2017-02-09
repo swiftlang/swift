@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -52,6 +52,7 @@ struct OwnershipModelEliminatorVisitor
   bool visitStoreInst(StoreInst *SI);
   bool visitStoreBorrowInst(StoreBorrowInst *SI);
   bool visitCopyValueInst(CopyValueInst *CVI);
+  bool visitCopyUnownedValueInst(CopyUnownedValueInst *CVI);
   bool visitDestroyValueInst(DestroyValueInst *DVI);
   bool visitLoadBorrowInst(LoadBorrowInst *LBI);
   bool visitBeginBorrowInst(BeginBorrowInst *BBI) {
@@ -63,6 +64,9 @@ struct OwnershipModelEliminatorVisitor
     EBI->eraseFromParent();
     return true;
   }
+  bool visitUnmanagedRetainValueInst(UnmanagedRetainValueInst *URVI);
+  bool visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *URVI);
+  bool visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *UAVI);
 };
 
 } // end anonymous namespace
@@ -130,6 +134,48 @@ bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *CVI) {
   B.emitCopyValueOperation(CVI->getLoc(), CVI->getOperand());
   CVI->replaceAllUsesWith(CVI->getOperand());
   CVI->eraseFromParent();
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitCopyUnownedValueInst(
+    CopyUnownedValueInst *CVI) {
+  B.createStrongRetainUnowned(CVI->getLoc(), CVI->getOperand(),
+                              Atomicity::Atomic);
+  // Users of copy_value_unowned expect an owned value. So we need to convert
+  // our unowned value to a ref.
+  auto *UTRI =
+      B.createUnownedToRef(CVI->getLoc(), CVI->getOperand(), CVI->getType());
+  CVI->replaceAllUsesWith(UTRI);
+  CVI->eraseFromParent();
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitUnmanagedRetainValueInst(
+    UnmanagedRetainValueInst *URVI) {
+  // Now that we have set the unqualified ownership flag, destroy value
+  // operation will delegate to the appropriate strong_release, etc.
+  B.emitCopyValueOperation(URVI->getLoc(), URVI->getOperand());
+  URVI->replaceAllUsesWith(URVI->getOperand());
+  URVI->eraseFromParent();
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitUnmanagedReleaseValueInst(
+    UnmanagedReleaseValueInst *URVI) {
+  // Now that we have set the unqualified ownership flag, destroy value
+  // operation will delegate to the appropriate strong_release, etc.
+  B.emitDestroyValueOperation(URVI->getLoc(), URVI->getOperand());
+  URVI->eraseFromParent();
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitUnmanagedAutoreleaseValueInst(
+    UnmanagedAutoreleaseValueInst *UAVI) {
+  // Now that we have set the unqualified ownership flag, destroy value
+  // operation will delegate to the appropriate strong_release, etc.
+  B.createAutoreleaseValue(UAVI->getLoc(), UAVI->getOperand(),
+                           Atomicity::Atomic);
+  UAVI->eraseFromParent();
   return true;
 }
 

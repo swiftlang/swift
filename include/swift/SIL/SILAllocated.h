@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,6 +14,8 @@
 #define SWIFT_SIL_SILALLOCATED_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Compiler.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <stddef.h>
 
 namespace swift {
@@ -29,7 +31,7 @@ public:
   void *operator new[](size_t) = delete;
 
   /// Disable non-placement delete.
-  void operator delete(void *) = delete;
+  void operator delete(void *) SWIFT_DELETE_OPERATOR_DELETED;
   void operator delete[](void *) = delete;
 
   /// Custom version of 'new' that uses the SILModule's BumpPtrAllocator with

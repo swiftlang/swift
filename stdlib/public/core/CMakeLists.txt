@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -119,7 +119,7 @@ set(SWIFTLIB_ESSENTIAL
   StringComparable.swift
   StringCore.swift
   StringHashable.swift
-  StringInterpolation.swift.gyb
+  StringInterpolation.swift
   StringLegacy.swift
   StringRangeReplaceableCollection.swift.gyb
   StringIndexConversions.swift
@@ -178,7 +178,6 @@ else()
   #set(LINK_FLAGS
   #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
   if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "")
-    find_package(ICU REQUIRED COMPONENTS uc i18n)
     list(APPEND swift_core_private_link_libraries
       ICU_UC ICU_I18N)
   else()

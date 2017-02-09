@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -101,12 +101,10 @@ static void mapOperands(SILInstruction *I,
   }
 }
 
-static void
-updateSSAForUseOfInst(SILSSAUpdater &Updater,
-                      SmallVectorImpl<SILArgument*> &InsertedPHIs,
-                      const llvm::DenseMap<ValueBase *, SILValue> &ValueMap,
-                      SILBasicBlock *Header, SILBasicBlock *EntryCheckBlock,
-                      ValueBase *Inst) {
+static void updateSSAForUseOfInst(
+    SILSSAUpdater &Updater, SmallVectorImpl<SILPHIArgument *> &InsertedPHIs,
+    const llvm::DenseMap<ValueBase *, SILValue> &ValueMap,
+    SILBasicBlock *Header, SILBasicBlock *EntryCheckBlock, ValueBase *Inst) {
   if (Inst->use_empty())
     return;
 
@@ -149,7 +147,7 @@ updateSSAForUseOfInst(SILSSAUpdater &Updater,
       Updater.RewriteUse(*Use);
     }
     // Canonicalize inserted phis to avoid extra BB Args.
-    for (SILArgument *Arg : InsertedPHIs) {
+    for (SILPHIArgument *Arg : InsertedPHIs) {
       if (SILInstruction *Inst = replaceBBArgWithCast(Arg)) {
         Arg->replaceAllUsesWith(Inst);
         // DCE+SimplifyCFG runs as a post-pass cleanup.
@@ -165,7 +163,7 @@ static void
 rewriteNewLoopEntryCheckBlock(SILBasicBlock *Header,
                               SILBasicBlock *EntryCheckBlock,
                         const llvm::DenseMap<ValueBase *, SILValue> &ValueMap) {
-  SmallVector<SILArgument*, 4> InsertedPHIs;
+  SmallVector<SILPHIArgument *, 4> InsertedPHIs;
   SILSSAUpdater Updater(&InsertedPHIs);
 
   // Fix PHIs (incoming arguments).

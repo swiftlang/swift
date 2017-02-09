@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,6 +26,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Triple.h"
 #include <string>
+#include <vector>
 
 namespace swift {
   /// \brief A collection of options that affect the language dialect and
@@ -132,7 +133,9 @@ namespace swift {
 
     /// \brief The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
-    unsigned SolverMemoryThreshold = 33554432; /* 32 * 1024 * 1024 */
+    unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
+
+    unsigned SolverBindingThreshold = 1024 * 1024;
 
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
@@ -159,6 +162,11 @@ namespace swift {
     /// member of some type instead. This includes inits, computed properties,
     /// and methods.
     bool InferImportAsMember = false;
+
+    /// If set to true, compile with the SIL Opaque Values enabled.
+    /// This is for bootstrapping. It can't be in SILOptions because the
+    /// TypeChecker uses it to set resolve the ParameterConvention.
+    bool EnableSILOpaqueValues = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -237,15 +245,27 @@ namespace swift {
     ///
     /// Note that this also canonicalizes the OS name if the check returns
     /// true.
-    static bool checkPlatformConditionOS(StringRef &OSName);
+    ///
+    /// \param suggestions Populated with suggested replacements
+    /// if a match is not found.
+    static bool checkPlatformConditionOS(
+      StringRef &OSName, std::vector<StringRef> &suggestions);
 
     /// Returns true if the 'arch' platform condition argument represents
     /// a supported target architecture.
-    static bool isPlatformConditionArchSupported(StringRef ArchName);
+    ///
+    /// \param suggestions Populated with suggested replacements
+    /// if a match is not found.
+    static bool isPlatformConditionArchSupported(
+      StringRef ArchName, std::vector<StringRef> &suggestions);
 
     /// Returns true if the 'endian' platform condition argument represents
     /// a supported target endianness.
-    static bool isPlatformConditionEndiannessSupported(StringRef endianness);
+    ///
+    /// \param suggestions Populated with suggested replacements
+    /// if a match is not found.
+    static bool isPlatformConditionEndiannessSupported(
+      StringRef endianness, std::vector<StringRef> &suggestions);
 
   private:
     llvm::SmallVector<std::pair<std::string, std::string>, 3>

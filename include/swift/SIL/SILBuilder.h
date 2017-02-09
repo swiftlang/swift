@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_SILBUILDER_H
 #define SWIFT_SIL_SILBUILDER_H
 
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -208,7 +209,7 @@ public:
 
   static SILType getPartialApplyResultType(SILType Ty, unsigned ArgCount,
                                          SILModule &M,
-                                         ArrayRef<Substitution> subs,
+                                         SubstitutionList subs,
                                          ParameterConvention calleeConvention);
 
   //===--------------------------------------------------------------------===//
@@ -318,7 +319,7 @@ public:
   }
 
   ApplyInst *createApply(SILLocation Loc, SILValue Fn, SILType SubstFnTy,
-                         SILType Result, ArrayRef<Substitution> Subs,
+                         SILType Result, SubstitutionList Subs,
                          ArrayRef<SILValue> Args, bool isNonThrowing) {
     return insert(ApplyInst::create(getSILDebugLocation(Loc), Fn, SubstFnTy,
                                     Result, Subs, Args, isNonThrowing, F,
@@ -327,14 +328,14 @@ public:
 
   ApplyInst *createApply(SILLocation Loc, SILValue Fn, ArrayRef<SILValue> Args,
                          bool isNonThrowing) {
-    auto FnTy = Fn->getType();
-    return createApply(Loc, Fn, FnTy,
-                       FnTy.castTo<SILFunctionType>()->getSILResult(),
-                       ArrayRef<Substitution>(), Args, isNonThrowing);
+    SILFunctionConventions conventions(Fn->getType().castTo<SILFunctionType>(),
+                                       getModule());
+    return createApply(Loc, Fn, Fn->getType(), conventions.getSILResultType(),
+                       SubstitutionList(), Args, isNonThrowing);
   }
 
   TryApplyInst *createTryApply(SILLocation Loc, SILValue fn, SILType substFnTy,
-                               ArrayRef<Substitution> subs,
+                               SubstitutionList subs,
                                ArrayRef<SILValue> args, SILBasicBlock *normalBB,
                                SILBasicBlock *errorBB) {
     return insertTerminator(TryApplyInst::create(getSILDebugLocation(Loc),
@@ -345,7 +346,7 @@ public:
 
   PartialApplyInst *createPartialApply(SILLocation Loc, SILValue Fn,
                                        SILType SubstFnTy,
-                                       ArrayRef<Substitution> Subs,
+                                       SubstitutionList Subs,
                                        ArrayRef<SILValue> Args,
                                        SILType ClosureTy) {
     return insert(PartialApplyInst::create(getSILDebugLocation(Loc), Fn,
@@ -354,7 +355,7 @@ public:
   }
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
-                             ArrayRef<Substitution> Subs,
+                             SubstitutionList Subs,
                              ArrayRef<SILValue> Args) {
     return insert(BuiltinInst::create(getSILDebugLocation(Loc), Name,
                                       ResultTy, Subs, Args, F));
@@ -468,7 +469,8 @@ public:
     assert((Qualifier == LoadOwnershipQualifier::Unqualified) ||
            F.hasQualifiedOwnership() &&
                "Qualified inst in unqualified function");
-    assert(LV->getType().isLoadable(F.getModule()));
+    assert(!SILModuleConventions(F.getModule()).useLoweredAddresses()
+           || LV->getType().isLoadable(F.getModule()));
     return insert(new (F.getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
   }
@@ -514,10 +516,16 @@ public:
     return lowering.emitStore(*this, Loc, Src, DestAddr, Qualifier);
   }
 
-  EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue Src,
-                                 SILValue DestAddr) {
-    return insert(new (F.getModule())
-                      EndBorrowInst(getSILDebugLocation(Loc), Src, DestAddr));
+  EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue BorrowedValue,
+                                 SILValue OriginalValue) {
+    return insert(new (F.getModule()) EndBorrowInst(
+        getSILDebugLocation(Loc), BorrowedValue, OriginalValue));
+  }
+
+  EndBorrowArgumentInst *createEndBorrowArgument(SILLocation Loc,
+                                                 SILValue Arg) {
+    return insert(new (F.getModule()) EndBorrowArgumentInst(
+        getSILDebugLocation(Loc), cast<SILArgument>(Arg)));
   }
 
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {
@@ -549,10 +557,10 @@ public:
   MarkUninitializedBehaviorInst *
   createMarkUninitializedBehavior(SILLocation Loc,
                                   SILValue initStorageFunc,
-                                  ArrayRef<Substitution> initStorageSubs,
+                                  SubstitutionList initStorageSubs,
                                   SILValue storage,
                                   SILValue setterFunc,
-                                  ArrayRef<Substitution> setterSubs,
+                                  SubstitutionList setterSubs,
                                   SILValue self,
                                   SILType ty) {
     return insert(MarkUninitializedBehaviorInst::create(F.getModule(),
@@ -803,9 +811,29 @@ public:
                                                        operand, atomicity));
   }
 
+  UnmanagedRetainValueInst *createUnmanagedRetainValue(SILLocation Loc,
+                                                       SILValue operand) {
+    assert(F.hasQualifiedOwnership());
+    return insert(new (F.getModule()) UnmanagedRetainValueInst(
+        getSILDebugLocation(Loc), operand));
+  }
+
+  UnmanagedReleaseValueInst *createUnmanagedReleaseValue(SILLocation Loc,
+                                                         SILValue operand) {
+    assert(F.hasQualifiedOwnership());
+    return insert(new (F.getModule()) UnmanagedReleaseValueInst(
+        getSILDebugLocation(Loc), operand));
+  }
+
   CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand) {
     return insert(new (F.getModule())
                       CopyValueInst(getSILDebugLocation(Loc), operand));
+  }
+
+  CopyUnownedValueInst *createCopyUnownedValue(SILLocation Loc,
+                                               SILValue operand) {
+    return insert(new (F.getModule()) CopyUnownedValueInst(
+        getSILDebugLocation(Loc), operand, getModule()));
   }
 
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
@@ -818,6 +846,12 @@ public:
                                                Atomicity atomicity) {
     return insert(new (F.getModule()) AutoreleaseValueInst(
         getSILDebugLocation(Loc), operand, atomicity));
+  }
+
+  UnmanagedAutoreleaseValueInst *
+  createUnmanagedAutoreleaseValue(SILLocation Loc, SILValue operand) {
+    return insert(new (F.getModule()) UnmanagedAutoreleaseValueInst(
+                      getSILDebugLocation(Loc), operand));
   }
 
   SetDeallocatingInst *createSetDeallocating(SILLocation Loc,
@@ -1131,7 +1165,7 @@ public:
   InitBlockStorageHeaderInst *
   createInitBlockStorageHeader(SILLocation Loc, SILValue BlockStorage,
                                SILValue InvokeFunction, SILType BlockType,
-                               ArrayRef<Substitution> Subs) {
+                               SubstitutionList Subs) {
     return insert(InitBlockStorageHeaderInst::create(F,
       getSILDebugLocation(Loc), BlockStorage, InvokeFunction, BlockType, Subs));
   }
@@ -1642,6 +1676,11 @@ private:
       InsertedInstrs->push_back(TheInst);
 
     BB->insert(InsertPt, TheInst);
+// TODO: We really shouldn't be creating instructions unless we are going to
+// insert them into a block... This failed in SimplifyCFG.
+#ifndef NDEBUG
+    TheInst->verifyOperandOwnership();
+#endif
   }
 
   void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {

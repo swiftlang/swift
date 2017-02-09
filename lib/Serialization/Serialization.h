@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -103,6 +103,10 @@ private:
   /// A map from generic parameter lists to the decls they come from.
   llvm::DenseMap<const GenericParamList *, const Decl *> GenericContexts;
 
+  /// A map from generic environments to their serialized IDs.
+  llvm::DenseMap<const GenericEnvironment *, GenericEnvironmentID>
+    GenericEnvironmentIDs;
+
   // A map from NormalProtocolConformances to their serialized IDs.
   llvm::DenseMap<const NormalProtocolConformance *, NormalConformanceID>
     NormalConformances;
@@ -126,6 +130,11 @@ public:
   // hash table of all defined Objective-C methods.
   using ObjCMethodTable = llvm::DenseMap<ObjCSelector, ObjCMethodTableData>;
 
+  using NestedTypeDeclsData = SmallVector<std::pair<DeclID, DeclID>, 4>;
+  // In-memory representation of what will eventually be an on-disk
+  // hash table of all defined Objective-C methods.
+  using NestedTypeDeclsTable = llvm::DenseMap<Identifier, NestedTypeDeclsData>;
+
 private:
   /// A map from identifiers to methods and properties with the given name.
   ///
@@ -143,6 +152,9 @@ private:
 
   /// Local DeclContexts that need to be serialized.
   std::queue<const DeclContext*> LocalDeclContextsToWrite;
+
+  /// Generic environments that need to be serialized.
+  std::queue<const GenericEnvironment*> GenericEnvironmentsToWrite;
 
   /// NormalProtocolConformances that need to be serialized.
   std::queue<const NormalProtocolConformance *> NormalConformancesToWrite;
@@ -175,6 +187,10 @@ private:
   /// The offset of each Identifier in the identifier data block, indexed by
   /// IdentifierID.
   std::vector<CharOffset> IdentifierOffsets;
+
+  /// The offset of each GenericEnvironment in the bitstream, indexed by
+  /// GenericEnvironmentID.
+  std::vector<BitOffset> GenericEnvironmentOffsets;
 
   /// The offset of each NormalProtocolConformance in the bitstream, indexed by
   /// NormalConformanceID.
@@ -212,6 +228,10 @@ private:
   uint32_t /*IdentifierID*/ LastIdentifierID =
       serialization::NUM_SPECIAL_MODULES - 1;
 
+  /// The last assigned GenericEnvironmentID for generic environments from this
+  /// module.
+  uint32_t /*GenericEnvironmentID*/ LastGenericEnvironmentID = 0;
+
   /// Returns the record code for serializing the given vector of offsets.
   ///
   /// This allows the offset-serialization code to be generic over all kinds
@@ -227,6 +247,8 @@ private:
       return index_block::DECL_CONTEXT_OFFSETS;
     if (&values == &LocalDeclContextOffsets)
       return index_block::LOCAL_DECL_CONTEXT_OFFSETS;
+    if (&values == &GenericEnvironmentOffsets)
+      return index_block::GENERIC_ENVIRONMENT_OFFSETS;
     if (&values == &NormalConformanceOffsets)
       return index_block::NORMAL_CONFORMANCE_OFFSETS;
     if (&values == &SILLayoutOffsets)
@@ -258,10 +280,6 @@ private:
 
   /// Writes a generic parameter list.
   bool writeGenericParams(const GenericParamList *genericParams);
-
-  /// Writes a set of generic requirements.
-  void writeGenericRequirements(ArrayRef<Requirement> requirements,
-                                const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
@@ -321,6 +339,9 @@ private:
   /// Writes the given type.
   void writeType(Type ty);
 
+  /// Writes a generic environment.
+  void writeGenericEnvironment(const GenericEnvironment *env);
+
   /// Registers the abbreviation for the given decl or type layout.
   template <typename Layout>
   void registerDeclTypeAbbr() {
@@ -350,7 +371,7 @@ private:
   void writeSIL(const SILModule *M, bool serializeAllSIL);
 
   /// Top-level entry point for serializing a module.
-  void writeAST(ModuleOrSourceFile DC);
+  void writeAST(ModuleOrSourceFile DC, bool enableNestedTypeLookupTable);
 
   void writeToStream(raw_ostream &os);
 
@@ -398,6 +419,11 @@ public:
   /// The DeclContext will be scheduled for serialization if necessary.
   DeclContextID addLocalDeclContextRef(const DeclContext *DC);
 
+  /// Records the use of the given generic environment.
+  ///
+  /// The GenericEnvironment will be scheduled for serialization if necessary.
+  GenericEnvironmentID addGenericEnvironmentRef(const GenericEnvironment *env);
+
   /// Records the use of the given normal protocol conformance.
   ///
   /// The normal protocol conformance will be scheduled for
@@ -425,7 +451,7 @@ public:
   /// the archetypes within the substitutions. The replacement types within
   /// the substitution will be mapped out of the generic environment before
   /// being written.
-  void writeSubstitutions(ArrayRef<Substitution> substitutions,
+  void writeSubstitutions(SubstitutionList substitutions,
                           const std::array<unsigned, 256> &abbrCodes,
                           GenericEnvironment *genericEnv = nullptr);
 
@@ -450,10 +476,9 @@ public:
                         const std::array<unsigned, 256> &abbrCodes,
                         GenericEnvironment *genericEnv = nullptr);
 
-  /// Writes a generic environment.
-  void writeGenericEnvironment(GenericEnvironment *env,
-                               const std::array<unsigned, 256> &abbrCodes,
-                               bool SILMode);
+  /// Writes a set of generic requirements.
+  void writeGenericRequirements(ArrayRef<Requirement> requirements,
+                                const std::array<unsigned, 256> &abbrCodes);
 };
 } // end namespace serialization
 } // end namespace swift

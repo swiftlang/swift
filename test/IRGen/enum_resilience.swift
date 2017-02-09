@@ -1,5 +1,8 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | %FileCheck %s
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
+// RUN: rm -rf %t && mkdir %t
+// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -O %s
 
 import resilient_enum
 import resilient_struct
@@ -139,22 +142,28 @@ public func constructResilientEnumPayload(_ s: Size) -> Medium {
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{i32|i64}} @_TF15enum_resilience19resilientSwitchTestFO14resilient_enum6MediumSi(%swift.opaque* noalias nocapture)
-// CHECK: [[BUFFER:%.*]] = alloca [[BUFFER_TYPE:\[(12|24) x i8\]]]
-
 // CHECK: [[METADATA:%.*]] = call %swift.type* @_TMaO14resilient_enum6Medium()
 // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
 // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
 // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
 
-// CHECK: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 5
+// CHECK: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 17
+// CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
+// CHECK: [[WITNESS_FOR_SIZE:%.*]] = ptrtoint i8* [[WITNESS]]
+// CHECK: [[ALLOCA:%.*]] = alloca i8, {{.*}} [[WITNESS_FOR_SIZE]], align 16
+// CHECK: [[ALLOCA:%.*]] = alloca i8, {{.*}} [[WITNESS_FOR_SIZE]], align 16
+// CHECK: [[ALLOCA:%.*]] = alloca i8, {{.*}} [[WITNESS_FOR_SIZE]], align 16
+// CHECK: [[ENUM_STORAGE:%.*]] = bitcast i8* [[ALLOCA]] to %swift.opaque*
+
+// CHECK: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 6
 // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK: [[WITNESS_FN:%.*]] = bitcast i8* [[WITNESS]]
-// CHECK: [[ENUM_COPY:%.*]] = call %swift.opaque* [[WITNESS_FN]]([[BUFFER_TYPE]]* [[BUFFER]], %swift.opaque* %0, %swift.type* [[METADATA]])
+// CHECK: [[ENUM_COPY:%.*]] = call %swift.opaque* [[WITNESS_FN]](%swift.opaque* [[ENUM_STORAGE]], %swift.opaque* %0, %swift.type* [[METADATA]])
 
 // CHECK: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 23
 // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK: [[WITNESS_FN:%.*]] = bitcast i8* [[WITNESS]]
-// CHECK: [[TAG:%.*]] = call i32 %getEnumTag(%swift.opaque* [[ENUM_COPY]], %swift.type* [[METADATA]])
+// CHECK: [[TAG:%.*]] = call i32 %getEnumTag(%swift.opaque* [[ENUM_STORAGE]], %swift.type* [[METADATA]])
 
 // CHECK: switch i32 [[TAG]], label %[[DEFAULT_CASE:.*]] [
 // CHECK:   i32 -1, label %[[PAMPHLET_CASE:.*]]

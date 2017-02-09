@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -289,7 +289,8 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
       // Resolve this component to the variable we found.
       expr->resolveComponent(idx, var);
-      updateState(/*isProperty=*/true, var->getType()->getRValueObjectType());
+      updateState(/*isProperty=*/true,
+                  var->getInterfaceType()->getRValueObjectType());
 
       // Check that the property is @objc.
       if (!var->isObjC()) {
@@ -331,7 +332,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       Type newType;
       if (lookupType && !lookupType->isAnyObject()) {
         newType = lookupType->getTypeOfMember(dc->getParentModule(), type,
-                                              this);
+                                              type->getDeclaredInterfaceType());
       } else {
         newType = type->getDeclaredInterfaceType();
       }

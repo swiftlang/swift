@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 // REQUIRES: CPU=i386_or_x86_64
 
@@ -25,7 +25,7 @@ bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
-  // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_TMaP12dynamic_cast1P_()
+  // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_T012dynamic_cast1P_pMa()
   // CHECK: call i1 @swift_rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 7)
   %1 = alloc_stack $S
   unconditional_checked_cast_addr take_always P in %0 : $*P to S in %1 : $*S
@@ -35,7 +35,7 @@ bb0(%0 : $*P):
   return %2 : $()
 }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_TMaP12dynamic_cast1P_()
+// CHECK-LABEL: define linkonce_odr hidden %swift.type* @_T012dynamic_cast1P_pMa()
 // CHECK:       call %swift.type* @swift_rt_swift_getExistentialTypeMetadata(
 
 // CHECK-LABEL: define{{( protected)?}} void @testUnconditional1(
@@ -44,7 +44,7 @@ bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
-  // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_TMaP12dynamic_cast1P_()
+  // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_T012dynamic_cast1P_pMa()
   // CHECK: call i1 @swift_rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 3)
   %1 = alloc_stack $S
   unconditional_checked_cast_addr take_on_success P in %0 : $*P to S in %1 : $*S
@@ -60,7 +60,7 @@ bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
-  // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_TMaP12dynamic_cast1P_()
+  // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_T012dynamic_cast1P_pMa()
   // CHECK: call i1 @swift_rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 1)
   %1 = alloc_stack $S
   unconditional_checked_cast_addr copy_on_success P in %0 : $*P to S in %1 : $*S
@@ -76,7 +76,7 @@ bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
-  // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_TMaP12dynamic_cast1P_()
+  // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_T012dynamic_cast1P_pMa()
   // CHECK: [[T4:%.*]] = call i1 @swift_rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 6)
   // CHECK: br i1 [[T4]],
   %1 = alloc_stack $S
@@ -96,7 +96,7 @@ bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
-  // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_TMaP12dynamic_cast1P_()
+  // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_T012dynamic_cast1P_pMa()
   // CHECK: [[T4:%.*]] = call i1 @swift_rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 2)
   // CHECK: br i1 [[T4]],
   %1 = alloc_stack $S
@@ -116,7 +116,7 @@ bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
   // CHECK: [[T1:%.*]] = bitcast [[S]]* [[T0]] to [[OPAQUE:%swift.opaque]]*
   // CHECK: [[T2:%.*]] = bitcast [[P:%.*]]* {{%.*}} to [[OPAQUE]]*
-  // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_TMaP12dynamic_cast1P_()
+  // CHECK: [[T3:%.*]] = call [[TYPE:%.*]]* @_T012dynamic_cast1P_pMa()
   // CHECK: [[T4:%.*]] = call i1 @swift_rt_swift_dynamicCast([[OPAQUE]]* [[T1]], [[OPAQUE]]* [[T2]], [[TYPE]]* [[T3]], [[TYPE]]* {{.*}}, [[LLVM_PTRSIZE_INT]] 0)
   // CHECK: br i1 [[T4]],
   %1 = alloc_stack $S

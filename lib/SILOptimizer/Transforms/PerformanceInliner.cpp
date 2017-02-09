@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -149,7 +149,7 @@ public:
   bool inlineCallsIntoFunction(SILFunction *F);
 };
 
-} // namespace
+} // end anonymous namespace
 
 // Return true if the callee has self-recursive calls.
 static bool calleeIsSelfRecursive(SILFunction *Callee) {
@@ -310,8 +310,8 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
           BlockW.updateBenefit(Benefit, RemovedStoreBenefit);
       } else if (isa<StrongReleaseInst>(&I) || isa<ReleaseValueInst>(&I)) {
         SILValue Op = stripCasts(I.getOperand(0));
-        if (SILArgument *Arg = dyn_cast<SILArgument>(Op)) {
-          if (Arg->isFunctionArg() && Arg->getArgumentConvention() ==
+        if (auto *Arg = dyn_cast<SILFunctionArgument>(Op)) {
+          if (Arg->getArgumentConvention() ==
               SILArgumentConvention::Direct_Guaranteed) {
             BlockW.updateBenefit(Benefit, RefCountBenefit);
           }
@@ -390,7 +390,7 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   // If all substitutions are concrete, then there is no need to perform the
   // generic inlining. Let the generic specializer create a specialized
   // function and then decide if it is beneficial to inline it.
-  if (!hasUnboundGenericTypes(AI.getSubstitutions()))
+  if (!hasArchetypes(AI.getSubstitutions()))
     return false;
 
   SILFunction *Callee = AI.getReferencedFunction();

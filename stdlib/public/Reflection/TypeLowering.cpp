@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,9 +19,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Reflection/TypeLowering.h"
-#include "swift/Basic/Unreachable.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
+#include "swift/Runtime/Unreachable.h"
 
 #include <iostream>
 
@@ -186,11 +186,11 @@ public:
     }
     }
 
-    swift_unreachable("Bad TypeInfo kind");
+    swift_runtime_unreachable("Bad TypeInfo kind");
   }
 };
 
-}
+} // end anonymous namespace
 
 void TypeInfo::dump(std::ostream &OS, unsigned Indent) const {
   PrintTypeInfo(OS, Indent).print(*this);
@@ -890,7 +890,7 @@ public:
     // NoPayloadEnumImplStrategy
     if (PayloadCases.empty()) {
       Kind = RecordKind::NoPayloadEnum;
-      Size += getNumTagBytes(/*payloadSize=*/0,
+      Size += getNumTagBytes(/*size=*/0,
                              NoPayloadCases,
                              /*payloadCases=*/0);
 
@@ -1043,7 +1043,7 @@ public:
       return nullptr;
     }
 
-    swift_unreachable("Unhandled FieldDescriptorKind in switch.");
+    swift_runtime_unreachable("Unhandled FieldDescriptorKind in switch.");
   }
 
   const TypeInfo *visitNominalTypeRef(const NominalTypeRef *N) {
@@ -1074,7 +1074,7 @@ public:
       return TC.getTypeInfo(TC.getThinFunctionTypeRef());
     }
 
-    swift_unreachable("Unhandled FunctionMetadataConvention in switch.");
+    swift_runtime_unreachable("Unhandled FunctionMetadataConvention in switch.");
   }
 
   const TypeInfo *visitProtocolTypeRef(const ProtocolTypeRef *P) {
@@ -1102,7 +1102,7 @@ public:
       return TC.getTypeInfo(TC.getAnyMetatypeTypeRef());
     }
 
-    swift_unreachable("Unhandled MetatypeRepresentation in switch.");
+    swift_runtime_unreachable("Unhandled MetatypeRepresentation in switch.");
   }
 
   const TypeInfo *
@@ -1285,8 +1285,8 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
     return nullptr;
   }
 
-  swift_unreachable("Unhandled FieldDescriptorKind in switch.");
+  swift_runtime_unreachable("Unhandled FieldDescriptorKind in switch.");
 }
 
-}  // namespace reflection
-}  // namespace swift
+} // namespace reflection
+} // namespace swift

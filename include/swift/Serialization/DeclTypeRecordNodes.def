@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -163,8 +163,9 @@ OTHER(TOP_LEVEL_CODE_DECL_CONTEXT, 239)
 OTHER(GENERIC_PARAM_LIST, 240)
 TRAILING_INFO(GENERIC_PARAM)
 TRAILING_INFO(GENERIC_REQUIREMENT)
-TRAILING_INFO(GENERIC_ENVIRONMENT)
-TRAILING_INFO(SIL_GENERIC_ENVIRONMENT)
+TRAILING_INFO(LAYOUT_REQUIREMENT)
+OTHER(GENERIC_ENVIRONMENT, 244)
+OTHER(SIL_GENERIC_ENVIRONMENT, 245)
 
 OTHER(LOCAL_DISCRIMINATOR, 248)
 OTHER(PRIVATE_DISCRIMINATOR, 249)

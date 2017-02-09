@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,6 +16,7 @@
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/Support/Chrono.h"
 #include <system_error>
 
 namespace swift {
@@ -53,7 +54,7 @@ public:
   };
 
   struct Value : public llvm::ThreadSafeRefCountedBase<Value> {
-    llvm::sys::TimeValue ModuleModificationTime;
+    llvm::sys::TimePoint<> ModuleModificationTime;
     CodeCompletionResultSink Sink;
   };
   using ValueRefCntPtr = llvm::IntrusiveRefCntPtr<Value>;

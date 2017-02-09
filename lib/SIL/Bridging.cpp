@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,6 +20,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Fallthrough.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/Support/Debug.h"
@@ -132,6 +133,8 @@ Type TypeConverter::getLoweredBridgedType(AbstractionPattern pattern,
     return getLoweredCBridgedType(pattern, t, canBridgeBool,
                                   purpose == ForResult);
   }
+
+  llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 };
 
 Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
@@ -222,7 +225,7 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
     auto conformance = foreignRepresentation.second;
     assert(conformance && "Missing conformance?");
     Type bridgedTy =
-      ProtocolConformance::getTypeWitnessByName(
+      ProtocolConformanceRef::getTypeWitnessByName(
         t, ProtocolConformanceRef(conformance),
         M.getASTContext().Id_ObjectiveCType,
         nullptr);

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -47,5 +47,16 @@ std::string IRGenMangler::manglePartialApplyForwarder(StringRef FuncName) {
     }
   }
   appendOperator("TA");
+  return finalize();
+}
+
+std::string IRGenMangler::mangleTypeForReflection(Type Ty,
+                                                  ModuleDecl *Module,
+                                                  bool isSingleFieldOfBox) {
+  Mod = Module;
+  OptimizeProtocolNames = false;
+  appendType(Ty);
+  if (isSingleFieldOfBox)
+    appendOperator("Xb");
   return finalize();
 }

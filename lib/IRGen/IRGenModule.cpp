@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -117,6 +117,11 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   return ClangCodeGen;
 }
 
+/// A helper for determining if the triple uses the DLL storage
+static bool useDllStorage(const llvm::Triple &Triple) {
+  return Triple.isOSBinFormatCOFF() && !Triple.isOSCygMing();
+}
+
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
                          SourceFile *SF, llvm::LLVMContext &LLVMContext,
@@ -126,7 +131,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                                             ModuleName)),
       Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
       DataLayout(target->createDataLayout()), Triple(Context.LangOpts.Target),
-      TargetMachine(std::move(target)), OutputFilename(OutputFilename),
+      TargetMachine(std::move(target)), silConv(irgen.SIL),
+      OutputFilename(OutputFilename),
+#ifndef NDEBUG
+      EligibleConfs(getSILModule()),
+#endif
       TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
       ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
       Types(*new TypeConverter(*this)) {
@@ -403,7 +412,7 @@ namespace RuntimeConstants {
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
-}
+} // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
 // RuntimeFunctions.def FUNCTION macro. Instead, special case the one attribute
@@ -439,7 +448,7 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
   if (auto fn = dyn_cast<llvm::Function>(cache)) {
     fn->setCallingConv(cc);
 
-    if (llvm::Triple(Module.getTargetTriple()).isOSBinFormatCOFF() &&
+    if (::useDllStorage(llvm::Triple(Module.getTargetTriple())) &&
         (fn->getLinkage() == llvm::GlobalValue::ExternalLinkage ||
          fn->getLinkage() == llvm::GlobalValue::AvailableExternallyLinkage))
       fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
@@ -519,7 +528,7 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
     auto *globalFnPtr = new llvm::GlobalVariable(
         Module, fnPtrTy, false, llvm::GlobalValue::ExternalLinkage, nullptr,
         symbol);
-    if (llvm::Triple(Module.getTargetTriple()).isOSBinFormatCOFF())
+    if (::useDllStorage(llvm::Triple(Module.getTargetTriple())))
       globalFnPtr->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
 
     // Forward all arguments.
@@ -638,7 +647,7 @@ llvm::Constant *IRGenModule::getEmptyTupleMetadata() {
   EmptyTupleMetadata = Module.getOrInsertGlobal(
                           MANGLE_AS_STRING(METADATA_SYM(EMPTY_TUPLE_MANGLING)),
                           FullTypeMetadataStructTy);
-  if (Triple.isOSBinFormatCOFF())
+  if (useDllStorage())
     cast<llvm::GlobalVariable>(EmptyTupleMetadata)
         ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
   return EmptyTupleMetadata;
@@ -652,7 +661,7 @@ llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {
     // struct objc_cache _objc_empty_cache;
     ObjCEmptyCachePtr = Module.getOrInsertGlobal("_objc_empty_cache",
                                                  OpaquePtrTy->getElementType());
-    if (Triple.isOSBinFormatCOFF())
+    if (useDllStorage())
       cast<llvm::GlobalVariable>(ObjCEmptyCachePtr)
           ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
   } else {
@@ -685,7 +694,7 @@ Address IRGenModule::getAddrOfObjCISAMask() {
   assert(TargetInfo.hasISAMasking());
   if (!ObjCISAMaskPtr) {
     ObjCISAMaskPtr = Module.getOrInsertGlobal("swift_isaMask", IntPtrTy);
-    if (Triple.isOSBinFormatCOFF())
+    if (useDllStorage())
       cast<llvm::GlobalVariable>(ObjCISAMaskPtr)
           ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
   }
@@ -851,7 +860,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, linkLib.getName());
     auto symbolAddr = Module.getOrInsertGlobal(buf.str(), Int1Ty);
-    if (Triple.isOSBinFormatCOFF())
+    if (useDllStorage())
       cast<llvm::GlobalVariable>(symbolAddr)
           ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
 
@@ -860,7 +869,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
 
     if (!Module.getGlobalVariable(buf.str())) {
       auto ref = new llvm::GlobalVariable(Module, symbolAddr->getType(),
-                                          /*constant=*/true,
+                                          /*isConstant=*/true,
                                           llvm::GlobalValue::WeakAnyLinkage,
                                           symbolAddr, buf.str());
       ref->setVisibility(llvm::GlobalValue::HiddenVisibility);
@@ -916,9 +925,9 @@ void IRGenModule::emitAutolinkInfo() {
                                        }),
                         AutolinkEntries.end());
 
-  if (TargetInfo.OutputObjectFormat == llvm::Triple::COFF ||
-      TargetInfo.OutputObjectFormat == llvm::Triple::MachO ||
-      Triple.isPS4()) {
+  if ((TargetInfo.OutputObjectFormat == llvm::Triple::COFF &&
+       !Triple.isOSCygMing()) ||
+      TargetInfo.OutputObjectFormat == llvm::Triple::MachO || Triple.isPS4()) {
     llvm::LLVMContext &ctx = Module.getContext();
 
     if (!LinkerOptions) {
@@ -935,8 +944,9 @@ void IRGenModule::emitAutolinkInfo() {
       assert(FoundOldEntry && "Could not replace old linker options entry?");
     }
   } else {
-    assert(TargetInfo.OutputObjectFormat == llvm::Triple::ELF &&
-           "expected ELF output format");
+    assert((TargetInfo.OutputObjectFormat == llvm::Triple::ELF ||
+            Triple.isOSCygMing()) &&
+           "expected ELF output format or COFF format for Cygwin/MinGW");
 
     // Merge the entries into null-separated string.
     llvm::SmallString<64> EntriesString;
@@ -965,11 +975,11 @@ void IRGenModule::emitAutolinkInfo() {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, IRGen.Opts.ForceLoadSymbolName);
     auto symbol =
-        new llvm::GlobalVariable(Module, Int1Ty, /*constant=*/false,
+        new llvm::GlobalVariable(Module, Int1Ty, /*isConstant=*/false,
                                  llvm::GlobalValue::CommonLinkage,
                                  llvm::Constant::getNullValue(Int1Ty),
                                  buf.str());
-    if (Triple.isOSBinFormatCOFF())
+    if (useDllStorage())
       symbol->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
   }
 }
@@ -984,7 +994,7 @@ void IRGenModule::cleanupClangCodeGenMetadata() {
   // image info.
   // Using "Objective-C Garbage Collection" as the key here is a hack,
   // but LLVM's object-file emission isn't general enough to collect
-  // arbitrary keys to put in the
+  // arbitrary keys to put in the image info.
 
   const char *ObjectiveCGarbageCollection = "Objective-C Garbage Collection";
   if (Module.getModuleFlag(ObjectiveCGarbageCollection)) {
@@ -1071,6 +1081,8 @@ void IRGenModule::error(SourceLoc loc, const Twine &message) {
   Context.Diags.diagnose(loc, diag::irgen_failure,
                          message.toStringRef(buffer));
 }
+
+bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {
   assert(GenModules.count(SF) == 0);

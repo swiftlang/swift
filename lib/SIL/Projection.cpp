@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -104,7 +104,7 @@ Projection::Projection(SILInstruction *I) : Value() {
   }
   case ValueKind::ProjectBoxInst: {
     auto *PBI = cast<ProjectBoxInst>(I);
-    Value = ValueTy(ProjectionKind::Box, (unsigned)0);
+    Value = ValueTy(ProjectionKind::Box, static_cast<uintptr_t>(0));
     assert(getKind() == ProjectionKind::Box);
     assert(getIndex() == 0);
     assert(getType(PBI->getOperand()->getType(), PBI->getModule()) ==
@@ -228,6 +228,8 @@ Projection::createObjectProjection(SILBuilder &B, SILLocation Loc,
   case ProjectionKind::BitwiseCast:
     return B.createUncheckedBitwiseCast(Loc, Base, getCastType(BaseTy));
   }
+
+  llvm_unreachable("Unhandled ProjectionKind in switch.");
 }
 
 NullablePtr<SILInstruction>
@@ -270,6 +272,8 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
   case ProjectionKind::BitwiseCast:
     return B.createUncheckedAddrCast(Loc, Base, getCastType(BaseTy));
   }
+
+  llvm_unreachable("Unhandled ProjectionKind in switch.");
 }
 
 void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,

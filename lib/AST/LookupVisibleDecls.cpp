@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,8 +16,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "NameLookupImpl.h"
-#include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/Initializer.h"
+#include "swift/AST/NameLookup.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -337,6 +339,9 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
         assert(FD->getImplicitSelfDecl() && "should not find free functions");
         (void)FD;
 
+        if (FD->isInvalid())
+          break;
+
         // Get the type without the first uncurry level with 'self'.
         CanType T = D->getInterfaceType()
                         ->castTo<AnyFunctionType>()
@@ -359,7 +364,8 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       case DeclKind::Var: {
         auto *VD = cast<VarDecl>(D);
         auto Signature =
-            std::make_pair(VD->getName(), VD->getType()->getCanonicalType());
+            std::make_pair(VD->getName(),
+                           VD->getInterfaceType()->getCanonicalType());
         if (!PropertiesReported.insert(Signature).second)
           return;
         break;
@@ -374,7 +380,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
   DynamicLookupConsumer ConsumerWrapper(Consumer, LS, CurrDC, TypeResolver);
 
   CurrDC->getParentSourceFile()->forAllVisibleModules(
-      [&](Module::ImportedModule Import) {
+      [&](ModuleDecl::ImportedModule Import) {
         Import.second->lookupClassMembers(Import.first, ConsumerWrapper);
       });
 }
@@ -514,7 +520,7 @@ static void lookupVisibleMemberDeclsImpl(
   if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
     AccessFilteringDeclConsumer FilteringConsumer(CurrDC, Consumer,
                                                   TypeResolver);
-    MT->getModule()->lookupVisibleDecls(Module::AccessPathTy(),
+    MT->getModule()->lookupVisibleDecls(ModuleDecl::AccessPathTy(),
                                         FilteringConsumer,
                                         NLKind::QualifiedLookup);
     return;
@@ -623,7 +629,7 @@ template <> struct DenseMapInfo<FoundDeclTy> {
   }
 };
 
-} // end llvm namespace
+} // namespace llvm
 
 namespace {
 
@@ -718,16 +724,16 @@ public:
 
     // Does it make sense to substitute types?
     bool shouldSubst = !BaseTy->hasUnboundGenericType() &&
-                       !isa<AnyMetatypeType>(BaseTy.getPointer()) &&
-                       !BaseTy->isAnyExistentialType() &&
+                       !BaseTy->is<AnyMetatypeType>() &&
+                       !BaseTy->isExistentialType() &&
                        !BaseTy->hasTypeVariable() &&
                        VD->getDeclContext()->isTypeContext();
     ModuleDecl *M = DC->getParentModule();
 
     auto FoundSignature = VD->getOverloadSignature();
     if (FoundSignature.InterfaceType && shouldSubst) {
-      auto subs = BaseTy->getMemberSubstitutions(VD->getDeclContext());
-      if (auto CT = FoundSignature.InterfaceType.subst(M, subs, None))
+      auto subs = BaseTy->getMemberSubstitutionMap(M, VD);
+      if (auto CT = FoundSignature.InterfaceType.subst(subs))
         FoundSignature.InterfaceType = CT->getCanonicalType();
     }
 
@@ -742,8 +748,8 @@ public:
 
       auto OtherSignature = OtherVD->getOverloadSignature();
       if (OtherSignature.InterfaceType && shouldSubst) {
-        auto subs = BaseTy->getMemberSubstitutions(OtherVD->getDeclContext());
-        if (auto CT = OtherSignature.InterfaceType.subst(M, subs, None))
+        auto subs = BaseTy->getMemberSubstitutionMap(M, OtherVD);
+        if (auto CT = OtherSignature.InterfaceType.subst(subs))
           OtherSignature.InterfaceType = CT->getCanonicalType();
       }
 
@@ -793,7 +799,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                                LazyResolver *TypeResolver,
                                bool IncludeTopLevel,
                                SourceLoc Loc) {
-  const Module &M = *DC->getParentModule();
+  const ModuleDecl &M = *DC->getParentModule();
   const SourceManager &SM = DC->getASTContext().SourceMgr;
   auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
 
@@ -825,8 +831,9 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 
       // Constructors and destructors don't have 'self' in parameter patterns.
       if (isa<ConstructorDecl>(AFD) || isa<DestructorDecl>(AFD))
-        Consumer.foundDecl(const_cast<ParamDecl*>(AFD->getImplicitSelfDecl()),
-                           DeclVisibilityKind::FunctionParameter);
+        if (auto *selfParam = AFD->getImplicitSelfDecl())
+          Consumer.foundDecl(const_cast<ParamDecl*>(selfParam),
+                             DeclVisibilityKind::FunctionParameter);
 
       if (AFD->getDeclContext()->isTypeContext()) {
         ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
@@ -864,12 +871,12 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     // Check any generic parameters for something with the given name.
     namelookup::FindLocalVal(SM, Loc, Consumer)
           .checkGenericParams(GenericParams);
-    
+
     DC = DC->getParent();
     Reason = DeclVisibilityKind::MemberOfOutsideNominal;
   }
 
-  SmallVector<Module::ImportedModule, 8> extraImports;
+  SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
   if (auto SF = dyn_cast<SourceFile>(DC)) {
     if (Loc.isValid()) {
       // Look for local variables in top-level code; normally, the parser
@@ -886,14 +893,14 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         return;
       }
 
-      SF->getImportedModules(extraImports, Module::ImportFilter::Private);
+      SF->getImportedModules(extraImports, ModuleDecl::ImportFilter::Private);
     }
   }
 
   if (IncludeTopLevel) {
     using namespace namelookup;
     SmallVector<ValueDecl *, 0> moduleResults;
-    auto &mutableM = const_cast<Module&>(M);
+    auto &mutableM = const_cast<ModuleDecl&>(M);
     lookupVisibleDeclsInModule(&mutableM, {}, moduleResults,
                                NLKind::UnqualifiedLookup,
                                ResolutionKind::Overloadable,

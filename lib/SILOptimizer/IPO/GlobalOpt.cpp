@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -148,7 +148,7 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
   }
 };
 
-} // namespace
+} // end anonymous namespace
 
 /// If this is a call to a global initializer, map it.
 void SILGlobalOpt::collectGlobalInitCall(ApplyInst *AI) {
@@ -232,7 +232,7 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   }
 
   // Generate a getter from the global init function without side-effects.
-  auto refType = varDecl->getType().getCanonicalTypeOrNull();
+  auto refType = varDecl->getInterfaceType()->getCanonicalType();
   // Function takes no arguments and returns refType
   SILResultInfo Results[] = { SILResultInfo(refType, ResultConvention::Owned) };
   SILFunctionType::ExtInfo EInfo;
@@ -485,7 +485,7 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   if (auto *F = InitF->getModule().lookUpFunction(getterName))
     return F;
 
-  auto refType = varDecl->getType().getCanonicalTypeOrNull();
+  auto refType = varDecl->getInterfaceType()->getCanonicalType();
   // Function takes no arguments and returns refType
   SILResultInfo Results[] = { SILResultInfo(refType, ResultConvention::Owned) };
   SILFunctionType::ExtInfo EInfo;
@@ -938,7 +938,7 @@ class SILGlobalOptPass : public SILModuleTransform
 
   StringRef getName() override { return "SIL Global Optimization"; }
 };
-} // anonymous
+} // end anonymous namespace
 
 SILTransform *swift::createGlobalOpt() {
   return new SILGlobalOptPass();

@@ -348,12 +348,15 @@ class SomeSubclass : SomeClass {}
 
 protocol SomeProtocol {}
 class SomeConformingClass : SomeProtocol {}
+class SomeConformingSubclass : SomeConformingClass {}
+class UnicodeCläss {}
 
 Runtime.test("typeByName") {
   expectTrue(_typeByName("a.SomeClass") == SomeClass.self)
   expectTrue(_typeByName("a.SomeSubclass") == SomeSubclass.self)
   // name lookup will be via protocol conformance table
   expectTrue(_typeByName("a.SomeConformingClass") == SomeConformingClass.self)
+  expectTrue(_typeByName("a.UnicodeCläss") == UnicodeCläss.self)
 }
 
 Runtime.test("demangleName") {
@@ -439,6 +442,54 @@ Runtime.test("casting AnyObject to class metatypes") {
     expectTrue(a as? AnyClass == SomeClass.self)
     expectTrue(a as? SomeClass.Type == SomeClass.self)
   }
+}
+
+func wantonlyWrapInAny<T>(_ x: T) -> Any {
+  return x
+}
+
+// Because `type(of: x)` and `T.self` have the same type `T.Type` in
+// a <T>(x: T) context, both operations must produce the concrete protocol
+// type value when `T` is bound to an existential type `P`.
+func castWithAbstractionBarrier<T>(_ x: T) -> (
+  staticWithConcreteType: T.Type,
+  dynamicWithConcreteType: T.Type,
+  staticWithErasedType: Any.Type,
+  dynamicWithErasedType: Any.Type,
+  dynamicExistentialWithErasedType: Any.Type,
+  dynamicDoubleWrappedExistentialWithErasedType: Any.Type
+) {
+  return (
+    staticWithConcreteType: T.self,
+    dynamicWithConcreteType: type(of: x),
+    staticWithErasedType: T.self,
+    dynamicWithErasedType: type(of: x),
+    dynamicExistentialWithErasedType: type(of: x as Any),
+    dynamicDoubleWrappedExistentialWithErasedType:
+      type(of: wantonlyWrapInAny(wantonlyWrapInAny(x)))
+  )
+}
+
+Runtime.test("abstraction barrier on casting generic param bound to existential") {
+  let c: SomeConformingClass = SomeConformingSubclass()
+  let x: SomeProtocol = c
+  let (staticWithConcreteType,
+       dynamicWithConcreteType,
+       staticWithErasedType,
+       dynamicWithErasedType,
+       dynamicExistentialWithErasedType,
+       dynamicDoubleWrappedExistentialWithErasedType)
+    = castWithAbstractionBarrier(x)
+
+  expectTrue(staticWithConcreteType == SomeProtocol.self)
+  expectTrue(dynamicWithConcreteType == SomeProtocol.self)
+  expectTrue(staticWithErasedType == SomeProtocol.self)
+  expectTrue(dynamicWithErasedType == SomeProtocol.self)
+
+  // type(of: x as Any) can be a proper existential type cast
+  expectTrue(dynamicExistentialWithErasedType == SomeConformingSubclass.self)
+  expectTrue(dynamicDoubleWrappedExistentialWithErasedType
+               == SomeConformingSubclass.self)
 }
 
 class Malkovich: Malkovichable {

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -70,7 +70,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case ScalarToTuple:
     case Load:
     case GenericArgument:
-    case InterpolationArgument:
     case NamedTupleElement:
     case TupleElement:
     case ApplyArgToParam:
@@ -162,10 +161,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case InstanceType:
       out << "instance type";
-      break;
-
-    case InterpolationArgument:
-      out << "interpolation argument #" << llvm::utostr(elt.getValue());
       break;
 
     case Load:

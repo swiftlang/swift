@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ///
@@ -35,6 +35,7 @@ PASSPIPELINE(OwnershipEliminator, "Utility pass to just run the ownership elimin
 PASSPIPELINE_WITH_OPTIONS(Performance, "Passes run at -O")
 PASSPIPELINE(Onone, "Passes run at -Onone")
 PASSPIPELINE(InstCount, "Utility pipeline to just run the inst count pass")
+PASSPIPELINE(IRGenPrepare, "Pipeline to run during IRGen")
 
 #undef PASSPIPELINE_WITH_OPTIONS
 #undef PASSPIPELINE

@@ -20,6 +20,7 @@ add_swift_unittest(SwiftBasicTests
   StringExtrasTest.cpp
   SuccessorMapTest.cpp
   ThreadSafeRefCntPointerTests.cpp
+  TransformArrayRef.cpp
   TreeScopedHashTableTests.cpp
   Unicode.cpp
   ${generated_tests}

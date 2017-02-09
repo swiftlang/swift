@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -40,6 +40,14 @@
 #define UNCHECKED_EXPR(Id, Parent) EXPR(Id, Parent)
 #endif
 
+/// A literal expression node represents a literal value, such as a number,
+/// boolean, string, etc.
+///
+/// By default, these are treated like any other expression.
+#ifndef LITERAL_EXPR
+#define LITERAL_EXPR(Id, Parent) EXPR(Id, Parent)
+#endif
+
 /// A convenience for determining the range of expressions.  These will always
 /// appear immediately after the last member.
 #ifndef EXPR_RANGE
@@ -48,16 +56,16 @@
 
 EXPR(Error, Expr)
 ABSTRACT_EXPR(Literal, Expr)
-  EXPR(NilLiteral, LiteralExpr)
+  LITERAL_EXPR(NilLiteral, LiteralExpr)
   ABSTRACT_EXPR(NumberLiteral, LiteralExpr)
-    EXPR(IntegerLiteral, NumberLiteralExpr)
-    EXPR(FloatLiteral, NumberLiteralExpr)
+    LITERAL_EXPR(IntegerLiteral, NumberLiteralExpr)
+    LITERAL_EXPR(FloatLiteral, NumberLiteralExpr)
   EXPR_RANGE(NumberLiteral, IntegerLiteral, FloatLiteral)
-  EXPR(BooleanLiteral, LiteralExpr)
-  EXPR(StringLiteral, LiteralExpr)
-  EXPR(InterpolatedStringLiteral, LiteralExpr)
-  EXPR(ObjectLiteral, LiteralExpr)
-  EXPR(MagicIdentifierLiteral, LiteralExpr)
+  LITERAL_EXPR(BooleanLiteral, LiteralExpr)
+  LITERAL_EXPR(StringLiteral, LiteralExpr)
+  LITERAL_EXPR(InterpolatedStringLiteral, LiteralExpr)
+  LITERAL_EXPR(ObjectLiteral, LiteralExpr)
+  LITERAL_EXPR(MagicIdentifierLiteral, LiteralExpr)
   EXPR_RANGE(Literal, NilLiteral, MagicIdentifierLiteral)
 EXPR(DiscardAssignment, Expr)
 EXPR(DeclRef, Expr)
@@ -107,6 +115,7 @@ EXPR(BindOptional, Expr)
 EXPR(OptionalEvaluation, Expr)
 EXPR(ForceValue, Expr)
 EXPR(OpenExistential, Expr)
+EXPR(MakeTemporarilyEscapable, Expr)
 ABSTRACT_EXPR(Apply, Expr)
   EXPR(Call, ApplyExpr)
   EXPR(PrefixUnary, ApplyExpr)
@@ -161,6 +170,7 @@ EXPR(ObjCSelector, Expr)
 EXPR(ObjCKeyPath, Expr)
 
 #undef EXPR_RANGE
+#undef LITERAL_EXPR
 #undef UNCHECKED_EXPR
 #undef ABSTRACT_EXPR
 #undef EXPR

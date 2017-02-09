@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -72,12 +72,15 @@ public:
   /// \param ReturnCode the return code of the task which finished execution.
   /// \param Output the output from the task which finished execution,
   /// if available. (This may not be available on all platforms.)
+  /// \param Errors the errors from the task which finished execution, if
+  /// available and SeparateErrors was true.  (This may not be available on all
+  /// platforms.)
   /// \param Context the context which was passed when the task was added
   ///
   /// \returns true if further execution of tasks should stop,
   /// false if execution should continue
   typedef std::function<TaskFinishedResponse(ProcessId Pid, int ReturnCode,
-                                             StringRef Output, void *Context)>
+                                             StringRef Output, StringRef Errors, void *Context)>
     TaskFinishedCallback;
 
   /// \brief A callback which will be executed if a task exited abnormally due
@@ -88,12 +91,19 @@ public:
   /// no reason could be deduced, this may be empty.
   /// \param Output the output from the task which exited abnormally, if
   /// available. (This may not be available on all platforms.)
+  /// \param Errors the errors from the task which exited abnormally, if
+  /// available and SeparateErrors was true.  (This may not be available on all
+  /// platforms.)
   /// \param Context the context which was passed when the task was added
+  /// \param Signal the terminating signal number, if available.
+  /// This may not be available on all platforms. If it is ever provided,
+  /// it should not be removed in future versions of the compiler.
   ///
   /// \returns a TaskFinishedResponse indicating whether or not execution
   /// should proceed
   typedef std::function<TaskFinishedResponse(ProcessId Pid, StringRef ErrorMsg,
-                                             StringRef Output, void *Context)>
+                                             StringRef Output, StringRef Errors,
+                                             void *Context, Optional<int> Signal)>
     TaskSignalledCallback;
 #pragma clang diagnostic pop
 
@@ -120,9 +130,10 @@ public:
   /// \param Env the environment which should be used for the task;
   /// must be null-terminated. If empty, inherits the parent's environment.
   /// \param Context an optional context which will be associated with the task
+  /// \param SeparateErrors Controls whether error output is reported separately
   virtual void addTask(const char *ExecPath, ArrayRef<const char *> Args,
                        ArrayRef<const char *> Env = llvm::None,
-                       void *Context = nullptr);
+                       void *Context = nullptr, bool SeparateErrors = false);
 
   /// \brief Synchronously executes the tasks in the TaskQueue.
   ///
@@ -153,10 +164,13 @@ class DummyTaskQueue : public TaskQueue {
     ArrayRef<const char *> Args;
     ArrayRef<const char *> Env;
     void *Context;
+    bool SeparateErrors;
 
     DummyTask(const char *ExecPath, ArrayRef<const char *> Args,
-              ArrayRef<const char *> Env = llvm::None, void *Context = nullptr)
-      : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context) {}
+              ArrayRef<const char *> Env = llvm::None, void *Context = nullptr,
+              bool SeparateErrors = false)
+        : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context),
+          SeparateErrors(SeparateErrors) {}
   };
 
   std::queue<std::unique_ptr<DummyTask>> QueuedTasks;
@@ -168,7 +182,7 @@ public:
 
   virtual void addTask(const char *ExecPath, ArrayRef<const char *> Args,
                        ArrayRef<const char *> Env = llvm::None,
-                       void *Context = nullptr);
+                       void *Context = nullptr, bool SeparateErrors = false);
 
   virtual bool
   execute(TaskBeganCallback Began = TaskBeganCallback(),

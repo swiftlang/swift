@@ -29,6 +29,7 @@ add_swift_library(swiftSIL STATIC
   SILType.cpp
   SILValue.cpp
   SILVerifier.cpp
+  SILOwnershipVerifier.cpp
   SILVTable.cpp
   SILWitnessTable.cpp
   TypeLowering.cpp

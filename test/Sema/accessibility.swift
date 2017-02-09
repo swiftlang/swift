@@ -156,6 +156,14 @@ public class Base {
   public subscript () -> () { return () }
 }
 
+
+public extension Base {
+  open func extMemberPublic() {} // expected-warning {{declaring open instance method in public extension}}
+}
+internal extension Base {
+  open func extMemberInternal() {} // expected-warning {{declaring open instance method in an internal extension}}
+}
+
 public class PublicSub: Base {
   required init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-12=public }}
   override func foo() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}} {{12-12=public }}
@@ -358,7 +366,8 @@ public struct Initializers {
 
 
 public class PublicClass {}
-// expected-note@+1 * {{type declared here}}
+// expected-note@+2 * {{type declared here}}
+// expected-note@+1 * {{superclass is declared here}}
 internal class InternalClass {}
 // expected-note@+1 * {{type declared here}}
 private class PrivateClass {}
@@ -408,6 +417,7 @@ public enum MultipleConformance : PrivateProto, PrivateInt { // expected-error {
   func privateReq() {}
 }
 
+open class OpenSubclassInternal : InternalClass {} // expected-error {{class cannot be declared open because its superclass is internal}} expected-error {{superclass 'InternalClass' of open class must be open}}
 public class PublicSubclassPublic : PublicClass {}
 public class PublicSubclassInternal : InternalClass {} // expected-error {{class cannot be declared public because its superclass is internal}}
 public class PublicSubclassPrivate : PrivateClass {} // expected-error {{class cannot be declared public because its superclass is private}}
@@ -437,7 +447,7 @@ struct DefaultGeneric<T> {}
 
 struct DefaultGenericPrivate<T: PrivateProto> {} // expected-error {{generic struct must be declared private or fileprivate because its generic parameter uses a private type}}
 struct DefaultGenericPrivate2<T: PrivateClass> {} // expected-error {{generic struct must be declared private or fileprivate because its generic parameter uses a private type}}
-struct DefaultGenericPrivateReq<T> where T == PrivateClass {} // expected-error 2 {{same-type requirement makes generic parameter 'T' non-generic}}
+struct DefaultGenericPrivateReq<T> where T == PrivateClass {} // expected-error  {{same-type requirement makes generic parameter 'T' non-generic}}
 // expected-error@-1 {{generic struct must be declared private or fileprivate because its generic requirement uses a private type}}
 struct DefaultGenericPrivateReq2<T> where T: PrivateProto {} // expected-error {{generic struct must be declared private or fileprivate because its generic requirement uses a private type}}
 

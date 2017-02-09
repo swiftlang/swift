@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend %s -O -emit-sil | %FileCheck -check-prefix=CHECK-WMO %s
-// RUN: %target-swift-frontend -primary-file %s -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -O -emit-sil | %FileCheck -check-prefix=CHECK-WMO %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s -O -emit-sil | %FileCheck %s
 
 // Test propagation of non-static let properties with compile-time constant values.
 
@@ -16,7 +16,7 @@
 // initialization code could be removed.
 // Specifically, the initialization code for Prop1, Prop2 and Prop3 can be removed.
 
-// CHECK-WMO-LABEL: sil @_TFC19let_properties_opts3Fooc{{.*}} : $@convention(method) (Int32, @owned Foo) -> @owned Foo
+// CHECK-WMO-LABEL: sil @_T019let_properties_opts3FooC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Int32, @owned Foo) -> @owned Foo
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
@@ -26,7 +26,7 @@
 // CHECK-WMO: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
 // CHECK-WMO: return
 
-// CHECK-WMO-LABEL: sil @_TFC19let_properties_opts3Fooc{{.*}} : $@convention(method) (Int64, @owned Foo) -> @owned Foo 
+// CHECK-WMO-LABEL: sil @_T019let_properties_opts3FooC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Int64, @owned Foo) -> @owned Foo 
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
@@ -41,14 +41,14 @@
 // from other modules. Therefore the initialization code could be removed.
 // Specifically, the initialization code for Prop2 can be removed.
 
-// CHECK-LABEL: sil @_TFC19let_properties_opts3Fooc{{.*}} : $@convention(method) (Int32, @owned Foo) -> @owned Foo
+// CHECK-LABEL: sil @_T019let_properties_opts3FooC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Int32, @owned Foo) -> @owned Foo
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop0
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
 // CHECK: return
 
-// CHECK-LABEL: sil @_TFC19let_properties_opts3Fooc{{.*}} : $@convention(method) (Int64, @owned Foo) -> @owned Foo
+// CHECK-LABEL: sil @_T019let_properties_opts3FooC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Int64, @owned Foo) -> @owned Foo
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop0
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
@@ -167,7 +167,7 @@ public struct StructWithPublicAndInternalAndPrivateLetProperties {
 // Check that Foo1.Prop1 is not constant-folded, because its value is unknown, since it is initialized differently
 // by Foo1 initializers.
 
-// CHECK-LABEL: sil [thunk] [always_inline] @_TF19let_properties_opts13testClassLet1FCS_4Foo1Vs5Int32 : $@convention(thin) (@owned Foo1) -> Int32
+// CHECK-LABEL: sil [thunk] [always_inline] @_T019let_properties_opts13testClassLet1s5Int32VAA4Foo1CF : $@convention(thin) (@owned Foo1) -> Int32
 // bb0
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop1 
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop2
@@ -180,7 +180,7 @@ public func testClassLet1(_ f: Foo1) -> Int32 {
 // Check that Foo1.Prop1 is not constant-folded, because its value is unknown, since it is initialized differently
 // by Foo1 initializers.
 
-// CHECK-LABEL: sil @_TF19let_properties_opts13testClassLet1FRCS_4Foo1Vs5Int32 : $@convention(thin) (@inout Foo1) -> Int32 
+// CHECK-LABEL: sil @_T019let_properties_opts13testClassLet1s5Int32VAA4Foo1CzF : $@convention(thin) (@inout Foo1) -> Int32 
 // bb0
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop1 
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop2
@@ -193,7 +193,7 @@ public func testClassLet1(_ f: inout Foo1) -> Int32 {
 // Check that return expressions in all subsequent functions can be constant folded, because the values of let properties
 // are known to be constants of simple types.
 
-// CHECK: sil [thunk] [always_inline] @_TF19let_properties_opts12testClassLetFCS_3FooVs5Int32 : $@convention(thin) (@owned Foo) -> Int32
+// CHECK: sil [thunk] [always_inline] @_T019let_properties_opts12testClassLets5Int32VAA3FooCF : $@convention(thin) (@owned Foo) -> Int32
 // CHECK: bb0
 // CHECK-NEXT: strong_release
 // CHECK: integer_literal $Builtin.Int32, 75
@@ -203,7 +203,7 @@ public func testClassLet(_ f: Foo) -> Int32 {
   return f.Prop1 + f.Prop1 + f.Prop2 + f.Prop3
 }
 
-// CHECK-LABEL: sil @_TF19let_properties_opts12testClassLetFRCS_3FooVs5Int32 : $@convention(thin) (@inout Foo) -> Int32
+// CHECK-LABEL: sil @_T019let_properties_opts12testClassLets5Int32VAA3FooCzF : $@convention(thin) (@inout Foo) -> Int32
 // CHECK: bb0
 // CHECK: integer_literal $Builtin.Int32, 75
 // CHECK-NEXT: struct $Int32
@@ -212,7 +212,7 @@ public func testClassLet(_ f: inout Foo) -> Int32 {
   return f.Prop1 + f.Prop1 + f.Prop2 + f.Prop3
 }
 
-// CHECK-LABEL: sil [thunk] [always_inline] @_TF19let_properties_opts18testClassPublicLetFCS_3FooVs5Int32 : $@convention(thin) (@owned Foo) -> Int32
+// CHECK-LABEL: sil [thunk] [always_inline] @_T019let_properties_opts18testClassPublicLets5Int32VAA3FooCF : $@convention(thin) (@owned Foo) -> Int32
 // CHECK: bb0
 // CHECK-NEXT: strong_release
 // CHECK: integer_literal $Builtin.Int32, 1
@@ -222,7 +222,7 @@ public func testClassPublicLet(_ f: Foo) -> Int32 {
   return f.Prop0
 }
 
-// CHECK-LABEL: sil @_TF19let_properties_opts13testStructLetFVS_3BooVs5Int32 : $@convention(thin) (Boo) -> Int32
+// CHECK-LABEL: sil @_T019let_properties_opts13testStructLets5Int32VAA3BooVF : $@convention(thin) (Boo) -> Int32
 // CHECK: bb0
 // CHECK: integer_literal $Builtin.Int32, 75
 // CHECK-NEXT: struct $Int32
@@ -231,7 +231,7 @@ public func testStructLet(_ b: Boo) -> Int32 {
   return b.Prop1 + b.Prop1 + b.Prop2 + b.Prop3
 }
 
-// CHECK-LABEL: sil @_TF19let_properties_opts13testStructLetFRVS_3BooVs5Int32 : $@convention(thin) (@inout Boo) -> Int32
+// CHECK-LABEL: sil @_T019let_properties_opts13testStructLets5Int32VAA3BooVzF : $@convention(thin) (@inout Boo) -> Int32
 // CHECK: bb0
 // CHECK: integer_literal $Builtin.Int32, 75
 // CHECK-NEXT: struct $Int32
@@ -240,7 +240,7 @@ public func testStructLet(_ b: inout Boo) -> Int32 {
   return b.Prop1 + b.Prop1 + b.Prop2 + b.Prop3
 }
 
-// CHECK-LABEL: sil @_TF19let_properties_opts19testStructPublicLetFVS_3BooVs5Int32 : $@convention(thin) (Boo) -> Int32
+// CHECK-LABEL: sil @_T019let_properties_opts19testStructPublicLets5Int32VAA3BooVF : $@convention(thin) (Boo) -> Int32
 // CHECK: bb0
 // CHECK: integer_literal $Builtin.Int32, 1
 // CHECK-NEXT: struct $Int32
@@ -251,7 +251,7 @@ public func testStructPublicLet(_ b: Boo) -> Int32 {
 
 // Check that f.x is not constant folded, because the initializer of Foo2 has multiple
 // assignments to the property x with different values.
-// CHECK-LABEL: sil [thunk] [always_inline] @_TF19let_properties_opts13testClassLet2FCS_4Foo2Vs5Int32 : $@convention(thin) (@owned Foo2) -> Int32
+// CHECK-LABEL: sil [thunk] [always_inline] @_T019let_properties_opts13testClassLet2s5Int32VAA4Foo2CF : $@convention(thin) (@owned Foo2) -> Int32
 // bb0
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo2, #Foo2.x
@@ -262,7 +262,7 @@ public func testClassLet2(_ f: Foo2) -> Int32 {
 }
 
 // Check that the sum of properties is not folded into a constant.
-// CHECK-WMO-LABEL: sil hidden [noinline] @_TF19let_properties_opts27testStructWithMultipleInitsFTVS_4Boo3S0__Vs5Int32 : $@convention(thin) (Boo3, Boo3) -> Int32
+// CHECK-WMO-LABEL: sil hidden [noinline] @_T019let_properties_opts27testStructWithMultipleInitss5Int32VAA4Boo3V_AFtF : $@convention(thin) (Boo3, Boo3) -> Int32
 // CHECK-WMO: bb0
 // No constant folding should have been performed.
 // CHECK-WMO-NOT: integer_literal $Builtin.Int32, 92
@@ -297,11 +297,11 @@ public func testStructWithMultipleInitsAndInlinedInitializer() {
 // different module.
 // Their values are not known and cannot be propagated.
 
-// CHECK-LABEL: sil @_TF19let_properties_opts31testStructPropertyAccessibilityFVS_33StructWithOnlyPublicLetPropertiesVs5Int32 
+// CHECK-LABEL: sil @_T019let_properties_opts31testStructPropertyAccessibilitys5Int32VAA0E27WithOnlyPublicLetPropertiesVF 
 // CHECK: struct_extract %0 : $StructWithOnlyPublicLetProperties, #StructWithOnlyPublicLetProperties.Prop0
 // CHECK: return
 
-// CHECK-WMO-LABEL: sil @_TF19let_properties_opts31testStructPropertyAccessibilityFVS_33StructWithOnlyPublicLetPropertiesVs5Int32
+// CHECK-WMO-LABEL: sil @_T019let_properties_opts31testStructPropertyAccessibilitys5Int32VAA0E27WithOnlyPublicLetPropertiesVF
 // CHECK-WMO: struct_extract %0 : $StructWithOnlyPublicLetProperties, #StructWithOnlyPublicLetProperties.Prop0
 // CHECK-WMO: return
 public func testStructPropertyAccessibility(_ b: StructWithOnlyPublicLetProperties) -> Int32 {
@@ -312,12 +312,12 @@ public func testStructPropertyAccessibility(_ b: StructWithOnlyPublicLetProperti
 // Their values are not known and cannot be propagated,
 // unless it is a WMO compilation.
 
-// CHECK-LABEL: sil @_TF19let_properties_opts31testStructPropertyAccessibilityFVS_40StructWithPublicAndInternalLetPropertiesVs5Int32
+// CHECK-LABEL: sil @_T019let_properties_opts31testStructPropertyAccessibilitys5Int32VAA0E34WithPublicAndInternalLetPropertiesVF
 // CHECK: struct_extract %0 : $StructWithPublicAndInternalLetProperties, #StructWithPublicAndInternalLetProperties.Prop0
 // CHECK-NOT: integer_literal $Builtin.Int32, 21
 // CHECK: return
 
-// CHECK-WMO-LABEL: sil @_TF19let_properties_opts31testStructPropertyAccessibilityFVS_40StructWithPublicAndInternalLetPropertiesVs5Int32
+// CHECK-WMO-LABEL: sil @_T019let_properties_opts31testStructPropertyAccessibilitys5Int32VAA0E34WithPublicAndInternalLetPropertiesVF
 // CHECK-WMO: integer_literal $Builtin.Int32, 21
 // CHECK-WMO-NEXT: struct $Int32
 // CHECK-WMO-NEXT: return
@@ -329,12 +329,12 @@ public func testStructPropertyAccessibility(_ b: StructWithPublicAndInternalLetP
 // properties is fileprivate.
 // Therefore their values are known and can be propagated.
 
-// CHECK: sil @_TF19let_properties_opts31testStructPropertyAccessibilityFVS_50StructWithPublicAndInternalAndPrivateLetPropertiesVs5Int32
+// CHECK: sil @_T019let_properties_opts31testStructPropertyAccessibilitys5Int32VAA0e21WithPublicAndInternalK20PrivateLetPropertiesVF
 // CHECK: integer_literal $Builtin.Int32, 33
 // CHECK-NEXT: struct $Int32
 // CHECK-NEXT: return
 
-// CHECK-WMO-LABEL: sil @_TF19let_properties_opts31testStructPropertyAccessibilityFVS_50StructWithPublicAndInternalAndPrivateLetPropertiesVs5Int32
+// CHECK-WMO-LABEL: sil @_T019let_properties_opts31testStructPropertyAccessibilitys5Int32VAA0e21WithPublicAndInternalK20PrivateLetPropertiesVF
 // CHECK-WMO: integer_literal $Builtin.Int32, 33
 // CHECK-WMO-NEXT: struct $Int32
 // CHECK-WMO-NEXT: return

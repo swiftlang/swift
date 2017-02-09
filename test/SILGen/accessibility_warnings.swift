@@ -1,13 +1,13 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
 // This file tests that the AST produced after fixing accessibility warnings
 // is valid according to SILGen and the verifiers.
 
 public struct PublicStruct {
-  // CHECK-DAG: sil{{( \[.+\])*}} @_TFV22accessibility_warnings12PublicStructg9publicVarSi
+  // CHECK-DAG: sil{{( \[.+\])*}} @_T022accessibility_warnings12PublicStructV9publicVarSifg
   public var publicVar = 0
-  // CHECK-DAG: sil hidden @_TFV22accessibility_warnings12PublicStructCfT_S0_
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings12PublicStructVACycfC
 }
 
 internal struct InternalStruct {
@@ -17,82 +17,82 @@ internal struct InternalStruct {
 
   public public(set) var publicVarPublicSet = 0
 
-  // CHECK-DAG: sil hidden @_TFV22accessibility_warnings14InternalStructg16publicVarGetOnlySi
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings14InternalStructV16publicVarGetOnlySifg
   public var publicVarGetOnly: Int { return 0 }
 
-  // CHECK-DAG: sil hidden @_TFV22accessibility_warnings14InternalStructg15publicVarGetSetSi
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings14InternalStructV15publicVarGetSetSifg
   public var publicVarGetSet: Int { get { return 0 } set {} }
 
-  // CHECK-DAG: sil hidden @_TFV22accessibility_warnings14InternalStructCfT_S0_
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings14InternalStructVACycfC
 }
 
 private struct PrivateStruct {
   public var publicVar = 0
-  // CHECK-DAG: sil private @_TFV22accessibility_warningsP33_5D2F2E026754A901C0FF90C404896D0213PrivateStructCfT_S0_
+  // CHECK-DAG: sil private @_T022accessibility_warnings13PrivateStruct33_5D2F2E026754A901C0FF90C404896D02LLVADycfC
 }
 
 
 extension PublicStruct {
-  // CHECK-DAG: sil @_TFV22accessibility_warnings12PublicStructCfT1xSi_S0_
+  // CHECK-DAG: sil @_T022accessibility_warnings12PublicStructVACSi1x_tcfC
   public init(x: Int) { self.init() }
 
-  // CHECK-DAG: sil @_TFV22accessibility_warnings12PublicStructg18publicVarExtensionSi
+  // CHECK-DAG: sil @_T022accessibility_warnings12PublicStructV18publicVarExtensionSifg
   public var publicVarExtension: Int { get { return 0 } set {} }
 }
 
 extension InternalStruct {
-  // CHECK-DAG: sil hidden @_TFV22accessibility_warnings14InternalStructCfT1xSi_S0_
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings14InternalStructVACSi1x_tcfC
   public init(x: Int) { self.init() }
 
-  // CHECK-DAG: sil hidden @_TFV22accessibility_warnings14InternalStructg18publicVarExtensionSi
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings14InternalStructV18publicVarExtensionSifg
   public var publicVarExtension: Int { get { return 0 } set {} }
 }
 
 extension PrivateStruct {
-  // CHECK-DAG: sil private @_TFV22accessibility_warningsP33_5D2F2E026754A901C0FF90C404896D0213PrivateStructCfT1xSi_S0_
+  // CHECK-DAG: sil private @_T022accessibility_warnings13PrivateStruct33_5D2F2E026754A901C0FF90C404896D02LLVADSi1x_tcfC
   public init(x: Int) { self.init() }
 
-  // CHECK-DAG: sil private @_TFV22accessibility_warningsP33_5D2F2E026754A901C0FF90C404896D0213PrivateStructg18publicVarExtensionSi
+  // CHECK-DAG: sil private @_T022accessibility_warnings13PrivateStruct33_5D2F2E026754A901C0FF90C404896D02LLV18publicVarExtensionSifg
   public var publicVarExtension: Int { get { return 0 } set {} }
 }
 
 public extension PublicStruct {
-  // CHECK-DAG: sil @_TFV22accessibility_warnings12PublicStruct15extMemberPublicfT_T_
+  // CHECK-DAG: sil @_T022accessibility_warnings12PublicStructV09extMemberC0yyF
   public func extMemberPublic() {}
-  // CHECK-DAG: sil private @_TFV22accessibility_warnings12PublicStructP33_5D2F2E026754A901C0FF90C404896D0213extImplPublicfT_T_
+  // CHECK-DAG: sil private @_T022accessibility_warnings12PublicStructV07extImplC033_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplPublic() {}
 }
 internal extension PublicStruct {
-  // CHECK-DAG: sil hidden @_TFV22accessibility_warnings12PublicStruct17extMemberInternalfT_T_
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings12PublicStructV17extMemberInternalyyF
   public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-9=internal}}
-  // CHECK-DAG: sil private @_TFV22accessibility_warnings12PublicStructP33_5D2F2E026754A901C0FF90C404896D0215extImplInternalfT_T_
+  // CHECK-DAG: sil private @_T022accessibility_warnings12PublicStructV15extImplInternal33_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplInternal() {}
 }
 private extension PublicStruct {
-  // CHECK-DAG: sil private @_TFV22accessibility_warnings12PublicStructP33_5D2F2E026754A901C0FF90C404896D0216extMemberPrivatefT_T_
+  // CHECK-DAG: sil private @_T022accessibility_warnings12PublicStructV16extMemberPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
   public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=private}}
-  // CHECK-DAG: sil private @_TFV22accessibility_warnings12PublicStructP33_5D2F2E026754A901C0FF90C404896D0214extImplPrivatefT_T_
+  // CHECK-DAG: sil private @_T022accessibility_warnings12PublicStructV14extImplPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplPrivate() {}
 }
 
 internal extension InternalStruct {
-  // CHECK-DAG: sil hidden @_TFV22accessibility_warnings14InternalStruct17extMemberInternalfT_T_
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings14InternalStructV09extMemberC0yyF
   public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-9=internal}}
-  // CHECK-DAG: sil private @_TFV22accessibility_warnings14InternalStructP33_5D2F2E026754A901C0FF90C404896D0215extImplInternalfT_T_
+  // CHECK-DAG: sil private @_T022accessibility_warnings14InternalStructV07extImplC033_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplInternal() {}
 }
 private extension InternalStruct {
-  // CHECK-DAG: sil private @_TFV22accessibility_warnings14InternalStructP33_5D2F2E026754A901C0FF90C404896D0216extMemberPrivatefT_T_
+  // CHECK-DAG: sil private @_T022accessibility_warnings14InternalStructV16extMemberPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
   public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=private}}
-  // CHECK-DAG: sil private @_TFV22accessibility_warnings14InternalStructP33_5D2F2E026754A901C0FF90C404896D0214extImplPrivatefT_T_
+  // CHECK-DAG: sil private @_T022accessibility_warnings14InternalStructV14extImplPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplPrivate() {}
 }
 
 
 private extension PrivateStruct {
-  // CHECK-DAG: sil private @_TFV22accessibility_warningsP33_5D2F2E026754A901C0FF90C404896D0213PrivateStruct16extMemberPrivatefT_T_
+  // CHECK-DAG: sil private @_T022accessibility_warnings13PrivateStruct33_5D2F2E026754A901C0FF90C404896D02LLV09extMemberC0yyF
   public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=private}}
-  // CHECK-DAG: sil private @_TFV22accessibility_warningsP33_5D2F2E026754A901C0FF90C404896D0213PrivateStruct14extImplPrivatefT_T_
+  // CHECK-DAG: sil private @_T022accessibility_warnings13PrivateStruct33_5D2F2E026754A901C0FF90C404896D02LLV07extImplC0yyF
   private func extImplPrivate() {}
 }
 
@@ -102,10 +102,10 @@ public protocol PublicReadOnlyOperations {
 }
 
 internal struct PrivateSettersForReadOnlyInternal : PublicReadOnlyOperations {
-  // CHECK-DAG: sil hidden{{( \[.+\])*}} @_TFV22accessibility_warnings33PrivateSettersForReadOnlyInternalg4sizeSi
+  // CHECK-DAG: sil hidden{{( \[.+\])*}} @_T022accessibility_warnings33PrivateSettersForReadOnlyInternalV4sizeSifg
   public private(set) var size = 0
-  // CHECK-DAG: sil hidden @_TFV22accessibility_warnings33PrivateSettersForReadOnlyInternalg9subscriptFSiSi
-  // CHECK-DAG: sil private @_TFV22accessibility_warnings33PrivateSettersForReadOnlyInternals9subscriptFSiSi
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings33PrivateSettersForReadOnlyInternalV9subscriptSiSicfg
+  // CHECK-DAG: sil private @_T022accessibility_warnings33PrivateSettersForReadOnlyInternalV9subscriptSiSicfs
   internal private(set) subscript (_: Int) -> Int { // no-warning
     get { return 42 }
     set {}
@@ -114,32 +114,32 @@ internal struct PrivateSettersForReadOnlyInternal : PublicReadOnlyOperations {
 
 
 public class PublicClass {
-  // CHECK-DAG: sil{{( \[.+\])*}} @_TFC22accessibility_warnings11PublicClassg9publicVarSi
+  // CHECK-DAG: sil{{( \[.+\])*}} @_T022accessibility_warnings11PublicClassC9publicVarSifg
   public var publicVar = 0
-  // CHECK-DAG: sil hidden @_TFC22accessibility_warnings11PublicClasscfT_S0_
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings11PublicClassCACycfc
 }
 
 internal class InternalClass {
-  // CHECK-DAG: sil hidden{{( \[.+\])*}} @_TFC22accessibility_warnings13InternalClassg9publicVarSi
+  // CHECK-DAG: sil hidden{{( \[.+\])*}} @_T022accessibility_warnings13InternalClassC9publicVarSifg
   public var publicVar = 0
 
-  // CHECK-DAG: sil hidden [transparent] @_TFC22accessibility_warnings13InternalClassg19publicVarPrivateSetSi
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings13InternalClassC19publicVarPrivateSetSifg
   public private(set) var publicVarPrivateSet = 0
 
   public public(set) var publicVarPublicSet = 0
 
-  // CHECK-DAG: sil hidden @_TFC22accessibility_warnings13InternalClassg16publicVarGetOnlySi
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings13InternalClassC16publicVarGetOnlySifg
   public var publicVarGetOnly: Int { return 0 }
 
-  // CHECK-DAG: sil hidden @_TFC22accessibility_warnings13InternalClassg15publicVarGetSetSi
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings13InternalClassC15publicVarGetSetSifg
   public var publicVarGetSet: Int { get { return 0 } set {} }
 
-  // CHECK-DAG: sil hidden @_TFC22accessibility_warnings13InternalClasscfT_S0_
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings13InternalClassCACycfc
 }
 
 private class PrivateClass {
-  // CHECK-DAG: sil private{{( \[.+\])*}} @_TFC22accessibility_warningsP33_5D2F2E026754A901C0FF90C404896D0212PrivateClassg9publicVarSi
+  // CHECK-DAG: sil private{{( \[.+\])*}} @_T022accessibility_warnings12PrivateClass33_5D2F2E026754A901C0FF90C404896D02LLC9publicVarSifg
   public var publicVar = 0
-  // CHECK-DAG: sil private @_TFC22accessibility_warningsP33_5D2F2E026754A901C0FF90C404896D0212PrivateClasscfT_S0_
+  // CHECK-DAG: sil private @_T022accessibility_warnings12PrivateClass33_5D2F2E026754A901C0FF90C404896D02LLCADycfc
 }
 

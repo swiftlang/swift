@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Initializer.h"
 #include "swift/Parse/Lexer.h"
 using namespace swift;
 
@@ -326,7 +327,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   TupleExpr *Arg = TupleExpr::create(TC.Context,
                                      SourceLoc(), 
                                      ArgElts2, { }, { }, SourceLoc(),
-                                     /*hasTrailingClosure=*/false,
+                                     /*HasTrailingClosure=*/false,
                                      /*Implicit=*/true);
 
   
@@ -352,7 +353,7 @@ namespace {
                == Associativity::Left;
     }
   };
-}
+} // end anonymous namespace
 
 /// foldSequence - Take a sequence of expressions and fold a prefix of
 /// it into a tree of BinaryExprs using precedence parsing.
@@ -654,9 +655,12 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
     return Type();
   TC.validateDecl(TD);
 
+  if (TD->isInvalid())
+    return Type();
+
   if (auto *NTD = dyn_cast<NominalTypeDecl>(TD))
     return NTD->getDeclaredType();
-  return cast<TypeAliasDecl>(TD)->getAliasType();
+  return cast<TypeAliasDecl>(TD)->getDeclaredInterfaceType();
 }
 
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
@@ -759,7 +763,7 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     // the name of the typealias itself anywhere.
     if (type && *type) {
       if (auto typeAlias = dyn_cast<NameAliasType>(type->getPointer()))
-        *type = typeAlias->getDecl()->getUnderlyingType();
+        *type = typeAlias->getSinglyDesugaredType();
     }
   }
 

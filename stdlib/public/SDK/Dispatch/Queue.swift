@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -221,12 +221,12 @@ public extension DispatchQueue {
 		}
 	}
 
-	private func _syncBarrier(block: () -> ()) {
+	private func _syncBarrier(block: () -> Void) {
 		__dispatch_barrier_sync(self, block)
 	}
 
 	private func _syncHelper<T>(
-		fn: (() -> ()) -> (),
+		fn: (() -> Void) -> Void,
 		execute work: () throws -> T,
 		rescue: ((Error) throws -> (T))) rethrows -> T
 	{
@@ -248,7 +248,7 @@ public extension DispatchQueue {
 
 	@available(OSX 10.10, iOS 8.0, *)
 	private func _syncHelper<T>(
-		fn: (DispatchWorkItem) -> (),
+		fn: (DispatchWorkItem) -> Void,
 		flags: DispatchWorkItemFlags,
 		execute work: () throws -> T,
 		rescue: ((Error) throws -> (T))) rethrows -> T
@@ -340,10 +340,10 @@ public extension DispatchQueue {
 		return nil
 	}
 
-	public func setSpecific<T>(key: DispatchSpecificKey<T>, value: T) {
-		let v = _DispatchSpecificValue(value: value)
+	public func setSpecific<T>(key: DispatchSpecificKey<T>, value: T?) {
 		let k = Unmanaged.passUnretained(key).toOpaque()
-		let p = Unmanaged.passRetained(v).toOpaque()
+		let v = value.flatMap { _DispatchSpecificValue(value: $0) }
+		let p = v.flatMap { Unmanaged.passRetained($0).toOpaque() }
 		__dispatch_queue_set_specific(self, k, p, _destructDispatchSpecificValue)
 	}
 }

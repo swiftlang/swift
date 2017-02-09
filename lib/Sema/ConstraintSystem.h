@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -29,6 +29,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "llvm/ADT/ilist.h"
@@ -520,6 +521,8 @@ public:
   Solution(Solution &&other) = default;
   Solution &operator=(Solution &&other) = default;
 
+  size_t getTotalMemory() const;
+
   /// \brief Retrieve the constraint system that this solution solves.
   ConstraintSystem &getConstraintSystem() const { return *constraintSystem; }
 
@@ -554,7 +557,7 @@ public:
 
   /// \brief Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
-  Type simplifyType(TypeChecker &tc, Type type) const;
+  Type simplifyType(Type type) const;
 
   /// \brief Coerce the given expression to the given type.
   ///
@@ -568,6 +571,9 @@ public:
   /// on a suspicious top-level optional injection (because the caller already
   /// diagnosed it).
   ///
+  /// \param skipClosures Whether to skip bodies of non-single expression
+  /// closures.
+  ///
   /// \param typeFromPattern Optionally, the caller can specify the pattern
   /// from where the toType is derived, so that we can deliver better fixit.
   ///
@@ -575,6 +581,7 @@ public:
   Expr *coerceToType(Expr *expr, Type toType,
                      ConstraintLocator *locator,
                      bool ignoreTopLevelInjection = false,
+                     bool skipClosures = false,
                      Optional<Pattern*> typeFromPattern = None) const;
 
   /// \brief Convert the given expression to a logic value.
@@ -607,17 +614,10 @@ public:
   /// Compute the set of substitutions required to map the given type
   /// to the provided "opened" type.
   ///
-  /// Either the generic type (\c origType) must be a \c GenericFunctionType,
-  /// in which case it's generic requirements will be used to compute the
-  /// required substitutions, or \c dc must be a generic context, in which
-  /// case it's generic requirements will be used.
-  ///
-  /// \param origType The generic type.
+  /// \param sig The generic signature.
   ///
   /// \param openedType The type to which this reference to the given
   /// generic function type was opened.
-  ///
-  /// \param dc The declaration context that owns the generic type
   ///
   /// \param locator The locator that describes where the substitutions came
   /// from.
@@ -626,8 +626,7 @@ public:
   /// to be applied to the generic function type.
   ///
   /// \returns The opened type after applying the computed substitutions.
-  Type computeSubstitutions(Type origType,
-                            DeclContext *dc,
+  Type computeSubstitutions(GenericSignature *sig,
                             Type openedType,
                             ConstraintLocator *locator,
                             SmallVectorImpl<Substitution> &substitutions) const;
@@ -869,10 +868,18 @@ private:
 
   /// \brief Counter for type variables introduced.
   unsigned TypeCounter = 0;
-  
-  /// \brief The expression being solved has exceeded the solver's memory
-  /// threshold.
-  bool expressionExceededThreshold = false;
+
+  /// \brief The number of scopes created so far during the solution
+  /// of this constraint system.
+  ///
+  /// This is a measure of complexity of the solution space. A new
+  /// scope is created every time we attempt a type variable binding
+  /// or explore an option in a disjunction.
+  unsigned CountScopes = 0;
+
+  /// High-water mark of measured memory usage in any sub-scope we
+  /// explored.
+  size_t MaxMemory = 0;
 
   /// \brief Cached member lookups.
   llvm::DenseMap<std::pair<Type, DeclName>, Optional<LookupResult>>
@@ -904,7 +911,7 @@ private:
   /// nodes themselves. This allows us to typecheck an expression and
   /// run through various diagnostics passes without actually mutating
   /// the types on the expression nodes.
-  llvm::DenseMap<Expr *, TypeBase *> ExprTypes;
+  llvm::DenseMap<const Expr *, TypeBase *> ExprTypes;
 
   /// There can only be a single contextual type on the root of the expression
   /// being checked.  If specified, this holds its type along with the base
@@ -1039,6 +1046,7 @@ private:
     ///
     /// \param scope The scope to associate with current solver state.
     void registerScope(SolverScope *scope) {
+      CS.incrementScopeCounter();
       scopes.insert({ scope, std::make_pair(retiredConstraints.begin(),
                                             generatedConstraints.size()) });
     }
@@ -1135,7 +1143,7 @@ private:
 
   private:
     /// The list of constraints that have been retired along the
-    /// current path, this list is used in LIFO fasion when constaints
+    /// current path, this list is used in LIFO fashion when constraints
     /// are added back to the circulation.
     ConstraintList retiredConstraints;
 
@@ -1170,9 +1178,67 @@ private:
 
       return expr;
     }
+
+    /// \brief Ignore statements.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return { false, stmt };
+    }
+
+    /// \brief Ignore declarations.
+    bool walkToDeclPre(Decl *decl) override { return false; }
+  };
+
+  class SetExprTypes : public ASTWalker {
+    Expr *RootExpr;
+    ConstraintSystem &CS;
+    bool ExcludeRoot;
+
+  public:
+    SetExprTypes(Expr *expr, ConstraintSystem &cs, bool excludeRoot)
+        : RootExpr(expr), CS(cs), ExcludeRoot(excludeRoot) {}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      if (auto *closure = dyn_cast<ClosureExpr>(expr))
+        if (!closure->hasSingleExpressionBody())
+          return { false, closure };
+
+      return { true, expr };
+    }
+
+    Expr *walkToExprPost(Expr *expr) override {
+      if (ExcludeRoot && expr == RootExpr)
+        return expr;
+
+      assert((!expr->getType() || CS.getType(expr)->isEqual(expr->getType()))
+             && "Mismatched types!");
+      assert(!CS.getType(expr)->hasTypeVariable() &&
+             "Should not write type variable into expression!");
+      expr->setType(CS.getType(expr));
+
+      return expr;
+    }
+
+    /// \brief Ignore statements.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return { false, stmt };
+    }
+
+    /// \brief Ignore declarations.
+    bool walkToDeclPre(Decl *decl) override { return false; }
   };
 
 public:
+
+  void setExprTypes(Expr *expr) {
+    SetExprTypes SET(expr, *this, /* excludeRoot = */ false);
+    expr->walk(SET);
+  }
+
+  void setSubExprTypes(Expr *expr) {
+    SetExprTypes SET(expr, *this, /* excludeRoot = */ true);
+    expr->walk(SET);
+  }
+
   /// Cache the types of the given expression and all subexpressions.
   void cacheExprTypes(Expr *expr) {
     bool excludeRoot = false;
@@ -1217,6 +1283,10 @@ public:
 private:
   unsigned assignTypeVariableID() {
     return TypeCounter++;
+  }
+
+  void incrementScopeCounter() {
+    CountScopes++;
   }
 
 public:
@@ -1386,16 +1456,17 @@ public:
   }
 
   /// Check to see if we have a type for an expression.
-  bool hasType(Expr *E) {
+  bool hasType(const Expr *E) const {
     return ExprTypes.find(E) != ExprTypes.end();
   }
 
   /// Get the type for an expression.
-  Type getType(Expr *E) {
+  Type getType(const Expr *E) const {
     assert(hasType(E) && "Expected type to have been set!");
-    assert(ExprTypes[E]->isEqual(E->getType()) &&
-           "Expected type in map to be the same type in expression!");
-    return ExprTypes[E];
+    assert((!E->getType() ||
+            E->getType()->isEqual(ExprTypes.find(E)->second)) &&
+           "Mismatched types!");
+    return ExprTypes.find(E)->second;
   }
 
   /// Cache the type of the expression argument and return that same
@@ -1522,19 +1593,22 @@ public:
 
   /// Add a constraint that binds an overload set to a specific choice.
   void addBindOverloadConstraint(Type boundTy, OverloadChoice choice,
-                                 ConstraintLocator *locator) {
-    resolveOverload(locator, boundTy, choice);
+                                 ConstraintLocator *locator,
+                                 DeclContext *useDC) {
+    resolveOverload(locator, boundTy, choice, useDC);
   }
 
   /// \brief Add a value member constraint to the constraint system.
   void addValueMemberConstraint(Type baseTy, DeclName name, Type memberTy,
+                                DeclContext *useDC,
                                 FunctionRefKind functionRefKind,
                                 ConstraintLocatorBuilder locator) {
     assert(baseTy);
     assert(memberTy);
     assert(name);
+    assert(useDC);
     switch (simplifyMemberConstraint(ConstraintKind::ValueMember, baseTy, name,
-                                     memberTy, functionRefKind,
+                                     memberTy, useDC, functionRefKind,
                                      TMF_GenerateConstraints, locator)) {
     case SolutionKind::Unsolved:
       llvm_unreachable("Unsolved result when generating constraints!");
@@ -1545,9 +1619,9 @@ public:
     case SolutionKind::Error:
       if (shouldAddNewFailingConstraint()) {
         addNewFailingConstraint(
-          Constraint::create(*this, ConstraintKind::ValueMember, baseTy,
-                             memberTy, name, functionRefKind,
-                             getConstraintLocator(locator)));
+          Constraint::createMember(*this, ConstraintKind::ValueMember, baseTy,
+                                   memberTy, name, useDC, functionRefKind,
+                                   getConstraintLocator(locator)));
       }
       break;
     }
@@ -1556,14 +1630,16 @@ public:
   /// \brief Add a value member constraint for an UnresolvedMemberRef
   /// to the constraint system.
   void addUnresolvedValueMemberConstraint(Type baseTy, DeclName name,
-                                          Type memberTy,
+                                          Type memberTy, DeclContext *useDC,
                                           FunctionRefKind functionRefKind,
                                           ConstraintLocatorBuilder locator) {
     assert(baseTy);
     assert(memberTy);
     assert(name);
+    assert(useDC);
     switch (simplifyMemberConstraint(ConstraintKind::UnresolvedValueMember,
-                                     baseTy, name, memberTy, functionRefKind,
+                                     baseTy, name, memberTy,
+                                     useDC, functionRefKind,
                                      TMF_GenerateConstraints, locator)) {
     case SolutionKind::Unsolved:
       llvm_unreachable("Unsolved result when generating constraints!");
@@ -1574,13 +1650,19 @@ public:
     case SolutionKind::Error:
       if (shouldAddNewFailingConstraint()) {
         addNewFailingConstraint(
-          Constraint::create(*this, ConstraintKind::UnresolvedValueMember,
-                             baseTy, memberTy, name, functionRefKind,
-                             getConstraintLocator(locator)));
+          Constraint::createMember(*this, ConstraintKind::UnresolvedValueMember,
+                                   baseTy, memberTy, name,
+                                   useDC, functionRefKind,
+                                   getConstraintLocator(locator)));
       }
       break;
     }
   }
+
+  /// Add an explicit conversion constraint (e.g., \c 'x as T').
+  void addExplicitConversionConstraint(Type fromType, Type toType,
+                                       bool allowFixes,
+                                       ConstraintLocatorBuilder locator);
 
   /// \brief Add a disjunction constraint.
   void addDisjunctionConstraint(ArrayRef<Constraint *> constraints,
@@ -1751,25 +1833,43 @@ public:
   /// viable solution.
   void setMustBeMaterializableRecursive(Type type);
   
-  /// \brief Determine if the type in question is an Array<T>.
-  bool isArrayType(Type t);
+  /// Determine if the type in question is an Array<T> and, if so, provide the
+  /// element type of the array.
+  static Optional<Type> isArrayType(Type type);
 
   /// Determine whether the given type is a dictionary and, if so, provide the
   /// key and value types for the dictionary.
-  Optional<std::pair<Type, Type>> isDictionaryType(Type type);
+  static Optional<std::pair<Type, Type>> isDictionaryType(Type type);
 
-  /// \brief Determine if the type in question is a Set<T>.
-  bool isSetType(Type t);
+  /// Determine if the type in question is a Set<T> and, if so, provide the
+  /// element type of the set.
+  static Optional<Type> isSetType(Type t);
 
   /// \brief Determine if the type in question is AnyHashable.
   bool isAnyHashableType(Type t);
 
   /// Call Expr::propagateLValueAccessKind on the given expression,
-  /// using a custom accessor for the type on the expression which
+  /// using a custom accessor for the type on the expression that
   /// reads the type from the ConstraintSystem expression type map.
   void propagateLValueAccessKind(Expr *E,
                                  AccessKind accessKind,
                                  bool allowOverwrite = false);
+
+  /// Call Expr::isTypeReference on the given expression, using a
+  /// custom accessor for the type on the expression that reads the
+  /// type from the ConstraintSystem expression type map.
+  bool isTypeReference(Expr *E);
+
+  /// Call Expr::isIsStaticallyDerivedMetatype on the given
+  /// expression, using a custom accessor for the type on the
+  /// expression that reads the type from the ConstraintSystem
+  /// expression type map.
+  bool isStaticallyDerivedMetatype(Expr *E);
+
+  /// Call Expr::getInstanceType on the given expression, using a
+  /// custom accessor for the type on the expression that reads the
+  /// type from the ConstraintSystem expression type map.
+  Type getInstanceType(TypeExpr *E);
 
 private:
   /// Introduce the constraints associated with the given type variable
@@ -1905,7 +2005,7 @@ public:
   /// \returns a pair containing the full opened type (which includes the opened
   /// base) and opened type of a reference to this member.
   std::pair<Type, Type> getTypeOfMemberReference(
-                          Type baseTy, ValueDecl *decl,
+                          Type baseTy, ValueDecl *decl, DeclContext *useDC,
                           bool isTypeReference,
                           bool isDynamicResult,
                           FunctionRefKind functionRefKind,
@@ -1917,7 +2017,7 @@ public:
   /// \brief Add a new overload set to the list of unresolved overload
   /// sets.
   void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
-                      ConstraintLocator *locator,
+                      DeclContext *useDC, ConstraintLocator *locator,
                       OverloadChoice *favored = nullptr);
 
   /// If the given type is ImplicitlyUnwrappedOptional<T>, and we're in a context
@@ -1998,15 +2098,6 @@ public:
                                        TypeMatchOptions flags,
                                        ConstraintLocatorBuilder locator);
 
-  /// \brief Subroutine of \c matchTypes(), which extracts a scalar value from
-  /// a single-element tuple type.
-  ///
-  /// \returns the result of performing the tuple-to-scalar conversion.
-  SolutionKind matchTupleToScalarTypes(TupleType *tuple1, Type type2,
-                                       ConstraintKind kind,
-                                       TypeMatchOptions flags,
-                                       ConstraintLocatorBuilder locator);
-
   /// \brief Subroutine of \c matchTypes(), which matches up two function
   /// types.
   SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,
@@ -2061,7 +2152,7 @@ public: // FIXME: public due to statics in CSSimplify.cpp
 public:
   /// \brief Resolve the given overload set to the given choice.
   void resolveOverload(ConstraintLocator *locator, Type boundType,
-                       OverloadChoice choice);
+                       OverloadChoice choice, DeclContext *useDC);
 
   /// \brief Simplify a type, by replacing type variables with either their
   /// fixed types (if available) or their representatives.
@@ -2116,6 +2207,7 @@ private:
   SolutionKind simplifyConstructionConstraint(Type valueType, 
                                               FunctionType *fnType,
                                               TypeMatchOptions flags,
+                                              DeclContext *DC,
                                               FunctionRefKind functionRefKind,
                                               ConstraintLocator *locator);
 
@@ -2154,7 +2246,7 @@ private:
   /// \brief Attempt to simplify the given member constraint.
   SolutionKind simplifyMemberConstraint(ConstraintKind kind,
                                         Type baseType, DeclName member,
-                                        Type memberType,
+                                        Type memberType, DeclContext *useDC,
                                         FunctionRefKind functionRefKind,
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator);
@@ -2166,6 +2258,12 @@ private:
                                           TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator);
 
+  /// \brief Attempt to simplify the BridgingConversion constraint.
+  SolutionKind simplifyBridgingConstraint(Type type1,
+                                         Type type2,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator);
+
   /// \brief Attempt to simplify the ApplicableFunction constraint.
   SolutionKind simplifyApplicableFnConstraint(
                                       Type type1,
@@ -2175,6 +2273,12 @@ private:
 
   /// \brief Attempt to simplify the given DynamicTypeOf constraint.
   SolutionKind simplifyDynamicTypeOfConstraint(
+                                         Type type1, Type type2,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator);
+
+  /// \brief Attempt to simplify the given EscapableFunctionOf constraint.
+  SolutionKind simplifyEscapableFunctionOfConstraint(
                                          Type type1, Type type2,
                                          TypeMatchOptions flags,
                                          ConstraintLocatorBuilder locator);
@@ -2328,7 +2432,7 @@ private:
 public:
   /// Increase the score of the given kind for the current (partial) solution
   /// along the.
-  void increaseScore(ScoreKind kind);
+  void increaseScore(ScoreKind kind, unsigned value = 1);
 
   /// Determine whether this solution is guaranteed to be worse than the best
   /// solution found so far.
@@ -2368,31 +2472,40 @@ public:
   Expr *applySolutionShallow(const Solution &solution, Expr *expr,
                              bool suppressDiagnostics);
   
-  /// Extract the base type from an array or slice type.
-  /// \param type The array type to inspect.
-  /// \returns the base type of the array.
-  Type getBaseTypeForArrayType(TypeBase *type);
-
-  /// Extract the base type from a set type.
-  /// \param type The set type to inspect.
-  /// \returns the base type of the set.
-  Type getBaseTypeForSetType(TypeBase *type);
-  
-  /// \brief Set whether or not the expression being solved is too complex and
-  /// has exceeded the solver's memory threshold.
-  void setExpressionTooComplex(bool tc) {
-    expressionExceededThreshold = tc;
-  }
-  
   /// \brief Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
   /// resolved before any others.
   void optimizeConstraints(Expr *e);
   
-  /// \brief Determine if the expression being solved has exceeded the solver's
-  /// memory threshold.
-  bool getExpressionTooComplex() {
-    return expressionExceededThreshold;
+  /// \brief Determine if we've already explored too many paths in an
+  /// attempt to solve this expression.
+  bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
+    if (!getASTContext().isSwiftVersion3()) {
+      if (CountScopes < TypeCounter)
+        return false;
+
+      // If we haven't explored a relatively large number of possibilities
+      // yet, continue.
+      if (CountScopes <= 16 * 1024)
+        return false;
+
+      // Clearly exponential
+      if (TypeCounter < 32 && CountScopes > (1U << TypeCounter))
+        return true;
+
+      // Bail out once we've looked at a really large number of
+      // choices, even if we haven't used a huge amount of memory.
+      if (CountScopes > TC.Context.LangOpts.SolverBindingThreshold)
+        return true;
+    }
+
+    auto used = TC.Context.getSolverMemory();
+    for (auto const& s : solutions) {
+      used += s.getTotalMemory();
+    }
+    MaxMemory = std::max(used, MaxMemory);
+    auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
+    return MaxMemory > threshold;
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(

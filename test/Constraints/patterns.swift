@@ -123,7 +123,7 @@ default:
 
 // <rdar://problem/19382878> Introduce new x? pattern
 switch Optional(42) {
-case let x?: break
+case let x?: break // expected-warning{{immutable value 'x' was never used; consider replacing with '_' or removing it}}
 case nil: break
 }
 
@@ -181,9 +181,9 @@ case x ?? 42: break // match value
 default: break
 }
 
-for (var x) in 0...100 {}
-for var x in 0...100 {}  // rdar://20167543
-for (let x) in 0...100 {} // expected-error {{'let' pattern cannot appear nested in an already immutable context}}
+for (var x) in 0...100 {} // expected-warning{{variable 'x' was never used; consider replacing with '_' or removing it}}
+for var x in 0...100 {}  // rdar://20167543 expected-warning{{variable 'x' was never used; consider replacing with '_' or removing it}}
+for (let x) in 0...100 { _ = x} // expected-error {{'let' pattern cannot appear nested in an already immutable context}}
 
 var (let y) = 42  // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
 let (var z) = 42  // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
@@ -248,3 +248,9 @@ enum SR2057 {
 let sr2057: SR2057?
 if case .foo = sr2057 { } // expected-error{{enum case 'foo' not found in type 'SR2057?'}}
 
+
+// Invalid 'is' pattern
+class SomeClass {}
+if case let doesNotExist as SomeClass:AlsoDoesNotExist {}
+// expected-error@-1 {{use of undeclared type 'AlsoDoesNotExist'}}
+// expected-error@-2 {{variable binding in a condition requires an initializer}}

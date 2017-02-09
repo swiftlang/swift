@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -27,6 +27,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/Compiler.h"
 #include <functional>
 #include <utility>
 
@@ -133,8 +134,14 @@ public:
     return StringRef(Unresolved.Data, UnresolvedLength);
   }
 };
+
+#if LLVM_PTR_SIZE == 4
+static_assert(sizeof(EffectiveClangContext) <= 4 * sizeof(void *),
+              "should fit in four pointers");
+#else
 static_assert(sizeof(EffectiveClangContext) <= 2 * sizeof(void *),
               "should fit in a couple pointers");
+#endif
 
 class SwiftLookupTableReader;
 class SwiftLookupTableWriter;

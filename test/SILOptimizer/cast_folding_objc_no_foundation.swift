@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -new-mangling-for-tests -O -emit-sil %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 // TODO: Update optimizer for id-as-Any changes.
@@ -7,7 +7,7 @@
 
 struct PlainStruct {}
 
-// CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation23testAnyObjectToArrayIntFPs9AnyObject_Sb
+// CHECK-LABEL: sil hidden [noinline] @_T031cast_folding_objc_no_foundation23testAnyObjectToArrayIntSbs0gH0_pFTf4g_n
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $Array<Int>
@@ -17,7 +17,7 @@ func testAnyObjectToArrayInt(_ a: AnyObject) -> Bool {
   return a is [Int]
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation26testAnyObjectToArrayStringFPs9AnyObject_Sb
+// CHECK-LABEL: sil hidden [noinline] @_T031cast_folding_objc_no_foundation26testAnyObjectToArrayStringSbs0gH0_pFTf4g_n
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $Array<String>
@@ -27,7 +27,7 @@ func testAnyObjectToArrayString(_ a: AnyObject) -> Bool {
   return a is [String]
 }
 
-// CHECK-LABEL: sil hidden [noinline] @{{.*}}testAnyObjectToArrayNotBridgedFPs9AnyObject{{.*}}
+// CHECK-LABEL: sil hidden [noinline] @_T031cast_folding_objc_no_foundation30testAnyObjectToArrayNotBridged{{.*}}
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $Array<PlainStruct>
@@ -37,7 +37,7 @@ func testAnyObjectToArrayNotBridged(_ a: AnyObject) -> Bool {
   return a is [PlainStruct]
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation25testAnyObjectToDictionaryFPs9AnyObject_Sb
+// CHECK-LABEL: sil hidden [noinline] @_T031cast_folding_objc_no_foundation25testAnyObjectToDictionarySbs0gH0_pFTf4g_n
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $Dictionary<Int, String>
@@ -47,7 +47,7 @@ func testAnyObjectToDictionary(_ a: AnyObject) -> Bool {
   return a is [Int: String]
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation21testAnyObjectToStringFPs9AnyObject_Sb
+// CHECK-LABEL: sil hidden [noinline] @_T031cast_folding_objc_no_foundation21testAnyObjectToStringSbs0gH0_pFTf4g_n
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $String

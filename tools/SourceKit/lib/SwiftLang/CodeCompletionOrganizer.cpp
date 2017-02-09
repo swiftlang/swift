@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -314,8 +314,8 @@ CodeCompletionViewRef CodeCompletionOrganizer::takeResultsView() {
 //===----------------------------------------------------------------------===//
 
 ImportDepth::ImportDepth(ASTContext &context, CompilerInvocation &invocation) {
-  llvm::DenseSet<Module *> seen;
-  std::deque<std::pair<Module *, uint8_t>> worklist;
+  llvm::DenseSet<ModuleDecl *> seen;
+  std::deque<std::pair<ModuleDecl *, uint8_t>> worklist;
 
   StringRef mainModule = invocation.getModuleName();
   auto *main = context.getLoadedModule(context.getIdentifier(mainModule));
@@ -331,8 +331,8 @@ ImportDepth::ImportDepth(ASTContext &context, CompilerInvocation &invocation) {
 
   // Private imports from this module.
   // FIXME: only the private imports from the current source file.
-  SmallVector<Module::ImportedModule, 16> mainImports;
-  main->getImportedModules(mainImports, Module::ImportFilter::Private);
+  SmallVector<ModuleDecl::ImportedModule, 16> mainImports;
+  main->getImportedModules(mainImports, ModuleDecl::ImportFilter::Private);
   for (auto &import : mainImports) {
     uint8_t depth = 1;
     if (auxImports.count(import.second->getName().str()))
@@ -342,7 +342,7 @@ ImportDepth::ImportDepth(ASTContext &context, CompilerInvocation &invocation) {
 
   // Fill depths with BFS over module imports.
   while (!worklist.empty()) {
-    Module *module;
+    ModuleDecl *module;
     uint8_t depth;
     std::tie(module, depth) = worklist.front();
     worklist.pop_front();
@@ -359,7 +359,7 @@ ImportDepth::ImportDepth(ASTContext &context, CompilerInvocation &invocation) {
     }
 
     // Add imports to the worklist.
-    SmallVector<Module::ImportedModule, 16> imports;
+    SmallVector<ModuleDecl::ImportedModule, 16> imports;
     module->getImportedModules(imports);
     for (auto &import : imports) {
       uint8_t next = std::max(depth, uint8_t(depth + 1)); // unsigned wrap

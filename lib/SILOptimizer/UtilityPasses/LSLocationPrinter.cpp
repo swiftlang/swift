@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -50,7 +50,7 @@ static llvm::cl::opt<MLKind> LSLocationKinds(
         clEnumValN(MLKind::OnlyReduction, "only-reduction", "only-reduction"),
         clEnumValN(MLKind::OnlyTypeExpansion, "only-type-expansion",
                    "only-type-expansion"),
-        clEnumValN(MLKind::All, "all", "all"), clEnumValEnd));
+        clEnumValN(MLKind::All, "all", "all")));
 
 static llvm::cl::opt<bool> UseProjection("lslocation-dump-use-new-projection",
                                             llvm::cl::init(false));

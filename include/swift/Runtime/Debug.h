@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,10 +20,10 @@
 #include <llvm/Support/Compiler.h>
 #include <stdint.h>
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/Unreachable.h"
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
 
-#define CRASH_REPORTER_CLIENT_HIDDEN __attribute__((visibility("hidden")))
 #define CRASHREPORTER_ANNOTATIONS_VERSION 5
 #define CRASHREPORTER_ANNOTATIONS_SECTION "__crash_info"
 
@@ -39,7 +39,7 @@ struct crashreporter_annotations_t {
 };
 
 extern "C" {
-CRASH_REPORTER_CLIENT_HIDDEN
+LLVM_LIBRARY_VISIBILITY
 extern struct crashreporter_annotations_t gCRAnnotations;
 }
 
@@ -75,13 +75,9 @@ LLVM_ATTRIBUTE_NORETURN
 LLVM_ATTRIBUTE_ALWAYS_INLINE // Minimize trashed registers
 static inline void crash(const char *message) {
   CRSetCrashLogMessage(message);
-  // __builtin_trap() doesn't always do the right thing due to GCC compatibility
-#if defined(__i386__) || defined(__x86_64__)
-  asm("int3");
-#else
-  __builtin_trap();
-#endif
-  __builtin_unreachable();
+
+  LLVM_BUILTIN_TRAP;
+  swift_runtime_unreachable("Expected compiler to crash.");
 }
 
 /// Report a corrupted type object.
@@ -114,7 +110,6 @@ swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
                          const char *message = nullptr);
 
 SWIFT_RUNTIME_EXPORT
-extern "C"
 void swift_reportError(uint32_t flags, const char *message);
 
 // Halt due to an overflow in swift_retain().

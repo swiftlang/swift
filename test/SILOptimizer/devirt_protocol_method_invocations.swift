@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O -emit-sil %s | %FileCheck %s
 
 public protocol Foo { 
   func foo(_ x:Int) -> Int
@@ -40,7 +40,7 @@ func callGetSelf(_ f: Foo) -> Foo {
 }
 
 // Check that methods returning Self are not devirtualized and do not crash the compiler.
-// CHECK-LABEL: sil [noinline] @_TF34devirt_protocol_method_invocations70test_devirt_protocol_extension_method_invocation_with_self_return_typeFCS_1CPS_3Foo_
+// CHECK-LABEL: sil [noinline] @_T034devirt_protocol_method_invocations05test_a1_b11_extension_C33_invocation_with_self_return_typeAA3Foo_pAA1CCF
 // CHECK: init_existential_addr
 // CHECK: open_existential_addr
 // CHECK: return
@@ -50,13 +50,13 @@ public func test_devirt_protocol_extension_method_invocation_with_self_return_ty
 }
 
 // It's not obvious why this isn't completely devirtualized.
-// CHECK: sil @_TF34devirt_protocol_method_invocations12test24114020FT_Si
+// CHECK: sil @_T034devirt_protocol_method_invocations12test24114020SiyF
 // CHECK:   [[T0:%.*]] = alloc_stack $SimpleBase
 // CHECK:   [[T1:%.*]] = witness_method $SimpleBase, #Base.x!getter.1 
 // CHECK:   [[T2:%.*]] = apply [[T1]]<SimpleBase>([[T0]])
 // CHECK:   return [[T2]]
 
-// CHECK: sil @_TF34devirt_protocol_method_invocations14testExMetatypeFT_Si
+// CHECK: sil @_T034devirt_protocol_method_invocations14testExMetatypeSiyF
 // CHECK:   [[T0:%.*]] = builtin "sizeof"<Int>
 // CHECK:   [[T1:%.*]] = builtin {{.*}}([[T0]]
 // CHECK:   [[T2:%.*]] = struct $Int ([[T1]] : {{.*}})
@@ -68,7 +68,7 @@ public func test_devirt_protocol_extension_method_invocation_with_self_return_ty
 // be propagated from init_existential_addr into witness_method and 
 // apply instructions.
 
-// CHECK-LABEL: sil [noinline] @_TTSf4g___TF34devirt_protocol_method_invocations38test_devirt_protocol_method_invocationFCS_1CSi
+// CHECK-LABEL: sil [noinline] @_T034devirt_protocol_method_invocations05test_a1_b1_C11_invocationSiAA1CCFTf4g_n
 // CHECK-NOT: witness_method
 // CHECK: checked_cast
 // CHECK-NOT: checked_cast
@@ -99,7 +99,7 @@ public func test_devirt_protocol_method_invocation(_ c: C) -> Int {
 // In fact, the call is expected to be inlined and then constant-folded
 // into a single integer constant.
 
-// CHECK-LABEL: sil [noinline] @_TTSf4d___TF34devirt_protocol_method_invocations48test_devirt_protocol_extension_method_invocationFCS_1CVs5Int32
+// CHECK-LABEL: sil [noinline] @_T034devirt_protocol_method_invocations05test_a1_b11_extension_C11_invocations5Int32VAA1CCFTf4d_n
 // CHECK-NOT: checked_cast
 // CHECK-NOT: open_existential
 // CHECK-NOT: witness_method
@@ -202,7 +202,7 @@ public final class V {
 }
 
 // Check that all witness_method invocations are devirtualized.
-// CHECK-LABEL: sil @_TTSf4g_d___TF34devirt_protocol_method_invocations44testPropagationOfConcreteTypeIntoExistentialFT1vCS_1V1xVs5Int32_T_
+// CHECK-LABEL: sil @_T034devirt_protocol_method_invocations44testPropagationOfConcreteTypeIntoExistentialyAA1VC1v_s5Int32V1xtFTf4gd_n
 // CHECK-NOT: witness_method
 // CHECK-NOT: class_method
 // CHECK: return

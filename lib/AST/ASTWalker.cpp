@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -201,10 +201,33 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitNominalTypeDecl(NominalTypeDecl *NTD) {
-    if (auto GPS = NTD->getGenericParams()) {
-      for (auto GP : GPS->getParams()) {
+    if (NTD->getGenericParams() &&
+        Walker.shouldWalkIntoGenericParams()) {
+      // Visit generic params
+      for (auto GP : NTD->getGenericParams()->getParams()) {
         if (doIt(GP))
           return true;
+        for(auto Inherit: GP->getInherited()) {
+          if (doIt(Inherit))
+            return true;
+        }
+      }
+      // Visit param conformance
+      for (auto &Req : NTD->getGenericParams()->getRequirements()) {
+        switch (Req.getKind()) {
+          case RequirementReprKind::SameType:
+            if (doIt(Req.getFirstTypeLoc()) || doIt(Req.getSecondTypeLoc()))
+              return true;
+            break;
+          case RequirementReprKind::TypeConstraint:
+            if (doIt(Req.getSubjectLoc()) || doIt(Req.getConstraintLoc()))
+              return true;
+            break;
+          case RequirementReprKind::LayoutConstraint:
+            if (doIt(Req.getFirstTypeLoc()))
+              return true;
+            break;
+        }
       }
     }
 
@@ -237,7 +260,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     PrettyStackTraceDecl debugStack("walking into body of", AFD);
 #endif
     if (AFD->getGenericParams() &&
-        Walker.shouldWalkIntoFunctionGenericParams()) {
+        Walker.shouldWalkIntoGenericParams()) {
 
       // Visit generic params
       for (auto &P : AFD->getGenericParams()->getParams()) {
@@ -258,6 +281,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
           break;
         case RequirementReprKind::TypeConstraint:
           if (doIt(Req.getSubjectLoc()) || doIt(Req.getConstraintLoc()))
+            return true;
+          break;
+        case RequirementReprKind::LayoutConstraint:
+          if (doIt(Req.getSubjectLoc()))
             return true;
           break;
         }
@@ -294,11 +321,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitEnumElementDecl(EnumElementDecl *ED) {
-    if (ED->hasArgumentType()) {
-      if (auto TR = ED->getArgumentTypeLoc().getTypeRepr()) {
-        if (doIt(TR)) {
-          return true;
-        }
+    if (auto TR = ED->getArgumentTypeLoc().getTypeRepr()) {
+      if (doIt(TR)) {
+        return true;
       }
     }
 
@@ -635,8 +660,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return nullptr;
     }
 
-    Expr *body = expr->getClosureBody();
-    if ((body = doIt(body)))
+    ClosureExpr *body = expr->getClosureBody();
+    if ((body = cast_or_null<ClosureExpr>(doIt(body))))
       expr->setClosureBody(body);
     else
       return nullptr;
@@ -848,6 +873,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     E->setSubExpr(sub);
     return E;
   }
+
+  Expr *visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *E) {
+    Expr *closure = doIt(E->getNonescapingClosureValue());
+    if (!closure) return nullptr;
+
+    Expr *sub = doIt(E->getSubExpr());
+    if (!sub) return nullptr;
+
+    E->setNonescapingClosureValue(closure);
+    E->setSubExpr(sub);
+    return E;
+  }
   
   Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
     HANDLE_SEMANTIC_EXPR(E);
@@ -945,7 +982,10 @@ public:
       // VarDecls are walked via their NamedPattern, ignore them if we encounter
       // then in the few cases where they are also pushed outside as members.
       // In all those cases we can walk them via the pattern binding decl.
-      if (Walker.Parent.getAsModule())
+      // This is used for when vising VarDecls from source, when visiting a
+      // module file we walk them as we encounter them.
+      if (Walker.Parent.getAsModule() &&
+          D->getDeclContext()->getParentSourceFile())
         return true;
       if (Decl *ParentD = Walker.Parent.getAsDecl())
         return (isa<NominalTypeDecl>(ParentD) || isa<ExtensionDecl>(ParentD));
@@ -1046,7 +1086,7 @@ public:
   }
 };
 
-} // end anonymous namespace.
+} // end anonymous namespace
 
 #pragma mark Statement traversal
 Stmt *Traversal::visitBreakStmt(BreakStmt *BS) {

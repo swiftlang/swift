@@ -37,6 +37,30 @@ func notPostfix() {
   _ = 1 + takeFunc { $0 }
 }
 
+func notLiterals() {
+  struct SR3671 { // <https://bugs.swift.org/browse/SR-3671>
+    var v: Int = 1 { // expected-error {{variable with getter/setter cannot have an initial value}}
+      get {
+        return self.v
+      }
+    }
+  }
+
+  var x: Int? = nil { get { } } // expected-error {{variable with getter/setter cannot have an initial value}}
+  _ = 1 {}
+  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-2 {{closure expression is unused}} expected-note@-2 {{did you mean to use a 'do' statement?}} {{9-9=do }}
+  _ = "hello" {}
+  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-2 {{closure expression is unused}} expected-note@-2 {{did you mean to use a 'do' statement?}} {{15-15=do }}
+  _ = [42] {}
+  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-2 {{closure expression is unused}} expected-note@-2 {{did you mean to use a 'do' statement?}} {{12-12=do }}
+  _ = (6765, 10946, 17711) {}
+  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-2 {{closure expression is unused}} expected-note@-2 {{did you mean to use a 'do' statement?}} {{28-28=do }}
+}
+
 class C {
   func map(_ x: (Int) -> Int) -> C { return self }
   func filter(_ x: (Int) -> Bool) -> C { return self }
@@ -52,15 +76,15 @@ var c = C().map
   $0 + 1
 }
 
-var c2 = C().map // expected-note{{parsing trailing closure for this call}}
+var c2 = C().map // expected-note{{callee is here}}
 
-{ // expected-warning{{trailing closure is separated from call site}}
+{ // expected-warning{{braces here form a trailing closure separated from its callee by multiple newlines}}
   $0 + 1
 }
 
-var c3 = C().map // expected-note{{parsing trailing closure for this call}}
+var c3 = C().map // expected-note{{callee is here}}
 // blah blah blah
-{ // expected-warning{{trailing closure is separated from call site}}
+{ // expected-warning{{braces here form a trailing closure separated from its callee by multiple newlines}}
   $0 + 1
 }
 
@@ -69,7 +93,7 @@ var c3 = C().map // expected-note{{parsing trailing closure for this call}}
 // <rdar://problem/16835718> Ban multiple trailing closures
 func multiTrailingClosure(_ a : () -> (), b : () -> ()) {  // expected-note {{'multiTrailingClosure(_:b:)' declared here}}
   multiTrailingClosure({}) {} // ok
-  multiTrailingClosure {} {}   // expected-error {{missing argument for parameter #1 in call}} expected-error {{consecutive statements on a line must be separated by ';'}} {{26-26=;}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}}
+  multiTrailingClosure {} {}   // expected-error {{missing argument for parameter #1 in call}} expected-error {{consecutive statements on a line must be separated by ';'}} {{26-26=;}} expected-error {{closure expression is unused}} expected-note{{did you mean to use a 'do' statement?}} {{27-27=do }}
   
   
 }

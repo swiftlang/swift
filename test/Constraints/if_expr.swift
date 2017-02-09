@@ -56,3 +56,10 @@ var y = 22 ? 1 : 0 // expected-error{{'Int' is not convertible to 'Bool'}}
 _ = x ? x : x // expected-error {{'Int' is not convertible to 'Bool'}}
 _ = true ? x : 1.2 // expected-error {{result values in '? :' expression have mismatching types 'Int' and 'Double'}}
 
+_ = (x: true) ? true : false // expected-error {{'(x: Bool)' is not convertible to 'Bool'}}
+_ = (x: 1) ? true : false // expected-error {{'(x: Int)' is not convertible to 'Bool'}}
+
+let ib: Bool! = false
+let eb: Bool? = .some(false)
+let conditional = ib ? "Broken" : "Heart" // should infer Bool!
+let conditional = eb ? "Broken" : "Heart" // expected-error {{value of optional type 'Bool?' not unwrapped; did you mean to use '!' or '?'?}}

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,7 +26,9 @@ module SwiftGlibc [system] {
   link "util"
 % end
 
+% if CMAKE_SDK != "FREEBSD":
   link "dl"
+% end
 
   // C standard library
   module C {
@@ -35,12 +37,24 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/complex.h"
       export *
     }
+% end
+% if CMAKE_SDK in ["LINUX", "CYGWIN"]:
     module pty {
       header "${GLIBC_INCLUDE_PATH}/pty.h"
       export *
     }
     module utmp {
       header "${GLIBC_INCLUDE_PATH}/utmp.h"
+      export *
+    }
+% end
+% if CMAKE_SDK == "FREEBSD":
+    module pty {
+      header "${GLIBC_INCLUDE_PATH}/libutil.h"
+      export *
+    }
+    module utmp {
+      header "${GLIBC_INCLUDE_PATH}/utmpx.h"
       export *
     }
 % end
@@ -205,6 +219,10 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/netdb.h"
       export *
     }
+    module ifaddrs {
+      header "${GLIBC_INCLUDE_PATH}/ifaddrs.h"
+      export *
+    }
     module search {
       header "${GLIBC_INCLUDE_PATH}/search.h"
       export *
@@ -355,10 +373,12 @@ module SwiftGlibc [system] {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/select.h"
         export *
       }
+% if CMAKE_SDK != "FREEBSD":
       module sendfile {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/sendfile.h"
         export *
       }
+% end
       module socket {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/socket.h"
         export *
@@ -379,6 +399,12 @@ module SwiftGlibc [system] {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/types.h"
         export *
       }
+% if CMAKE_SDK in ["FREEBSD"]:
+      module event {
+        header "${GLIBC_ARCH_INCLUDE_PATH}/sys/event.h"
+        export *
+      }
+% end
       module uio {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/uio.h"
         export *

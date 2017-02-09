@@ -3,11 +3,11 @@
 // Verify that variables bound in the for statements are in distinct scopes.
 
 for i in 0 ..< 3 {
-// CHECK: ![[SCOPE1:[0-9]+]] = {{.*}}Block(scope: ![[MAIN:[0-9]+]],{{.*}}line: 5
+// CHECK-DAG: ![[SCOPE1:[0-9]+]] = {{.*}}Block(scope: ![[MAIN:[0-9]+]],{{.*}}line: [[@LINE-1]] 
 }
 
 for i in 0 ..< 3 {
-// CHECK: ![[SCOPE2:[0-9]+]] = {{.*}}Block(scope: ![[MAIN]],{{.*}}line: 9
-// CHECK: !DILocalVariable(name: "i", scope: ![[SCOPE1]]
-// CHECK: !DILocalVariable(name: "i", scope: ![[SCOPE2]]
+// CHECK-DAG: ![[SCOPE2:[0-9]+]] = {{.*}}Block(scope: ![[MAIN]],{{.*}}line: [[@LINE-1]]
+// CHECK-DAG: !DILocalVariable(name: "i", scope: ![[SCOPE1]]
+// CHECK-DAG: !DILocalVariable(name: "i", scope: ![[SCOPE2]]
 }

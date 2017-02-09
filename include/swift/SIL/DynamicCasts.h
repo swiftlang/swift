@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -86,6 +86,10 @@ void emitIndirectConditionalCastWithScalar(
 
 /// \brief Does the type conform to the _ObjectiveCBridgeable protocol.
 bool isObjectiveCBridgeable(ModuleDecl *M, CanType Ty);
+
+/// \brief Get the bridged NS class of a CF class if it exists. Returns
+/// an empty CanType if such class does not exist.
+CanType getNSBridgedClassOfCFClass(ModuleDecl *M, CanType type);
 
 /// \brief Does the type conform to Error.
 bool isError(ModuleDecl *M, CanType Ty);

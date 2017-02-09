@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,7 +20,7 @@
 #define SWIFT_ABI_METADATAVALUES_H
 
 #include "swift/AST/Ownership.h"
-#include "swift/Basic/Unreachable.h"
+#include "swift/Runtime/Unreachable.h"
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -381,7 +381,7 @@ public:
       return true;
     }
 
-    swift_unreachable("Unhandled ProtocolDispatchStrategy in switch.");
+    swift_runtime_unreachable("Unhandled ProtocolDispatchStrategy in switch.");
   }
   
   /// Return the identifier if this is a special runtime-known protocol.

@@ -7,6 +7,7 @@ add_swift_library(swiftSILGen STATIC
   SILGen.cpp
   SILGenApply.cpp
   SILGenBridging.cpp
+  SILGenBuilder.cpp
   SILGenBuiltin.cpp
   SILGenConstructor.cpp
   SILGenConvert.cpp

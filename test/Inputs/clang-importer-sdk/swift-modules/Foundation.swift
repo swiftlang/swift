@@ -355,6 +355,8 @@ extension NSDictionary {
     @objc(_swift_objectForKeyedSubscript:)
     get { fatalError() }
   }
+
+  public func nonObjCExtensionMethod<T>(_: T) {}
 }
 extension NSMutableDictionary {
   public override subscript(_: Any) -> Any? {

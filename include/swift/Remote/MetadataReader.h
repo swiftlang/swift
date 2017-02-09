@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,7 +21,7 @@
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Unreachable.h"
+#include "swift/Runtime/Unreachable.h"
 
 #include <vector>
 #include <unordered_map>
@@ -498,9 +498,46 @@ private:
   using OwnedProtocolDescriptorRef =
     std::unique_ptr<const TargetProtocolDescriptor<Runtime>, delete_with_free>;
 
-  /// Cached isa mask.
-  StoredPointer isaMask;
-  bool hasIsaMask = false;
+  enum class IsaEncodingKind {
+    /// We haven't checked yet.
+    Unknown,
+
+    /// There was an error trying to find out the isa encoding.
+    Error,
+
+    /// There's no special isa encoding.
+    None,
+
+    /// There's an unconditional mask to apply to the isa pointer.
+    ///   - IsaMask stores the mask.
+    Masked,
+
+    /// Isa pointers are indexed.  If applying a mask yields a magic value,
+    /// applying a different mask and shifting yields an index into a global
+    /// array of class pointers.  Otherwise, the isa pointer is just a raw
+    /// class pointer.
+    ///  - IsaIndexMask stores the index mask.
+    ///  - IsaIndexShift stores the index shift.
+    ///  - IsaMagicMask stores the magic value mask.
+    ///  - IsaMagicValue stores the magic value.
+    ///  - IndexedClassesPointer stores the pointer to the start of the
+    ///    indexed classes array; this is constant throughout the program.
+    ///  - IndexedClassesCountPointer stores a pointer to the number
+    ///    of elements in the indexed classes array.
+    Indexed
+  };
+
+  IsaEncodingKind IsaEncoding = IsaEncodingKind::Unknown;
+  union {
+    StoredPointer IsaMask;
+    StoredPointer IsaIndexMask;
+  };
+  StoredPointer IsaIndexShift;
+  StoredPointer IsaMagicMask;
+  StoredPointer IsaMagicValue;
+  StoredPointer IndexedClassesPointer;
+  StoredPointer IndexedClassesCountPointer;
+  StoredPointer LastIndexedClassesCount = 0;
 
 public:
   BuilderType Builder;
@@ -535,15 +572,12 @@ public:
 
   /// Get the remote process's swift_isaMask.
   std::pair<bool, StoredPointer> readIsaMask() {
-    auto address = Reader->getSymbolAddress("swift_isaMask");
-    if (!address)
-      return {false, 0};
+    auto encoding = getIsaEncoding();
+    if (encoding != IsaEncodingKind::Masked)
+      // Still return success if there's no isa encoding at all.
+      return {encoding == IsaEncodingKind::None, 0};
 
-    if (!Reader->readInteger(address, &isaMask))
-      return {false, 0};
-
-    hasIsaMask = true;
-    return {true, isaMask};
+    return {true, IsaMask};
   }
 
   /// Given a remote pointer to metadata, attempt to discover its MetadataKind.
@@ -763,7 +797,7 @@ public:
     }
     }
 
-    swift_unreachable("Unhandled MetadataKind in switch");
+    swift_runtime_unreachable("Unhandled MetadataKind in switch");
   }
 
   BuiltType readTypeFromMangledName(const char *MangledTypeName,
@@ -774,20 +808,64 @@ public:
 
   /// Read the isa pointer of a class or closure context instance and apply
   /// the isa mask.
-  std::pair<bool, StoredPointer> readMetadataFromInstance(
-      StoredPointer ObjectAddress) {
-    StoredPointer isaMaskValue = ~0;
-    auto isaMask = readIsaMask();
-    if (isaMask.first)
-      isaMaskValue = isaMask.second;
-
-    StoredPointer MetadataAddress;
-    if (!Reader->readBytes(RemoteAddress(ObjectAddress),
-                           (uint8_t*)&MetadataAddress,
-                           sizeof(StoredPointer)))
+  std::pair<bool, StoredPointer>
+  readMetadataFromInstance(StoredPointer objectAddress) {
+    StoredPointer isa;
+    if (!Reader->readInteger(RemoteAddress(objectAddress), &isa))
       return {false, 0};
 
-    return {true, MetadataAddress & isaMaskValue};
+    switch (getIsaEncoding()) {
+    case IsaEncodingKind::Unknown:
+    case IsaEncodingKind::Error:
+      return {false, 0};
+
+    case IsaEncodingKind::None:
+      return {true, isa};
+
+    case IsaEncodingKind::Masked:
+      return {true, isa & IsaMask};
+
+    case IsaEncodingKind::Indexed: {
+      // If applying the magic mask doesn't give us the magic value,
+      // it's not an indexed isa.
+      if ((isa & IsaMagicMask) != IsaMagicValue)
+        return {true, isa};
+
+      // Extract the index.
+      auto classIndex = (isa & IsaIndexMask) >> IsaIndexShift;
+
+      // 0 is never a valid index.
+      if (classIndex == 0) {
+        return {false, 0};
+
+      // If the index is out of range, it's an error; but check for an
+      // update first.  (This will also trigger the first time because
+      // we initialize LastIndexedClassesCount to 0).
+      } else if (classIndex >= LastIndexedClassesCount) {
+        StoredPointer count;
+        if (!Reader->readInteger(RemoteAddress(IndexedClassesCountPointer),
+                                 &count)) {
+          return {false, 0};
+        }
+
+        LastIndexedClassesCount = count;
+        if (classIndex >= count) {
+          return {false, 0};
+        }
+      }
+
+      // Find the address of the appropriate array element.
+      RemoteAddress eltPointer =
+        RemoteAddress(IndexedClassesPointer
+                        + classIndex * sizeof(StoredPointer));
+      StoredPointer metadataPointer;
+      if (!Reader->readInteger(eltPointer, &metadataPointer)) {
+        return {false, 0};
+      }
+
+      return {true, metadataPointer};
+    }
+    }
   }
 
   /// Read the parent type metadata from a nested nominal type metadata.
@@ -1239,6 +1317,66 @@ private:
       return StoredPointer();
 
     return dataPtr;
+  }
+
+  IsaEncodingKind getIsaEncoding() {
+    if (IsaEncoding != IsaEncodingKind::Unknown)
+      return IsaEncoding;
+
+    auto finish = [&](IsaEncodingKind result) -> IsaEncodingKind {
+      IsaEncoding = result;
+      return result;
+    };
+
+    /// Look up the given global symbol and bind 'varname' to its
+    /// address if its exists.
+#   define tryFindSymbol(varname, symbolName)                \
+      auto varname = Reader->getSymbolAddress(symbolName);   \
+      if (!varname)                                          \
+        return finish(IsaEncodingKind::Error)
+    /// Read from the given pointer into 'dest'.
+#   define tryReadSymbol(varname, dest) do {                 \
+      if (!Reader->readInteger(varname, &dest))              \
+        return finish(IsaEncodingKind::Error);               \
+    } while (0)
+    /// Read from the given global symbol into 'dest'.
+#   define tryFindAndReadSymbol(dest, symbolName) do {       \
+      tryFindSymbol(_address, symbolName);                    \
+      tryReadSymbol(_address, dest);                          \
+    } while (0)
+
+    // Check for the magic-mask symbol that indicates that the ObjC
+    // runtime is using indexed ISAs.
+    if (auto magicMaskAddress =
+          Reader->getSymbolAddress("objc_debug_indexed_isa_magic_mask")) {
+      tryReadSymbol(magicMaskAddress, IsaMagicMask);
+      if (IsaMagicMask != 0) {
+        tryFindAndReadSymbol(IsaMagicValue,
+                             "objc_debug_indexed_isa_magic_value");
+        tryFindAndReadSymbol(IsaIndexMask,
+                             "objc_debug_indexed_isa_index_mask");
+        tryFindAndReadSymbol(IsaIndexShift,
+                             "objc_debug_indexed_isa_index_shift");
+        tryFindSymbol(indexedClasses, "objc_indexed_classes");
+        IndexedClassesPointer = indexedClasses.getAddressData();
+        tryFindSymbol(indexedClassesCount, "objc_indexed_classes_count");
+        IndexedClassesCountPointer = indexedClassesCount.getAddressData();
+
+        return finish(IsaEncodingKind::Indexed);
+      }
+    }
+
+    // Check for the ISA mask symbol.  This has to come second because
+    // the standard library will define this even if the ObjC runtime
+    // doesn't use it.
+    if (auto maskAddress = Reader->getSymbolAddress("swift_isaMask")) {
+      tryReadSymbol(maskAddress, IsaMask);
+      if (IsaMask != 0) {
+        return finish(IsaEncodingKind::Masked);
+      }
+    }
+
+    return finish(IsaEncodingKind::None);
   }
 
   template <class T>

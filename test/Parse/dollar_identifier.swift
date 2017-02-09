@@ -54,3 +54,10 @@ func escapedDollarFunc() {
   func `$`(`$`: Int) {} // no error
   `$`(`$`: 25) // no error
 }
+
+func escapedDollarAnd() {
+  // FIXME: Bad diagnostics.
+  `$0` = 1 // expected-error {{expected expression}}
+  `$$` = 2 // expected-error {{expected numeric value following '$'}}
+  `$abc` = 3 // expected-error {{expected numeric value following '$'}}
+}

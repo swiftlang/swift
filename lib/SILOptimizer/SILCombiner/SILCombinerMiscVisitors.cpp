@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -777,7 +777,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
 
   // If the enum does not have a payload create the enum/store since we don't
   // need to worry about payloads.
-  if (!IEAI->getElement()->hasArgumentType()) {
+  if (!IEAI->getElement()->getArgumentInterfaceType()) {
     EnumInst *E =
       Builder.createEnum(IEAI->getLoc(), SILValue(), IEAI->getElement(),
                           IEAI->getOperand()->getType().getObjectType());
@@ -926,8 +926,8 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     // Found an apply that initializes the enum. We can optimize this by
     // localizing the initialization to an alloc_stack and loading from it.
     DataAddrInst = dyn_cast<InitEnumDataAddrInst>(Opd.get());
-    if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand() &&
-        ArgIdx < AI->getSubstCalleeType()->getNumIndirectResults()) {
+    if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand()
+        && ArgIdx < AI->getSubstCalleeConv().getNumIndirectSILResults()) {
       EnumInitOperand = &Opd;
       break;
     }

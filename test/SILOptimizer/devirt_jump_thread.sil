@@ -43,7 +43,7 @@ bb0(%0 : $Int32, %1 : $FooClass):
 // devirt_jump_thread.FooClass.foo (devirt_jump_thread.FooClass)(Swift.Int32) -> Swift.Int32
 sil [noinline] @_TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 {
 bb0(%0 : $Int32, %1 : $FooClass):
-  // function_ref @!objc  with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
+  // function_ref @!objc with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
   %2 = function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %3
   %3 = apply %2(%0, %1) : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %6
   return %3 : $Int32                                // id: %6
@@ -108,7 +108,7 @@ bb4(%26 : $Int32):                                  // Preds: bb11 bb12
   return %32 : $Int32                               // id: %33
 
 bb5(%34 : $FooClass):                             // Preds: bb0
-  // function_ref @!objc  with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
+  // function_ref @!objc with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
   %35 = function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %37
   strong_retain %0 : $FooClass                    // id: %36
   %37 = apply %35(%2, %34) : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %40
@@ -117,13 +117,13 @@ bb5(%34 : $FooClass):                             // Preds: bb0
   br bb1(%37 : $Int32)                              // id: %40
 
 bb6:                                              // Preds: bb0
-  %41 = class_method %0 : $FooClass, #FooClass.foo!1 : (FooClass) -> (Int32) -> Int32 , $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %43
+  %41 = class_method %0 : $FooClass, #FooClass.foo!1 : (FooClass) -> (Int32) -> Int32, $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %43
   strong_retain %0 : $FooClass                    // id: %42
   %43 = apply %41(%2, %0) : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %44
   br bb1(%43 : $Int32)                              // id: %44
 
 bb7(%45 : $FooClass):                             // Preds: bb1
-  // function_ref @!objc  with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
+  // function_ref @!objc with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
   %46 = function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %48
   strong_retain %0 : $FooClass                    // id: %47
   %48 = apply %46(%2, %45) : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %51
@@ -132,13 +132,13 @@ bb7(%45 : $FooClass):                             // Preds: bb1
   br bb2(%48 : $Int32)                              // id: %51
 
 bb8:                                              // Preds: bb1
-  %52 = class_method %0 : $FooClass, #FooClass.foo!1 : (FooClass) -> (Int32) -> Int32 , $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %54
+  %52 = class_method %0 : $FooClass, #FooClass.foo!1 : (FooClass) -> (Int32) -> Int32, $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %54
   strong_retain %0 : $FooClass                    // id: %53
   %54 = apply %52(%2, %0) : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %55
   br bb2(%54 : $Int32)                              // id: %55
 
 bb9(%56 : $FooClass):                             // Preds: bb2
-  // function_ref @!objc  with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
+  // function_ref @!objc with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
   %57 = function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %59
   strong_retain %0 : $FooClass                    // id: %58
   %59 = apply %57(%15, %56) : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %62
@@ -147,13 +147,13 @@ bb9(%56 : $FooClass):                             // Preds: bb2
   br bb3(%59 : $Int32)                              // id: %62
 
 bb10:                                             // Preds: bb2
-  %63 = class_method %0 : $FooClass, #FooClass.foo!1 : (FooClass) -> (Int32) -> Int32 , $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %65
+  %63 = class_method %0 : $FooClass, #FooClass.foo!1 : (FooClass) -> (Int32) -> Int32, $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %65
   strong_retain %0 : $FooClass                    // id: %64
   %65 = apply %63(%15, %0) : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %66
   br bb3(%65 : $Int32)                              // id: %66
 
 bb11(%67 : $FooClass):                            // Preds: bb3
-  // function_ref @!objc  with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
+  // function_ref @!objc with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
   %68 = function_ref @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %69
   %69 = apply %68(%24, %67) : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %72
   fix_lifetime %67 : $FooClass                    // id: %70
@@ -161,7 +161,7 @@ bb11(%67 : $FooClass):                            // Preds: bb3
   br bb4(%69 : $Int32)                              // id: %72
 
 bb12:                                             // Preds: bb3
-  %73 = class_method %0 : $FooClass, #FooClass.foo!1 : (FooClass) -> (Int32) -> Int32 , $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %74
+  %73 = class_method %0 : $FooClass, #FooClass.foo!1 : (FooClass) -> (Int32) -> Int32, $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %74
   %74 = apply %73(%24, %0) : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 // user: %75
   br bb4(%74 : $Int32)                              // id: %75
 }
@@ -202,7 +202,7 @@ bb3(%14 : $FooClass):                             // Preds: bb0
   br bb1(%16 : $Int32)                              // id: %17
 
 bb4:                                              // Preds: bb0
-  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : (FooClass) -> () -> Int32 , $@convention(method) (@guaranteed FooClass) -> Int32 // user: %20
+  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : (FooClass) -> () -> Int32, $@convention(method) (@guaranteed FooClass) -> Int32 // user: %20
   strong_retain %0 : $FooClass                    // id: %19
   %20 = apply %18(%0) : $@convention(method) (@guaranteed FooClass) -> Int32 // user: %21
   br bb1(%20 : $Int32)                              // id: %21
@@ -214,7 +214,7 @@ bb5(%22 : $FooClass):                             // Preds: bb1
   br bb2(%24 : $Int32)                              // id: %26
 
 bb6:                                              // Preds: bb1
-  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : (FooClass) -> () -> Int32 , $@convention(method) (@guaranteed FooClass) -> Int32 // user: %28
+  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : (FooClass) -> () -> Int32, $@convention(method) (@guaranteed FooClass) -> Int32 // user: %28
   %28 = apply %27(%0) : $@convention(method) (@guaranteed FooClass) -> Int32 // user: %29
   br bb2(%28 : $Int32)                              // id: %29
 }
@@ -257,7 +257,7 @@ bb3(%14 : $FooClass):                             // Preds: bb0
   br bb1(%16 : $Int32)                              // id: %17
 
 bb4:                                              // Preds: bb0
-  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : (FooClass) -> () -> Int32 , $@convention(method) (@guaranteed FooClass) -> Int32 // user: %20
+  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : (FooClass) -> () -> Int32, $@convention(method) (@guaranteed FooClass) -> Int32 // user: %20
   %20 = apply %18(%0) : $@convention(method) (@guaranteed FooClass) -> Int32 // user: %21
   br bb1(%20 : $Int32)                              // id: %21
 
@@ -267,7 +267,7 @@ bb5(%22 : $FooClass):                             // Preds: bb1
   br bb2(%24 : $Int32)                              // id: %26
 
 bb6:                                              // Preds: bb1
-  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : (FooClass) -> () -> Int32 , $@convention(method) (@guaranteed FooClass) -> Int32 // user: %28
+  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : (FooClass) -> () -> Int32, $@convention(method) (@guaranteed FooClass) -> Int32 // user: %28
   %28 = apply %27(%0) : $@convention(method) (@guaranteed FooClass) -> Int32 // user: %29
   br bb2(%28 : $Int32)                              // id: %29
 }
@@ -291,7 +291,7 @@ bb0(%0 : $FooClass):
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb3, bb4 // id: %1
 
 bb1(%2 : $Int32):                                   // Preds: bb3 bb4
-  %101 = class_method [volatile] %100 : $Bar, #Bar.foo!1.foreign : (Bar) -> () -> () , $@convention(objc_method) (Bar) -> ()
+  %101 = class_method [volatile] %100 : $Bar, #Bar.foo!1.foreign : (Bar) -> () -> (), $@convention(objc_method) (Bar) -> ()
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb5, bb6 // id: %3
 
 bb2(%4 : $Int32):                                   // Preds: bb5 bb6
@@ -311,7 +311,7 @@ bb3(%14 : $FooClass):                             // Preds: bb0
   br bb1(%16 : $Int32)                              // id: %17
 
 bb4:                                              // Preds: bb0
-  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : (FooClass) -> () -> Int32 , $@convention(method) (@guaranteed FooClass) -> Int32 // user: %20
+  %18 = class_method %0 : $FooClass, #FooClass.value!getter.1 : (FooClass) -> () -> Int32, $@convention(method) (@guaranteed FooClass) -> Int32 // user: %20
   strong_retain %0 : $FooClass                    // id: %19
   %20 = apply %18(%0) : $@convention(method) (@guaranteed FooClass) -> Int32 // user: %21
   br bb1(%20 : $Int32)                              // id: %21
@@ -323,12 +323,12 @@ bb5(%22 : $FooClass):                             // Preds: bb1
   br bb2(%24 : $Int32)                              // id: %26
 
 bb6:                                              // Preds: bb1
-  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : (FooClass) -> () -> Int32 , $@convention(method) (@guaranteed FooClass) -> Int32 // user: %28
+  %27 = class_method %0 : $FooClass, #FooClass.value!getter.1 : (FooClass) -> () -> Int32, $@convention(method) (@guaranteed FooClass) -> Int32 // user: %28
   %28 = apply %27(%0) : $@convention(method) (@guaranteed FooClass) -> Int32 // user: %29
   br bb2(%28 : $Int32)                              // id: %29
 }
 
-// @!objc  with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
+// @!objc with unmangled suffix "no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi"
 sil [noinline] @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 {
 bb0(%0 : $Int32, %1 : $FooClass):
   %2 = integer_literal $Builtin.Int32, 11          // user: %5

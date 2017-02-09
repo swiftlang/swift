@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(_MSC_VER)
+#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(_WIN32)
 #  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 0
 #else
 #  define SWIFT_SUPPORTS_BACKTRACE_REPORTING 1
@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 #include <io.h>
 #else
 #include <unistd.h>
@@ -152,7 +152,7 @@ static void dumpStackTraceEntry(unsigned index, void *framePC) {
 // The layout of this struct is CrashReporter ABI, so there are no ABI concerns
 // here.
 extern "C" {
-CRASH_REPORTER_CLIENT_HIDDEN
+LLVM_LIBRARY_VISIBILITY
 struct crashreporter_annotations_t gCRAnnotations
 __attribute__((__section__("__DATA," CRASHREPORTER_ANNOTATIONS_SECTION))) = {
     CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0, 0};
@@ -198,7 +198,7 @@ reportOnCrash(uint32_t flags, const char *message)
 static void
 reportNow(uint32_t flags, const char *message)
 {
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 #define STDERR_FILENO 2
   _write(STDERR_FILENO, message, strlen(message));
 #else
@@ -230,7 +230,7 @@ void swift::swift_reportError(uint32_t flags,
 }
 
 static int swift_vasprintf(char **strp, const char *fmt, va_list ap) {
-#if defined(_MSC_VER)
+#if defined(_WIN32)
   int len = _vscprintf(fmt, ap);
   if (len < 0)
     return -1;
@@ -267,7 +267,7 @@ swift::fatalError(uint32_t flags, const char *format, ...)
 // Crash when a deleted method is called by accident.
 SWIFT_RUNTIME_EXPORT
 LLVM_ATTRIBUTE_NORETURN
-extern "C" void
+void
 swift_deletedMethodError() {
   swift::fatalError(/* flags = */ 0,
                     "fatal error: call of deleted method\n");

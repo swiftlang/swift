@@ -1,5 +1,6 @@
 // RUN: %scale-test -O --threshold 0.2 --begin 20 --end 25 --step 1 --select computeMethodCallees %s
-// REQUIRES: OS=macosx, tools-release, assertions
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
 
 class C0<T:Integer> {
     func foo() {

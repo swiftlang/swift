@@ -132,7 +132,7 @@ Here are the proposed rules:
   default, part of the public interface of a subclass defined in
   Objective-C.
 
-* ``self.init(…)`` calls in Swift never dispatch virtually.  We have a
+* ``self.init(...)`` calls in Swift never dispatch virtually.  We have a
   safe model for "virtual initialization:" ``init`` methods can call
   overridable methods after all instance variables and superclasses
   are initialized.  Allowing *virtual* constructor delegation would

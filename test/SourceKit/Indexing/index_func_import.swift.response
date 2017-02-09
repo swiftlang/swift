@@ -26,6 +26,13 @@
   ],
   key.entities: [
     {
+      key.kind: source.lang.swift.ref.function.free,
+      key.name: "globalFunc()",
+      key.usr: "s:F11test_module10globalFuncFT_T_",
+      key.line: 8,
+      key.column: 25
+    },
+    {
       key.kind: source.lang.swift.decl.function.free,
       key.name: "test()",
       key.usr: "s:F17index_func_import4testFT_T_",

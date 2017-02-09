@@ -30,6 +30,9 @@ if(SWIFT_BUILD_STATIC_STDLIB)
         set(ICU_STATICLIB "TRUE")
       else()
         set(ICU_STATICLIB "FALSE")
+        find_package(ICU REQUIRED COMPONENTS uc i18n)
+        get_filename_component(ICU_UC_LIBDIR "${ICU_UC_LIBRARY}" DIRECTORY)
+        get_filename_component(ICU_I18N_LIBDIR "${ICU_I18N_LIBRARY}" DIRECTORY)
       endif()
       set(linkfile "${lowercase_sdk}/static-stdlib-args.lnk")
       add_custom_command_target(swift_static_stdlib_${sdk}_args
@@ -38,8 +41,12 @@ if(SWIFT_BUILD_STATIC_STDLIB)
           "${sdk}"
           "${SWIFTSTATICLIB_DIR}/${linkfile}"
           "${ICU_STATICLIB}"
+          "${ICU_UC_LIBDIR}"
+          "${ICU_I18N_LIBDIR}"
         OUTPUT
-          "${SWIFTSTATICLIB_DIR}/${linkfile}")
+          "${SWIFTSTATICLIB_DIR}/${linkfile}"
+        DEPENDS
+          "${SWIFT_SOURCE_DIR}/utils/gen-static-stdlib-link-args")
 
       list(APPEND static_stdlib_lnk_file_list ${swift_static_stdlib_${sdk}_args})
       swift_install_in_component(stdlib

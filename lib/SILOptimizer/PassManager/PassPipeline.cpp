@@ -1,8 +1,8 @@
-//===--- Passes.cpp - Swift Compiler SIL Pass Entrypoints -----------------===//
+//===--- PassPipeline.cpp - Swift Compiler SIL Pass Entrypoints -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -39,12 +39,6 @@
 
 using namespace swift;
 
-namespace {
-
-using ExecutionKind = SILPassPipelinePlan::ExecutionKind;
-
-} // end anonymous namespace
-
 static llvm::cl::opt<bool>
     SILViewCFG("sil-view-cfg", llvm::cl::init(false),
                llvm::cl::desc("Enable the sil cfg viewer pass"));
@@ -62,24 +56,23 @@ static llvm::cl::opt<bool> SILViewSILGenCFG(
 //===----------------------------------------------------------------------===//
 
 static void addCFGPrinterPipeline(SILPassPipelinePlan &P, StringRef Name) {
-  P.startPipeline(ExecutionKind::OneIteration, Name);
+  P.startPipeline(Name);
   P.addCFGPrinter();
 }
 
 static void addMandatoryDebugSerialization(SILPassPipelinePlan &P) {
-  P.startPipeline(ExecutionKind::UntilFixPoint,
-                  "Mandatory Debug Serialization");
+  P.startPipeline("Mandatory Debug Serialization");
   P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
 }
 
 static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline(ExecutionKind::OneIteration, "Ownership Model Eliminator");
+  P.startPipeline("Ownership Model Eliminator");
   P.addOwnershipModelEliminator();
 }
 
 static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline(ExecutionKind::OneIteration, "Guaranteed Passes");
+  P.startPipeline("Guaranteed Passes");
   P.addCapturePromotion();
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
@@ -284,13 +277,12 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
 }
 
 static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline(ExecutionKind::UntilFixPoint,
-                  "Performance Debug Serialization");
+  P.startPipeline("Performance Debug Serialization");
   P.addSILLinker();
 }
 
 static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline(ExecutionKind::UntilFixPoint, "EarlyModulePasses");
+  P.startPipeline("EarlyModulePasses");
 
   // Get rid of apparently dead functions as soon as possible so that
   // we do not spend time optimizing them.
@@ -300,7 +292,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
 }
 
 static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline(ExecutionKind::OneIteration, "HighLevel+EarlyLoopOpt");
+  P.startPipeline("HighLevel+EarlyLoopOpt");
   // FIXME: update this to be a function pass.
   P.addEagerSpecializer();
   addSSAPasses(P, OptimizationLevelKind::HighLevel);
@@ -308,7 +300,7 @@ static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {
 }
 
 static void addMidModulePassesStackPromotePassPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline(ExecutionKind::OneIteration, "MidModulePasses+StackPromote");
+  P.startPipeline("MidModulePasses+StackPromote");
   P.addDeadFunctionElimination();
   P.addSILLinker();
   P.addDeadObjectElimination();
@@ -319,7 +311,7 @@ static void addMidModulePassesStackPromotePassPipeline(SILPassPipelinePlan &P) {
 }
 
 static void addMidLevelPassPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline(ExecutionKind::OneIteration, "MidLevel");
+  P.startPipeline("MidLevel");
   addSSAPasses(P, OptimizationLevelKind::MidLevel);
 
   // Specialize partially applied functions with dead arguments as a preparation
@@ -328,7 +320,7 @@ static void addMidLevelPassPipeline(SILPassPipelinePlan &P) {
 }
 
 static void addLoweringPassPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline(ExecutionKind::OneIteration, "Lower");
+  P.startPipeline("Lower");
   P.addDeadFunctionElimination();
   P.addDeadObjectElimination();
 
@@ -365,7 +357,7 @@ static void addLoweringPassPipeline(SILPassPipelinePlan &P) {
 }
 
 static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline(ExecutionKind::OneIteration, "LowLevel");
+  P.startPipeline("LowLevel");
 
   // Should be after FunctionSignatureOpts and before the last inliner.
   P.addReleaseDevirtualizer();
@@ -378,7 +370,7 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
 }
 
 static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline(ExecutionKind::OneIteration, "LateLoopOpt");
+  P.startPipeline("LateLoopOpt");
 
   // Delete dead code and drop the bodies of shared functions.
   P.addExternalFunctionDefinitionsElimination();
@@ -405,8 +397,23 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
 }
 
 static void addSILDebugInfoGeneratorPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline(ExecutionKind::OneIteration, "SIL Debug Info Generator");
+  P.startPipeline("SIL Debug Info Generator");
   P.addSILDebugInfoGenerator();
+}
+
+/// Non-mandatory passes that should run as preparation for IRGen.
+static void addIRGenPreparePipeline(SILPassPipelinePlan &P) {
+  P.startPipeline("IRGen Preparation");
+  // Insert SIL passes to run during IRGen.
+  // Hoist generic alloc_stack instructions to the entry block to enable better
+  // llvm-ir generation for dynamic alloca instructions.
+  P.addAllocStackHoisting();
+}
+
+SILPassPipelinePlan SILPassPipelinePlan::getIRGenPreparePassPipeline() {
+  SILPassPipelinePlan P;
+  addIRGenPreparePipeline(P);
+  return P;
 }
 
 SILPassPipelinePlan
@@ -458,10 +465,10 @@ SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
   SILPassPipelinePlan P;
 
   // First specialize user-code.
-  P.startPipeline(ExecutionKind::UntilFixPoint, "Prespecialization");
+  P.startPipeline("Prespecialization");
   P.addUsePrespecialized();
 
-  P.startPipeline(ExecutionKind::OneIteration, "Rest of Onone");
+  P.startPipeline("Rest of Onone");
   // Don't keep external functions from stdlib and other modules.
   // We don't want that our unoptimized version will be linked instead
   // of the optimized version from the stdlib.
@@ -484,7 +491,7 @@ SILPassPipelinePlan SILPassPipelinePlan::getOnonePassPipeline() {
 
 SILPassPipelinePlan SILPassPipelinePlan::getInstCountPassPipeline() {
   SILPassPipelinePlan P;
-  P.startPipeline(ExecutionKind::OneIteration, "Inst Count");
+  P.startPipeline("Inst Count");
   P.addInstCount();
   return P;
 }
@@ -513,10 +520,9 @@ void SILPassPipelinePlan::addPasses(ArrayRef<PassKind> PassKinds) {
 }
 
 SILPassPipelinePlan
-SILPassPipelinePlan::getPassPipelineForKinds(ExecutionKind ExecKind,
-                                             ArrayRef<PassKind> PassKinds) {
+SILPassPipelinePlan::getPassPipelineForKinds(ArrayRef<PassKind> PassKinds) {
   SILPassPipelinePlan P;
-  P.startPipeline(ExecKind, "Pass List Pipeline");
+  P.startPipeline("Pass List Pipeline");
   P.addPasses(PassKinds);
   return P;
 }
@@ -543,8 +549,7 @@ void SILPassPipelinePlan::print(llvm::raw_ostream &os) {
     First = false;
     os << "    [\n";
 
-    os << "        \"" << Pipeline.Name << "\",\n"
-       << "        \"" << Pipeline.ExecutionKind << '"';
+    os << "        \"" << Pipeline.Name << "\"";
     for (PassKind Kind : getPipelinePasses(Pipeline)) {
       os << ",\n        [\"" << PassKindID(Kind) << "\"," << PassKindName(Kind)
          << ']';
@@ -589,10 +594,6 @@ SILPassPipelinePlan::getPassPipelineFromFile(StringRef Filename) {
     DEBUG(llvm::dbgs() << "    Name: \"" << Name << "\"\n");
     ++DescIter;
 
-    StringRef ExecutionKind = cast<yaml::ScalarNode>(&*DescIter)->getRawValue();
-    DEBUG(llvm::dbgs() << "    ExecutionKind: \"" << ExecutionKind << "\"\n");
-    ++DescIter;
-
     for (auto DescEnd = Desc->end(); DescIter != DescEnd; ++DescIter) {
       auto *InnerPassList = cast<yaml::SequenceNode>(&*DescIter);
       auto *FirstNode = &*InnerPassList->begin();
@@ -605,35 +606,9 @@ SILPassPipelinePlan::getPassPipelineFromFile(StringRef Filename) {
       Passes.push_back(Kind);
     }
 
-    using ExecutionKindTy = SILPassPipelinePlan::ExecutionKind;
-    auto ExecKind =
-        llvm::StringSwitch<ExecutionKindTy>(ExecutionKind)
-            .Case("\"one_iteration\"", ExecutionKindTy::OneIteration)
-            .Case("\"until_fix_point\"", ExecutionKindTy::UntilFixPoint)
-            .Default(ExecutionKindTy::Invalid);
-    assert(ExecKind != ExecutionKindTy::Invalid &&
-           "Failed to find a valid execution kind");
-    P.startPipeline(ExecKind, Name);
+    P.startPipeline(Name);
     P.addPasses(Passes);
   }
 
   return P;
-}
-
-//===----------------------------------------------------------------------===//
-//                                  Utility
-//===----------------------------------------------------------------------===//
-
-llvm::raw_ostream &llvm::
-operator<<(llvm::raw_ostream &os,
-           swift::SILPassPipelinePlan::ExecutionKind ExecKind) {
-  using ExecKindTy = swift::SILPassPipelinePlan::ExecutionKind;
-  switch (ExecKind) {
-  case ExecKindTy::Invalid:
-    return os << "invalid";
-  case ExecKindTy::OneIteration:
-    return os << "one_iteration";
-  case ExecKindTy::UntilFixPoint:
-    return os << "until_fix_point";
-  }
 }

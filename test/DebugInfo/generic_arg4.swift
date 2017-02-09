@@ -1,9 +1,9 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s
 // REQUIRES: objc_interop
 public struct Q<T> {
   let x: T
 }
-  // CHECK: define {{.*}}_TF12generic_arg43foourFGSaGVS_1Qx__T_
+  // CHECK: define {{.*}}_T012generic_arg43fooySayAA1QVyxGGlF
   // CHECK: store %[[TY:.*]]* %0, %[[TY]]** %[[ALLOCA:.*]], align
   // CHECK: call void @llvm.dbg.declare(metadata %[[TY]]** %[[ALLOCA]],
   // CHECK-SAME:       metadata ![[ARG:.*]], metadata ![[EXPR:.*]])
@@ -11,6 +11,6 @@ public struct Q<T> {
   // CHECK: ![[EXPR]] = !DIExpression()
   // CHECK: ![[ARG]] = !DILocalVariable(name: "arg", arg: 1,
   // CHECK-SAME:                        line: [[@LINE+2]], type: ![[TY:.*]])
-  // CHECK: ![[TY]] = !DICompositeType({{.*}}identifier: "_TtGSaGV12generic_arg41QQq_FS_3foourFGSaGS0_x__T___")
+  // CHECK: ![[TY]] = !DICompositeType({{.*}}identifier: "_T0Say12generic_arg41QVyAA3fooySayACyxGGlFQq_GGD")
 public func foo<T>(_ arg: [Q<T>]) {
 }

@@ -2,7 +2,7 @@
 
 func doSomething<T>(_ t: T) {}
 
-// CHECK: func_decl "outerGeneric(t:x:)"<T> interface type='<T> (t: T, x: AnyObject) -> ()'
+// CHECK: func_decl "outerGeneric(t:x:)" <T> interface type='<T> (t: T, x: AnyObject) -> ()'
 
 func outerGeneric<T>(t: T, x: AnyObject) {
   // Simple case -- closure captures outer generic parameter
@@ -20,15 +20,15 @@ func outerGeneric<T>(t: T, x: AnyObject) {
 
   // Nested generic functions always capture outer generic parameters, even if
   // they're not mentioned in the function body
-  // CHECK: func_decl "innerGeneric(u:)"<U> interface type='<T, U> (u: U) -> ()' {{.*}} captures=(<generic> )
+  // CHECK: func_decl "innerGeneric(u:)" <U> interface type='<T, U> (u: U) -> ()' {{.*}} captures=(<generic> )
   func innerGeneric<U>(u: U) {}
 
   // Make sure we look through typealiases
   typealias TT = (a: T, b: T)
 
-  // CHECK: func_decl "localFunction(tt:)" interface type='<T> (tt: (a: T, b: T)) -> ()' {{.*}} captures=(<generic> )
+  // CHECK: func_decl "localFunction(tt:)" interface type='<T> (tt: TT) -> ()' {{.*}} captures=(<generic> )
   func localFunction(tt: TT) {}
 
-  // CHECK: closure_expr type='(TT) -> ()' {{.*}} captures=(<generic> )
+  // CHECK: closure_expr type='((a: T, b: T)) -> ()' {{.*}} captures=(<generic> )
   let _: (TT) -> () = { _ in }
 }

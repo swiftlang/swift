@@ -15,10 +15,6 @@ list(APPEND CMAKE_MODULE_PATH
 include(AddSwiftBenchmarkSuite)
 
 set(SWIFT_BENCH_MODULES
-    single-source/unit-tests/ObjectiveCBridging
-    single-source/unit-tests/ObjectiveCBridgingStubs
-    single-source/unit-tests/ObjectiveCNoBridgingStubs
-    single-source/unit-tests/StackPromo
     single-source/Ackermann
     single-source/AngryPhonebook
     single-source/AnyHashableWithAClass
@@ -35,6 +31,8 @@ set(SWIFT_BENCH_MODULES
     single-source/ByteSwap
     single-source/Calculator
     single-source/CaptureProp
+    single-source/CharacterLiteralsLarge
+    single-source/CharacterLiteralsSmall
     single-source/Chars
     single-source/ClassArrayGetter
     single-source/DeadArray
@@ -64,10 +62,13 @@ set(SWIFT_BENCH_MODULES
     single-source/NSStringConversion
     single-source/NopDeinit
     single-source/ObjectAllocation
+    single-source/ObjectiveCBridging
+    single-source/ObjectiveCBridgingStubs
+    single-source/ObjectiveCNoBridgingStubs
     single-source/ObserverClosure
     single-source/ObserverForwarderStruct
-    single-source/ObserverPartiallyAppliedMethod 
-    single-source/ObserverUnappliedMethod 
+    single-source/ObserverPartiallyAppliedMethod
+    single-source/ObserverUnappliedMethod
     single-source/OpenClose
     single-source/Phonebook
     single-source/PolymorphicCalls
@@ -80,11 +81,13 @@ set(SWIFT_BENCH_MODULES
     single-source/RGBHistogram
     single-source/RangeAssignment
     single-source/RecursiveOwnedParameter
+    single-source/ReversedCollections
     single-source/SetTests
     single-source/SevenBoom
     single-source/Sim2DArray
     single-source/SortLettersInPlace
     single-source/SortStrings
+    single-source/StackPromo
     single-source/StaticArray
     single-source/StrComplexWalk
     single-source/StrToInt
@@ -136,9 +139,18 @@ if(NOT SWIFT_LIBRARY_PATH)
   set(SWIFT_LIBRARY_PATH "${tmp_dir}/lib/swift")
 endif()
 
-runcmd(COMMAND "xcrun" "-toolchain" "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" "-f" "clang"
-       VARIABLE CLANG_EXEC
-       ERROR "Unable to find Clang driver")
+# If the CMAKE_C_COMPILER is already clang, don't find it again,
+# thus allowing the --host-cc build-script argument to work here.
+get_filename_component(c_compiler ${CMAKE_C_COMPILER} NAME)
+
+if(${c_compiler} STREQUAL "clang")
+  set(CLANG_EXEC ${CMAKE_C_COMPILER})
+else()
+  runcmd(COMMAND "xcrun" "-toolchain" "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" "-f" "clang"
+         VARIABLE CLANG_EXEC
+         ERROR "Unable to find Clang driver")
+endif()
+
 
 # You have to delete CMakeCache.txt in the swift build to force a
 # reconfiguration.

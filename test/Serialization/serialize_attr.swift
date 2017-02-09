@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %target-swift-frontend -emit-module -parse-as-library -sil-serialize-all -o %t %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-module -parse-as-library -sil-serialize-all -o %t %s
 // RUN: llvm-bcanalyzer %t/serialize_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: %target-sil-opt -enable-sil-verify-all %t/serialize_attr.swiftmodule | %FileCheck %s
+// RUN: %target-sil-opt -new-mangling-for-tests -enable-sil-verify-all %t/serialize_attr.swiftmodule | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
 
@@ -16,9 +16,9 @@
 // -----------------------------------------------------------------------------
 
 // These lines should be contiguous.
-// CHECK-DAG: @_specialize(Int, Float)
+// CHECK-DAG: @_specialize(exported: false, kind: full, where T == Int, U == Float)
 // CHECK-DAG: func specializeThis<T, U>(_ t: T, u: U)
-@_specialize(Int, Float)
+@_specialize(where T == Int, U == Float)
 func specializeThis<T, U>(_ t: T, u: U) {}
 
 protocol PP {
@@ -42,16 +42,16 @@ struct GG<T : PP> {}
 // label, and the declaration order is unpredictable.
 //
 // CHECK-DAG: class CC<T> where T : PP {
-// CHECK-DAG: @_specialize(RR, SS)
+// CHECK-DAG: @_specialize(exported: false, kind: full, where T == RR, U == SS)
 // CHECK-DAG: @inline(never) func foo<U>(_ u: U, g: GG<T>) -> (U, GG<T>) where U : QQ
 class CC<T : PP> {
   @inline(never)
-  @_specialize(RR, SS)
+  @_specialize(where T==RR, U==SS)
   func foo<U : QQ>(_ u: U, g: GG<T>) -> (U, GG<T>) {
     return (u, g)
   }
 }
 
-// CHECK-DAG: sil hidden [fragile] [_specialize <Int, Float>] @_TF14serialize_attr14specializeThisu0_rFTx1uq__T_ : $@convention(thin) <T, U> (@in T, @in U) -> () {
+// CHECK-DAG: sil hidden [fragile] [_specialize exported: false, kind: full, where T == Int, U == Float] @_T014serialize_attr14specializeThisyx_q_1utr0_lF : $@convention(thin) <T, U> (@in T, @in U) -> () {
 
-// CHECK-DAG: sil hidden [fragile] [noinline] [_specialize <RR, SS>] @_TFC14serialize_attr2CC3foouRd__S_2QQrfTqd__1gGVS_2GGx__Tqd__GS2_x__ : $@convention(method) <T where T : PP><U where U : QQ> (@in U, GG<T>, @guaranteed CC<T>) -> (@out U, GG<T>) {
+// CHECK-DAG: sil hidden [fragile] [noinline] [_specialize exported: false, kind: full, where T == RR, U == SS] @_T014serialize_attr2CCC3fooqd___AA2GGVyxGtqd___AFyxG1gtAA2QQRd__lF : $@convention(method) <T where T : PP><U where U : QQ> (@in U, GG<T>, @guaranteed CC<T>) -> (@out U, GG<T>) {

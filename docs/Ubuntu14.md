@@ -1,10 +1,5 @@
 # Getting Started with Swift on Ubuntu 14.04
 
-The Swift project no longer officially supports Ubuntu 14.04 as a build platform.
-It is highly recommended to upgrade to Ubuntu 16.04 or higher in order to have the best experience building and running the project.
-
-If you cannot upgrade Ubuntu to a more up to date version, you should follow these steps before checking out and building the Swift source code. These are not guaranteed to work in the future, and may break or be unreliable.
-
 ## Upgrade Clang
 You'll need to upgrade your clang compiler for C++14 support and create a symlink. The minimum required version of clang may change, and may not be available on Ubuntu 14.04 in the future.
 ```bash

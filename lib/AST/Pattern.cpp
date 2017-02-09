@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,6 +17,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/Support/raw_ostream.h"
@@ -116,7 +117,7 @@ Type Pattern::getType() const {
 
     if (auto genericEnv = dc->getGenericEnvironmentOfContext()) {
       ctx.DelayedPatternContexts.erase(this);
-      Ty = genericEnv->mapTypeIntoContext(dc->getParentModule(), Ty);
+      Ty = genericEnv->mapTypeIntoContext(Ty);
       PatternBits.hasInterfaceType = false;
     }
   }
@@ -296,7 +297,8 @@ bool Pattern::isRefutablePattern() const {
 
     // If this is an always matching 'is' pattern, then it isn't refutable.
     if (auto *is = dyn_cast<IsPattern>(Node))
-      if (is->getCastKind() == CheckedCastKind::Coercion)
+      if (is->getCastKind() == CheckedCastKind::Coercion ||
+          is->getCastKind() == CheckedCastKind::BridgingCoercion)
         return;
 
     // If this is an ExprPattern that isn't resolved yet, do some simple

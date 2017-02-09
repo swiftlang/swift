@@ -2482,7 +2482,7 @@ SetTestSuite.test("SetUpcastBridged") {
   }
 
   do {
-    var s = s as Set<NSObject>
+    var s = s as! Set<NSObject>
 
     expectEqual(3, s.count)
     expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))

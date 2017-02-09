@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "llvm/ADT/Statistic.h"
 
 using namespace swift;
@@ -27,9 +26,9 @@ using namespace constraints;
 #define DEBUG_TYPE "Constraint solver overall"
 STATISTIC(NumDiscardedSolutions, "Number of solutions discarded");
 
-void ConstraintSystem::increaseScore(ScoreKind kind) {
+void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
   unsigned index = static_cast<unsigned>(kind);
-  ++CurrentScore.Data[index];
+  CurrentScore.Data[index] += value;
 
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -222,7 +221,7 @@ namespace {
     /// The second type conforms to the first.
     ConformedToBy
   };
-}
+} // end anonymous namespace
 
 /// Determines whether the first type is nominally a superclass of the second
 /// type, ignore generic arguments.
@@ -356,7 +355,7 @@ static Type getTypeAtIndex(const ParameterList *params, size_t index) {
     if (param->isVariadic())
       return param->getVarargBaseTy();
   
-    return param->getType();
+    return param->getInterfaceType();
   }
   
   /// FIXME: This looks completely wrong for varargs within a parameter list.
@@ -439,7 +438,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   Type selfType2 = sig2->getGenericParams()[0];
   cs.addConstraint(ConstraintKind::Bind,
                    replacements[selfType2->getCanonicalType()],
-                   ArchetypeBuilder::mapTypeIntoContext(dc1, selfType1),
+                   dc1->mapTypeIntoContext(selfType1),
                    nullptr);
 
   // Solve the system. If the first extension is at least as specialized as the
@@ -525,7 +524,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       if (isa<AbstractFunctionDecl>(decl1) || isa<EnumElementDecl>(decl1)) {
         // Nothing to do: these have the curried 'self' already.
         if (auto elt = dyn_cast<EnumElementDecl>(decl1)) {
-          checkKind = elt->hasArgumentType() ? CheckInput : CheckAll;
+          checkKind = elt->getArgumentInterfaceType() ? CheckInput : CheckAll;
         } else {
           checkKind = CheckInput;
         }
@@ -580,9 +579,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       }
 
       for (const auto &replacement : replacements) {
-        if (auto mapped = 
-                  ArchetypeBuilder::mapTypeIntoContext(dc1,
-                                                       replacement.first)) {
+        if (auto mapped = dc1->mapTypeIntoContext(replacement.first)) {
           cs.addConstraint(ConstraintKind::Bind, replacement.second, mapped,
                            locator);
         }
@@ -678,9 +675,6 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
             fewerEffectiveParameters = true;
             continue;
           }
-
-          // Labels must match.
-          if (params1[i].Label != params2[i].Label) return false;
 
           // If one parameter is variadic and the other is not...
           if (params1[i].isVariadic() != params2[i].isVariadic()) {
@@ -877,10 +871,10 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
             
             // If both are convenience initializers, and the instance type of
             // one is a subtype of the other's, favor the subtype constructor.
-            auto resType1 = ArchetypeBuilder::mapTypeIntoContext(
-                ctor1, ctor1->getResultInterfaceType());
-            auto resType2 = ArchetypeBuilder::mapTypeIntoContext(
-                ctor2, ctor2->getResultInterfaceType());
+            auto resType1 = ctor1->mapTypeIntoContext(
+                ctor1->getResultInterfaceType());
+            auto resType2 = ctor2->mapTypeIntoContext(
+                ctor2->getResultInterfaceType());
             
             if (!resType1->isEqual(resType2)) {
               if (tc.isSubtypeOf(resType1, resType2, cs.DC)) {

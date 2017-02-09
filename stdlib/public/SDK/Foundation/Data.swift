@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,11 +20,11 @@ import Glibc
     
 import CoreFoundation
 
-internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void {
+internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutableRawPointer, _ length: Int) {
     munmap(mem, length)
 }
 
-internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void {
+internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ length: Int) {
     free(mem)
 }
 
@@ -33,13 +33,13 @@ internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ le
 @_exported import Foundation // Clang module
 
 @_silgen_name("__NSDataInvokeDeallocatorVM")
-internal func __NSDataInvokeDeallocatorVM(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void
+internal func __NSDataInvokeDeallocatorVM(_ mem: UnsafeMutableRawPointer, _ length: Int)
 
 @_silgen_name("__NSDataInvokeDeallocatorUnmap")
-internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void
+internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutableRawPointer, _ length: Int)
 
 @_silgen_name("__NSDataInvokeDeallocatorFree")
-internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void
+internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ length: Int)
 
 @_silgen_name("_NSWriteDataToFile_Swift")
 internal func _NSWriteDataToFile_Swift(url: NSURL, data: NSData, options: UInt, error: NSErrorPointer) -> Bool
@@ -48,7 +48,7 @@ internal func _NSWriteDataToFile_Swift(url: NSURL, data: NSData, options: UInt, 
 
 public final class _DataStorage {
     public enum Backing {
-        // A mirror of the objective-c implementation that is suitable to inline in swift
+        // A mirror of the Objective-C implementation that is suitable to inline in Swift
         case swift
         
         // these two storage points for immutable and mutable data are reserved for references that are returned by "known"
@@ -59,7 +59,7 @@ public final class _DataStorage {
         case immutable(NSData) // This will most often (perhaps always) be NSConcreteData
         case mutable(NSMutableData) // This will often (perhaps always) be NSConcreteMutableData
         
-        // These are reserved for foregin sources where neither Swift nor Foundation are fully certain whom they belong
+        // These are reserved for foreign sources where neither Swift nor Foundation are fully certain whom they belong
         // to from an object inheritance standpoint, this means that all bets are off and the values of bytes, mutableBytes,
         // and length cannot be cached. This also means that all methods are expected to dynamically dispatch out to the
         // backing reference.
@@ -83,7 +83,7 @@ public final class _DataStorage {
         var dest = dest_
         var source = source_
         var num = num_
-        if _DataStorage.vmOpsThreshold <= num && ((unsafeBitCast(source, to: Int.self) | unsafeBitCast(dest, to: Int.self)) & (NSPageSize() - 1)) == 0 {
+        if _DataStorage.vmOpsThreshold <= num && ((unsafeBitCast(source, to: Int.self) | Int(bitPattern: dest)) & (NSPageSize() - 1)) == 0 {
             let pages = NSRoundDownToMultipleOfPageSize(num)
             NSCopyMemoryPages(source!, dest, pages)
             source = source!.advanced(by: pages)
@@ -91,7 +91,7 @@ public final class _DataStorage {
             num -= pages
         }
         if num > 0 {
-            memmove(dest, source, num)
+            memmove(dest, source!, num)
         }
     }
     
@@ -103,7 +103,7 @@ public final class _DataStorage {
     public var _length: Int
     public var _capacity: Int
     public var _needToZero: Bool
-    public var _deallocator: ((UnsafeMutableRawPointer, Int) -> Void)? = nil
+    public var _deallocator: ((UnsafeMutableRawPointer, Int) -> Void)?
     public var _backing: Backing = .swift
     
     public var bytes: UnsafeRawPointer? {
@@ -188,13 +188,10 @@ public final class _DataStorage {
         switch _backing {
         case .swift:
             block(UnsafeBufferPointer<UInt8>(start: _bytes?.assumingMemoryBound(to: UInt8.self), count: _length), 0, &stop)
-            break
         case .immutable:
             block(UnsafeBufferPointer<UInt8>(start: _bytes?.assumingMemoryBound(to: UInt8.self), count: _length), 0, &stop)
-            break
         case .mutable:
             block(UnsafeBufferPointer<UInt8>(start: _bytes?.assumingMemoryBound(to: UInt8.self), count: _length), 0, &stop)
-            break
         case .customReference(let d):
             d.enumerateBytes { (ptr, range, stop) in
                 var stopv = false
@@ -204,7 +201,6 @@ public final class _DataStorage {
                     stop.pointee = true
                 }
             }
-            break
         case .customMutableReference(let d):
             d.enumerateBytes { (ptr, range, stop) in
                 var stopv = false
@@ -214,7 +210,6 @@ public final class _DataStorage {
                     stop.pointee = true
                 }
             }
-            break
         }
     }
     
@@ -233,8 +228,8 @@ public final class _DataStorage {
             newBytes = _DataStorage.allocate(newCapacity, allocateCleared)
             if newBytes == nil {
                 /* Try again with minimum length */
-                allocateCleared = clear && _DataStorage.shouldAllocateCleared(newLength);
-                newBytes = _DataStorage.allocate(newLength, allocateCleared);
+                allocateCleared = clear && _DataStorage.shouldAllocateCleared(newLength)
+                newBytes = _DataStorage.allocate(newLength, allocateCleared)
             }
         } else {
             let tryCalloc = (origLength == 0 || (newLength / origLength) >= 4)
@@ -304,33 +299,28 @@ public final class _DataStorage {
             let newLength = length
             if _capacity < newLength || _bytes == nil {
                 _grow(newLength, true)
-            } else if (origLength < newLength && _needToZero) {
+            } else if origLength < newLength && _needToZero {
                 memset(_bytes! + origLength, 0, newLength - origLength)
-            } else if (newLength < origLength) {
+            } else if newLength < origLength {
                 _needToZero = true
             }
             _length = newLength
-            break
         case .immutable(let d):
             let data = d.mutableCopy() as! NSMutableData
             data.length = length
             _backing = .mutable(data)
             _length = length
             _bytes = data.mutableBytes
-            break
         case .mutable(let d):
             d.length = length
             _length = length
             _bytes = d.mutableBytes
-            break
         case .customReference(let d):
             let data = d.mutableCopy() as! NSMutableData
             data.length = length
             _backing = .customMutableReference(data)
-            break
         case .customMutableReference(let d):
             d.length = length
-            break
         }
     }
     
@@ -345,27 +335,22 @@ public final class _DataStorage {
             }
             _length = newLength
             _DataStorage.move(_bytes!.advanced(by: origLength), bytes, length)
-            break
         case .immutable(let d):
             let data = d.mutableCopy() as! NSMutableData
             data.append(bytes, length: length)
             _backing = .mutable(data)
             _length = data.length
             _bytes = data.mutableBytes
-            break
         case .mutable(let d):
             d.append(bytes, length: length)
             _length = d.length
             _bytes = d.mutableBytes
-            break
         case .customReference(let d):
             let data = d.mutableCopy() as! NSMutableData
             data.append(bytes, length: length)
             _backing = .customReference(data)
-            break
         case .customMutableReference(let d):
             d.append(bytes, length: length)
-            break
         }
         
     }
@@ -382,7 +367,7 @@ public final class _DataStorage {
     
     @inline(__always)
     public func append(_ otherData: Data) {
-        otherData.enumerateBytes { (buffer: UnsafeBufferPointer<UInt8>, location: Data.Index, stop: inout Bool) in
+        otherData.enumerateBytes { (buffer: UnsafeBufferPointer<UInt8>, _, _) in
             append(buffer.baseAddress!, length: buffer.count)
         }
     }
@@ -400,27 +385,22 @@ public final class _DataStorage {
                 memset(_bytes!.advanced(by: origLength), 0, extraLength)
             }
             _length = newLength
-            break
         case .immutable(let d):
             let data = d.mutableCopy() as! NSMutableData
             data.increaseLength(by: extraLength)
             _backing = .mutable(data)
             _length += extraLength
             _bytes = data.mutableBytes
-            break
         case .mutable(let d):
             d.increaseLength(by: extraLength)
             _length += extraLength
             _bytes = d.mutableBytes
-            break
         case .customReference(let d):
             let data = d.mutableCopy() as! NSMutableData
             data.increaseLength(by: extraLength)
             _backing = .customReference(data)
-            break
         case .customMutableReference(let d):
             d.increaseLength(by: extraLength)
-            break
         }
         
     }
@@ -432,12 +412,10 @@ public final class _DataStorage {
             fallthrough
         case .mutable:
             _bytes!.advanced(by: index).assumingMemoryBound(to: UInt8.self).pointee = value
-            break
         default:
             var theByte = value
             let range = NSRange(location: index, length: 1)
             replaceBytes(in: range, with: &theByte, length: 1)
-            break
         }
         
     }
@@ -456,27 +434,22 @@ public final class _DataStorage {
                 _length = newLength
             }
             _DataStorage.move(_bytes!.advanced(by: range.location), bytes!, range.length)
-            break
         case .immutable(let d):
             let data = d.mutableCopy() as! NSMutableData
             data.replaceBytes(in: range, withBytes: bytes!)
             _backing = .mutable(data)
             _length = data.length
             _bytes = data.mutableBytes
-            break
         case .mutable(let d):
             d.replaceBytes(in: range, withBytes: bytes!)
             _length = d.length
             _bytes = d.mutableBytes
-            break
         case .customReference(let d):
             let data = d.mutableCopy() as! NSMutableData
             data.replaceBytes(in: range, withBytes: bytes!)
             _backing = .customMutableReference(data)
-            break
         case .customMutableReference(let d):
             d.replaceBytes(in: range, withBytes: bytes!)
-            break
         }
     }
     
@@ -500,7 +473,7 @@ public final class _DataStorage {
             }
             if replacementLength != 0 {
                 if replacementBytes != nil {
-                    memmove(mutableBytes! + start, replacementBytes, replacementLength)
+                    memmove(mutableBytes! + start, replacementBytes!, replacementLength)
                 } else {
                     memset(mutableBytes! + start, 0, replacementLength)
                 }
@@ -509,28 +482,23 @@ public final class _DataStorage {
             if resultingLength < currentLength {
                 setLength(resultingLength)
             }
-            break
         case .immutable(let d):
             let data = d.mutableCopy() as! NSMutableData
             data.replaceBytes(in: range, withBytes: replacementBytes, length: replacementLength)
             _backing = .mutable(data)
             _length = replacementLength
             _bytes = data.mutableBytes
-            break
         case .mutable(let d):
             d.replaceBytes(in: range, withBytes: replacementBytes, length: replacementLength)
             _backing = .mutable(d)
             _length = replacementLength
             _bytes = d.mutableBytes
-            break
         case .customReference(let d):
             let data = d.mutableCopy() as! NSMutableData
             data.replaceBytes(in: range, withBytes: replacementBytes, length: replacementLength)
             _backing = .customMutableReference(data)
-            break
         case .customMutableReference(let d):
             d.replaceBytes(in: range, withBytes: replacementBytes, length: replacementLength)
-            break
         }
     }
     
@@ -547,27 +515,22 @@ public final class _DataStorage {
                 _length = newLength
             }
             memset(_bytes!.advanced(by: range.location), 0, range.length)
-            break
         case .immutable(let d):
             let data = d.mutableCopy() as! NSMutableData
             data.resetBytes(in: range)
             _backing = .mutable(data)
             _length = data.length
             _bytes = data.mutableBytes
-            break
         case .mutable(let d):
             d.resetBytes(in: range)
             _length = d.length
             _bytes = d.mutableBytes
-            break
         case .customReference(let d):
             let data = d.mutableCopy() as! NSMutableData
             data.resetBytes(in: range)
             _backing = .customMutableReference(data)
-            break
         case .customMutableReference(let d):
             d.resetBytes(in: range)
-            break
         }
         
     }
@@ -580,7 +543,7 @@ public final class _DataStorage {
     public init(length: Int) {
         precondition(length < _DataStorage.maxSize)
         var capacity = (length < 1024 * 1024 * 1024) ? length + (length >> 2) : length
-        if (_DataStorage.vmOpsThreshold <= capacity) {
+        if _DataStorage.vmOpsThreshold <= capacity {
             capacity = NSRoundUpToMultipleOfPageSize(capacity)
         }
         
@@ -596,7 +559,7 @@ public final class _DataStorage {
     public init(capacity capacity_: Int) {
         var capacity = capacity_
         precondition(capacity < _DataStorage.maxSize)
-        if (_DataStorage.vmOpsThreshold <= capacity) {
+        if _DataStorage.vmOpsThreshold <= capacity {
             capacity = NSRoundUpToMultipleOfPageSize(capacity)
         }
         _length = 0
@@ -620,7 +583,7 @@ public final class _DataStorage {
             _DataStorage.move(_bytes!, bytes, length)
         } else {
             var capacity = length
-            if (_DataStorage.vmOpsThreshold <= capacity) {
+            if _DataStorage.vmOpsThreshold <= capacity {
                 capacity = NSRoundUpToMultipleOfPageSize(capacity)
             }
             _length = length
@@ -659,7 +622,7 @@ public final class _DataStorage {
             }
         } else {
             var capacity = length
-            if (_DataStorage.vmOpsThreshold <= capacity) {
+            if _DataStorage.vmOpsThreshold <= capacity {
                 capacity = NSRoundUpToMultipleOfPageSize(capacity)
             }
             _length = length
@@ -709,7 +672,6 @@ public final class _DataStorage {
         switch _backing {
         case .swift:
             _freeBytes()
-            break
         default:
             break
         }
@@ -759,7 +721,7 @@ public final class _DataStorage {
             return d
         case .customMutableReference(let d):
             // Because this is returning an object that may be mutated in the future it needs to create a copy to prevent
-            // any further mutations out from under the reciever
+            // any further mutations out from under the receiver
             return d.copy() as! NSData
         }
     }
@@ -822,7 +784,10 @@ public final class _DataStorage {
             if lhs.bytes == rhs.bytes {
                 return true
             }
-            return memcmp(lhs._bytes, rhs._bytes, length1) == 0
+            if length1 > 0 {
+                return memcmp(lhs._bytes!, rhs._bytes!, length1) == 0
+            }
+            return true
         }
     }
     
@@ -865,7 +830,7 @@ internal class _NSSwiftData : NSData {
     override var bytes: UnsafeRawPointer {
         // NSData's byte pointer methods are not annotated for nullability correctly
         // (but assume non-null by the wrapping macro guards). This placeholder value
-        // is to work-around this bug. Any indirection to the underlying bytes of a NSData
+        // is to work-around this bug. Any indirection to the underlying bytes of an NSData
         // with a length of zero would have been a programmer error anyhow so the actual
         // return value here is not needed to be an allocated value. This is specifically
         // needed to live like this to be source compatible with Swift3. Beyond that point
@@ -932,7 +897,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         /// A custom deallocator.
         case custom((UnsafeMutableRawPointer, Int) -> Void)
         
-        fileprivate var _deallocator : ((UnsafeMutableRawPointer, Int) -> Void)? {
+        fileprivate var _deallocator : ((UnsafeMutableRawPointer, Int) -> Void) {
 #if DEPLOYMENT_RUNTIME_SWIFT
             switch self {
             case .unmap:
@@ -940,7 +905,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             case .free:
                 return { __NSDataInvokeDeallocatorFree($0, $1) }
             case .none:
-                return nil
+                return { _, _ in }
             case .custom(let b):
                 return { (ptr, len) in
                     b(ptr, len)
@@ -955,7 +920,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             case .free:
                 return { __NSDataInvokeDeallocatorFree($0, $1) }
             case .none:
-                return nil
+                return { _, _ in }
             case .custom(let b):
                 return { (ptr, len) in
                     b(ptr, len)
@@ -1005,6 +970,17 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public init(bytes: ArraySlice<UInt8>) {
         _backing = bytes.withUnsafeBufferPointer {
             return _DataStorage(bytes: $0.baseAddress, length: $0.count)
+        }
+    }
+
+    /// Initialize a `Data` with a repeating byte pattern
+    ///
+    /// - parameter repeatedValue: A byte to initialize the pattern
+    /// - parameter count: The number of bytes the data initially contains initialized to the repeatedValue
+    public init(repeating repeatedValue: UInt8, count: Int) {
+        self.init(count: count)
+        withUnsafeMutableBytes { (bytes: UnsafeMutablePointer<UInt8>) -> Void in
+            memset(bytes, Int32(repeatedValue), count)
         }
     }
     
@@ -1327,9 +1303,12 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
         count += estimatedCount
         for byte in newElements {
+            let newIndex = idx + 1
+            if newIndex > count {
+                count = newIndex
+            }
             self[idx] = byte
-            idx += 1
-            count = idx
+            idx = newIndex
         }
     }
     
@@ -1422,11 +1401,11 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 // In the future, if we keep the malloced pointer and count inside this struct/ref instead of deferring to NSData, we may be able to do this more efficiently.
                 self.count = resultCount
             }
-            
+
             let shift = resultCount - currentCount
             let start = subrange.lowerBound
             
-            self.withUnsafeMutableBytes { (bytes : UnsafeMutablePointer<UInt8>) -> () in
+            self.withUnsafeMutableBytes { (bytes : UnsafeMutablePointer<UInt8>) -> Void in
                 if shift != 0 {
                     let destination = bytes + start + replacementCount
                     let source = bytes + start + subrangeCount
@@ -1434,7 +1413,11 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 }
                 
                 if replacementCount != 0 {
-                    newElements._copyContents(initializing: bytes + start)
+                    let buf = UnsafeMutableBufferPointer(start: bytes + start, 
+                                                         count: replacementCount)
+                    var (it,idx) = newElements._copyContents(initializing: buf)
+                    precondition(it.next() == nil && idx == buf.endIndex,
+                      "newElements iterator returned different count to newElements.count")
                 }
             }
     }
@@ -1639,7 +1622,10 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         if backing1.bytes == backing2.bytes {
             return true
         }
-        return memcmp(backing1.bytes, backing2.bytes, length1) == 0
+        if length1 > 0 {
+            return memcmp(backing1.bytes!, backing2.bytes!, length1) == 0
+        }
+        return true
     }
 }
 

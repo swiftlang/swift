@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -emit-verbose-sil | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -emit-verbose-sil | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -6,18 +6,18 @@ import Foundation
 
 final class Foo {
   @objc func foo() {}
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC10objc_final3Foo3foo
+  // CHECK-LABEL: sil hidden [thunk] @_T010objc_final3FooC3foo{{[_0-9a-zA-Z]*}}FTo
 
   @objc var prop: Int = 0
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC10objc_final3Foog4propSi
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC10objc_final3Foos4propSi
+  // CHECK-LABEL: sil hidden [thunk] @_T010objc_final3FooC4propSifgTo
+  // CHECK-LABEL: sil hidden [thunk] @_T010objc_final3FooC4propSifsTo
 }
 
-// CHECK-LABEL: sil hidden @_TF10objc_final7callFooFCS_3FooT_
+// CHECK-LABEL: sil hidden @_T010objc_final7callFooyAA0D0CF
 func callFoo(_ x: Foo) {
   // Calls to the final @objc method statically reference the native entry
   // point.
-  // CHECK: function_ref @_TFC10objc_final3Foo3foo
+  // CHECK: function_ref @_T010objc_final3FooC3foo{{[_0-9a-zA-Z]*}}F
   x.foo()
 
   // Final @objc properties are still accessed directly.

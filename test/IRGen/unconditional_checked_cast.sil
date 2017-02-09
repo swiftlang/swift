@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -14,7 +14,7 @@ sil_vtable D {}
 // CHECK: entry:
 // CHECK-NEXT: [[INPUTPTR:%[0-9]+]] = load %C26unconditional_checked_cast1C*, %C26unconditional_checked_cast1C** [[INPUTPTRPTR:%[0-9]+]], align 8
 // CHECK-NEXT: [[I8INPUTPTR:%[0-9]+]] = bitcast %C26unconditional_checked_cast1C* [[INPUTPTR]] to i8*
-// CHECK-NEXT: [[T0:%.*]] = call %swift.type* @_TMaC26unconditional_checked_cast1D()
+// CHECK-NEXT: [[T0:%.*]] = call %swift.type* @_T026unconditional_checked_cast1DCMa()
 // CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
 // CHECK-NEXT: [[I8RESULTPTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[I8INPUTPTR]], i8* [[T1]])
 // CHECK-NEXT: [[DOWNCASTINPUTPTR:%[0-9]+]] = bitcast i8* [[I8RESULTPTR]] to %C26unconditional_checked_cast1D*

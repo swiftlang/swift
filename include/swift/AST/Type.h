@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/STLExtras.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/OptionSet.h"
@@ -41,7 +42,9 @@ class NominalTypeDecl;
 class GenericTypeDecl;
 class NormalProtocolConformance;
 enum OptionalTypeKind : unsigned;
+class ProtocolConformanceRef;
 class ProtocolDecl;
+class ProtocolType;
 class StructDecl;
 class SubstitutableType;
 class SubstitutionMap;
@@ -55,9 +58,10 @@ typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 
 /// Function used to provide substitutions.
 ///
-/// \returns A null \c Type to indicate that there is no substitution for
+/// Returns a null \c Type to indicate that there is no substitution for
 /// this substitutable type; otherwise, the replacement type.
-typedef llvm::function_ref<Type(SubstitutableType *)> TypeSubstitutionFn;
+using TypeSubstitutionFn
+  = llvm::function_ref<Type(SubstitutableType *dependentType)>;
 
 /// A function object suitable for use as a \c TypeSubstitutionFn that
 /// queries an underlying \c TypeSubstitutionMap.
@@ -67,6 +71,74 @@ struct QueryTypeSubstitutionMap {
   Type operator()(SubstitutableType *type) const;
 };
 
+/// A function object suitable for use as a \c TypeSubstitutionFn that
+/// queries an underlying \c SubstitutionMap.
+struct QuerySubstitutionMap {
+  const SubstitutionMap &subMap;
+
+  Type operator()(SubstitutableType *type) const;
+};
+
+/// Function used to resolve conformances.
+using GenericFunction = auto(CanType dependentType,
+  Type conformingReplacementType,
+  ProtocolType *conformedProtocol)
+  ->Optional<ProtocolConformanceRef>;
+using LookupConformanceFn = llvm::function_ref<GenericFunction>;
+  
+/// Functor class suitable for use as a \c LookupConformanceFn to look up a
+/// conformance through a module.
+class LookUpConformanceInModule {
+  ModuleDecl *M;
+public:
+  explicit LookUpConformanceInModule(ModuleDecl *M)
+    : M(M) {}
+  
+  Optional<ProtocolConformanceRef>
+  operator()(CanType dependentType,
+             Type conformingReplacementType,
+             ProtocolType *conformedProtocol) const;
+};
+
+/// Functor class suitable for use as a \c LookupConformanceFn to look up a
+/// conformance in a \c SubstitutionMap.
+class LookUpConformanceInSubstitutionMap {
+  const SubstitutionMap &Subs;
+public:
+  explicit LookUpConformanceInSubstitutionMap(const SubstitutionMap &Subs)
+    : Subs(Subs) {}
+  
+  Optional<ProtocolConformanceRef>
+  operator()(CanType dependentType,
+             Type conformingReplacementType,
+             ProtocolType *conformedProtocol) const;
+};
+
+/// Functor class suitable for use as a \c LookupConformanceFn that provides
+/// only abstract conformances for generic types. Asserts that the replacement
+/// type is an opaque generic type.
+class MakeAbstractConformanceForGenericType {
+public:
+  Optional<ProtocolConformanceRef>
+  operator()(CanType dependentType,
+             Type conformingReplacementType,
+             ProtocolType *conformedProtocol) const;
+};
+
+/// Functor class suitable for use as a \c LookupConformanceFn that fetches
+/// conformances from a generic signature.
+class LookUpConformanceInSignature {
+  const GenericSignature &Sig;
+public:
+  LookUpConformanceInSignature(const GenericSignature &Sig)
+    : Sig(Sig) {}
+  
+  Optional<ProtocolConformanceRef>
+  operator()(CanType dependentType,
+             Type conformingReplacementType,
+             ProtocolType *conformedProtocol) const;
+};
+  
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
   /// If a type cannot be produced because some member type is
@@ -167,6 +239,30 @@ public:
   /// \returns the result of transforming the type.
   Type transform(llvm::function_ref<Type(Type)> fn) const;
 
+  /// Transform the given type by applying the user-provided function to
+  /// each type.
+  ///
+  /// This routine applies the given function to transform one type into
+  /// another. If the function leaves the type unchanged, recurse into the
+  /// child type nodes and transform those. If any child type node changes,
+  /// the parent type node will be rebuilt.
+  ///
+  /// If at any time the function returns a null type, the null will be
+  /// propagated out.
+  ///
+  /// If the function returns \c None, the transform operation will
+  ///
+  /// \param fn A function object with the signature
+  /// \c Optional<Type>(TypeBase *), which accepts a type pointer and returns a
+  /// transformed type, a null type (which will propagate the null type to the
+  /// outermost \c transform() call), or None (to indicate that the transform
+  /// operation should recursively transform the subtypes). The function object
+  /// should use \c dyn_cast rather \c getAs, because the transform itself
+  /// handles desugaring.
+  ///
+  /// \returns the result of transforming the type.
+  Type transformRec(llvm::function_ref<Optional<Type>(TypeBase *)> fn) const;
+
   /// Look through the given type and its children and apply fn to them.
   void visit(llvm::function_ref<void (Type)> fn) const {
     findIf([&fn](Type t) -> bool {
@@ -174,21 +270,6 @@ public:
         return false;
       });
   }
-
-  /// Replace references to substitutable types with new, concrete types and
-  /// return the substituted result.
-  ///
-  /// \param module The module to use for conformance lookups.
-  ///
-  /// \param substitutions The mapping from substitutable types to their
-  /// replacements.
-  ///
-  /// \param options Options that affect the substitutions.
-  ///
-  /// \returns the substituted type, or a null type if an error occurred.
-  Type subst(ModuleDecl *module,
-             const TypeSubstitutionMap &substitutions,
-             SubstOptions options = None) const;
 
   /// Replace references to substitutable types with new, concrete types and
   /// return the substituted result.
@@ -205,17 +286,20 @@ public:
   /// Replace references to substitutable types with new, concrete types and
   /// return the substituted result.
   ///
-  /// \param module The module to use for conformance lookups.
-  ///
   /// \param substitutions A function mapping from substitutable types to their
   /// replacements.
+  ///
+  /// \param conformances A function for looking up conformances.
   ///
   /// \param options Options that affect the substitutions.
   ///
   /// \returns the substituted type, or a null type if an error occurred.
-  Type subst(ModuleDecl *module,
-             TypeSubstitutionFn substitutions,
+  Type subst(TypeSubstitutionFn substitutions,
+             LookupConformanceFn conformances,
              SubstOptions options = None) const;
+
+  /// Replace references to substitutable types with error types.
+  Type substDependentTypesWithErrorTypes() const;
 
   bool isPrivateStdlibType(bool whitelistProtocols=true) const;
 
@@ -227,9 +311,6 @@ public:
 
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
-
-  /// Get the canonical type, or return null if the type is null.
-  CanType getCanonicalTypeOrNull() const; // in Types.h
 
   /// Computes the join between two types.
   ///
@@ -351,6 +432,11 @@ public:
   CanType getNominalParent() const; // in Types.h
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
+
+  /// Returns information about the layout constraint represented by
+  /// this type. If this type does not represent a layout constraint,
+  /// it returns an empty LayoutConstraint.
+  LayoutConstraint getLayoutConstraint() const;
 
   /// \brief Retrieve the most-specific class bound of this type,
   /// which is either a class, a bound-generic class, or a class-bounded

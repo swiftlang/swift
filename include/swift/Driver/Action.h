@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,7 +19,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/Support/TimeValue.h"
+#include "llvm/Support/Chrono.h"
 
 namespace llvm {
 namespace opt {
@@ -48,9 +48,10 @@ public:
     REPLJob,
     LinkJob,
     GenerateDSYMJob,
+    GeneratePCHJob,
 
     JobFirst=CompileJob,
-    JobLast=GenerateDSYMJob
+    JobLast=GeneratePCHJob
   };
 
   static const char *getClassName(ActionClass AC);
@@ -137,14 +138,14 @@ public:
       NewlyAdded
     };
     Status status = UpToDate;
-    llvm::sys::TimeValue previousModTime;
+    llvm::sys::TimePoint<> previousModTime;
 
     InputInfo() = default;
-    InputInfo(Status stat, llvm::sys::TimeValue time)
+    InputInfo(Status stat, llvm::sys::TimePoint<> time)
         : status(stat), previousModTime(time) {}
 
     static InputInfo makeNewlyAdded() {
-      return InputInfo(Status::NewlyAdded, llvm::sys::TimeValue::MaxTime());
+      return InputInfo(Status::NewlyAdded, llvm::sys::TimePoint<>::max());
     }
   };
 
@@ -265,6 +266,17 @@ public:
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::GenerateDSYMJob;
+  }
+};
+
+class GeneratePCHJobAction : public JobAction {
+  virtual void anchor();
+public:
+  explicit GeneratePCHJobAction(Action *Input)
+    : JobAction(Action::GeneratePCHJob, Input, types::TY_PCH) {}
+
+  static bool classof(const Action *A) {
+    return A->getKind() == Action::GeneratePCHJob;
   }
 };
 

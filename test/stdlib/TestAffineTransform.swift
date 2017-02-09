@@ -1,4 +1,4 @@
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -169,19 +169,19 @@ class TestAffineTransform : TestAffineTransformSuper {
         checkPointTransformation(noop, point: point, expectedPoint: point)
         
         var tenEighty = AffineTransform.identity
-        tenEighty.rotate(byRadians: CGFloat(6 * M_PI))
+        tenEighty.rotate(byRadians: 6 * .pi)
         checkPointTransformation(tenEighty, point: point, expectedPoint: point)
         
         var rotateCounterClockwise = AffineTransform.identity
-        rotateCounterClockwise.rotate(byRadians: CGFloat(M_PI_2))
+        rotateCounterClockwise.rotate(byRadians: .pi / 2)
         checkPointTransformation(rotateCounterClockwise, point: point, expectedPoint: NSPoint(x: CGFloat(-10.0), y: CGFloat(10.0)))
         
         var rotateClockwise = AffineTransform.identity
-        rotateClockwise.rotate(byRadians: CGFloat(-M_PI_2))
+        rotateClockwise.rotate(byRadians: -.pi / 2)
         checkPointTransformation(rotateClockwise, point: point, expectedPoint: NSPoint(x: CGFloat(10.0), y: CGFloat(-10.0)))
         
         var reflectAboutOrigin = AffineTransform.identity
-        reflectAboutOrigin.rotate(byRadians: CGFloat(M_PI))
+        reflectAboutOrigin.rotate(byRadians: .pi)
         checkPointTransformation(reflectAboutOrigin, point: point, expectedPoint: NSPoint(x: CGFloat(-10.0), y: CGFloat(-10.0)))
     }
     

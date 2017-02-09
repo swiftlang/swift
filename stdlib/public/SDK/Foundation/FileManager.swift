@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -56,7 +56,7 @@ extension FileManager {
     @available(OSX 10.6, iOS 4.0, *)
     public func enumerator(at url: URL, includingPropertiesForKeys keys: [URLResourceKey]?, options mask: FileManager.DirectoryEnumerationOptions = [], errorHandler handler: ((URL, Error) -> Bool)? = nil) -> FileManager.DirectoryEnumerator? {
         return NS_Swift_NSFileManager_enumeratorAt_includingPropertiesForKeys_options_errorHandler(self, url as NSURL, keys as NSArray?, mask, { (url, error) in
-            var errorResult = true;
+            var errorResult = true
             if let h = handler {
                 errorResult = h(url as URL, error)
             }

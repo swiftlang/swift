@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -28,7 +28,7 @@
 #include <condition_variable>
 #include <new>
 #include <cctype>
-#if defined(_MSC_VER)
+#if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 // Avoid defining macro max(), min() which conflict with std::max(), std::min()
 #define NOMINMAX
@@ -101,7 +101,7 @@ namespace {
       return reinterpret_cast<GenericCacheEntry*>(bytes);
     }
   };
-}
+} // end anonymous namespace
 
 using GenericMetadataCache = MetadataCache<GenericCacheEntry>;
 using LazyGenericMetadataCache = Lazy<GenericMetadataCache>;
@@ -225,10 +225,8 @@ swift::swift_allocateGenericValueMetadata(GenericMetadata *pattern,
 }
 
 /// The primary entrypoint.
-SWIFT_RT_ENTRY_VISIBILITY
-const Metadata *
-swift::swift_getGenericMetadata(GenericMetadata *pattern,
-                                const void *arguments)
+const Metadata *swift::swift_getGenericMetadata(GenericMetadata *pattern,
+                                                const void *arguments)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   auto genericArgs = (const void * const *) arguments;
   size_t numGenericArgs = pattern->NumKeyArguments;
@@ -531,7 +529,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 /// The uniquing structure for tuple type metadata.
 static SimpleGlobalCache<TupleCacheEntry> TupleTypes;
@@ -1126,7 +1124,7 @@ namespace {
       return (void (*)(OutArgs *...))function;
     }
   };
-}
+} // end anonymous namespace
 
 /// Cast a function that takes all pointer arguments and returns to a
 /// function type that takes different pointer arguments and returns.
@@ -1428,7 +1426,7 @@ namespace {
     const uint8_t *WeakIvarLayout;
     const void *PropertyList;
   };
-}
+} // end anonymous namespace
 
 #if SWIFT_OBJC_INTEROP
 static uint32_t getLog2AlignmentFromMask(size_t alignMask) {
@@ -1811,14 +1809,14 @@ namespace {
       return 0;
     }
   };
-}
+} // end anonymous namespace
 
 /// The uniquing structure for metatype type metadata.
 static SimpleGlobalCache<MetatypeCacheEntry> MetatypeTypes;
 
 /// \brief Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT
-extern "C" const MetatypeMetadata *
+const MetatypeMetadata *
 swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
   return &MetatypeTypes.getOrInsert(instanceMetadata).first->Data;
 }
@@ -1879,7 +1877,7 @@ public:
   }
 };
 
-} // end anonymous namespace 
+} // end anonymous namespace
 
 /// The uniquing structure for existential metatype value witness tables.
 static SimpleGlobalCache<ExistentialMetatypeValueWitnessTableCacheEntry>
@@ -1941,7 +1939,7 @@ ExistentialMetatypeValueWitnessTableCacheEntry(unsigned numWitnessTables) {
 
 /// \brief Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT
-extern "C" const ExistentialMetatypeMetadata *
+const ExistentialMetatypeMetadata *
 swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
   return &ExistentialMetatypes.getOrInsert(instanceMetadata).first->Data;
 }
@@ -2199,6 +2197,8 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
   case ProtocolClassConstraint::Any:
     return getOpaqueExistentialValueWitnesses(numWitnessTables);
   }
+
+  swift_runtime_unreachable("Unhandled ProtocolClassConstraint in switch.");
 }
 
 template<> ExistentialTypeRepresentation
@@ -2240,6 +2240,9 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
     return errorBox->isPureNSError();
   }
   }
+
+  swift_runtime_unreachable(
+      "Unhandled ExistentialTypeRepresentation in switch.");
 }
 
 template<> void
@@ -2289,6 +2292,9 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
     return errorBox->getValue();
   }
   }
+
+  swift_runtime_unreachable(
+      "Unhandled ExistentialTypeRepresentation in switch.");
 }
 
 template<> const Metadata *
@@ -2311,6 +2317,9 @@ ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
     return errorBox->getType();
   }
   }
+
+  swift_runtime_unreachable(
+      "Unhandled ExistentialTypeRepresentation in switch.");
 }
 
 template<> const WitnessTable *
@@ -2353,7 +2362,6 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
 
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
-SWIFT_RT_ENTRY_VISIBILITY
 const ExistentialTypeMetadata *
 swift::swift_getExistentialTypeMetadata(size_t numProtocols,
                                         const ProtocolDescriptor **protocols)
@@ -2440,7 +2448,7 @@ namespace {
     StringRef Data;
     /*implicit*/ GlobalString(StringRef data) : Data(data) {}
   };
-}
+} // end anonymous namespace
 
 template <>
 struct llvm::DenseMapInfo<GlobalString> {
@@ -2468,7 +2476,7 @@ struct ForeignTypeState {
   ConditionVariable InitializationWaiters;
   llvm::DenseMap<GlobalString, const ForeignTypeMetadata *> Types;
 };
-}
+} // end anonymous namespace
 
 static Lazy<ForeignTypeState> ForeignTypes;
 
@@ -2600,11 +2608,12 @@ Metadata::getClassObject() const {
   case MetadataKind::ErrorObject:
     return nullptr;
   }
+
+  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
 }
 
 #ifndef NDEBUG
 SWIFT_RUNTIME_EXPORT
-extern "C"
 void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
                                             const void *runtimeValue,
                                             const void *staticValue,
@@ -2660,7 +2669,7 @@ namespace {
           genericTable->WitnessTablePrivateSizeInWords);
     }
   };
-}
+} // end anonymous namespace
 
 using GenericWitnessTableCache = MetadataCache<WitnessTableCacheEntry>;
 using LazyGenericWitnessTableCache = Lazy<GenericWitnessTableCache>;
@@ -2760,12 +2769,9 @@ allocateWitnessTable(GenericWitnessTable *genericTable,
   return entry;
 }
 
-SWIFT_RT_ENTRY_VISIBILITY
-extern "C" const WitnessTable *
-swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
-                                    const Metadata *type,
-                                    void * const *instantiationArgs)
-    SWIFT_CC(RegisterPreservingCC_IMPL) {
+const WitnessTable *swift::swift_getGenericWitnessTable(
+    GenericWitnessTable *genericTable, const Metadata *type,
+    void *const *instantiationArgs) SWIFT_CC(RegisterPreservingCC_IMPL) {
   if (doesNotRequireInstantiation(genericTable)) {
     return genericTable->Pattern;
   }

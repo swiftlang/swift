@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -619,11 +619,11 @@ public protocol Sequence {
   /// in the same order.
   func _copyToContiguousArray() -> ContiguousArray<Iterator.Element>
 
-  /// Copy a Sequence into an array, returning one past the last
-  /// element initialized.
-  @discardableResult
-  func _copyContents(initializing ptr: UnsafeMutablePointer<Iterator.Element>)
-    -> UnsafeMutablePointer<Iterator.Element>
+  /// Copy `self` into an unsafe buffer, returning a partially-consumed 
+  /// iterator with any elements that didn't fit remaining.
+  func _copyContents(
+    initializing ptr: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index)
 }
 
 /// A default makeIterator() function for `IteratorProtocol` instances that
@@ -1349,8 +1349,7 @@ extension Sequence {
   /// Returns a subsequence containing all but the last element of the
   /// sequence.
   ///
-  /// The sequence must be finite. If the sequence has no elements, the result
-  /// is an empty subsequence.
+  /// The sequence must be finite. 
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
   ///     print(numbers.dropLast())
@@ -1369,19 +1368,30 @@ extension Sequence {
 }
 
 extension Sequence {
-  @discardableResult
+  /// Copies `self` into the supplied buffer.
+  ///
+  /// - Precondition: The memory in `self` is uninitialized. The buffer must
+  ///   contain sufficient uninitialized memory to accommodate `source.underestimatedCount`.
+  ///
+  /// - Postcondition: The `Pointee`s at `buffer[startIndex..<returned index]` are
+  ///   initialized.
   public func _copyContents(
-    initializing ptr: UnsafeMutablePointer<Iterator.Element>
-  ) -> UnsafeMutablePointer<Iterator.Element> {
-    var p = UnsafeMutablePointer<Iterator.Element>(ptr)
-    for x in IteratorSequence(self.makeIterator()) {
-      p.initialize(to: x)
-      p += 1
+    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+      var it = self.makeIterator()
+      guard var ptr = buffer.baseAddress else { return (it,buffer.startIndex) }
+      for idx in buffer.startIndex..<buffer.count {
+        guard let x = it.next() else {
+          return (it, idx)
+        }
+        ptr.initialize(to: x)
+        ptr += 1
+      }
+      return (it,buffer.endIndex)
     }
-    return p
-  }
 }
 
+// FIXME(ABI)#182
 // Pending <rdar://problem/14011860> and <rdar://problem/14396120>,
 // pass an IteratorProtocol through IteratorSequence to give it "Sequence-ness"
 /// A sequence built around an iterator of type `Base`.

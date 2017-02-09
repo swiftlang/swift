@@ -5,9 +5,12 @@
 // RUN: %swift -target arm64-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
 // RUN: %swift -target x86_64-unknown-linux-gnu -disable-objc-interop %s -module-name function_types -emit-ir -o - | %FileCheck %s
 
-// REQUIRES: X86
-// REQUIRES: ARM
+// REQUIRES: CODEGENERATOR=X86
+// REQUIRES: CODEGENERATOR=ARM
 
+// FIXME: SR-3603 test is failing after being unintentionally disabled for a while
+// REQUIRES: SR3603
+ 
 import Builtin
 
 sil_stage canonical

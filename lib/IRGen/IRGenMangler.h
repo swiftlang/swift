@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -147,7 +147,27 @@ public:
     return mangleNominalTypeSymbol(Decl, "MC");
   }
 
+  std::string mangleOutlinedCopyFunction(const NominalTypeDecl *Decl) {
+    beginMangling();
+    appendNominalType(Decl);
+    appendOperator("Wy");
+    return finalize();
+  }
+  std::string mangleOutlinedConsumeFunction(const NominalTypeDecl *Decl) {
+    beginMangling();
+    appendNominalType(Decl);
+    appendOperator("We");
+    return finalize();
+  }
+
   std::string manglePartialApplyForwarder(StringRef FuncName);
+
+  std::string mangleTypeForMetadata(Type type) {
+    return mangleTypeWithoutPrefix(type);
+  }
+
+  std::string mangleTypeForReflection(Type Ty, ModuleDecl *Module,
+                                      bool isSingleFieldOfBox);
 
 protected:
 

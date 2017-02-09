@@ -1,5 +1,8 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | %FileCheck %s
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
+// RUN: rm -rf %t && mkdir %t
+// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -O %s
 
 import resilient_struct
 import resilient_enum
@@ -15,25 +18,24 @@ import resilient_enum
 
 public func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 
-// CHECK: [[RESULT:%.*]] = alloca [[BUFFER_TYPE:\[.* x i8\]]]
-
 // CHECK: [[METADATA:%.*]] = call %swift.type* @_TMaV16resilient_struct4Size()
 // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
 // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
 // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
 
-// CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 5
+// CHECK: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 17
+// CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
+// CHECK: [[WITNESS_FOR_SIZE:%.*]] = ptrtoint i8* [[WITNESS]]
+// CHECK: [[ALLOCA:%.*]] = alloca i8, {{.*}} [[WITNESS_FOR_SIZE]], align 16
+// CHECK: [[STRUCT_ADDR:%.*]] = bitcast i8* [[ALLOCA]] to %swift.opaque*
+
+// CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 6
 // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_PTR]]
-// CHECK: [[initializeBufferWithCopy:%.*]] = bitcast i8* [[WITNESS]]
-// CHECK: [[BUFFER:%.*]] = call %swift.opaque* [[initializeBufferWithCopy]]([[BUFFER_TYPE]]* [[RESULT]], %swift.opaque* %1, %swift.type* [[METADATA]])
+// CHECK: [[initializeWithCopy:%.*]] = bitcast i8* [[WITNESS]]
+// CHECK: [[STRUCT_LOC:%.*]] = call %swift.opaque* [[initializeWithCopy]](%swift.opaque* [[STRUCT_ADDR]], %swift.opaque* %1, %swift.type* [[METADATA]])
 
 // CHECK: [[FN:%.*]] = bitcast i8* %2 to void (%swift.opaque*, %swift.opaque*, %swift.refcounted*)*
-// CHECK: call void [[FN]](%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture [[BUFFER]], %swift.refcounted* %3)
-
-// CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 3
-// CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_PTR]]
-// CHECK: [[deallocateBuffer:%.*]] = bitcast i8* [[WITNESS]]
-// CHECK: call void [[deallocateBuffer]]([[BUFFER_TYPE]]* [[RESULT]], %swift.type* [[METADATA]])
+// CHECK: call void [[FN]](%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture [[STRUCT_ADDR]], %swift.refcounted* %3)
 
 // CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 4
 // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_PTR]]

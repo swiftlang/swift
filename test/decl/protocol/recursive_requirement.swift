@@ -30,7 +30,7 @@ protocol PP2 {
 }
 
 protocol P2 : PP2 {
-  associatedtype A = Self
+  associatedtype A = Self // expected-error{{type may not reference itself as a requirement}}
 }
 
 struct X2<T: P2> {

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -181,7 +181,7 @@ namespace {
     void complete(IRGenFunction &IGF) override {}
     void get(IRGenFunction &IGF, SILType T, const TypeInfo &type) {}
   };
-}
+} // end anonymous namespace
 
 /// Dynamic check for the enabling conditions of different kinds of
 /// packing into a fixed-size buffer, and perform an operation at each
@@ -1019,7 +1019,7 @@ static llvm::Constant *getCopyOutOfLinePointerFunction(IRGenModule &IGM) {
 
 namespace {
   enum class MemMoveOrCpy { MemMove, MemCpy };
-}
+} // end anonymous namespace
 
 /// Return a function which takes two pointer arguments and a count, memmoves
 /// or memcpys from the second to the first, and returns the first argument.

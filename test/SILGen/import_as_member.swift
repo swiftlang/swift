@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -I %S/../IDE/Inputs/custom-modules %s 2>&1 | %FileCheck --check-prefix=SIL %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -I %S/../IDE/Inputs/custom-modules %s 2>&1 | %FileCheck --check-prefix=SIL %s
 // REQUIRES: objc_interop
 import ImportAsMember.A
 import ImportAsMember.Class
@@ -28,7 +28,7 @@ public func useClass(d: Double, opts: SomeClass.Options) {
 }
 
 extension SomeClass {
-  // SIL-LABEL: sil hidden @_TFE16import_as_memberCSo9SomeClasscfT6doubleSd_S0_
+  // SIL-LABEL: sil hidden @_T0So9SomeClassC16import_as_memberEABSd6double_tcfc
   // SIL: bb0([[DOUBLE:%[0-9]+]] : $Double
   // SIL-NOT: value_metatype
   // SIL: [[FNREF:%[0-9]+]] = function_ref @MakeIAMSomeClass

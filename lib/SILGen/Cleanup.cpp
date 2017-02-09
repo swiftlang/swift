@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -39,7 +39,7 @@ namespace {
     
     Cleanup &getCopy() { return *reinterpret_cast<Cleanup*>(Data.data()); }
   };
-}
+} // end anonymous namespace
 
 void CleanupManager::popTopDeadCleanups(CleanupsDepth end) {
   Stack.checkIterator(end);
@@ -231,4 +231,33 @@ void CleanupStateRestorationScope::pop() {
            "changing state of dead cleanup");
     cleanup.setState(stateToRestore);
   }
+}
+
+llvm::raw_ostream &Lowering::operator<<(llvm::raw_ostream &os,
+                                        CleanupState state) {
+  switch (state) {
+  case CleanupState::Dormant:
+    return os << "Dormant";
+  case CleanupState::Dead:
+    return os << "Dead";
+  case CleanupState::Active:
+    return os << "Active";
+  case CleanupState::PersistentlyActive:
+    return os << "PersistentlyActive";
+  }
+}
+
+void CleanupManager::dump() const {
+#ifndef NDEBUG
+  auto begin = Stack.stable_begin();
+  auto end = Stack.stable_end();
+  while (begin != end) {
+    auto iter = Stack.find(begin);
+    const Cleanup &stackCleanup = *iter;
+    llvm::errs() << "CLEANUP DEPTH: " << begin.getDepth() << "\n";
+    stackCleanup.dump();
+    begin = Stack.stabilize(++iter);
+    Stack.checkIterator(begin);
+  }
+#endif
 }

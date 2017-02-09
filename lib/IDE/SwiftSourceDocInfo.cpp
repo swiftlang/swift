@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -71,12 +71,13 @@ SourceManager &SemaLocResolver::getSourceMgr() const
 }
 
 bool SemaLocResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
-                                 SourceLoc Loc, bool IsRef, Type Ty) {
+                                 ExtensionDecl *ExtTyRef, SourceLoc Loc,
+                                 bool IsRef, Type Ty) {
   if (!D->hasName())
     return false;
 
   if (Loc == LocToResolve) {
-    SemaTok = { D, CtorTyRef, Loc, IsRef, Ty, ContainerType };
+    SemaTok = { D, CtorTyRef, ExtTyRef, Loc, IsRef, Ty, ContainerType };
     return true;
   }
   return false;
@@ -93,7 +94,8 @@ bool SemaLocResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {
 bool SemaLocResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                               bool IsOpenBracket) {
   // We should treat both open and close brackets equally
-  return visitDeclReference(D, Range, nullptr, Type());
+  return visitDeclReference(D, Range, nullptr, nullptr, Type(),
+                            SemaReferenceKind::SubscriptRef);
 }
 
 SemaToken SemaLocResolver::resolve(SourceLoc Loc) {
@@ -112,8 +114,8 @@ bool SemaLocResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
     return true;
 
   if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-    return !tryResolve(VD, /*CtorTyRef=*/nullptr, Range.getStart(),
-                       /*IsRef=*/false);
+    return !tryResolve(VD, /*CtorTyRef=*/nullptr, /*ExtTyRef=*/nullptr,
+                       Range.getStart(), /*IsRef=*/false);
 
   return true;
 }
@@ -146,10 +148,12 @@ bool SemaLocResolver::walkToStmtPost(Stmt *S) {
 }
 
 bool SemaLocResolver::visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                                         TypeDecl *CtorTyRef, Type T) {
+                                         TypeDecl *CtorTyRef,
+                                         ExtensionDecl *ExtTyRef, Type T,
+                                         SemaReferenceKind Kind) {
   if (isDone())
     return false;
-  return !tryResolve(D, CtorTyRef, Range.getStart(), /*IsRef=*/true, T);
+  return !tryResolve(D, CtorTyRef, ExtTyRef, Range.getStart(), /*IsRef=*/true, T);
 }
 
 bool SemaLocResolver::walkToExprPre(Expr *E) {
@@ -172,7 +176,7 @@ bool SemaLocResolver::visitCallArgName(Identifier Name, CharSourceRange Range,
                                        ValueDecl *D) {
   if (isDone())
     return false;
-  bool Found = tryResolve(D, nullptr, Range.getStart(), /*IsRef=*/true);
+  bool Found = tryResolve(D, nullptr, nullptr, Range.getStart(), /*IsRef=*/true);
   if (Found)
     SemaTok.IsKeywordArgument = true;
   return !Found;
@@ -204,10 +208,62 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
     Ty->print(OS);
     OS << "</Type>\n";
   }
+
+  OS << "<Context>";
+  printContext(OS, RangeContext);
+  OS << "</Context>\n";
+
+  if (!HasSingleEntry) {
+    OS << "<Entry>Multi</Entry>\n";
+  }
+
+  if (Orphan != OrphanKind::None) {
+    OS << "<Orphan>";
+    switch (Orphan) {
+    case OrphanKind::Continue:
+      OS << "Continue";
+      break;
+    case OrphanKind::Break:
+      OS << "Break";
+      break;
+    case OrphanKind::None:
+      llvm_unreachable("cannot enter here.");
+    }
+    OS << "</Orphan>";
+  }
+
+  for (auto &VD : DeclaredDecls) {
+    OS << "<Declared>" << VD.VD->getNameStr() << "</Declared>";
+    OS << "<OutscopeReference>";
+    if (VD.ReferredAfterRange)
+      OS << "true";
+    else
+      OS << "false";
+    OS << "</OutscopeReference>\n";
+  }
+  for (auto &RD : ReferencedDecls) {
+    OS << "<Referenced>" << RD.VD->getNameStr() << "</Referenced>";
+    OS << "<Type>";
+    RD.Ty->print(OS);
+    OS << "</Type>\n";
+  }
+
+  OS << "<ASTNodes>" << ContainedNodes.size() << "</ASTNodes>\n";
+  OS << "<end>\n";
+}
+
+bool DeclaredDecl::operator==(const DeclaredDecl& Other) {
+  return VD == Other.VD;
+}
+
+bool ReferencedDecl::operator==(const ReferencedDecl& Other) {
+  return VD == Other.VD && Ty.getPointer() == Other.Ty.getPointer();
 }
 
 struct RangeResolver::Implementation {
   SourceFile &File;
+  ASTContext &Ctx;
+  SourceManager &SM;
 private:
   enum class RangeMatchKind : int8_t {
     NoneMatch,
@@ -218,9 +274,14 @@ private:
 
   struct ContextInfo {
     ASTNode Parent;
+
+    // Whether the context is entirely contained in the given range under
+    // scrutiny.
+    bool ContainedInRange;
     std::vector<ASTNode> StartMatches;
     std::vector<ASTNode> EndMatches;
-    ContextInfo(ASTNode Parent) : Parent(Parent) {}
+    ContextInfo(ASTNode Parent, bool ContainedInRange) : Parent(Parent),
+      ContainedInRange(ContainedInRange) {}
   };
 
   SourceLoc Start;
@@ -233,17 +294,61 @@ private:
     return ContextStack.back();
   }
 
+  std::vector<DeclaredDecl> DeclaredDecls;
+  std::vector<ReferencedDecl> ReferencedDecls;
+
+  // Keep track of the AST nodes contained in the range under question.
+  std::vector<ASTNode> ContainedASTNodes;
+
+  /// Collect the type that an ASTNode should be evaluated to.
+  Type resolveNodeType(ASTNode N) {
+    if (N.is<Stmt*>()) {
+      if (auto RS = dyn_cast<ReturnStmt>(N.get<Stmt*>())) {
+        return resolveNodeType(RS->getResult());
+      }
+      // For other statements, the type should be void.
+      return Ctx.getVoidDecl()->getDeclaredInterfaceType();
+    } else if (N.is<Expr*>()) {
+      return N.get<Expr*>()->getType();
+    }
+    return Type();
+  }
+
   ResolvedRangeInfo getSingleNodeKind(ASTNode Node) {
     assert(!Node.isNull());
+    assert(ContainedASTNodes.size() == 1);
+    // Single node implies single entry point, or is it?
+    bool SingleEntry = true;
+    OrphanKind Kind = getOrphanKind(ContainedASTNodes);
     if (Node.is<Expr*>())
       return ResolvedRangeInfo(RangeKind::SingleExpression,
-                               Node.get<Expr*>()->getType(), Content);
+                               resolveNodeType(Node), Content,
+                               getImmediateContext(), SingleEntry, Kind,
+                               llvm::makeArrayRef(ContainedASTNodes),
+                               llvm::makeArrayRef(DeclaredDecls),
+                               llvm::makeArrayRef(ReferencedDecls));
     else if (Node.is<Stmt*>())
-      return ResolvedRangeInfo(RangeKind::SingleStatement, Type(), Content);
+      return ResolvedRangeInfo(RangeKind::SingleStatement, resolveNodeType(Node),
+                               Content, getImmediateContext(), SingleEntry, Kind,
+                               llvm::makeArrayRef(ContainedASTNodes),
+                               llvm::makeArrayRef(DeclaredDecls),
+                               llvm::makeArrayRef(ReferencedDecls));
     else {
       assert(Node.is<Decl*>());
-      return ResolvedRangeInfo(RangeKind::SingleDecl, Type(), Content);
+      return ResolvedRangeInfo(RangeKind::SingleDecl, Type(), Content,
+                               getImmediateContext(), SingleEntry, Kind,
+                               llvm::makeArrayRef(ContainedASTNodes),
+                               llvm::makeArrayRef(DeclaredDecls),
+                               llvm::makeArrayRef(ReferencedDecls));
     }
+  }
+
+  bool isContainedInSelection(CharSourceRange Range) {
+    if (SM.isBeforeInBuffer(Range.getStart(), Start))
+      return false;
+    if (SM.isBeforeInBuffer(End, Range.getEnd()))
+      return false;
+    return true;
   }
 
   static SourceLoc getNonwhitespaceLocBefore(SourceManager &SM,
@@ -283,12 +388,38 @@ private:
     return SourceLoc();
   }
 
+  DeclContext *getImmediateContext() {
+    for (auto It = ContextStack.rbegin(); It != ContextStack.rend(); It ++) {
+      if (auto *DC = It->Parent.getAsDeclContext())
+        return DC;
+    }
+    return static_cast<DeclContext*>(&File);
+  }
+
   Implementation(SourceFile &File, SourceLoc Start, SourceLoc End) :
-    File(File), Start(Start), End(End), Content(getContent()) {}
+    File(File), Ctx(File.getASTContext()), SM(Ctx.SourceMgr), Start(Start),
+    End(End), Content(getContent()) {}
 
 public:
   bool hasResult() { return Result.hasValue(); }
-  void enter(ASTNode Node) { ContextStack.emplace_back(Node); }
+
+  void enter(ASTNode Node) {
+    bool ContainedInRange;
+    if (!Node.getOpaqueValue()) {
+      // If the node is the root, it's not contained for sure.
+      ContainedInRange = false;
+    } else if (ContextStack.back().ContainedInRange) {
+      // If the node's parent is contained in the range, so is the node.
+      ContainedInRange = true;
+    } else {
+      // If the node's parent is not contained in the range, check if this node is.
+      ContainedInRange = isContainedInSelection(CharSourceRange(SM,
+                                                            Node.getStartLoc(),
+                                                            Node.getEndLoc()));
+    }
+    ContextStack.emplace_back(Node, ContainedInRange);
+  }
+
   void leave(ASTNode Node) {
     assert(ContextStack.back().Parent.getOpaqueValue() == Node.getOpaqueValue());
     ContextStack.pop_back();
@@ -310,6 +441,8 @@ public:
 
   static Implementation *createInstance(SourceFile &File, SourceLoc Start,
                                         SourceLoc End) {
+    if (Start.isInvalid() || End.isInvalid())
+      return nullptr;
     SourceManager &SM = File.getASTContext().SourceMgr;
     unsigned BufferId = File.getBufferID().getValue();
     unsigned StartOff = SM.getLocOffsetInBuffer(Start, BufferId);
@@ -317,14 +450,136 @@ public:
     return createInstance(File, StartOff, EndOff - StartOff);
   }
 
+  void analyzeDecl(Decl *D) {
+    // Collect declared decls in the range.
+    if (auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
+      if (isContainedInSelection(CharSourceRange(SM, VD->getStartLoc(),
+                                                 VD->getEndLoc())))
+        if(std::find(DeclaredDecls.begin(), DeclaredDecls.end(),
+                     DeclaredDecl(VD)) == DeclaredDecls.end())
+          DeclaredDecls.push_back(VD);
+    }
+  }
+
+  class CompleteWalker : public SourceEntityWalker {
+    Implementation *Impl;
+    bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+      Impl->analyzeDecl(D);
+      return true;
+    }
+    bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
+                            TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+                            SemaReferenceKind Kind) override {
+      Impl->analyzeDeclRef(D, Range, T, Kind);
+      return true;
+    }
+  public:
+    CompleteWalker(Implementation *Impl) : Impl(Impl) {}
+  };
+
+  /// This walker walk the current decl context and analyze whether declared
+  /// decls in the range is referenced after it.
+  class FurtherReferenceWalker : public SourceEntityWalker {
+    Implementation *Impl;
+    bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
+                            TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+                            SemaReferenceKind Kind) override {
+      // If the reference is after the given range, continue logic.
+      if (!Impl->SM.isBeforeInBuffer(Impl->End, Range.getStart()))
+        return true;
+
+      // If the referenced decl is declared in the range, than the declared decl
+      // is referenced out of scope/range.
+      auto It = std::find(Impl->DeclaredDecls.begin(),
+                          Impl->DeclaredDecls.end(), D);
+      if (It != Impl->DeclaredDecls.end()) {
+        It->ReferredAfterRange = true;
+      }
+      return true;
+    }
+  public:
+    FurtherReferenceWalker(Implementation *Impl) : Impl(Impl) {}
+  };
+
+  void postAnalysis(ASTNode EndNode) {
+    // Visit the content of this node thoroughly, because the walker may
+    // abort early.
+    EndNode.walk(CompleteWalker(this));
+
+    // Analyze whether declared decls in the range is referenced outside of it.
+    FurtherReferenceWalker(this).walk(getImmediateContext());
+  }
+
+  bool hasSingleEntryPoint(ArrayRef<ASTNode> Nodes) {
+    unsigned CaseCount = 0;
+    // Count the number of case/default statements.
+    for (auto N : Nodes) {
+      if (Stmt *S = N.is<Stmt*>() ? N.get<Stmt*>() : nullptr) {
+        if (S->getKind() == StmtKind::Case)
+          CaseCount ++;
+      }
+    }
+    // If there are more than one case/default statements, there are more than
+    // one entry point.
+    if (CaseCount > 1)
+      return false;
+    return true;
+  }
+
+  OrphanKind getOrphanKind(ArrayRef<ASTNode> Nodes) {
+
+    // Prepare the entire range.
+    SourceRange WholeRange(Nodes.front().getStartLoc(),
+                           Nodes.back().getEndLoc());
+    struct ControlFlowStmtSelector : public SourceEntityWalker {
+      std::vector<std::pair<SourceRange, OrphanKind>> Ranges;
+      bool walkToStmtPre(Stmt *S) override {
+        // For each continue/break statement, record its target's range and the
+        // orphan kind.
+        if (auto *CS = dyn_cast<ContinueStmt>(S)) {
+          Ranges.emplace_back(CS->getTarget()->getSourceRange(),
+                              OrphanKind::Continue);
+        } else if (auto *BS = dyn_cast<BreakStmt>(S)) {
+          Ranges.emplace_back(BS->getTarget()->getSourceRange(),
+                              OrphanKind::Break);
+        }
+        return true;
+      }
+    };
+    for (auto N : Nodes) {
+      ControlFlowStmtSelector TheWalker;
+      N.walk(TheWalker);
+      for (auto Pair : TheWalker.Ranges) {
+
+        // If the entire range does not include the target's range, we find
+        // an orphan.
+        if (!SM.rangeContains(WholeRange, Pair.first))
+          return Pair.second;
+      }
+    }
+
+    // We find no orphan.
+    return OrphanKind::None;
+  }
+
   void analyze(ASTNode Node) {
+    Decl *D = Node.is<Decl*>() ? Node.get<Decl*>() : nullptr;
+    analyzeDecl(D);
     auto &DCInfo = getCurrentDC();
     switch (getRangeMatchKind(Node.getSourceRange())) {
     case RangeMatchKind::NoneMatch:
-      return;
-    case RangeMatchKind::RangeMatch:
+      // PatternBindingDecl is not visited; we need to explicitly analyze here.
+      if (auto *VA = dyn_cast_or_null<VarDecl>(D))
+        analyze(VA->getParentPatternBinding());
+      break;
+    case RangeMatchKind::RangeMatch: {
+      postAnalysis(Node);
+
+      // The node is contained in the given range.
+      ContainedASTNodes.push_back(Node);
       Result = getSingleNodeKind(Node);
       return;
+    }
     case RangeMatchKind::StartMatch:
       DCInfo.StartMatches.emplace_back(Node);
       break;
@@ -332,14 +587,34 @@ public:
       DCInfo.EndMatches.emplace_back(Node);
       break;
     }
+
+    // If the node's parent is not contained in the range under question but the
+    // node itself is, we keep track of the node as top-level contained node.
+    if (!getCurrentDC().ContainedInRange &&
+        isContainedInSelection(CharSourceRange(SM, Node.getStartLoc(),
+                                               Node.getEndLoc()))) {
+      if (std::find_if(ContainedASTNodes.begin(), ContainedASTNodes.end(),
+          [&](ASTNode N) { return SM.rangeContains(N.getSourceRange(),
+            Node.getSourceRange()); }) == ContainedASTNodes.end()) {
+        ContainedASTNodes.push_back(Node);
+      }
+    }
+
     if (!DCInfo.StartMatches.empty() && !DCInfo.EndMatches.empty()) {
-      Result = {RangeKind::MultiStatement, Type(), Content};
+      postAnalysis(DCInfo.EndMatches.back());
+      Result = {RangeKind::MultiStatement,
+                /* Last node has the type */
+                resolveNodeType(DCInfo.EndMatches.back()), Content,
+                getImmediateContext(), hasSingleEntryPoint(ContainedASTNodes),
+                getOrphanKind(ContainedASTNodes),
+                llvm::makeArrayRef(ContainedASTNodes),
+                llvm::makeArrayRef(DeclaredDecls),
+                llvm::makeArrayRef(ReferencedDecls)};
       return;
     }
   }
 
   bool shouldEnter(ASTNode Node) {
-    SourceManager &SM = File.getASTContext().SourceMgr;
     if (hasResult())
       return false;
     if (SM.isBeforeInBuffer(End, Node.getSourceRange().Start))
@@ -352,7 +627,27 @@ public:
   ResolvedRangeInfo getResult() {
     if (Result.hasValue())
       return Result.getValue();
-    return ResolvedRangeInfo(RangeKind::Invalid, Type(), getContent());
+    return ResolvedRangeInfo();
+  }
+
+  void analyzeDeclRef(ValueDecl *VD, CharSourceRange Range, Type Ty,
+                      SemaReferenceKind Kind) {
+    // Only collect decl ref.
+    if (Kind != SemaReferenceKind::DeclRef)
+      return;
+
+    if (!isContainedInSelection(Range))
+      return;
+
+    // If the VD is declared outside of current file, exclude such decl.
+    if (VD->getDeclContext()->getParentSourceFile() != &File)
+      return;
+
+    // Collect referenced decls in the range.
+    ReferencedDecl RD(VD, Ty);
+    if (std::find(ReferencedDecls.begin(), ReferencedDecls.end(), RD) ==
+          ReferencedDecls.end())
+      ReferencedDecls.push_back(RD);
   }
 
 private:
@@ -420,6 +715,14 @@ bool RangeResolver::walkToStmtPost(Stmt *S) {
 bool RangeResolver::walkToDeclPost(Decl *D) {
   Impl->leave(D);
   return !Impl->hasResult();
+}
+
+
+bool RangeResolver::
+visitDeclReference(ValueDecl *D, CharSourceRange Range, TypeDecl *CtorTyRef,
+                   ExtensionDecl *ExtTyRef, Type T, SemaReferenceKind Kind) {
+  Impl->analyzeDeclRef(D, Range, T, Kind);
+  return true;
 }
 
 ResolvedRangeInfo RangeResolver::resolve() {

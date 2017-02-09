@@ -21,3 +21,12 @@ entry(%x : $*Optional<@callee_owned (@in ()) -> @out ()>):
   %q = partial_apply %g<() -> ()>() : $@convention(witness_method) <T> (@in_guaranteed Optional<T>) -> ()
   return undef : $()
 }
+
+// SR-3548: Ensure we correctly emit "metadata for layout" for lowered Optional types.
+
+sil @alloc_stack_optional_with_generic : $@convention(thin) <T> () -> () {
+  %a = alloc_stack $*Optional<(T, @convention(thin) () -> ())>
+  dealloc_stack %a : $*Optional<(T, @convention(thin) () -> ())>
+  %t = tuple ()
+  return %t : $()
+}

@@ -28,7 +28,7 @@ func makeObject() -> NSObject? {
 
 // OPT-LABEL: sil hidden @_TF21objc_nonnull_lie_hack15callClassMethod
 // OPT: [[METATYPE:%[0-9]+]] = metatype $@thick Gizmo.Type
-// OPT: [[METHOD:%[0-9]+]] = class_method [volatile] [[METATYPE]] : $@thick Gizmo.Type, #Gizmo.nonNilGizmo!1.foreign : (Gizmo.Type) -> () -> Gizmo , $@convention(objc_method) (@objc_metatype Gizmo.Type) -> @autoreleased Gizmo
+// OPT: [[METHOD:%[0-9]+]] = class_method [volatile] [[METATYPE]] : $@thick Gizmo.Type, #Gizmo.nonNilGizmo!1.foreign : (Gizmo.Type) -> () -> Gizmo, $@convention(objc_method) (@objc_metatype Gizmo.Type) -> @autoreleased Gizmo
 // OPT: [[OBJC_METATYPE:%[0-9]+]] = metatype $@objc_metatype Gizmo.Type
 // OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[METHOD]]([[OBJC_METATYPE]]) : $@convention(objc_method) (@objc_metatype Gizmo.Type) -> @autoreleased Gizmo
 // OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]] : $Gizmo to $Optional<Gizmo>
@@ -42,7 +42,7 @@ func callClassMethod() -> Gizmo? {
 }
 
 // OPT-LABEL: sil hidden @_TTSf4g___TF21objc_nonnull_lie_hack18callInstanceMetho
-// OPT: [[METHOD:%[0-9]+]] = class_method [volatile] [[OBJ:%[0-9]+]] : $Gizmo, #Gizmo.nonNilGizmo!1.foreign : (Gizmo) -> () -> Gizmo , $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
+// OPT: [[METHOD:%[0-9]+]] = class_method [volatile] [[OBJ:%[0-9]+]] : $Gizmo, #Gizmo.nonNilGizmo!1.foreign : (Gizmo) -> () -> Gizmo, $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
 // OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[METHOD]]([[OBJ]]) : $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
 // OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]]
 // OPT: switch_enum [[OPTIONAL]] : $Optional<Gizmo>
@@ -56,7 +56,7 @@ func callInstanceMethod(gizmo: Gizmo) -> Gizmo? {
 }
 
 // OPT-LABEL: sil hidden @_TTSf4g___TF21objc_nonnull_lie_hack12loadPropertyFT5gizmoCSo5Gizmo_GSqS0__
-// OPT: [[GETTER:%[0-9]+]] = class_method [volatile] [[OBJ:%[0-9]+]] : $Gizmo, #Gizmo.nonNilGizmoProperty!getter.1.foreign : (Gizmo) -> () -> Gizmo , $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
+// OPT: [[GETTER:%[0-9]+]] = class_method [volatile] [[OBJ:%[0-9]+]] : $Gizmo, #Gizmo.nonNilGizmoProperty!getter.1.foreign : (Gizmo) -> () -> Gizmo, $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
 // OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[GETTER]]([[OBJ]]) : $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
 // OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]] : $Gizmo to $Optional<Gizmo>
 // OPT: switch_enum [[OPTIONAL]] : $Optional<Gizmo>,
@@ -69,7 +69,7 @@ func loadProperty(gizmo: Gizmo) -> Gizmo? {
 }
 
 // OPT-LABEL: sil hidden @_TTSf4g___TF21objc_nonnull_lie_hack19loadUnownedPropertyFT5gizmoCSo5Gizmo_GSqS0__
-// OPT: [[GETTER:%[0-9]+]] = class_method [volatile] [[OBJ:%[0-9]+]] : $Gizmo, #Gizmo.unownedNonNilGizmoProperty!getter.1.foreign : (Gizmo) -> () -> Gizmo , $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
+// OPT: [[GETTER:%[0-9]+]] = class_method [volatile] [[OBJ:%[0-9]+]] : $Gizmo, #Gizmo.unownedNonNilGizmoProperty!getter.1.foreign : (Gizmo) -> () -> Gizmo, $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
 // OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[GETTER]]([[OBJ]]) : $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
 // OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_cast [[NONOPTIONAL]] : $Gizmo to $Optional<Gizmo>
 // OPT: switch_enum [[OPTIONAL]] : $Optional<Gizmo>

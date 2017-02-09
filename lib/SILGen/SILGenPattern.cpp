@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -222,6 +222,8 @@ static bool isWildcardPattern(const Pattern *p) {
   case PatternKind::Var:
     return isWildcardPattern(p->getSemanticsProvidingPattern());
   }
+
+  llvm_unreachable("Unhandled PatternKind in switch.");
 }
 
 /// Check to see if the given pattern is a specializing pattern,
@@ -284,6 +286,8 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
   case PatternKind::Typed:
     llvm_unreachable("not semantic");
   }
+
+  llvm_unreachable("Unhandled PatternKind in switch.");
 }
 
 namespace {
@@ -863,7 +867,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 /// Return the dispatchable length of the given column.
 static unsigned getConstructorPrefix(const ClauseMatrix &matrix,
@@ -1698,7 +1702,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
 
     SILType eltTy;
     bool hasElt = false;
-    if (elt->hasArgumentType()) {
+    if (elt->getArgumentInterfaceType()) {
       eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
       hasElt = !eltTy.getSwiftRValueType()->isVoid();
     }
@@ -1777,7 +1781,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
           eltValue = eltTL->emitLoad(SGF.B, loc, eltValue,
                                      LoadOwnershipQualifier::Take);
       } else {
-        eltValue = caseBB->createArgument(eltTy);
+        eltValue = caseBB->createPHIArgument(eltTy, ValueOwnershipKind::Owned);
       }
 
       origCMV = getManagedSubobject(SGF, eltValue, *eltTL, eltConsumption);
@@ -1799,8 +1803,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       // Reabstract to the substituted type, if needed.
 
       CanType substEltTy =
-        sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
-                                    formalElt, nullptr,
+        sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(), formalElt,
                                     formalElt->getArgumentInterfaceType())
                   ->getCanonicalType();
 
@@ -1968,7 +1971,8 @@ JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock,
       pattern->forEachVariable([&](VarDecl *V) {
         if (!V->hasName())
           return;
-        block->createArgument(SGF.VarLocs[V].value->getType(), V);
+        block->createPHIArgument(SGF.VarLocs[V].value->getType(),
+                                 ValueOwnershipKind::Owned, V);
       });
     }
   }
@@ -2075,7 +2079,7 @@ namespace {
     bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   };
-}
+} // end anonymous namespace
 
 
 static bool containsFallthrough(Stmt *S) {

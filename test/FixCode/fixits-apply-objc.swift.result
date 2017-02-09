@@ -17,9 +17,9 @@ func foo(an : Any) {
   let a1 : AnyObject
   a1 = an as AnyObject
   let a2 : AnyObject?
-  a2 = an as AnyObject?
+  a2 = an as AnyObject
   let a3 : AnyObject!
-  a3 = an as AnyObject!
+  a3 = an as AnyObject
 }
 
 func foo1(_ an : Any) {
@@ -27,5 +27,5 @@ func foo1(_ an : Any) {
 }
 
 func foo2(_ messageData: Any?) -> AnyObject? {
-  return messageData as AnyObject?
+  return messageData as AnyObject
 }

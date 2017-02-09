@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -236,6 +236,14 @@ def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
 def disable_swift_bridge_attr : Flag<["-"], "disable-swift-bridge-attr">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable using the swift bridge attribute">;
+
+def enable_bridging_pch : Flag<["-"], "enable-bridging-pch">,
+  Flags<[HelpHidden]>,
+  HelpText<"Enable automatic generation of bridging PCH files">;
+
+def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
+  Flags<[HelpHidden]>,
+  HelpText<"Disable automatic generation of bridging PCH files">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,

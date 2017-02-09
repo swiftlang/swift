@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,12 +18,12 @@
 
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Witness.h"
+#include "swift/Basic/Compiler.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -159,12 +159,6 @@ public:
   getTypeWitnessSubstAndDecl(AssociatedTypeDecl *assocType,
                              LazyResolver *resolver) const;
 
-  static Type
-  getTypeWitnessByName(Type type,
-                       ProtocolConformanceRef conformance,
-                       Identifier name,
-                       LazyResolver *resolver);
-
   /// Apply the given function object to each type witness within this
   /// protocol conformance.
   ///
@@ -265,7 +259,7 @@ public:
   
   // Make vanilla new/delete illegal for protocol conformances.
   void *operator new(size_t bytes) = delete;
-  void operator delete(void *data) = delete;
+  void operator delete(void *data) SWIFT_DELETE_OPERATOR_DELETED;
 
   // Only allow allocation of protocol conformances using the allocator in
   // ASTContext or by doing a placement new.
@@ -297,7 +291,8 @@ private:
   /// applies to the substituted type.
   ProtocolConformance *subst(ModuleDecl *module,
                              Type substType,
-                             const SubstitutionMap &subMap) const;
+                             TypeSubstitutionFn subs,
+                             LookupConformanceFn conformances) const;
 };
 
 /// Normal protocol conformance, which involves mapping each of the protocol
@@ -533,7 +528,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   /// The substitutions applied to the generic conformance to produce this
   /// conformance.
-  ArrayRef<Substitution> GenericSubstitutions;
+  SubstitutionList GenericSubstitutions;
 
   /// The mapping from associated type requirements to their substitutions.
   ///
@@ -545,7 +540,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   SpecializedProtocolConformance(Type conformingType,
                                  ProtocolConformance *genericConformance,
-                                 ArrayRef<Substitution> substitutions);
+                                 SubstitutionList substitutions);
 
 public:
   /// Get the generic conformance from which this conformance was derived,
@@ -556,7 +551,7 @@ public:
 
   /// Get the substitutions used to produce this specialized conformance from
   /// the generic conformance.
-  ArrayRef<Substitution> getGenericSubstitutions() const {
+  SubstitutionList getGenericSubstitutions() const {
     return GenericSubstitutions;
   }
 
@@ -610,7 +605,7 @@ public:
     // some crazy cases that also require major diagnostic work, where the
     // substitutions involve conformances of the same type to the same
     // protocol drawn from different imported modules.
-    ID.AddPointer(type->getCanonicalType().getPointer());
+    ID.AddPointer(type.getPointer());
     ID.AddPointer(genericConformance);
   }
 

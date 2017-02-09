@@ -26,8 +26,8 @@ bb0(%0 : $A, %1 : $X):
   %5 = mark_uninitialized [delegatingself] %1 : $X
   store %5 to [init] %2a : $*X
   %7 = load [copy] %2a : $*X
-  // CHECK: class_method [volatile] %{{[0-9]+}} : $X, #X.init!initializer.1.foreign : (X.Type) -> (A, A) -> X , $@convention(objc_method) (A, A, @owned X) -> @owned X
-  %9 = class_method [volatile] %7 : $X, #X.init!initializer.1.foreign : (X.Type) -> (A, A) -> X , $@convention(objc_method) (A, A, @owned X) -> @owned X
+  // CHECK: class_method [volatile] %{{[0-9]+}} : $X, #X.init!initializer.1.foreign : (X.Type) -> (A, A) -> X, $@convention(objc_method) (A, A, @owned X) -> @owned X
+  %9 = class_method [volatile] %7 : $X, #X.init!initializer.1.foreign : (X.Type) -> (A, A) -> X, $@convention(objc_method) (A, A, @owned X) -> @owned X
   %10 = load [trivial] %3a : $*A
   %11 = load [trivial] %3a : $*A
   %12 = apply %9(%10, %11, %7) : $@convention(objc_method) (A, A, @owned X) -> @owned X

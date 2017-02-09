@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -43,7 +43,7 @@ static void collectApplyInst(SILFunction &F,
 /// of the corresponding pre-specialized function, if such a pre-specialization
 /// exists.
 class UsePrespecialized: public SILModuleTransform {
-  virtual ~UsePrespecialized() { }
+  ~UsePrespecialized() override { }
 
   void run() override {
     auto &M = *getModule();
@@ -84,24 +84,25 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     // available for it already and use this specialization
     // instead of the generic version.
 
-    ArrayRef<Substitution> Subs = AI.getSubstitutions();
+    SubstitutionList Subs = AI.getSubstitutions();
     if (Subs.empty())
       continue;
 
-    ReabstractionInfo ReInfo(ReferencedF, Subs);
-
-    auto SpecType = ReInfo.getSpecializedType();
-    if (!SpecType)
+    // Bail if any generic type parameters are unbound.
+    // TODO: Remove this limitation once public partial specializations
+    // are supported and can be provided by other modules.
+    if (hasArchetypes(Subs))
       continue;
 
+    ReabstractionInfo ReInfo(AI, ReferencedF, Subs);
+
+    if (!ReInfo.canBeSpecialized())
+      continue;
+
+    auto SpecType = ReInfo.getSpecializedType();
     // Bail if any generic types parameters of the concrete type
     // are unbound.
     if (SpecType->hasArchetype())
-      continue;
-
-    // Bail if any generic types parameters of the concrete type
-    // are unbound.
-    if (hasUnboundGenericTypes(Subs))
       continue;
 
     // Create a name of the specialization.

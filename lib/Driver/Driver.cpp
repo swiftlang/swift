@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -270,7 +270,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
   bool optionsMatch = true;
 
   auto readTimeValue = [&scratch](yaml::Node *node,
-                                  llvm::sys::TimeValue &timeValue) -> bool {
+                                  llvm::sys::TimePoint<> &timeValue) -> bool {
     auto *seq = dyn_cast<yaml::SequenceNode>(node);
     if (!seq)
       return true;
@@ -282,7 +282,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     auto *secondsRaw = dyn_cast<yaml::ScalarNode>(&*seqI);
     if (!secondsRaw)
       return true;
-    llvm::sys::TimeValue::SecondsType parsedSeconds;
+    std::time_t parsedSeconds;
     if (secondsRaw->getValue(scratch).getAsInteger(10, parsedSeconds))
       return true;
 
@@ -293,7 +293,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     auto *nanosecondsRaw = dyn_cast<yaml::ScalarNode>(&*seqI);
     if (!nanosecondsRaw)
       return true;
-    llvm::sys::TimeValue::NanoSecondsType parsedNanoseconds;
+    std::chrono::system_clock::rep parsedNanoseconds;
     if (nanosecondsRaw->getValue(scratch).getAsInteger(10, parsedNanoseconds))
       return true;
 
@@ -301,8 +301,8 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     if (seqI != seqE)
       return true;
 
-    timeValue.seconds(parsedSeconds);
-    timeValue.nanoseconds(parsedNanoseconds);
+    timeValue = llvm::sys::TimePoint<>(std::chrono::seconds(parsedSeconds));
+    timeValue += std::chrono::nanoseconds(parsedNanoseconds);
     return false;
   };
 
@@ -346,7 +346,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
         return failedToReadOutOfDateMap(ShowIncrementalBuildDecisions,
                                         buildRecordPath, reason);
       }
-      llvm::sys::TimeValue timeVal;
+      llvm::sys::TimePoint<> timeVal;
       if (readTimeValue(i->getValue(), timeVal))
         return true;
       map[nullptr] = { InputInfo::NeedsCascadingBuild, timeVal };
@@ -377,7 +377,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
         if (!previousBuildState)
           return true;
 
-        llvm::sys::TimeValue timeValue;
+        llvm::sys::TimePoint<> timeValue;
         if (readTimeValue(value, timeValue))
           return true;
 
@@ -453,7 +453,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     ArrayRef<const char *> Args) {
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
 
-  llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
+  llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
 
   std::unique_ptr<InputArgList> ArgList(parseArgStrings(Args.slice(1)));
   if (Diags.hadAnyError())
@@ -1073,6 +1073,11 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = types::TY_LLVM_BC;
       break;
 
+    case options::OPT_emit_pch:
+      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
+      OI.CompilerOutputType = types::TY_PCH;
+      break;
+
     case options::OPT_parse:
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
@@ -1204,6 +1209,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                         [&OI](sys::ProcessId PID,
                               int returnCode,
                               StringRef output,
+                              StringRef errors,
                               void *unused) -> sys::TaskFinishedResponse {
             if (returnCode == 0) {
               output = output.rtrim();
@@ -1265,6 +1271,26 @@ void Driver::buildActions(const ToolChain &TC,
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::UpdateCode: {
+
+    // If the user is importing a textual (.h) bridging header and we're in
+    // standard-compile (non-WMO) mode, we take the opportunity to precompile
+    // the header into a temporary PCH, and replace the import argument with the
+    // PCH in the subsequent frontend jobs.
+    JobAction *PCH = nullptr;
+    if (Args.hasFlag(options::OPT_enable_bridging_pch,
+                     options::OPT_disable_bridging_pch,
+                     true)) {
+      if (Arg *A = Args.getLastArg(options::OPT_import_objc_header)) {
+        StringRef Value = A->getValue();
+        auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
+        if (Ty == types::TY_ObjCHeader) {
+          std::unique_ptr<Action> HeaderInput(new InputAction(*A, Ty));
+          PCH = new GeneratePCHJobAction(HeaderInput.release());
+          Actions.push_back(PCH);
+        }
+      }
+    }
+
     for (const InputPair &Input : Inputs) {
       types::ID InputType = Input.first;
       const Arg *InputArg = Input.second;
@@ -1279,7 +1305,7 @@ void Driver::buildActions(const ToolChain &TC,
 
         CompileJobAction::InputInfo previousBuildState = {
           CompileJobAction::InputInfo::NeedsCascadingBuild,
-          llvm::sys::TimeValue::MinTime()
+          llvm::sys::TimePoint<>::min()
         };
         if (OutOfDateMap)
           previousBuildState = OutOfDateMap->lookup(InputArg);
@@ -1295,6 +1321,21 @@ void Driver::buildActions(const ToolChain &TC,
                                              OI.CompilerOutputType,
                                              previousBuildState));
           AllModuleInputs.push_back(Current.get());
+        }
+        if (PCH) {
+          // FIXME: When we have a PCH job, it's officially owned by the Actions
+          // array; but it's also a secondary input to each of the current
+          // JobActions, which means that we need to flip the "owns inputs" bit
+          // on the JobActions so they don't try to free it. That in turn means
+          // we need to transfer ownership of all the JobActions' existing
+          // inputs to the Actions array, since the JobActions either own or
+          // don't own _all_ of their inputs. Ownership can't vary
+          // input-by-input.
+          auto *job = cast<JobAction>(Current.get());
+          auto inputs = job->getInputs();
+          Actions.append(inputs.begin(), inputs.end());
+          job->setOwnsInputs(false);
+          job->addInput(PCH);
         }
         AllLinkerInputs.push_back(Current.release());
         break;
@@ -1328,6 +1369,7 @@ void Driver::buildActions(const ToolChain &TC,
       case types::TY_ClangModuleFile:
       case types::TY_SwiftDeps:
       case types::TY_Remapping:
+      case types::TY_PCH:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -1548,6 +1590,12 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
     unsigned NumOutputs = 0;
     for (const Action *A : Actions) {
       types::ID Type = A->getType();
+
+      // Skip any GeneratePCHJobActions or InputActions incidentally stored in
+      // Actions (for ownership), as a result of PCH-generation.
+      if (isa<GeneratePCHJobAction>(A) || isa<InputAction>(A))
+        continue;
+
       // Only increment NumOutputs if this is an output which must have its
       // path specified using -o.
       // (Module outputs can be specified using -module-output-path, or will
@@ -1574,8 +1622,10 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
   }
 
   for (const Action *A : Actions) {
-    (void)buildJobsForAction(C, cast<JobAction>(A), OI, OFM, TC,
-                             /*TopLevel*/true, JobCache);
+    if (auto *JA = dyn_cast<JobAction>(A)) {
+      (void)buildJobsForAction(C, JA, OI, OFM, TC,
+                               /*TopLevel*/true, JobCache);
+    }
   }
 }
 
@@ -1634,6 +1684,13 @@ static StringRef getOutputFilename(Compilation &C,
     return Buffer.str();
   }
 
+  // FIXME: Treat GeneratePCHJobAction as non-top-level (to get tempfile and not
+  // use the -o arg) even though, based on ownership considerations within the
+  // driver, it is stored as a "top level" JobAction.
+  if (isa<GeneratePCHJobAction>(JA)) {
+    AtTopLevel = false;
+  }
+
   // We don't have an output from an Action-specific command line option,
   // so figure one out using the defaults.
   if (AtTopLevel) {
@@ -1654,8 +1711,8 @@ static StringRef getOutputFilename(Compilation &C,
 
   // We don't yet have a name, assign one.
   if (!AtTopLevel) {
-    // We should output to a temporary file, since we're not at
-    // the top level.
+    // We should output to a temporary file, since we're not at the top level
+    // (or are generating a bridging PCH, which is currently always a temp).
     StringRef Stem = llvm::sys::path::stem(BaseName);
     StringRef Suffix = types::getTypeTempSuffix(JA->getType());
     std::error_code EC =

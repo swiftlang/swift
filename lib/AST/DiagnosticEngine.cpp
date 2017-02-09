@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -250,15 +250,18 @@ bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
 /// \param Text The text to search through, which will be updated to point
 /// just after the delimiter.
 ///
-/// \param Delim1 The first character delimiter to search for.
+/// \param Delim The first character delimiter to search for.
 ///
-/// \param Delim2 The second character delimiter to search for.
+/// \param FoundDelim On return, true if the delimiter was found, or false
+/// if the end of the string was reached.
 ///
 /// \returns The string leading up to the delimiter, or the empty string
 /// if no delimiter is found.
 static StringRef 
-skipToDelimiter(StringRef &Text, char Delim1, char Delim2 = 0) {
+skipToDelimiter(StringRef &Text, char Delim, bool *FoundDelim = nullptr) {
   unsigned Depth = 0;
+  if (FoundDelim)
+    *FoundDelim = false;
 
   unsigned I = 0;
   for (unsigned N = Text.size(); I != N; ++I) {
@@ -272,8 +275,11 @@ skipToDelimiter(StringRef &Text, char Delim1, char Delim2 = 0) {
       continue;
     }
     
-    if (Text[I] == Delim1 || Text[I] == Delim2)
+    if (Text[I] == Delim) {
+      if (FoundDelim)
+        *FoundDelim = true;
       break;
+    }
   }
 
   assert(Depth == 0 && "Unbalanced {} set in diagnostic text");
@@ -295,8 +301,11 @@ static void formatSelectionArgument(StringRef ModifierArguments,
                                     ArrayRef<DiagnosticArgument> Args,
                                     unsigned SelectedIndex,
                                     llvm::raw_ostream &Out) {
+  bool foundPipe = false;
   do {
-    StringRef Text = skipToDelimiter(ModifierArguments, '|');
+    assert((!ModifierArguments.empty() || foundPipe) &&
+           "Index beyond bounds in %select modifier");
+    StringRef Text = skipToDelimiter(ModifierArguments, '|', &foundPipe);
     if (SelectedIndex == 0) {
       formatDiagnosticText(Text, Args, Out);
       break;
@@ -391,7 +400,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
       showAKA = false;
 
     // Don't show generic type parameters.
-    if (showAKA && type->getCanonicalType()->hasTypeParameter())
+    if (showAKA && type->hasTypeParameter())
       showAKA = false;
 
     if (showAKA)
@@ -437,6 +446,10 @@ static void formatDiagnosticArgument(StringRef Modifier,
            "Improper modifier for VersionTuple argument");
     Out << Arg.getAsVersionTuple().getAsString();
     break;
+  case DiagnosticArgumentKind::LayoutConstraint:
+    assert(Modifier.empty() && "Improper modifier for LayoutConstraint argument");
+    Out << '\'' << Arg.getAsLayoutConstraint() << '\'';
+    break;
   }
 }
 
@@ -468,13 +481,17 @@ static void formatDiagnosticText(StringRef InText,
     // Parse an optional modifier.
     StringRef Modifier;
     {
-      unsigned Length = 0;
-      while (isalpha(InText[Length]))
-        ++Length;
+      size_t Length = InText.find_if_not(isalpha);
       Modifier = InText.substr(0, Length);
       InText = InText.substr(Length);
     }
     
+    if (Modifier == "error") {
+      assert(false && "encountered %error in diagnostic text");
+      Out << StringRef("<<ERROR>>");
+      break;
+    }
+
     // Parse the optional argument list for a modifier, which is brace-enclosed.
     StringRef ModifierArguments;
     if (InText[0] == '{') {
@@ -482,14 +499,8 @@ static void formatDiagnosticText(StringRef InText,
       ModifierArguments = skipToDelimiter(InText, '}');
     }
     
-    // Find the digit sequence.
-    unsigned Length = 0;
-    for (size_t N = InText.size(); Length != N; ++Length) {
-      if (!isdigit(InText[Length]))
-        break;
-    }
-      
-    // Parse the digit sequence into an argument index.
+    // Find the digit sequence, and parse it into an argument index.
+    size_t Length = InText.find_if_not(isdigit);
     unsigned ArgIndex;      
     bool Result = InText.substr(0, Length).getAsInteger(10, ArgIndex);
     assert(!Result && "Unparseable argument index value?");
@@ -516,6 +527,8 @@ static DiagnosticKind toDiagnosticKind(DiagnosticState::Behavior behavior) {
   case DiagnosticState::Behavior::Warning:
     return DiagnosticKind::Warning;
   }
+
+  llvm_unreachable("Unhandled DiagnosticKind in switch.");
 }
 
 DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
@@ -577,6 +590,8 @@ DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
   case DiagnosticKind::Warning:
     return set(Behavior::Warning);
   }
+
+  llvm_unreachable("Unhandled DiagnosticKind in switch.");
 }
 
 void DiagnosticEngine::flushActiveDiagnostic() {
@@ -675,7 +690,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
           // build the name of the buffer.
           SmallVector<StringRef, 4> nameComponents;
           while (dc) {
-            nameComponents.push_back(cast<Module>(dc)->getName().str());
+            nameComponents.push_back(cast<ModuleDecl>(dc)->getName().str());
             dc = dc->getParent();
           }
 

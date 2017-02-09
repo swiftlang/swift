@@ -67,7 +67,7 @@ if(NOT SWIFT_LIBRARY_PATH)
   set(SWIFT_LIBRARY_PATH "${tmp_dir}/lib/swift")
 endif()
 
-runcmd(COMMAND "xcrun" "-f" "clang"
+runcmd(COMMAND "xcrun" "-toolchain" "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" "-f" "clang"
        VARIABLE CLANG_EXEC
        ERROR "Unable to find Clang driver")
 
@@ -83,6 +83,11 @@ if(NOT SWIFT_OPTIMIZATION_LEVELS)
   set(SWIFT_OPTIMIZATION_LEVELS "Onone" "O" "Ounchecked"
                                 ${SWIFT_EXTRA_BENCH_CONFIGS})
 endif()
+
+set(SWIFT_BENCHMARK_NUM_O_ITERATIONS "" CACHE STRING
+    "Number of iterations to perform when running -O benchmarks via cmake")
+set(SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS "" CACHE STRING
+    "Number of iterations to perform when running -Onone benchmarks via cmake")
 
 # Options for the default (= empty) configuration
 set(BENCHOPTS "-whole-module-optimization")

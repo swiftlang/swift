@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,10 +23,15 @@
 #include <mutex>
 #include <assert.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdocumentation"
+
 #include <unicode/ustring.h>
 #include <unicode/ucol.h>
 #include <unicode/ucoleitr.h>
 #include <unicode/uiter.h>
+
+#pragma clang diagnostic pop
 
 #include "../SwiftShims/UnicodeShims.h"
 

@@ -18,12 +18,46 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
 
 .. glossary::
 
+  abstraction pattern
+    The unsubstituted generic type of a property or function parameter, which
+    sets constraints on its representation in memory. For example, given the
+    following definitions::
+    
+      struct Foo<T> {
+        var value: T
+        // Foo.value has abstraction pattern <T> T
+    
+      struct Bar<T, U> {
+        var value: (T) -> U
+        // Bar.value has abstraction pattern <T, U> (T) -> U
+      }
+      struct Bas {
+        var value: (Int) -> String
+        // Bas.value has abstraction pattern (Int) -> String
+      }
+      let transform: (Int) -> String = { "\($0)" }
+      let foo = Foo<(Int) -> String>(value: transform)
+      let bar = Bar<Int, String>(value: transform)
+      let bas = Bas(value: transform)
+    
+    although ``foo.value``, ``bar.value``, and ``bas.value`` all have the same
+    function type ``(Int) -> String``, they have different *abstraction
+    patterns*. Because a value of type ``Foo`` or ``Bar`` may be used in a
+    generic context and invoke ``value`` with a parameter or result type 
+    of unknown size, the compiler has to pick a more conservative representation
+    for the closure that uses indirect argument passing, whereas ``Bas.value``
+    has a fully concrete closure type so can always use a more specialized
+    direct register-based calling convention. The compiler transparently
+    introduces `reabstraction` conversions when a value is used with a
+    different abstraction pattern. (This is where the infamous "reabstraction
+    thunk helpers" sometimes seen in Swift backtraces come from.)
+
   archetype
     A placeholder for a generic parameter or an associated type within a
     generic context. Sometimes known as a "rigid type variable" in formal
     CS literature. Directly stores its conforming protocols and nested
     archetypes, if any.
-
+    
   AST
     "Abstract syntax tree", although in practice it's more of a directed graph.
     A parsed representation of code used by a compiler.
@@ -197,6 +231,17 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     library on the system when the library on the system cannot be modified.
     Apple has a number of overlays for its own SDKs in stdlib/public/SDK/.
 
+  PCH
+    Precompiled header, a type of file ending in .pch. A precompiled header is
+    like a precompiled module, in the sense that it's the same file format and
+    is just a cache file produced by clang and read by ``clang::ASTReader``. The
+    difference is that PCH files are not "modular": they do not correspond to a
+    named module, and cannot be read in any order or imported by module-name;
+    rather they must be the first file parsed by the compiler. PCHs are used
+    only to accelerate the process of reading C/C++/Objective-C headers, such as
+    the bridging headers read in by the ``-import-objc-header`` command-line
+    flag to swiftc.
+
   PR
     1. "Problem Report": An issue reported in `LLVM's bug tracker`__.
        See also `SR`.
@@ -234,6 +279,10 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     SIL just after being generated, not yet in a form that can be used for
     IR generation.
     See `mandatory passes <mandatory passes / mandatory optimizations>`.
+
+  reabstraction
+    An implicit representation change that occurs when a value is used with
+    a different `abstraction pattern` from its current representation.
 
   resilient
     Describes a type or function where making certain changes will not break

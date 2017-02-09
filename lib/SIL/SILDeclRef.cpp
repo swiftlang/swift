@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -258,7 +258,7 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
   } else if (auto *ed = dyn_cast<EnumElementDecl>(vd)) {
     assert(kind == Kind::EnumElement
            && "can only create EnumElement SILDeclRef for enum element");
-    naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
+    naturalUncurryLevel = ed->getArgumentInterfaceType() ? 1 : 0;
   } else if (isa<DestructorDecl>(vd)) {
     assert((kind == Kind::Destroyer || kind == Kind::Deallocator)
            && "can only create destroyer/deallocator SILDeclRef for dtor");
@@ -315,7 +315,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
     else if (EnumElementDecl *ed = dyn_cast<EnumElementDecl>(vd)) {
       loc = ed;
       kind = Kind::EnumElement;
-      naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
+      naturalUncurryLevel = ed->getArgumentInterfaceType() ? 1 : 0;
     }
     // VarDecl constants require an explicit kind.
     else if (isa<VarDecl>(vd)) {
@@ -438,11 +438,6 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (isEnumElement())
     return SILLinkage::Shared;
 
-  // Stored property initializers have hidden linkage, since they are
-  // not meant to be used from outside of their module.
-  if (isStoredPropertyInitializer())
-    return SILLinkage::Hidden;
-
   // Declarations imported from Clang modules have shared linkage.
   const SILLinkage ClangLinkage = SILLinkage::Shared;
 
@@ -499,8 +494,15 @@ bool SILDeclRef::isFragile() const {
   DeclContext *dc;
   if (auto closure = getAbstractClosureExpr())
     dc = closure->getLocalContext();
-  else
+  else {
     dc = getDecl()->getInnermostDeclContext();
+
+    // Enum case constructors are serialized if the enum is @_versioned
+    // or public.
+    if (isEnumElement())
+      if (cast<EnumDecl>(dc)->getEffectiveAccess() >= Accessibility::Public)
+        return true;
+  }
 
   // This is stupid
   return (dc->getResilienceExpansion() == ResilienceExpansion::Minimal);

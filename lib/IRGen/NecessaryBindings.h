@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -49,7 +49,7 @@ public:
   static NecessaryBindings forFunctionInvocations(IRGenModule &IGM,
                                                   CanSILFunctionType origType,
                                                   CanSILFunctionType substType,
-                                                  ArrayRef<Substitution> subs);
+                                                  const SubstitutionMap &subs);
   
   /// Add whatever information is necessary to reconstruct type metadata
   /// for the given type.

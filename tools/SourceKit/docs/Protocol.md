@@ -23,6 +23,7 @@ The protocol is documented in the following format:
 | [Code Completion](#code-completion) | source.request.codecomplete |
 | [Cursor Info](#cursor-info) | source.request.cursorinfo |
 | [Demangling](#demangling) | source.request.demangle |
+| [Mangling](#simple-class-mangling) | source.request.mangle_simple_class |
 | [Documentation](#documentation) | source.request.docinfo |
 | [Module interface generation](#module-interface-generation) | source.request.editor.open.interface |
 | [Indexing](#indexing) | source.request.indexsource  |
@@ -502,6 +503,77 @@ Welcome to SourceKit.  Type ':help' for assistance.
     key.request: source.request.demangle,
     key.names: [
       "_TF13MyCoolPackageg6raichuVS_7Pokemon"
+    ]
+}
+```
+
+## Simple Class Mangling
+
+SourceKit is capable of "mangling" Swift class names. In other words,
+it's capable of taking the human-readable `UIKit.ViewController` as input and returning the symbol `_TtC5UIKit14ViewController`.
+
+### Request
+
+```
+{
+    <key.request>: (UID) <source.request.mangle_simple_class>,
+    <key.names>:   [mangle-request*] // An array of requests to mangle.
+}
+```
+
+```
+mangle-request ::=
+{
+    <key.modulename>: (string)  // The Swift module name
+    <key.name>: (string)        // The class name
+}
+```
+
+### Response
+
+```
+{
+    <key.results>: (array) [mangle-result+]   // The results for each
+                                              // mangling, in the order in
+                                              // which they were requested.
+}
+```
+
+```
+mangle-result ::=
+{
+    <key.name>: (string) // The mangled name.
+}
+```
+
+### Testing
+
+```
+$ sourcekitd-test -req=mangle [<names>]
+```
+
+For example, to mangle the name `UIKit.ViewController`:
+
+```
+$ sourcekitd-test -req=mangle UIKit.ViewController
+```
+
+Note that when using `sourcekitd-test`, the output is output in an ad hoc text
+format, not JSON.
+
+You could also issue the following request in the `sourcekitd-repl`, which
+produces JSON:
+
+```
+$ sourcekitd-repl
+Welcome to SourceKit.  Type ':help' for assistance.
+(SourceKit) {
+    key.request: source.request.mangle_simple_class,
+    key.names: [
+      {
+          key.modulename: "UIKit",
+          key.name: "ViewController"
+      }
     ]
 }
 ```

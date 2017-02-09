@@ -31,10 +31,10 @@ class C { // expected-note 2 {{in declaration of 'C'}} expected-note {{to match 
 
 #if os(iOS)
 	func foo() {}
-} // expected-error{{expected declaration}} expected-error{{expected #else or #endif at end of conditional compilation block}}
+} // expected-error{{expected declaration}}
 #else
 	func bar() {}
 	func baz() {}
-} // expected-error{{expected declaration}} expected-error{{expected #else or #endif at end of conditional compilation block}}
+} // expected-error{{expected declaration}}
 #endif
 // expected-error@+1{{expected '}' in class}}

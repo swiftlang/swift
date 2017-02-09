@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -137,7 +137,7 @@ Optional<unsigned> SourceManager::getIDForBufferIdentifier(
   return It->second;
 }
 
-const char *SourceManager::getIdentifierForBuffer(unsigned bufferID) const {
+StringRef SourceManager::getIdentifierForBuffer(unsigned bufferID) const {
   auto *buffer = LLVMSourceMgr.getMemoryBuffer(bufferID);
   assert(buffer && "invalid buffer ID");
   return buffer->getBufferIdentifier();

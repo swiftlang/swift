@@ -387,3 +387,32 @@ entry(%x : $Int):
   return %e : $IndirectCase
 }
 
+sil @write_to_bool : $@convention(c) (UnsafeMutablePointer<Bool>) -> Int32
+
+// CHECK-LABEL: sil @escaping_address
+sil @escaping_address : $@convention(thin) () -> Bool {
+bb0:
+  // CHECK: [[A:%[0-9]+]] = alloc_stack
+  %a = alloc_stack $Bool
+  %f = function_ref @write_to_bool : $@convention(c) (UnsafeMutablePointer<Bool>) -> Int32
+  %a2p = address_to_pointer %a : $*Bool to $Builtin.RawPointer
+  %ump = struct $UnsafeMutablePointer<Bool> (%a2p : $Builtin.RawPointer)
+
+  %0 = integer_literal $Builtin.Int1, 0
+  %b0 = struct $Bool (%0 : $Builtin.Int1)
+  // CHECK: [[BV:%[0-9]+]] = struct_element_addr [[A]]
+  %bv = struct_element_addr %a : $*Bool, #Bool._value
+  store %b0 to %a : $*Bool
+
+  // CHECK: apply
+  %ap = apply %f(%ump) : $@convention(c) (UnsafeMutablePointer<Bool>) -> Int32
+
+  // CHECK: [[L:%[0-9]+]] = load [[BV]]
+  %l = load %bv : $*Builtin.Int1
+  // CHECK: [[R:%[0-9]+]] = struct $Bool ([[L]]
+  %r = struct $Bool (%l : $Builtin.Int1)
+  dealloc_stack %a : $*Bool
+  // CHECK: return [[R]]
+  return %r : $Bool
+}
+

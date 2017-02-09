@@ -109,6 +109,60 @@ func testBitwiseOps() {
   _ = (BIT_SHIFT_1 | BIT_SHIFT_2) as CInt
   _ = BIT_SHIFT_3 as CLongLong
   _ = BIT_SHIFT_4 as CUnsignedInt
+
+  _ = RSHIFT_ONE as CUnsignedInt
+  _ = RSHIFT_INVALID // expected-error {{use of unresolved identifier 'RSHIFT_INVALID'}}
+
+  _ = XOR_HIGH as CUnsignedLongLong
+
+  var attributes = 0 as CInt
+  attributes |= ATTR_BOLD
+  attributes |= ATTR_ITALIC
+  attributes |= ATTR_UNDERLINE
+  attributes |= ATTR_INVALID // expected-error {{use of unresolved identifier 'ATTR_INVALID'}}
+}
+
+func testIntegerArithmetic() {
+  _ = ADD_ZERO as CInt
+  _ = ADD_ONE as CInt
+  _ = ADD_TWO as CInt
+  _ = ADD_MINUS_TWO as CInt
+  _ = ADD_MIXED_WIDTH as CLongLong
+  _ = ADD_MIXED_SIGN as CLongLong
+  _ = ADD_UNDERFLOW as CUnsignedInt
+  _ = ADD_OVERFLOW as CUnsignedInt
+
+  _ = SUB_ONE as CInt
+  _ = SUB_ZERO as CInt
+  _ = SUB_MINUS_ONE as CInt
+  _ = SUB_MIXED_WIDTH as CLongLong
+  _ = SUB_MIXED_SIGN as CUnsignedInt
+  _ = SUB_UNDERFLOW as CUnsignedInt
+  _ = SUB_OVERFLOW as CUnsignedInt
+
+  _ = MULT_POS as CInt
+  _ = MULT_NEG as CInt
+  _ = MULT_MIXED_TYPES as CLongLong
+
+  _ = DIVIDE_INTEGRAL as CInt
+  _ = DIVIDE_NONINTEGRAL as CInt
+  _ = DIVIDE_MIXED_TYPES as CLongLong
+  _ = DIVIDE_INVALID // expected-error {{use of unresolved identifier 'DIVIDE_INVALID'}}
+}
+
+func testIntegerComparisons() {
+  if EQUAL_FALSE, EQUAL_TRUE, EQUAL_TRUE_MIXED_TYPES,
+     GT_FALSE, GT_TRUE, GTE_FALSE, GTE_TRUE,
+     LT_FALSE, LT_TRUE, LTE_FALSE, LTE_TRUE {
+    fatalError("You hit the jackpot!")
+  }
+}
+
+func testLogicalComparisons() {
+  if L_AND_TRUE, L_AND_FALSE, L_AND_TRUE_B, L_AND_FALSE_B,
+     L_OR_TRUE,  L_OR_FALSE,  L_OR_TRUE_B,  L_OR_FALSE_B {
+    fatalError("Yet again!")
+  }
 }
 
 func testRecursion() {

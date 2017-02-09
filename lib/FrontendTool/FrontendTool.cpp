@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -62,6 +62,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/Timer.h"
+#include "llvm/Target/TargetMachine.h"
 
 #include <memory>
 #include <unordered_set>
@@ -127,7 +128,7 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
 }
 
 /// Writes SIL out to the given file.
-static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
+static bool writeSIL(SILModule &SM, ModuleDecl *M, bool EmitVerboseSIL,
                      StringRef OutputFilename, bool SortSIL) {
   std::error_code EC;
   llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
@@ -140,7 +141,7 @@ static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
   return false;
 }
 
-static bool printAsObjC(const std::string &outputPath, Module *M,
+static bool printAsObjC(const std::string &outputPath, ModuleDecl *M,
                         StringRef bridgingHeader, bool moduleIsPublic) {
   using namespace llvm::sys;
 
@@ -150,13 +151,13 @@ static bool printAsObjC(const std::string &outputPath, Module *M,
   std::error_code EC;
   std::unique_ptr<llvm::raw_pwrite_stream> out =
     Clang.createOutputFile(outputPath, EC,
-                           /*binary=*/false,
-                           /*removeOnSignal=*/true,
-                           /*inputPath=*/"",
+                           /*Binary=*/false,
+                           /*RemoveFileOnSignal=*/true,
+                           /*BaseInput=*/"",
                            path::extension(outputPath),
-                           /*temporary=*/true,
-                           /*createDirs=*/false,
-                           /*finalPath=*/nullptr,
+                           /*UseTemporary=*/true,
+                           /*CreateMissingDirectories=*/false,
+                           /*ResultPathName=*/nullptr,
                            &tmpFilePath);
 
   if (!out) {
@@ -214,7 +215,7 @@ public:
     : OSPtr(std::move(OS)),
       FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
-  ~JSONFixitWriter() {
+  ~JSONFixitWriter() override {
     swift::writeEditsInJson(llvm::makeArrayRef(AllEdits), *OSPtr);
   }
 private:
@@ -323,14 +324,25 @@ static void debugFailWithCrash() {
 }
 
 /// Performs the compile requested by the user.
+/// \param Instance Will be reset after performIRGeneration when the verifier
+///                 mode is NoVerify and there were no errors.
 /// \returns true on error
-static bool performCompile(CompilerInstance &Instance,
+static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
                            CompilerInvocation &Invocation,
                            ArrayRef<const char *> Args,
                            int &ReturnValue,
                            FrontendObserver *observer) {
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
+
+  // We've been asked to precompile a bridging header; we want to
+  // avoid touching any other inputs and just parse, emit and exit.
+  if (Action == FrontendOptions::EmitPCH) {
+    auto clangImporter = static_cast<ClangImporter *>(
+      Instance->getASTContext().getClangModuleLoader());
+    return clangImporter->emitBridgingPCH(
+      Invocation.getInputFilenames()[0], opts.getSingleOutputFilename());
+  }
 
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
@@ -344,7 +356,7 @@ static bool performCompile(CompilerInstance &Instance,
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
       llvm::MemoryBuffer::getFileOrSTDIN(Invocation.getInputFilenames()[0]);
     if (!FileBufOrErr) {
-      Instance.getASTContext().Diags.diagnose(SourceLoc(),
+      Instance->getASTContext().Diags.diagnose(SourceLoc(),
                                               diag::error_open_input_file,
                                               Invocation.getInputFilenames()[0],
                                               FileBufOrErr.getError().message());
@@ -359,7 +371,7 @@ static bool performCompile(CompilerInstance &Instance,
     if (!Module) {
       // TODO: Translate from the diagnostic info to the SourceManager location
       // if available.
-      Instance.getASTContext().Diags.diagnose(SourceLoc(),
+      Instance->getASTContext().Diags.diagnose(SourceLoc(),
                                               diag::error_parse_input_file,
                                               Invocation.getInputFilenames()[0],
                                               Err.getMessage());
@@ -369,26 +381,26 @@ static bool performCompile(CompilerInstance &Instance,
     // TODO: remove once the frontend understands what action it should perform
     IRGenOpts.OutputKind = getOutputKind(Action);
 
-    return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get());
+    return performLLVM(IRGenOpts, Instance->getASTContext(), Module.get());
   }
 
   ReferencedNameTracker nameTracker;
   bool shouldTrackReferences = !opts.ReferenceDependenciesFilePath.empty();
   if (shouldTrackReferences)
-    Instance.setReferencedNameTracker(&nameTracker);
+    Instance->setReferencedNameTracker(&nameTracker);
 
   if (Action == FrontendOptions::Parse ||
       Action == FrontendOptions::DumpParse ||
       Action == FrontendOptions::DumpInterfaceHash)
-    Instance.performParseOnly();
+    Instance->performParseOnly();
   else
-    Instance.performSema();
+    Instance->performSema();
 
   if (Action == FrontendOptions::Parse)
-    return false;
+    return Instance->getASTContext().hadError();
 
   if (observer) {
-    observer->performedSemanticAnalysis(Instance);
+    observer->performedSemanticAnalysis(*Instance);
   }
 
   FrontendOptions::DebugCrashMode CrashMode = opts.CrashMode;
@@ -397,15 +409,15 @@ static bool performCompile(CompilerInstance &Instance,
   else if (CrashMode == FrontendOptions::DebugCrashMode::CrashAfterParse)
     debugFailWithCrash();
 
-  ASTContext &Context = Instance.getASTContext();
+  ASTContext &Context = Instance->getASTContext();
 
   if (Action == FrontendOptions::REPL) {
-    runREPL(Instance, ProcessCmdLine(Args.begin(), Args.end()),
+    runREPL(*Instance, ProcessCmdLine(Args.begin(), Args.end()),
             Invocation.getParseStdlib());
-    return false;
+    return Context.hadError();
   }
 
-  SourceFile *PrimarySourceFile = Instance.getPrimarySourceFile();
+  SourceFile *PrimarySourceFile = Instance->getPrimarySourceFile();
 
   // We've been told to dump the AST (either after parsing or type-checking,
   // which is already differentiated in CompilerInstance::performSema()),
@@ -419,7 +431,7 @@ static bool performCompile(CompilerInstance &Instance,
     SourceFile *SF = PrimarySourceFile;
     if (!SF) {
       SourceFileKind Kind = Invocation.getSourceFileKind();
-      SF = &Instance.getMainModule()->getMainSourceFile(Kind);
+      SF = &Instance->getMainModule()->getMainSourceFile(Kind);
     }
     if (Action == FrontendOptions::PrintAST)
       SF->print(llvm::outs(), PrintOptions::printEverything());
@@ -429,7 +441,7 @@ static bool performCompile(CompilerInstance &Instance,
       if (opts.DumpScopeMapLocations.empty()) {
         scope.expandAll();
       } else if (auto bufferID = SF->getBufferID()) {
-        SourceManager &sourceMgr = Instance.getSourceMgr();
+        SourceManager &sourceMgr = Instance->getSourceMgr();
         // Probe each of the locations, and dump what we find.
         for (auto lineColumn : opts.DumpScopeMapLocations) {
           SourceLoc loc = sourceMgr.getLocForLineCol(*bufferID,
@@ -473,7 +485,7 @@ static bool performCompile(CompilerInstance &Instance,
       SF->dumpInterfaceHash(llvm::errs());
     else
       SF->dump();
-    return false;
+    return Context.hadError();
   }
 
   // If we were asked to print Clang stats, do so.
@@ -481,12 +493,12 @@ static bool performCompile(CompilerInstance &Instance,
     Context.getClangModuleLoader()->printStatistics();
 
   if (!opts.DependenciesFilePath.empty())
-    (void)emitMakeDependencies(Context.Diags, *Instance.getDependencyTracker(),
+    (void)emitMakeDependencies(Context.Diags, *Instance->getDependencyTracker(),
                                opts);
 
   if (shouldTrackReferences)
-    emitReferenceDependencies(Context.Diags, Instance.getPrimarySourceFile(),
-                              *Instance.getDependencyTracker(), opts);
+    emitReferenceDependencies(Context.Diags, Instance->getPrimarySourceFile(),
+                              *Instance->getDependencyTracker(), opts);
 
   if (Context.hadError())
     return true;
@@ -494,33 +506,33 @@ static bool performCompile(CompilerInstance &Instance,
   // FIXME: This is still a lousy approximation of whether the module file will
   // be externally consumed.
   bool moduleIsPublic =
-      !Instance.getMainModule()->hasEntryPoint() &&
+      !Instance->getMainModule()->hasEntryPoint() &&
       opts.ImplicitObjCHeaderPath.empty() &&
       !Context.LangOpts.EnableAppExtensionRestrictions;
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::Typecheck) {
     if (!opts.ObjCHeaderOutputPath.empty())
-      return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
+      return printAsObjC(opts.ObjCHeaderOutputPath, Instance->getMainModule(),
                          opts.ImplicitObjCHeaderPath, moduleIsPublic);
-    return false;
+    return Context.hadError();
   }
 
   assert(Action >= FrontendOptions::EmitSILGen &&
          "All actions not requiring SILGen must have been handled!");
 
-  std::unique_ptr<SILModule> SM = Instance.takeSILModule();
+  std::unique_ptr<SILModule> SM = Instance->takeSILModule();
   if (!SM) {
     if (opts.PrimaryInput.hasValue() && opts.PrimaryInput.getValue().isFilename()) {
       FileUnit *PrimaryFile = PrimarySourceFile;
       if (!PrimaryFile) {
         auto Index = opts.PrimaryInput.getValue().Index;
-        PrimaryFile = Instance.getMainModule()->getFiles()[Index];
+        PrimaryFile = Instance->getMainModule()->getFiles()[Index];
       }
       SM = performSILGeneration(*PrimaryFile, Invocation.getSILOptions(),
                                 None, opts.SILSerializeAll);
     } else {
-      SM = performSILGeneration(Instance.getMainModule(), Invocation.getSILOptions(),
+      SM = performSILGeneration(Instance->getMainModule(), Invocation.getSILOptions(),
                                 opts.SILSerializeAll,
                                 true);
     }
@@ -535,7 +547,7 @@ static bool performCompile(CompilerInstance &Instance,
     // If we are asked to link all, link all.
     if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
       performSILLinking(SM.get(), true);
-    return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
+    return writeSIL(*SM, Instance->getMainModule(), opts.EmitVerboseSIL,
                     opts.getSingleOutputFilename(), opts.EmitSortedSIL);
   }
 
@@ -545,7 +557,7 @@ static bool performCompile(CompilerInstance &Instance,
       performSILLinking(SM.get(), true);
 
     auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
-                                  Instance.getMainModule();
+                                  Instance->getMainModule();
     if (!opts.ModuleOutputPath.empty()) {
       SerializationOptions serializationOpts;
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
@@ -554,7 +566,7 @@ static bool performCompile(CompilerInstance &Instance,
 
       serialize(DC, serializationOpts, SM.get());
     }
-    return false;
+    return Context.hadError();
   }
 
   // Perform "stable" optimizations that are invariant across compiler versions.
@@ -622,13 +634,13 @@ static bool performCompile(CompilerInstance &Instance,
   }
 
   if (!opts.ObjCHeaderOutputPath.empty()) {
-    (void)printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
+    (void)printAsObjC(opts.ObjCHeaderOutputPath, Instance->getMainModule(),
                       opts.ImplicitObjCHeaderPath, moduleIsPublic);
   }
 
   if (Action == FrontendOptions::EmitSIB) {
     auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
-                                  Instance.getMainModule();
+                                  Instance->getMainModule();
     if (!opts.ModuleOutputPath.empty()) {
       SerializationOptions serializationOpts;
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
@@ -637,12 +649,12 @@ static bool performCompile(CompilerInstance &Instance,
 
       serialize(DC, serializationOpts, SM.get());
     }
-    return false;
+    return Context.hadError();
   }
 
   if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
     auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
-                                  Instance.getMainModule();
+                                  Instance->getMainModule();
     if (!opts.ModuleOutputPath.empty()) {
       SerializationOptions serializationOpts;
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
@@ -654,6 +666,8 @@ static bool performCompile(CompilerInstance &Instance,
       serializationOpts.ModuleLinkName = opts.ModuleLinkName;
       serializationOpts.ExtraClangOptions =
           Invocation.getClangImporterOptions().ExtraArgs;
+      serializationOpts.EnableNestedTypeLookupTable =
+          opts.EnableSerializationNestedTypeLookupTable;
       if (!IRGenOpts.ForceLoadSymbolName.empty())
         serializationOpts.AutolinkForceLoad = true;
 
@@ -667,7 +681,7 @@ static bool performCompile(CompilerInstance &Instance,
     }
 
     if (Action == FrontendOptions::EmitModuleOnly)
-      return false;
+      return Context.hadError();
   }
 
   assert(Action >= FrontendOptions::EmitSIL &&
@@ -675,14 +689,14 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've been told to write canonical SIL, so write it now.
   if (Action == FrontendOptions::EmitSIL) {
-    return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
+    return writeSIL(*SM, Instance->getMainModule(), opts.EmitVerboseSIL,
                     opts.getSingleOutputFilename(), opts.EmitSortedSIL);
   }
 
   assert(Action >= FrontendOptions::Immediate &&
          "All actions not requiring IRGen must have been handled!");
   assert(Action != FrontendOptions::REPL &&
-         "REPL mode must be handled immediately after Instance.performSema()");
+         "REPL mode must be handled immediately after Instance->performSema()");
 
   // Check if we had any errors; if we did, don't proceed to IRGen.
   if (Context.hadError())
@@ -699,33 +713,64 @@ static bool performCompile(CompilerInstance &Instance,
     IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::Normal;
     const ProcessCmdLine &CmdLine = ProcessCmdLine(opts.ImmediateArgv.begin(),
                                                    opts.ImmediateArgv.end());
-    Instance.setSILModule(std::move(SM));
+    Instance->setSILModule(std::move(SM));
 
     if (observer) {
-      observer->aboutToRunImmediately(Instance);
+      observer->aboutToRunImmediately(*Instance);
     }
 
     ReturnValue =
-      RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
-    return false;
+      RunImmediately(*Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
+    return Context.hadError();
   }
 
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
   auto &LLVMContext = getGlobalLLVMContext();
+  std::unique_ptr<llvm::Module> IRModule;
+  llvm::GlobalVariable *HashGlobal;
   if (PrimarySourceFile) {
-    performIRGeneration(IRGenOpts, *PrimarySourceFile, std::move(SM),
-                        opts.getSingleOutputFilename(), LLVMContext);
+    IRModule = performIRGeneration(IRGenOpts, *PrimarySourceFile, std::move(SM),
+                                   opts.getSingleOutputFilename(), LLVMContext,
+                                   0, &HashGlobal);
   } else {
-    performIRGeneration(IRGenOpts, Instance.getMainModule(), std::move(SM),
-                        opts.getSingleOutputFilename(), LLVMContext);
+    IRModule = performIRGeneration(IRGenOpts, Instance->getMainModule(),
+                                   std::move(SM),
+                                   opts.getSingleOutputFilename(), LLVMContext,
+                                   &HashGlobal);
   }
 
-  return false;
+  // Just because we had an AST error it doesn't mean we can't performLLVM.
+  bool HadError = Instance->getASTContext().hadError();
+  
+  // If the AST Context has no errors but no IRModule is available,
+  // parallelIRGen happened correctly, since parallel IRGen produces multiple
+  // modules.
+  if (!IRModule) {
+    return HadError;
+  }
+
+  std::unique_ptr<llvm::TargetMachine> TargetMachine =
+    createTargetMachine(IRGenOpts, Context);
+  version::Version EffectiveLanguageVersion =
+    Context.LangOpts.EffectiveLanguageVersion;
+  DiagnosticEngine &Diags = Context.Diags;
+  const DiagnosticOptions &DiagOpts = Invocation.getDiagnosticOptions();
+  
+  // Delete the compiler instance now that we have an IRModule.
+  if (DiagOpts.VerifyMode == DiagnosticOptions::NoVerify) {
+    SM.reset();
+    Instance.reset();
+  }
+  
+  // Now that we have a single IR Module, hand it over to performLLVM.
+  return performLLVM(IRGenOpts, &Diags, nullptr, HashGlobal, IRModule.get(),
+                  TargetMachine.get(), EffectiveLanguageVersion,
+                  opts.getSingleOutputFilename()) || HadError;
 }
 
 /// Returns true if an error occurred.
-static bool dumpAPI(Module *Mod, StringRef OutDir) {
+static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
   using namespace llvm::sys;
 
   auto getOutPath = [&](SourceFile *SF) -> std::string {
@@ -794,12 +839,13 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   llvm::InitializeAllAsmPrinters();
   llvm::InitializeAllAsmParsers();
 
-  CompilerInstance Instance;
+  std::unique_ptr<CompilerInstance> Instance =
+    llvm::make_unique<CompilerInstance>();
   PrintingDiagnosticConsumer PDC;
-  Instance.addDiagnosticConsumer(&PDC);
+  Instance->addDiagnosticConsumer(&PDC);
 
   if (Args.empty()) {
-    Instance.getDiags().diagnose(SourceLoc(), diag::error_no_frontend_args);
+    Instance->getDiags().diagnose(SourceLoc(), diag::error_no_frontend_args);
     return 1;
   }
 
@@ -812,7 +858,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   llvm::sys::fs::current_path(workingDirectory);
 
   // Parse arguments.
-  if (Invocation.parseArgs(Args, Instance.getDiags(), workingDirectory)) {
+  if (Invocation.parseArgs(Args, Instance->getDiags(), workingDirectory)) {
     return 1;
   }
 
@@ -840,7 +886,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   if (Invocation.getFrontendOptions().RequestedAction ==
         FrontendOptions::NoneAction) {
-    Instance.getDiags().diagnose(SourceLoc(),
+    Instance->getDiags().diagnose(SourceLoc(),
                                  diag::error_missing_frontend_action);
     return 1;
   }
@@ -863,7 +909,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                                         llvm::sys::fs::F_None));
 
       if (EC) {
-        Instance.getDiags().diagnose(SourceLoc(),
+        Instance->getDiags().diagnose(SourceLoc(),
                                      diag::cannot_open_serialized_file,
                                      SerializedDiagnosticsPath, EC.message());
         return 1;
@@ -871,7 +917,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
       SerializedConsumer.reset(
           serialized_diagnostics::createConsumer(std::move(OS)));
-      Instance.addDiagnosticConsumer(SerializedConsumer.get());
+      Instance->addDiagnosticConsumer(SerializedConsumer.get());
     }
   }
 
@@ -887,7 +933,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                                         llvm::sys::fs::F_None));
 
       if (EC) {
-        Instance.getDiags().diagnose(SourceLoc(),
+        Instance->getDiags().diagnose(SourceLoc(),
                                      diag::cannot_open_file,
                                      FixitsOutputPath, EC.message());
         return 1;
@@ -895,7 +941,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
       FixitsConsumer.reset(new JSONFixitWriter(std::move(OS),
                                             Invocation.getDiagnosticOptions()));
-      Instance.addDiagnosticConsumer(FixitsConsumer.get());
+      Instance->addDiagnosticConsumer(FixitsConsumer.get());
     }
   }
 
@@ -911,45 +957,45 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
-    enableDiagnosticVerifier(Instance.getSourceMgr());
+    enableDiagnosticVerifier(Instance->getSourceMgr());
   }
 
   DependencyTracker depTracker;
   if (!Invocation.getFrontendOptions().DependenciesFilePath.empty() ||
       !Invocation.getFrontendOptions().ReferenceDependenciesFilePath.empty()) {
-    Instance.setDependencyTracker(&depTracker);
+    Instance->setDependencyTracker(&depTracker);
   }
 
-  if (Instance.setup(Invocation)) {
+  if (Instance->setup(Invocation)) {
     return 1;
   }
 
   // The compiler instance has been configured; notify our observer.
   if (observer) {
-    observer->configuredCompiler(Instance);
+    observer->configuredCompiler(*Instance);
   }
 
   int ReturnValue = 0;
   bool HadError =
-    performCompile(Instance, Invocation, Args, ReturnValue, observer) ||
-    Instance.getASTContext().hadError();
+    performCompile(Instance, Invocation, Args, ReturnValue, observer);
 
   if (!HadError) {
     NewMangling::printManglingStats();
   }
 
   if (!HadError && !Invocation.getFrontendOptions().DumpAPIPath.empty()) {
-    HadError = dumpAPI(Instance.getMainModule(),
+    HadError = dumpAPI(Instance->getMainModule(),
                        Invocation.getFrontendOptions().DumpAPIPath);
   }
 
   if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
     HadError = verifyDiagnostics(
-        Instance.getSourceMgr(),
-        Instance.getInputBufferIDs(),
-        diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes);
+        Instance->getSourceMgr(),
+        Instance->getInputBufferIDs(),
+        diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
+        diagOpts.VerifyIgnoreUnknown);
 
-    DiagnosticEngine &diags = Instance.getDiags();
+    DiagnosticEngine &diags = Instance->getDiags();
     if (diags.hasFatalErrorOccurred() &&
         !Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
       diags.resetHadAnyError();

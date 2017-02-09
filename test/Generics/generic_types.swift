@@ -167,6 +167,7 @@ func useRangeOfPrintables(_ roi : RangeOfPrintables<[Int]>) {
 
 var dfail : Dictionary<Int> // expected-error{{generic type 'Dictionary' specialized with too few type parameters (got 1, but expected 2)}}
 var notgeneric : Int<Float> // expected-error{{cannot specialize non-generic type 'Int'}}{{21-28=}}
+var notgenericNested : Array<Int<Float>> // expected-error{{cannot specialize non-generic type 'Int'}}{{33-40=}}
 
 // Make sure that redundant typealiases (that map to the same
 // underlying type) don't break protocol conformance or use.
@@ -227,7 +228,7 @@ var y: X5<X4, Int> // expected-error{{'X5' requires the types 'X4.AssocP' (aka '
 // Recursive generic signature validation.
 class Top {}
 class Bottom<T : Bottom<Top>> {}
-// expected-error@-1 {{type 'Bottom' references itself}}
+// expected-error@-1 {{generic class 'Bottom' references itself}}
 // expected-note@-2 {{type declared here}}
 
 // Invalid inheritance clause

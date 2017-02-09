@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -137,7 +137,8 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
                            SILFunction::iterator(ReturnToBB));
 
     // Create an argument on the return-to BB representing the returned value.
-    auto *RetArg = ReturnToBB->createArgument(AI.getInstruction()->getType());
+    auto *RetArg = ReturnToBB->createPHIArgument(AI.getInstruction()->getType(),
+                                                 ValueOwnershipKind::Owned);
     // Replace all uses of the ApplyInst with the new argument.
     AI.getInstruction()->replaceAllUsesWith(RetArg);
   }
@@ -226,6 +227,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::StringLiteralInst:
     case ValueKind::FixLifetimeInst:
     case ValueKind::EndBorrowInst:
+    case ValueKind::EndBorrowArgumentInst:
     case ValueKind::BeginBorrowInst:
     case ValueKind::MarkDependenceInst:
     case ValueKind::FunctionRefInst:
@@ -325,7 +327,9 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::CopyBlockInst:
     case ValueKind::CopyAddrInst:
     case ValueKind::RetainValueInst:
+    case ValueKind::UnmanagedRetainValueInst:
     case ValueKind::CopyValueInst:
+    case ValueKind::CopyUnownedValueInst:
     case ValueKind::DeallocBoxInst:
     case ValueKind::DeallocExistentialBoxInst:
     case ValueKind::DeallocRefInst:
@@ -338,8 +342,10 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::ProjectBoxInst:
     case ValueKind::ProjectExistentialBoxInst:
     case ValueKind::ReleaseValueInst:
+    case ValueKind::UnmanagedReleaseValueInst:
     case ValueKind::DestroyValueInst:
     case ValueKind::AutoreleaseValueInst:
+    case ValueKind::UnmanagedAutoreleaseValueInst:
     case ValueKind::DynamicMethodBranchInst:
     case ValueKind::DynamicMethodInst:
     case ValueKind::EnumInst:
@@ -406,7 +412,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
 
       return InlineCost::Expensive;
     }
-    case ValueKind::SILArgument:
+    case ValueKind::SILPHIArgument:
+    case ValueKind::SILFunctionArgument:
     case ValueKind::SILUndef:
       llvm_unreachable("Only instructions should be passed into this "
                        "function.");

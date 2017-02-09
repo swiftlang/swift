@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -110,10 +110,8 @@ extension _SwiftNativeFoundationType {
         switch __wrapped {
         case .Immutable(let i):
             i.release()
-            break
         case .Mutable(let m):
             m.release()
-            break
         }
     }
     
@@ -157,7 +155,7 @@ extension _MutablePairBoxing {
 
         let unmanagedHandle = Unmanaged.passUnretained(_wrapped)
         let wrapper = unmanagedHandle._withUnsafeGuaranteedRef { $0.__wrapped }
-        switch (wrapper) {
+        switch wrapper {
         case .Immutable(let i):
             return try i._withUnsafeGuaranteedRef {
                 return try whatToDo($0)
@@ -185,14 +183,14 @@ extension _MutablePairBoxing {
         let wrapper = _unmanagedHandle._withUnsafeGuaranteedRef { $0.__wrapped }
 
         // This check is done twice because: <rdar://problem/24939065> Value kept live for too long causing uniqueness check to fail
-        switch (wrapper) {
+        switch wrapper {
         case .Immutable(_):
             break
         case .Mutable(_):
             unique = isKnownUniquelyReferenced(&_wrapped)
         }
 
-        switch (wrapper) {
+        switch wrapper {
         case .Immutable(let i):
             // We need to become mutable; by creating a new instance we also become unique
             let copy = Unmanaged.passRetained(i._withUnsafeGuaranteedRef {

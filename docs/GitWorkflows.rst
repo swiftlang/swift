@@ -11,9 +11,9 @@ Purpose
 Swift development has been based on SVN since its inception.  As part of the
 transition to Git this document helps to address questions about how common SVN
 workflows we use today translate to their Git counterparts as well as to discuss
-Git workflow practices we plan on having — at least initially — after the Git
-transition.  Notably we will follow a model where commits to trunk — which is
-the 'master' branch in Git — has commits land (in the common case) via rebasing
+Git workflow practices we plan on having -- at least initially -- after the Git
+transition.  Notably we will follow a model where commits to trunk -- which is
+the 'master' branch in Git -- has commits land (in the common case) via rebasing
 instead of merging.  This model is open to evolution later, but this mimics the
 workflow we have today with SVN.
 

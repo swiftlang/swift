@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,6 +18,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Types.h"
 using namespace swift;
 
 /// TODO: unique and reuse the () parameter list in ASTContext, it is common to
@@ -88,7 +89,8 @@ ParameterList *ParameterList::clone(const ASTContext &C,
 
   // Remap the ParamDecls inside of the ParameterList.
   for (auto &decl : params) {
-    bool hadDefaultArgument =decl->getDefaultValue() != nullptr;
+    bool hadDefaultArgument =
+        decl->getDefaultArgumentKind() == DefaultArgumentKind::Normal;
 
     decl = new (C) ParamDecl(decl);
     if (options & Implicit)
@@ -101,8 +103,12 @@ ParameterList *ParameterList::clone(const ASTContext &C,
       decl->setName(C.getIdentifier("argument"));
     
     // If we're inheriting a default argument, mark it as such.
-    if (hadDefaultArgument && (options & Inherited)) {
-      decl->setDefaultArgumentKind(DefaultArgumentKind::Inherited);
+    // FIXME: Figure out how to clone default arguments as well.
+    if (hadDefaultArgument) {
+      if (options & Inherited)
+        decl->setDefaultArgumentKind(DefaultArgumentKind::Inherited);
+      else
+        decl->setDefaultArgumentKind(DefaultArgumentKind::None);
     }
   }
   

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -51,10 +51,6 @@ STATISTIC(TotalPublicExternalFuncs, "Number of public external funcs");
 STATISTIC(TotalHiddenExternalFuncs, "Number of hidden external funcs");
 STATISTIC(TotalPrivateExternalFuncs, "Number of private external funcs");
 STATISTIC(TotalSharedExternalFuncs, "Number of shared external funcs");
-
-// Specialization Statistics
-STATISTIC(TotalSpecializedInsts, "Number of instructions (of all types) in "
-          "specialized functions");
 
 // Individual instruction statistics
 #define INST(Id, Parent, TextualName, MemBehavior, ReleasingBehavior)          \
@@ -117,10 +113,6 @@ class InstCount : public SILFunctionTransform {
       TotalInsts += V.InstCount;
       TotalBlocks += V.BlockCount;
       TotalFuncs++;
-    }
-
-    if (F->getName().count("_TTSg")) {
-      TotalSpecializedInsts += V.InstCount;
     }
 
     switch (F->getLinkage()) {

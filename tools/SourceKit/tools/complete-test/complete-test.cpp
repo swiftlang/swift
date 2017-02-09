@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -64,6 +64,7 @@ static sourcekitd_uid_t KeyRequest;
 static sourcekitd_uid_t KeyCompilerArgs;
 static sourcekitd_uid_t KeyOffset;
 static sourcekitd_uid_t KeyLength;
+static sourcekitd_uid_t KeyActionable;
 static sourcekitd_uid_t KeySourceFile;
 static sourcekitd_uid_t KeySourceText;
 static sourcekitd_uid_t KeyName;
@@ -285,6 +286,7 @@ static int skt_main(int argc, const char **argv) {
   KeyCompilerArgs = sourcekitd_uid_get_from_cstr("key.compilerargs");
   KeyOffset = sourcekitd_uid_get_from_cstr("key.offset");
   KeyLength = sourcekitd_uid_get_from_cstr("key.length");
+  KeyActionable = sourcekitd_uid_get_from_cstr("key.actionable");
   KeyKind = sourcekitd_uid_get_from_cstr("key.kind");
   KeyCodeCompleteOptions =
       sourcekitd_uid_get_from_cstr("key.codecomplete.options");

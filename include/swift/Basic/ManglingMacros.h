@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -24,7 +24,7 @@
 #define MANGLE_AS_STRING(M) STRINGIFY_MANGLING(M)
 
 /// The mangling prefix for the new mangling.
-#define MANGLING_PREFIX _S
+#define MANGLING_PREFIX _T0
 
 #define MANGLING_PREFIX_STR MANGLE_AS_STRING(MANGLING_PREFIX)
 
@@ -40,26 +40,28 @@
 #define MANGLING_CONCAT2(a, b) MANGLING_CONCAT2_IMPL(a, b)
 #define MANGLING_CONCAT3(a, b, c) MANGLING_CONCAT3_IMPL(a, b, c)
 #define MANGLE_SYM(Ops) MANGLING_CONCAT2(MANGLING_PREFIX, Ops)
-#define SELECT_MANGLING(Old, New) New
+#define SELECT_MANGLING(Old, New) MANGLE_SYM(New)
 #define METADATA_MANGLING N
 #define METATYPE_MANGLING m
 #define EMPTY_TUPLE_MANGLING yt
 #define NO_ARGS_MANGLING yy
 #define FUNC_TYPE_MANGLING c
 #define OBJC_PARTIAL_APPLY_THUNK_MANGLING Ta
+#define OPTIONAL_MANGLING(Ty) MANGLING_CONCAT2_IMPL(Ty, Sg)
 
 #else
 
 #define MANGLING_CONCAT2(a, b) MANGLING_CONCAT2_IMPL(b, a)
 #define MANGLING_CONCAT3(a, b, c) MANGLING_CONCAT3_IMPL(c, b, a)
 #define MANGLE_SYM(Ops) MANGLING_CONCAT2_IMPL(_T, Ops)
-#define SELECT_MANGLING(Old, New) Old
+#define SELECT_MANGLING(Old, New) MANGLE_SYM(Old)
 #define METADATA_MANGLING M
 #define METATYPE_MANGLING M
 #define EMPTY_TUPLE_MANGLING T_
 #define NO_ARGS_MANGLING T_T_
 #define FUNC_TYPE_MANGLING F
 #define OBJC_PARTIAL_APPLY_THUNK_MANGLING PAo
+#define OPTIONAL_MANGLING(Ty) MANGLING_CONCAT3_IMPL(GSq, Ty, _)
 
 #endif
 
@@ -68,9 +70,6 @@
 
 #define THIN_FUNCTION_MANGLING \
           MANGLING_CONCAT2(NO_ARGS_MANGLING, Xf)
-
-#define OPTIONAL_MANGLING(Ty) \
-          MANGLING_CONCAT3(MANGLING_CONCAT2_IMPL(Ty, _), Sq, G)
 
 #define METADATA_SYM(Ty) \
           MANGLE_SYM(MANGLING_CONCAT2(Ty, METADATA_MANGLING))

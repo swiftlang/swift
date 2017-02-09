@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1340,6 +1340,26 @@ void Remangler::mangleDependentGenericSameTypeRequirement(Node *node) {
   mangle(node->getChild(1).get());
 }
 
+void Remangler::mangleDependentGenericLayoutRequirement(Node *node) {
+  mangleConstrainedType(node->getChild(0).get());
+  Out << 'l';
+  auto id =  node->getChild(1)->getText();
+  auto size = -1;
+  if (node->getNumChildren() > 2) {
+    size = node->getChild(2)->getIndex();
+  }
+  int alignment = -1;
+  if (node->getNumChildren() > 3) {
+    alignment = node->getChild(3)->getIndex();
+  }
+  Out << id;
+  if (size >= 0)
+    Out << size;
+  if (alignment >= 0) {
+    Out << "_" << alignment;
+  }
+}
+
 void Remangler::mangleConstrainedType(Node *node) {
   if (node->getFirstChild()->getKind()
         == Node::Kind::DependentGenericParamType) {
@@ -1366,18 +1386,6 @@ void Remangler::mangleAssociatedType(Node *node) {
   } else {
     Out << '_';
   }
-}
-
-void Remangler::mangleArchetypeRef(Node *node) {
-  Node::IndexType relativeDepth = node->getChild(0)->getIndex();
-  Node::IndexType index = node->getChild(1)->getIndex();
-
-  Out << 'Q';
-  if (relativeDepth != 0) {
-    Out << 'd';
-    mangleIndex(relativeDepth - 1);
-  }
-  mangleIndex(index);
 }
 
 void Remangler::mangleQualifiedArchetype(Node *node) {
@@ -1695,6 +1703,16 @@ void Remangler::mangleFirstElementMarker(Node *node) {
 
 void Remangler::mangleVariadicMarker(Node *node) {
   Out << "<vararg>";
+}
+
+void Remangler::mangleOutlinedCopy(Node *node) {
+  Out << "Wy";
+  mangleChildNodes(node);
+}
+
+void Remangler::mangleOutlinedConsume(Node *node) {
+  Out << "We";
+  mangleChildNodes(node);
 }
 
 void Remangler::mangleSILBoxTypeWithLayout(Node *node) {

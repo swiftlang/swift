@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -49,7 +49,7 @@ namespace {
 static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
                                        EnumElementDecl *EnumDecl,
                                        SILValue DefOfEnum = SILValue()) {
-  assert(EnumDecl->hasArgumentType() &&
+  assert(EnumDecl->getArgumentInterfaceType() &&
          "We assume enumdecl has an argument type");
 
   SILModule &Mod = I->getModule();
@@ -482,7 +482,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
     BB->getArgument(ArgNum)->replaceAllUsesWith(FSI);
 
     const auto &ArgType = FSI->getOperand(*DifferentOperandIndex)->getType();
-    BB->replaceArgument(ArgNum, ArgType);
+    BB->replacePHIArgument(ArgNum, ArgType, ValueOwnershipKind::Owned);
 
     // Update all branch instructions in the predecessors to pass the new
     // argument to this BB.
@@ -753,7 +753,7 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
     EnumElementDecl *Enum = Case.first;
     SILBasicBlock *Succ = Case.second;
     Builder.setInsertionPoint(&*Succ->begin());
-    if (Enum->hasArgumentType())
+    if (Enum->getArgumentInterfaceType())
       createRefCountOpForPayload(Builder, &*RV, Enum, Switch->getOperand());
   }
 
@@ -839,7 +839,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
     EnumElementDecl *Enum = Elts[i];
     SILBasicBlock *Succ = i == 0 ? CondBr->getTrueBB() : CondBr->getFalseBB();
     Builder.setInsertionPoint(&*Succ->begin());
-    if (Enum->hasArgumentType())
+    if (Enum->getArgumentInterfaceType())
       createRefCountOpForPayload(Builder, &*I, Enum, SEI->getEnumOperand());
   }
 
@@ -1302,7 +1302,7 @@ bool BBEnumTagDataflowState::visitRetainValueInst(RetainValueInst *RVI) {
     return false;
 
   // If we do not have any argument, kill the retain_value.
-  if (!(*FindResult)->second->hasArgumentType()) {
+  if (!(*FindResult)->second->getArgumentInterfaceType()) {
     RVI->eraseFromParent();
     return true;
   }
@@ -1322,7 +1322,7 @@ bool BBEnumTagDataflowState::visitReleaseValueInst(ReleaseValueInst *RVI) {
     return false;
 
   // If we do not have any argument, just delete the release value.
-  if (!(*FindResult)->second->hasArgumentType()) {
+  if (!(*FindResult)->second->getArgumentInterfaceType()) {
     RVI->eraseFromParent();
     return true;
   }
@@ -1413,7 +1413,7 @@ BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA) {
     for (auto P : EnumBBCaseList) {
       // If we don't have an argument for this case, there is nothing to
       // do... continue...
-      if (!P.second->hasArgumentType())
+      if (!P.second->getArgumentInterfaceType())
         continue;
 
       // Otherwise create the release_value before the terminator of the
@@ -1478,7 +1478,7 @@ findRetainsSinkableFromSwitchRegionForEnum(
 
     // If the case does not have an argument type, skip the predecessor since
     // there will not be a retain to sink.
-    if (!Decl->hasArgumentType())
+    if (!Decl->getArgumentInterfaceType())
       continue;
 
     // Ok, we found a payloaded predecessor. Look backwards through the

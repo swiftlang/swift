@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -24,7 +24,7 @@ protocol Ansible {
   func anse()
 }
 
-// CHECK-LABEL: sil hidden  @_TF14objc_protocols12objc_generic
+// CHECK-LABEL: sil hidden  @_T014objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F
 func objc_generic<T : NSRuncing>(_ x: T) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
   // -- Result of runce is autoreleased according to default objc conv
@@ -39,10 +39,10 @@ func objc_generic<T : NSRuncing>(_ x: T) -> (NSObject, NSObject) {
   // CHECK: destroy_value [[THIS2]]
 }
 
-// CHECK-LABEL: sil hidden @_TF14objc_protocols26objc_generic_partial_applyuRxS_9NSRuncingrFxT_ : $@convention(thin) <T where T : NSRuncing> (@owned T) -> () {
+// CHECK-LABEL: sil hidden @_T014objc_protocols0A22_generic_partial_applyyxAA9NSRuncingRzlF : $@convention(thin) <T where T : NSRuncing> (@owned T) -> () {
 func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
   // CHECK: bb0([[ARG:%.*]] : $T):
-  // CHECK:   [[FN:%.*]] = function_ref @[[THUNK1:_TTOFP14objc_protocols9NSRuncing5runceFT_CSo8NSObject]] :
+  // CHECK:   [[FN:%.*]] = function_ref @[[THUNK1:_T014objc_protocols9NSRuncingP5runceSo8NSObjectCyFTcTO]] :
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   [[METHOD:%.*]] = apply [[FN]]<T>([[ARG_COPY]])
   // CHECK:   destroy_value [[METHOD]]
@@ -53,18 +53,18 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
   // CHECK:   destroy_value [[METHOD]]
   _ = T.runce
 
-  // CHECK:   [[FN:%.*]] = function_ref @[[THUNK2:_TTOZFP14objc_protocols9NSRuncing5minceFT_CSo8NSObject]]
+  // CHECK:   [[FN:%.*]] = function_ref @[[THUNK2:_T014objc_protocols9NSRuncingP5minceSo8NSObjectCyFZTcTO]]
   // CHECK:   [[METATYPE:%.*]] = metatype $@thick T.Type
   // CHECK:   [[METHOD:%.*]] = apply [[FN]]<T>([[METATYPE]])
   // CHECK:   destroy_value [[METHOD:%.*]]
   _ = T.mince
   // CHECK:   destroy_value [[ARG]]
 }
-// CHECK: } // end sil function '_TF14objc_protocols26objc_generic_partial_applyuRxS_9NSRuncingrFxT_'
+// CHECK: } // end sil function '_T014objc_protocols0A22_generic_partial_applyyxAA9NSRuncingRzlF'
 
 // CHECK: sil shared [thunk] @[[THUNK1]] :
 // CHECK: bb0([[SELF:%.*]] : $Self):
-// CHECK:   [[FN:%.*]] = function_ref @[[THUNK1_THUNK:_TTOFP14objc_protocols9NSRuncing5runcefT_CSo8NSObject]] :
+// CHECK:   [[FN:%.*]] = function_ref @[[THUNK1_THUNK:_T014objc_protocols9NSRuncingP5runceSo8NSObjectCyFTO]] :
 // CHECK:   [[METHOD:%.*]] = partial_apply [[FN]]<Self>([[SELF]])
 // CHECK:   return [[METHOD]]
 // CHECK: } // end sil function '[[THUNK1]]'
@@ -79,7 +79,7 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK: } // end sil function '[[THUNK1_THUNK]]'
 
 // CHECK: sil shared [thunk] @[[THUNK2]] :
-// CHECK:   [[FN:%.*]] = function_ref @[[THUNK2_THUNK:_TTOZFP14objc_protocols9NSRuncing5mincefT_CSo8NSObject]]
+// CHECK:   [[FN:%.*]] = function_ref @[[THUNK2_THUNK:_T014objc_protocols9NSRuncingP5minceSo8NSObjectCyFZTO]]
 // CHECK:   [[METHOD:%.*]] = partial_apply [[FN]]<Self>(%0)
 // CHECK:   return [[METHOD]]
 // CHECK: } // end sil function '[[THUNK2]]'
@@ -90,7 +90,7 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK-NEXT: return [[RESULT]]
 // CHECK: } // end sil function '[[THUNK2_THUNK]]'
 
-// CHECK-LABEL: sil hidden  @_TF14objc_protocols13objc_protocol
+// CHECK-LABEL: sil hidden  @_T014objc_protocols0A9_protocol{{[_0-9a-zA-Z]*}}F
 func objc_protocol(_ x: NSRuncing) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
   // -- Result of runce is autoreleased according to default objc conv
@@ -107,11 +107,11 @@ func objc_protocol(_ x: NSRuncing) -> (NSObject, NSObject) {
   // CHECK: destroy_value [[THIS2_ORIG]]
 }
 
-// CHECK-LABEL: sil hidden @_TF14objc_protocols27objc_protocol_partial_applyFPS_9NSRuncing_T_ : $@convention(thin) (@owned NSRuncing) -> () {
+// CHECK-LABEL: sil hidden @_T014objc_protocols0A23_protocol_partial_applyyAA9NSRuncing_pF : $@convention(thin) (@owned NSRuncing) -> () {
 func objc_protocol_partial_apply(_ x: NSRuncing) {
   // CHECK: bb0([[ARG:%.*]] : $NSRuncing):
   // CHECK:   [[OPENED_ARG:%.*]] = open_existential_ref [[ARG]] : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
-  // CHECK:   [[FN:%.*]] = function_ref @_TTOFP14objc_protocols9NSRuncing5runceFT_CSo8NSObject
+  // CHECK:   [[FN:%.*]] = function_ref @_T014objc_protocols9NSRuncingP5runceSo8NSObjectCyFTcTO
   // CHECK:   [[OPENED_ARG_COPY:%.*]] = copy_value [[OPENED_ARG]]
   // CHECK:   [[RESULT:%.*]] = apply [[FN]]<[[OPENED]]>([[OPENED_ARG_COPY]])
   // CHECK:   destroy_value [[RESULT]]
@@ -121,9 +121,9 @@ func objc_protocol_partial_apply(_ x: NSRuncing) {
   // FIXME: rdar://21289579
   // _ = NSRuncing.runce
 }
-// CHECK : } // end sil function '_TF14objc_protocols27objc_protocol_partial_applyFPS_9NSRuncing_T_'
+// CHECK : } // end sil function '_T014objc_protocols0A23_protocol_partial_applyyAA9NSRuncing_pF'
 
-// CHECK-LABEL: sil hidden  @_TF14objc_protocols25objc_protocol_composition
+// CHECK-LABEL: sil hidden  @_T014objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F
 func objc_protocol_composition(_ x: NSRuncing & NSFunging) {
   // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $NSFunging & NSRuncing to $[[OPENED:@opened(.*) NSFunging & NSRuncing]]
   // CHECK: [[METHOD:%.*]] = witness_method [volatile] $[[OPENED]], #NSRuncing.runce!1.foreign
@@ -154,10 +154,10 @@ class Foo : NSRuncing, NSFunging, Ansible {
   func anse() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Foo5runce
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Foo11copyRuncing
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Foo5funge
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Foo3foo
+// CHECK-LABEL: sil hidden [thunk] @_T014objc_protocols3FooC5runce{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @_T014objc_protocols3FooC11copyRuncing{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @_T014objc_protocols3FooC5funge{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @_T014objc_protocols3FooC3foo{{[_0-9a-zA-Z]*}}FTo
 // CHECK-NOT: sil hidden @_TToF{{.*}}anse{{.*}}
 
 class Bar { }
@@ -169,9 +169,9 @@ extension Bar : NSRuncing {
   @objc static func mince() -> NSObject { return NSObject() }
 }
 
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Bar5runce
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Bar11copyRuncing
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Bar3foo
+// CHECK-LABEL: sil hidden [thunk] @_T014objc_protocols3BarC5runce{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @_T014objc_protocols3BarC11copyRuncing{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @_T014objc_protocols3BarC3foo{{[_0-9a-zA-Z]*}}FTo
 
 // class Bas from objc_protocols_Bas module
 extension Bas : NSRuncing {
@@ -181,8 +181,8 @@ extension Bas : NSRuncing {
   @objc static func mince() -> NSObject { return NSObject() }
 }
 
-// CHECK-LABEL: sil hidden [thunk] @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas11copyRuncing
-// CHECK-LABEL: sil hidden [thunk] @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas3foo
+// CHECK-LABEL: sil hidden [thunk] @_T018objc_protocols_Bas0C0C0a1_B0E11copyRuncing{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @_T018objc_protocols_Bas0C0C0a1_B0E3foo{{[_0-9a-zA-Z]*}}FTo
 
 // -- Inherited objc protocols
 
@@ -193,8 +193,8 @@ class Zim : Fungible {
   @objc func foo() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Zim5funge
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Zim3foo
+// CHECK-LABEL: sil hidden [thunk] @_T014objc_protocols3ZimC5funge{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @_T014objc_protocols3ZimC3foo{{[_0-9a-zA-Z]*}}FTo
 
 // class Zang from objc_protocols_Bas module
 extension Zang : Fungible {
@@ -202,7 +202,7 @@ extension Zang : Fungible {
   @objc func foo() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] @_TToFE14objc_protocolsC18objc_protocols_Bas4Zang3foo
+// CHECK-LABEL: sil hidden [thunk] @_T018objc_protocols_Bas4ZangC0a1_B0E3foo{{[_0-9a-zA-Z]*}}FTo
 
 // -- objc protocols with property requirements in extensions
 //    <rdar://problem/16284574>
@@ -216,14 +216,14 @@ class StoredPropertyCount {
 }
 
 extension StoredPropertyCount: NSCounting {}
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC14objc_protocols19StoredPropertyCountg5countSi
+// CHECK-LABEL: sil hidden [thunk] @_T014objc_protocols19StoredPropertyCountC5countSifgTo
 
 class ComputedPropertyCount {
   @objc var count: Int { return 0 }
 }
 
 extension ComputedPropertyCount: NSCounting {}
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols21ComputedPropertyCountg5countSi
+// CHECK-LABEL: sil hidden [thunk] @_T014objc_protocols21ComputedPropertyCountC5countSifgTo
 
 // -- adding @objc protocol conformances to native ObjC classes should not
 //    emit thunks since the methods are already available to ObjC.
@@ -244,31 +244,31 @@ extension InformallyFunging: NSFunging { }
   init(int: Int)
 }
 
-// CHECK-LABEL: sil hidden @_TF14objc_protocols28testInitializableExistentialFTPMPS_13Initializable_1iSi_PS0__ : $@convention(thin) (@thick Initializable.Type, Int) -> @owned Initializable {
+// CHECK-LABEL: sil hidden @_T014objc_protocols28testInitializableExistentialAA0D0_pAaC_pXp_Si1itF : $@convention(thin) (@thick Initializable.Type, Int) -> @owned Initializable {
 func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializable {
   // CHECK: bb0([[META:%[0-9]+]] : $@thick Initializable.Type, [[I:%[0-9]+]] : $Int):
-  // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Initializable>
+  // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box ${ var Initializable }
   // CHECK:   [[PB:%.*]] = project_box [[I2_BOX]]
   // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[META]] : $@thick Initializable.Type to $@thick (@opened([[N:".*"]]) Initializable).Type
   // CHECK:   [[ARCHETYPE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[ARCHETYPE_META]] : $@thick (@opened([[N]]) Initializable).Type to $@objc_metatype (@opened([[N]]) Initializable).Type
   // CHECK:   [[I2_ALLOC:%[0-9]+]] = alloc_ref_dynamic [objc] [[ARCHETYPE_META_OBJC]] : $@objc_metatype (@opened([[N]]) Initializable).Type, $@opened([[N]]) Initializable
-  // CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method [volatile] $@opened([[N]]) Initializable, #Initializable.init!initializer.1.foreign, [[ARCHETYPE_META]]{{.*}} : $@convention(objc_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
+  // CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method [volatile] $@opened([[N]]) Initializable, #Initializable.init!initializer.1.foreign : {{.*}}, [[ARCHETYPE_META]]{{.*}} : $@convention(objc_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
   // CHECK:   [[I2_COPY:%.*]] = copy_value [[I2_ALLOC]]
   // CHECK:   [[I2:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]]) Initializable>([[I]], [[I2_COPY]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
   // CHECK:   [[I2_EXIST_CONTAINER:%[0-9]+]] = init_existential_ref [[I2]] : $@opened([[N]]) Initializable : $@opened([[N]]) Initializable, $Initializable
   // CHECK:   store [[I2_EXIST_CONTAINER]] to [init] [[PB]] : $*Initializable
   // CHECK:   [[I2:%[0-9]+]] = load [copy] [[PB]] : $*Initializable
-  // CHECK:   destroy_value [[I2_BOX]] : $<τ_0_0> { var τ_0_0 } <Initializable>
+  // CHECK:   destroy_value [[I2_BOX]] : ${ var Initializable }
   // CHECK:   return [[I2]] : $Initializable
   var i2 = im.init(int: i)
   return i2
 }
-// CHECK: } // end sil function '_TF14objc_protocols28testInitializableExistentialFTPMPS_13Initializable_1iSi_PS0__'
+// CHECK: } // end sil function '_T014objc_protocols28testInitializableExistentialAA0D0_pAaC_pXp_Si1itF'
 
 class InitializableConformer: Initializable {
   @objc required init(int: Int) {}
 }
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols22InitializableConformerc
+// CHECK-LABEL: sil hidden [thunk] @_T014objc_protocols22InitializableConformerC{{[_0-9a-zA-Z]*}}fcTo
 
 final class InitializableConformerByExtension {
   init() {}
@@ -279,4 +279,13 @@ extension InitializableConformerByExtension: Initializable {
     self.init()
   }
 }
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols33InitializableConformerByExtensionc
+// CHECK-LABEL: sil hidden [thunk] @_T014objc_protocols33InitializableConformerByExtensionC{{[_0-9a-zA-Z]*}}fcTo
+
+// Make sure we're crashing from trying to use materializeForSet here.
+@objc protocol SelectionItem {
+  var time: Double { get set }
+}
+
+func incrementTime(contents: SelectionItem) {
+  contents.time += 1.0
+}

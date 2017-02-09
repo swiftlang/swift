@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -224,7 +224,7 @@ protected:
     }
   }
 };
-} // namespace
+} // end anonymous namespace
 
 // Do the two values \p A and \p B reference the same 'array' after potentially
 // looking through a load. To identify a common array address this functions
@@ -410,7 +410,7 @@ protected:
       SILValue V, llvm::SmallSet<SILInstruction *, 16> &Releases);
   bool hoistInLoopWithOnlyNonArrayValueMutatingOperations();
 };
-} // namespace
+} // end anonymous namespace
 
 /// \return true of the given container is known to be a unique copy of the
 /// array with no aliases. Cases we check:
@@ -1604,7 +1604,7 @@ class COWArrayOptPass : public SILFunctionTransform {
 
   StringRef getName() override { return "SIL COW Array Optimization"; }
 };
-} // anonymous
+} // end anonymous namespace
 
 SILTransform *swift::createCOWArrayOpts() {
   return new COWArrayOptPass();
@@ -1828,7 +1828,8 @@ private:
         if (FunctionArgs[ArgIdx] != Arg)
           continue;
 
-        if (!Params[ArgIdx].isIndirectInOut() && Params[ArgIdx].isIndirect()) {
+        if (!Params[ArgIdx].isIndirectInOut()
+            && Params[ArgIdx].isFormalIndirect()) {
           DEBUG(llvm::dbgs()
                 << "    Skipping Array: Not an inout or by val argument!\n");
           return false;
@@ -1863,10 +1864,7 @@ private:
 
   bool isClassElementTypeArray(SILValue Arr) {
     auto Ty = Arr->getType().getSwiftRValueType();
-    auto Canonical = Ty.getCanonicalTypeOrNull();
-    if (Canonical.isNull())
-      return false;
-    auto *Struct = Canonical->getStructOrBoundGenericStruct();
+    auto *Struct = Ty->getStructOrBoundGenericStruct();
     assert(Struct && "Array must be a struct !?");
     if (Struct) {
       // No point in hoisting generic code.
@@ -1876,11 +1874,8 @@ private:
 
       // Check the array element type parameter.
       bool isClass = false;
-      for (auto TP : BGT->getGenericArgs()) {
-        auto EltTy = TP.getCanonicalTypeOrNull();
-        if (EltTy.isNull())
-          return false;
-        if (!EltTy.hasReferenceSemantics())
+      for (auto EltTy : BGT->getGenericArgs()) {
+        if (!EltTy->hasReferenceSemantics())
           return false;
         isClass = true;
       }
@@ -1933,7 +1928,7 @@ private:
     return true;
   }
 };
-} // End anonymous namespace.
+} // end anonymous namespace
 
 namespace {
 /// Clone a single exit multiple exit region starting at basic block and ending
@@ -1981,8 +1976,8 @@ public:
 
     // Clone the arguments.
     for (auto &Arg : StartBB->getArguments()) {
-      SILValue MappedArg =
-          ClonedStartBB->createArgument(getOpType(Arg->getType()));
+      SILValue MappedArg = ClonedStartBB->createPHIArgument(
+          getOpType(Arg->getType()), ValueOwnershipKind::Owned);
       ValueMap.insert(std::make_pair(Arg, MappedArg));
     }
 
@@ -2102,7 +2097,7 @@ protected:
     }
   }
 };
-} // End anonymous namespace.
+} // end anonymous namespace
 
 namespace {
 /// This class transforms a hoistable loop nest into a speculatively specialized
@@ -2130,7 +2125,7 @@ public:
 protected:
   void specializeLoopNest();
 };
-} // End anonymous namespace.
+} // end anonymous namespace
 
 static SILValue createStructExtract(SILBuilder &B, SILLocation Loc,
                                     SILValue Opd, unsigned FieldNo) {
@@ -2361,7 +2356,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
 
   StringRef getName() override { return "SIL Swift Array Optimization"; }
 };
-} // End anonymous namespace.
+} // end anonymous namespace
 
 SILTransform *swift::createSwiftArrayOpts() {
   return new SwiftArrayOptPass();

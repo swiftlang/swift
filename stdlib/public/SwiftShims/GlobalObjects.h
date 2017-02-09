@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -36,7 +36,7 @@ struct _SwiftEmptyArrayStorage {
   struct _SwiftArrayBodyStorage body;
 };
 
-extern SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_INTERFACE
 struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
 
 struct _SwiftUnsafeBitMap {
@@ -71,10 +71,10 @@ struct _SwiftEmptySetStorage {
   __swift_uintptr_t entries;
 };
 
-extern SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_INTERFACE
 struct _SwiftEmptyDictionaryStorage _swiftEmptyDictionaryStorage;
 
-extern SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_INTERFACE
 struct _SwiftEmptySetStorage _swiftEmptySetStorage;
 
 struct _SwiftHashingSecretKey {
@@ -82,10 +82,10 @@ struct _SwiftHashingSecretKey {
   __swift_uint64_t key1;
 };
 
-extern SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_INTERFACE
 struct _SwiftHashingSecretKey _swift_stdlib_Hashing_secretKey;
 
-extern SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_uint64_t _swift_stdlib_HashingDetail_fixedSeedOverride;
 
 #ifdef __cplusplus

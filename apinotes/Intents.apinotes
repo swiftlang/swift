@@ -3,3 +3,9 @@ Name: Intents
 Tags:
 - Name: INIntentErrorCode
   NSErrorDomain: INIntentErrorDomain
+Classes:
+- Name: INRequestRideIntent
+  Methods:
+  - Selector: 'initWithPickupLocation:dropOffLocation:rideOptionName:partySize:paymentMethod:'
+    MethodKind: Instance
+    SwiftPrivate: true

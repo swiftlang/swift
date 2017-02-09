@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -61,19 +61,6 @@ namespace irgen {
 /// Either a type or a forward-declaration.
 typedef llvm::PointerUnion<const TypeInfo*, llvm::Type*> TypeCacheEntry;
 
-/// A unique archetype arbitrarily chosen as an exemplar for all archetypes with
-/// the same constraints.
-class ExemplarArchetype : public llvm::FoldingSetNode,
-                          public llvm::ilist_node<ExemplarArchetype> {
-public:
-  ArchetypeType * const Archetype;
-  
-  ExemplarArchetype() : Archetype(nullptr) {}
-  ExemplarArchetype(ArchetypeType *t) : Archetype(t) {}
-  
-  void Profile(llvm::FoldingSetNodeID &ID) const;
-};
-  
 /// The helper class for generating types.
 class TypeConverter {
 public:
@@ -195,9 +182,6 @@ private:
     llvm::DenseMap<TypeBase*, TypeCacheEntry> DependentCache;
     llvm::DenseMap<TypeBase*, TypeCacheEntry> &getCacheFor(TypeBase *t);
 
-    llvm::ilist<ExemplarArchetype> ExemplarArchetypeStorage;
-    llvm::FoldingSet<ExemplarArchetype> ExemplarArchetypes;
-    
     friend TypeCacheEntry TypeConverter::getTypeEntry(CanType T);
     friend TypeCacheEntry TypeConverter::convertAnyNominalType(CanType Type,
                                                            NominalTypeDecl *D);

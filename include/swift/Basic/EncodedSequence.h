@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,6 +21,7 @@
 #ifndef SWIFT_BASIC_ENCODEDSEQUENCE_H
 #define SWIFT_BASIC_ENCODEDSEQUENCE_H
 
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/PrefixMap.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -339,7 +340,7 @@ public:
   template <class ValueType> class Map {
     // Hack: MSVC isn't able to resolve the InlineKeyCapacity part of the
     // template of PrefixMap, so we have to split it up and pass it manually.
-#if defined(_MSC_VER)
+#if SWIFT_COMPILER_IS_MSVC
     static const size_t Size = (sizeof(void*) - 1) / sizeof(Chunk);
     static const size_t ActualSize = max<size_t>(Size, 1);
 

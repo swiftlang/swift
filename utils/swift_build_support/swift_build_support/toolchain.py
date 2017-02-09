@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -51,6 +51,8 @@ _register("distcc", "distcc")
 _register("distcc_pump", "distcc-pump", "pump")
 _register("llvm_profdata", "llvm-profdata")
 _register("llvm_cov", "llvm-cov")
+_register("lipo", "lipo")
+_register("libtool", "libtool")
 
 
 class Darwin(Toolchain):

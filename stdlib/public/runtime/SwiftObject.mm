@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -391,7 +391,6 @@ bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
 /// type, but note that does not imply being known to be a ClassMetadata
 /// due to the existence of ObjCClassWrapper.
 SWIFT_RUNTIME_EXPORT
-extern "C"
 bool
 swift_objc_class_usesNativeSwiftReferenceCounting(const Metadata *theClass) {
 #if SWIFT_OBJC_INTEROP
@@ -421,7 +420,6 @@ static uintptr_t const objectPointerIsObjCBit = 0x4000000000000000ULL;
 static uintptr_t const objectPointerIsObjCBit = 0x00000002U;
 #endif
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_unknownRetain_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
@@ -433,7 +431,6 @@ void swift::swift_unknownRetain_n(void *object, int n)
     objc_retain(static_cast<id>(object));
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_unknownRelease_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
@@ -443,7 +440,6 @@ void swift::swift_unknownRelease_n(void *object, int n)
     objc_release(static_cast<id>(object));
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_unknownRetain(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
@@ -454,7 +450,6 @@ void swift::swift_unknownRetain(void *object)
   objc_retain(static_cast<id>(object));
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_unknownRelease(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
@@ -463,7 +458,6 @@ void swift::swift_unknownRelease(void *object)
   return objc_release(static_cast<id>(object));
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_nonatomic_unknownRetain_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
@@ -475,7 +469,6 @@ void swift::swift_nonatomic_unknownRetain_n(void *object, int n)
     objc_retain(static_cast<id>(object));
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_nonatomic_unknownRelease_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
@@ -485,7 +478,6 @@ void swift::swift_nonatomic_unknownRelease_n(void *object, int n)
     objc_release(static_cast<id>(object));
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_nonatomic_unknownRetain(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
@@ -496,7 +488,6 @@ void swift::swift_nonatomic_unknownRetain(void *object)
   objc_retain(static_cast<id>(object));
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_nonatomic_unknownRelease(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
   if (isObjCTaggedPointerOrNull(object)) return;
@@ -526,7 +517,6 @@ static void* toPlainObject_unTagged_bridgeObject(void *object) {
   return (void*)(uintptr_t(object) & ~unTaggedNonNativeBridgeObjectBits);
 }
 
-SWIFT_RUNTIME_EXPORT
 void *swift::swift_bridgeObjectRetain(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
@@ -589,7 +579,6 @@ void swift::swift_bridgeObjectRelease(void *object)
 #endif
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_nonatomic_bridgeObjectRelease(void *object)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
@@ -608,7 +597,6 @@ void swift::swift_nonatomic_bridgeObjectRelease(void *object)
 #endif
 }
 
-SWIFT_RUNTIME_EXPORT
 void *swift::swift_bridgeObjectRetain_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
@@ -633,7 +621,6 @@ void *swift::swift_bridgeObjectRetain_n(void *object, int n)
 #endif
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_bridgeObjectRelease_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
@@ -653,7 +640,6 @@ void swift::swift_bridgeObjectRelease_n(void *object, int n)
 #endif
 }
 
-SWIFT_RUNTIME_EXPORT
 void *swift::swift_nonatomic_bridgeObjectRetain_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
@@ -678,7 +664,6 @@ void *swift::swift_nonatomic_bridgeObjectRetain_n(void *object, int n)
 #endif
 }
 
-SWIFT_RUNTIME_EXPORT
 void swift::swift_nonatomic_bridgeObjectRelease_n(void *object, int n)
     SWIFT_CC(DefaultCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
@@ -1040,7 +1025,7 @@ bool swift::classConformsToObjCProtocol(const void *theClass,
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
+const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
                                                  const Metadata *type,
                                                  size_t numProtocols,
                                                  Protocol * const *protocols) {
@@ -1089,7 +1074,7 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
+const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
                                                 const Metadata *type,
                                                 size_t numProtocols,
                                                 Protocol * const *protocols) {
@@ -1136,9 +1121,9 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" id swift_dynamicCastObjCProtocolUnconditional(id object,
-                                                 size_t numProtocols,
-                                                 Protocol * const *protocols) {
+id swift_dynamicCastObjCProtocolUnconditional(id object,
+                                              size_t numProtocols,
+                                              Protocol * const *protocols) {
   for (size_t i = 0; i < numProtocols; ++i) {
     if (![object conformsToProtocol:protocols[i]]) {
       Class sourceType = object_getClass(object);
@@ -1151,9 +1136,9 @@ extern "C" id swift_dynamicCastObjCProtocolUnconditional(id object,
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" id swift_dynamicCastObjCProtocolConditional(id object,
-                                                 size_t numProtocols,
-                                                 Protocol * const *protocols) {
+id swift_dynamicCastObjCProtocolConditional(id object,
+                                            size_t numProtocols,
+                                            Protocol * const *protocols) {
   for (size_t i = 0; i < numProtocols; ++i) {
     if (![object conformsToProtocol:protocols[i]]) {
       return nil;
@@ -1178,7 +1163,7 @@ void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
-extern "C" Class swift_getInitializedObjCClass(Class c)
+Class swift_getInitializedObjCClass(Class c)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   // Used when we have class metadata and we want to ensure a class has been
   // initialized by the Objective-C runtime. We need to do this because the
@@ -1235,10 +1220,8 @@ static bool usesNativeSwiftReferenceCounting_nonNull(
 }
 #endif
 
-SWIFT_RT_ENTRY_VISIBILITY
-bool swift::swift_isUniquelyReferenced_nonNull_native(
-  const HeapObject* object
-) SWIFT_CC(RegisterPreservingCC_IMPL) {
+bool swift::swift_isUniquelyReferenced_nonNull_native(const HeapObject *object)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
   assert(object != nullptr);
   assert(!object->refCounts.isDeiniting());
   return object->refCounts.isUniquelyReferenced();
@@ -1334,21 +1317,17 @@ bool swift::swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(
 // Given a non-@objc object reference, return true iff the
 // object is non-nil and either has a strong reference count of 1
 // or is pinned.
-SWIFT_RT_ENTRY_VISIBILITY
-bool swift::swift_isUniquelyReferencedOrPinned_native(
-  const HeapObject* object)
+bool swift::swift_isUniquelyReferencedOrPinned_native(const HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
-  return object != nullptr
-    && swift_isUniquelyReferencedOrPinned_nonNull_native(object);
+  return object != nullptr &&
+         swift_isUniquelyReferencedOrPinned_nonNull_native(object);
 }
 
 /// Given a non-nil native swift object reference, return true if
 /// either the object has a strong reference count of 1 or its
 /// pinned flag is set.
-SWIFT_RT_ENTRY_VISIBILITY
 bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
-                                                    const HeapObject* object)
-  SWIFT_CC(RegisterPreservingCC_IMPL) {
+    const HeapObject *object) SWIFT_CC(RegisterPreservingCC_IMPL) {
   assert(object != nullptr);
   assert(!object->refCounts.isDeiniting());
   return object->refCounts.isUniquelyReferencedOrPinned();
@@ -1357,7 +1336,6 @@ bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
 using ClassExtents = TwoWordPair<size_t, size_t>;
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
-extern "C"
 ClassExtents::Return
 swift_class_getInstanceExtents(const Metadata *c) {
   assert(c && c->isClassObject());
@@ -1371,7 +1349,6 @@ swift_class_getInstanceExtents(const Metadata *c) {
 #if SWIFT_OBJC_INTEROP
 
 SWIFT_RUNTIME_EXPORT
-extern "C"
 ClassExtents::Return
 swift_objc_class_unknownGetInstanceExtents(const ClassMetadata* c) {
   // Pure ObjC classes never have negative extents.

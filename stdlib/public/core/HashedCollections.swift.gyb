@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -124,7 +124,7 @@ import SwiftShims
 // declared its actual type parameters. Similarly, the empty singleton would 
 // have to declare its actual type parameters. If the singleton was, for 
 // instance, a `HashableStorage<(), ()>`, then it would be a violation of 
-// Swift's strict  aliasing rules to pass it where a `HashableStorage<Int, Int>`
+// Swift's strict aliasing rules to pass it where a `HashableStorage<Int, Int>`
 // was expected.
 //
 // It's therefore necessary for several types to store a RawStorage, rather than
@@ -243,7 +243,6 @@ internal protocol _HashBuffer {
   @discardableResult
   mutating func removeValue(forKey key: Key) -> Value?
 
-  @discardableResult
   mutating func removeAll(keepingCapacity keepCapacity: Bool)
 
   var count: Int { get }
@@ -451,6 +450,7 @@ public struct Set<Element : Hashable> :
   internal typealias _VariantBuffer = _VariantSetBuffer<Element>
   internal typealias _NativeBuffer = _NativeSetBuffer<Element>
 
+  @_versioned
   internal var _variantBuffer: _VariantBuffer
 
   /// Creates a new, empty set with at least the specified number of elements'
@@ -1102,7 +1102,7 @@ public struct Set<Element : Hashable> :
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
   public var hashValue: Int {
-    // FIXME: <rdar://problem/18915294> Cache Set<T> hashValue
+    // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
     var result: Int = _mixInt(0)
     for member in self {
        result ^= _mixInt(member.hashValue)
@@ -1645,6 +1645,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// key-value pair.
   public typealias Element = (key: Key, value: Value)
 
+  @_versioned
   internal var _variantBuffer: _VariantBuffer
 
   /// Creates an empty dictionary.
@@ -2050,8 +2051,7 @@ public struct Dictionary<Key : Hashable, Value> :
   // Collection conformance
   //
 
-  /// A Boolean value that indicates whether the dictionary is empty. (read
-  /// only)
+  /// A Boolean value that indicates whether the dictionary is empty.
   ///
   /// Dictionaries are empty when created with an initializer or an empty
   /// dictionary literal.

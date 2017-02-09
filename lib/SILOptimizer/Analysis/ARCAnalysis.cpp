@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -633,7 +633,7 @@ findMatchingRetains(SILBasicBlock *BB) {
 
       // If this is a SILArgument of current basic block, we can split it up to
       // values in the predecessors.
-      SILArgument *SA = dyn_cast<SILArgument>(R.second);
+      auto *SA = dyn_cast<SILPHIArgument>(R.second);
       if (SA && SA->getParent() != R.first)
         SA = nullptr;
 
@@ -814,21 +814,18 @@ collectMatchingReleases(SILBasicBlock *BB) {
     SILValue OrigOp = Target->getOperand(0);
     SILValue Op = RCFI->getRCIdentityRoot(OrigOp);
 
-    // Check whether this is a SILArgument.
-    auto *Arg = dyn_cast<SILArgument>(Op);
-    // If this is not a SILArgument, maybe it is a part of a SILArgument.
-    // This is possible after we expand release instructions in SILLowerAgg pass.
-    if (!Arg) {
-      Arg = dyn_cast<SILArgument>(stripValueProjections(OrigOp));
-    }
+    // Check whether this is a SILArgument or a part of a SILArgument. This is
+    // possible after we expand release instructions in SILLowerAgg pass.
+    auto *Arg = dyn_cast<SILFunctionArgument>(stripValueProjections(Op));
+    if (!Arg)
+      break;
 
     // If Op is not a consumed argument, we must break since this is not an Op
     // that is a part of a return sequence. We are being conservative here since
     // we could make this more general by allowing for intervening non-arg
     // releases in the sense that we do not allow for race conditions in between
     // destructors.
-    if (!Arg || !Arg->isFunctionArg() ||
-        !Arg->hasConvention(SILArgumentConvention::Direct_Owned))
+    if (!Arg->hasConvention(SILArgumentConvention::Direct_Owned))
       break;
 
     // Ok, we have a release on a SILArgument that is direct owned. Attempt to

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,35 +16,28 @@
 //===----------------------------------------------------------------------===//
 
 #include "DebugTypeInfo.h"
-#include "IRGen.h"
 #include "FixedTypeInfo.h"
+#include "IRGen.h"
+#include "swift/SIL/SILGlobalVariable.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace irgen;
 
-DebugTypeInfo::DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy,
-                             uint64_t SizeInBytes, uint32_t AlignInBytes,
-                             DeclContext *DC)
-    : DeclCtx(DC), Type(Ty.getPointer()), StorageType(StorageTy),
-      size(SizeInBytes), align(AlignInBytes) {
+DebugTypeInfo::DebugTypeInfo(DeclContext *DC, swift::Type Ty,
+                             llvm::Type *StorageTy, Size size, Alignment align)
+    : DeclCtx(DC), Type(Ty.getPointer()), StorageType(StorageTy), size(size),
+      align(align) {
+  assert((!isArchetype() || (isArchetype() && DC)) &&
+         "archetype without a declcontext");
   assert(StorageType && "StorageType is a nullptr");
   assert(align.getValue() != 0);
 }
 
-DebugTypeInfo::DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy, Size size,
-                             Alignment align, DeclContext *DC)
-    : DeclCtx(DC), Type(Ty.getPointer()), StorageType(StorageTy),
-      size(size), align(align) {
-  assert(StorageType && "StorageType is a nullptr");
-  assert(align.getValue() != 0);
-}
-
-static void
-initFromTypeInfo(Size &size, Alignment &align, llvm::Type *&StorageType,
-                 const TypeInfo &Info) {
-  StorageType = Info.getStorageType();
+DebugTypeInfo DebugTypeInfo::getFromTypeInfo(DeclContext *DC, swift::Type Ty,
+                                             const TypeInfo &Info) {
+  Size size;
   if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
     size = FixTy.getFixedSize();
@@ -53,80 +46,76 @@ initFromTypeInfo(Size &size, Alignment &align, llvm::Type *&StorageType,
     // encounter one.
     size = Size(0);
   }
-  align = Info.getBestKnownAlignment();
-  assert(align.getValue() != 0);
-  assert(StorageType && "StorageType is a nullptr");
+  return DebugTypeInfo(DC, Ty.getPointer(), Info.getStorageType(), size,
+                       Info.getBestKnownAlignment());
 }
 
-DebugTypeInfo::DebugTypeInfo(swift::Type Ty, const TypeInfo &Info,
-                             DeclContext *DC)
-    : DeclCtx(DC), Type(Ty.getPointer()) {
-  initFromTypeInfo(size, align, StorageType, Info);
-}
+DebugTypeInfo DebugTypeInfo::getLocalVariable(DeclContext *DeclCtx,
+                                              VarDecl *Decl, swift::Type Ty,
+                                              const TypeInfo &Info,
+                                              bool Unwrap) {
 
-DebugTypeInfo::DebugTypeInfo(TypeDecl *Decl, const TypeInfo &Info)
-    : DeclCtx(Decl->getDeclContext()) {
-  // Use the sugared version of the type, if there is one.
-  if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl))
-    Type = AliasDecl->getAliasType();
-  else
-    Type = Decl->getInterfaceType().getPointer();
-
-  initFromTypeInfo(size, align, StorageType, Info);
-}
-
-DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, llvm::Type *StorageTy, Size size,
-                             Alignment align)
-    : DeclCtx(Decl->getDeclContext()), StorageType(StorageTy), size(size),
-      align(align) {
-  // Use the sugared version of the type, if there is one.
-  if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl))
-    Type = AliasDecl->getAliasType();
-  else
-    Type = Decl->getInterfaceType().getPointer();
-
-  assert(StorageType && "StorageType is a nullptr");
-  assert(align.getValue() != 0);
-}
-
-DebugTypeInfo::DebugTypeInfo(VarDecl *Decl, swift::Type Ty,
-                             const TypeInfo &Info, bool Unwrap)
-    : DeclCtx(Decl->getDeclContext()) {
-  // Prefer the original, potentially sugared version of the type if
-  // the type hasn't been mucked with by an optimization pass.
-  CanType DeclType = Decl->getType()->getCanonicalType();
-  CanType RealType = Ty.getCanonicalTypeOrNull();
+  auto DeclType = Ty;
+  if (DeclCtx)
+    DeclType = (Decl->hasType()
+                    ? Decl->getType()
+                    : DeclCtx->mapTypeIntoContext(Decl->getInterfaceType()));
+  auto RealType = Ty;
   if (Unwrap) {
-    DeclType = DeclType.getLValueOrInOutObjectType();
-    RealType = RealType.getLValueOrInOutObjectType();
+    DeclType = DeclType->getInOutObjectType();
+    RealType = RealType->getInOutObjectType();
   }
 
-  // Desugar for comparison.
-  DeclType = DeclType->getDesugaredType()->getCanonicalType();
   // DynamicSelfType is also sugar as far as debug info is concerned.
-  if (auto DynSelfTy = dyn_cast<DynamicSelfType>(DeclType))
-    DeclType = DynSelfTy->getSelfType()->getCanonicalType();
-  RealType = RealType->getDesugaredType()->getCanonicalType();
+  auto DeclSelfType = DeclType;
+  if (auto DynSelfTy = DeclType->getAs<DynamicSelfType>())
+    DeclSelfType = DynSelfTy->getSelfType();
 
-  if ((DeclType == RealType) || isa<AnyFunctionType>(DeclType))
-    Type = Unwrap ? Decl->getType()->getLValueOrInOutObjectType().getPointer()
-                  : Decl->getType().getPointer();
-  else
-    Type = RealType.getPointer();
-
-  initFromTypeInfo(size, align, StorageType, Info);
-}
-
-DebugTypeInfo::DebugTypeInfo(VarDecl *Decl, swift::Type Ty,
-                             llvm::Type *StorageTy, Size size, Alignment align)
-    : DeclCtx(Decl->getDeclContext()), StorageType(StorageTy), size(size),
-      align(align) {
   // Prefer the original, potentially sugared version of the type if
   // the type hasn't been mucked with by an optimization pass.
-  if (Decl->getType().getCanonicalTypeOrNull() == Ty.getCanonicalTypeOrNull())
-    Type = Decl->getType().getPointer();
-  else
-    Type = Ty.getPointer();
+  auto *Type = DeclSelfType->isEqual(RealType) ? DeclType.getPointer()
+                                               : RealType.getPointer();
+  return getFromTypeInfo(DeclCtx, Type, Info);
+}
+
+DebugTypeInfo DebugTypeInfo::getMetadata(swift::Type Ty, llvm::Type *StorageTy,
+                                         Size size, Alignment align) {
+  DebugTypeInfo DbgTy = {nullptr, Ty.getPointer(), StorageTy, size, align};
+  assert(!DbgTy.isArchetype() && "type metadata cannot contain an archetype");
+  return DbgTy;
+}
+
+DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
+                                       llvm::Type *StorageTy, Size size,
+                                       Alignment align) {
+  // Prefer the original, potentially sugared version of the type if
+  // the type hasn't been mucked with by an optimization pass.
+  auto LowTy = GV->getLoweredType().getSwiftType();
+  auto *Type = LowTy.getPointer();
+  if (auto *Decl = GV->getDecl()) {
+    auto DeclType =
+        (Decl->hasType() ? Decl->getType()
+                         : Decl->getDeclContext()->mapTypeIntoContext(
+                               Decl->getInterfaceType()));
+    if (DeclType->isEqual(LowTy))
+      Type = DeclType.getPointer();
+  }
+  DebugTypeInfo DbgTy = {nullptr, Type, StorageTy, size, align};
+  assert(StorageTy && "StorageType is a nullptr");
+  assert(!DbgTy.isArchetype() &&
+         "type of a global var cannot contain an archetype");
+  assert(align.getValue() != 0);
+  return DbgTy;
+}
+
+DebugTypeInfo DebugTypeInfo::getObjCClass(ClassDecl *theClass,
+                                          llvm::Type *StorageType, Size size,
+                                          Alignment align) {
+  DebugTypeInfo DbgTy(nullptr, theClass->getInterfaceType().getPointer(),
+                      StorageType, size, align);
+  assert(!DbgTy.isArchetype() &&
+         "type of an objc class cannot contain an archetype");
+  return DbgTy;
 }
 
 static bool typesEqual(Type A, Type B) {
@@ -139,7 +128,7 @@ static bool typesEqual(Type A, Type B) {
 
   // Tombstone.
   auto Tombstone =
-    llvm::DenseMapInfo<swift::Type>::getTombstoneKey().getPointer();
+      llvm::DenseMapInfo<swift::Type>::getTombstoneKey().getPointer();
   if ((A.getPointer() == Tombstone) || (B.getPointer() == Tombstone))
     return false;
 
@@ -148,14 +137,11 @@ static bool typesEqual(Type A, Type B) {
 }
 
 bool DebugTypeInfo::operator==(DebugTypeInfo T) const {
-  return typesEqual(getType(), T.getType())
-    && size == T.size
-    && align == T.align;
+  return typesEqual(getType(), T.getType()) && size == T.size &&
+         align == T.align;
 }
 
-bool DebugTypeInfo::operator!=(DebugTypeInfo T) const {
-  return !operator==(T);
-}
+bool DebugTypeInfo::operator!=(DebugTypeInfo T) const { return !operator==(T); }
 
 TypeDecl *DebugTypeInfo::getDecl() const {
   if (auto *N = dyn_cast<NominalType>(Type))
@@ -169,9 +155,10 @@ TypeDecl *DebugTypeInfo::getDecl() const {
   return nullptr;
 }
 
-void DebugTypeInfo::dump() const {
-  llvm::errs() << "[Size " << size.getValue()
-               << " Alignment " << align.getValue()<<"] ";
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
+  llvm::errs() << "[Size " << size.getValue() << " Alignment "
+               << align.getValue() << "] ";
 
   getType()->dump();
   if (StorageType) {
@@ -179,3 +166,4 @@ void DebugTypeInfo::dump() const {
     StorageType->dump();
   }
 }
+#endif

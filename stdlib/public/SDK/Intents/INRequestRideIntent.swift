@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,8 +13,8 @@
 @_exported import Intents
 import Foundation
 
-#if os(iOS)
-@available(iOS 10.0, *)
+#if os(iOS) || os(watchOS)
+@available(iOS 10.0, watchOS 3.2, *)
 extension INRequestRideIntent {
   @nonobjc
   public convenience init(
@@ -22,13 +22,23 @@ extension INRequestRideIntent {
     dropOffLocation: CLPlacemark? = nil,
     rideOptionName: INSpeakableString? = nil,
     partySize: Int? = nil,
-    paymentMethod: INPaymentMethod? = nil
+    paymentMethod: INPaymentMethod? = nil,
+    scheduledPickupTime: INDateComponentsRange? = nil
   ) {
-    self.init(__pickupLocation: pickupLocation,
-      dropOffLocation: dropOffLocation,
-      rideOptionName: rideOptionName,
-      partySize: partySize.map { NSNumber(value: $0) },
-      paymentMethod: paymentMethod)
+    if #available(iOS 10.3, *) {
+      self.init(__pickupLocation: pickupLocation,
+        dropOffLocation: dropOffLocation,
+        rideOptionName: rideOptionName,
+        partySize: partySize.map { NSNumber(value: $0) },
+        paymentMethod: paymentMethod,
+        scheduledPickupTime: scheduledPickupTime)
+    } else {
+      self.init(__pickupLocation: pickupLocation,
+        dropOffLocation: dropOffLocation,
+        rideOptionName: rideOptionName,
+        partySize: partySize.map { NSNumber(value: $0) },
+        paymentMethod: paymentMethod)
+    }
   }
 
   @nonobjc

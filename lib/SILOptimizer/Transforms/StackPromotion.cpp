@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -300,12 +300,8 @@ public:
                          NonUnreachableBlockIter rhs) {
     return lhs.BaseIterator == rhs.BaseIterator;
   }
-  friend bool operator!=(NonUnreachableBlockIter lhs,
-                         NonUnreachableBlockIter rhs) {
-    return !(lhs == rhs);
-  }
 };
-}
+} // end anonymous namespace
 
 namespace llvm {
 
@@ -320,19 +316,21 @@ template <> struct GraphTraits<StackPromoter *>
     return &SP->getFunction()->front();
   }
 
-  typedef NonUnreachableBlockIter nodes_iterator;
+  typedef pointer_iterator<NonUnreachableBlockIter> nodes_iterator;
   static nodes_iterator nodes_begin(GraphType SP) {
-    return nodes_iterator(SP->getFunction()->begin(), SP->getFunction()->end());
+    return nodes_iterator(NonUnreachableBlockIter(SP->getFunction()->begin(),
+                                                  SP->getFunction()->end()));
   }
   static nodes_iterator nodes_end(GraphType SP) {
-    return nodes_iterator(SP->getFunction()->end(), SP->getFunction()->end());
+    return nodes_iterator(NonUnreachableBlockIter(SP->getFunction()->end(),
+                                                  SP->getFunction()->end()));
   }
   static unsigned size(GraphType SP) {
     return std::distance(SP->getFunction()->begin(), SP->getFunction()->end());
   }
 };
 
-}
+} // namespace llvm
 
 bool StackPromoter::canPromoteAlloc(AllocRefInst *ARI,
                                     SILInstruction *&AllocInsertionPoint,

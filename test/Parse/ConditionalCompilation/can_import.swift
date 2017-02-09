@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library
 // RUN: %target-typecheck-verify-swift -D WITH_PERFORM -primary-file %s %S/Inputs/can_import_nonprimary_file.swift
 
+// REQUIRES: can_import
+
 public struct LibraryDependentBool : ExpressibleByBooleanLiteral {
 #if canImport(Swift)
   var _description: String
@@ -94,3 +96,19 @@ func performPerOS() -> Int {
   return performFoo(withX: value, andY: value)
 }
 #endif
+
+let osName: String = {
+#if os(iOS)
+  return "iOS"
+#elseif os(watchOS)
+  return "watchOS"
+#elseif os(tvOS)
+  return "tvOS"
+#elseif os(OSX)
+  return "OS X"
+#elseif os(Linux)
+  return "Linux"
+#else
+  return "Unknown"
+#endif
+}()

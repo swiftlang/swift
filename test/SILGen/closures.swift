@@ -28,7 +28,7 @@ func return_local_generic_function_with_captures<A, R>(_ a: A) -> (A) -> R {
 func read_only_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
-  // CHECK:   [[XBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK:   [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
   // SEMANTIC ARC TODO: This is incorrect. We need to do the project_box on the copy.
   // CHECK:   [[PROJECT:%.*]] = project_box [[XBOX]]
   // CHECK:   store [[X]] to [trivial] [[PROJECT]]
@@ -41,7 +41,7 @@ func read_only_capture(_ x: Int) -> Int {
   // CHECK:   [[XBOX_COPY:%.*]] = copy_value [[XBOX]]
   // SEMANTIC ARC TODO: See above. This needs to happen on the copy_valued box.
   // CHECK:   mark_function_escape [[PROJECT]]
-  // CHECK:   [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:_TFF8closures17read_only_capture.*]] : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
+  // CHECK:   [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:_TFF8closures17read_only_capture.*]] : $@convention(thin) (@owned { var Int }) -> Int
   // CHECK:   [[RET:%[0-9]+]] = apply [[CAP]]([[XBOX_COPY]])
   // CHECK:   destroy_value [[XBOX]]
   // CHECK:   return [[RET]]
@@ -49,7 +49,7 @@ func read_only_capture(_ x: Int) -> Int {
 // CHECK:   } // end sil function '_TF8closures17read_only_captureFSiSi'
 
 // CHECK: sil shared @[[CAP_NAME]]
-// CHECK: bb0([[XBOX:%[0-9]+]] : $<τ_0_0> { var τ_0_0 } <Int>):
+// CHECK: bb0([[XBOX:%[0-9]+]] : ${ var Int }):
 // CHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
 // CHECK: [[X:%[0-9]+]] = load [trivial] [[XADDR]]
 // CHECK: destroy_value [[XBOX]]
@@ -61,10 +61,10 @@ func read_only_capture(_ x: Int) -> Int {
 func write_to_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
-  // CHECK:   [[XBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK:   [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX]]
   // CHECK:   store [[X]] to [trivial] [[XBOX_PB]]
-  // CHECK:   [[X2BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK:   [[X2BOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   [[X2BOX_PB:%.*]] = project_box [[X2BOX]]
   // CHECK:   copy_addr [[XBOX_PB]] to [initialization] [[X2BOX_PB]]
   // CHECK:   [[X2BOX_COPY:%.*]] = copy_value [[X2BOX]]
@@ -77,7 +77,7 @@ func write_to_capture(_ x: Int) -> Int {
   }
 
   scribble()
-  // CHECK:   [[SCRIB:%[0-9]+]] = function_ref @[[SCRIB_NAME:_TFF8closures16write_to_capture.*]] : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
+  // CHECK:   [[SCRIB:%[0-9]+]] = function_ref @[[SCRIB_NAME:_TFF8closures16write_to_capture.*]] : $@convention(thin) (@owned { var Int }) -> ()
   // CHECK:   apply [[SCRIB]]([[X2BOX_COPY]])
   // SEMANTIC ARC TODO: This should load from X2BOX_COPY project. There is an
   // issue here where after a copy_value, we need to reassign a projection in
@@ -91,7 +91,7 @@ func write_to_capture(_ x: Int) -> Int {
 // CHECK:  } // end sil function '_TF8closures16write_to_captureFSiSi'
 
 // CHECK: sil shared @[[SCRIB_NAME]]
-// CHECK: bb0([[XBOX:%[0-9]+]] : $<τ_0_0> { var τ_0_0 } <Int>):
+// CHECK: bb0([[XBOX:%[0-9]+]] : ${ var Int }):
 // CHECK:   [[XADDR:%[0-9]+]] = project_box [[XBOX]]
 // CHECK:   copy_addr {{%[0-9]+}} to [[XADDR]]
 // CHECK:   destroy_value [[XBOX]]
@@ -106,9 +106,9 @@ func multiple_closure_refs(_ x: Int) -> (() -> Int, () -> Int) {
   }
 
   return (cap, cap)
-  // CHECK: [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:_TFF8closures21multiple_closure_refs.*]] : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
+  // CHECK: [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:_TFF8closures21multiple_closure_refs.*]] : $@convention(thin) (@owned { var Int }) -> Int
   // CHECK: [[CAP_CLOSURE_1:%[0-9]+]] = partial_apply [[CAP]]
-  // CHECK: [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:_TFF8closures21multiple_closure_refs.*]] : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
+  // CHECK: [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:_TFF8closures21multiple_closure_refs.*]] : $@convention(thin) (@owned { var Int }) -> Int
   // CHECK: [[CAP_CLOSURE_2:%[0-9]+]] = partial_apply [[CAP]]
   // CHECK: [[RET:%[0-9]+]] = tuple ([[CAP_CLOSURE_1]] : {{.*}}, [[CAP_CLOSURE_2]] : {{.*}})
   // CHECK: return [[RET]]
@@ -118,14 +118,14 @@ func multiple_closure_refs(_ x: Int) -> (() -> Int, () -> Int) {
 func capture_local_func(_ x: Int) -> () -> () -> Int {
   // CHECK: bb0([[ARG:%.*]] : $Int):
   var x = x
-  // CHECK:   [[XBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK:   [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX]]
   // CHECK:   store [[ARG]] to [trivial] [[XBOX_PB]]
 
   func aleph() -> Int { return x }
 
   func beth() -> () -> Int { return aleph }
-  // CHECK: [[BETH_REF:%.*]] = function_ref @[[BETH_NAME:_TFF8closures18capture_local_funcFSiFT_FT_SiL_4bethfT_FT_Si]] : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> @owned @callee_owned () -> Int
+  // CHECK: [[BETH_REF:%.*]] = function_ref @[[BETH_NAME:_TFF8closures18capture_local_funcFSiFT_FT_SiL_4bethfT_FT_Si]] : $@convention(thin) (@owned { var Int }) -> @owned @callee_owned () -> Int
   // CHECK: [[XBOX_COPY:%.*]] = copy_value [[XBOX]]
   // SEMANTIC ARC TODO: This is incorrect. This should be a project_box from XBOX_COPY.
   // CHECK: mark_function_escape [[XBOX_PB]]
@@ -137,13 +137,13 @@ func capture_local_func(_ x: Int) -> () -> () -> Int {
 }
 // CHECK: } // end sil function '_TF8closures18capture_local_funcFSiFT_FT_Si'
 
-// CHECK: sil shared @[[ALEPH_NAME:_TFF8closures18capture_local_funcFSiFT_FT_SiL_5alephfT_Si]] : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
-// CHECK: bb0([[XBOX:%[0-9]+]] : $<τ_0_0> { var τ_0_0 } <Int>):
+// CHECK: sil shared @[[ALEPH_NAME:_TFF8closures18capture_local_funcFSiFT_FT_SiL_5alephfT_Si]] : $@convention(thin) (@owned { var Int }) -> Int {
+// CHECK: bb0([[XBOX:%[0-9]+]] : ${ var Int }):
 
-// CHECK: sil shared @[[BETH_NAME]] : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> @owned @callee_owned () -> Int {
-// CHECK: bb0([[XBOX:%[0-9]+]] : $<τ_0_0> { var τ_0_0 } <Int>):
+// CHECK: sil shared @[[BETH_NAME]] : $@convention(thin) (@owned { var Int }) -> @owned @callee_owned () -> Int {
+// CHECK: bb0([[XBOX:%[0-9]+]] : ${ var Int }):
 // CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX]]
-// CHECK:   [[ALEPH_REF:%[0-9]+]] = function_ref @[[ALEPH_NAME]] : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
+// CHECK:   [[ALEPH_REF:%[0-9]+]] = function_ref @[[ALEPH_NAME]] : $@convention(thin) (@owned { var Int }) -> Int
 // CHECK:   [[XBOX_COPY:%.*]] = copy_value [[XBOX]]
 // SEMANTIC ARC TODO: This should be on a PB from XBOX_COPY.
 // CHECK:   mark_function_escape [[XBOX_PB]]
@@ -156,7 +156,7 @@ func capture_local_func(_ x: Int) -> () -> () -> Int {
 func anon_read_only_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
-  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PB:%.*]] = project_box [[XBOX]]
 
   return ({ x })()
@@ -177,7 +177,7 @@ func anon_read_only_capture(_ x: Int) -> Int {
 func small_closure_capture(_ x: Int) -> Int {
   var x = x
   // CHECK: bb0([[X:%[0-9]+]] : $Int):
-  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PB:%.*]] = project_box [[XBOX]]
 
   return { x }()
@@ -198,19 +198,19 @@ func small_closure_capture(_ x: Int) -> Int {
 // CHECK-LABEL: sil hidden @_TF8closures35small_closure_capture_with_argument
 func small_closure_capture_with_argument(_ x: Int) -> (_ y: Int) -> Int {
   var x = x
-  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
 
   return { x + $0 }
   // -- func expression
-  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures35small_closure_capture_with_argument.*]] : $@convention(thin) (Int, @owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
+  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures35small_closure_capture_with_argument.*]] : $@convention(thin) (Int, @owned { var Int }) -> Int
   // CHECK: [[XBOX_COPY:%.*]] = copy_value [[XBOX]]
   // CHECK: [[ANON_CLOSURE_APP:%[0-9]+]] = partial_apply [[ANON]]([[XBOX_COPY]])
   // -- return
   // CHECK: destroy_value [[XBOX]]
   // CHECK: return [[ANON_CLOSURE_APP]]
 }
-// CHECK: sil shared @[[CLOSURE_NAME]] : $@convention(thin) (Int, @owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
-// CHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int, [[XBOX:%[0-9]+]] : $<τ_0_0> { var τ_0_0 } <Int>):
+// CHECK: sil shared @[[CLOSURE_NAME]] : $@convention(thin) (Int, @owned { var Int }) -> Int
+// CHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int, [[XBOX:%[0-9]+]] : ${ var Int }):
 // CHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
 // CHECK: [[PLUS:%[0-9]+]] = function_ref @_TFsoi1pFTSiSi_Si{{.*}}
 // CHECK: [[LHS:%[0-9]+]] = load [trivial] [[XADDR]]
@@ -233,12 +233,12 @@ func uncaptured_locals(_ x: Int) -> (Int, Int) {
   var x = x
   // -- locals without captures are stack-allocated
   // CHECK: bb0([[XARG:%[0-9]+]] : $Int):
-  // CHECK:   [[XADDR:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK:   [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   [[PB:%.*]] = project_box [[XADDR]]
   // CHECK:   store [[XARG]] to [trivial] [[PB]]
 
   var y = zero
-  // CHECK:   [[YADDR:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  // CHECK:   [[YADDR:%[0-9]+]] = alloc_box ${ var Int }
   return (x, y)
 
 }
@@ -355,8 +355,10 @@ func closeOverLetLValue() {
 // CHECK:   [[TMP_CLASS_ADDR:%.*]] = alloc_stack $ClassWithIntProperty, let, name "a", argno 1
 // CHECK:   store [[ARG]] to [init] [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
 // CHECK:   [[LOADED_CLASS:%.*]] = load [copy] [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
-// CHECK:   [[INT_IN_CLASS_ADDR:%.*]] = ref_element_addr [[LOADED_CLASS]] : $ClassWithIntProperty, #ClassWithIntProperty.x
+// CHECK:   [[BORROWED_LOADED_CLASS:%.*]] = begin_borrow [[LOADED_CLASS]]
+// CHECK:   [[INT_IN_CLASS_ADDR:%.*]] = ref_element_addr [[BORROWED_LOADED_CLASS]] : $ClassWithIntProperty, #ClassWithIntProperty.x
 // CHECK:   [[INT_IN_CLASS:%.*]] = load [trivial] [[INT_IN_CLASS_ADDR]] : $*Int
+// CHECK:   end_borrow [[BORROWED_LOADED_CLASS]] from [[LOADED_CLASS]]
 // CHECK:   destroy_value [[LOADED_CLASS]]
 // CHECK:   destroy_addr [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
 // CHECK:   dealloc_stack %1 : $*ClassWithIntProperty
@@ -624,7 +626,7 @@ class SuperSub : SuperBase {
 // CHECK-LABEL: sil hidden @_TFC8closures24UnownedSelfNestedCapture13nestedCapture{{.*}} : $@convention(method) (@guaranteed UnownedSelfNestedCapture) -> ()
 // -- We enter with an assumed strong +1.
 // CHECK:  bb0([[SELF:%.*]] : $UnownedSelfNestedCapture):
-// CHECK:         [[OUTER_SELF_CAPTURE:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <@sil_unowned UnownedSelfNestedCapture>
+// CHECK:         [[OUTER_SELF_CAPTURE:%.*]] = alloc_box ${ var @sil_unowned UnownedSelfNestedCapture }
 // CHECK:         [[PB:%.*]] = project_box [[OUTER_SELF_CAPTURE]]
 // -- strong +2
 // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -719,3 +721,26 @@ func r25993258_helper(_ fn: (inout Int, Int) -> ()) {}
 func r25993258() {
   r25993258_helper { _ in () }
 }
+
+// rdar://29810997
+//
+// Using a let from a closure in an init was causing the type-checker
+// to produce invalid AST: 'self.fn' was an l-value, but 'self' was already
+// loaded to make an r-value.  This was ultimately because CSApply was
+// building the member reference correctly in the context of the closure,
+// where 'fn' is not settable, but CSGen / CSSimplify was processing it
+// in the general DC of the constraint system, i.e. the init, where
+// 'fn' *is* settable.
+func r29810997_helper(_ fn: (Int) -> Int) -> Int { return fn(0) }
+struct r29810997 {
+    private let fn: (Int) -> Int
+    private var x: Int
+
+    init(function: @escaping (Int) -> Int) {
+        fn = function
+        x = r29810997_helper { fn($0) }
+    }
+}
+
+//   DI will turn this into a direct capture of the specific stored property.
+// CHECK-LABEL: sil hidden @_TF8closures16r29810997_helperFFSiSiSi : $@convention(thin) (@owned @callee_owned (Int) -> Int) -> Int

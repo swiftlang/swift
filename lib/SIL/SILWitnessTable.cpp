@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -22,6 +22,7 @@
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/SmallString.h"
 
@@ -137,9 +138,7 @@ void SILWitnessTable::convertToDefinition(ArrayRef<Entry> entries,
   IsDeclaration = false;
   IsFragile = isFragile;
 
-  void *buf = Mod.allocate(sizeof(Entry)*entries.size(), alignof(Entry));
-  memcpy(buf, entries.begin(), sizeof(Entry)*entries.size());
-  Entries = MutableArrayRef<Entry>(static_cast<Entry*>(buf), entries.size());
+  Entries = Mod.allocateCopy(entries);
 
   // Bump the reference count of witness functions referenced by this table.
   for (auto entry : getEntries()) {

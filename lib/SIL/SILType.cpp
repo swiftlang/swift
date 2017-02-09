@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILType.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
@@ -72,7 +73,9 @@ bool SILType::isReferenceCounted(SILModule &M) const {
 
 bool SILType::isNoReturnFunction() const {
   if (auto funcTy = dyn_cast<SILFunctionType>(getSwiftRValueType()))
-    return funcTy->getSILResult().getSwiftRValueType()->isUninhabited();
+    return funcTy->getDirectFormalResultsType()
+        .getSwiftRValueType()
+        ->isUninhabited();
 
   return false;
 }
@@ -176,7 +179,7 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
   if (EnumDecl *toEnum = toType.getEnumOrBoundGenericEnum()) {
     for (auto toElement : toEnum->getAllElements()) {
       ++numToElements;
-      if (!toElement->hasArgumentType())
+      if (!toElement->getArgumentInterfaceType())
         continue;
       // Bail on multiple payloads.
       if (!toElementTy.isNull())
@@ -190,7 +193,8 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
   }
   // If toType has more elements, it may be larger.
   auto fromElements = fromEnum->getAllElements();
-  if (numToElements > std::distance(fromElements.begin(), fromElements.end()))
+  if (static_cast<ptrdiff_t>(numToElements) >
+      std::distance(fromElements.begin(), fromElements.end()))
     return false;
 
   if (toElementTy.isNull())
@@ -199,7 +203,7 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
   // If any of the fromElements can be cast by value to the singleton toElement,
   // then the overall enum can be cast by value.
   for (auto fromElement : fromElements) {
-    if (!fromElement->hasArgumentType())
+    if (!fromElement->getArgumentInterfaceType())
       continue;
 
     auto fromElementTy = fromType.getEnumElementType(fromElement, M);
@@ -307,7 +311,7 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
 
 SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
-  assert(elt->hasArgumentType());
+  assert(elt->getArgumentInterfaceType());
 
   if (auto objectType = getSwiftRValueType().getAnyOptionalObjectType()) {
     assert(elt == M.getASTContext().getOptionalSomeDecl());
@@ -315,8 +319,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   }
 
   auto substEltTy =
-    getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(),
-                                          elt, nullptr,
+    getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(), elt,
                                           elt->getArgumentInterfaceType());
   auto loweredTy =
     M.Types.getLoweredType(M.Types.getAbstractionPattern(elt), substEltTy);
@@ -337,7 +340,7 @@ bool SILType::isAddressOnly(SILModule &M) const {
 }
 
 SILType SILType::substGenericArgs(SILModule &M,
-                                  ArrayRef<Substitution> Subs) const {
+                                  SubstitutionList Subs) const {
   SILFunctionType *fnTy = getSwiftRValueType()->castTo<SILFunctionType>();
   if (Subs.empty()) {
     assert(!fnTy->isPolymorphic() && "function type without subs must not "
@@ -350,7 +353,7 @@ SILType SILType::substGenericArgs(SILModule &M,
   return SILType::getPrimitiveObjectType(canFnTy);
 }
 
-ArrayRef<Substitution> SILType::gatherAllSubstitutions(SILModule &M) {
+SubstitutionList SILType::gatherAllSubstitutions(SILModule &M) {
   return getSwiftRValueType()->gatherAllSubstitutions(M.getSwiftModule(),
                                                       nullptr);
 }
@@ -410,7 +413,7 @@ bool SILType::aggregateContainsRecord(SILType Record, SILModule &Mod) const {
     // Then if we have an enum...
     if (EnumDecl *E = Ty.getEnumOrBoundGenericEnum()) {
       for (auto Elt : E->getAllElements())
-        if (Elt->hasArgumentType())
+        if (Elt->getArgumentInterfaceType())
           Worklist.push_back(Ty.getEnumElementType(Elt, Mod));
       continue;
     }
@@ -548,5 +551,79 @@ SILType::canUseExistentialRepresentation(SILModule &M,
   case ExistentialRepresentation::Metatype:
     return is<ExistentialMetatypeType>();
   }
+
+  llvm_unreachable("Unhandled ExistentialRepresentation in switch.");
 }
 
+SILType SILType::getReferentType(SILModule &M) const {
+  ReferenceStorageType *Ty =
+      getSwiftRValueType()->castTo<ReferenceStorageType>();
+  return M.Types.getLoweredType(Ty->getReferentType()->getCanonicalType());
+}
+
+CanType
+SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
+  auto fieldTy = getLayout()->getFields()[index].getLoweredType();
+  
+  // Apply generic arguments if the layout is generic.
+  if (!getGenericArgs().empty()) {
+    // FIXME: Map the field type into the layout's generic context because
+    // SIL TypeLowering currently expects to lower abstract generic parameters
+    // with a generic context pushed, but nested generic contexts are not
+    // supported by TypeLowering. If TypeLowering were properly
+    // de-contextualized and plumbed through the generic signature, this could
+    // be avoided.
+    auto *env = getLayout()->getGenericSignature()
+      .getGenericEnvironment(*M.getSwiftModule());
+    auto substMap =
+      env->getSubstitutionMap(getGenericArgs());
+    fieldTy = env->mapTypeIntoContext(fieldTy)
+      ->getCanonicalType();
+    
+    fieldTy = SILType::getPrimitiveObjectType(fieldTy)
+      .subst(M, substMap)
+      .getSwiftRValueType();
+  }
+  return fieldTy;
+}
+
+ValueOwnershipKind
+SILResultInfo::getOwnershipKind(SILModule &M,
+                                CanGenericSignature signature) const {
+  GenericContextScope GCS(M.Types, signature);
+  bool IsTrivial = getSILStorageType().isTrivial(M);
+  switch (getConvention()) {
+  case ResultConvention::Indirect:
+    return SILModuleConventions(M).isSILIndirect(*this)
+               ? ValueOwnershipKind::Trivial
+               : ValueOwnershipKind::Owned;
+  case ResultConvention::Autoreleased:
+  case ResultConvention::Owned:
+    return ValueOwnershipKind::Owned;
+  case ResultConvention::Unowned:
+  case ResultConvention::UnownedInnerPointer:
+    if (IsTrivial)
+      return ValueOwnershipKind::Trivial;
+    return ValueOwnershipKind::Unowned;
+  }
+
+  llvm_unreachable("Unhandled ResultConvention in switch.");
+}
+
+SILModuleConventions::SILModuleConventions(const SILModule &M)
+    : loweredAddresses(!M.getASTContext().LangOpts.EnableSILOpaqueValues) {}
+
+bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
+                                                     SILModule &M) {
+  if (SILModuleConventions(M).loweredAddresses)
+    return type.isAddressOnly(M);
+
+  return false;
+}
+
+bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
+  if (SILModuleConventions(M).loweredAddresses)
+    return type.isAddressOnly(M);
+
+  return false;
+}

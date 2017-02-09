@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,24 +16,17 @@
 
 extension ${Self} : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    // this code comes straight from the quicklooks
+    let data = (self as AnyObject)._copyImageData?() as Data?
 
-    let data = (self as AnyObject)._copyImageData?()
     // we could send a Raw, but I don't want to make a copy of the
     // bytes for no good reason make an NSImage out of them and
     // send that
 #if os(OSX)
-    if let data = data {
-      return .sprite(NSImage(data: data as Data))
-    } else {
-      return .sprite(NSImage())
-    }
+    let image = data.flatMap(NSImage.init(data:)) ?? NSImage()
 #elseif os(iOS) || os(watchOS) || os(tvOS)
-    if let data = data {
-      return .sprite(UIImage(data: data as Data))
-    } else {
-      return .sprite(UIImage())
-    }
+    let image = data.flatMap(UIImage.init(data:)) ?? UIImage() 
 #endif
+
+    return .sprite(image)
   }
 }

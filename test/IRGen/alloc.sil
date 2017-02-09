@@ -1,12 +1,12 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -module-name main %s -emit-ir -o - | %FileCheck %s
-// RUN: %swift -target i386-apple-ios7.0 %s -module-name main -emit-ir -o - | %FileCheck %s
-// RUN: %swift -target x86_64-apple-ios7.0 %s -module-name main -emit-ir -o - | %FileCheck %s
-// RUN: %swift -target armv7-apple-ios7.0 %s -module-name main -emit-ir -o - | %FileCheck %s
-// RUN: %swift -target arm64-apple-ios7.0 %s -module-name main -emit-ir -o - | %FileCheck %s
-// RUN: %swift -target x86_64-unknown-linux-gnu %s -disable-objc-interop -module-name main -emit-ir -o - | %FileCheck %s
+// RUN: %swift -Xllvm -new-mangling-for-tests -target x86_64-apple-macosx10.9 -module-name main %s -emit-ir -o - | %FileCheck %s
+// RUN: %swift -Xllvm -new-mangling-for-tests -target i386-apple-ios7.0 %s -module-name main -emit-ir -o - | %FileCheck %s
+// RUN: %swift -Xllvm -new-mangling-for-tests -target x86_64-apple-ios7.0 %s -module-name main -emit-ir -o - | %FileCheck %s
+// RUN: %swift -Xllvm -new-mangling-for-tests -target armv7-apple-ios7.0 %s -module-name main -emit-ir -o - | %FileCheck %s
+// RUN: %swift -Xllvm -new-mangling-for-tests -target arm64-apple-ios7.0 %s -module-name main -emit-ir -o - | %FileCheck %s
+// RUN: %swift -Xllvm -new-mangling-for-tests -target x86_64-unknown-linux-gnu %s -disable-objc-interop -module-name main -emit-ir -o - | %FileCheck %s
 
-// REQUIRES: X86
-// REQUIRES: ARM
+// REQUIRES: CODEGENERATOR=X86
+// REQUIRES: CODEGENERATOR=ARM
 
 import Builtin
 
@@ -22,13 +22,13 @@ struct Huge {
 // CHECK: @_swift_slowAlloc = external global i8* ([[SIZE_T:i(32|64)]],
 // CHECK: define linkonce_odr hidden i8* @swift_rt_swift_slowAlloc([[SIZE_T:i(32|64)]],
 
-// CHECK:    define linkonce_odr hidden void @_TwdeV4main4Huge(
+// CHECK:    define linkonce_odr hidden void @_T04main4HugeVwde(
 // CHECK:      [[T0:%.*]] = bitcast [[BUFFER:.[0-9]+ x i8.]]* {{%.*}} to i8**
 // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
 // CHECK-NEXT: call void @swift_rt_swift_slowDealloc(i8* [[T1]], [[SIZE_T]] 4097, [[SIZE_T]] 7)
 // CHECK-NEXT: ret void
 
-// CHECK:    define linkonce_odr hidden [[OPAQUE:%swift.opaque]]* @_TwalV4main4Huge(
+// CHECK:    define linkonce_odr hidden [[OPAQUE:%swift.opaque]]* @_T04main4HugeVwal(
 // CHECK:      [[T0:%.*]] = call noalias i8* @swift_rt_swift_slowAlloc([[SIZE_T]] 4097, [[SIZE_T]] 7)
 // CHECK-NEXT: [[T1:%.*]] = bitcast [[BUFFER]]* {{%.*}} to i8**
 // CHECK-NEXT: store i8* [[T0]], i8** [[T1]]

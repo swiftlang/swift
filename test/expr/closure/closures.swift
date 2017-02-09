@@ -22,6 +22,11 @@ var closure6 = $0  // expected-error {{anonymous closure argument not contained 
 var closure7 : Int =
    { 4 }  // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{9-9=()}}
 
+var capturedVariable = 1
+var closure8 = { [capturedVariable] in
+  capturedVariable += 1 // expected-error {{left side of mutating operator isn't mutable: 'capturedVariable' is an immutable capture}}
+}
+
 func funcdecl1(_ a: Int, _ y: Int) {}
 func funcdecl3() -> Int {}
 func funcdecl4(_ a: ((Int) -> Int), _ b: Int) {}
@@ -123,9 +128,18 @@ var shadowedShort = { (shadowedShort: Int) -> Int in shadowedShort+1 } // no-war
 
 
 func anonymousClosureArgsInClosureWithArgs() {
+  func f(_: String) {}
   var a1 = { () in $0 } // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
   var a2 = { () -> Int in $0 } // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
-  var a3 = { (z: Int) in $0 } // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
+  var a3 = { (z: Int) in $0 } // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'z'?}} {{26-28=z}}
+  var a4 = { (z: [Int], w: [Int]) in
+    f($0.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'z'?}} {{7-9=z}} expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+    f($1.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'w'?}} {{7-9=w}} expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  }
+  var a5 = { (_: [Int], w: [Int]) in
+    f($0.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
+    f($1.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'w'?}} {{7-9=w}} expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  }
 }
 
 func doStuff(_ fn : @escaping () -> Int) {}
@@ -227,7 +241,7 @@ var closureWithObservedProperty: () -> () = {
 
 ;
 
-{}() // expected-error{{statement cannot begin with a closure expression}} expected-note{{explicitly discard the result of the closure by assigning to '_'}} {{1-1=_ = }}
+{}() // expected-error{{top-level statement cannot begin with a closure expression}}
 
 
 

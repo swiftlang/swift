@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,6 +23,14 @@
 #error "Macro must be defined by includer"
 #endif
 
+/// IRGEN_PASS(Id, Name, Description)
+///   The pass is identified by PassKind::Id.
+///   An IRGen pass is created by IRGen and needs to be register with the pass
+///   manager dynamically.
+#ifndef IRGEN_PASS
+#define IRGEN_PASS(Id, Name, Description) PASS(Id, Name, Description)
+#endif
+
 /// PASS_RANGE(RANGE_ID, START, END)
 ///   Pass IDs between PassKind::START and PassKind::END, inclusive,
 ///   fall within the set known as
@@ -36,6 +44,8 @@ PASS(ABCOpt, "abcopts",
      "Optimization of array bounds checks")
 PASS(AllocBoxToStack, "allocbox-to-stack",
      "Promote heap allocations to stack allocations")
+IRGEN_PASS(AllocStackHoisting, "alloc-stack-hoisting",
+           "Hoist generic alloc_stack instructions to the entry block")
 PASS(ArrayCountPropagation, "array-count-propagation",
      "Propagate the count of arrays")
 PASS(ArrayElementPropagation, "array-element-propagation",
@@ -237,9 +247,12 @@ PASS(UnsafeGuaranteedPeephole, "unsafe-guaranteed-peephole",
      "Builtin.unsafeGuaranteed")
 PASS(UsePrespecialized, "use-prespecialized",
      "Use pre-specialized functions")
+PASS(ValueOwnershipKindDumper, "value-ownership-kind-dumper",
+     "Print the value ownership kind of all ValueBase in a SILModule")
 PASS(BugReducerTester, "bug-reducer-tester",
      "Utility pass for testing sil-bug-reducer. Asserts when visits an apply that calls a specific function")
 PASS_RANGE(AllPasses, AADumper, BugReducerTester)
 
+#undef IRGEN_PASS
 #undef PASS
 #undef PASS_RANGE

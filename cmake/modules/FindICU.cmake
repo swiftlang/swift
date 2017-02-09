@@ -12,14 +12,20 @@ foreach(MODULE ${ICU_FIND_COMPONENTS})
     ICU_${MODULE}_INCLUDE_DIR ICU_${MODULE}_LIBRARIES)
 
   pkg_check_modules(PC_ICU_${MODULE} QUIET icu-${module})
-  if(${PC_ICU_${MODULE}_FOUND})
+  if(NOT ${PKGCONFIG_FOUND})
+    # PkgConfig doesn't exist on this system, so we manually provide hints via CMake.
+    set(PC_ICU_${MODULE}_INCLUDE_DIRS "${ICU_${MODULE}_INCLUDE_DIRS}")
+    set(PC_ICU_${MODULE}_LIBRARY_DIRS "${ICU_${MODULE}_LIBRARY_DIRS}")
+  endif()
+
+  if((${PC_ICU_${MODULE}_FOUND}) OR (NOT ${PKGCONFIG_FOUND}))
     set(ICU_${MODULE}_DEFINITIONS ${PC_ICU_${MODULE}_CFLAGS_OTHER})
 
     find_path(ICU_${MODULE}_INCLUDE_DIR unicode
       HINTS ${PC_ICU_${MODULE}_INCLUDEDIR} ${PC_ICU_${MODULE}_INCLUDE_DIRS})
-    set(ICU_${MODULE}_INCLUDE_DIR ${ICU_${MODULE}_INCLUDE_DIR})
+    set(ICU_${MODULE}_INCLUDE_DIRS ${ICU_${MODULE}_INCLUDE_DIR})
 
-    find_library(ICU_${MODULE}_LIBRARY NAMES icu${module}
+    find_library(ICU_${MODULE}_LIBRARY NAMES icu${module} ${ICU_${MODULE}_LIB_NAME}
       HINTS ${PC_ICU_${MODULE}_LIBDIR} ${PC_ICU_${MODULE}_LIBRARY_DIRS})
     set(ICU_${MODULE}_LIBRARIES ${ICU_${MODULE}_LIBRARY})
   endif()

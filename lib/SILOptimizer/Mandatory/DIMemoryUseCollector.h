@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -191,7 +191,7 @@ public:
                               SILBuilder &B) const;
 
   /// getElementType - Return the swift type of the specified element.
-  CanType getElementType(unsigned EltNo) const;
+  SILType getElementType(unsigned EltNo) const;
 
   /// Push the symbolic path name to the specified element number onto the
   /// specified std::string.  If the actual decl (or a subelement thereof) can
@@ -288,7 +288,8 @@ void collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
                               SmallVectorImpl<DIMemoryUse> &Uses,
                               SmallVectorImpl<TermInst*> &FailableInits,
                               SmallVectorImpl<SILInstruction*> &Releases,
-                              bool isDefiniteInitFinished);
+                              bool isDefiniteInitFinished,
+                              bool TreatAddressToPointerAsInout);
 
 } // end namespace swift
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Unreachable.h"
 #include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Remote/CMemoryReader.h"
+#include "swift/Runtime/Unreachable.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
 
 using namespace swift;
@@ -177,7 +177,7 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   }
   }
 
-  swift_unreachable("Unhandled TypeInfoKind in switch");
+  swift_runtime_unreachable("Unhandled TypeInfoKind in switch");
 }
 
 static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
 struct Foo<T> {
 }
@@ -12,32 +12,32 @@ extension Foo {
   // An unconstrained extension in the same module doesn't use the extension
   // mangling, since the implementation can be resiliently moved into the
   // definition.
-  // CHECK-LABEL: sil hidden @_TFV27mangling_generic_extensions3Foog1aSi
-  // NO-SELF-LABEL: sil hidden @_TFV27mangling_generic_extensions3Foog1aSi
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooV1aSifg
+  // NO-SELF-LABEL: sil hidden @_T027mangling_generic_extensions3FooV1aSifg
   var a: Int { return 0 }
 
-  // NO-SELF-LABEL: sil hidden @_TFV27mangling_generic_extensions3Foo3zimfT_T_
+  // NO-SELF-LABEL: sil hidden @_T027mangling_generic_extensions3FooV3zimyyF
   func zim() { }
-  // NO-SELF-LABEL: sil hidden @_TFV27mangling_generic_extensions3Foo4zangu_rfqd__T_
+  // NO-SELF-LABEL: sil hidden @_T027mangling_generic_extensions3FooV4zangyqd__lF
   func zang<U>(_: U) { }
-  // NO-SELF-LABEL: sil hidden @_TFV27mangling_generic_extensions3Foo4zungu_Rd__S_8Runcible_zwd__3Hatrfqd__T_
+  // NO-SELF-LABEL: sil hidden @_T027mangling_generic_extensions3FooV4zungyqd__AA8RuncibleRd__3HatQyd__Rs_lF
   func zung<U: Runcible where U.Hat == T>(_: U) { }
 }
 
 extension Foo where T: Runcible {
   // A constrained extension always uses the extension mangling.
-  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRxS_8RunciblerVS_3Foog1aSi
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVAaA8RuncibleRzlE1aSifg
   var a: Int { return 0 }
 
-  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRxS_8RunciblerVS_3Foog1bx
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVAaA8RuncibleRzlE1bxfg
   var b: T { get { } }
 }
 
 extension Foo where T: Runcible, T.Spoon: Runcible {
-  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRxS_8Runciblewx5SpoonS0_rVS_3Foog1aSi
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVAaA8RuncibleRzAaD5SpoonRpzlE1aSifg
   var a: Int { return 0 }
 
-  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRxS_8Runciblewx5SpoonS0_rVS_3Foog1bx
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVAaA8RuncibleRzAaD5SpoonRpzlE1bxfg
   var b: T { get { } }
 }
 
@@ -48,11 +48,11 @@ extension Foo where T: Runcible, T.Spoon: Runcible {
 // declaration, so we would no longer want to use the extension mangling
 // in unconstrained cases.
 extension Runcible {
-  // CHECK-LABEL: sil hidden @_TFE27mangling_generic_extensionsPS_8Runcible5runcefT_T_
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions8RunciblePAAE5runceyyF
   func runce() {}
 }
 
 extension Runcible where Self.Spoon == Self.Hat {
-  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRxS_8Runciblewx3Hatzwx5SpoonrS0_5runcefT_T_
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions8RunciblePAaaBRz5SpoonQz3HatRtzlE5runceyyF
   func runce() {}
 }

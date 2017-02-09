@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,6 +16,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Basic/Demangle.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
@@ -72,7 +73,7 @@ namespace {
       return 0;
     }
   };
-}
+} // end anonymous namespace
 
 struct TypeMetadataState {
   ConcurrentMap<TypeMetadataCacheEntry> Cache;
@@ -189,27 +190,46 @@ _searchTypeMetadataRecords(const TypeMetadataState &T,
 }
 
 static const Metadata *
-_typeByMangledName(const llvm::StringRef typeName) {
+_classByName(const llvm::StringRef typeName) {
+
+  size_t DotPos = typeName.find('.');
+  if (DotPos == llvm::StringRef::npos)
+    return nullptr;
+  if (typeName.find('.', DotPos + 1) != llvm::StringRef::npos)
+    return nullptr;
+
+  using namespace Demangle;
+
+  NodePointer ClassNd = NodeFactory::create(Node::Kind::Class);
+  NodePointer ModuleNd = NodeFactory::create(Node::Kind::Module,
+                                             typeName.substr(0, DotPos));
+  NodePointer NameNd = NodeFactory::create(Node::Kind::Identifier,
+                                           typeName.substr(DotPos + 1));
+  ClassNd->addChildren(ModuleNd, NameNd);
+
+  std::string Mangled = mangleNode(ClassNd);
+  StringRef MangledName = Mangled;
+
   const Metadata *foundMetadata = nullptr;
   auto &T = TypeMetadataRecords.get();
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
-  if (auto Value = T.Cache.find(typeName))
+  if (auto Value = T.Cache.find(MangledName))
     return Value->getMetadata();
 
   // Check type metadata records
   T.SectionsToScanLock.withLock([&] {
-    foundMetadata = _searchTypeMetadataRecords(T, typeName);
+    foundMetadata = _searchTypeMetadataRecords(T, MangledName);
   });
 
   // Check protocol conformances table. Note that this has no support for
   // resolving generic types yet.
   if (!foundMetadata)
-    foundMetadata = _searchConformancesByMangledTypeName(typeName);
+    foundMetadata = _searchConformancesByMangledTypeName(MangledName);
 
   if (foundMetadata) {
-    T.Cache.getOrInsert(typeName, foundMetadata);
+    T.Cache.getOrInsert(MangledName, foundMetadata);
   }
 
 #if SWIFT_OBJC_INTEROP
@@ -226,14 +246,16 @@ _typeByMangledName(const llvm::StringRef typeName) {
   return foundMetadata;
 }
 
-/// Return the type metadata for a given mangled name, used in the
-/// implementation of _typeByName(). The human readable name returned
-/// by swift_getTypeName() is non-unique, so we used mangled names
-/// internally.
+/// Return the type metadata for a given name, used in the
+/// implementation of _typeByName().
+///
+/// Currently only top-level classes are supported.
+
+/// \param typeName The name of a class in the form: <module>.<class>
+/// \return Returns the metadata of the type, if found.
 SWIFT_RUNTIME_EXPORT
-extern "C"
 const Metadata *
-swift_getTypeByMangledName(const char *typeName, size_t typeNameLength) {
+swift_getTypeByName(const char *typeName, size_t typeNameLength) {
   llvm::StringRef name(typeName, typeNameLength);
-  return _typeByMangledName(name);
+  return _classByName(name);
 }

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
 
 
 sil_stage canonical
@@ -66,7 +66,7 @@ sil @test : $@convention(thin) (Val<Bool>, Val<Int>) -> Val<(Bool, Int)> {
 bb0(%0 : $Val<Bool>, %1 : $Val<Int>):
   // CHECK: [[COERCE:%.*]] = function_ref @coerce
   %2 = function_ref @coerce : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2> (@owned @callee_owned (@owned Ref<τ_0_0>) -> @owned @callee_owned (@owned Ref<τ_0_1>) -> @owned Ref<τ_0_2>) -> @owned @callee_owned (Val<τ_0_1>) -> Val<τ_0_2>
-  // CHECK: [[MERGE:%.*]] = function_ref @_TTSg5GC4main3RefSb_GS0_Sb_S_8RefProtoS__Si__merge_curried
+  // CHECK: [[MERGE:%.*]] = function_ref @_T013merge_curried4main3RefCySbG_SiTg5
   %3 = function_ref @merge_curried : $@convention(thin) <τ_0_0 where τ_0_0 : RefProto><τ_1_0> (@in τ_0_0) -> @owned @callee_owned (@owned Ref<τ_1_0>) -> @owned Ref<(τ_0_0.T, τ_1_0)>
   // CHECK: [[PARTIAL:%.*]] = partial_apply [[MERGE]]()
   %4 = partial_apply %3<Ref<Bool>, Int>() : $@convention(thin) <τ_0_0 where τ_0_0 : RefProto><τ_1_0> (@in τ_0_0) -> @owned @callee_owned (@owned Ref<τ_1_0>) -> @owned Ref<(τ_0_0.T, τ_1_0)>

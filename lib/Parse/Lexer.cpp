@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -472,7 +472,7 @@ static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
 static bool isValidIdentifierStartCodePoint(uint32_t c) {
   if (!isValidIdentifierContinuationCodePoint(c))
     return false;
-  if (c < 0x80 && isDigit(c))
+  if (c < 0x80 && (isDigit(c) || c == '$'))
     return false;
 
   // N1518: Recommendations for extended identifier characters for C and C++
@@ -548,13 +548,17 @@ tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
 #include "swift/Parse/Tokens.def"
     .Default(tok::identifier);
 
-  // These keywords are only active in SIL mode.
-  if ((Kind == tok::kw_sil || Kind == tok::kw_sil_stage ||
-       Kind == tok::kw_sil_vtable || Kind == tok::kw_sil_global ||
-       Kind == tok::kw_sil_witness_table || Kind == tok::kw_sil_default_witness_table ||
-       Kind == tok::kw_sil_coverage_map || Kind == tok::kw_undef) &&
-      !InSILMode)
-    Kind = tok::identifier;
+  // SIL keywords are only active in SIL mode.
+  switch (Kind) {
+#define SIL_KEYWORD(kw) \
+    case tok::kw_##kw:
+#include "swift/Parse/Tokens.def"
+      if (!InSILMode)
+        Kind = tok::identifier;
+      break;
+    default:
+      break;
+  }
   return Kind;
 }
 
@@ -674,6 +678,19 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound,
   }
 }
 
+static bool rangeContainsPlaceholderEnd(const char *CurPtr,
+                                        const char *End) {
+  for (auto SubStr = CurPtr; SubStr != End - 1; ++SubStr) {
+    if (SubStr[0] == '\n') {
+      return false;
+    }
+    if (SubStr[0] == '#' && SubStr[1] == '>') {
+      return true;
+    }
+  }
+  return false;
+}
+
 /// lexOperatorIdentifier - Match identifiers formed out of punctuation.
 void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;
@@ -693,6 +710,10 @@ void Lexer::lexOperatorIdentifier() {
     // started with a '.'.
     if (*CurPtr == '.' && *TokStart != '.')
       break;
+    if (Identifier::isEditorPlaceholder(StringRef(CurPtr, BufferEnd-CurPtr)) &&
+        rangeContainsPlaceholderEnd(CurPtr + 2, BufferEnd)) {
+      break;
+    }
   } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
 
   if (CurPtr-TokStart > 2) {
@@ -1383,6 +1404,14 @@ void Lexer::lexEscapedIdentifier() {
       NextToken.setEscapedIdentifier(true);
       return;
     }
+  }
+
+  // Special case; allow '`$`'.
+  if (Quote[1] == '$' && Quote[2] == '`') {
+    CurPtr = Quote + 3;
+    formToken(tok::identifier, Quote);
+    NextToken.setEscapedIdentifier(true);
+    return;
   }
 
   // The backtick is punctuation.

@@ -16,13 +16,11 @@
 
 
 // RUN: %swift_driver -lldb-repl -### | %FileCheck -check-prefix=LLDB %s
-// RUN: %swift_driver -lldb-repl -DA,B,C -DD -L /path/to/libraries -L /path/to/more/libraries -F /path/to/frameworks -lsomelib -framework SomeFramework -sdk / -I "this folder" -module-name Test -### | %FileCheck -check-prefix=LLDB-OPTS %s
+// RUN: %swift_driver -lldb-repl -DA,B,C -DD -L /path/to/libraries -L /path/to/more/libraries -F /path/to/frameworks -lsomelib -framework SomeFramework -sdk / -I "this folder" -module-name Test -target %target-triple -### | %FileCheck -check-prefix=LLDB-OPTS %s
 
-// LLDB: lldb{{"?}} "--repl=
+// LLDB: lldb{{"?}} {{"?}}--repl=
 // LLDB-NOT: -module-name
-// LLDB: -target {{[^ "]+}}
-// LLDB-NOT: -module-name
-// LLDB: "
+// LLDB-NOT: -target
 
 // LLDB-OPTS: lldb{{"?}} "--repl=
 // LLDB-OPTS-DAG: -target {{[^ ]+}}

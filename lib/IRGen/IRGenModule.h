@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/SuccessorMap.h"
@@ -366,8 +367,17 @@ public:
   ModuleDecl *getSwiftModule() const;
   Lowering::TypeConverter &getSILTypes() const;
   SILModule &getSILModule() const { return IRGen.SIL; }
+  SILModuleConventions silConv;
+
   llvm::SmallString<128> OutputFilename;
-  
+
+#ifndef NDEBUG
+  // Used for testing ConformanceCollector.
+  ConformanceCollector EligibleConfs;
+  SILInstruction *CurrentInst = nullptr;
+  SILWitnessTable *CurrentWitnessTable = nullptr;
+#endif
+
   /// Order dependency -- TargetInfo must be initialized after Opts.
   const SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
@@ -533,6 +543,8 @@ public:
   LLVM_ATTRIBUTE_NORETURN
   void fatal_unimplemented(SourceLoc, StringRef Message);
   void error(SourceLoc loc, const Twine &message);
+
+  bool useDllStorage();
 
 private:
   Size PtrSize;
@@ -758,7 +770,7 @@ public:
   llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
                                              CanSILFunctionType origCalleeType,
                                              CanSILFunctionType substCalleeType,
-                                             ArrayRef<Substitution> subs,
+                                             SubstitutionList subs,
                                              const HeapLayout &layout);
   llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
 
@@ -1000,6 +1012,9 @@ private:
                                         llvm::Type *defaultType,
                                         DebugTypeInfo debugType,
                                         SymbolReferenceKind refKind);
+
+  void checkEligibleConf(const ProtocolConformance *Conf);
+  void checkEligibleMetaType(NominalTypeDecl *NT);
 
   void emitLazyPrivateDefinitions();
   void addRuntimeResolvableType(CanType type);

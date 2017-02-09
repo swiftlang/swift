@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -99,11 +99,12 @@ static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
 }
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
-  Mangle::Mangler mangler(/*debug style=*/false, /*Unicode=*/true);
+  Mangle::Mangler mangler(/*debug style=*/false, /*usePunycode=*/true);
   mangler.mangleContext(type);
   std::string Old = mangler.finalize();
 
-  NewMangling::ASTMangler NewMangler(/*debug style=*/false, /*Unicode=*/true);
+  NewMangling::ASTMangler NewMangler(/*debug style=*/false,
+                                     /*usePunycode=*/true);
   std::string New = NewMangler.mangleTypeAsContextUSR(type);
 
   return NewMangling::selectMangling(Old, New);

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -24,6 +24,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 
 #include "Explosion.h"
@@ -336,7 +337,7 @@ namespace {
       return ReferenceCounting::Native;
     }
   };
-}
+} // end anonymous namespace
 
 const LoadableTypeInfo *TypeConverter::convertBuiltinNativeObject() {
   return new BuiltinNativeObjectTypeInfo(IGM.RefCountedPtrTy,
@@ -384,7 +385,7 @@ namespace {
       return storeHeapObjectExtraInhabitant(IGF, index, dest);
     }
   };
-}
+} // end anonymous namespace
 
 const LoadableTypeInfo *
 TypeConverter::createUnmanagedStorageType(llvm::Type *valueType) {
@@ -538,7 +539,7 @@ namespace {
       IGF.emitNativeWeakAssign(value, dest);
     }
   };
-}
+} // end anonymous namespace
 
 SpareBitVector IRGenModule::getWeakReferenceSpareBits() const {
   // The runtime needs to be able to freely manipulate live weak
@@ -766,7 +767,7 @@ namespace {
       IGF.emitUnknownWeakAssign(value, dest);
     }
   };
-}
+} // end anonymous namespace
 
 const TypeInfo *TypeConverter::createUnownedStorageType(llvm::Type *valueType,
                                                       ReferenceCounting style) {
@@ -1397,7 +1398,7 @@ public:
 
   /// Allocate a box of the given type.
   virtual OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, SILType boxedInterfaceType,
+  allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
            const llvm::Twine &name) const = 0;
 
   /// Deallocate an uninitialized box.
@@ -1415,7 +1416,7 @@ public:
   EmptyBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, SILType boxedInterfaceType,
+  allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
            const llvm::Twine &name) const override {
     return OwnedAddress(IGF.getTypeInfo(boxedType).getUndefAddress(),
                         IGF.IGM.RefCountedNull);
@@ -1440,7 +1441,7 @@ public:
   NonFixedBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, SILType boxedInterfaceType,
+  allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
            const llvm::Twine &name) const override {
     auto &ti = IGF.getTypeInfo(boxedType);
     // Use the runtime to allocate a box of the appropriate size.
@@ -1481,10 +1482,17 @@ public:
   {}
 
   OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, SILType boxedInterfaceType,
+  allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
            const llvm::Twine &name)
   const override {
     // Allocate a new object using the layout.
+    auto boxedInterfaceType = boxedType;
+    if (env) {
+      boxedInterfaceType = SILType::getPrimitiveType(
+        env->mapTypeOutOfContext(boxedType.getSwiftRValueType())
+           ->getCanonicalType(),
+         boxedType.getCategory());
+    }
 
     auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(
         boxedInterfaceType.getSwiftRValueType());
@@ -1547,7 +1555,7 @@ public:
   {}
 };
 
-}
+} // end anonymous namespace
 
 const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // We can share a type info for all dynamic-sized heap metadata.
@@ -1604,14 +1612,13 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
 
 OwnedAddress
 irgen::emitAllocateBox(IRGenFunction &IGF, CanSILBoxType boxType,
-                       CanSILBoxType boxInterfaceType,
+                       GenericEnvironment *env,
                        const llvm::Twine &name) {
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
   assert(boxType->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
   return boxTI.allocate(IGF,
-                      boxType->getFieldType(IGF.IGM.getSILModule(), 0),
-                      boxInterfaceType->getFieldType(IGF.IGM.getSILModule(), 0),
+                      boxType->getFieldType(IGF.IGM.getSILModule(), 0), env,
                       name);
 }
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -101,14 +101,13 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
     (void)accessorTy;
     assert(!accessorTy->isPolymorphic()
            && "generic global variable accessors not yet implemented");
-    SILValue addr = B.createApply(loc, accessor, accessor->getType(),
-                              accessor->getType().castTo<SILFunctionType>()
-                                      ->getSingleResult().getSILType(),
-                              {}, {});
+    SILValue addr = B.createApply(
+        loc, accessor, accessor->getType(),
+        accessorFn->getConventions().getSingleSILResultType(), {}, {});
     // FIXME: It'd be nice if the result of the accessor was natively an
     // address.
     addr = B.createPointerToAddress(
-      loc, addr, getLoweredType(var->getType()).getAddressType(),
+      loc, addr, getLoweredType(var->getInterfaceType()).getAddressType(),
       /*isStrict*/ true);
     return ManagedValue::forLValue(addr);
   }
@@ -320,7 +319,7 @@ void SILGenFunction::emitGlobalGetter(VarDecl *global,
   auto *silG = SGM.getSILGlobalVariable(global, NotForDefinition);
   SILValue addr = B.createGlobalAddr(global, silG);
 
-  auto refType = global->getType()->getCanonicalType();
+  auto refType = global->getInterfaceType()->getCanonicalType();
   ManagedValue value = emitLoad(global, addr, getTypeLowering(refType),
                                 SGFContext(), IsNotTake);
   SILValue result = value.forward(*this);

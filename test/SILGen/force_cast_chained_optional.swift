@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
 
 class Foo {
   var bar: Bar!
@@ -11,8 +11,8 @@ class Bar {
 class C {}
 class D: C {}
 
-// CHECK-LABEL: sil hidden @_TF27force_cast_chained_optional4testFCS_3FooCS_1D
-// CHECK:         class_method %0 : $Foo, #Foo.bar!getter.1 : (Foo) -> () -> Bar! , $@convention(method) (@guaranteed Foo) ->
+// CHECK-LABEL: sil hidden @_T027force_cast_chained_optional4testAA1DCAA3FooCF
+// CHECK:         class_method %0 : $Foo, #Foo.bar!getter.1 : (Foo) -> () -> Bar!, $@convention(method) (@guaranteed Foo) ->
 // CHECK:         select_enum_addr
 // CHECK:         cond_br {{%.*}}, [[SOME_BAR:bb[0-9]+]], [[NO_BAR:bb[0-9]+]]
 // CHECK:       [[NO_BAR]]:
@@ -20,7 +20,7 @@ class D: C {}
 // CHECK:       [[SOME_BAR]]:
 // CHECK:         [[PAYLOAD_ADDR:%.*]] = unchecked_take_enum_data_addr {{%.*}} : $*Optional<Bar>
 // CHECK:         [[BAR:%.*]] = load [copy] [[PAYLOAD_ADDR]]
-// CHECK:         [[METHOD:%.*]] = class_method [[BAR]] : $Bar, #Bar.bas!getter.1 : (Bar) -> () -> C! , $@convention(method) (@guaranteed Bar) ->
+// CHECK:         [[METHOD:%.*]] = class_method [[BAR]] : $Bar, #Bar.bas!getter.1 : (Bar) -> () -> C!, $@convention(method) (@guaranteed Bar) ->
 // CHECK:         apply [[METHOD]]([[BAR]])
 // CHECK:         destroy_value [[BAR]]
 // CHECK:         unconditional_checked_cast {{%.*}} : $C to $D

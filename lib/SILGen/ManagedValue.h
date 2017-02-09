@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,9 +26,12 @@
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
+
 enum class CastConsumptionKind : unsigned char;
 
 namespace Lowering {
+
+class SILGenFunction;
 
 /// ManagedValue - represents a singular SIL value and an optional cleanup.
 /// Ownership of the ManagedValue can be "forwarded" to disable its cleanup when
@@ -44,8 +47,9 @@ namespace Lowering {
 ///                this represents a value that was emitted directly into an
 ///                initialization stored by an SGFContext.
 ///
-/// The RValue cases may or may not have a cleanup associated with the value.
-/// A cleanup is associated with +1 values of non-trivial type.
+/// The RValue cases may or may not have a cleanup associated with the value.  A
+/// cleanup is associated with +1 values of non-trivial type and +0 values of
+/// non-trivial type.
 ///
 class ManagedValue {
   /// The value (or address of an address-only value) being managed, and
@@ -64,18 +68,103 @@ class ManagedValue {
 public:
   
   ManagedValue() = default;
-  
+
   /// Create a managed value for a +1 rvalue.
+  ///
+  /// Please do not introduce new uses of this method! Instead use one of the
+  /// static constructors below.
   ManagedValue(SILValue value, CleanupHandle cleanup)
     : valueAndFlag(value, false), cleanup(cleanup) {
-    assert(value && "No value specified");
+    assert(value && "No value specified?!");
   }
 
   /// Create a managed value for a +0 rvalue.
+  ///
+  /// Please do not introduce new uses of this method! Instead use one of the
+  /// static constructors below!
   static ManagedValue forUnmanaged(SILValue value) {
     assert(value && "No value specified");
     return ManagedValue(value, false, CleanupHandle::invalid());
   }
+
+  /// Create a managed value for a +1 rvalue object.
+  static ManagedValue forOwnedObjectRValue(SILValue value,
+                                           CleanupHandle cleanup) {
+    assert(value && "No value specified");
+    assert(value->getType().isObject() &&
+           "Expected borrowed rvalues to be objects");
+    assert(value.getOwnershipKind() != ValueOwnershipKind::Trivial);
+    return ManagedValue(value, false, cleanup);
+  }
+
+  /// Create a managed value for a +1 rvalue address.
+  ///
+  /// From a high level perspective, this consists of a temporary buffer.
+  static ManagedValue forOwnedAddressRValue(SILValue value,
+                                            CleanupHandle cleanup) {
+    assert(value && "No value specified");
+    assert(value->getType().isAddress() && "Expected value to be an address");
+    assert(value.getOwnershipKind() == ValueOwnershipKind::Trivial &&
+           "Addresses always have trivial ownership");
+    return ManagedValue(value, false, cleanup);
+  }
+
+  /// Create a managed value for a +1 non-trivial rvalue.
+  static ManagedValue forOwnedRValue(SILValue value, CleanupHandle cleanup) {
+    if (value->getType().isAddress())
+      return ManagedValue::forOwnedAddressRValue(value, cleanup);
+    return ManagedValue::forOwnedObjectRValue(value, cleanup);
+  }
+
+  /// Create a managed value for a +0 borrowed non-trivial rvalue object.
+  static ManagedValue
+  forBorrowedObjectRValue(SILValue value) {
+    assert(value && "No value specified");
+    assert(value->getType().isObject() &&
+           "Expected borrowed rvalues to be objects");
+    assert(value.getOwnershipKind() != ValueOwnershipKind::Trivial);
+    return ManagedValue(value, false, CleanupHandle::invalid());
+  }
+
+  /// Create a managed value for a +0 borrowed non-trivial rvalue address.
+  static ManagedValue
+  forBorrowedAddressRValue(SILValue value) {
+    assert(value && "No value specified");
+    assert(value->getType().isAddress() && "Expected value to be an address");
+    assert(value.getOwnershipKind() == ValueOwnershipKind::Trivial &&
+           "Addresses always have trivial ownership");
+    return ManagedValue(value, false, CleanupHandle::invalid());
+  }
+
+  /// Create a managed value for a +0 guaranteed rvalue.
+  static ManagedValue
+  forBorrowedRValue(SILValue value) {
+    if (value->getType().isAddress())
+      return ManagedValue::forBorrowedAddressRValue(value);
+    return ManagedValue::forBorrowedObjectRValue(value);
+  }
+
+  /// Create a managed value for a +0 trivial object rvalue.
+  static ManagedValue forTrivialObjectRValue(SILValue value) {
+    assert(value->getType().isObject() && "Expected an object");
+    assert(value.getOwnershipKind() == ValueOwnershipKind::Trivial);
+    return ManagedValue(value, false, CleanupHandle::invalid());
+  }
+
+  /// Create a managed value for a +0 trivial address rvalue.
+  static ManagedValue forTrivialAddressRValue(SILValue value) {
+    assert(value->getType().isAddress() && "Expected an address");
+    assert(value.getOwnershipKind() == ValueOwnershipKind::Trivial);
+    return ManagedValue(value, false, CleanupHandle::invalid());
+  }
+
+  /// Create a managed value for a +0 trivial rvalue.
+  static ManagedValue forTrivialRValue(SILValue value) {
+    if (value->getType().isObject())
+      return ManagedValue::forTrivialObjectRValue(value);
+    return ManagedValue::forTrivialAddressRValue(value);
+  }
+
   /// Create a managed value for an l-value.
   static ManagedValue forLValue(SILValue value) {
     assert(value && "No value specified");
@@ -120,7 +209,26 @@ public:
   SILValue getValue() const { return valueAndFlag.getPointer(); }
   
   SILType getType() const { return getValue()->getType(); }
-  
+
+  ValueOwnershipKind getOwnershipKind() const {
+    return getValue().getOwnershipKind();
+  }
+
+  /// Transform the given ManagedValue, replacing the underlying value, but
+  /// keeping the same cleanup.
+  ///
+  /// For owned values, this is equivalent to forwarding the cleanup and
+  /// creating a new cleanup of the same type on the new value. This is useful
+  /// for forwarding sequences.
+  ///
+  /// For all other values, it is a move.
+  ManagedValue transform(SILValue newValue) && {
+    assert(getValue().getOwnershipKind() == newValue.getOwnershipKind() &&
+           "New value and old value must have the same ownership kind");
+    ManagedValue M(newValue, isLValue(), getCleanup());
+    *this = ManagedValue();
+    return M;
+  }
 
   CanType getSwiftType() const {
     return isLValue()
@@ -147,9 +255,10 @@ public:
   /// An l-value is borrowed as itself.  A +1 r-value is borrowed as a
   /// +0 r-value, with the assumption that the original ManagedValue
   /// will not be forwarded until the borrowed value is fully used.
-  ManagedValue borrow() const {
-    assert(getValue() && "cannot borrow an invalid or in-context value");
-    return (isLValue() ? *this : ManagedValue::forUnmanaged(getValue()));
+  ManagedValue borrow(SILGenFunction &gen, SILLocation loc) const;
+
+  ManagedValue unmanagedBorrow() const {
+    return isLValue() ? *this : ManagedValue::forUnmanaged(getValue());
   }
 
   /// Disable the cleanup for this value.
@@ -252,8 +361,46 @@ public:
     return { asUnmanagedValue(), CastConsumptionKind::CopyOnSuccess };
   }
 };
-  
-} // end namespace Lowering
+
+/// An RAII object that allows a user to borrow a value without a specific scope
+/// that ensures that the object is cleaned up before other scoped cleanups
+/// occur. The way cleanup is triggered is by calling:
+///
+///   std::move(value).cleanup();
+class BorrowedManagedValue {
+  SILGenFunction &gen;
+  ManagedValue borrowedValue;
+  Optional<CleanupHandle> handle;
+  SILLocation loc;
+
+public:
+  BorrowedManagedValue(SILGenFunction &gen, ManagedValue originalValue,
+                       SILLocation loc);
+  ~BorrowedManagedValue() {
+    assert(!borrowedValue &&
+           "Did not manually cleanup borrowed managed value?!");
+  }
+  BorrowedManagedValue(const BorrowedManagedValue &) = delete;
+  BorrowedManagedValue(BorrowedManagedValue &&) = delete;
+  BorrowedManagedValue &operator=(const BorrowedManagedValue &) = delete;
+  BorrowedManagedValue &operator=(BorrowedManagedValue &&) = delete;
+
+  void cleanup() && { cleanupImpl(); }
+  operator ManagedValue() const { return borrowedValue; }
+
+private:
+  void cleanupImpl();
+};
+
+} // namespace Lowering
+} // namespace swift
+
+namespace swift {
+
+template <typename To> inline bool isa(const Lowering::ManagedValue &M) {
+  return isa<To>(M.getValue());
+}
+
 } // end namespace swift
 
 #endif

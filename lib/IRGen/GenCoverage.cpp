@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -97,8 +97,9 @@ void IRGenModule::emitCoverageMapping() {
           MR.Counter, /*FileID=*/0, MR.StartLine, MR.StartCol, MR.EndLine,
           MR.EndCol));
     // Append each function's regions into the encoded buffer.
-    llvm::coverage::CoverageMappingWriter W({FileID}, M.getExpressions(),
-                                            Regions);
+    ArrayRef<unsigned> VirtualFileMapping(FileID);
+    llvm::coverage::CoverageMappingWriter W(VirtualFileMapping,
+                                            M.getExpressions(), Regions);
     W.write(OS);
 
     std::string NameValue = llvm::getPGOFuncName(

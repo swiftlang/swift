@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -104,7 +104,7 @@ public typealias StringLiteralType = String
 // IEEE Binary64, and we need 1 bit to represent the sign.  Instead of using
 // 1025, we use the next round number -- 2048.
 public typealias _MaxBuiltinIntegerType = Builtin.Int2048
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if (!os(Windows) || CYGWIN) && (arch(i386) || arch(x86_64))
 public typealias _MaxBuiltinFloatType = Builtin.FPIEEE80
 #else
 public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64

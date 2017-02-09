@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,6 +17,7 @@
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Initializer.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringMap.h"
@@ -158,8 +159,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
   // Parse the parameter list.
   bool isClosure = paramContext == ParameterContextKind::Closure;
-  return parseList(tok::r_paren, leftParenLoc, rightParenLoc, tok::comma,
-                      /*OptionalSep=*/false, /*AllowSepAfterLast=*/false,
+  return parseList(tok::r_paren, leftParenLoc, rightParenLoc,
+                      /*AllowSepAfterLast=*/false,
                       diag::expected_rparen_parameter,
                       [&]() -> ParserStatus {
     ParsedParameter param;
@@ -430,6 +431,13 @@ mapParsedParameters(Parser &parser,
                            param.FirstName, param.FirstNameLoc);
     }
 
+    // Warn when an unlabeled parameter follows a variadic parameter
+    if (ellipsisLoc.isValid() && elements.back()->isVariadic() &&
+        param.FirstName.empty()) {
+      parser.diagnose(param.FirstNameLoc,
+                      diag::unlabeled_parameter_following_variadic_parameter);
+    }
+    
     // If this parameter had an ellipsis, check whether it's the last parameter.
     if (param.EllipsisLoc.isValid()) {
       if (ellipsisLoc.isValid()) {
@@ -475,26 +483,44 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
   if (!Tok.is(tok::l_paren)) {
     // If we don't have the leading '(', complain.
     Diag<> diagID;
+    bool skipIdentifier = false;
     switch (paramContext) {
     case ParameterContextKind::Function:
     case ParameterContextKind::Operator:
       diagID = diag::func_decl_without_paren;
       break;
     case ParameterContextKind::Subscript:
-      diagID = diag::expected_lparen_subscript;
+      skipIdentifier = Tok.is(tok::identifier) &&
+                       peekToken().is(tok::l_paren);
+      diagID = skipIdentifier ? diag::subscript_has_name
+                              : diag::expected_lparen_subscript;
       break;
     case ParameterContextKind::Initializer:
-      diagID = diag::expected_lparen_initializer;
+      skipIdentifier = Tok.is(tok::identifier) &&
+                       peekToken().is(tok::l_paren);
+      diagID = skipIdentifier ? diag::initializer_has_name
+                              : diag::expected_lparen_initializer;
       break;
     case ParameterContextKind::Closure:
     case ParameterContextKind::Curried:
       llvm_unreachable("should never be here");
     }
 
-    auto diag = diagnose(Tok, diagID);
-    if (Tok.isAny(tok::l_brace, tok::arrow, tok::kw_throws, tok::kw_rethrows))
-      diag.fixItInsertAfter(PreviousLoc, "()");
+    {
+      auto diag = diagnose(Tok, diagID);
+      if (Tok.isAny(tok::l_brace, tok::arrow, tok::kw_throws, tok::kw_rethrows))
+        diag.fixItInsertAfter(PreviousLoc, "()");
 
+      if (skipIdentifier)
+        diag.fixItRemove(Tok.getLoc());
+    }
+
+    // We might diagnose again down here, so make sure 'diag' is out of scope.
+    if (skipIdentifier) {
+      consumeToken();
+      skipSingle();
+    }
+    
     // Create an empty parameter list to recover.
     return makeParserErrorResult(
         ParameterList::createEmpty(Context, PreviousLoc, PreviousLoc));
@@ -764,6 +790,10 @@ ParserResult<Pattern> Parser::parsePattern() {
     Identifier name;
     SourceLoc loc = consumeIdentifier(&name);
     bool isLet = InVarOrLetPattern != IVOLP_InVar;
+
+    if (Tok.isIdentifierOrUnderscore() && !Tok.isContextualDeclKeyword())
+      diagnoseConsecutiveIDs(name.str(), loc, isLet ? "constant" : "variable");
+
     return makeParserResult(createBindingFromPattern(loc, name, isLet));
   }
     
@@ -819,8 +849,9 @@ ParserResult<Pattern> Parser::parsePattern() {
 
 Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
                                           bool isLet) {
-  auto var = new (Context) VarDecl(/*static*/ false, /*IsLet*/ isLet,
-                                   loc, name, Type(), CurDeclContext);
+  auto var = new (Context) VarDecl(/*IsStatic*/false, /*IsLet*/isLet,
+                                   /*IsCaptureList*/false, loc, name, Type(),
+                                   CurDeclContext);
   return new (Context) NamedPattern(var);
 }
 
@@ -865,7 +896,7 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;
   ParserStatus ListStatus =
-    parseList(tok::r_paren, LPLoc, RPLoc, tok::comma, /*OptionalSep=*/false,
+    parseList(tok::r_paren, LPLoc, RPLoc,
               /*AllowSepAfterLast=*/false,
               diag::expected_rparen_tuple_pattern_list,
               [&] () -> ParserStatus {
@@ -901,8 +932,8 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result,
     return result;
 
   Pattern *P;
-  if (result.isNull())  // Recover by creating AnyPattern.
-    P = new (Context) AnyPattern(Tok.getLoc());
+  if (result.isNull())
+    return nullptr;
   else
     P = result.get();
 
@@ -917,7 +948,7 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result,
   // In an if-let, the actual type of the expression is Optional of whatever
   // was written.
   if (isOptional)
-    repr = new (Context) OptionalTypeRepr(repr, Tok.getLoc());
+    repr = new (Context) OptionalTypeRepr(repr, Tok.isNot(tok::eof) ? Tok.getLoc() : PreviousLoc);
 
   return makeParserResult(new (Context) TypedPattern(P, repr));
 }

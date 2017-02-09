@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,6 +19,7 @@
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
+#include "swift/Runtime/Unreachable.h"
 #include "ImageInspection.h"
 #include "Private.h"
 
@@ -116,6 +117,8 @@ const {
     // The record does not apply to a single type.
     return nullptr;
   }
+
+  swift_runtime_unreachable("Unhandled TypeMetadataRecordKind in switch.");
 }
 
 template<>
@@ -129,6 +132,9 @@ const {
   case ProtocolConformanceReferenceKind::WitnessTableAccessor:
     return getWitnessTableAccessor()(type);
   }
+
+  swift_runtime_unreachable(
+      "Unhandled ProtocolConformanceReferenceKind in switch.");
 }
 
 namespace {
@@ -206,7 +212,7 @@ namespace {
       return FailureGeneration.load(std::memory_order_relaxed);
     }
   };
-}
+} // end anonymous namespace
 
 // Conformance Cache.
 struct ConformanceState {
@@ -341,7 +347,7 @@ recur:
         // An up-to-date entry for the original type is authoritative.
         isAuthoritative = true;
       } else {
-        // A up-to-date cached failure for a superclass of the type is not
+        // An up-to-date cached failure for a superclass of the type is not
         // authoritative: there may be a still-undiscovered conformance
         // for the original query type.
         isAuthoritative = false;
@@ -509,7 +515,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
         if (protocol != P)
           continue;
 
-        if (!isRelatedType(type, metadata, /*isMetadata=*/true))
+        if (!isRelatedType(type, metadata, /*candidateIsMetadata=*/true))
           continue;
 
         // Store the type-protocol pair in the cache.
@@ -533,7 +539,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
         if (protocol != P)
           continue;
 
-        if (!isRelatedType(type, R, /*isMetadata=*/false))
+        if (!isRelatedType(type, R, /*candidateIsMetadata=*/false))
           continue;
 
         // Store the type-protocol pair in the cache.

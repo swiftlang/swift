@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -55,7 +55,7 @@ public:
   TestOptTable() : OptTable(InfoTable, llvm::array_lengthof(InfoTable)){}
 };
 
-} // namespace anonymous
+} // end anonymous namespace
 
 static std::pair<unsigned, unsigned> parseLineCol(StringRef LineCol) {
   unsigned Line, Col;
@@ -256,6 +256,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 
     case OPT_async:
       isAsyncRequest = true;
+      break;
+
+    case OPT_cursor_action:
+      CollectActionables = true;
       break;
 
     case OPT_UNKNOWN:

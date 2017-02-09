@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,6 +23,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
@@ -100,10 +101,9 @@ llvm::Value *LocalTypeDataCache::tryGet(IRGenFunction &IGF, Key key,
   CacheEntry *best = nullptr;
   Optional<unsigned> bestCost;
 
-  CacheEntry *next = chain.Root, *nextPrev = nullptr;
+  CacheEntry *next = chain.Root;
   while (next) {
     CacheEntry *cur = next;
-    nextPrev = cur;
     next = cur->getNext();
 
     // Ignore abstract entries if so requested.
@@ -369,8 +369,8 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
     chain.push_front(newEntry);
   }
 }
-
-void LocalTypeDataCache::dump() const {
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+LLVM_DUMP_METHOD void LocalTypeDataCache::dump() const {
   auto &out = llvm::errs();
 
   if (Map.empty()) {
@@ -410,10 +410,13 @@ void LocalTypeDataCache::dump() const {
     out << "]\n";
   }
 }
+#endif
 
-void LocalTypeDataKey::dump() const {
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+LLVM_DUMP_METHOD void LocalTypeDataKey::dump() const {
   print(llvm::errs());
 }
+#endif
 
 void LocalTypeDataKey::print(llvm::raw_ostream &out) const {
   out << "(" << Type.getPointer()
@@ -422,9 +425,12 @@ void LocalTypeDataKey::print(llvm::raw_ostream &out) const {
   out << ")";
 }
 
-void LocalTypeDataKind::dump() const {
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+LLVM_DUMP_METHOD void LocalTypeDataKind::dump() const {
   print(llvm::errs());
 }
+#endif
+
 void LocalTypeDataKind::print(llvm::raw_ostream &out) const {
   if (isConcreteProtocolConformance()) {
     out << "ConcreteConformance(";

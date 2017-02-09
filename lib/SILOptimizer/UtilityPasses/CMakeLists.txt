@@ -3,24 +3,25 @@ set(UTILITYPASSES_SOURCES
   UtilityPasses/BasicCalleePrinter.cpp
   UtilityPasses/BasicInstructionPropertyDumper.cpp
   UtilityPasses/BugReducerTester.cpp
-  UtilityPasses/CallerAnalysisPrinter.cpp
   UtilityPasses/CFGPrinter.cpp
+  UtilityPasses/CallerAnalysisPrinter.cpp
   UtilityPasses/ComputeDominanceInfo.cpp
   UtilityPasses/ComputeLoopInfo.cpp
   UtilityPasses/EpilogueARCMatcherDumper.cpp
   UtilityPasses/EpilogueRetainReleaseMatcherDumper.cpp
   UtilityPasses/EscapeAnalysisDumper.cpp
   UtilityPasses/FunctionOrderPrinter.cpp
-  UtilityPasses/InstCount.cpp
   UtilityPasses/IVInfoPrinter.cpp
+  UtilityPasses/InstCount.cpp
+  UtilityPasses/LSLocationPrinter.cpp
   UtilityPasses/Link.cpp
   UtilityPasses/LoopCanonicalizer.cpp
   UtilityPasses/LoopInfoPrinter.cpp
   UtilityPasses/LoopRegionPrinter.cpp
-  UtilityPasses/LSLocationPrinter.cpp
   UtilityPasses/MemBehaviorDumper.cpp
   UtilityPasses/RCIdentityDumper.cpp
-  UtilityPasses/SideEffectsDumper.cpp
   UtilityPasses/SILDebugInfoGenerator.cpp
+  UtilityPasses/SideEffectsDumper.cpp
   UtilityPasses/StripDebugInfo.cpp
+  UtilityPasses/ValueOwnershipKindDumper.cpp
   PARENT_SCOPE)

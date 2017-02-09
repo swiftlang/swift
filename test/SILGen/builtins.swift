@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -parse-stdlib %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -Onone -parse-stdlib %s -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CANONICAL %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -parse-stdlib %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -Onone -parse-stdlib %s -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CANONICAL %s
 
 import Swift
 
@@ -9,13 +9,13 @@ struct Pointer {
   var value: Builtin.RawPointer
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins3foo
+// CHECK-LABEL: sil hidden @_T08builtins3foo{{[_0-9a-zA-Z]*}}F
 func foo(_ x: Builtin.Int1, y: Builtin.Int1) -> Builtin.Int1 {
   // CHECK: builtin "cmp_eq_Int1"
   return Builtin.cmp_eq_Int1(x, y)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins8load_pod
+// CHECK-LABEL: sil hidden @_T08builtins8load_pod{{[_0-9a-zA-Z]*}}F
 func load_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.Int64
   // CHECK: [[VAL:%.*]] = load [trivial] [[ADDR]]
@@ -23,7 +23,7 @@ func load_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
   return Builtin.load(x)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins8load_obj
+// CHECK-LABEL: sil hidden @_T08builtins8load_obj{{[_0-9a-zA-Z]*}}F
 func load_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.NativeObject
   // CHECK: [[VAL:%.*]] = load [copy] [[ADDR]]
@@ -31,7 +31,7 @@ func load_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
   return Builtin.load(x)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins12load_raw_pod
+// CHECK-LABEL: sil hidden @_T08builtins12load_raw_pod{{[_0-9a-zA-Z]*}}F
 func load_raw_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.Int64
   // CHECK: [[VAL:%.*]] = load [trivial] [[ADDR]]
@@ -39,7 +39,7 @@ func load_raw_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
   return Builtin.loadRaw(x)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins12load_raw_obj
+// CHECK-LABEL: sil hidden @_T08builtins12load_raw_obj{{[_0-9a-zA-Z]*}}F
 func load_raw_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.NativeObject
   // CHECK: [[VAL:%.*]] = load [copy] [[ADDR]]
@@ -47,14 +47,14 @@ func load_raw_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
   return Builtin.loadRaw(x)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins8load_gen
+// CHECK-LABEL: sil hidden @_T08builtins8load_gen{{[_0-9a-zA-Z]*}}F
 func load_gen<T>(_ x: Builtin.RawPointer) -> T {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
   // CHECK: copy_addr [[ADDR]] to [initialization] {{%.*}}
   return Builtin.load(x)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins8move_pod
+// CHECK-LABEL: sil hidden @_T08builtins8move_pod{{[_0-9a-zA-Z]*}}F
 func move_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.Int64
   // CHECK: [[VAL:%.*]] = load [trivial] [[ADDR]]
@@ -62,7 +62,7 @@ func move_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
   return Builtin.take(x)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins8move_obj
+// CHECK-LABEL: sil hidden @_T08builtins8move_obj{{[_0-9a-zA-Z]*}}F
 func move_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.NativeObject
   // CHECK: [[VAL:%.*]] = load [take] [[ADDR]]
@@ -71,14 +71,14 @@ func move_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
   return Builtin.take(x)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins8move_gen
+// CHECK-LABEL: sil hidden @_T08builtins8move_gen{{[_0-9a-zA-Z]*}}F
 func move_gen<T>(_ x: Builtin.RawPointer) -> T {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
   // CHECK: copy_addr [take] [[ADDR]] to [initialization] {{%.*}}
   return Builtin.take(x)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins11destroy_pod
+// CHECK-LABEL: sil hidden @_T08builtins11destroy_pod{{[_0-9a-zA-Z]*}}F
 func destroy_pod(_ x: Builtin.RawPointer) {
   var x = x
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box
@@ -91,21 +91,21 @@ func destroy_pod(_ x: Builtin.RawPointer) {
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins11destroy_obj
+// CHECK-LABEL: sil hidden @_T08builtins11destroy_obj{{[_0-9a-zA-Z]*}}F
 func destroy_obj(_ x: Builtin.RawPointer) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.NativeObject
   // CHECK: destroy_addr [[ADDR]]
   return Builtin.destroy(Builtin.NativeObject, x)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins11destroy_gen
+// CHECK-LABEL: sil hidden @_T08builtins11destroy_gen{{[_0-9a-zA-Z]*}}F
 func destroy_gen<T>(_ x: Builtin.RawPointer, _: T) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
   // CHECK: destroy_addr [[ADDR]]
   return Builtin.destroy(T.self, x)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins10assign_pod
+// CHECK-LABEL: sil hidden @_T08builtins10assign_pod{{[_0-9a-zA-Z]*}}F
 func assign_pod(_ x: Builtin.Int64, y: Builtin.RawPointer) {
   var x = x
   var y = y
@@ -122,7 +122,7 @@ func assign_pod(_ x: Builtin.Int64, y: Builtin.RawPointer) {
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins10assign_obj
+// CHECK-LABEL: sil hidden @_T08builtins10assign_obj{{[_0-9a-zA-Z]*}}F
 func assign_obj(_ x: Builtin.NativeObject, y: Builtin.RawPointer) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.NativeObject
   // CHECK: assign {{%.*}} to [[ADDR]]
@@ -130,7 +130,7 @@ func assign_obj(_ x: Builtin.NativeObject, y: Builtin.RawPointer) {
   Builtin.assign(x, y)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins12assign_tuple
+// CHECK-LABEL: sil hidden @_T08builtins12assign_tuple{{[_0-9a-zA-Z]*}}F
 func assign_tuple(_ x: (Builtin.Int64, Builtin.NativeObject),
                   y: Builtin.RawPointer) {
   var x = x
@@ -144,14 +144,14 @@ func assign_tuple(_ x: (Builtin.Int64, Builtin.NativeObject),
   Builtin.assign(x, y)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins10assign_gen
+// CHECK-LABEL: sil hidden @_T08builtins10assign_gen{{[_0-9a-zA-Z]*}}F
 func assign_gen<T>(_ x: T, y: Builtin.RawPointer) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
   // CHECK: copy_addr [take] {{%.*}} to [[ADDR]] :
   Builtin.assign(x, y)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins8init_pod
+// CHECK-LABEL: sil hidden @_T08builtins8init_pod{{[_0-9a-zA-Z]*}}F
 func init_pod(_ x: Builtin.Int64, y: Builtin.RawPointer) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.Int64
   // CHECK-NOT: load [[ADDR]]
@@ -160,7 +160,7 @@ func init_pod(_ x: Builtin.Int64, y: Builtin.RawPointer) {
   Builtin.initialize(x, y)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins8init_obj
+// CHECK-LABEL: sil hidden @_T08builtins8init_obj{{[_0-9a-zA-Z]*}}F
 func init_obj(_ x: Builtin.NativeObject, y: Builtin.RawPointer) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.NativeObject
   // CHECK-NOT: load [[ADDR]]
@@ -169,7 +169,7 @@ func init_obj(_ x: Builtin.NativeObject, y: Builtin.RawPointer) {
   Builtin.initialize(x, y)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins8init_gen
+// CHECK-LABEL: sil hidden @_T08builtins8init_gen{{[_0-9a-zA-Z]*}}F
 func init_gen<T>(_ x: T, y: Builtin.RawPointer) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
   // CHECK: copy_addr [[OTHER_LOC:%.*]] to [initialization]  [[ADDR]]
@@ -180,7 +180,7 @@ func init_gen<T>(_ x: T, y: Builtin.RawPointer) {
 class C {}
 class D {}
 
-// CHECK-LABEL: sil hidden @_TF8builtins22class_to_native_object
+// CHECK-LABEL: sil hidden @_T08builtins22class_to_native_object{{[_0-9a-zA-Z]*}}F
 func class_to_native_object(_ c:C) -> Builtin.NativeObject {
   // CHECK: [[OBJ:%.*]] = unchecked_ref_cast [[C:%.*]] to $Builtin.NativeObject
   // CHECK-NOT: destroy_value [[C]]
@@ -189,7 +189,7 @@ func class_to_native_object(_ c:C) -> Builtin.NativeObject {
   return Builtin.castToNativeObject(c)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins23class_to_unknown_object
+// CHECK-LABEL: sil hidden @_T08builtins23class_to_unknown_object{{[_0-9a-zA-Z]*}}F
 func class_to_unknown_object(_ c:C) -> Builtin.UnknownObject {
   // CHECK: [[OBJ:%.*]] = unchecked_ref_cast [[C:%.*]] to $Builtin.UnknownObject
   // CHECK-NOT: destroy_value [[C]]
@@ -198,7 +198,7 @@ func class_to_unknown_object(_ c:C) -> Builtin.UnknownObject {
   return Builtin.castToUnknownObject(c)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins32class_archetype_to_native_object
+// CHECK-LABEL: sil hidden @_T08builtins32class_archetype_to_native_object{{[_0-9a-zA-Z]*}}F
 func class_archetype_to_native_object<T : C>(_ t: T) -> Builtin.NativeObject {
   // CHECK: [[OBJ:%.*]] = unchecked_ref_cast [[C:%.*]] to $Builtin.NativeObject
   // CHECK-NOT: destroy_value [[C]]
@@ -207,7 +207,7 @@ func class_archetype_to_native_object<T : C>(_ t: T) -> Builtin.NativeObject {
   return Builtin.castToNativeObject(t)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins33class_archetype_to_unknown_object
+// CHECK-LABEL: sil hidden @_T08builtins33class_archetype_to_unknown_object{{[_0-9a-zA-Z]*}}F
 func class_archetype_to_unknown_object<T : C>(_ t: T) -> Builtin.UnknownObject {
   // CHECK: [[OBJ:%.*]] = unchecked_ref_cast [[C:%.*]] to $Builtin.UnknownObject
   // CHECK-NOT: destroy_value [[C]]
@@ -216,21 +216,21 @@ func class_archetype_to_unknown_object<T : C>(_ t: T) -> Builtin.UnknownObject {
   return Builtin.castToUnknownObject(t)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins34class_existential_to_native_object
+// CHECK-LABEL: sil hidden @_T08builtins34class_existential_to_native_object{{[_0-9a-zA-Z]*}}F
 func class_existential_to_native_object(_ t:ClassProto) -> Builtin.NativeObject {
   // CHECK: [[REF:%[0-9]+]] = open_existential_ref [[T:%[0-9]+]] : $ClassProto
   // CHECK: [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}) ClassProto to $Builtin.NativeObject
   return Builtin.castToNativeObject(t)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins35class_existential_to_unknown_object
+// CHECK-LABEL: sil hidden @_T08builtins35class_existential_to_unknown_object{{[_0-9a-zA-Z]*}}F
 func class_existential_to_unknown_object(_ t:ClassProto) -> Builtin.UnknownObject {
   // CHECK: [[REF:%[0-9]+]] = open_existential_ref [[T:%[0-9]+]] : $ClassProto
   // CHECK: [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}) ClassProto to $Builtin.UnknownObject
   return Builtin.castToUnknownObject(t)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins24class_from_native_object
+// CHECK-LABEL: sil hidden @_T08builtins24class_from_native_object{{[_0-9a-zA-Z]*}}F
 func class_from_native_object(_ p: Builtin.NativeObject) -> C {
   // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] to $C
   // CHECK-NOT: destroy_value [[C]]
@@ -239,7 +239,7 @@ func class_from_native_object(_ p: Builtin.NativeObject) -> C {
   return Builtin.castFromNativeObject(p)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins25class_from_unknown_object
+// CHECK-LABEL: sil hidden @_T08builtins25class_from_unknown_object{{[_0-9a-zA-Z]*}}F
 func class_from_unknown_object(_ p: Builtin.UnknownObject) -> C {
   // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] to $C
   // CHECK-NOT: destroy_value [[C]]
@@ -248,7 +248,7 @@ func class_from_unknown_object(_ p: Builtin.UnknownObject) -> C {
   return Builtin.castFromUnknownObject(p)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins34class_archetype_from_native_object
+// CHECK-LABEL: sil hidden @_T08builtins34class_archetype_from_native_object{{[_0-9a-zA-Z]*}}F
 func class_archetype_from_native_object<T : C>(_ p: Builtin.NativeObject) -> T {
   // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] : $Builtin.NativeObject to $T
   // CHECK-NOT: destroy_value [[C]]
@@ -257,7 +257,7 @@ func class_archetype_from_native_object<T : C>(_ p: Builtin.NativeObject) -> T {
   return Builtin.castFromNativeObject(p)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins35class_archetype_from_unknown_object
+// CHECK-LABEL: sil hidden @_T08builtins35class_archetype_from_unknown_object{{[_0-9a-zA-Z]*}}F
 func class_archetype_from_unknown_object<T : C>(_ p: Builtin.UnknownObject) -> T {
   // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] : $Builtin.UnknownObject to $T
   // CHECK-NOT: destroy_value [[C]]
@@ -266,7 +266,7 @@ func class_archetype_from_unknown_object<T : C>(_ p: Builtin.UnknownObject) -> T
   return Builtin.castFromUnknownObject(p)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins41objc_class_existential_from_native_object
+// CHECK-LABEL: sil hidden @_T08builtins41objc_class_existential_from_native_object{{[_0-9a-zA-Z]*}}F
 func objc_class_existential_from_native_object(_ p: Builtin.NativeObject) -> AnyObject {
   // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] : $Builtin.NativeObject to $AnyObject
   // CHECK-NOT: destroy_value [[C]]
@@ -275,7 +275,7 @@ func objc_class_existential_from_native_object(_ p: Builtin.NativeObject) -> Any
   return Builtin.castFromNativeObject(p)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins42objc_class_existential_from_unknown_object
+// CHECK-LABEL: sil hidden @_T08builtins42objc_class_existential_from_unknown_object{{[_0-9a-zA-Z]*}}F
 func objc_class_existential_from_unknown_object(_ p: Builtin.UnknownObject) -> AnyObject {
   // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] : $Builtin.UnknownObject to $AnyObject
   // CHECK-NOT: destroy_value [[C]]
@@ -284,7 +284,7 @@ func objc_class_existential_from_unknown_object(_ p: Builtin.UnknownObject) -> A
   return Builtin.castFromUnknownObject(p)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins20class_to_raw_pointer
+// CHECK-LABEL: sil hidden @_T08builtins20class_to_raw_pointer{{[_0-9a-zA-Z]*}}F
 func class_to_raw_pointer(_ c: C) -> Builtin.RawPointer {
   // CHECK: [[RAW:%.*]] = ref_to_raw_pointer [[C:%.*]] to $Builtin.RawPointer
   // CHECK: return [[RAW]]
@@ -301,14 +301,14 @@ func existential_to_raw_pointer(_ p: CP) -> Builtin.RawPointer {
   return Builtin.bridgeToRawPointer(p)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins18obj_to_raw_pointer
+// CHECK-LABEL: sil hidden @_T08builtins18obj_to_raw_pointer{{[_0-9a-zA-Z]*}}F
 func obj_to_raw_pointer(_ c: Builtin.NativeObject) -> Builtin.RawPointer {
   // CHECK: [[RAW:%.*]] = ref_to_raw_pointer [[C:%.*]] to $Builtin.RawPointer
   // CHECK: return [[RAW]]
   return Builtin.bridgeToRawPointer(c)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins22class_from_raw_pointer
+// CHECK-LABEL: sil hidden @_T08builtins22class_from_raw_pointer{{[_0-9a-zA-Z]*}}F
 func class_from_raw_pointer(_ p: Builtin.RawPointer) -> C {
   // CHECK: [[C:%.*]] = raw_pointer_to_ref [[RAW:%.*]] to $C
   // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
@@ -320,7 +320,7 @@ func class_archetype_from_raw_pointer<T : C>(_ p: Builtin.RawPointer) -> T {
   return Builtin.bridgeFromRawPointer(p)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins20obj_from_raw_pointer
+// CHECK-LABEL: sil hidden @_T08builtins20obj_from_raw_pointer{{[_0-9a-zA-Z]*}}F
 func obj_from_raw_pointer(_ p: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[C:%.*]] = raw_pointer_to_ref [[RAW:%.*]] to $Builtin.NativeObject
   // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
@@ -328,7 +328,7 @@ func obj_from_raw_pointer(_ p: Builtin.RawPointer) -> Builtin.NativeObject {
   return Builtin.bridgeFromRawPointer(p)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins28unknown_obj_from_raw_pointer
+// CHECK-LABEL: sil hidden @_T08builtins28unknown_obj_from_raw_pointer{{[_0-9a-zA-Z]*}}F
 func unknown_obj_from_raw_pointer(_ p: Builtin.RawPointer) -> Builtin.UnknownObject {
   // CHECK: [[C:%.*]] = raw_pointer_to_ref [[RAW:%.*]] to $Builtin.UnknownObject
   // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
@@ -336,7 +336,7 @@ func unknown_obj_from_raw_pointer(_ p: Builtin.RawPointer) -> Builtin.UnknownObj
   return Builtin.bridgeFromRawPointer(p)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins28existential_from_raw_pointer
+// CHECK-LABEL: sil hidden @_T08builtins28existential_from_raw_pointer{{[_0-9a-zA-Z]*}}F
 func existential_from_raw_pointer(_ p: Builtin.RawPointer) -> AnyObject {
   // CHECK: [[C:%.*]] = raw_pointer_to_ref [[RAW:%.*]] to $AnyObject
   // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
@@ -344,21 +344,21 @@ func existential_from_raw_pointer(_ p: Builtin.RawPointer) -> AnyObject {
   return Builtin.bridgeFromRawPointer(p)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins9gep_raw64
+// CHECK-LABEL: sil hidden @_T08builtins9gep_raw64{{[_0-9a-zA-Z]*}}F
 func gep_raw64(_ p: Builtin.RawPointer, i: Builtin.Int64) -> Builtin.RawPointer {
   // CHECK: [[GEP:%.*]] = index_raw_pointer
   // CHECK: return [[GEP]]
   return Builtin.gepRaw_Int64(p, i)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins9gep_raw32
+// CHECK-LABEL: sil hidden @_T08builtins9gep_raw32{{[_0-9a-zA-Z]*}}F
 func gep_raw32(_ p: Builtin.RawPointer, i: Builtin.Int32) -> Builtin.RawPointer {
   // CHECK: [[GEP:%.*]] = index_raw_pointer
   // CHECK: return [[GEP]]
   return Builtin.gepRaw_Int32(p, i)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins3gep
+// CHECK-LABEL: sil hidden @_T08builtins3gep{{[_0-9a-zA-Z]*}}F
 func gep<Elem>(_ p: Builtin.RawPointer, i: Builtin.Word, e: Elem.Type) -> Builtin.RawPointer {
   // CHECK: [[P2A:%.*]] = pointer_to_address %0
   // CHECK: [[GEP:%.*]] = index_addr [[P2A]] : $*Elem, %1 : $Builtin.Word
@@ -369,7 +369,7 @@ func gep<Elem>(_ p: Builtin.RawPointer, i: Builtin.Word, e: Elem.Type) -> Builti
 
 public final class Header { }
 
-// CHECK-LABEL: sil hidden @_TF8builtins20allocWithTailElems_1
+// CHECK-LABEL: sil hidden @_T08builtins20allocWithTailElems_1{{[_0-9a-zA-Z]*}}F
 func allocWithTailElems_1<T>(n: Builtin.Word, ty: T.Type) -> Header {
   // CHECK: [[M:%.*]] = metatype $@thick Header.Type
   // CHECK: [[A:%.*]] = alloc_ref [tail_elems $T * %0 : $Builtin.Word] $Header
@@ -377,7 +377,7 @@ func allocWithTailElems_1<T>(n: Builtin.Word, ty: T.Type) -> Header {
   return Builtin.allocWithTailElems_1(Header.self, n, ty)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins20allocWithTailElems_3
+// CHECK-LABEL: sil hidden @_T08builtins20allocWithTailElems_3{{[_0-9a-zA-Z]*}}F
 func allocWithTailElems_3<T1, T2, T3>(n1: Builtin.Word, ty1: T1.Type, n2: Builtin.Word, ty2: T2.Type, n3: Builtin.Word, ty3: T3.Type) -> Header {
   // CHECK: [[M:%.*]] = metatype $@thick Header.Type
   // CHECK: [[A:%.*]] = alloc_ref [tail_elems $T1 * %0 : $Builtin.Word] [tail_elems $T2 * %2 : $Builtin.Word] [tail_elems $T3 * %4 : $Builtin.Word] $Header
@@ -385,7 +385,7 @@ func allocWithTailElems_3<T1, T2, T3>(n1: Builtin.Word, ty1: T1.Type, n2: Builti
   return Builtin.allocWithTailElems_3(Header.self, n1, ty1, n2, ty2, n3, ty3)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins16projectTailElems
+// CHECK-LABEL: sil hidden @_T08builtins16projectTailElems{{[_0-9a-zA-Z]*}}F
 func projectTailElems<T>(h: Header, ty: T.Type) -> Builtin.RawPointer {
   // CHECK: bb0([[ARG1:%.*]] : $Header
   // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
@@ -396,9 +396,9 @@ func projectTailElems<T>(h: Header, ty: T.Type) -> Builtin.RawPointer {
   // CHECK:   return [[A2P]]
   return Builtin.projectTailElems(h, ty)
 }
-// CHECK: } // end sil function '_TF8builtins16projectTailElemsurFT1hCS_6Header2tyMx_Bp'
+// CHECK: } // end sil function '_T08builtins16projectTailElemsBpAA6HeaderC1h_xm2tytlF'
 
-// CHECK-LABEL: sil hidden @_TF8builtins11getTailAddr
+// CHECK-LABEL: sil hidden @_T08builtins11getTailAddr{{[_0-9a-zA-Z]*}}F
 func getTailAddr<T1, T2>(start: Builtin.RawPointer, i: Builtin.Word, ty1: T1.Type, ty2: T2.Type) -> Builtin.RawPointer {
   // CHECK: [[P2A:%.*]] = pointer_to_address %0
   // CHECK: [[TA:%.*]] = tail_addr [[P2A]] : $*T1, %1 : $Builtin.Word, $T2
@@ -407,7 +407,7 @@ func getTailAddr<T1, T2>(start: Builtin.RawPointer, i: Builtin.Word, ty1: T1.Typ
   return Builtin.getTailAddr_Word(start, i, ty1, ty2)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins8condfail
+// CHECK-LABEL: sil hidden @_T08builtins8condfail{{[_0-9a-zA-Z]*}}F
 func condfail(_ i: Builtin.Int1) {
   Builtin.condfail(i)
   // CHECK: cond_fail {{%.*}} : $Builtin.Int1
@@ -419,7 +419,7 @@ struct S {}
 @objc protocol OP2 {}
 protocol P {}
 
-// CHECK-LABEL: sil hidden @_TF8builtins10canBeClass
+// CHECK-LABEL: sil hidden @_T08builtins10canBeClass{{[_0-9a-zA-Z]*}}F
 func canBeClass<T>(_: T) {
   // CHECK: integer_literal $Builtin.Int8, 1
   Builtin.canBeClass(O.self)
@@ -446,7 +446,7 @@ func canBeClass<T>(_: T) {
 
 // FIXME: "T.Type.self" does not parse as an expression
 
-// CHECK-LABEL: sil hidden @_TF8builtins18canBeClassMetatype
+// CHECK-LABEL: sil hidden @_T08builtins18canBeClassMetatype{{[_0-9a-zA-Z]*}}F
 func canBeClassMetatype<T>(_: T) {
   // CHECK: integer_literal $Builtin.Int8, 0
   typealias OT = O.Type
@@ -477,7 +477,7 @@ func canBeClassMetatype<T>(_: T) {
   Builtin.canBeClass(TT.self)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins11fixLifetimeFCS_1CT_ : $@convention(thin) (@owned C) -> () {
+// CHECK-LABEL: sil hidden @_T08builtins11fixLifetimeyAA1CCF : $@convention(thin) (@owned C) -> () {
 func fixLifetime(_ c: C) {
   // CHECK: bb0([[ARG:%.*]] : $C):
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
@@ -486,30 +486,30 @@ func fixLifetime(_ c: C) {
   // CHECK:   destroy_value [[ARG]]
   Builtin.fixLifetime(c)
 }
-// CHECK: } // end sil function '_TF8builtins11fixLifetimeFCS_1CT_'
+// CHECK: } // end sil function '_T08builtins11fixLifetimeyAA1CCF'
 
-// CHECK-LABEL: sil hidden @_TF8builtins20assert_configuration
+// CHECK-LABEL: sil hidden @_T08builtins20assert_configuration{{[_0-9a-zA-Z]*}}F
 func assert_configuration() -> Builtin.Int32 {
   return Builtin.assert_configuration()
   // CHECK: [[APPLY:%.*]] = builtin "assert_configuration"() : $Builtin.Int32
   // CHECK: return [[APPLY]] : $Builtin.Int32
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins17assumeNonNegativeFBwBw
+// CHECK-LABEL: sil hidden @_T08builtins17assumeNonNegativeBwBwF
 func assumeNonNegative(_ x: Builtin.Word) -> Builtin.Word {
   return Builtin.assumeNonNegative_Word(x)
   // CHECK: [[APPLY:%.*]] = builtin "assumeNonNegative_Word"(%0 : $Builtin.Word) : $Builtin.Word
   // CHECK: return [[APPLY]] : $Builtin.Word
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins11autoreleaseFCS_1OT_ : $@convention(thin) (@owned O) -> () {
+// CHECK-LABEL: sil hidden @_T08builtins11autoreleaseyAA1OCF : $@convention(thin) (@owned O) -> () {
 // ==> SEMANTIC ARC TODO: This will be unbalanced... should we allow it?
 // CHECK: bb0([[ARG:%.*]] : $O):
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:   autorelease_value [[ARG_COPY]]
 // CHECK:   destroy_value [[ARG_COPY]]
 // CHECK:   destroy_value [[ARG]]
-// CHECK: } // end sil function '_TF8builtins11autoreleaseFCS_1OT_'
+// CHECK: } // end sil function '_T08builtins11autoreleaseyAA1OCF'
 func autorelease(_ o: O) {
   Builtin.autorelease(o)
 }
@@ -517,15 +517,15 @@ func autorelease(_ o: O) {
 // The 'unreachable' builtin is emitted verbatim by SILGen and eliminated during
 // diagnostics.
 
-// CHECK-LABEL: sil hidden @_TF8builtins11unreachable
+// CHECK-LABEL: sil hidden @_T08builtins11unreachable{{[_0-9a-zA-Z]*}}F
 // CHECK:         builtin "unreachable"()
 // CHECK:         return
-// CANONICAL-LABEL: sil hidden @_TF8builtins11unreachableFT_T_ : $@convention(thin) () -> () {
+// CANONICAL-LABEL: sil hidden @_T08builtins11unreachableyyF : $@convention(thin) () -> () {
 func unreachable() {
   Builtin.unreachable()
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins15reinterpretCastFTCS_1C1xBw_TBwCS_1DGSqS0__S0__ : $@convention(thin) (@owned C, Builtin.Word) -> (Builtin.Word, @owned D, @owned Optional<C>, @owned C)
+// CHECK-LABEL: sil hidden @_T08builtins15reinterpretCastBw_AA1DCAA1CCSgAFtAF_Bw1xtF : $@convention(thin) (@owned C, Builtin.Word) -> (Builtin.Word, @owned D, @owned Optional<C>, @owned C)
 // CHECK:       bb0([[ARG1:%.*]] : $C, [[ARG2:%.*]] : $Builtin.Word):
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    debug_value
@@ -548,13 +548,13 @@ func reinterpretCast(_ c: C, x: Builtin.Word) -> (Builtin.Word, D, C?, C) {
           Builtin.reinterpretCast(x) as C)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins19reinterpretAddrOnly
+// CHECK-LABEL: sil hidden @_T08builtins19reinterpretAddrOnly{{[_0-9a-zA-Z]*}}F
 func reinterpretAddrOnly<T, U>(_ t: T) -> U {
   // CHECK: unchecked_addr_cast {{%.*}} : $*T to $*U
   return Builtin.reinterpretCast(t)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins28reinterpretAddrOnlyToTrivial
+// CHECK-LABEL: sil hidden @_T08builtins28reinterpretAddrOnlyToTrivial{{[_0-9a-zA-Z]*}}F
 func reinterpretAddrOnlyToTrivial<T>(_ t: T) -> Int {
   // CHECK: [[ADDR:%.*]] = unchecked_addr_cast [[INPUT:%.*]] : $*T to $*Int
   // CHECK: [[VALUE:%.*]] = load [trivial] [[ADDR]]
@@ -562,7 +562,7 @@ func reinterpretAddrOnlyToTrivial<T>(_ t: T) -> Int {
   return Builtin.reinterpretCast(t)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins27reinterpretAddrOnlyLoadable
+// CHECK-LABEL: sil hidden @_T08builtins27reinterpretAddrOnlyLoadable{{[_0-9a-zA-Z]*}}F
 func reinterpretAddrOnlyLoadable<T>(_ a: Int, _ b: T) -> (T, Int) {
   // CHECK: [[BUF:%.*]] = alloc_stack $Int
   // CHECK: store {{%.*}} to [trivial] [[BUF]]
@@ -574,27 +574,27 @@ func reinterpretAddrOnlyLoadable<T>(_ a: Int, _ b: T) -> (T, Int) {
           Builtin.reinterpretCast(b) as Int)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins18castToBridgeObject
+// CHECK-LABEL: sil hidden @_T08builtins18castToBridgeObject{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[BO:%.*]] = ref_to_bridge_object {{%.*}} : $C, {{%.*}} : $Builtin.Word
 // CHECK:         return [[BO]]
 func castToBridgeObject(_ c: C, _ w: Builtin.Word) -> Builtin.BridgeObject {
   return Builtin.castToBridgeObject(c, w)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins23castRefFromBridgeObject
+// CHECK-LABEL: sil hidden @_T08builtins23castRefFromBridgeObject{{[_0-9a-zA-Z]*}}F
 // CHECK:         bridge_object_to_ref [[BO:%.*]] : $Builtin.BridgeObject to $C
 func castRefFromBridgeObject(_ bo: Builtin.BridgeObject) -> C {
   return Builtin.castReferenceFromBridgeObject(bo)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins30castBitPatternFromBridgeObject
+// CHECK-LABEL: sil hidden @_T08builtins30castBitPatternFromBridgeObject{{[_0-9a-zA-Z]*}}F
 // CHECK:         bridge_object_to_word [[BO:%.*]] : $Builtin.BridgeObject to $Builtin.Word
 // CHECK:         destroy_value [[BO]]
 func castBitPatternFromBridgeObject(_ bo: Builtin.BridgeObject) -> Builtin.Word {
   return Builtin.castBitPatternFromBridgeObject(bo)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins8pinUnpin
+// CHECK-LABEL: sil hidden @_T08builtins8pinUnpin{{[_0-9a-zA-Z]*}}F
 // CHECK:       bb0([[ARG:%.*]] : $Builtin.NativeObject):
 // CHECK-NEXT:    debug_value
 func pinUnpin(_ object : Builtin.NativeObject) {
@@ -621,7 +621,7 @@ func pinUnpin(_ object : Builtin.NativeObject) {
 // ----------------------------------------------------------------------------
 
 // NativeObject
-// CHECK-LABEL: sil hidden @_TF8builtins8isUnique
+// CHECK-LABEL: sil hidden @_T08builtins8isUnique{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Optional<Builtin.NativeObject>):
 // CHECK: [[BUILTIN:%.*]] = is_unique %0 : $*Optional<Builtin.NativeObject>
 // CHECK: return
@@ -630,7 +630,7 @@ func isUnique(_ ref: inout Builtin.NativeObject?) -> Bool {
 }
 
 // NativeObject nonNull
-// CHECK-LABEL: sil hidden @_TF8builtins8isUnique
+// CHECK-LABEL: sil hidden @_T08builtins8isUnique{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Builtin.NativeObject):
 // CHECK: [[BUILTIN:%.*]] = is_unique %0 : $*Builtin.NativeObject
 // CHECK: return
@@ -639,7 +639,7 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
 }
 
 // NativeObject pinned
-// CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinned
+// CHECK-LABEL: sil hidden @_T08builtins16isUniqueOrPinned{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Optional<Builtin.NativeObject>):
 // CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned %0 : $*Optional<Builtin.NativeObject>
 // CHECK: return
@@ -648,7 +648,7 @@ func isUniqueOrPinned(_ ref: inout Builtin.NativeObject?) -> Bool {
 }
 
 // NativeObject pinned nonNull
-// CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinned
+// CHECK-LABEL: sil hidden @_T08builtins16isUniqueOrPinned{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Builtin.NativeObject):
 // CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned %0 : $*Builtin.NativeObject
 // CHECK: return
@@ -657,7 +657,7 @@ func isUniqueOrPinned(_ ref: inout Builtin.NativeObject) -> Bool {
 }
 
 // UnknownObject (ObjC)
-// CHECK-LABEL: sil hidden @_TF8builtins8isUnique
+// CHECK-LABEL: sil hidden @_T08builtins8isUnique{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Optional<Builtin.UnknownObject>):
 // CHECK: [[BUILTIN:%.*]] = is_unique %0 : $*Optional<Builtin.UnknownObject>
 // CHECK: return
@@ -666,7 +666,7 @@ func isUnique(_ ref: inout Builtin.UnknownObject?) -> Bool {
 }
 
 // UnknownObject (ObjC) nonNull
-// CHECK-LABEL: sil hidden @_TF8builtins8isUnique
+// CHECK-LABEL: sil hidden @_T08builtins8isUnique{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Builtin.UnknownObject):
 // CHECK: [[BUILTIN:%.*]] = is_unique %0 : $*Builtin.UnknownObject
 // CHECK: return
@@ -675,7 +675,7 @@ func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
 }
 
 // UnknownObject (ObjC) pinned nonNull
-// CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinned
+// CHECK-LABEL: sil hidden @_T08builtins16isUniqueOrPinned{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Builtin.UnknownObject):
 // CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned %0 : $*Builtin.UnknownObject
 // CHECK: return
@@ -684,7 +684,7 @@ func isUniqueOrPinned(_ ref: inout Builtin.UnknownObject) -> Bool {
 }
 
 // BridgeObject nonNull
-// CHECK-LABEL: sil hidden @_TF8builtins8isUnique
+// CHECK-LABEL: sil hidden @_T08builtins8isUnique{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Builtin.BridgeObject):
 // CHECK: [[BUILTIN:%.*]] = is_unique %0 : $*Builtin.BridgeObject
 // CHECK: return
@@ -693,7 +693,7 @@ func isUnique(_ ref: inout Builtin.BridgeObject) -> Bool {
 }
 
 // BridgeObject pinned nonNull
-// CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinned
+// CHECK-LABEL: sil hidden @_T08builtins16isUniqueOrPinned{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Builtin.BridgeObject):
 // CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned %0 : $*Builtin.BridgeObject
 // CHECK: return
@@ -702,7 +702,7 @@ func isUniqueOrPinned(_ ref: inout Builtin.BridgeObject) -> Bool {
 }
 
 // BridgeObject nonNull native
-// CHECK-LABEL: sil hidden @_TF8builtins15isUnique_native
+// CHECK-LABEL: sil hidden @_T08builtins15isUnique_native{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Builtin.BridgeObject):
 // CHECK: [[CAST:%.*]] = unchecked_addr_cast %0 : $*Builtin.BridgeObject to $*Builtin.NativeObject
 // CHECK: return
@@ -711,7 +711,7 @@ func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
 }
 
 // BridgeObject pinned nonNull native
-// CHECK-LABEL: sil hidden @_TF8builtins23isUniqueOrPinned_native
+// CHECK-LABEL: sil hidden @_T08builtins23isUniqueOrPinned_native{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Builtin.BridgeObject):
 // CHECK: [[CAST:%.*]] = unchecked_addr_cast %0 : $*Builtin.BridgeObject to $*Builtin.NativeObject
 // CHECK: [[BUILTIN:%.*]] = is_unique_or_pinned [[CAST]] : $*Builtin.NativeObject
@@ -728,47 +728,47 @@ class A {}
 protocol PUnknown {}
 protocol PClass : class {}
 
-// CHECK-LABEL: sil hidden @_TF8builtins19refcast_generic_any
+// CHECK-LABEL: sil hidden @_T08builtins19refcast_generic_any{{[_0-9a-zA-Z]*}}F
 // CHECK: unchecked_ref_cast_addr  T in %{{.*}} : $*T to AnyObject in %{{.*}} : $*AnyObject
 func refcast_generic_any<T>(_ o: T) -> AnyObject {
   return Builtin.castReference(o)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins17refcast_class_anyFCS_1APs9AnyObject_ :
+// CHECK-LABEL: sil hidden @_T08builtins17refcast_class_anys9AnyObject_pAA1ACF :
 // CHECK: bb0([[ARG:%.*]] : $A):
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:   [[ARG_COPY_CASTED:%.*]] = unchecked_ref_cast [[ARG_COPY]] : $A to $AnyObject
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return [[ARG_COPY_CASTED]]
-// CHECK: } // end sil function '_TF8builtins17refcast_class_anyFCS_1APs9AnyObject_'
+// CHECK: } // end sil function '_T08builtins17refcast_class_anys9AnyObject_pAA1ACF'
 func refcast_class_any(_ o: A) -> AnyObject {
   return Builtin.castReference(o)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins20refcast_punknown_any
+// CHECK-LABEL: sil hidden @_T08builtins20refcast_punknown_any{{[_0-9a-zA-Z]*}}F
 // CHECK: unchecked_ref_cast_addr PUnknown in %{{.*}} : $*PUnknown to AnyObject in %{{.*}} : $*AnyObject
 func refcast_punknown_any(_ o: PUnknown) -> AnyObject {
   return Builtin.castReference(o)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins18refcast_pclass_anyFPS_6PClass_Ps9AnyObject_ :
+// CHECK-LABEL: sil hidden @_T08builtins18refcast_pclass_anys9AnyObject_pAA6PClass_pF :
 // CHECK: bb0([[ARG:%.*]] : $PClass):
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:   [[ARG_COPY_CAST:%.*]] = unchecked_ref_cast [[ARG_COPY]] : $PClass to $AnyObject
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return [[ARG_COPY_CAST]]
-// CHECK: } // end sil function '_TF8builtins18refcast_pclass_anyFPS_6PClass_Ps9AnyObject_'
+// CHECK: } // end sil function '_T08builtins18refcast_pclass_anys9AnyObject_pAA6PClass_pF'
 func refcast_pclass_any(_ o: PClass) -> AnyObject {
   return Builtin.castReference(o)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins20refcast_any_punknown
+// CHECK-LABEL: sil hidden @_T08builtins20refcast_any_punknown{{[_0-9a-zA-Z]*}}F
 // CHECK: unchecked_ref_cast_addr AnyObject in %{{.*}} : $*AnyObject to PUnknown in %{{.*}} : $*PUnknown
 func refcast_any_punknown(_ o: AnyObject) -> PUnknown {
   return Builtin.castReference(o)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins22unsafeGuaranteed_class
+// CHECK-LABEL: sil hidden @_T08builtins22unsafeGuaranteed_class{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[P:%.*]] : $A):
 // CHECK:   [[P_COPY:%.*]] = copy_value  [[P]]
 // CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<A>([[P_COPY]] : $A)
@@ -784,7 +784,7 @@ func unsafeGuaranteed_class(_ a: A) -> A {
   return a
 }
 
-// CHECK-LABEL: _TF8builtins24unsafeGuaranteed_generic
+// CHECK-LABEL: _T08builtins24unsafeGuaranteed_generic{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[P:%.*]] : $T):
 // CHECK:   [[P_COPY:%.*]] = copy_value  [[P]]
 // CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<T>([[P_COPY]] : $T)
@@ -800,7 +800,7 @@ func unsafeGuaranteed_generic<T: AnyObject> (_ a: T) -> T {
   return a
 }
 
-// CHECK_LABEL: sil hidden @_TF8builtins31unsafeGuaranteed_generic_return
+// CHECK_LABEL: sil hidden @_T08builtins31unsafeGuaranteed_generic_return{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[P:%.*]] : $T):
 // CHECK:   [[P_COPY:%.*]] = copy_value [[P]]
 // CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<T>([[P_COPY]] : $T)
@@ -814,7 +814,7 @@ func unsafeGuaranteed_generic_return<T: AnyObject> (_ a: T) -> (T, Builtin.Int8)
   return Builtin.unsafeGuaranteed(a)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins19unsafeGuaranteedEnd
+// CHECK-LABEL: sil hidden @_T08builtins19unsafeGuaranteedEnd{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[P:%.*]] : $Builtin.Int8):
 // CHECK:   builtin "unsafeGuaranteedEnd"([[P]] : $Builtin.Int8)
 // CHECK:   [[S:%.*]] = tuple ()
@@ -824,7 +824,7 @@ func unsafeGuaranteedEnd(_ t: Builtin.Int8) {
   Builtin.unsafeGuaranteedEnd(t)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins10bindMemory
+// CHECK-LABEL: sil hidden @_T08builtins10bindMemory{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[P:%.*]] : $Builtin.RawPointer, [[I:%.*]] : $Builtin.Word, [[T:%.*]] : $@thick T.Type):
 // CHECK: bind_memory [[P]] : $Builtin.RawPointer, [[I]] : $Builtin.Word to $*T
 // CHECK:   return {{%.*}} : $()

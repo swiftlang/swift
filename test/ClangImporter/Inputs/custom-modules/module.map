@@ -150,3 +150,7 @@ module MacrosRedefA {
 module MacrosRedefB {
   header "MacrosRedefB.h"
 }
+
+module IndirectFields {
+  header "IndirectFields.h"
+}

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -215,22 +215,14 @@ public func fpclassify(_ value: ${T}) -> Int {
 %if T == 'Double':
 #if os(Linux)
   return Int(__fpclassify(CDouble(value)))
-#elseif os(Windows)
-#if CYGWIN
-  return Int(__fpclassify(CDouble(value)))
-#else
+#elseif os(Windows) && !CYGWIN
   return Int(_dclass(CDouble(value)))
-#endif
 #else
   return Int(__fpclassifyd(CDouble(value)))
 #endif
 %else:
-#if os(Windows)
-#if CYGWIN
-  return Int(__fpclassify${f}(${CT}(value)))
-#else
+#if os(Windows) && !CYGWIN
   return Int(_${f}dclass(${CT}(value)))
-#endif
 #else
   return Int(__fpclassify${f}(${CT}(value)))
 #endif
@@ -305,7 +297,7 @@ public func scalbn(_ x: ${T}, _ n: Int) -> ${T} {
 
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
-#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || CYGWIN
 @_transparent
 public func lgamma(_ x: ${T}) -> (${T}, Int) {
   var sign = Int32(0)

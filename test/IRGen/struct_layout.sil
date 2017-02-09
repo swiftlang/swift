@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -module-name main -emit-ir -o - | %FileCheck -check-prefix=%target-ptrsize %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -module-name main -emit-ir -o - | %FileCheck -check-prefix=%target-ptrsize %s
 
 import Builtin
 import Swift
@@ -9,9 +9,9 @@ import Swift
 // 64: %V4main14Rdar15410780_C = type <{ %GSqSS_ }>
 // 64: %GSqSS_ = type <{ [24 x i8], [1 x i8] }>
 
-// 64: @_TWVV4main14Rdar15410780_A = hidden constant {{.*}} (i64 257
-// 64: @_TWVV4main14Rdar15410780_B = hidden constant {{.*}} (i64 258
-// 64: @_TWVV4main14Rdar15410780_C = hidden constant {{.*}} (i64 25
+// 64: @_T04main14Rdar15410780_AVWV = hidden constant {{.*}} (i64 257
+// 64: @_T04main14Rdar15410780_BVWV = hidden constant {{.*}} (i64 258
+// 64: @_T04main14Rdar15410780_CVWV = hidden constant {{.*}} (i64 25
 
 
 // 32: %V4main14Rdar15410780_A = type <{ i2048, %Vs4Int8 }>
@@ -20,9 +20,9 @@ import Swift
 // 32: %V4main14Rdar15410780_C = type <{ %GSqSS_ }>
 // 32: %GSqSS_ = type <{ [12 x i8], [1 x i8] }>
 
-// 32: @_TWVV4main14Rdar15410780_A = hidden constant {{.*}} (i32 257
-// 32: @_TWVV4main14Rdar15410780_B = hidden constant {{.*}} (i32 258
-// 32: @_TWVV4main14Rdar15410780_C = hidden constant {{.*}} (i32 13
+// 32: @_T04main14Rdar15410780_AVWV = hidden constant {{.*}} (i32 257
+// 32: @_T04main14Rdar15410780_BVWV = hidden constant {{.*}} (i32 258
+// 32: @_T04main14Rdar15410780_CVWV = hidden constant {{.*}} (i32 13
 
 
 // <rdar://problem/15410780>

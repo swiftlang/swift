@@ -3,12 +3,14 @@ import json
 import md5
 import subprocess
 
-import bug_reducer_utils
+import func_bug_reducer
 
 import list_reducer
 from list_reducer import TESTRESULT_KEEPPREFIX
 from list_reducer import TESTRESULT_KEEPSUFFIX
 from list_reducer import TESTRESULT_NOFAILURE
+
+import swift_tools
 
 
 class ReduceMiscompilingPasses(list_reducer.ListReducer):
@@ -22,14 +24,15 @@ class ReduceMiscompilingPasses(list_reducer.ListReducer):
         # broken with JUST the kept passes, discard the prefix passes.
         suffix_joined = ' '.join(suffix)
         suffix_hash = md5.md5(suffix_joined).hexdigest()
-        print("Checking to see if '%s' compiles correctly" % suffix_joined)
+        print("Checking to see if suffix '%s' compiles correctly" %
+              suffix_joined)
 
         result = self.invoker.invoke_with_passlist(
             suffix,
             self.invoker.get_suffixed_filename(suffix_hash))
 
         # Found a miscompile! Keep the suffix
-        if result != 0:
+        if result['exit_code'] != 0:
             print("Suffix maintains the predicate. Returning suffix")
             return (TESTRESULT_KEEPSUFFIX, prefix, suffix)
 
@@ -53,7 +56,7 @@ class ReduceMiscompilingPasses(list_reducer.ListReducer):
         result = self.invoker.invoke_with_passlist(
             prefix,
             prefix_path)
-        if result != 0:
+        if result['exit_code'] != 0:
             print("Prefix maintains the predicate by itself. Returning keep "
                   "prefix")
             return (TESTRESULT_KEEPPREFIX, prefix, suffix)
@@ -76,7 +79,7 @@ class ReduceMiscompilingPasses(list_reducer.ListReducer):
 
         # If we failed at this point, then the prefix is our new
         # baseline. Return keep suffix.
-        if result != 0:
+        if result['exit_code'] != 0:
             print("Suffix failed. Keeping prefix as new baseline")
             return (TESTRESULT_KEEPSUFFIX, prefix, suffix)
 
@@ -86,57 +89,70 @@ class ReduceMiscompilingPasses(list_reducer.ListReducer):
         return (TESTRESULT_NOFAILURE, prefix, suffix)
 
 
-def pass_bug_reducer(args):
+def pass_bug_reducer(tools, config, passes, sil_opt_invoker, reduce_sil):
+    # Make sure that the base case /does/ crash.
+    filename = sil_opt_invoker.get_suffixed_filename('base_case')
+    result = sil_opt_invoker.invoke_with_passlist(passes, filename)
+    # If we succeed, there is no further work to do.
+    if result['exit_code'] == 0:
+        print("Success with base case: %s" % (' '.join(passes)))
+        return True
+    print("Base case crashes! First trying to reduce the pass list!")
+
+    # Otherwise, reduce the list of passes that cause the optimizer to crash.
+    r = ReduceMiscompilingPasses(passes, sil_opt_invoker)
+    if not r.reduce_list():
+        print("Failed to find miscompiling pass list!")
+
+    cmdline = sil_opt_invoker.cmdline_with_passlist(r.target_list)
+    print("*** Found miscompiling passes!")
+    print("*** Final File: %s" % sil_opt_invoker.input_file)
+    print("*** Final Passes: %s" % (' '.join(r.target_list)))
+    print("*** Repro command line: %s" % (' '.join(cmdline)))
+    if not reduce_sil:
+        return False
+
+    print("*** User requested that we try to reduce SIL. Lets try.")
+    input_file = sil_opt_invoker.input_file
+    nm = swift_tools.SILNMInvoker(config, tools)
+    sil_extract_invoker = swift_tools.SILFuncExtractorInvoker(config,
+                                                              tools,
+                                                              input_file)
+
+    func_bug_reducer.function_bug_reducer(input_file, nm, sil_opt_invoker,
+                                          sil_extract_invoker,
+                                          r.target_list)
+    print("*** Final Passes: %s" % (' '.join(r.target_list)))
+    return False
+
+
+def invoke_pass_bug_reducer(args):
     """Given a path to a sib file with canonical sil, attempt to find a perturbed
 list of passes that the perf pipeline"""
-    tools = bug_reducer_utils.SwiftTools(args.swift_build_dir)
+    tools = swift_tools.SwiftTools(args.swift_build_dir)
+    config = swift_tools.SILToolInvokerConfig(args)
 
     passes = []
-    early_module_passes = []
     if args.pass_list is None:
         json_data = json.loads(subprocess.check_output(
             [tools.sil_passpipeline_dumper, '-Performance']))
-        passes = sum((p[2:] for p in json_data if p[0] != 'EarlyModulePasses'), [])
+        passes = sum((p[1:] for p in json_data), [])
         passes = ['-' + x[1] for x in passes]
-        # We assume we have an early module passes that runs until fix point and
-        # that is strictly not what is causing the issue.
-        #
-        # Everything else runs one iteration.
-        early_module_passes = [p[2:] for p in json_data
-                               if p[0] == 'EarlyModulePasses'][0]
-        early_module_passes = ['-' + x[1] for x in early_module_passes]
     else:
         passes = ['-' + x for x in args.pass_list]
 
     extra_args = []
     if args.extra_args is not None:
         extra_args = args.extra_args
-    sil_opt_invoker = bug_reducer_utils.SILOptInvoker(args, tools,
-                                                      early_module_passes,
-                                                      extra_args)
-
-    # Make sure that the base case /does/ crash.
-    filename = sil_opt_invoker.get_suffixed_filename('base_case')
-    result = sil_opt_invoker.invoke_with_passlist(passes, filename)
-    # If we succeed, there is no further work to do.
-    if result == 0:
-        print("Success with PassList: %s" % (' '.join(passes)))
-        return
-
-    # Otherwise, reduce the list of pases that cause the optimzier to crash.
-    r = ReduceMiscompilingPasses(passes, sil_opt_invoker)
-    if not r.reduce_list():
-        print("Failed to find miscompiling pass list!")
-    cmdline = sil_opt_invoker.cmdline_with_passlist(r.target_list)
-    print("*** Found miscompiling passes!")
-    print("*** Final File: %s" % sil_opt_invoker.input_file)
-    print("*** Final Passes: %s" % (' '.join(r.target_list)))
-    print("*** Repro command line: %s" % (' '.join(cmdline)))
+    sil_opt_invoker = swift_tools.SILOptInvoker(config, tools,
+                                                args.input_file,
+                                                extra_args)
+    pass_bug_reducer(tools, config, passes, sil_opt_invoker, args.reduce_sil)
 
 
 def add_parser_arguments(parser):
     """Add parser arguments for opt_bug_reducer"""
-    parser.set_defaults(func=pass_bug_reducer)
+    parser.set_defaults(func=invoke_pass_bug_reducer)
     parser.add_argument('input_file', help='The input file to optimize')
     parser.add_argument('--module-cache', help='The module cache to use')
     parser.add_argument('--sdk', help='The sdk to pass to sil-opt')
@@ -150,5 +166,10 @@ def add_parser_arguments(parser):
                         help='The name of the module we are optimizing')
     parser.add_argument('--pass', help='pass to test', dest='pass_list',
                         action='append')
-    parser.add_argument('--extra-arg', help='extra argument to pass to sil-opt',
+    parser.add_argument('--extra-arg',
+                        help='extra argument to pass to sil-opt',
                         dest='extra_args', action='append')
+    parser.add_argument('--reduce-sil', help='After finding the relevant '
+                        'passes, try to reduce the SIL by eliminating '
+                        'functions, blocks, etc',
+                        action='store_true')

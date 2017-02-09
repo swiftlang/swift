@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -475,14 +475,14 @@ private:
     }
   };
 };
-}
+} // end anonymous namespace
 
 NominalTypeDecl *
 RemoteASTTypeBuilder::createNominalTypeDecl(const Demangle::NodePointer &node) {
   auto DC = findDeclContext(node);
   if (!DC) {
     return fail<NominalTypeDecl*>(Failure::CouldNotResolveTypeDecl,
-                    Demangle::mangleNode(node, NewMangling::useNewMangling()));
+                              Demangle::mangleNode(node, useNewMangling(node)));
   }
 
   auto decl = dyn_cast<NominalTypeDecl>(DC);
@@ -546,8 +546,7 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
       if (!module) return nullptr;
 
       // Look up the local type by its mangling.
-      auto mangledName = Demangle::mangleNode(node,
-                                              NewMangling::useNewMangling());
+      auto mangledName = Demangle::mangleNode(node, useNewMangling(node));
       auto decl = module->lookupLocalType(mangledName);
       if (!decl) return nullptr;
 

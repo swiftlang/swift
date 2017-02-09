@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -24,13 +24,13 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/raw_ostream.h"
 
+// For std::rand, to work around a bug if main()'s first function call passes
+// argv[0].
+#if defined(__CYGWIN__)
 #include <cstdlib>
-#include <string>
-#if !defined(_MSC_VER) && !defined(__MINGW32__)
-#include <unistd.h>
-#else
-#include <io.h>
 #endif
+
+#include <iostream>
 
 static llvm::cl::opt<bool>
 ExpandMode("expand",
@@ -49,12 +49,20 @@ RemangleMode("test-remangle",
            llvm::cl::desc("Remangle test mode (show the remangled string)"));
 
 static llvm::cl::opt<bool>
+RemangleNew("remangle-new",
+           llvm::cl::desc("Remangle the symbol with new mangling scheme"));
+
+static llvm::cl::opt<bool>
 DisableSugar("no-sugar",
            llvm::cl::desc("No sugar mode (disable common language idioms such as ? and [] from the output)"));
 
 static llvm::cl::opt<bool>
 Simplified("simplified",
            llvm::cl::desc("Don't display module names or implicit self types"));
+
+static llvm::cl::opt<bool>
+Classify("classify",
+           llvm::cl::desc("Display symbol classification characters"));
 
 static llvm::cl::list<std::string>
 InputNames(llvm::cl::Positional, llvm::cl::desc("[mangled name...]"),
@@ -92,7 +100,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       remangled = name;
     } else {
       remangled = swift::Demangle::mangleNode(pointer,
-                                        /*NewMangling*/ name.startswith("_S"));
+                          /*NewMangling*/ name.startswith(MANGLING_PREFIX_STR));
       if (name != remangled) {
         llvm::errs() << "\nError: re-mangled name \n  " << remangled
                      << "\ndoes not match original name\n  " << name << '\n';
@@ -104,9 +112,28 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     return;
   }
   if (!TreeOnly) {
+    if (RemangleNew) {
+      if (!pointer) {
+        llvm::errs() << "Can't de-mangle " << name << '\n';
+        exit(1);
+      }
+      std::string remangled = swift::Demangle::mangleNodeNew(pointer);
+      llvm::outs() << remangled;
+      return;
+    }
     std::string string = swift::Demangle::nodeToString(pointer, options);
     if (!CompactMode)
       llvm::outs() << name << " ---> ";
+
+    if (Classify) {
+      std::string Classifications;
+      if (!swift::Demangle::isSwiftSymbol(name.data(), name.size()))
+        Classifications += 'N';
+      if (swift::Demangle::isThunkSymbol(name.data(), name.size()))
+        Classifications += 'T';
+      if (!Classifications.empty())
+        llvm::outs() << '{' << Classifications << "} ";
+    }
     llvm::outs() << (string.empty() ? name : llvm::StringRef(string));
   }
 }
@@ -115,18 +142,9 @@ static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   // This doesn't handle Unicode symbols, but maybe that's okay.
   llvm::Regex maybeSymbol("(_T|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
 
-  while (true) {
-    char *inputLine = nullptr;
-    size_t size;
-    if (getline(&inputLine, &size, stdin) == -1 || size <= 0) {
-      if (errno == 0) {
-        break;
-      }
+  for (std::string mangled; std::getline(std::cin, mangled);) {
+    llvm::StringRef inputContents(mangled);
 
-      return EXIT_FAILURE;
-    }
-
-    llvm::StringRef inputContents(inputLine);
     llvm::SmallVector<llvm::StringRef, 1> matches;
     while (maybeSymbol.match(inputContents, &matches)) {
       llvm::outs() << substrBefore(inputContents, matches.front());
@@ -134,8 +152,7 @@ static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
       inputContents = substrAfter(inputContents, matches.front());
     }
 
-    llvm::outs() << inputContents;
-    free(inputLine);
+    llvm::outs() << inputContents << '\n';
   }
 
   return EXIT_SUCCESS;

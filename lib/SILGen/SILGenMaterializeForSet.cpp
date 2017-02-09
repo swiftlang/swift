@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -27,6 +27,7 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
@@ -72,7 +73,7 @@ getMaterializeForSetCallbackName(ProtocolConformance *conformance,
     New = NewMangler.mangleClosureEntity(&closure,
                                 NewMangling::ASTMangler::SymbolKind::Default);
   }
-  mangler.mangleClosureEntity(&closure, /*uncurryLevel=*/1);
+  mangler.mangleClosureEntity(&closure, /*uncurryingLevel=*/1);
   std::string Old = mangler.finalize();
 
   return NewMangling::selectMangling(Old, New);
@@ -103,7 +104,7 @@ struct MaterializeForSetEmitter {
   FuncDecl *Witness;
   AbstractStorageDecl *WitnessStorage;
   AbstractionPattern WitnessStoragePattern;
-  ArrayRef<Substitution> WitnessSubs;
+  SubstitutionList WitnessSubs;
 
   CanGenericSignature GenericSig;
   GenericEnvironment *GenericEnv;
@@ -126,7 +127,7 @@ struct MaterializeForSetEmitter {
 private:
 
   MaterializeForSetEmitter(SILGenModule &SGM, SILLinkage linkage,
-                           FuncDecl *witness, ArrayRef<Substitution> subs,
+                           FuncDecl *witness, SubstitutionList subs,
                            Type selfInterfaceType, Type selfType)
     : SGM(SGM),
       Linkage(linkage),
@@ -172,7 +173,7 @@ public:
                   Type selfInterfaceType, Type selfType,
                   GenericEnvironment *genericEnv,
                   FuncDecl *requirement, FuncDecl *witness,
-                  ArrayRef<Substitution> witnessSubs) {
+                  SubstitutionList witnessSubs) {
     MaterializeForSetEmitter emitter(SGM, linkage, witness, witnessSubs,
                                      selfInterfaceType, selfType);
 
@@ -206,7 +207,7 @@ public:
   static MaterializeForSetEmitter
   forConcreteImplementation(SILGenModule &SGM,
                             FuncDecl *witness,
-                            ArrayRef<Substitution> witnessSubs) {
+                            SubstitutionList witnessSubs) {
     auto *dc = witness->getDeclContext();
     Type selfInterfaceType = dc->getSelfInterfaceType();
     Type selfType = witness->mapTypeIntoContext(selfInterfaceType);
@@ -385,9 +386,9 @@ public:
   /// Given part of the witness's interface type, produce its
   /// substitution according to the witness substitutions.
   CanType getSubstWitnessInterfaceType(CanType type) {
-    return SubstSelfType->getTypeOfMember(SGM.SwiftModule, type,
-                                          WitnessStorage->getDeclContext())
-                        ->getCanonicalType();
+    auto subs = SubstSelfType->getRValueInstanceType()
+        ->getMemberSubstitutionMap(SGM.SwiftModule, WitnessStorage);
+    return type.subst(subs)->getCanonicalType();
   }
 
 };
@@ -456,8 +457,8 @@ void MaterializeForSetEmitter::emit(SILGenFunction &gen) {
   SILType rawPointerTy = SILType::getRawPointerType(gen.getASTContext());
   address = gen.B.createAddressToPointer(loc, address, rawPointerTy);
 
-  SILType resultTupleTy = gen.F.mapTypeIntoContext(
-                 gen.F.getLoweredFunctionType()->getSILResult());
+  SILType resultTupleTy =
+      gen.F.mapTypeIntoContext(gen.F.getConventions().getSILResultType());
   SILType optCallbackTy = resultTupleTy.getTupleElementType(1);
 
   // Form the callback.
@@ -562,10 +563,10 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
   {
     SILGenFunction gen(SGM, *callback);
 
-    auto makeParam = [&](unsigned index) -> SILArgument* {
+    auto makeParam = [&](unsigned index) -> SILArgument * {
       SILType type = gen.F.mapTypeIntoContext(
-          callbackType->getParameters()[index].getSILType());
-      return gen.F.begin()->createArgument(type);
+          gen.getSILType(callbackType->getParameters()[index]));
+      return gen.F.begin()->createFunctionArgument(type);
     };
 
     // Add arguments for all the parameters.
@@ -745,8 +746,14 @@ namespace {
     void emit(SILGenFunction &gen, CleanupLocation loc) override {
       gen.B.createDeallocValueBuffer(loc, ValueType, Buffer);
     }
+    void dump() const override {
+#ifndef NDEBUG
+      llvm::errs() << "DeallocateValueBuffer\n"
+                   << "State: " << getState() << "Buffer: " << Buffer << "\n";
+#endif
+    }
   }; 
-}
+} // end anonymous namespace
 
 /// Emit a materializeForSet callback that stores the value from the
 /// result buffer back into the l-value.
@@ -826,7 +833,7 @@ maybeEmitMaterializeForSetThunk(ProtocolConformance *conformance,
                                 GenericEnvironment *genericEnv,
                                 FuncDecl *requirement,
                                 FuncDecl *witness,
-                                ArrayRef<Substitution> witnessSubs) {
+                                SubstitutionList witnessSubs) {
 
   MaterializeForSetEmitter emitter
     = MaterializeForSetEmitter::forWitnessThunk(

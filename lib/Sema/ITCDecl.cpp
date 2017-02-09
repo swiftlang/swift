@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -112,6 +112,10 @@ void IterativeTypeChecker::processResolveInheritedClauseEntry(
                       &unsatisfiedDependency)) {
     inherited->setInvalidType(getASTContext());
   }
+
+  auto type = inherited->getType();
+  if (!type.isNull())
+    inherited->setType(dc->mapTypeOutOfContext(type));
 }
 
 bool IterativeTypeChecker::breakCycleForResolveInheritedClauseEntry(
@@ -289,14 +293,33 @@ bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
   if (typeDecl->hasInterfaceType())
     return true;
 
+  if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+    if (typeAliasDecl->getDeclContext()->isModuleScopeContext() &&
+        typeAliasDecl->getGenericParams() == nullptr) {
+      return typeAliasDecl->hasInterfaceType();
+    }
+  }
+
   // If this request can *never* be satisfied due to recursion,
   // return success and fail elsewhere.
-  if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
-    if (nominal->isBeingTypeChecked())
-      return true;
-  } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    if (ext->isBeingTypeChecked())
-      return true;
+  if (typeDecl->isBeingValidated())
+    return true;
+
+  while (dc) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+      if (nominal->isBeingValidated())
+        return true;
+      if (nominal->hasInterfaceType())
+        return false;
+    } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+      if (ext->isBeingValidated())
+        return true;
+      if (ext->validated())
+        return false;
+    } else {
+      break;
+    }
+    dc = dc->getParent();
   }
 
   // Ok, we can try calling validateDecl().
@@ -307,11 +330,10 @@ void IterativeTypeChecker::processResolveTypeDecl(
        TypeDecl *typeDecl,
        UnsatisfiedDependency unsatisfiedDependency) {
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-    if (typeAliasDecl->getDeclContext()->isModuleScopeContext()) {
-      // FIXME: This is silly.
-      if (!typeAliasDecl->getAliasType())
-        typeAliasDecl->computeType();
-      
+    if (typeAliasDecl->getDeclContext()->isModuleScopeContext() &&
+        typeAliasDecl->getGenericParams() == nullptr) {
+      typeAliasDecl->setHasCompletedValidation();
+
       TypeResolutionOptions options;
       if (typeAliasDecl->getFormalAccess() <= Accessibility::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
@@ -322,30 +344,12 @@ void IterativeTypeChecker::processResolveTypeDecl(
       if (TC.validateType(typeAliasDecl->getUnderlyingTypeLoc(), typeAliasDecl,
                           options, &resolver, &unsatisfiedDependency)) {
         typeAliasDecl->setInvalid();
-        typeAliasDecl->setInterfaceType(ErrorType::get(getASTContext()));
         typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
       }
 
       if (typeAliasDecl->getUnderlyingTypeLoc().wasValidated()) {
-        // We create TypeAliasTypes with invalid underlying types, so we
-        // need to propagate recursive properties now.
-        typeAliasDecl->getAliasType()->setRecursiveProperties(
-                  typeAliasDecl->getUnderlyingType()->getRecursiveProperties());
-
-        // Map the alias type out of context; if it is not dependent,
-        // we'll keep the sugar.
-        Type interfaceTy = typeAliasDecl->getAliasType();
-
-        // lldb creates global typealiases containing archetypes
-        // sometimes...
-        if (typeAliasDecl->getUnderlyingType()->hasArchetype() &&
-            typeAliasDecl->isGenericContext()) {
-          interfaceTy = typeAliasDecl->mapTypeOutOfContext(interfaceTy);
-        }
-
-        typeAliasDecl->setInterfaceType(
-            MetatypeType::get(interfaceTy,
-                              typeDecl->getASTContext()));
+        typeAliasDecl->setUnderlyingType(
+            typeAliasDecl->getUnderlyingTypeLoc().getType());
       }
 
       return;

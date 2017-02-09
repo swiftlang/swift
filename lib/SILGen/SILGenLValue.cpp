@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -82,8 +82,8 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
     component->writeback(gen, loc, base, materialized, isFinal);
   }
 };
-}
-}
+} // namespace Lowering
+} // namespace swift
 
 namespace {
   class LValueWritebackCleanup : public Cleanup {
@@ -93,8 +93,15 @@ namespace {
     void emit(SILGenFunction &gen, CleanupLocation loc) override {
       gen.getWritebackStack()[Depth].performWriteback(gen, /*isFinal*/ false);
     }
+
+    void dump() const override {
+#ifndef NDEBUG
+      llvm::errs() << "LValueWritebackCleanup\n"
+                   << "State: " << getState() << "Depth: " << Depth << "\n";
+#endif
+    }
   };
-}
+} // end anonymous namespace
 
 std::vector<LValueWriteback> &SILGenFunction::getWritebackStack() {
   if (!WritebackStack)
@@ -230,20 +237,21 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
 
   // Otherwise, we need to emit a get and set.  Borrow the base for
   // the getter.
-  ManagedValue getterBase = (base ? base.borrow() : ManagedValue());
+  BorrowedManagedValue borrowedBase(gen, base, loc);
 
   // Clone anything else about the component that we might need in the
   // writeback.
   auto clonedComponent = clone(gen, loc);
 
-  // Emit a 'get' into a temporary.
-  ManagedValue temporary = emitGetIntoTemporary(gen, loc, getterBase,
-                                                std::move(*this));
+  // Emit a 'get' into a temporary and then pop the borrow of base.
+  ManagedValue temporary =
+      emitGetIntoTemporary(gen, loc, borrowedBase, std::move(*this));
+  std::move(borrowedBase).cleanup();
 
   // Push a writeback for the temporary.
   pushWriteback(gen, loc, std::move(clonedComponent), base,
                 MaterializedLValue(temporary));
-  return temporary.borrow();
+  return temporary.unmanagedBorrow();
 }
 
 void LogicalPathComponent::writeback(SILGenFunction &gen, SILLocation loc,
@@ -427,8 +435,10 @@ namespace {
              "base for ref element component must be an object");
       assert(base.getType().hasReferenceSemantics() &&
              "base for ref element component must be a reference type");
-      auto Res = gen.B.createRefElementAddr(loc, base.getValue(), Field,
-                                            SubstFieldType);
+      // Borrow the ref element addr.
+      base = base.borrow(gen, loc);
+      auto Res = gen.B.createRefElementAddr(loc, base.getUnmanagedValue(),
+                                            Field, SubstFieldType);
       return ManagedValue::forLValue(Res);
     }
 
@@ -558,7 +568,7 @@ namespace {
       OS << "ValueComponent()\n";
     }
   };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 static bool isReadNoneFunction(const Expr *e) {
   // If this is a curried call to an integer literal conversion operations, then
@@ -691,7 +701,7 @@ namespace {
     AccessorBasedComponent(PathComponent::KindTy kind,
                            AbstractStorageDecl *decl,
                            bool isSuper, bool isDirectAccessorUse,
-                           ArrayRef<Substitution> substitutions,
+                           SubstitutionList substitutions,
                            CanType baseFormalType,
                            LValueTypeData typeData,
                            Expr *subscriptIndexExpr,
@@ -750,7 +760,7 @@ namespace {
 
      GetterSetterComponent(AbstractStorageDecl *decl,
                            bool isSuper, bool isDirectAccessorUse,
-                           ArrayRef<Substitution> substitutions,
+                           SubstitutionList substitutions,
                            CanType baseFormalType,
                            LValueTypeData typeData,
                            Expr *subscriptIndexExpr = nullptr,
@@ -831,10 +841,11 @@ namespace {
         return true;
       }
 
-      // If the declaration is dynamically dispatched through a protocol,
-      // we have to use materializeForSet.
-      if (isa<ProtocolDecl>(decl->getDeclContext()))
-        return true;
+      // If the declaration is dynamically dispatched through a
+      // non-ObjC protocol, we have to use materializeForSet.
+      if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl->getDeclContext()))
+        if (!protoDecl->isObjC())
+          return true;
 
       return false;
     }
@@ -864,7 +875,7 @@ namespace {
 
       // If the base is a +1 r-value, just borrow it for materializeForSet.
       // prepareAccessorArgs will copy it if necessary.
-      ManagedValue borrowedBase = (base ? base.borrow() : ManagedValue());
+      BorrowedManagedValue borrowedBase(gen, base, loc);
 
       // Clone the component without cloning the indices.  We don't actually
       // consume them in writeback().
@@ -910,6 +921,11 @@ namespace {
         materialized.temporary = ManagedValue::forUnmanaged(
             gen.B.createMarkDependence(loc, temporary, base.getValue()));
       }
+
+      // Now that we have emitted the materializeForSet and created a dependence
+      // on the base from the temporary value, we can end the shared borrow of
+      // the base scope if we performed one.
+      std::move(borrowedBase).cleanup();
 
       // TODO: maybe needsWriteback should be a thin function pointer
       // to which we pass the base?  That would let us use direct
@@ -957,7 +973,8 @@ namespace {
         auto rawPointerTy = SILType::getRawPointerType(ctx);
 
         // The callback is a BB argument from the switch_enum.
-        SILValue callback = writebackBB->createArgument(rawPointerTy);
+        SILValue callback = writebackBB->createPHIArgument(
+            rawPointerTy, ValueOwnershipKind::Trivial);
 
         // Cast the callback to the correct polymorphic function type.
         auto origCallbackFnType = gen.SGM.Types.getMaterializeForSetCallbackType(
@@ -968,7 +985,8 @@ namespace {
         auto substCallbackFnType = origCallbackFnType->substGenericArgs(
             M, substitutions);
         auto substCallbackType = SILType::getPrimitiveObjectType(substCallbackFnType);
-        auto metatypeType = substCallbackFnType->getParameters().back().getSILType();
+        auto metatypeType =
+            gen.getSILType(substCallbackFnType->getParameters().back());
 
         // We need to borrow the base here.  We can't just consume it
         // because we're in conditionally-executed code (and because
@@ -1187,7 +1205,7 @@ namespace {
   public:
      AddressorComponent(AbstractStorageDecl *decl,
                         bool isSuper, bool isDirectAccessorUse,
-                        ArrayRef<Substitution> substitutions,
+                        SubstitutionList substitutions,
                         CanType baseFormalType, LValueTypeData typeData,
                         SILType substFieldType,
                         Expr *subscriptIndexExpr = nullptr,
@@ -1250,7 +1268,7 @@ namespace {
       printBase(OS, "AddressorComponent");
     }
   };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 RValue
 TranslationPathComponent::get(SILGenFunction &gen, SILLocation loc,
@@ -1407,7 +1425,7 @@ namespace {
       OS << "OwnershipComponent(...)\n";
     }
   };
-} // end anonymous namespace.
+} // end anonymous namespace
 
 LValue LValue::forValue(ManagedValue value,
                         CanType substFormalType) {
@@ -1435,7 +1453,7 @@ LValue LValue::forAddress(ManagedValue address,
 
 void LValue::addMemberComponent(SILGenFunction &gen, SILLocation loc,
                                 AbstractStorageDecl *storage,
-                                ArrayRef<Substitution> subs,
+                                SubstitutionList subs,
                                 bool isSuper,
                                 AccessKind accessKind,
                                 AccessSemantics accessSemantics,
@@ -1576,13 +1594,12 @@ LValue SILGenLValue::visitExpr(Expr *e, AccessKind accessKind) {
   llvm_unreachable("unimplemented lvalue expr");
 }
 
-ArrayRef<Substitution>
+SubstitutionList
 SILGenModule::getNonMemberVarDeclSubstitutions(VarDecl *var) {
-  ArrayRef<Substitution> substitutions;
+  SubstitutionList substitutions;
   auto *dc = var->getDeclContext();
-  if (auto *genericEnv = dc->getGenericEnvironmentOfContext()) {
-    substitutions = genericEnv->getForwardingSubstitutions(SwiftModule);
-  }
+  if (auto *genericEnv = dc->getGenericEnvironmentOfContext())
+    substitutions = genericEnv->getForwardingSubstitutions();
   return substitutions;
 }
 
@@ -1669,9 +1686,8 @@ LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
   SILValue address = gen.emitTemporaryAllocation(e, typeData.TypeOfRValue);
   address = gen.B.createMarkUninitialized(e, address,
                                           MarkUninitializedInst::Var);
-  gen.enterDestroyCleanup(address);
   LValue lv;
-  lv.add<ValueComponent>(ManagedValue::forUnmanaged(address), typeData);
+  lv.add<ValueComponent>(gen.emitManagedBufferWithCleanup(address), typeData);
   return lv;
 }
 
@@ -1713,8 +1729,10 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
   assert(!entry.HasBeenConsumed && "opaque value already consumed");
   entry.HasBeenConsumed = true;
 
+  RegularLocation loc(e);
   LValue lv;
-  lv.add<ValueComponent>(entry.Value.borrow(), getValueTypeData(gen, e));
+  lv.add<ValueComponent>(entry.Value.borrow(gen, loc),
+                         getValueTypeData(gen, e));
   return lv;
 }
 
@@ -1784,7 +1802,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
 
 void LValue::addMemberVarComponent(SILGenFunction &gen, SILLocation loc,
                                    VarDecl *var,
-                                   ArrayRef<Substitution> subs,
+                                   SubstitutionList subs,
                                    bool isSuper,
                                    AccessKind accessKind,
                                    AccessSemantics accessSemantics,
@@ -1885,7 +1903,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
 
 void LValue::addMemberSubscriptComponent(SILGenFunction &gen, SILLocation loc,
                                          SubscriptDecl *decl,
-                                         ArrayRef<Substitution> subs,
+                                         SubstitutionList subs,
                                          bool isSuper,
                                          AccessKind accessKind,
                                          AccessSemantics accessSemantics,
@@ -2017,7 +2035,7 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
   SILGenLValue sgl(*this);
   LValue lv;
 
-  ArrayRef<Substitution> subs =
+  SubstitutionList subs =
       base.getType().gatherAllSubstitutions(SGM.M);
 
   LValueTypeData baseTypeData = getValueTypeData(baseFormalType,
@@ -2065,7 +2083,8 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
 
   if (varStorageType.is<ReferenceStorageType>()) {
     auto formalRValueType =
-      ivar->getType()->getRValueType()->getReferenceStorageReferent()
+      ivar->getDeclContext()->mapTypeIntoContext(ivar->getInterfaceType())
+          ->getReferenceStorageReferent()
           ->getCanonicalType();
     auto typeData =
       getPhysicalStorageTypeData(SGM, ivar, formalRValueType);
@@ -2164,6 +2183,27 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
   llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
 }
 
+ManagedValue SILGenFunction::emitConversionToSemanticRValue(
+    SILLocation loc, ManagedValue src, const TypeLowering &valueTL) {
+  // Weak storage types are handled with their underlying type.
+  assert(!src.getType().is<WeakStorageType>() &&
+         "weak pointers are always the right optional types");
+
+  // For @unowned(safe) types, we need to generate a strong retain and
+  // strip the unowned box.
+  if (src.getType().is<UnownedStorageType>()) {
+    return B.createCopyUnownedValue(loc, src);
+  }
+
+  // For @unowned(unsafe) types, we need to strip the unmanaged box
+  // and then do an (unsafe) retain.
+  if (src.getType().is<UnmanagedStorageType>()) {
+    return B.createUnsafeCopyUnownedValue(loc, src);
+  }
+
+  llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
+}
+
 /// Given that the type-of-rvalue differs from the type-of-storage,
 /// and given that the type-of-rvalue is loadable, produce a +1 scalar
 /// of the type-of-rvalue.
@@ -2206,7 +2246,7 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
 
   // NSString * must be bridged to String.
   if (storageType.getSwiftRValueType() == gen.SGM.Types.getNSStringType()) {
-    auto nsstr = gen.B.createLoadBorrow(loc, src);
+    auto nsstr = gen.B.createLoad(loc, src, LoadOwnershipQualifier::Copy);
     auto str = gen.emitBridgedToNativeValue(loc,
                                 ManagedValue::forUnmanaged(nsstr),
                                 SILFunctionTypeRepresentation::CFunctionPointer,
@@ -2321,7 +2361,8 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
 
   // Easy case: the types match.
   if (rvalue->getType() == destTL.getLoweredType()) {
-    assert(destTL.isAddressOnly() == rvalue->getType().isAddress());
+    assert(!silConv.useLoweredAddresses()
+           || (destTL.isAddressOnly() == rvalue->getType().isAddress()));
     if (rvalue->getType().isAddress()) {
       B.createCopyAddr(loc, rvalue, dest, IsTake, isInit);
     } else {

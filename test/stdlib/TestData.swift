@@ -1,4 +1,4 @@
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -898,6 +898,29 @@ class TestData : TestDataSuper {
         
         expectTrue(deallocated)
     }
+
+    func test_doubleDeallocation() {
+        let data = "12345679".data(using: .utf8)!
+        let len = data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Int in
+            let slice = Data(bytesNoCopy: UnsafeMutablePointer(mutating: bytes), count: 1, deallocator: .none)
+            return slice.count
+        }
+        expectEqual(len, 1)
+    }
+
+    func test_repeatingValueInitialization() {
+        var d = Data(repeating: 0x01, count: 3)
+        let elements = repeatElement(UInt8(0x02), count: 3) // ensure we fall into the sequence case
+        d.append(contentsOf: elements)
+
+        expectEqual(d[0], 0x01)
+        expectEqual(d[1], 0x01)
+        expectEqual(d[2], 0x01)
+
+        expectEqual(d[3], 0x02)
+        expectEqual(d[4], 0x02)
+        expectEqual(d[5], 0x02)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -941,6 +964,8 @@ DataTests.test("test_classForCoder") { TestData().test_classForCoder() }
 DataTests.test("test_AnyHashableContainingData") { TestData().test_AnyHashableContainingData() }
 DataTests.test("test_AnyHashableCreatedFromNSData") { TestData().test_AnyHashableCreatedFromNSData() }
 DataTests.test("test_noCopyBehavior") { TestData().test_noCopyBehavior() }
+DataTests.test("test_doubleDeallocation") { TestData().test_doubleDeallocation() }
+DataTests.test("test_repeatingValueInitialization") { TestData().test_repeatingValueInitialization() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {

@@ -1,19 +1,19 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-swift-frontend -emit-module-path %t/Test.swiftmodule -emit-sil -o /dev/null -module-name Test %s -sdk "" -import-objc-header %S/Inputs/serialization-sil.h
-// RUN: %target-sil-func-extractor %t/Test.swiftmodule -func=_TF4Test16testPartialApplyFPSo4Test_T_ -o - | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-module-path %t/Test.swiftmodule -emit-sil -o /dev/null -module-name Test %s -sdk "" -import-objc-header %S/Inputs/serialization-sil.h
+// RUN: %target-sil-func-extractor %t/Test.swiftmodule -func=_T04Test16testPartialApplyySoAA_pF -o - | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 // @_transparent to force serialization.
 @_transparent
 public func testPartialApply(_ obj: Test) {
-  // CHECK-LABEL: @_TF4Test16testPartialApplyFPSo4Test_T_ : $@convention(thin) (@owned Test) -> () {
+  // CHECK-LABEL: @_T04Test16testPartialApplyySoAA_pF : $@convention(thin) (@owned Test) -> () {
   if let curried1 = obj.normalObject {
     // CHECK: dynamic_method_br [[CURRIED1_OBJ:%.+]] : $@opened([[CURRIED1_EXISTENTIAL:.+]]) Test, #Test.normalObject!1.foreign, [[CURRIED1_TRUE:[^,]+]], [[CURRIED1_FALSE:[^,]+]]
     // CHECK: [[CURRIED1_FALSE]]:
     // CHECK: [[CURRIED1_TRUE]]([[CURRIED1_METHOD:%.+]] : $@convention(objc_method) (@opened([[CURRIED1_EXISTENTIAL]]) Test) -> @autoreleased AnyObject):
     // CHECK: [[CURRIED1_PARTIAL:%.+]] = partial_apply [[CURRIED1_METHOD]]([[CURRIED1_OBJ]]) : $@convention(objc_method) (@opened([[CURRIED1_EXISTENTIAL]]) Test) -> @autoreleased AnyObject
-    // CHECK: [[CURRIED1_THUNK:%.+]] = function_ref @_TTRXFo__oPs9AnyObject__XFo__iP__ : $@convention(thin) (@owned @callee_owned () -> @owned AnyObject) -> @out Any
+    // CHECK: [[CURRIED1_THUNK:%.+]] = function_ref @_T0s9AnyObject_pIxo_ypIxr_TR : $@convention(thin) (@owned @callee_owned () -> @owned AnyObject) -> @out Any
     // CHECK: = partial_apply [[CURRIED1_THUNK]]([[CURRIED1_PARTIAL]])
     curried1()
   }

@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
 public protocol A {}
 
 public class AC : A{}
 
 public class CVC<A1: AC> where A1: A {
-  // CHECK-LABEL: define{{.*}}@{{.*}}21superclass_constraint3CVCcfT_GS0_x
+  // CHECK-LABEL: define{{.*}} @_T021superclass_constraint3CVCCACyxGycfc
   public init() {
     // CHECK: [[A:%.*]] = alloca %C21superclass_constraint3CVC*
     // CHECK-NOT: ret

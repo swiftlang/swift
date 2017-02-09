@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,7 +20,9 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/Basic/Compiler.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <utility>
 
@@ -107,14 +109,12 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   }
 
   GenericEnvironment(GenericSignature *signature,
-                     ArchetypeBuilder *builder,
-                     TypeSubstitutionMap interfaceToArchetypeMap);
+                     ArchetypeBuilder *builder);
 
   friend class ArchetypeType;
   friend class ArchetypeBuilder;
   
   ArchetypeBuilder *getArchetypeBuilder() const { return Builder; }
-  void clearArchetypeBuilder() { Builder = nullptr; }
 
   /// Query function suitable for use as a \c TypeSubstitutionFn that queries
   /// the mapping of interface types to archetypes.
@@ -142,6 +142,8 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   };
   friend class QueryArchetypeToInterfaceSubstitutions;
 
+  void populateParentMap(SubstitutionMap &subMap) const;
+
 public:
   GenericSignature *getGenericSignature() const {
     return Signature;
@@ -154,10 +156,6 @@ public:
   /// Determine whether this generic environment contains the given
   /// primary archetype.
   bool containsPrimaryArchetype(ArchetypeType *archetype) const;
-
-  static
-  GenericEnvironment *get(GenericSignature *signature,
-                          TypeSubstitutionMap interfaceToArchetypeMap);
 
   /// Create a new, "incomplete" generic environment that will be populated
   /// by calls to \c addMapping().
@@ -188,7 +186,7 @@ public:
 
   /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
-  void operator delete(void *Data) = delete;
+  void operator delete(void *Data) SWIFT_DELETE_OPERATOR_DELETED;
 
   /// Only allow placement new.
   void *operator new(size_t Bytes, void *Mem) {
@@ -196,11 +194,23 @@ public:
     return Mem; 
   }
 
+  /// Map an interface type to a contextual type.
+  static Type mapTypeIntoContext(GenericEnvironment *genericEnv,
+                                 Type type);
+
   /// Map a contextual type to an interface type.
-  Type mapTypeOutOfContext(ModuleDecl *M, Type type) const;
+  static Type mapTypeOutOfContext(GenericEnvironment *genericEnv,
+                                  Type type);
+
+  /// Map a contextual type to an interface type.
+  Type mapTypeOutOfContext(Type type) const;
 
   /// Map an interface type to a contextual type.
-  Type mapTypeIntoContext(ModuleDecl *M, Type type) const;
+  Type mapTypeIntoContext(Type type) const;
+
+  /// Map an interface type to a contextual type.
+  Type mapTypeIntoContext(Type type,
+                          LookupConformanceFn lookupConformance) const;
 
   /// Map a generic parameter type to a contextual type.
   Type mapTypeIntoContext(GenericTypeParamType *type) const;
@@ -214,20 +224,23 @@ public:
   /// Get the sugared form of a generic parameter type.
   GenericTypeParamType *getSugaredType(GenericTypeParamType *type) const;
 
+  /// Get the sugared form of a type by substituting any
+  /// generic parameter types by their sugared form.
+  Type getSugaredType(Type type) const;
+
   /// Derive a contextual type substitution map from a substitution array.
   /// This is just like GenericSignature::getSubstitutionMap(), except
   /// with contextual types instead of interface types.
   SubstitutionMap
-  getSubstitutionMap(ModuleDecl *mod,
-                     ArrayRef<Substitution> subs) const;
+  getSubstitutionMap(SubstitutionList subs) const;
 
-  /// Same as above, but updates an existing map.
-  void
-  getSubstitutionMap(ModuleDecl *mod,
-                     ArrayRef<Substitution> subs,
-                     SubstitutionMap &subMap) const;
+  /// Build a contextual type substitution map from a type substitution function
+  /// and conformance lookup function.
+  SubstitutionMap
+  getSubstitutionMap(TypeSubstitutionFn subs,
+                     LookupConformanceFn lookupConformance) const;
 
-  ArrayRef<Substitution> getForwardingSubstitutions(ModuleDecl *M) const;
+  SubstitutionList getForwardingSubstitutions() const;
 
   void dump() const;
 };

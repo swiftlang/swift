@@ -173,3 +173,64 @@ func testOptionSetLike(b: Bool) {
   let _: OptionSetLike = [ b ? [] : OptionSetLike.option, OptionSetLike.option]
   let _: OptionSetLike = [ b ? [] : .option, .option]
 }
+
+// Join of class metatypes - <rdar://problem/30233451>
+
+class Company<T> {
+  init(routes: [() -> T]) { }
+}
+
+class Person { }
+
+class Employee: Person { }
+
+class Manager: Person { }
+
+let router = Company(
+  routes: [
+    { () -> Employee.Type in
+      _ = ()
+      return Employee.self
+    },
+
+    { () -> Manager.Type in
+      _ = ()
+      return Manager.self
+    }
+  ]
+)
+
+// Same as above but with existentials
+
+protocol Fruit {}
+
+protocol Tomato : Fruit {}
+
+struct Chicken : Tomato {}
+
+protocol Pear : Fruit {}
+
+struct Beef : Pear {}
+
+let router = Company(
+  routes: [
+    // FIXME: implement join() for existentials
+    // expected-error@+1 {{cannot convert value of type '() -> Tomato.Type' to expected element type '() -> _'}}
+    { () -> Tomato.Type in
+      _ = ()
+      return Chicken.self
+    },
+
+    { () -> Pear.Type in
+      _ = ()
+      return Beef.self
+    }
+  ]
+)
+
+// Infer [[Int]] for SR3786aa.
+// FIXME: As noted in SR-3786, this was the behavior in Swift 3, but
+//        it seems like the wrong choice and is less by design than by
+//        accident.
+let SR3786a: [Int] = [1, 2, 3]
+let SR3786aa = [SR3786a.reversed(), SR3786a]

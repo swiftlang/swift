@@ -1,4 +1,4 @@
-// REQUIRES: rdar://29605167
+// REQUIRES: no_asan
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -o %t/libTypesToReflect.%target-dylib-extension
 // RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect.%target-dylib-extension -binary-filename %platform-module-dir/libswiftCore.%target-dylib-extension -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize

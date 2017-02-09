@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -140,6 +140,8 @@ public:
     case ImplodeKind::Copy:
       return v.copyUnmanaged(gen, l).forward(gen);
     }
+
+    llvm_unreachable("Unhandled ImplodeKind in switch.");
   }
 
   ImplodeLoadableTupleValue(ArrayRef<ManagedValue> values,
@@ -254,8 +256,18 @@ public:
     : gen(gen), parent(parent), loc(l), functionArgs(functionArgs) {}
 
   RValue visitType(CanType t) {
-    SILValue arg = parent->createArgument(gen.getLoweredType(t),
-                                          loc.getAsASTNode<ValueDecl>());
+    SILValue arg;
+    if (functionArgs) {
+      arg = parent->createFunctionArgument(gen.getLoweredType(t),
+                                           loc.getAsASTNode<ValueDecl>());
+    } else {
+      SILType lty = gen.getLoweredType(t);
+      ValueOwnershipKind ownershipkind = lty.isAddress()
+                                             ? ValueOwnershipKind::Trivial
+                                             : ValueOwnershipKind::Owned;
+      arg = parent->createPHIArgument(lty, ownershipkind,
+                                      loc.getAsASTNode<ValueDecl>());
+    }
     ManagedValue mv = isa<InOutType>(t)
       ? ManagedValue::forLValue(arg)
       : gen.emitManagedRValueWithCleanup(arg);

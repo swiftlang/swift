@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -669,7 +669,7 @@ namespace {
   private:
     const SILInstruction *LHS;
   };
-}
+} // end anonymous namespace
 
 bool SILInstruction::hasIdenticalState(const SILInstruction *RHS) const {
   SILInstruction *UnconstRHS = const_cast<SILInstruction *>(RHS);
@@ -814,7 +814,8 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
   case ValueKind::CLASS:                                                       \
     return MemoryBehavior::MEMBEHAVIOR;
 #include "swift/SIL/SILNodes.def"
-  case ValueKind::SILArgument:
+  case ValueKind::SILPHIArgument:
+  case ValueKind::SILFunctionArgument:
   case ValueKind::SILUndef:
     llvm_unreachable("Non-instructions are unreachable.");
   }
@@ -827,9 +828,10 @@ SILInstruction::ReleasingBehavior SILInstruction::getReleasingBehavior() const {
   case ValueKind::CLASS:                                                       \
     return ReleasingBehavior::RELEASINGBEHAVIOR;
 #include "swift/SIL/SILNodes.def"
- case ValueKind::SILArgument:
- case ValueKind::SILUndef:
-   llvm_unreachable("Non-instructions are unreachable.");
+  case ValueKind::SILPHIArgument:
+  case ValueKind::SILFunctionArgument:
+  case ValueKind::SILUndef:
+    llvm_unreachable("Non-instructions are unreachable.");
   }
   llvm_unreachable("We've just exhausted the switch.");
 }
@@ -946,7 +948,7 @@ namespace {
     }
     SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
   };
-}
+} // end anonymous namespace
 
 bool SILInstruction::isAllocatingStack() const {
   if (isa<AllocStackInst>(this))
@@ -1043,6 +1045,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
     case SILInstruction::MemoryBehavior::MayHaveSideEffects:
       return OS << "MayHaveSideEffects";
   }
+
+  llvm_unreachable("Unhandled MemoryBehavior in switch.");
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
@@ -1053,4 +1057,6 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
   case SILInstruction::ReleasingBehavior::MayRelease:
     return OS << "MayRelease";
   }
+
+  llvm_unreachable("Unhandled ReleasingBehavior in switch.");
 }

@@ -50,7 +50,7 @@ bb0(%0 : $Int32, %25: $Bar):
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar, %30 : $<τ_0_0> { var τ_0_0 } <Bool>, %30a : $*Bool)
 
 bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $Bar, %31 : $<τ_0_0> { var τ_0_0 } <Bool>, %32 : $*Bool):
-  %24 = class_method %26 : $Bar, #Bar.foo!1 : (Bar) -> () -> () , $@convention(method) (@guaranteed Bar) -> () // user: %6
+  %24 = class_method %26 : $Bar, #Bar.foo!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %6
   %27 = apply %24(%25) : $@convention(method) (@guaranteed Bar) -> ()
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
@@ -224,7 +224,7 @@ bb0(%0 : $Int32, %25: $Bar):
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar)
 
 bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $Bar):
-  %101 = class_method [volatile] %100 : $Bar, #Bar.foo!1.foreign : (Bar) -> () -> () , $@convention(objc_method) (Bar) -> ()
+  %101 = class_method [volatile] %100 : $Bar, #Bar.foo!1.foreign : (Bar) -> () -> (), $@convention(objc_method) (Bar) -> ()
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   cond_br %8, bb3, bb2

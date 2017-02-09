@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -126,10 +126,10 @@ bool swift::isIntermediateRelease(SILInstruction *I,
   // OK. we have a release instruction.
   // Check whether this is a release on part of a guaranteed function argument.
   SILValue Op = stripValueProjections(I->getOperand(0));
-  SILArgument *Arg = dyn_cast<SILArgument>(Op);
-  if (!Arg || !Arg->isFunctionArg())
+  auto *Arg = dyn_cast<SILFunctionArgument>(Op);
+  if (!Arg)
     return false;
-  
+
   // This is a release on a guaranteed parameter. Its not the final release.
   if (Arg->hasConvention(SILArgumentConvention::Direct_Guaranteed))
     return true;
@@ -322,38 +322,11 @@ void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
   recursivelyDeleteTriviallyDeadInstructions(OldApply, true);
 }
 
-bool swift::hasUnboundGenericTypes(const TypeSubstitutionMap &SubsMap) {
-  // Check whether any of the substitutions are dependent.
-  for (auto &entry : SubsMap)
-    if (entry.second->getCanonicalType()->hasArchetype())
-      return true;
-
-  return false;
-}
-
-bool swift::hasUnboundGenericTypes(ArrayRef<Substitution> Subs) {
+bool swift::hasArchetypes(SubstitutionList Subs) {
   // Check whether any of the substitutions are dependent.
   for (auto &sub : Subs)
-    if (sub.getReplacement()->getCanonicalType()->hasArchetype())
+    if (sub.getReplacement()->hasArchetype())
       return true;
-  return false;
-}
-
-bool swift::hasDynamicSelfTypes(const TypeSubstitutionMap &SubsMap) {
-  // Check whether any of the substitutions are refer to dynamic self.
-  for (auto &entry : SubsMap)
-    if (entry.second->getCanonicalType()->hasDynamicSelfType())
-      return true;
-
-  return false;
-}
-
-bool swift::hasDynamicSelfTypes(ArrayRef<Substitution> Subs) {
-  // Check whether any of the substitutions are refer to dynamic self.
-  for (auto &sub : Subs)
-    if (sub.getReplacement()->getCanonicalType()->hasDynamicSelfType())
-      return true;
-
   return false;
 }
 
@@ -583,7 +556,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     auto *CurBB = B->getInsertionPoint()->getParent();
 
     auto *ContBB = CurBB->split(B->getInsertionPoint());
-    ContBB->createArgument(DestTy, nullptr);
+    ContBB->createPHIArgument(DestTy, ValueOwnershipKind::Owned);
 
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
     CaseBBs.push_back(std::make_pair(SomeDecl, SomeBB));
@@ -1008,9 +981,10 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
   Arguments.push_back(FuncResultType);
 
   auto FnTy = FRIConvertFromBuiltin->getType();
-  auto STResultType = FnTy.castTo<SILFunctionType>()->getSILResult();
+  auto fnConv = FRIConvertFromBuiltin->getConventions();
+  auto STResultType = fnConv.getSILResultType();
   return Builder.createApply(AI->getLoc(), FRIConvertFromBuiltin, FnTy,
-                             STResultType, ArrayRef<Substitution>(), Arguments,
+                             STResultType, SubstitutionList(), Arguments,
                              false);
 }
 
@@ -1446,7 +1420,8 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
       // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
       if (isConditional) {
         SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-        CastSuccessBB->createArgument(SILBridgedTy);
+        CastSuccessBB->createPHIArgument(SILBridgedTy,
+                                         ValueOwnershipKind::Owned);
         Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
         Builder.setInsertionPoint(CastSuccessBB);
         SrcOp = CastSuccessBB->getArgument(0);
@@ -1455,7 +1430,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
       }
     } else if (isConditional) {
       SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-      CastSuccessBB->createArgument(SILBridgedTy);
+      CastSuccessBB->createPHIArgument(SILBridgedTy, ValueOwnershipKind::Owned);
       NewI = Builder.createCheckedCastBranch(Loc, false, Load, SILBridgedTy,
                                              CastSuccessBB, ConvFailBB);
       Builder.setInsertionPoint(CastSuccessBB);
@@ -1488,7 +1463,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   auto *FuncRef = Builder.createFunctionRef(Loc, BridgedFunc);
 
   auto MetaTy = MetatypeType::get(Target, MetatypeRepresentation::Thick);
-  auto SILMetaTy = M.Types.getTypeLowering(MetaTy, 0).getLoweredType();
+  auto SILMetaTy = M.Types.getTypeLowering(MetaTy).getLoweredType();
   auto *MetaTyVal = Builder.createMetatype(Loc, SILMetaTy);
   SmallVector<SILValue, 1> Args;
 
@@ -1501,7 +1476,8 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   };
   auto SILFnTy = FuncRef->getType();
   SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
-  SILType ResultTy = SubstFnTy.castTo<SILFunctionType>()->getSILResult();
+  SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(), M);
+  SILType ResultTy = substConv.getSILResultType();
 
   // Temporary to hold the intermediate result.
   AllocStackInst *Tmp = nullptr;
@@ -1512,7 +1488,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
     // Create a temporary
     OptionalTy = OptionalType::get(Dest->getType().getSwiftRValueType())
                      ->getImplementationType()
-                     .getCanonicalTypeOrNull();
+                     ->getCanonicalType();
     OptionalTy.getAnyOptionalObjectType(OTK);
     Tmp = Builder.createAllocStack(Loc,
                                    SILType::getPrimitiveObjectType(OptionalTy));
@@ -1627,7 +1603,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
          "There should be exactly one implementation of _bridgeToObjectiveC");
   auto BridgeFuncDecl = Members.front();
   auto BridgeFuncDeclRef = SILDeclRef(BridgeFuncDecl);
-  Module *Mod = M.getASTContext().getLoadedModule(
+  ModuleDecl *Mod = M.getASTContext().getLoadedModule(
       M.getASTContext().Id_Foundation);
   if (!Mod)
     return nullptr;
@@ -1659,19 +1635,22 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
       M.Types.getConstantFunctionType(BridgeFuncDeclRef));
 
   // TODO: Handle return from witness function.
-  if (BridgedFunc->getLoweredFunctionType()->getSingleResult().isIndirect())
+  if (BridgedFunc->getLoweredFunctionType()
+          ->getSingleResult()
+          .isFormalIndirect())
     return nullptr;
 
   // Get substitutions, if source is a bound generic type.
-  ArrayRef<Substitution> Subs =
+  SubstitutionList Subs =
       Source->gatherAllSubstitutions(
           M.getSwiftModule(), nullptr);
 
   SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
-  SILType ResultTy = SubstFnTy.castTo<SILFunctionType>()->getSILResult();
+  SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(), M);
+  SILType ResultTy = substConv.getSILResultType();
 
   auto FnRef = Builder.createFunctionRef(Loc, BridgedFunc);
-  if (Src->getType().isAddress() && !ParamTypes[0].isIndirect()) {
+  if (Src->getType().isAddress() && !substConv.isSILIndirect(ParamTypes[0])) {
     // Create load
     Src = Builder.createLoad(Loc, Src, LoadOwnershipQualifier::Unqualified);
   }
@@ -1736,6 +1715,8 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
       // Source as-is, we don't need to copy it due to guarantee
       break;
     case ParameterConvention::Indirect_In: {
+      assert(substConv.isSILIndirect(ParamTypes[0])
+             && "unsupported convention for bridging conversion");
       // Need to make a copy of the source, can be changed in ObjC
       auto BridgeStack = Builder.createAllocStack(Loc, Src->getType());
       Src = Builder.createCopyAddr(Loc, Src, BridgeStack, IsNotTake,
@@ -1746,8 +1727,6 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     case ParameterConvention::Indirect_InoutAliasable:
       // TODO handle remaining indirect argument types
       return nullptr;
-    case ParameterConvention::Direct_Deallocating:
-      llvm_unreachable("unsupported convention for bridging conversion");
   }
 
   if (needRetainBeforeCall)
@@ -1769,11 +1748,25 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     // If it is addr cast then store the result.
     auto ConvTy = NewAI->getType();
     auto DestTy = Dest->getType().getObjectType();
-    assert((ConvTy == DestTy || DestTy.isExactSuperclassOf(ConvTy)) &&
-           "Destination should have the same type or be a superclass "
-           "of the source operand");
-    auto CastedValue = SILValue(
-        (ConvTy == DestTy) ? NewI : Builder.createUpcast(Loc, NewAI, DestTy));
+    SILValue CastedValue;
+    if ((ConvTy == DestTy || DestTy.isExactSuperclassOf(ConvTy))) {
+      CastedValue = SILValue(
+          (ConvTy == DestTy) ? NewI : Builder.createUpcast(Loc, NewAI, DestTy));
+    } else if (ConvTy.getSwiftRValueType() ==
+                   getNSBridgedClassOfCFClass(M.getSwiftModule(),
+                                              DestTy.getSwiftRValueType()) ||
+               DestTy.getSwiftRValueType() ==
+                   getNSBridgedClassOfCFClass(M.getSwiftModule(),
+                                              ConvTy.getSwiftRValueType())) {
+      // Handle NS <-> CF toll-free bridging here.
+      CastedValue =
+          SILValue(Builder.createUncheckedRefCast(Loc, NewAI, DestTy));
+    } else {
+      llvm_unreachable(
+          "Destination should have the same type, be bridgeable CF "
+          "type or be a superclass "
+          "of the source operand");
+    }
     NewI = Builder.createStore(Loc, CastedValue, Dest,
                                StoreOwnershipQualifier::Unqualified);
   }
@@ -2146,7 +2139,8 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
           auto NewI = B.createCheckedCastBranch(
               Loc, false /*isExact*/, MI,
               Dest->getType().getObjectType(), SuccessBB, FailureBB);
-          SuccessBB->createArgument(Dest->getType().getObjectType(), nullptr);
+          SuccessBB->createPHIArgument(Dest->getType().getObjectType(),
+                                       ValueOwnershipKind::Owned);
           B.setInsertionPoint(SuccessBB->begin());
           // Store the result
           B.createStore(Loc, SuccessBB->getArgument(0), Dest,

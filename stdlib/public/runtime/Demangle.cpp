@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -42,6 +42,11 @@ _buildDemanglingForNominalType(const Metadata *type) {
   switch (type->getKind()) {
   case MetadataKind::Class: {
     auto classType = static_cast<const ClassMetadata *>(type);
+#if SWIFT_OBJC_INTEROP
+    // Peek through artificial subclasses.
+    while (classType->isTypeMetadata() && classType->isArtificialSubclass())
+      classType = classType->SuperClass;
+#endif
     parent = classType->getParentType(classType->getDescription());
     boundGenericKind = Node::Kind::BoundGenericClass;
     description = classType->getDescription();

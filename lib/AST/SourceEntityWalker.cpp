@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -31,6 +31,7 @@ namespace {
 class SemaAnnotator : public ASTWalker {
   SourceEntityWalker &SEWalker;
   SmallVector<ConstructorRefCallExpr *, 2> CtorRefs;
+  SmallVector<ExtensionDecl *, 2> ExtDecls;
   bool Cancelled = false;
 
 public:
@@ -40,8 +41,8 @@ public:
   bool isDone() const { return Cancelled; }
 
 private:
-  bool shouldWalkIntoFunctionGenericParams() override {
-    return SEWalker.shouldWalkIntoFunctionGenericParams();
+  bool shouldWalkIntoGenericParams() override {
+    return SEWalker.shouldWalkIntoGenericParams();
   }
   bool walkToDeclPre(Decl *D) override;
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
@@ -60,7 +61,7 @@ private:
   bool passModulePathElements(ArrayRef<ImportDecl::AccessPathElement> Path,
                               const clang::Module *ClangMod);
 
-  bool passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc);
+  bool passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, SemaReferenceKind Kind);
   bool passReference(ModuleEntity Mod, std::pair<Identifier, SourceLoc> IdLoc);
 
   bool passSubscriptReference(ValueDecl *D, SourceLoc Loc, bool IsOpenBracket);
@@ -100,7 +101,7 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
     Loc = SR.Start;
     if (Loc.isValid())
       NameLen = ED->getASTContext().SourceMgr.getByteDistance(SR.Start, SR.End);
-
+    ExtDecls.push_back(ED);
   } else if (auto Import = dyn_cast<ImportDecl>(D)) {
     if (!handleImports(Import))
       return false;
@@ -151,6 +152,11 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
     }
   }
 
+  if (isa<ExtensionDecl>(D)) {
+    assert(ExtDecls.back() == D);
+    ExtDecls.pop_back();
+  }
+
   if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D) && !isa<ImportDecl>(D))
     return true;
 
@@ -192,6 +198,14 @@ Stmt *SemaAnnotator::walkToStmtPost(Stmt *S) {
   return Continue ? S : nullptr;
 }
 
+static SemaReferenceKind getReferenceKind(Expr *Parent, Expr *E) {
+  if (auto SA = dyn_cast_or_null<SelfApplyExpr>(Parent)) {
+    if (SA->getFn() == E)
+      return SemaReferenceKind::DeclMemberRef;
+  }
+  return SemaReferenceKind::DeclRef;
+}
+
 std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (isDone())
     return { false, nullptr };
@@ -211,7 +225,8 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
                          std::make_pair(module->getName(), E->getLoc())))
         return { false, nullptr };
     } else if (!passReference(DRE->getDecl(), DRE->getType(),
-                              DRE->getNameLoc())) {
+                              DRE->getNameLoc(),
+                              getReferenceKind(Parent.getAsExpr(), E))) {
       return { false, nullptr };
     }
   } else if (MemberRefExpr *MRE = dyn_cast<MemberRefExpr>(E)) {
@@ -219,7 +234,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (!MRE->getBase()->walk(*this))
       return { false, nullptr };
     if (!passReference(MRE->getMember().getDecl(), MRE->getType(),
-                       MRE->getNameLoc()))
+                       MRE->getNameLoc(), SemaReferenceKind::DeclMemberRef))
       return { false, nullptr };
 
     // We already visited the children.
@@ -229,7 +244,8 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
   } else if (auto OtherCtorE = dyn_cast<OtherConstructorDeclRefExpr>(E)) {
     if (!passReference(OtherCtorE->getDecl(), OtherCtorE->getType(),
-                       OtherCtorE->getConstructorLoc()))
+                       OtherCtorE->getConstructorLoc(),
+                       SemaReferenceKind::DeclConstructorRef))
       return { false, nullptr };
 
   } else if (SubscriptExpr *SE = dyn_cast<SubscriptExpr>(E)) {
@@ -293,7 +309,8 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
         return passReference(ModD, std::make_pair(IdT->getIdentifier(),
                                                   IdT->getIdLoc()));
 
-      return passReference(VD, Type(), DeclNameLoc(IdT->getIdLoc()));
+      return passReference(VD, Type(), DeclNameLoc(IdT->getIdLoc()),
+                           SemaReferenceKind::TypeRef);
     }
   }
   return true;
@@ -323,7 +340,8 @@ std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
     if (!Element)
       return { true, P };
     Type T = EP->hasType() ? EP->getType() : Type();
-    return { passReference(Element, T, DeclNameLoc(EP->getLoc())), P };
+    return { passReference(Element, T, DeclNameLoc(EP->getLoc()),
+                           SemaReferenceKind::EnumElementRef), P };
   }
 
   auto *TP = dyn_cast<TypedPattern>(P);
@@ -353,7 +371,9 @@ bool SemaAnnotator::handleImports(ImportDecl *Import) {
   auto Decls = Import->getDecls();
   if (Decls.size() == 1) {
     // FIXME: ImportDecl should store a DeclNameLoc.
-    if (!passReference(Decls.front(), Type(), DeclNameLoc(Import->getEndLoc())))
+    // FIXME: Handle overloaded funcs too by passing a reference for each?
+    if (!passReference(Decls.front(), Type(), DeclNameLoc(Import->getEndLoc()),
+        SemaReferenceKind::DeclRef))
       return false;
   }
 
@@ -385,8 +405,10 @@ bool SemaAnnotator::passSubscriptReference(ValueDecl *D, SourceLoc Loc,
   return Continue;
 }
 
-bool SemaAnnotator::passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc) {
+bool SemaAnnotator::
+passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, SemaReferenceKind Kind) {
   TypeDecl *CtorTyRef = nullptr;
+  ExtensionDecl *ExtDecl = nullptr;
 
   if (TypeDecl *TD = dyn_cast<TypeDecl>(D)) {
     if (!CtorRefs.empty() && Loc.isValid()) {
@@ -396,12 +418,20 @@ bool SemaAnnotator::passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc) {
         CtorTyRef = TD;
       }
     }
+
+    if (!ExtDecls.empty() && Loc.isValid()) {
+      auto ExtTyLoc = ExtDecls.back()->getExtendedTypeLoc().getLoc();
+      if (ExtTyLoc.isValid() && ExtTyLoc == Loc.getBaseNameLoc()) {
+        ExtDecl = ExtDecls.back();
+      }
+    }
   }
 
   CharSourceRange Range =
     Lexer::getCharSourceRangeFromSourceRange(D->getASTContext().SourceMgr,
                                              Loc.getSourceRange());
-  bool Continue = SEWalker.visitDeclReference(D, Range, CtorTyRef, Ty);
+  bool Continue = SEWalker.visitDeclReference(D, Range, CtorTyRef, ExtDecl, Ty,
+                                              Kind);
   if (!Continue)
     Cancelled = true;
   return Continue;
@@ -459,9 +489,19 @@ bool SourceEntityWalker::walk(SourceFile &SrcFile) {
   return SrcFile.walk(Annotator);
 }
 
-bool SourceEntityWalker::walk(Module &Mod) {
+bool SourceEntityWalker::walk(ModuleDecl &Mod) {
   SemaAnnotator Annotator(*this);
   return Mod.walk(Annotator);
+}
+
+bool SourceEntityWalker::walk(Stmt *S) {
+  SemaAnnotator Annotator(*this);
+  return S->walk(Annotator);
+}
+
+bool SourceEntityWalker::walk(Expr *E) {
+  SemaAnnotator Annotator(*this);
+  return E->walk(Annotator);
 }
 
 bool SourceEntityWalker::walk(Decl *D) {
@@ -475,7 +515,9 @@ bool SourceEntityWalker::walk(DeclContext *DC) {
 }
 
 bool SourceEntityWalker::visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                                            TypeDecl *CtorTyRef, Type T) {
+                                            TypeDecl *CtorTyRef,
+                                            ExtensionDecl *ExtTyRef, Type T,
+                                            SemaReferenceKind Kind) {
   return true;
 }
 
@@ -485,7 +527,8 @@ bool SourceEntityWalker::visitSubscriptReference(ValueDecl *D,
   // Most of the clients treat subscript reference the same way as a
   // regular reference when called on the open bracket and
   // ignore the closing one.
-  return IsOpenBracket ? visitDeclReference(D, Range, nullptr, Type()) : true;
+  return IsOpenBracket ? visitDeclReference(D, Range, nullptr, nullptr, Type(),
+                                        SemaReferenceKind::SubscriptRef) : true;
 }
 
 bool SourceEntityWalker::visitCallArgName(Identifier Name,

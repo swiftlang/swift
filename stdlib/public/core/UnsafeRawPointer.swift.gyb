@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,80 +16,314 @@
 %  Self = 'UnsafeMutableRawPointer' if mutable else 'UnsafeRawPointer'
 %  a_Self = 'an `UnsafeMutableRawPointer`' if mutable else 'an `UnsafeRawPointer`'
 %  Mutable = 'Mutable' if mutable else ''
+%  ConvertibleTypes = '`UnsafeMutablePointer`' if mutable else '`UnsafeMutablePointer` or `UnsafePointer`'
 
-/// A raw pointer for accessing untyped data. This provides no
-/// automatic memory management, no type safety, and no alignment
-/// guarantees. This implements Strideable to provide a view
-/// of byte-addressable memory.
+/// A raw pointer for accessing ${'and manipulating' if mutable else ''}
+/// untyped data.
+///
+/// The `${Self}` type provides no automated memory management, no type safety,
+/// and no alignment guarantees. You are responsible for handling the life
+/// cycle of any memory you work with through unsafe pointers, to avoid leaks
+/// or undefined behavior.
+///
+/// Memory that you manually manage can be either *untyped* or *bound* to a
+/// specific type. You use the `Unsafe${Mutable}RawPointer` type to access and
+/// manage raw bytes in memory, whether or not that memory has been bound to a
+/// specific type.
+///
+/// Understanding a Pointer's Memory State
+/// ======================================
+///
+/// The memory referenced by an `${Self}` instance can be in one of several
+/// states. Many pointer operations must only be applied to pointers with
+/// memory in a specific state---you must keep track of the state of the
+/// memory you are working with and understand the changes to that state that
+/// different operations perform. Memory can be untyped and uninitialized,
+/// bound to a type and uninitialized, or bound to a type and initialized to a
+/// value. Finally, memory that was allocated previously may have been
+/// deallocated, leaving existing pointers referencing unallocated memory.
+///
+/// Raw, Uninitialized Memory
+/// -------------------------
+///
+/// Raw memory that has just been allocated is in an *uninitialized, untyped*
+/// state. Uninitialized memory must be initialized with values of a type
+/// before it can be used with any typed operations.
+///
+%if mutable:
+/// You can use methods like `initializeMemory(as:from:)` and
+/// `moveInitializeMemory(as:from:count)` to bind raw memory to a type and
+/// initialize it with a value or series of values. To bind uninitialized
+/// memory to a type without initializing it, use the `bindMemory(to:count:)`
+/// method. These methods all return typed pointers for further typed access
+/// to the memory.
+% else:
+/// To bind uninitialized memory to a type without initializing it, use the
+/// `bindMemory(to:count:)` method. This method returns a typed pointer
+/// for further typed access to the memory.
+% end
+///
+/// Typed Memory
+/// ------------
+///
+/// Memory that has been bound to a type, whether it is initialized or
+/// uninitialized, is typically accessed using typed pointers---instances of
+/// `UnsafePointer` and `UnsafeMutablePointer`. Initialization, assignment,
+/// and deinitialization can be performed using `UnsafeMutablePointer`
+/// methods.
+///
+/// Memory that has been bound to a type can be rebound to a different type
+/// only after it has been deinitialized or if the bound type is a *trivial
+/// type*. Deinitializing typed memory does not unbind that memory's type. The
+/// deinitialized memory can be reinitialized with values of the same type,
+/// bound to a new type, or deallocated.
+///
+/// - Note: A trivial type can be copied bit for bit with no indirection or
+///   reference-counting operations. Generally, native Swift types that do not
+///   contain strong or weak references or other forms of indirection are
+///   trivial, as are imported C structs and enumerations.
+///
+/// When reading from ${'or writing to ' if mutable else ''} memory as raw
+/// bytes when that memory is bound to a type, you must ensure that you
+/// satisfy any alignment requirements.
+%if mutable:
+/// Writing to typed memory as raw bytes must only be performed when the bound
+/// type is a trivial type.
+%end
+///
+/// Raw Pointer Arithmetic
+/// ======================
+///
+/// Pointer arithmetic with raw pointers is performed at the byte level. When
+/// you add to or subtract from a raw pointer, the result is a new raw pointer
+/// offset by that number of bytes. The following example allocates four bytes
+/// of memory and stores `0xFF` in all four bytes:
+///
+///     let bytesPointer = UnsafeMutableRawPointer.allocate(bytes: 4, alignedTo: 1)
+///     bytesPointer.storeBytes(of: 0xFFFF_FFFF, as: UInt32.self)
+///
+///     // Load a value from the memory referenced by 'bytesPointer'
+///     let x = bytesPointer.load(as: UInt8.self)       // 255
+///
+///     // Load a value from the last two allocated bytes
+///     let offsetPointer = bytesPointer + 2
+///     let y = offsetPointer.load(as: UInt16.self)     // 65535
+///
+/// The code above stores the value `0xFFFF_FFFF` into the four newly allocated
+/// bytes, and then loads the first byte as a `UInt8` instance and the third
+/// and fourth bytes as a `UInt16` instance.
+///
+/// Always remember to deallocate any memory that you allocate yourself.
+///
+///     bytesPointer.deallocate(bytes: 4, alignedTo: 1)
+///
+/// Implicit Casting and Bridging
+/// =============================
+///
+/// When calling a function or method with an `${Self}` parameter, you can pass
+/// an instance of that specific pointer type, pass an instance of a
+/// compatible pointer type, or use Swift's implicit bridging to pass a
+/// compatible pointer.
+///
+/// For example, the `print(address:as:)` function in the following code sample
+/// takes an `${Self}` instance as its first parameter:
+///
+///     func print<T>(address p: Unsafe${Mutable}RawPointer, as type: T.Type) {
+///         let value = p.load(as: type)
+///         print(value)
+///     }
+///
+/// As is typical in Swift, you can call the `print(address:as:)` function with
+/// an `${Self}` instance. This example passes `rawPointer` as the initial
+/// parameter.
+///
+///     // 'rawPointer' points to memory initialized with `Int` values.
+///     let rawPointer: Unsafe${Mutable}RawPointer = ...
+///     print(address: rawPointer, as: Int.self)
+///     // Prints "42"
+///
+%if mutable:
+/// Because typed pointers can be implicitly cast to raw pointers when passed
+/// as a parameter, you can also call `print(address:as:)` with any mutable
+/// typed pointer instance.
+///
+///     let intPointer: UnsafeMutablePointer<Int> = ...
+///     print(address: intPointer, as: Int.self)
+///     // Prints "42"
+///
+/// Alternatively, you can use Swift's *implicit bridging* to pass a pointer to
+/// an instance or to the elements of an array. Use inout syntax to implicitly
+/// create a pointer to an instance of any type. The following example uses
+/// implicit bridging to pass a pointer to `value` when calling
+/// `print(address:as:)`:
+///
+///     var value: Int = 23
+///     print(address: &value, as: Int.self)
+///     // Prints "23"
+///
+/// A mutable pointer to the elements of an array is implicitly created when
+/// you pass the array using inout syntax. This example uses implicit bridging
+/// to pass a pointer to the elements of `numbers` when calling
+/// `print(address:as:)`.
+///
+///     var numbers = [5, 10, 15, 20]
+///     print(address: &numbers, as: Int.self)
+///     // Prints "5"
+%else: #!mutable
+/// Because typed pointers can be implicitly cast to raw pointers when passed
+/// as a parameter, you can also call `print(address:as:)` with any mutable or
+/// immutable typed pointer instance.
+///
+///     let intPointer: UnsafePointer<Int> = ...
+///     print(address: intPointer, as: Int.self)
+///     // Prints "42"
+///
+///     let mutableIntPointer = UnsafeMutablePointer(mutating: intPointer)
+///     print(address: mutableIntPointer, as: Int.self)
+///     // Prints "42"
+///
+/// Alternatively, you can use Swift's *implicit bridging* to pass a pointer to
+/// an instance or to the elements of an array. Use inout syntax to implicitly
+/// create a pointer to an instance of any type. The following example uses
+/// implicit bridging to pass a pointer to `value` when calling
+/// `print(address:as:)`:
+///
+///     var value: Int = 23
+///     print(address: &value, as: Int.self)
+///     // Prints "23"
+///
+/// An immutable pointer to the elements of an array is implicitly created when
+/// you pass the array as an argument. This example uses implicit bridging to
+/// pass a pointer to the elements of `numbers` when calling
+/// `print(address:as:)`.
+///
+///     let numbers = [5, 10, 15, 20]
+///     print(address: numbers, as: Int.self)
+///     // Prints "5"
+///
+/// You can also use inout syntax to pass a mutable pointer to the elements of
+/// an array. Because `print(address:as:)` requires an immutable pointer,
+/// although this is syntactically valid, it isn't necessary.
+///
+///     var mutableNumbers = numbers
+///     print(address: &mutableNumbers, as: Int.self)
+%end
+///
+/// - Important: The pointer created through implicit bridging of an instance
+///   or of an array's elements is only valid during the execution of the
+///   called function. Escaping the pointer to use after the execution of the
+///   function is undefined behavior. In particular, do not use implicit
+///   bridging when calling an `${Self}` initializer.
+///
+///       var number = 5
+///       let numberPointer = ${Self}(&number)
+///       // Accessing 'numberPointer' is undefined behavior.
 @_fixed_layout
 public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// The underlying raw pointer.
   /// Implements conformance to the public protocol `_Pointer`.
   public let _rawValue: Builtin.RawPointer
 
-  /// Creates ${a_Self} from another `${Self}`.
+  /// Creates a new raw pointer from the given raw or typed pointer.
+  ///
+  /// Use this initializer to explicitly convert `other` to an `${Self}`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The pointer to convert.
   @_transparent
   public init(_ other: Unsafe${Mutable}RawPointer) {
     self = other
   }
 
-  /// Creates ${a_Self} from another `${Self}`.
+  /// Creates a new raw pointer from the given raw or typed pointer.
   ///
-  /// Returns `nil` if `other` is `nil`.
+  /// Use this initializer to explicitly convert `other` to an `${Self}`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The pointer to convert. If `other` is `nil`, the
+  ///   result is `nil`.
   @_transparent
   public init?(_ other: Unsafe${Mutable}RawPointer?) {
     guard let unwrapped = other else { return nil }
     self = unwrapped
   }
 
-  /// Converts a builtin raw pointer to ${a_Self}.
+  /// Creates a new raw pointer from a builtin raw pointer.
   @_transparent
   public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
 
-  /// Converts an opaque pointer to ${a_Self}.
+  /// Creates a new raw pointer from the given opaque pointer.
+  ///
+  /// Use this initializer to explicitly convert `other` to an `${Self}`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The opaque pointer to convert.
   @_transparent
   public init(_ other: OpaquePointer) {
     _rawValue = other._rawValue
   }
 
-  /// Converts an opaque pointer to ${a_Self}.
+  /// Creates a new raw pointer from the given opaque pointer.
   ///
-  /// Returns `nil` if `from` is `nil`.
+  /// Use this initializer to explicitly convert `other` to an `${Self}`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The opaque pointer to convert. If `other` is `nil`,
+  ///   the result is `nil`.
   @_transparent
   public init?(_ other: OpaquePointer?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
 
-  /// Converts a pattern of bits to ${a_Self}.
+  /// Creates a new raw pointer from the given address, specified as a bit
+  /// pattern.
   ///
-  /// Returns `nil` if `bitPattern` is zero.
+  /// - Parameter bitPattern: A bit pattern to use for the address of the new
+  ///   raw pointer. If `bitPattern` is zero, the result is `nil`.
   @_transparent
   public init?(bitPattern: Int) {
     if bitPattern == 0 { return nil }
     _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Converts a pattern of bits to ${a_Self}.
+  /// Creates a new raw pointer from the given address, specified as a bit
+  /// pattern.
   ///
-  /// Returns `nil` if `bitPattern` is zero.
+  /// - Parameter bitPattern: A bit pattern to use for the address of the new
+  ///   raw pointer. If `bitPattern` is zero, the result is `nil`.
   @_transparent
   public init?(bitPattern: UInt) {
     if bitPattern == 0 { return nil }
     _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Converts an Unsafe${Mutable}Pointer to ${a_Self}.
+  /// Creates a new raw pointer from the given typed pointer.
+  ///
+  /// Use this initializer to explicitly convert `other` to an `${Self}`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The typed pointer to convert.
   @_transparent
   public init<T>(_ other: Unsafe${Mutable}Pointer<T>) {
     _rawValue = other._rawValue
   }
 
-  /// Converts an Unsafe${Mutable}Pointer to ${a_Self}.
+  /// Creates a new raw pointer from the given typed pointer.
   ///
-  /// Returns `nil` if `other` is `nil`.
+  /// Use this initializer to explicitly convert `other` to an `${Self}`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
+  ///   result is `nil`.
   @_transparent
   public init?<T>(_ other: Unsafe${Mutable}Pointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -97,45 +331,78 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   }
 
 %  if mutable:
-  /// Converts an UnsafeRawPointer to ${a_Self}.
+  /// Creates a new mutable raw pointer from the given immutable raw pointer.
+  ///
+  /// Use this initializer to explicitly convert `other` to an `${Self}`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The immutable raw pointer to convert.
   @_transparent
   public init(mutating other: UnsafeRawPointer) {
     _rawValue = other._rawValue
   }
 
-  /// Converts an UnsafeRawPointer to ${a_Self}.
+  /// Creates a new mutable raw pointer from the given immutable raw pointer.
   ///
-  /// Returns `nil` if `other` is `nil`.
+  /// Use this initializer to explicitly convert `other` to an `${Self}`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The immutable raw pointer to convert. If `other` is
+  ///   `nil`, the result is `nil`.
   @_transparent
   public init?(mutating other: UnsafeRawPointer?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
 %  else: # !mutable
-  /// Converts an UnsafeMutableRawPointer to ${a_Self}.
+  /// Creates a new raw pointer from the given mutable raw pointer.
+  ///
+  /// Use this initializer to explicitly convert `other` to an `${Self}`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The mutable raw pointer to convert.
   @_transparent
   public init(_ other: UnsafeMutableRawPointer) {
     _rawValue = other._rawValue
   }
 
-  /// Converts an UnsafeMutableRawPointer to ${a_Self}.
+  /// Creates a new raw pointer from the given mutable raw pointer.
   ///
-  /// Returns `nil` if `other` is `nil`.
+  /// Use this initializer to explicitly convert `other` to an `${Self}`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The mutable raw pointer to convert. If `other` is
+  ///   `nil`, the result is `nil`.
   @_transparent
   public init?(_ other: UnsafeMutableRawPointer?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
 
-  /// Converts an UnsafeMutablePointer to ${a_Self}.
+  /// Creates a new raw pointer from the given typed pointer.
+  ///
+  /// Use this initializer to explicitly convert `other` to an `${Self}`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The typed pointer to convert.
   @_transparent
   public init<T>(_ other: UnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
-  /// Converts an UnsafeMutablePointer to ${a_Self}.
+  /// Creates a new raw pointer from the given typed pointer.
   ///
-  /// Returns `nil` if `other` is `nil`.
+  /// Use this initializer to explicitly convert `other` to an `${Self}`
+  /// instance. This initializer creates a new pointer to the same address as
+  /// `other` and performs no allocation or copying.
+  ///
+  /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
+  ///   result is `nil`.
   @_transparent
   public init?<T>(_ other: UnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -144,81 +411,148 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
 %  end # !mutable
 
 %  if mutable:
-  /// Allocates and points at uninitialized memory for `size` bytes with
-  /// `alignedTo` alignment.
+  /// Allocates uninitialized memory with the specified size and alignment.
   ///
-  /// - Postcondition: The memory is allocated, but not initialized.
-  public static func allocate(bytes size: Int, alignedTo: Int)
-  -> UnsafeMutableRawPointer {
+  /// You are in charge of managing the allocated memory. Be sure to deallocate
+  /// any memory that you manually allocate.
+  ///
+  /// The allocated memory is not bound to any specific type and must be bound
+  /// before performing any typed operations. If you are using the memory for
+  /// a specific type, allocate memory using the
+  /// `UnsafeMutablePointer.allocate(capacity:)` static method instead.
+  ///
+  /// - Parameters:
+  ///   - size: The number of bytes to allocate. `size` must not be negative.
+  ///   - alignedTo: The alignment of the new region of allocated memory, in
+  ///     bytes.
+  /// - Returns: A pointer to a newly allocated region of memory. The memory is
+  ///   allocated, but not initialized.
+  ///
+  /// - SeeAlso: `UnsafeMutablePointer`
+  public static func allocate(
+    bytes size: Int, alignedTo: Int
+  ) -> UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(Builtin.allocRaw(
         size._builtinWordValue, alignedTo._builtinWordValue))
   }
 %  end # mutable
 
-  /// Deallocates uninitialized memory allocated for `bytes` number of bytes
-  /// with `alignedTo` alignment.
+  /// Deallocates memory referenced by the pointer with the specified size and
+  /// alignment.
   ///
-  /// - Precondition: The memory is uninitialized or initialized to a
-  ///   trivial type.
-  /// - Postcondition: The memory has been deallocated.
-  public func deallocate(bytes: Int, alignedTo: Int) {
+  /// The memory to be deallocated must be uninitialized or initialized to a
+  /// trivial type.
+  ///
+  /// - Parameters:
+  ///   - size: The number of bytes to deallocate.
+  ///   - alignedTo: The alignment of the region to be deallocated, in bytes.
+  public func deallocate(bytes size: Int, alignedTo: Int) {
     Builtin.deallocRaw(
-      _rawValue, bytes._builtinWordValue, alignedTo._builtinWordValue)
+      _rawValue, size._builtinWordValue, alignedTo._builtinWordValue)
   }
 
-  /// Binds the allocated memory to type `T` and returns an
-  /// `Unsafe${Mutable}Pointer<T>` to the bound memory at `self`.
+  /// Binds the memory to the specified type and returns a typed pointer to the
+  /// bound memory.
   ///
-  /// - Precondition: The memory is uninitialized or initialized to a type
-  ///   that is layout compatible with `T`.
-  /// - Postcondition: The memory is bound to 'T' starting at `self` continuing
-  ///   through `self` + `count` * `MemoryLayout<T>.stride`
-  /// - Warning: A memory location may only be bound to one type at a time.
-  ///   The behavior of accessing memory as type `U` while it is bound to an
-  ///   unrelated type `T` is undefined.
+  /// Use the `bindMemory(to:capacity:)` method to bind the memory referenced
+  /// by this pointer to the type `T`. The memory must be uninitialized or
+  /// initialized to a type that is layout compatible with `T`. If the memory
+  /// is uninitialized, it is still uninitialized after being bound to `T`.
+  ///
+  /// In this example, 100 bytes of raw memory are allocated for the pointer
+  /// `bytesPointer`, and then the first four bytes are bound to the `Int8`
+  /// type.
+  ///
+  ///     let count = 4
+  ///     let bytesPointer = UnsafeMutableRawPointer.allocate(
+  ///             bytes: 100,
+  ///             alignedTo: MemoryLayout<Int8>.alignment)
+  ///     let int8Pointer = bytesPointer.bindMemory(to: Int8.self, capacity: count)
+  ///
+  /// After calling `bindMemory(to:capacity:)`, the first four bytes of the
+  /// memory referenced by `bytesPointer` are bound to the `Int8` type, though
+  /// they remain uninitialized. The remainder of the allocated region is
+  /// unbound raw memory. All 100 bytes of memory must eventually be
+  /// deallocated.
+  ///
+  /// - Warning: A memory location may only be bound to one type at a time. The
+  ///   behavior of accessing memory as a type unrelated to its bound type is
+  ///   undefined.
+  ///
+  /// - Parameters:
+  ///   - type: The type `T` to bind the memory to.
+  ///   - count: The amount of memory to bind to type `T`, counted as instances
+  ///     of `T`.
+  /// - Returns: A typed pointer to the newly bound memory. The memory in this
+  ///   region is bound to `T`, but has not been modified in any other way.
+  ///   The number of bytes in this region is
+  ///   `count * MemoryLayout<T>.stride`.
   @_transparent
   @discardableResult
-  public func bindMemory<T>(to type: T.Type, capacity count: Int)
-  -> Unsafe${Mutable}Pointer<T> {
+  public func bindMemory<T>(
+    to type: T.Type, capacity count: Int
+  ) -> Unsafe${Mutable}Pointer<T> {
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
     return Unsafe${Mutable}Pointer<T>(_rawValue)
   }
 
-  /// Converts from ${a_Self} to Unsafe${Mutable}Pointer<T> given that
-  /// the region of memory starting at `self` is already bound to type `T`.
+  /// Returns a typed pointer to the memory referenced by this pointer,
+  /// assuming that the memory is already bound to the specified type.
   ///
-  /// - Precondition: The memory is bound to 'T' starting at `self` for some
-  ///   unspecified capacity.
+  /// Use this method when you have a raw pointer to memory that has *already*
+  /// been bound to the specified type. The memory starting at this pointer
+  /// must be bound to the type `T`. Accessing memory through the returned
+  /// pointer is undefined if the memory has not been bound to `T`. To bind
+  /// memory to `T`, use `bindMemory(to:capacity:)` instead of this method.
   ///
-  /// - Warning: Accessing memory via the returned pointer is undefined if the
-  ///   memory has not been bound to `T`.
+  /// - Parameter to: The type `T` that the memory has already been bound to.
+  /// - Returns: A typed pointer to the same memory as this raw pointer.
+  ///
+  /// - SeeAlso: `bindMemory(to:capacity:)`
   @_transparent
   public func assumingMemoryBound<T>(to: T.Type) -> Unsafe${Mutable}Pointer<T> {
     return Unsafe${Mutable}Pointer<T>(_rawValue)
   }
 
 %  if mutable:
-  /// Initializes this memory location `self + strideof(T) * index`
-  /// with `count` consecutive copies of `value` and binds the
-  /// initialized memory to type `T`.
+  /// Initializes the memory referenced by this pointer with the given value,
+  /// binds the memory to the value's type, and returns a typed pointer to the
+  /// initialized memory.
   ///
-  /// Returns an `UnsafeMutablePointer<T>` to this memory.
+  /// The memory referenced by this pointer must be uninitialized or
+  /// initialized to a trivial type, and must be properly aligned for
+  /// accessing `T`.
   ///
-  /// - Precondition: The memory at
-  ///  `self + index * strideof(T)..<self + (index + count) * strideof(T)`
-  ///  is uninitialized or initialized to a trivial type.
+  /// The following example allocates enough raw memory to hold four instances
+  /// of `Int8`, and then uses the `initializeMemory(as:at:count:to:)` method
+  /// to initialize the allocated memory.
   ///
-  /// - Precondition: The underlying pointer is properly aligned for
-  ///                 accessing `T`.
+  ///     let count = 4
+  ///     let bytesPointer = UnsafeMutableRawPointer.allocate(
+  ///             bytes: count * MemoryLayout<Int8>.stride,
+  ///             alignedTo: MemoryLayout<Int8>.alignment)
+  ///     let int8Pointer = myBytes.initializeMemory(
+  ///             as: Int8.self, count: count, value: 0)
   ///
-  /// - Precondition: `index` is non-negative.
+  ///     // After using 'int8Pointer':
+  ///     int8Pointer.deallocate(count)
   ///
-  /// - Precondition: `count` is non-negative.
+  /// After calling this method on a raw pointer `p`, the region starting at
+  /// `p + index * MemoryLayout<T>.stride` and continuing up to
+  /// `p + (index + count) * MemoryLayout<T>.stride` is bound to type `T` and
+  /// initialized. If `T` is a nontrivial type, you must eventually deinitialize
+  /// or move from the values in this region to avoid leaks.
   ///
-  /// - Postcondition: The memory at
-  ///  `(self + strideof(T) * index)..<(self + strideof(T) * index) + count`
-  ///  is bound to type `T` and initialized; the value should eventually be
-  ///  destroyed or moved from to avoid leaks.
+  /// - Parameters:
+  ///   - type: The type to bind this memory to.
+  ///   - index: The offset from this pointer to the region of memory to be
+  ///     initialized with `value`, in the stride of type `T`. `index` must
+  ///     not be negative. The default is zero.
+  ///   - count: The number of copies of `value` to copy into memory. `count`
+  ///     must not be negative. The default is `1`.
+  ///   - value: The instance to copy into memory.
+  /// - Returns: A typed pointer to the memory referenced by this raw pointer,
+  ///   offset by `index * MemoryLayout<T>.stride` bytes.
   @discardableResult
   public func initializeMemory<T>(as type: T.Type, at index: Int = 0,
     count: Int = 1, to value: T
@@ -237,25 +571,49 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     return UnsafeMutablePointer(_rawValue)
   }
 
-  /// Initializes memory starting at `self` with `count` `T` values beginning
-  /// at `source` and binds the initialized memory to type `T`.
+  /// Initializes the memory referenced by this pointer with the values
+  /// starting at the given pointer, binds the memory to the values' type, and
+  /// returns a typed pointer to the initialized memory.
   ///
-  /// Returns an `UnsafeMutablePointer<T>` this memory.
+  /// The memory referenced by this pointer must be uninitialized or
+  /// initialized to a trivial type, and must be properly aligned for
+  /// accessing `T`.
   ///
-  /// - Precondition: `count >= 0`
-  /// - Precondition: The memory regions `source..<source + count` and
-  ///   `self..<self + count * MemoryLayout<T>.stride` do not overlap.
-  /// - Precondition: The memory at
-  ///   `self..<self + count * MemoryLayout<T>.stride` is uninitialized or
-  ///   initialized to a trivial type, and the `T` values at
-  ///   `source..<source + count` are initialized.
-  /// - Precondition: The underlying pointer is properly aligned for accessing
-  ///   `T`.
-  /// - Postcondition: The memory at
-  ///   `self..<self + count * MemoryLayout<T>.stride` is bound to type `T`.
-  /// - Postcondition: The `T` values at
-  ///   `self..<self + count * MemoryLayout<T>.stride` and
-  ///   `source..<source + count` are initialized.
+  /// The following example allocates enough raw memory to hold four instances
+  /// of `Int8`, and then uses the `initializeMemory(as:from:count:)` method
+  /// to initialize the allocated memory.
+  ///
+  ///     let count = 4
+  ///     let bytesPointer = UnsafeMutableRawPointer.allocate(
+  ///             bytes: count * MemoryLayout<Int8>.stride,
+  ///             alignedTo: MemoryLayout<Int8>.alignment)
+  ///     let values: [Int8] = [1, 2, 3, 4]
+  ///     let int8Pointer = values.withUnsafeBufferPointer { buffer in
+  ///         return bytesPointer.initializeMemory(as: Int8.self,
+  ///                   from: buffer.baseAddress!,
+  ///                   count: buffer.count)
+  ///     }
+  ///     // int8Pointer.pointee == 1
+  ///     // (int8Pointer + 3).pointee == 4
+  ///
+  ///     // After using 'int8Pointer':
+  ///     int8Pointer.deallocate(count)
+  ///
+  /// After calling this method on a raw pointer `p`, the region starting at
+  /// `p` and continuing up to `p + count * MemoryLayout<T>.stride` is bound
+  /// to type `T` and initialized. If `T` is a nontrivial type, you must
+  /// eventually deinitialize or move from the values in this region to avoid
+  /// leaks. The instances in the region `source..<(source + count)` are
+  /// unaffected.
+  ///
+  /// - Parameters:
+  ///   - type: The type to bind this memory to.
+  ///   - source: A pointer to the values to copy. The memory in the region
+  ///     `source..<(source + count)` must be initialized to type `T` and must
+  ///     not overlap the destination region.
+  ///   - count: The number of copies of `value` to copy into memory. `count`
+  ///     must not be negative.
+  /// - Returns: A typed pointer to the memory referenced by this raw pointer.
   @discardableResult
   public func initializeMemory<T>(
     as type: T.Type, from source: UnsafePointer<T>, count: Int
@@ -279,26 +637,52 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     return UnsafeMutablePointer(_rawValue)
   }
 
-  /// Initializes memory starting at `self` with the elements of
-  /// `source` and binds the initialized memory to type `T`.
+  /// Initializes the memory referenced by this pointer with the values of the
+  /// given collection, binds the memory to the values' type, and returns a
+  /// typed pointer to the initialized memory.
   ///
-  /// Returns an `UnsafeMutablePointer<T>` this memory.
+  /// The memory referenced by this pointer must be uninitialized or
+  /// initialized to a trivial type, and must be properly aligned for
+  /// accessing `T`.
   ///
-  /// - Precondition: The memory at `self..<self + source.count *
-  ///   MemoryLayout<T>.stride` is uninitialized or initialized to a
-  ///   trivial type.
+  /// The following example allocates enough raw memory to hold four instances
+  /// of `Int8`, and then uses the `initializeMemory(as:from:)` method to
+  /// initialize the allocated memory.
   ///
-  /// - Postcondition: The memory at `self..<self + source.count *
-  ///   MemoryLayout<T>.stride` is bound to type `T`.
+  ///     let count = 4
+  ///     let bytesPointer = UnsafeMutableRawPointer.allocate(
+  ///             bytes: count * MemoryLayout<Int8>.stride,
+  ///             alignedTo: MemoryLayout<Int8>.alignment)
+  ///     let values: [Int8] = [1, 2, 3, 4]
+  ///     let int8Pointer = bytesPointer.initializeMemory(
+  ///             as: Int8.self,
+  ///             from: values)
+  ///     // int8Pointer.pointee == 1
+  ///     // (int8Pointer + 3).pointee == 4
   ///
-  /// - Postcondition: The `T` values at `self..<self + source.count *
-  ///   MemoryLayout<T>.stride` are initialized.
+  ///     // After using 'int8Pointer':
+  ///     int8Pointer.deallocate(count)
   ///
-  /// TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
+  /// After calling this method on a raw pointer `p`, the region starting at
+  /// `p` and continuing up to `p + count * MemoryLayout<T>.stride` is bound
+  /// to type `T` and initialized. If `T` is a nontrivial type, you must
+  /// eventually deinitialize or move from the values in this region to avoid
+  /// leaks.
+  ///
+  /// - Parameters:
+  ///   - type: The type to bind this memory to.
+  ///   - source: A pointer to the values to copy. If `source` is an
+  ///     `UnsafeBufferPointer` or `UnsafeMutableBufferPointer` instance, the
+  ///     memory region referenced by `source` must not overlap the
+  ///     destination region.
+  /// - Returns: A typed pointer to the memory referenced by this raw pointer.
+  // This is fundamentally unsafe since collections can underreport their count.
+  @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'UnsafeMutableRawBufferPointer.initialize(from:)' instead")
   @discardableResult
   public func initializeMemory<C : Collection>(
-    as: C.Iterator.Element.Type, from source: C
+    as type: C.Iterator.Element.Type, from source: C
   ) -> UnsafeMutablePointer<C.Iterator.Element> {
+    // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
     // Initialize and bind each element of the container.
     for (index, element) in source.enumerated() {
       self.initializeMemory(as: C.Iterator.Element.self, at: index, to: element)
@@ -306,25 +690,35 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     return UnsafeMutablePointer(_rawValue)
   }
 
-  /// Initializes memory starting at `self` with `count` `T` values
-  /// beginning at `source`, binds the initialized memory to type `T`,
-  /// and returns the source memory to an uninitialized state.
+  /// Initializes the memory referenced by this pointer with the values
+  /// starting at the given pointer, binds the memory to the values' type,
+  /// deinitializes the source memory, and returns a typed pointer to the
+  /// newly initialized memory.
   ///
-  /// Returns an `UnsafeMutablePointer<T>` this memory.
+  /// The memory referenced by this pointer must be uninitialized or
+  /// initialized to a trivial type, and must be properly aligned for
+  /// accessing `T`.
   ///
-  /// - Precondition: `count >= 0`
+  /// The memory in the region `source..<(source + count)` may overlap with the
+  /// destination region. The `moveInitializeMemory(as:from:count:)` method
+  /// automatically performs a forward or backward copy of all instances from
+  /// the source region to their destination.
   ///
-  /// - Precondition: The memory at `self..<self + count *
-  ///   MemoryLayout<T>.stride` is uninitialized or initialized to a
-  ///   trivial type and the `T` values at
-  ///   `source..<source + count` are initialized.
+  /// After calling this method on a raw pointer `p`, the region starting at
+  /// `p` and continuing up to `p + count * MemoryLayout<T>.stride` is bound
+  /// to type `T` and initialized. If `T` is a nontrivial type, you must
+  /// eventually deinitialize or move from the values in this region to avoid
+  /// leaks. Any memory in the region `source..<(source + count)` that does
+  /// not overlap with the destination region is returned to an uninitialized
+  /// state.
   ///
-  /// - Postcondition: The memory at `self..<self + count *
-  ///   MemoryLayout<T>.stride` is bound to type `T`.
-  ///
-  /// - Postcondition: The `T` values at `self..<self + count *
-  ///   MemoryLayout<T>.stride` are initialized and the memory at
-  ///   `source..<source + count` is uninitialized.
+  /// - Parameters:
+  ///   - type: The type to bind this memory to.
+  ///   - source: A pointer to the values to copy. The memory in the region
+  ///     `source..<(source + count)` must be initialized to type `T`.
+  ///   - count: The number of copies of `value` to copy into memory. `count`
+  ///     must not be negative.
+  /// - Returns: A typed pointer to the memory referenced by this raw pointer.
   @discardableResult
   public func moveInitializeMemory<T>(
     as type: T.Type, from source: UnsafeMutablePointer<T>, count: Int
@@ -360,14 +754,20 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   }
 %  end # mutable
 
-  /// Reads raw bytes from memory at `self + offset` and constructs a
-  /// value of type `T`.
+  /// Returns a new instance of the given type, constructed from the raw memory
+  /// at the specified offset.
   ///
-  /// - Precondition: The underlying pointer plus `offset` is properly
-  ///   aligned for accessing `T`.
+  /// The memory at this pointer plus `offset` must be properly aligned for
+  /// accessing `T` and initialized to `T` or another type that is layout
+  /// compatible with `T`.
   ///
-  /// - Precondition: The memory is initialized to a value of some type, `U`,
-  ///   such that `T` is layout compatible with `U`.
+  /// - Parameters:
+  ///   - offset: The offset from this pointer, in bytes. `offset` must be
+  ///     nonnegative. The default is zero.
+  ///   - type: The type of the instance to create.
+  /// - Returns: A new instance of type `T`, read from the raw bytes at
+  ///   `offset`. The returned instance is memory-managed and unassociated
+  ///   with the value in the memory referenced by this pointer.
   public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
     _debugPrecondition(0 == (UInt(bitPattern: self + offset)
         & (UInt(MemoryLayout<T>.alignment) - 1)),
@@ -377,38 +777,44 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   }
 
 %  if mutable:
-  /// Stores a value's bytes into raw memory at `self + offset`.
+  /// Stores the given value's bytes into raw memory at the specified offset.
   ///
-  /// - Precondition: The underlying pointer plus `offset` is properly
-  ///   aligned for storing type `T`.
+  /// The type `T` to be stored must be a trivial type. The memory at this
+  /// pointer plus `offset` must be properly aligned for accessing `T`. The
+  /// memory must also be uninitialized, initialized to `T`, or initialized to
+  /// another trivial type that is layout compatible with `T`.
   ///
-  /// - Precondition: `T` is a trivial type.
+  /// After calling `storeBytes(of:toByteOffset:as:)`, the memory is
+  /// initialized to the raw bytes of `value`. If the memory is bound to a
+  /// type `U` that is layout compatible with `T`, then it contains a value of
+  /// type `U`. Calling `storeBytes(of:toByteOffset:as:)` does not change the
+  /// bound type of the memory.
   ///
-  /// - Precondition: The memory is uninitialized, or initialized to
-  ///   some trivial type `U` such that `T` and `U` are mutually layout
-  ///   compatible.
+  /// - Note: A trivial type can be copied with just a bit-for-bit copy without
+  ///   any indirection or reference-counting operations. Generally, native
+  ///   Swift types that do not contain strong or weak references or other
+  ///   forms of indirection are trivial, as are imported C structs and enums.
   ///
-  /// - Postcondition: The memory is initialized to raw bytes. If the
-  ///   memory is bound to type `U`, then it now contains a value of
-  ///   type `U`.
+  /// If you need to store a copy of a nontrivial value into memory, or to
+  /// store a value into memory that contains a nontrivial value, you cannot
+  /// use the `storeBytes(of:toByteOffset:as:)` method. Instead, you must know
+  /// the type of value previously in memory and initialize or assign the
+  /// memory. For example, to replace a value stored in a raw pointer `p`,
+  /// where `U` is the current type and `T` is the new type, use a typed
+  /// pointer to access and deinitialize the current value before initializing
+  /// the memory with a new value.
   ///
-  /// - Note: A trivial type can be copied with just a bit-for-bit
-  ///   copy without any indirection or reference-counting operations.
-  ///   Generally, native Swift types that do not contain strong or
-  ///   weak references or other forms of indirection are trivial, as
-  ///   are imported C structs and enums.
+  ///     let typedPointer = p.bindMemory(to: U.self, capacity: 1)
+  ///     typedPointer.deinitialize(count: 1)
+  ///     p.initializeMemory(as: T.self, to: newValue)
   ///
-  /// - Note: Storing a copy of a nontrivial value into memory
-  ///   requires that the user know the type of value previously in
-  ///   memory, and requires initialization or assignment of the
-  ///   memory. This can be achieved via a typed `UnsafeMutablePointer`
-  ///   or via a raw pointer `self`, as follows, where `U` is the
-  ///   previous type and `T` is the copied value's type:
-  ///   `let typedPtr = self.bindMemory(to: U.self, capacity: 1)`
-  ///   `typedPtr.deinitialize(count: 1)`
-  ///   `self.initializeMemory(as: T.self, to: newValue)`
+  /// - Parameters:
+  ///   - value: The value to store as raw bytes.
+  ///   - offset: The offset from this pointer, in bytes. `offset` must be
+  ///     nonnegative. The default is zero.
+  ///   - type: The type of `value`.
   public func storeBytes<T>(
-    of value: T, toByteOffset offset: Int = 0, as: T.Type
+    of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
     _debugPrecondition(0 == (UInt(bitPattern: self + offset)
         & (UInt(MemoryLayout<T>.alignment) - 1)),
@@ -425,21 +831,23 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     }
   }
 
-  /// Copies `count` bytes from `source` into memory at `self`.
+  /// Copies the specified number of bytes from the given raw pointer's memory
+  /// into this pointer's memory.
   ///
-  /// - Precondition: `count` is non-negative.
+  /// If the `count` bytes of memory referenced by this pointer are bound to a
+  /// type `T`, then `T` must be a trivial type, this pointer and `source`
+  /// must be properly aligned for accessing `T`, and `count` must be a
+  /// multiple of `MemoryLayout<T>.stride`.
   ///
-  /// - Precondition: The memory at `source..<source + count` is
-  ///   initialized to some trivial type `T`.
+  /// After calling `copyBytes(from:count:)`, the `count` bytes of memory
+  /// referenced by this pointer are initialized to raw bytes. If the memory
+  /// is bound to type `T`, then it contains values of type `T`.
   ///
-  /// - Precondition: If the memory at `self..<self+count` is bound to
-  ///   a type `U`, then `U` is a trivial type, the underlying
-  ///   pointers `source` and `self` are properly aligned for type
-  ///   `U`, and `count` is a multiple of `MemoryLayout<U>.stride`.
-  ///
-  /// - Postcondition: The memory at `self..<self+count` is
-  ///   initialized to raw bytes. If the memory is bound to type `U`,
-  ///   then it contains values of type `U`.
+  /// - Parameters:
+  ///   - source: A pointer to the memory to copy bytes from. The memory in the
+  ///     region `source..<(source + count)` must be initialized to a trivial
+  ///     type.
+  ///   - count: The number of bytes to copy. `count` must not be negative.
   public func copyBytes(from source: UnsafeRawPointer, count: Int) {
     _debugPrecondition(
       count >= 0, "UnsafeMutableRawPointer.copyBytes with negative count")
@@ -461,27 +869,60 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     return Int(bitPattern: self)
   }
 
-  /// Returns `x - self`.
+  /// Returns the distance from this pointer to the given pointer.
+  ///
+  /// With pointers `p` and `q`, the result of `p.distance(to: q)` is
+  /// equivalent to `q - p`.
+  ///
+  /// - Parameter x: The pointer to calculate the distance to.
+  /// - Returns: The distance from this pointer to `x`, in bytes.
   public func distance(to x: ${Self}) -> Int {
     return Int(Builtin.sub_Word(Builtin.ptrtoint_Word(x._rawValue),
         Builtin.ptrtoint_Word(_rawValue)))
   }
 
-  /// Returns `self + n`.
+  /// Returns a pointer offset from this pointer by the specified number of
+  /// bytes.
+  ///
+  /// With pointer `p` and distance `n`, the result of `p.advanced(by: n)` is
+  /// equivalent to `p + n`.
+  ///
+  /// The resulting pointer must be within the bounds of the same allocation as
+  /// this pointer.
+  ///
+  /// - Parameter n: The number of bytes to offset this pointer. `n` may be
+  ///   positive, negative, or zero.
+  /// - Returns: A pointer offset from this pointer by `n` bytes.
   public func advanced(by n: Int) -> ${Self} {
     return ${Self}(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
   }
 }
 
 extension ${Self} {
-/// - Note: This may be more efficient than Strideable's implementation
-///   calling ${Self}.distance().
+  // - Note: This may be more efficient than Strideable's implementation
+  //   calling ${Self}.distance().
+  /// Returns a Boolean value indicating whether two pointers are equal.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: Another pointer.
+  /// - Returns: `true` if `lhs` and `rhs` reference the same memory address;
+  ///   otherwise, `false`.
   @_transparent
   public static func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
   }
 
-  /// - Note: This is an unsigned comparison unlike Strideable's implementation.
+  // - Note: This is an unsigned comparison unlike Strideable's
+  //   implementation.
+  /// Returns a Boolean value indicating whether the first pointer references
+  /// an earlier memory location than the second pointer.
+  ///
+  /// - Parameters:
+  ///   - lhs: A pointer.
+  ///   - rhs: Another pointer.
+  /// - Returns: `true` if `lhs` references a memory address earlier than
+  ///   `rhs`; otherwise, `false`.
   @_transparent
   public static func < (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))

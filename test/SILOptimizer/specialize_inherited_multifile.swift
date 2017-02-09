@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s %S/Inputs/specialize_inherited_multifile.swift -O -emit-sil -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s %S/Inputs/specialize_inherited_multifile.swift -O -emit-sil -sil-verify-all | %FileCheck %s
 
 @_semantics("optimize.sil.never") func takesBase<T : Base>(t: T) {}
 
@@ -8,8 +8,8 @@
 
 // Make sure the ConcreteDerived : Base conformance is available here.
 
-// CHECK-LABEL: sil shared [noinline] @_TTSg5C30specialize_inherited_multifile20ConcreteHasAssocTypeS0_S_12HasAssocTypeS____TF30specialize_inherited_multifile17takesHasAssocTypeuRxS_12HasAssocTyperFT1tx_T_ : $@convention(thin) (@owned ConcreteHasAssocType) -> ()
-// CHECK: [[FN:%.*]] = function_ref @_TF30specialize_inherited_multifile9takesBaseuRxS_4BaserFT1tx_T_
+// CHECK-LABEL: sil shared [noinline] @_T030specialize_inherited_multifile17takesHasAssocTypeyx1t_tAA0efG0RzlFAA08ConcreteefG0C_Tg5 : $@convention(thin) (@owned ConcreteHasAssocType) -> ()
+// CHECK: [[FN:%.*]] = function_ref @_T030specialize_inherited_multifile9takesBaseyx1t_tAA0E0RzlF
 // CHECK: apply [[FN]]<ConcreteDerived>({{%.*}})
 // CHECK: return
 

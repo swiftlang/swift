@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -91,8 +91,8 @@ struct WordReplacement {
 /// Current operator characters:   @/=-+*%<>!&|^~ and the special operator '..'
 char translateOperatorChar(char op);
 
-/// Returns a string where all characters of the operator \Op are translated to
-/// their mangled form.
+/// Returns a string where all characters of the operator \p Op are translated
+/// to their mangled form.
 std::string translateOperator(StringRef Op);
 
 /// Mangles an identifier using a generic Mangler class.
@@ -110,67 +110,71 @@ void mangleIdentifier(Mangler &M, StringRef ident) {
 
   size_t WordsInBuffer = M.Words.size();
   assert(M.SubstWordsInIdent.empty());
-  std::string punycodeBuf;
   if (M.UsePunycode && needsPunycodeEncoding(ident)) {
     // If the identifier contains non-ASCII character, we mangle
     // with an initial '00' and Punycode the identifier string.
+    std::string punycodeBuf;
     Punycode::encodePunycodeUTF8(ident, punycodeBuf,
                                  /*mapNonSymbolChars*/ true);
-    ident = punycodeBuf;
-    M.Buffer << "00";
-  } else {
-    // Search for word substitutions and for new words.
-    const size_t NotInsideWord = ~0;
-    size_t wordStartPos = NotInsideWord;
-    for (size_t Pos = 0, Len = ident.size(); Pos <= Len; ++Pos) {
-      char ch = (Pos < Len ? ident[Pos] : 0);
-      if (wordStartPos != NotInsideWord && isWordEnd(ch, ident[Pos - 1])) {
-        // This position is the end of a word, i.e. the next character after a
-        // word.
-        assert(Pos > wordStartPos);
-        size_t wordLen = Pos - wordStartPos;
-        StringRef Word = ident.substr(wordStartPos, wordLen);
-
-        // Helper function to lookup the Word in a string.
-        auto lookupWord = [&] (StringRef Str,
-                               size_t FromWordIdx, size_t ToWordIdx) -> int {
-          for (size_t Idx = FromWordIdx; Idx < ToWordIdx; ++Idx) {
-            const SubstitutionWord &w = M.Words[Idx];
-            StringRef existingWord =  Str.substr(w.start, w.length);
-            if (Word == existingWord)
-              return (int)Idx;
-          }
-          return -1;
-        };
-
-        // Is the word already present in the so far mangled string?
-        int WordIdx = lookupWord(M.getBufferStr(), 0, WordsInBuffer);
-        // Otherwise, is the word already present in this identifier?
-        if (WordIdx < 0)
-          WordIdx = lookupWord(ident, WordsInBuffer, M.Words.size());
-
-        if (WordIdx >= 0) {
-          // We found a word substitution!
-          assert(WordIdx < 26);
-          M.SubstWordsInIdent.push_back({wordStartPos, WordIdx});
-        } else if (wordLen >= 2 && M.Words.size() < 26) {
-          // It's a new word: remember it.
-          // Note: at this time the word's start position is relative to the
-          // begin of the identifier. We must update it afterwards so that it is
-          // relative to the begin of the whole mangled Buffer.
-          M.Words.push_back({wordStartPos, wordLen});
-        }
-        wordStartPos = NotInsideWord;
-      }
-      if (wordStartPos == NotInsideWord && isWordStart(ch)) {
-        // This position is the begin of a word.
-        wordStartPos = Pos;
-      }
-    }
-    // If we have word substitutions mangle an initial '0'.
-    if (!M.SubstWordsInIdent.empty())
-      M.Buffer << '0';
+    StringRef pcIdent = punycodeBuf;
+    M.Buffer << "00" << pcIdent.size();
+    if (isDigit(pcIdent[0]) || pcIdent[0] == '_')
+      M.Buffer << '_';
+    M.Buffer << pcIdent;
+    return;
   }
+  // Search for word substitutions and for new words.
+  const size_t NotInsideWord = ~0;
+  size_t wordStartPos = NotInsideWord;
+  for (size_t Pos = 0, Len = ident.size(); Pos <= Len; ++Pos) {
+    char ch = (Pos < Len ? ident[Pos] : 0);
+    if (wordStartPos != NotInsideWord && isWordEnd(ch, ident[Pos - 1])) {
+      // This position is the end of a word, i.e. the next character after a
+      // word.
+      assert(Pos > wordStartPos);
+      size_t wordLen = Pos - wordStartPos;
+      StringRef Word = ident.substr(wordStartPos, wordLen);
+
+      // Helper function to lookup the Word in a string.
+      auto lookupWord = [&] (StringRef Str,
+                             size_t FromWordIdx, size_t ToWordIdx) -> int {
+        for (size_t Idx = FromWordIdx; Idx < ToWordIdx; ++Idx) {
+          const SubstitutionWord &w = M.Words[Idx];
+          StringRef existingWord =  Str.substr(w.start, w.length);
+          if (Word == existingWord)
+            return (int)Idx;
+        }
+        return -1;
+      };
+
+      // Is the word already present in the so far mangled string?
+      int WordIdx = lookupWord(M.getBufferStr(), 0, WordsInBuffer);
+      // Otherwise, is the word already present in this identifier?
+      if (WordIdx < 0)
+        WordIdx = lookupWord(ident, WordsInBuffer, M.Words.size());
+
+      if (WordIdx >= 0) {
+        // We found a word substitution!
+        assert(WordIdx < 26);
+        M.SubstWordsInIdent.push_back({wordStartPos, WordIdx});
+      } else if (wordLen >= 2 && M.Words.size() < 26) {
+        // It's a new word: remember it.
+        // Note: at this time the word's start position is relative to the
+        // begin of the identifier. We must update it afterwards so that it is
+        // relative to the begin of the whole mangled Buffer.
+        M.Words.push_back({wordStartPos, wordLen});
+      }
+      wordStartPos = NotInsideWord;
+    }
+    if (wordStartPos == NotInsideWord && isWordStart(ch)) {
+      // This position is the begin of a word.
+      wordStartPos = Pos;
+    }
+  }
+  // If we have word substitutions mangle an initial '0'.
+  if (!M.SubstWordsInIdent.empty())
+    M.Buffer << '0';
+
   size_t Pos = 0;
   // Add a dummy-word at the end of the list.
   M.SubstWordsInIdent.push_back({ident.size(), -1});
@@ -205,7 +209,7 @@ void mangleIdentifier(Mangler &M, StringRef ident) {
       if (Idx < End - 2) {
         M.Buffer << (char)(Repl.WordIdx + 'a');
       } else {
-        // The last word substitution is a captial letter.
+        // The last word substitution is a capital letter.
         M.Buffer << (char)(Repl.WordIdx + 'A');
         if (Pos == ident.size())
           M.Buffer << '0';

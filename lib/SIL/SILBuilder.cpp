@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -30,7 +30,7 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
 
 SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                         SILModule &M,
-                                        ArrayRef<Substitution> subs,
+                                        SubstitutionList subs,
                                         ParameterConvention calleeConvention) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
@@ -51,7 +51,7 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   // If the original method has an @autoreleased return, the partial application
   // thunk will retain it for us, converting the return value to @owned.
   SmallVector<SILResultInfo, 4> results;
-  results.append(FTI->getAllResults().begin(), FTI->getAllResults().end());
+  results.append(FTI->getResults().begin(), FTI->getResults().end());
   for (auto &result : results) {
     if (result.getConvention() == ResultConvention::UnownedInnerPointer)
       result = SILResultInfo(result.getType(), ResultConvention::Unowned);

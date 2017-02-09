@@ -225,7 +225,7 @@ typedef __INT32_TYPE__ int32_t;
 + (nullable instancetype)stringWithPath:(NSString*)path encoding:(int)encoding;
 @end
 
-NSString *NSStringToNSString(NSString *str);
+__attribute__((warn_unused_result)) NSString *NSStringToNSString(NSString *str);
 
 @interface Bee : NSObject
 -(void)buzz;
@@ -379,6 +379,15 @@ typedef NS_ENUM(unsigned char, NSAliasesEnum) {
   NSAliasesByEquivalentValue = -127,
   NSAliasesByName = NSAliasesOriginal,
   NSAliasesDifferentValue = 2
+};
+
+typedef NS_ENUM(unsigned char, NSUnavailableAliasesEnum) {
+  NSUnavailableAliasesOriginalAU = 0,
+  NSUnavailableAliasesAliasAU __attribute__((unavailable)) = 0,
+  NSUnavailableAliasesOriginalUA __attribute__((unavailable)) = 1,
+  NSUnavailableAliasesAliasUA = 1,
+  NSUnavailableAliasesOriginalUU __attribute__((unavailable)) = 2,
+  NSUnavailableAliasesAliasUU __attribute__((unavailable)) = 2,
 };
 
 NS_ENUM(NSInteger, NSMalformedEnumMissingTypedef) {

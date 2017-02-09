@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -313,6 +313,11 @@ public func == (lhs: CGVector, rhs: CGVector) -> Bool {
   return lhs.dx == rhs.dx  &&  lhs.dy == rhs.dy
 }
 
+extension CGVector : CustomDebugStringConvertible {
+  public var debugDescription : String {
+    return "(\(dx), \(dy))"
+  }
+}
 
 public extension CGRect {
   static var zero: CGRect {

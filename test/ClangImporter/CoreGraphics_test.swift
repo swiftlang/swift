@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target x86_64-apple-macosx10.11 -emit-ir -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -target x86_64-apple-macosx10.11 -module-name=cgtest -emit-ir -O %s | %FileCheck %s
 
 // Test some imported CG APIs
 import CoreGraphics

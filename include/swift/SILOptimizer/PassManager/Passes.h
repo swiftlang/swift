@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -22,6 +22,10 @@
 namespace swift {
   class SILOptions;
   class SILTransform;
+
+  namespace irgen {
+    class IRGenModule;
+  }
 
   /// \brief Run all the SIL diagnostic passes on \p M.
   ///
@@ -74,6 +78,7 @@ namespace swift {
   StringRef PassKindID(PassKind Kind);
 
 #define PASS(ID, NAME, DESCRIPTION) SILTransform *create##ID();
+#define IRGEN_PASS(ID, NAME, DESCRIPTION)
 #include "Passes.def"
 
 } // end namespace swift

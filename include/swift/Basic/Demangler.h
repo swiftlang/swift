@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -114,6 +114,8 @@ public:
 
   NodePointer demangleTopLevel();
 
+  NodePointer demangleType();
+
 private:
 
   void addSubstitution(NodePointer Nd) {
@@ -166,6 +168,8 @@ private:
     return createWithChild(kind, popNode(Node::Kind::Type));
   }
 
+  void parseAndPushNodes();
+
   NodePointer changeKind(NodePointer Node, Node::Kind NewKind);
 
   NodePointer demangleOperator();
@@ -196,7 +200,9 @@ private:
   NodePointer popTypeList();
   NodePointer popProtocol();
   NodePointer demangleBoundGenericType();
-  NodePointer demangleBoundGenericArgs(NodePointer nominalType);
+  NodePointer demangleBoundGenericArgs(NodePointer nominalType,
+                                    const std::vector<NodePointer> &TypeLists,
+                                    size_t TypeListIdx);
   NodePointer demangleInitializer();
   NodePointer demangleImplParamConvention();
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
@@ -221,7 +227,8 @@ private:
   NodePointer addFuncSpecParamNumber(NodePointer Param,
                               FunctionSigSpecializationParamKind Kind);
 
-  NodePointer demangleSpecAttributes(Node::Kind SpecKind);
+  NodePointer demangleSpecAttributes(Node::Kind SpecKind,
+                                     bool demangleUniqueID = false);
 
   NodePointer demangleWitness();
   NodePointer demangleSpecialType();

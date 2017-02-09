@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,14 +23,15 @@ using namespace swift;
 //                  DIMemoryObjectInfo Implementation
 //===----------------------------------------------------------------------===//
 
-static unsigned getElementCountRec(CanType T,
+static unsigned getElementCountRec(SILModule &Module,
+                                   SILType T,
                                    bool IsSelfOfNonDelegatingInitializer) {
   // If this is a tuple, it is always recursively flattened.
-  if (CanTupleType TT = dyn_cast<TupleType>(T)) {
+  if (CanTupleType TT = T.getAs<TupleType>()) {
     assert(!IsSelfOfNonDelegatingInitializer && "self never has tuple type");
     unsigned NumElements = 0;
-    for (auto EltTy : TT.getElementTypes())
-      NumElements += getElementCountRec(EltTy, false);
+    for (unsigned i = 0, e = TT->getNumElements(); i < e; i++)
+      NumElements += getElementCountRec(Module, T.getTupleElementType(i), false);
     return NumElements;
   }
 
@@ -39,11 +40,11 @@ static unsigned getElementCountRec(CanType T,
   // for each of the tuple members.
   if (IsSelfOfNonDelegatingInitializer) {
     // Protocols never have a stored properties.
-    if (auto *NTD = cast_or_null<NominalTypeDecl>(T->getAnyNominal())) {
+    if (auto *NTD = T.getNominalOrBoundGenericNominal()) {
 
       unsigned NumElements = 0;
       for (auto *VD : NTD->getStoredProperties())
-        NumElements += getElementCountRec(VD->getType()->getCanonicalType(),
+        NumElements += getElementCountRec(Module, T.getFieldType(VD, Module),
                                           false);
       return NumElements;
     }
@@ -55,13 +56,15 @@ static unsigned getElementCountRec(CanType T,
 
 
 DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
+  auto &Module = MI->getModule();
+
   MemoryInst = MI;
   // Compute the type of the memory object.
   if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst)) {
     assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
            && "analyzing multi-field boxes not implemented");
     MemorySILType =
-      ABI->getBoxType()->getFieldType(getFunction().getModule(), 0);
+      ABI->getBoxType()->getFieldType(Module, 0);
   } else if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst)) {
     MemorySILType = ASI->getElementType();
   } else {
@@ -91,7 +94,7 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
   }
 
   // Otherwise, we break down the initializer.
-  NumElements = getElementCountRec(getType(), isNonDelegatingInit());
+  NumElements = getElementCountRec(Module, MemorySILType, isNonDelegatingInit());
 
   // If this is a derived class init method, track an extra element to determine
   // whether super.init has been called at each program point.
@@ -104,16 +107,16 @@ SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
 }
 
 /// Given a symbolic element number, return the type of the element.
-static CanType getElementTypeRec(CanType T, unsigned EltNo,
+static SILType getElementTypeRec(SILModule &Module, SILType T, unsigned EltNo,
                                  bool IsSelfOfNonDelegatingInitializer) {
   // If this is a tuple type, walk into it.
-  if (TupleType *TT = T->getAs<TupleType>()) {
+  if (CanTupleType TT = T.getAs<TupleType>()) {
     assert(!IsSelfOfNonDelegatingInitializer && "self never has tuple type");
-    for (auto &Elt : TT->getElements()) {
-      auto FieldType = Elt.getType()->getCanonicalType();
-      unsigned NumFieldElements = getElementCountRec(FieldType, false);
+    for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
+      auto FieldType = T.getTupleElementType(i);
+      unsigned NumFieldElements = getElementCountRec(Module, FieldType, false);
       if (EltNo < NumFieldElements)
-        return getElementTypeRec(FieldType, EltNo, false);
+        return getElementTypeRec(Module, FieldType, EltNo, false);
       EltNo -= NumFieldElements;
     }
     llvm::report_fatal_error("invalid element number");
@@ -123,12 +126,12 @@ static CanType getElementTypeRec(CanType T, unsigned EltNo,
   // Stored properties with tuple types are tracked with independent lifetimes
   // for each of the tuple members.
   if (IsSelfOfNonDelegatingInitializer) {
-    if (auto *NTD = cast_or_null<NominalTypeDecl>(T->getAnyNominal())) {
+    if (auto *NTD = T.getNominalOrBoundGenericNominal()) {
       for (auto *VD : NTD->getStoredProperties()) {
-        auto FieldType = VD->getType()->getCanonicalType();
-        unsigned NumFieldElements = getElementCountRec(FieldType, false);
+        auto FieldType = T.getFieldType(VD, Module);
+        unsigned NumFieldElements = getElementCountRec(Module, FieldType, false);
         if (EltNo < NumFieldElements)
-          return getElementTypeRec(FieldType, EltNo, false);
+          return getElementTypeRec(Module, FieldType, EltNo, false);
         EltNo -= NumFieldElements;
       }
       llvm::report_fatal_error("invalid element number");
@@ -141,8 +144,9 @@ static CanType getElementTypeRec(CanType T, unsigned EltNo,
 }
 
 /// getElementTypeRec - Return the swift type of the specified element.
-CanType DIMemoryObjectInfo::getElementType(unsigned EltNo) const {
-  return getElementTypeRec(getType(), EltNo, isNonDelegatingInit());
+SILType DIMemoryObjectInfo::getElementType(unsigned EltNo) const {
+  auto &Module = MemoryInst->getModule();
+  return getElementTypeRec(Module, MemorySILType, EltNo, isNonDelegatingInit());
 }
 
 /// computeTupleElementAddress - Given a tuple element number (in the flattened
@@ -150,18 +154,21 @@ CanType DIMemoryObjectInfo::getElementType(unsigned EltNo) const {
 SILValue DIMemoryObjectInfo::
 emitElementAddress(unsigned EltNo, SILLocation Loc, SILBuilder &B) const {
   SILValue Ptr = getAddress();
-  CanType PointeeType = getType();
   bool IsSelf = isNonDelegatingInit();
+  auto &Module = MemoryInst->getModule();
+
+  auto PointeeType = MemorySILType;
 
   while (1) {
     // If we have a tuple, flatten it.
-    if (CanTupleType TT = dyn_cast<TupleType>(PointeeType)) {
+    if (CanTupleType TT = PointeeType.getAs<TupleType>()) {
       assert(!IsSelf && "self never has tuple type");
 
       // Figure out which field we're walking into.
       unsigned FieldNo = 0;
-      for (auto EltTy : TT.getElementTypes()) {
-        unsigned NumSubElt = getElementCountRec(EltTy, false);
+      for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
+        auto EltTy = PointeeType.getTupleElementType(i);
+        unsigned NumSubElt = getElementCountRec(Module, EltTy, false);
         if (EltNo < NumSubElt) {
           Ptr = B.createTupleElementAddr(Loc, Ptr, FieldNo);
           PointeeType = EltTy;
@@ -178,13 +185,12 @@ emitElementAddress(unsigned EltNo, SILLocation Loc, SILBuilder &B) const {
     // classes.  Stored properties with tuple types are tracked with independent
     // lifetimes for each of the tuple members.
     if (IsSelf) {
-      if (auto *NTD =
-             cast_or_null<NominalTypeDecl>(PointeeType->getAnyNominal())) {
+      if (auto *NTD = PointeeType.getNominalOrBoundGenericNominal()) {
         if (isa<ClassDecl>(NTD) && Ptr->getType().isAddress())
           Ptr = B.createLoad(Loc, Ptr, LoadOwnershipQualifier::Unqualified);
         for (auto *VD : NTD->getStoredProperties()) {
-          auto FieldType = VD->getType()->getCanonicalType();
-          unsigned NumFieldElements = getElementCountRec(FieldType, false);
+          auto FieldType = PointeeType.getFieldType(VD, Module);
+          unsigned NumFieldElements = getElementCountRec(Module, FieldType, false);
           if (EltNo < NumFieldElements) {
             if (isa<StructDecl>(NTD))
               Ptr = B.createStructElementAddr(Loc, Ptr, VD);
@@ -212,13 +218,14 @@ emitElementAddress(unsigned EltNo, SILLocation Loc, SILBuilder &B) const {
 
 /// Push the symbolic path name to the specified element number onto the
 /// specified std::string.
-static void getPathStringToElementRec(CanType T, unsigned EltNo,
-                                      std::string &Result) {
-  if (CanTupleType TT = dyn_cast<TupleType>(T)) {
+static void getPathStringToElementRec(SILModule &Module, SILType T,
+                                      unsigned EltNo, std::string &Result) {
+  if (CanTupleType TT = T.getAs<TupleType>()) {
     unsigned FieldNo = 0;
-    for (auto &Field : TT->getElements()) {
-      CanType FieldTy = Field.getType()->getCanonicalType();
-      unsigned NumFieldElements = getElementCountRec(FieldTy, false);
+    for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
+      auto Field = TT->getElement(i);
+      SILType FieldTy = T.getTupleElementType(i);
+      unsigned NumFieldElements = getElementCountRec(Module, FieldTy, false);
       
       if (EltNo < NumFieldElements) {
         Result += '.';
@@ -226,7 +233,7 @@ static void getPathStringToElementRec(CanType T, unsigned EltNo,
           Result += Field.getName().str();
         else
           Result += llvm::utostr(FieldNo);
-        return getPathStringToElementRec(FieldTy, EltNo, Result);
+        return getPathStringToElementRec(Module, FieldTy, EltNo, Result);
       }
       
       EltNo -= NumFieldElements;
@@ -242,6 +249,8 @@ static void getPathStringToElementRec(CanType T, unsigned EltNo,
 
 ValueDecl *DIMemoryObjectInfo::
 getPathStringToElement(unsigned Element, std::string &Result) const {
+  auto &Module = MemoryInst->getModule();
+
   if (isAnyInitSelf())
     Result = "self";
   else if (ValueDecl *VD =
@@ -253,14 +262,14 @@ getPathStringToElement(unsigned Element, std::string &Result) const {
 
   // If this is indexing into a field of 'self', look it up.
   if (isNonDelegatingInit() && !isDerivedClassSelfOnly()) {
-    if (auto *NTD = cast_or_null<NominalTypeDecl>(getType()->getAnyNominal())) {
+    if (auto *NTD = MemorySILType.getNominalOrBoundGenericNominal()) {
       for (auto *VD : NTD->getStoredProperties()) {
-        auto FieldType = VD->getType()->getCanonicalType();
-        unsigned NumFieldElements = getElementCountRec(FieldType, false);
+        auto FieldType = MemorySILType.getFieldType(VD, Module);
+        unsigned NumFieldElements = getElementCountRec(Module, FieldType, false);
         if (Element < NumFieldElements) {
           Result += '.';
           Result += VD->getName().str();
-          getPathStringToElementRec(FieldType, Element, Result);
+          getPathStringToElementRec(Module, FieldType, Element, Result);
           return VD;
         }
         Element -= NumFieldElements;
@@ -269,7 +278,7 @@ getPathStringToElement(unsigned Element, std::string &Result) const {
   }
 
   // Get the path through a tuple, if relevant.
-  getPathStringToElementRec(getType(), Element, Result);
+  getPathStringToElementRec(Module, MemorySILType, Element, Result);
 
   // If we are analyzing a variable, we can generally get the decl associated
   // with it.
@@ -287,10 +296,12 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
   // can't have 'let' properties.
   if (!isNonDelegatingInit()) return IsLet;
 
-  if (auto *NTD = cast_or_null<NominalTypeDecl>(getType()->getAnyNominal())) {
+  auto &Module = MemoryInst->getModule();
+
+  if (auto *NTD = MemorySILType.getNominalOrBoundGenericNominal()) {
     for (auto *VD : NTD->getStoredProperties()) {
-      auto FieldType = VD->getType()->getCanonicalType();
-      unsigned NumFieldElements = getElementCountRec(FieldType, false);
+      auto FieldType = MemorySILType.getFieldType(VD, Module);
+      unsigned NumFieldElements = getElementCountRec(Module, FieldType, false);
       if (Element < NumFieldElements)
         return VD->isLet();
       Element -= NumFieldElements;
@@ -320,16 +331,7 @@ onlyTouchesTrivialElements(const DIMemoryObjectInfo &MI) const {
       return false;
 
     auto EltTy = MI.getElementType(i);
-
-    auto SILEltTy = EltTy;
-    // We are getting the element type from a compound type. This might not be a
-    // legal SIL type. Lower the type if it is not a legal type.
-    if (!SILEltTy->isLegalSILType())
-      SILEltTy = MI.MemoryInst->getModule()
-                     .Types.getLoweredType(EltTy, 0)
-                     .getSwiftRValueType();
-
-    if (!SILType::getPrimitiveObjectType(SILEltTy).isTrivial(Module))
+    if (!EltTy.isTrivial(Module))
       return false;
   }
   return true;
@@ -392,6 +394,7 @@ static SILValue scalarizeLoad(LoadInst *LI,
 
 namespace {
   class ElementUseCollector {
+    SILModule &Module;
     const DIMemoryObjectInfo &TheMemory;
     SmallVectorImpl<DIMemoryUse> &Uses;
     SmallVectorImpl<TermInst*> &FailableInits;
@@ -404,6 +407,15 @@ namespace {
     /// IsSelfOfNonDelegatingInitializer - This is true if we're looking at the
     /// top level of a 'self' variable in a non-delegating init method.
     bool IsSelfOfNonDelegatingInitializer;
+
+    /// How should address_to_pointer be handled?
+    ///
+    /// In DefiniteInitialization it is considered as an inout parameter to get
+    /// diagnostics about passing a let variable to an inout mutable-pointer
+    /// argument.
+    /// In PredictableMemOpt it is considered as an escape point to be
+    /// conservative.
+    bool TreatAddressToPointerAsInout;
 
     /// When walking the use list, if we index into a struct element, keep track
     /// of this, so that any indexes into tuple subelements don't affect the
@@ -418,10 +430,13 @@ namespace {
                         SmallVectorImpl<DIMemoryUse> &Uses,
                         SmallVectorImpl<TermInst*> &FailableInits,
                         SmallVectorImpl<SILInstruction*> &Releases,
-                        bool isDefiniteInitFinished)
-      : TheMemory(TheMemory), Uses(Uses),
+                        bool isDefiniteInitFinished,
+                        bool TreatAddressToPointerAsInout)
+      : Module(TheMemory.MemoryInst->getModule()),
+        TheMemory(TheMemory), Uses(Uses),
         FailableInits(FailableInits), Releases(Releases),
-        isDefiniteInitFinished(isDefiniteInitFinished) {
+        isDefiniteInitFinished(isDefiniteInitFinished),
+        TreatAddressToPointerAsInout(TreatAddressToPointerAsInout) {
     }
 
     /// This is the main entry point for the use walker.  It collects uses from
@@ -495,7 +510,7 @@ void ElementUseCollector::addElementUses(unsigned BaseEltNo, SILType UseTy,
   // things that come after it in a parent tuple.
   unsigned NumElements = 1;
   if (TheMemory.NumElements != 1 && !InStructSubElement && !InEnumSubElement)
-    NumElements = getElementCountRec(UseTy.getSwiftRValueType(),
+    NumElements = getElementCountRec(Module, UseTy,
                                      IsSelfOfNonDelegatingInitializer);
   
   Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, NumElements));
@@ -518,10 +533,12 @@ collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseEltNo) {
   // tuple_element_addr P, 42 indexes into the current tuple element.
   // Recursively process its uses with the adjusted element number.
   unsigned FieldNo = TEAI->getFieldNo();
-  auto *TT = TEAI->getTupleType();
-  for (unsigned i = 0; i != FieldNo; ++i) {
-    CanType EltTy = TT->getElementType(i)->getCanonicalType();
-    BaseEltNo += getElementCountRec(EltTy, false);
+  auto T = TEAI->getOperand()->getType();
+  if (T.is<TupleType>()) {
+    for (unsigned i = 0; i != FieldNo; ++i) {
+      SILType EltTy = T.getTupleElementType(i);
+      BaseEltNo += getElementCountRec(Module, EltTy, false);
+    }
   }
   
   collectUses(TEAI, BaseEltNo);
@@ -546,8 +563,8 @@ void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
     if (SEAI->getField() == VD)
       break;
 
-    auto FieldType = VD->getType()->getCanonicalType();
-    BaseEltNo += getElementCountRec(FieldType, false);
+    auto FieldType = SEAI->getOperand()->getType().getFieldType(VD, Module);
+    BaseEltNo += getElementCountRec(Module, FieldType, false);
   }
 
   collectUses(SEAI, BaseEltNo);
@@ -708,11 +725,11 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     // Note that partial_apply instructions always close over their argument.
     //
     if (auto *Apply = dyn_cast<ApplyInst>(User)) {
-      auto FTI = Apply->getSubstCalleeType();
+      auto substConv = Apply->getSubstCalleeConv();
       unsigned ArgumentNumber = UI->getOperandNumber()-1;
 
       // If this is an out-parameter, it is like a store.
-      unsigned NumIndirectResults = FTI->getNumIndirectResults();
+      unsigned NumIndirectResults = substConv.getNumIndirectSILResults();
       if (ArgumentNumber < NumIndirectResults) {
         assert(!InStructSubElement && "We're initializing sub-members?");
         addElementUses(BaseEltNo, PointeeType, User,
@@ -724,14 +741,13 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         ArgumentNumber -= NumIndirectResults;
       }
 
-      auto ParamConvention = FTI->getParameters()[ArgumentNumber]
-        .getConvention();
+      auto ParamConvention =
+          substConv.getParameters()[ArgumentNumber].getConvention();
 
       switch (ParamConvention) {
       case ParameterConvention::Direct_Owned:
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Direct_Guaranteed:
-      case ParameterConvention::Direct_Deallocating:
         llvm_unreachable("address value passed to indirect parameter");
 
       // If this is an in-parameter, it is like a load.
@@ -759,7 +775,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       llvm_unreachable("bad parameter convention");
     }
     
-    if (isa<AddressToPointerInst>(User)) {
+    if (isa<AddressToPointerInst>(User) && TreatAddressToPointerAsInout) {
       // address_to_pointer is a mutable escape, which we model as an inout use.
       addElementUses(BaseEltNo, PointeeType, User, DIUseKind::InOutUse);
       continue;
@@ -957,11 +973,12 @@ void ElementUseCollector::collectClassSelfUses() {
   llvm::SmallDenseMap<VarDecl*, unsigned> EltNumbering;
 
   {
-    auto *NTD = cast<NominalTypeDecl>(TheMemory.getType()->getAnyNominal());
+    SILType T = TheMemory.MemorySILType;
+    auto *NTD = T.getNominalOrBoundGenericNominal();
     unsigned NumElements = 0;
     for (auto *VD : NTD->getStoredProperties()) {
       EltNumbering[VD] = NumElements;
-      NumElements += getElementCountRec(VD->getType()->getCanonicalType(),
+      NumElements += getElementCountRec(Module, T.getFieldType(VD, Module),
                                         false);
     }
   }
@@ -1489,7 +1506,9 @@ void swift::collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
                                      SmallVectorImpl<DIMemoryUse> &Uses,
                                      SmallVectorImpl<TermInst*> &FailableInits,
                                      SmallVectorImpl<SILInstruction*> &Releases,
-                                     bool isDIFinished) {
-  ElementUseCollector(MemoryInfo, Uses, FailableInits, Releases, isDIFinished)
+                                     bool isDIFinished,
+                                     bool TreatAddressToPointerAsInout) {
+  ElementUseCollector(MemoryInfo, Uses, FailableInits, Releases, isDIFinished,
+                      TreatAddressToPointerAsInout)
       .collectFrom();
 }

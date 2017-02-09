@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,7 +21,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Casting.h"
 #include "swift/ABI/MetadataValues.h"
-#include "swift/Basic/Unreachable.h"
+#include "swift/Runtime/Unreachable.h"
 
 #include <iostream>
 
@@ -783,7 +783,7 @@ public:
 #include "swift/Reflection/TypeRefs.def"
     }
 
-    swift_unreachable("Unhandled TypeRefKind in switch.");
+    swift_runtime_unreachable("Unhandled TypeRefKind in switch.");
   }
 };
 

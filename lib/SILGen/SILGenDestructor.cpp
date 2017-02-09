@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -59,7 +59,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
     SILValue baseSelf = B.createUpcast(cleanupLoc, selfValue, baseSILTy);
     ManagedValue dtorValue;
     SILType dtorTy;
-    ArrayRef<Substitution> subs
+    SubstitutionList subs
       = superclassTy->gatherAllSubstitutions(SGM.M.getSwiftModule(), nullptr);
     std::tie(dtorValue, dtorTy, subs)
       = emitSiblingMethodRef(cleanupLoc, baseSelf, dtorConstant, subs);
@@ -91,7 +91,7 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
   auto classTy = selfValue->getType();
   ManagedValue dtorValue;
   SILType dtorTy;
-  ArrayRef<Substitution> subs = classTy.gatherAllSubstitutions(SGM.M);
+  SubstitutionList subs = classTy.gatherAllSubstitutions(SGM.M);
   std::tie(dtorValue, dtorTy, subs)
     = emitSiblingMethodRef(loc, selfValue, dtorConstant, subs);
 
@@ -185,14 +185,14 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // Call the superclass's -dealloc.
   SILType superclassSILTy = getLoweredLoadableType(superclassTy);
   SILValue superSelf = B.createUpcast(cleanupLoc, selfValue, superclassSILTy);
-  ArrayRef<Substitution> subs
+  SubstitutionList subs
     = superclassTy->gatherAllSubstitutions(SGM.M.getSwiftModule(), nullptr);
   auto substDtorType = superclassDtorType.castTo<SILFunctionType>()
     ->substGenericArgs(SGM.M, subs);
+  SILFunctionConventions dtorConv(substDtorType, SGM.M);
   B.createApply(cleanupLoc, superclassDtorValue,
                 SILType::getPrimitiveObjectType(substDtorType),
-                substDtorType->getSILResult(),
-                subs, superSelf);
+                dtorConv.getSILResultType(), subs, superSelf);
 
   // Return.
   B.createReturn(returnLoc, emitEmptyTuple(cleanupLoc));

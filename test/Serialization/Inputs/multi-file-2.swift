@@ -1,5 +1,5 @@
-// Do not put any classes in this file. It's part of the test that no classes
-// get serialized here.
+// Do not put any protocols in this file. It's part of the test that no
+// protocols get serialized here.
 
 enum TheEnum {
   case A, B, C(MyClass)
@@ -27,4 +27,9 @@ public func hasLocal() {
   // Make sure we can handle the == of local enums.
   useEquatable(LocalEnum.A)
   useEquatable(Wrapper.LocalEnum.A)
+}
+
+class Base {
+  class var conflict: Int { return 0 }
+  var conflict: Int { return 1 }
 }

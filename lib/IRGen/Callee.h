@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -63,7 +63,7 @@ namespace irgen {
     /// Prepare a callee for a known function with a known data pointer.
     static Callee forKnownFunction(CanSILFunctionType origFnType,
                                    CanSILFunctionType substFnType,
-                                   ArrayRef<Substitution> subs,
+                                   SubstitutionList subs,
                                    llvm::Value *fn, llvm::Value *data,
                                    ForeignFunctionInfo foreignInfo) {
       // Invariant on the function pointer.
@@ -89,7 +89,7 @@ namespace irgen {
     CanSILFunctionType getSubstFunctionType() const { return SubstFnType; }
 
     bool hasSubstitutions() const { return !Substitutions.empty(); }
-    ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
+    SubstitutionList getSubstitutions() const { return Substitutions; }
 
     llvm::Value *getFunction() const { return FnPtr; }
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -396,7 +396,7 @@ static SILInstruction *createEnumElement(SILBuilder &Builder,
   auto EnumVal = SEI->getOperand();
   // Do we have a payload.
   auto EnumTy = EnumVal->getType();
-  if (EnumElement->hasArgumentType()) {
+  if (EnumElement->getArgumentInterfaceType()) {
     auto Ty = EnumTy.getEnumElementType(EnumElement, SEI->getModule());
     SILValue UED(Builder.createUncheckedEnumData(SEI->getLoc(), EnumVal,
                                                  EnumElement, Ty));
@@ -1580,7 +1580,7 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
     return true;
   }
 
-  if (!Element || !Element->hasArgumentType() || Dest->args_empty()) {
+  if (!Element || !Element->getArgumentInterfaceType() || Dest->args_empty()) {
     assert(Dest->args_empty() && "Unexpected argument at destination!");
 
     SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), Dest);
@@ -1883,11 +1883,12 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
     return false;
 
   // Check that the argument types are matching.
+  SILModuleConventions silConv(TAI->getModule());
   for (unsigned Idx = 0; Idx < numParams; Idx++) {
     if (!canCastValueToABICompatibleType(
-          TAI->getModule(),
-          OrigFnTy->getParameters()[Idx].getSILType(),
-          TargetFnTy->getParameters()[Idx].getSILType()))
+            TAI->getModule(),
+            silConv.getSILType(OrigFnTy->getParameters()[Idx]),
+            silConv.getSILType(TargetFnTy->getParameters()[Idx])))
       return false;
   }
 
@@ -1931,8 +1932,8 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
       isTryApplyWithUnreachableError(TAI, Callee, CalleeType)) {
 
     auto CalleeFnTy = cast<SILFunctionType>(CalleeType.getSwiftRValueType());
-
-    auto ResultTy = CalleeFnTy->getSILResult();
+    SILFunctionConventions calleeConv(CalleeFnTy, TAI->getModule());
+    auto ResultTy = calleeConv.getSILResultType();
     auto OrigResultTy = TAI->getNormalBB()->getArgument(0)->getType();
 
     // Bail if the cast between the actual and expected return types cannot
@@ -1943,12 +1944,12 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
 
     SILBuilderWithScope Builder(TAI);
 
-    auto TargetFnTy = dyn_cast<SILFunctionType>(
-                        CalleeType.getSwiftRValueType());
+    auto TargetFnTy = CalleeFnTy;
     if (TargetFnTy->isPolymorphic()) {
       TargetFnTy = TargetFnTy->substGenericArgs(TAI->getModule(),
                                                 TAI->getSubstitutions());
     }
+    SILFunctionConventions targetConv(TargetFnTy, TAI->getModule());
 
     auto OrigFnTy = dyn_cast<SILFunctionType>(
         TAI->getCallee()->getType().getSwiftRValueType());
@@ -1956,6 +1957,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
       OrigFnTy = OrigFnTy->substGenericArgs(TAI->getModule(),
                                             TAI->getSubstitutions());
     }
+    SILFunctionConventions origConv(OrigFnTy, TAI->getModule());
 
     unsigned numArgs = TAI->getNumArguments();
 
@@ -1965,8 +1967,8 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     // sure that we don't crash.
     for (unsigned i = 0; i < numArgs; ++i) {
       if (!canCastValueToABICompatibleType(TAI->getModule(),
-                                           OrigFnTy->getSILArgumentType(i),
-                                           TargetFnTy->getSILArgumentType(i))) {
+                                           origConv.getSILArgumentType(i),
+                                           targetConv.getSILArgumentType(i))) {
         return false;
       }
     }
@@ -1976,14 +1978,14 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
       auto Arg = TAI->getArgument(i);
       // Cast argument if required.
       Arg = castValueToABICompatibleType(&Builder, TAI->getLoc(), Arg,
-                                         OrigFnTy->getSILArgumentType(i),
-                                         TargetFnTy->getSILArgumentType(i))
-        .getValue();
+                                         origConv.getSILArgumentType(i),
+                                         targetConv.getSILArgumentType(i))
+                .getValue();
       Args.push_back(Arg);
     }
 
-    assert (CalleeFnTy->getNumSILArguments() == Args.size() &&
-            "The number of arguments should match");
+    assert(calleeConv.getNumSILArguments() == Args.size()
+           && "The number of arguments should match");
 
     DEBUG(llvm::dbgs() << "replace with apply: " << *TAI);
     ApplyInst *NewAI = Builder.createApply(TAI->getLoc(), Callee,
@@ -2456,7 +2458,7 @@ private:
   void replaceIncomingArgs(SILBuilder &B, CondBranchInst *CBI,
                            llvm::SmallVectorImpl<SILValue> &NewIncomingValues);
 };
-}
+} // end anonymous namespace
 
 void ArgumentSplitter::replaceIncomingArgs(
     SILBuilder &B, BranchInst *BI,
@@ -2547,7 +2549,8 @@ bool ArgumentSplitter::createNewArguments() {
   // old one.
   llvm::SmallVector<SILValue, 4> NewArgumentValues;
   for (auto &P : Projections) {
-    auto *NewArg = ParentBB->createArgument(P.getType(Ty, Mod), nullptr);
+    auto *NewArg = ParentBB->createPHIArgument(P.getType(Ty, Mod),
+                                               ValueOwnershipKind::Owned);
     // This is unfortunate, but it feels wrong to put in an API into SILBuilder
     // that only takes in arguments.
     //
@@ -3323,7 +3326,8 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   // the uses in this block, and then rewrite the branch operands.
   DEBUG(llvm::dbgs() << "unwrap argument:" << *A);
   A->replaceAllUsesWith(SILUndef::get(A->getType(), BB->getModule()));
-  auto *NewArg = BB->replaceArgument(i, User->getType());
+  auto *NewArg =
+      BB->replacePHIArgument(i, User->getType(), ValueOwnershipKind::Owned);
   User->replaceAllUsesWith(NewArg);
 
   // Rewrite the branch operand for each incoming branch.
@@ -3552,7 +3556,7 @@ public:
   StringRef getName() override { return "Move Cond Fail To Preds"; }
 };
 
-} // End anonymous namespace.
+} // end anonymous namespace
 
 /// Splits all critical edges in a function.
 SILTransform *swift::createSplitAllCriticalEdges() {

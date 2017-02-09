@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -11,8 +11,8 @@ func trap() -> Never {
 // CHECK: bb0({{%.*}} : $Int32, {{%.*}} : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
 
 // -- initialize x
-// CHECK: alloc_global @_Tv8toplevel1xSi
-// CHECK: [[X:%[0-9]+]] = global_addr @_Tv8toplevel1xSi : $*Int
+// CHECK: alloc_global @_T08toplevel1xSiv
+// CHECK: [[X:%[0-9]+]] = global_addr @_T08toplevel1xSiv : $*Int
 // CHECK: integer_literal $Builtin.Int2048, 999
 // CHECK: store {{.*}} to [trivial] [[X]]
 
@@ -25,7 +25,7 @@ func print_x() {
 // -- assign x
 // CHECK: integer_literal $Builtin.Int2048, 0
 // CHECK: assign {{.*}} to [[X]]
-// CHECK: [[PRINT_X:%[0-9]+]] = function_ref @_TF8toplevel7print_xFT_T_ :
+// CHECK: [[PRINT_X:%[0-9]+]] = function_ref @_T08toplevel7print_xyyF :
 // CHECK: apply [[PRINT_X]]
 
 
@@ -33,8 +33,8 @@ x = 0
 print_x()
 
 // <rdar://problem/19770775> Deferred initialization of let bindings rejected at top level in playground
-// CHECK: alloc_global @_Tv8toplevel5countSi
-// CHECK: [[COUNTADDR:%[0-9]+]] = global_addr @_Tv8toplevel5countSi : $*Int
+// CHECK: alloc_global @_T08toplevel5countSiv
+// CHECK: [[COUNTADDR:%[0-9]+]] = global_addr @_T08toplevel5countSiv : $*Int
 // CHECK-NEXT: [[COUNTMUI:%[0-9]+]] = mark_uninitialized [var] [[COUNTADDR]] : $*Int
 let count: Int
 // CHECK: cond_br
@@ -62,11 +62,11 @@ func print_y() {
 
 
 // -- assign y
-// CHECK: alloc_global @_Tv8toplevel1ySi
-// CHECK: [[Y1:%[0-9]+]] = global_addr @_Tv8toplevel1ySi : $*Int
+// CHECK: alloc_global @_T08toplevel1ySiv
+// CHECK: [[Y1:%[0-9]+]] = global_addr @_T08toplevel1ySiv : $*Int
 // CHECK: [[Y:%[0-9]+]] = mark_uninitialized [var] [[Y1]]
 // CHECK: assign {{.*}} to [[Y]]
-// CHECK: [[PRINT_Y:%[0-9]+]] = function_ref @_TF8toplevel7print_yFT_T_
+// CHECK: [[PRINT_Y:%[0-9]+]] = function_ref @_T08toplevel7print_yyyF
 y = 1
 print_y()
 
@@ -76,7 +76,7 @@ print_y()
 // CHECK: [[SOME_CASE]]([[VALUE:%.+]] : $A):
 // CHECK: store [[VALUE]] to [init] [[BOX:%.+]] : $*A
 // CHECK-NOT: destroy_value
-// CHECK: [[SINK:%.+]] = function_ref @_TF8toplevel8markUsedurFxT_
+// CHECK: [[SINK:%.+]] = function_ref @_T08toplevel8markUsedyxlF
 // CHECK-NOT: destroy_value
 // CHECK: apply [[SINK]]<A>({{%.+}})
 class A {}
@@ -84,8 +84,8 @@ guard var a = Optional(A()) else { trap() }
 markUsed(a)
 
 
-// CHECK: alloc_global @_Tv8toplevel21NotInitializedIntegerSi
-// CHECK-NEXT: [[VARADDR:%[0-9]+]] = global_addr @_Tv8toplevel21NotInitializedIntegerSi
+// CHECK: alloc_global @_T08toplevel21NotInitializedIntegerSiv
+// CHECK-NEXT: [[VARADDR:%[0-9]+]] = global_addr @_T08toplevel21NotInitializedIntegerSiv
 // CHECK-NEXT: [[VARMUI:%[0-9]+]] = mark_uninitialized [var] [[VARADDR]] : $*Int
 // CHECK-NEXT: mark_function_escape [[VARMUI]] : $*Int
 
@@ -109,13 +109,13 @@ fooUsesUninitializedValue()
 
 
 
-// CHECK-LABEL: sil hidden @_TF8toplevel7print_xFT_T_
+// CHECK-LABEL: sil hidden @_T08toplevel7print_xyyF
 
-// CHECK-LABEL: sil hidden @_TF8toplevel7print_yFT_T_
+// CHECK-LABEL: sil hidden @_T08toplevel7print_yyyF
 
-// CHECK: sil hidden @_TF8toplevel13testGlobalCSEFT_Si
+// CHECK: sil hidden @_T08toplevel13testGlobalCSESiyF
 // CHECK-NOT: global_addr
-// CHECK: %0 = global_addr @_Tv8toplevel1xSi : $*Int
+// CHECK: %0 = global_addr @_T08toplevel1xSiv : $*Int
 // CHECK-NOT: global_addr
 // CHECK: return
 func testGlobalCSE() -> Int {

@@ -94,6 +94,186 @@ let _: () -> Int = {
 }
 
 //===----------------------------------------------------------------------===//
+// Members of archetypes
+//===----------------------------------------------------------------------===//
+
+func id<T>(_ t: T) -> T { return t }
+
+protocol Initable {
+  init()
+}
+
+protocol P : Initable {
+  func bar(_ x: Int)
+  mutating func mut(_ x: Int)
+  static func tum()
+}
+
+protocol ClassP : class {
+  func bas(_ x: Int)
+  func quux(_ x: Int)
+}
+
+class ClassC : ClassP {
+  func bas(_ x: Int) {}
+}
+
+extension ClassP {
+  func quux(_ x: Int) {}
+  func bing(_ x: Int) {}
+}
+
+func generic<T: P>(_ t: T) {
+  var t = t
+  // Instance member of archetype
+  let _: (Int) -> () = id(t.bar)
+  let _: () = id(t.bar(0))
+
+  // Static member of archetype metatype
+  let _: () -> () = id(T.tum)
+
+  // Instance member of archetype metatype
+  let _: (T) -> (Int) -> () = id(T.bar)
+  let _: (Int) -> () = id(T.bar(t))
+
+  _ = t.mut // expected-error{{partial application of 'mutating' method is not allowed}}
+  _ = t.tum // expected-error{{static member 'tum' cannot be used on instance of type 'T'}}
+}
+
+func genericClassP<T: ClassP>(_ t: T) {
+  // Instance member of archetype)
+  let _: (Int) -> () = id(t.bas)
+  let _: () = id(t.bas(0))
+
+  // Instance member of archetype metatype)
+  let _: (T) -> (Int) -> () = id(T.bas)
+  let _: (Int) -> () = id(T.bas(t))
+  let _: () = id(T.bas(t)(1))
+}
+
+func genericClassC<C : ClassC>(_ c: C) {
+  // Make sure that we can find members of protocol extensions
+  // on a class-bound archetype
+  let _ = c.bas(123)
+  let _ = c.quux(123)
+  let _ = c.bing(123)
+}
+
+//===----------------------------------------------------------------------===//
+// Members of existentials
+//===----------------------------------------------------------------------===//
+
+func existential(_ p: P) {
+  var p = p
+  // Fully applied mutating method
+  p.mut(1)
+  _ = p.mut // expected-error{{partial application of 'mutating' method is not allowed}}
+
+  // Instance member of existential)
+  let _: (Int) -> () = id(p.bar)
+  let _: () = id(p.bar(0))
+
+  // Static member of existential metatype)
+  let _: () -> () = id(type(of: p).tum)
+}
+
+func staticExistential(_ p: P.Type, pp: P.Protocol) {
+  let _ = p() // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+  let _ = p().bar // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+  let _ = p().bar(1) // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+
+  let ppp: P = p.init()
+
+  _ = pp() // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}} // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+  _ = pp().bar // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}} // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+  _ = pp().bar(2) // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}} // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+
+  _ = pp.init() // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
+  _ = pp.init().bar // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
+  _ = pp.init().bar(3) // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
+
+  _ = P() // expected-error{{protocol type 'P' cannot be instantiated}}
+  _ = P().bar // expected-error{{protocol type 'P' cannot be instantiated}}
+  _ = P().bar(4) // expected-error{{protocol type 'P' cannot be instantiated}}
+
+  // Instance member of metatype
+  let _: (P) -> (Int) -> () = P.bar
+  let _: (Int) -> () = P.bar(ppp)
+  P.bar(ppp)(5)
+
+  // Instance member of metatype value
+  let _: (P) -> (Int) -> () = pp.bar
+  let _: (Int) -> () = pp.bar(ppp)
+  pp.bar(ppp)(5)
+
+  // Static member of existential metatype value
+  let _: () -> () = p.tum
+
+  // Instance member of existential metatype -- not allowed
+  _ = p.bar // expected-error{{instance member 'bar' cannot be used on type 'P'}}
+  _ = p.mut // expected-error{{instance member 'mut' cannot be used on type 'P'}}
+
+  // Static member of metatype -- not allowed
+  _ = pp.tum // expected-error{{static member 'tum' cannot be used on protocol metatype 'P.Protocol'}}
+  _ = P.tum // expected-error{{static member 'tum' cannot be used on protocol metatype 'P.Protocol'}}
+}
+
+protocol StaticP {
+  static func foo(a: Int)
+}
+extension StaticP {
+  func bar() {
+    _ = StaticP.foo(a:) // expected-error{{static member 'foo(a:)' cannot be used on protocol metatype 'StaticP.Protocol'}} {{9-16=Self}}
+
+    func nested() {
+      _ = StaticP.foo(a:) // expected-error{{static member 'foo(a:)' cannot be used on protocol metatype 'StaticP.Protocol'}} {{11-18=Self}}
+    }
+  }
+}
+
+func existentialClassP(_ p: ClassP) {
+  // Instance member of existential)
+  let _: (Int) -> () = id(p.bas)
+  let _: () = id(p.bas(0))
+
+  // Instance member of existential metatype)
+  let _: (ClassP) -> (Int) -> () = id(ClassP.bas)
+  let _: (Int) -> () = id(ClassP.bas(p))
+  let _: () = id(ClassP.bas(p)(1))
+}
+
+// Partial application of curried protocol methods
+protocol Scalar {}
+protocol Vector {
+  func scale(_ c: Scalar) -> Self
+}
+protocol Functional {
+  func apply(_ v: Vector) -> Scalar
+}
+protocol Coalgebra {
+  func coproduct(_ f: Functional) -> (_ v1: Vector, _ v2: Vector) -> Scalar
+}
+
+// Make sure existential is closed early when we partially apply
+func wrap<T>(_ t: T) -> T {
+  return t
+}
+
+func exercise(_ c: Coalgebra, f: Functional, v: Vector) {
+  let _: (Vector, Vector) -> Scalar = wrap(c.coproduct(f))
+  let _: (Scalar) -> Vector = v.scale
+}
+
+// Make sure existential isn't closed too late
+protocol Copyable {
+  func copy() -> Self
+}
+
+func copyTwice(_ c: Copyable) -> Copyable {
+  return c.copy().copy()
+}
+
+//===----------------------------------------------------------------------===//
 // Dynamic self
 //===----------------------------------------------------------------------===//
 protocol Clonable {
@@ -101,18 +281,87 @@ protocol Clonable {
   func doubleMaybeClone() -> Self??
   func subdivideClone() -> (Self, Self)
   func metatypeOfClone() -> Self.Type
-  func badClonerFn() -> ((Self) -> Self)
-  func veryBadClonerFn() -> ((inout Self) -> ())
   func goodClonerFn() -> (() -> Self)
 }
 
-func testClonable(_ v : Clonable) { // expected-error {{protocol 'Clonable' can only be used as a generic constraint because it has Self or associated type requirements}}
-  let v2 = v.maybeClone()
-  let v3 = v.doubleMaybeClone()
-  let v4 = v.subdivideClone()
-  let v5 = v.metatypeOfClone()
-  let v6 = v.goodClonerFn()
+extension Clonable {
+  func badClonerFn() -> ((Self) -> Self) { }
 
-  let v7 = v.badClonerFn() // expected-error {{member 'badClonerFn' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
-  let v8 = v.veryBadClonerFn() // expected-error {{member 'veryBadClonerFn' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
+  func veryBadClonerFn() -> ((inout Self) -> ()) { }
+
+  func extClone() -> Self { }
+
+  func extMaybeClone(_ b: Bool) -> Self? { }
+
+  func extProbablyClone(_ b: Bool) -> Self! { }
+
+  static func returnSelfStatic() -> Self { }
+
+  static func returnSelfOptionalStatic(_ b: Bool) -> Self? { }
+
+  static func returnSelfIUOStatic(_ b: Bool) -> Self! { }
+}
+
+func testClonableArchetype<T : Clonable>(_ t: T) {
+  // Instance member of extension returning Self)
+  let _: (T) -> () -> T = id(T.extClone)
+  let _: () -> T = id(T.extClone(t))
+  let _: T = id(T.extClone(t)())
+
+  let _: () -> T = id(t.extClone)
+  let _: T = id(t.extClone())
+
+  let _: (T) -> (Bool) -> T? = id(T.extMaybeClone)
+  let _: (Bool) -> T? = id(T.extMaybeClone(t))
+  let _: T? = id(T.extMaybeClone(t)(false))
+
+  let _: (Bool) -> T? = id(t.extMaybeClone)
+  let _: T? = id(t.extMaybeClone(true))
+
+  let _: (T) -> (Bool) -> T! = id(T.extProbablyClone)
+  let _: (Bool) -> T! = id(T.extProbablyClone(t))
+  let _: T! = id(T.extProbablyClone(t)(true))
+
+  let _: (Bool) -> T! = id(t.extProbablyClone)
+  let _: T! = id(t.extProbablyClone(true))
+
+  // Static member of extension returning Self)
+  let _: () -> T = id(T.returnSelfStatic)
+  let _: T = id(T.returnSelfStatic())
+
+  let _: (Bool) -> T? = id(T.returnSelfOptionalStatic)
+  let _: T? = id(T.returnSelfOptionalStatic(false))
+
+  let _: (Bool) -> T! = id(T.returnSelfIUOStatic)
+  let _: T! = id(T.returnSelfIUOStatic(true))
+}
+
+func testClonableExistential(_ v: Clonable, _ vv: Clonable.Type) {
+  let _: Clonable? = v.maybeClone()
+  let _: Clonable?? = v.doubleMaybeClone()
+  // FIXME: Tuple-to-tuple conversions are not implemented
+  let _: (Clonable, Clonable) = v.subdivideClone()
+  // expected-error@-1{{cannot express tuple conversion '(Clonable, Clonable)' to '(Clonable, Clonable)'}}
+  let _: Clonable.Type = v.metatypeOfClone()
+  let _: () -> Clonable = v.goodClonerFn()
+
+  // Instance member of extension returning Self
+  let _: () -> Clonable = id(v.extClone)
+  let _: Clonable = id(v.extClone())
+  let _: Clonable? = id(v.extMaybeClone(true))
+  let _: Clonable! = id(v.extProbablyClone(true))
+
+  // Static member of extension returning Self)
+  let _: () -> Clonable = id(vv.returnSelfStatic)
+  let _: Clonable = id(vv.returnSelfStatic())
+
+  let _: (Bool) -> Clonable? = id(vv.returnSelfOptionalStatic)
+  let _: Clonable? = id(vv.returnSelfOptionalStatic(false))
+
+  let _: (Bool) -> Clonable! = id(vv.returnSelfIUOStatic)
+  let _: Clonable! = id(vv.returnSelfIUOStatic(true))
+
+  let _ = v.badClonerFn() // expected-error {{member 'badClonerFn' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
+  let _ = v.veryBadClonerFn() // expected-error {{member 'veryBadClonerFn' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
+
 }

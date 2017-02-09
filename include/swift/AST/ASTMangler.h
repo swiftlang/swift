@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -39,7 +39,7 @@ protected:
   const DeclContext *DeclCtx = nullptr;
 
   /// Optimize out protocol names if a type only conforms to one protocol.
-  bool OptimizeProtocolNames;
+  bool OptimizeProtocolNames = true;
 
   /// If enabled, Arche- and Alias types are mangled with context.
   bool DWARFMangling;
@@ -55,10 +55,8 @@ public:
   };
 
   ASTMangler(bool DWARFMangling = false,
-          bool usePunycode = true,
-          bool OptimizeProtocolNames = true)
+          bool usePunycode = true)
     : Mangler(usePunycode),
-      OptimizeProtocolNames(OptimizeProtocolNames),
       DWARFMangling(DWARFMangling) {}
 
   std::string mangleClosureEntity(const AbstractClosureExpr *closure,
@@ -109,17 +107,24 @@ public:
   std::string mangleGlobalInit(const VarDecl *decl, int counter,
                                bool isInitFunc);
 
-  std::string mangleReabstructionThunkHelper(CanSILFunctionType ThunkType,
+  std::string mangleReabstractionThunkHelper(CanSILFunctionType ThunkType,
                                              Type FromType, Type ToType,
                                              ModuleDecl *Module);
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
 
-  std::string mangleTypeAsUSR(Type type);
+  std::string mangleTypeAsUSR(Type type) {
+    return mangleTypeWithoutPrefix(type);
+  }
 
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
   std::string mangleDeclAsUSR(ValueDecl *Decl, StringRef USRPrefix);
+
+  std::string mangleAccessorEntityAsUSR(AccessorKind kind,
+                                        AddressorKind addressorKind,
+                                        const ValueDecl *decl,
+                                        StringRef USRPrefix);
 
 protected:
 
@@ -149,7 +154,7 @@ protected:
     appendType(BlandTy);
   }
 
-  void appendBoundGenericArgs(Type type);
+  void appendBoundGenericArgs(Type type, bool &isFirstArgList);
 
   void appendImplFunctionType(SILFunctionType *fn);
 
@@ -218,7 +223,12 @@ protected:
 
   void appendProtocolConformance(const ProtocolConformance *conformance);
 
-  static bool checkGenericParamsOrder(ArrayRef<GenericTypeParamType *> params);
+  void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
+
+  std::string mangleTypeWithoutPrefix(Type type) {
+    appendType(type);
+    return finalize();
+  }
 };
 
 } // end namespace NewMangling

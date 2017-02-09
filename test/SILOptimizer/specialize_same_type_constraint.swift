@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -O -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests  -O -emit-sil -primary-file %s | %FileCheck %s
 
 protocol FirstChild {}
 
@@ -45,9 +45,9 @@ struct ConcreteSecondParent<T> : SecondParent {
 doStuff(f: ConcreteFirstParent<ConcreteChild>(),
         s: ConcreteSecondParent<ConcreteChild>())
 
-// CHECK-LABEL: sil shared [noinline] @_TTSf4d_d___TTSg5GV31specialize_same_type_constraint19ConcreteFirstParentVS_13ConcreteChild_GS0_S1__S_11FirstParentS__GVS_20ConcreteSecondParentS1__GS3_S1__S_12SecondParentS____TF31specialize_same_type_constraint7doStuffu0_RxS_11FirstParent_S_12SecondParentwx5Childzw_5ChildrFT1fx1sq__T_
-// CHECK: [[FIRST:%.*]] = function_ref @_TF31specialize_same_type_constraint15takesFirstChilduRxS_10FirstChildrFT1tx_T_
+// CHECK-LABEL: sil shared [noinline] @_T031specialize_same_type_constraint7doStuffyx1f_q_1stAA11FirstParentRzAA06SecondH0R_5ChildQy_AGRtzr0_lFAA08ConcretegH0VyAA0kJ0VG_AA0kiH0VyAMGTg5Tf4dd_n : $@convention(thin) () -> () {
+// CHECK: [[FIRST:%.*]] = function_ref @_T031specialize_same_type_constraint15takesFirstChildyx1t_tAA0fG0RzlF
 // CHECK: apply [[FIRST]]<ConcreteChild>({{.*}}) : $@convention(thin) <τ_0_0 where τ_0_0 : FirstChild> (@in τ_0_0) -> ()
-// CHECK: [[SECOND:%.*]] = function_ref @_TF31specialize_same_type_constraint16takesSecondChilduRxS_11SecondChildrFT1tx_T_
+// CHECK: [[SECOND:%.*]] = function_ref @_T031specialize_same_type_constraint16takesSecondChildyx1t_tAA0fG0RzlF
 // CHECK: apply [[SECOND]]<ConcreteChild>({{.*}}) : $@convention(thin) <τ_0_0 where τ_0_0 : SecondChild> (@in τ_0_0) -> ()
 // CHECK: return

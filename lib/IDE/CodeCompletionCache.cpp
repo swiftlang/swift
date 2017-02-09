@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -77,7 +77,7 @@ void CodeCompletionCache::setImpl(const Key &K, ValueRefCntPtr V,
 
     llvm::sys::fs::file_status ModuleStatus;
     if (llvm::sys::fs::status(K.ModuleFilename, ModuleStatus)) {
-      V->ModuleModificationTime = llvm::sys::TimeValue::now();
+      V->ModuleModificationTime = std::chrono::system_clock::now();
       return;
     } else {
       V->ModuleModificationTime = ModuleStatus.getLastModificationTime();
@@ -153,7 +153,8 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     if (!allowOutOfDate) {
       llvm::sys::fs::file_status status;
       if (llvm::sys::fs::status(K.ModuleFilename, status) ||
-          status.getLastModificationTime().toEpochTime() != mtime) {
+          status.getLastModificationTime().time_since_epoch().count() !=
+          std::chrono::nanoseconds(mtime).count()) {
         return false; // Out of date, or doesn't exist.
       }
     }
@@ -293,7 +294,8 @@ static void writeCachedModule(llvm::raw_ostream &out,
   // HEADER
   // Metadata required for reading the completions.
   LE.write(onDiskCompletionCacheVersion);           // Version
-  LE.write(V.ModuleModificationTime.toEpochTime()); // Mtime for module file
+  auto mtime = V.ModuleModificationTime.time_since_epoch().count();
+  LE.write(mtime);                                  // Mtime for module file
 
   // KEY
   // We don't need the stored key to load the results, but it is useful if we

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -213,7 +213,7 @@ _swift_allocError_(const Metadata *type,
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" auto *_swift_allocError = _swift_allocError_;
+auto *_swift_allocError = _swift_allocError_;
 
 BoxPair::Return
 swift::swift_allocError(const Metadata *type,
@@ -231,7 +231,7 @@ _swift_deallocError_(SwiftError *error,
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" auto *_swift_deallocError = _swift_deallocError_;
+auto *_swift_deallocError = _swift_deallocError_;
 
 void
 swift::swift_deallocError(SwiftError *error, const Metadata *type) {
@@ -247,8 +247,8 @@ static const WitnessTable *getNSErrorConformanceToError() {
   // Swift source.
 
   auto TheWitnessTable = SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT,
-                  SELECT_MANGLING("_TWPCSo7CFErrors5Error10Foundation",
-                                  "_SSo7CFErrorCs5Error10FoundationWP")));
+        MANGLE_AS_STRING(SELECT_MANGLING(WPCSo7CFErrors5Error10Foundation,
+                                         So7CFErrorCs5Error10FoundationWP))));
   assert(TheWitnessTable &&
          "Foundation overlay not loaded, or 'CFError : Error' conformance "
          "not available");
@@ -257,9 +257,9 @@ static const WitnessTable *getNSErrorConformanceToError() {
 }
 
 static const HashableWitnessTable *getNSErrorConformanceToHashable() {
-  auto TheWitnessTable = SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT,
-                   SELECT_MANGLING("__TWPCSo8NSObjects8Hashable10ObjectiveC",
-                                   "__SSo8NSObjectCs8Hashable10ObjectiveCWP")));
+  auto TheWitnessTable = SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT, "_"
+      MANGLE_AS_STRING(SELECT_MANGLING(WPCSo8NSObjects8Hashable10ObjectiveC,
+                                       So8NSObjectCs8Hashable10ObjectiveCWP))));
   assert(TheWitnessTable &&
          "ObjectiveC overlay not loaded, or 'NSObject : Hashable' conformance "
          "not available");
@@ -364,7 +364,7 @@ _swift_getErrorValue_(const SwiftError *errorObject,
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" auto *_swift_getErrorValue = _swift_getErrorValue_;
+auto *_swift_getErrorValue = _swift_getErrorValue_;
 
 void
 swift::swift_getErrorValue(const SwiftError *errorObject,
@@ -399,7 +399,7 @@ extern "C" NSDictionary *swift_stdlib_getErrorUserInfoNSDictionary(
 //@_silgen_name("swift_stdlib_getErrorDefaultUserInfo")
 //public func _stdlib_getErrorDefaultUserInfo<T : Error>(_ x: UnsafePointer<T>) -> AnyObject
 SWIFT_CC(swift) SWIFT_RT_ENTRY_VISIBILITY
-extern "C" NSDictionary *swift_stdlib_getErrorDefaultUserInfo(
+NSDictionary *swift_stdlib_getErrorDefaultUserInfo(
                            OpaqueValue *error,
                            const Metadata *T,
                            const WitnessTable *Error) {
@@ -475,7 +475,7 @@ static id _swift_bridgeErrorToNSError_(SwiftError *errorObject) {
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" auto *_swift_bridgeErrorToNSError = _swift_bridgeErrorToNSError_;
+auto *_swift_bridgeErrorToNSError = _swift_bridgeErrorToNSError_;
 
 id
 swift::swift_bridgeErrorToNSError(SwiftError *errorObject) {
@@ -504,8 +504,8 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
   // protocol _ObjectiveCBridgeableError
   auto TheObjectiveCBridgeableError = SWIFT_LAZY_CONSTANT(
     reinterpret_cast<const ProtocolDescriptor *>(dlsym(RTLD_DEFAULT,
-            SELECT_MANGLING("_TMp10Foundation26_ObjectiveCBridgeableError",
-                            "_S10Foundation26_ObjectiveCBridgeableErrorMp"))));
+    MANGLE_AS_STRING(SELECT_MANGLING(Mp10Foundation26_ObjectiveCBridgeableError,
+                               10Foundation26_ObjectiveCBridgeableErrorMp)))));
 
   // If the Foundation overlay isn't loaded, then NSErrors can't be bridged.
   if (!bridgeNSErrorToError || !TheObjectiveCBridgeableError)
@@ -573,7 +573,7 @@ static SwiftError *_swift_errorRetain_(SwiftError *error) {
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" auto *_swift_errorRetain = _swift_errorRetain_;
+auto *_swift_errorRetain = _swift_errorRetain_;
 
 SwiftError *swift::swift_errorRetain(SwiftError *error) {
   return _swift_errorRetain(error);
@@ -585,7 +585,7 @@ static void _swift_errorRelease_(SwiftError *error) {
 }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" auto *_swift_errorRelease = _swift_errorRelease_;
+auto *_swift_errorRelease = _swift_errorRelease_;
 
 void swift::swift_errorRelease(SwiftError *error) {
   return _swift_errorRelease(error);
@@ -594,7 +594,7 @@ void swift::swift_errorRelease(SwiftError *error) {
 static void _swift_willThrow_(SwiftError *error) { }
 
 SWIFT_RUNTIME_EXPORT
-extern "C" auto *_swift_willThrow = _swift_willThrow_;
+auto *_swift_willThrow = _swift_willThrow_;
 
 void swift::swift_willThrow(SwiftError *error) {
   return _swift_willThrow(error);

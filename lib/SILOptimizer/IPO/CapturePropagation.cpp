@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -47,7 +47,7 @@ protected:
                                       SILFunction *SubstF);
   void rewritePartialApply(PartialApplyInst *PAI, SILFunction *SpecialF);
 };
-} // namespace
+} // end anonymous namespace
 
 static LiteralInst *getConstant(SILValue V) {
   if (auto I = dyn_cast<ThinToThickFunctionInst>(V))
@@ -72,15 +72,16 @@ static std::string getClonedName(PartialApplyInst *PAI, IsFragile_t Fragile,
                                  SILFunction *F) {
 
   Mangle::Mangler M;
-  auto P = SpecializationPass::CapturePropagation;
+  auto P = Demangle::SpecializationPass::CapturePropagation;
   FunctionSignatureSpecializationMangler OldMangler(P, M, Fragile, F);
   NewMangling::FunctionSignatureSpecializationMangler NewMangler(P, Fragile, F);
 
   // We know that all arguments are literal insts.
-  auto Args = PAI->getArguments();
-  for (unsigned i : indices(Args)) {
-    OldMangler.setArgumentConstantProp(i, getConstant(Args[i]));
-    NewMangler.setArgumentConstantProp(i, getConstant(Args[i]));
+  unsigned argIdx = ApplySite(PAI).getCalleeArgIndexOfFirstAppliedArg();
+  for (auto arg : PAI->getArguments()) {
+    OldMangler.setArgumentConstantProp(argIdx, getConstant(arg));
+    NewMangler.setArgumentConstantProp(argIdx, getConstant(arg));
+    ++argIdx;
   }
   OldMangler.mangle();
   std::string Old = M.finalize();
@@ -135,7 +136,7 @@ protected:
 
   void cloneConstValue(SILValue Const);
 };
-} // namespace
+} // end anonymous namespace
 
 /// Clone a constant value. Recursively walk the operand chain through cast
 /// instructions to ensure that all dependents are cloned. Note that the
@@ -170,18 +171,18 @@ void CapturePropagationCloner::cloneBlocks(
   // Create the entry basic block with the function arguments.
   SILBasicBlock *OrigEntryBB = &*OrigF->begin();
   SILBasicBlock *ClonedEntryBB = CloneF.createBasicBlock();
-  CanSILFunctionType CloneFTy = CloneF.getLoweredFunctionType();
+  auto cloneConv = CloneF.getConventions();
 
   // Only clone the arguments that remain in the new function type. The trailing
   // arguments are now propagated through the partial apply.
   assert(!IsCloningConstant && "incorrect mode");
   unsigned ParamIdx = 0;
-  for (unsigned NewParamEnd = CloneFTy->getNumSILArguments();
+  for (unsigned NewParamEnd = cloneConv.getNumSILArguments();
        ParamIdx != NewParamEnd; ++ParamIdx) {
 
     SILArgument *Arg = OrigEntryBB->getArgument(ParamIdx);
 
-    SILValue MappedValue = ClonedEntryBB->createArgument(
+    SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
         remapType(Arg->getType()), Arg->getDecl());
     ValueMap.insert(std::make_pair(Arg, MappedValue));
   }
@@ -249,11 +250,10 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
       OrigF->isTransparent(), Fragile, OrigF->isThunk(),
       OrigF->getClassVisibility(), OrigF->getInlineStrategy(),
       OrigF->getEffectsKind(),
-      /*InsertBefore*/ OrigF, OrigF->getDebugScope(), OrigF->getDeclContext());
+      /*InsertBefore*/ OrigF, OrigF->getDebugScope());
   if (OrigF->hasUnqualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();
   }
-  NewF->setDeclCtx(OrigF->getDeclContext());
   DEBUG(llvm::dbgs() << "  Specialize callee as ";
         NewF->printName(llvm::dbgs()); llvm::dbgs() << " " << NewFTy << "\n");
 

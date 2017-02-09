@@ -5,6 +5,7 @@ add_swift_host_tool(swift-ide-test
   LINK_LIBRARIES
     swiftDriver
     swiftFrontend
+    swiftIndex
     swiftIDE
   LLVM_COMPONENT_DEPENDS
     DebugInfoCodeView
@@ -19,9 +20,8 @@ if(SWIFT_HAVE_LIBXML)
 endif()
 
 # Create a symlink for swift-api-dump.py in the bin directory
-add_custom_command(TARGET swift-ide-test POST_BUILD
-    COMMAND
-      "${CMAKE_COMMAND}" "-E" "create_symlink"
-      "${SWIFT_SOURCE_DIR}/utils/swift-api-dump.py"
-      "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-api-dump.py"
-    COMMENT "Creating development symlink for swift-api-dump.py")
+swift_create_post_build_symlink(swift-ide-test
+  SOURCE "${SWIFT_SOURCE_DIR}/utils/swift-api-dump.py"
+  DESTINATION "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-api-dump.py"
+  COMMENT "Creating development symlink for swift-api-dump.py.")
+  

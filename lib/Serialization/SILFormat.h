@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -155,6 +155,7 @@ namespace sil_block {
       = decls_block::INHERITED_PROTOCOL_CONFORMANCE,
     GENERIC_PARAM = decls_block::GENERIC_PARAM,
     GENERIC_REQUIREMENT = decls_block::GENERIC_REQUIREMENT,
+    LAYOUT_REQUIREMENT = decls_block::LAYOUT_REQUIREMENT,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -170,6 +171,7 @@ namespace sil_block {
   using VTableEntryLayout = BCRecordLayout<
     SIL_VTABLE_ENTRY,
     DeclIDField,  // SILFunction name
+    SILLinkageField,      // Linkage
     BCArray<ValueIDField> // SILDeclRef
   >;
 
@@ -247,6 +249,7 @@ namespace sil_block {
                      BCFixed<2>,  // number of specialize attributes
                      BCFixed<1>,  // has qualified ownership
                      TypeIDField, // SILFunctionType
+                     GenericEnvironmentIDField,
                      DeclIDField, // ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute
                      // followed by specialize attributes
@@ -255,8 +258,8 @@ namespace sil_block {
 
   using SILSpecializeAttrLayout =
       BCRecordLayout<SIL_SPECIALIZE_ATTR,
-                     BCFixed<5> // number of substitutions
-                     // followed by bound generic substitutions
+                     BCFixed<1>, // exported
+                     BCFixed<1> // specialization kind
                      >;
 
   // Has an optional argument list where each argument is a typed valueref.

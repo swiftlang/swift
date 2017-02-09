@@ -1,39 +1,39 @@
-// RUN: %target-swift-frontend -emit-silgen -module-name main %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -module-name main %s | %FileCheck %s
 internal func internalFunc() {}
 
-// CHECK-LABEL: sil @_TF4main3foo
+// CHECK-LABEL: sil @_T04main3fooyyF
 public func foo() {
-  // CHECK-LABEL: sil shared [always_inline] @_TFF4main3foo{{.*}}zim
+  // CHECK-LABEL: sil shared [always_inline] @_T04main3foo{{[_0-9a-zA-Z]*}}zim
   @inline(__always)
   func zim() {
-    // CHECK-LABEL: sil shared @_TFFF4main3foo{{.*}}zim{{.*}}zang
+    // CHECK-LABEL: sil shared @_T04main3fooyyF3zimL_yyF4zangL_yyF
     func zang() { internalFunc() }
     internalFunc()
   }
 
-  // CHECK-LABEL: sil shared @_TFF4main3foo{{.*}}U_
+  // CHECK-LABEL: sil shared @_T04main3foo{{[_0-9a-zA-Z]*}}U_
   let zung = {
-    // CHECK-LABEL: sil shared [always_inline] @_TFFF4main3foo{{.*}}U_{{.*}}zippity
+    // CHECK-LABEL: sil shared [always_inline] @_T04main3fooyyFyycfU_7zippityL_yyF
     @inline(__always)
     func zippity() { internalFunc() }
     internalFunc()
   }
 }
 
-// CHECK-LABEL: sil hidden [always_inline] @_TF4main3bar
+// CHECK-LABEL: sil hidden [always_inline] @_T04main3baryyF
 @inline(__always)
 internal func bar() {
-  // CHECK-LABEL: sil shared [always_inline] @_TFF4main3bar{{.*}}zim
+  // CHECK-LABEL: sil shared [always_inline] @_T04main3baryyF3zimL_yyF
   @inline(__always)
   func zim() {
-    // CHECK-LABEL: sil shared @_TFFF4main3bar{{.*}}zim{{.*}}zang
+    // CHECK-LABEL: sil shared @_T04main3baryyF3zimL_yyF4zangL_yyF
     func zang() { internalFunc() }
     internalFunc()
   }
 
-  // CHECK-LABEL: sil shared @_TFF4main3bar{{.*}}U_
+  // CHECK-LABEL: sil shared @_T04main3bar{{[_0-9a-zA-Z]*}}U_
   let zung = {
-    // CHECK-LABEL: sil shared [always_inline] @_TFFF4main3bar{{.*}}U_{{.*}}zippity
+    // CHECK-LABEL: sil shared [always_inline] @_T04main3baryyFyycfU_7zippityL_yyF
     @inline(__always)
     func zippity() { internalFunc() }
     internalFunc()
@@ -42,20 +42,20 @@ internal func bar() {
 
 public func publicFunc() {}
 
-// CHECK-LABEL: sil [fragile] [always_inline] @_TF4main3bas
+// CHECK-LABEL: sil [fragile] [always_inline] @_T04main3basyyF
 @inline(__always)
 public func bas() {
-  // CHECK-LABEL: sil shared [fragile] [always_inline] @_TFF4main3bas{{.*}}zim
+  // CHECK-LABEL: sil shared [fragile] [always_inline] @_T04main3basyyF3zimL_yyF
   @inline(__always)
   func zim() {
-    // CHECK-LABEL: sil shared [fragile] @_TFFF4main3bas{{.*}}zim{{.*}}zang
+    // CHECK-LABEL: sil shared [fragile] @_T04main3basyyF3zimL_yyF4zangL_yyF
     func zang() { publicFunc() }
     publicFunc()
   }
 
-  // CHECK-LABEL: sil shared [fragile] @_TFF4main3bas{{.*}}U_
+  // CHECK-LABEL: sil shared [fragile] @_T04main3bas{{[_0-9a-zA-Z]*}}U_
   let zung = {
-    // CHECK-LABEL: sil shared [fragile] [always_inline] @_TFFF4main3bas{{.*}}U_{{.*}}zippity
+    // CHECK-LABEL: sil shared [fragile] [always_inline] @_T04main3basyyFyycfU_7zippityL_yyF
     @inline(__always)
     func zippity() { publicFunc() }
     publicFunc()

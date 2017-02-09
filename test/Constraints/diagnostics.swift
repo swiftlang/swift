@@ -910,3 +910,18 @@ let _ = SR_2164<Int, Bool>(a: 0)    // Ok
 let _ = SR_2164<Int, Bool>(b: true) // Ok
 SR_2164<Int, Bool, Float>(a: 0) // expected-error {{generic type 'SR_2164' specialized with too many type parameters (got 3, but expected 2)}}
 SR_2164<Int, Bool, Float>(b: 0) // expected-error {{generic type 'SR_2164' specialized with too many type parameters (got 3, but expected 2)}}
+
+// <rdar://problem/29850459> Swift compiler misreports type error in ternary expression
+
+let r29850459_flag = true
+let r29850459_a: Int = 0
+let r29850459_b: Int = 1
+func r29850459() -> Bool { return false }
+let _ = (r29850459_flag ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
+// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+let _ = ({ true }() ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
+// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+let _ = (r29850459() ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
+// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+let _ = ((r29850459_flag || r29850459()) ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
+// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}

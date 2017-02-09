@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -59,12 +59,13 @@ public:
   /// conformances.
   Substitution subst(ModuleDecl *module,
                      const SubstitutionMap &subMap) const;
+  Substitution subst(ModuleDecl *module,
+                     TypeSubstitutionFn subs,
+                     LookupConformanceFn conformances) const;
 
 private:
   friend class ProtocolConformance;
 };
-
-void dump(const ArrayRef<Substitution> &subs);
 
 } // end namespace swift
 

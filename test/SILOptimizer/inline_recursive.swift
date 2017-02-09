@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s  -parse-as-library -emit-sil -O | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s  -parse-as-library -emit-sil -O | %FileCheck %s
 
 private func recFunc(_ x: Int32) -> Int32 {
   if x > 0 {
@@ -9,7 +9,7 @@ private func recFunc(_ x: Int32) -> Int32 {
 
 // CHECK-LABEL: sil {{.*}}callit
 // CHECK: bb0:
-// CHECK: [[REF:%.*]] = function_ref @_TF16inline_recursiveP33_38E63D320CFF538A1F98BBC31453B1EB7recFuncFVs5Int32S0_
+// CHECK: [[REF:%.*]] = function_ref @_T016inline_recursive7recFunc33_38E63D320CFF538A1F98BBC31453B1EBLLs5Int32VAEF
 // CHECK: [[INTLIT:%.*]] = integer_literal $Builtin.Int32, 3
 // CHECK: [[STRUCT:%.*]] = struct $Int32 ([[INTLIT]] : $Builtin.Int32)
 // CHECK: [[APPLY:%.*]] = apply [[REF]]([[STRUCT]])

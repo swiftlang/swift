@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,7 +20,7 @@ import SwiftPrivateLibcExtras
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || CYGWIN
 import Glibc
 #endif
 
@@ -578,7 +578,8 @@ extension ProcessTerminationStatus {
       return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
     default:
       // This default case is needed for standard library builds where
-      // resilience is enabled
+      // resilience is enabled.
+      // FIXME: Need a way to suppress when not.
       return false
     }
   }
@@ -979,6 +980,9 @@ struct _ParentProcess {
       let crashOutput = crashStdout + crashStderr
       for expectedSubstring in t.crashOutputMatches {
         var found = false
+        if crashOutput.isEmpty && expectedSubstring.isEmpty {
+          found = true
+        }
         for s in crashOutput {
           if findSubstring(s, expectedSubstring) != nil {
             found = true
@@ -1428,6 +1432,8 @@ public enum OSVersion : CustomStringConvertible {
   case freeBSD
   case android
   case ps4
+  case windowsCygnus
+  case windows
 
   public var description: String {
     switch self {
@@ -1453,6 +1459,10 @@ public enum OSVersion : CustomStringConvertible {
       return "PS4"
     case .android:
       return "Android"
+    case .windowsCygnus:
+      return "Cygwin"
+    case .windows:
+      return "Windows"
     }
   }
 }
@@ -1491,6 +1501,10 @@ func _getOSVersion() -> OSVersion {
   return .ps4
 #elseif os(Android)
   return .android
+#elseif os(Windows) && CYGWIN
+  return .windowsCygnus
+#elseif os(Windows)
+  return .windows
 #else
   let productVersion = _stdlib_getSystemVersionPlistProperty("ProductVersion")!
   let (major, minor, bugFix) = _parseDottedVersionTriple(productVersion)
@@ -1568,6 +1582,10 @@ public enum TestRunPredicate : CustomStringConvertible {
   case ps4Any(reason: String)
 
   case androidAny(reason: String)
+
+  case windowsAny(reason: String)
+
+  case windowsCygnusAny(reason: String)
 
   case objCRuntime(/*reason:*/ String)
   case nativeRuntime(/*reason:*/ String)
@@ -1654,6 +1672,12 @@ public enum TestRunPredicate : CustomStringConvertible {
 
     case .ps4Any(reason: let reason):
       return "ps4Any(*, reason: \(reason))"
+
+    case .windowsAny(reason: let reason):
+      return "windowsAny(*, reason: \(reason))"
+
+    case .windowsCygnusAny(reason: let reason):
+      return "windowsCygnusAny(*, reason: \(reason))"
 
     case .objCRuntime(let reason):
       return "Objective-C runtime, reason: \(reason))"
@@ -1915,6 +1939,24 @@ public enum TestRunPredicate : CustomStringConvertible {
     case .ps4Any:
       switch _getRunningOSVersion() {
       case .ps4:
+        return true
+      default:
+        return false
+      }
+
+    case .windowsAny:
+      switch _getRunningOSVersion() {
+      case .windowsCygnus:
+        return true
+      case .windows:
+        return true
+      default:
+        return false
+      }
+
+    case .windowsCygnusAny:
+      switch _getRunningOSVersion() {
+      case .windowsCygnus:
         return true
       default:
         return false

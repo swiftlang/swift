@@ -34,11 +34,18 @@ import gizmo
 // CHECK: define hidden i64 @_TF13generic_casts8allToInt{{.*}}(%swift.opaque* noalias nocapture, %swift.type* %T)
 func allToInt<T>(_ x: T) -> Int {
   return x as! Int
-  // CHECK: [[BUF:%.*]] = alloca [[BUFFER:.24 x i8.]],
   // CHECK: [[INT_TEMP:%.*]] = alloca %Si,
-  // CHECK: [[TEMP:%.*]] = call %swift.opaque* {{.*}}([[BUFFER]]* [[BUF]], %swift.opaque* %0, %swift.type* %T)
+	// CHECK: [[TYPE_ADDR:%.*]] = bitcast %swift.type* %T to i8***
+  // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_ADDR]], i64 -1
+  // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+  // CHECK: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 17
+  // CHECK: [[SIZE_WITNESS:%.*]] = load i8*, i8** [[SIZE_WITNESS_ADDR]]
+  // CHECK: [[SIZE:%.*]] = ptrtoint i8* [[SIZE_WITNESS]]
+  // CHECK: [[T_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
+  // CHECK: [[T_TMP:%.*]] = bitcast i8* [[T_ALLOCA]] to %swift.opaque*
+  // CHECK: [[TEMP:%.*]] = call %swift.opaque* {{.*}}(%swift.opaque* [[T_TMP]], %swift.opaque* %0, %swift.type* %T)
   // CHECK: [[T0:%.*]] = bitcast %Si* [[INT_TEMP]] to %swift.opaque*
-  // CHECK: call i1 @swift_rt_swift_dynamicCast(%swift.opaque* [[T0]], %swift.opaque* [[TEMP]], %swift.type* %T, %swift.type* @_TMSi, i64 7)
+  // CHECK: call i1 @swift_rt_swift_dynamicCast(%swift.opaque* [[T0]], %swift.opaque* [[T_TMP]], %swift.type* %T, %swift.type* @_TMSi, i64 7)
   // CHECK: [[T0:%.*]] = getelementptr inbounds %Si, %Si* [[INT_TEMP]], i32 0, i32 0
   // CHECK: [[INT_RESULT:%.*]] = load i64, i64* [[T0]],
   // CHECK: ret i64 [[INT_RESULT]]

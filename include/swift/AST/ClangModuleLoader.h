@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,6 +17,7 @@
 
 namespace clang {
 class ASTContext;
+class CompilerInstance;
 class Preprocessor;
 class Sema;
 } // namespace clang
@@ -32,6 +33,7 @@ public:
   virtual clang::ASTContext &getClangASTContext() const = 0;
   virtual clang::Preprocessor &getClangPreprocessor() const = 0;
   virtual clang::Sema &getClangSema() const = 0;
+  virtual const clang::CompilerInstance &getClangInstance() const = 0;
   virtual void printStatistics() const = 0;
 
   /// Returns the module that contains imports and declarations from all loaded

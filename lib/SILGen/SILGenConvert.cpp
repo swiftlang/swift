@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,6 +14,7 @@
 #include "Scope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/type_traits.h"
@@ -237,7 +238,7 @@ ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
   ManagedValue payload;
 
   // Take the payload from the optional.  Cheat a bit in the +0
-  // case—UncheckedTakeEnumData will never actually invalidate an Optional enum
+  // case--UncheckedTakeEnumData will never actually invalidate an Optional enum
   // value.
   SILValue payloadVal;
   if (!addrOrValue.getType().isAddress()) {
@@ -281,7 +282,8 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   if (resultTL.isAddressOnly())
     result = emitTemporaryAllocation(loc, resultTy);
   else
-    result = contBB->createArgument(resultTL.getLoweredType());
+    result = contBB->createPHIArgument(resultTL.getLoweredType(),
+                                       ValueOwnershipKind::Owned);
 
   // Branch on whether the input is optional, this doesn't consume the value.
   auto isPresent = emitDoesOptionalHaveValue(loc, input.getValue());
@@ -395,13 +397,13 @@ public:
                                                 repr);
   }
 
-  void finishInitialization(SILGenFunction &gen) {
+  void finishInitialization(SILGenFunction &gen) override {
     SingleBufferInitialization::finishInitialization(gen);
     gen.Cleanups.setCleanupState(Cleanup, CleanupState::Dead);
   }
 };
 
-}
+} // end anonymous namespace
 
 ManagedValue SILGenFunction::emitExistentialErasure(
                             SILLocation loc,
@@ -445,7 +447,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       auto nsErrorVar = SGM.getNSErrorRequirement(loc);
       if (!nsErrorVar) return emitUndef(loc, existentialTL.getLoweredType());
 
-      ArrayRef<Substitution> nsErrorVarSubstitutions;
+      SubstitutionList nsErrorVarSubstitutions;
 
       // Devirtualize.  Maybe this should be done implicitly by
       // emitPropertyLValue?
@@ -523,7 +525,8 @@ ManagedValue SILGenFunction::emitExistentialErasure(
         // layering reasons, so perform an unchecked cast down to NSError.
         SILType anyObjectTy =
           potentialNSError.getType().getAnyOptionalObjectType();
-        SILValue nsError = isPresentBB->createArgument(anyObjectTy);
+        SILValue nsError = isPresentBB->createPHIArgument(
+            anyObjectTy, ValueOwnershipKind::Owned);
         nsError = B.createUncheckedRefCast(loc, nsError, 
                                            getLoweredType(nsErrorType));
 
@@ -554,8 +557,8 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       // Continue.
       B.emitBlock(contBB);
 
-      SILValue existentialResult =
-          contBB->createArgument(existentialTL.getLoweredType());
+      SILValue existentialResult = contBB->createPHIArgument(
+          existentialTL.getLoweredType(), ValueOwnershipKind::Owned);
       return emitManagedRValueWithCleanup(existentialResult, existentialTL);
     }
   }
@@ -667,6 +670,8 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     return manageBufferForExprResult(existential, existentialTL, C);
   }
   }
+
+  llvm_unreachable("Unhandled ExistentialRepresentation in switch.");
 }
 
 ManagedValue SILGenFunction::emitClassMetatypeToObject(SILLocation loc,

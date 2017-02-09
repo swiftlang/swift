@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -38,7 +38,7 @@ public struct DispatchWorkItemFlags : OptionSet, RawRepresentable {
 public class DispatchWorkItem {
 	internal var _block: _DispatchBlock
 
-	public init(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], block: @escaping @convention(block) () -> ()) {
+	public init(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], block: @escaping @convention(block) () -> Void) {
 		_block =  _swift_dispatch_block_create_with_qos_class(
 			__dispatch_block_flags_t(rawValue: flags.rawValue),
 			qos.qosClass.rawValue, Int32(qos.relativePriority), block)
@@ -46,7 +46,7 @@ public class DispatchWorkItem {
 
 	// Used by DispatchQueue.synchronously<T> to provide a path through
 	// dispatch_block_t, as we know the lifetime of the block in question.
-	internal init(flags: DispatchWorkItemFlags = [], noescapeBlock: () -> ()) {
+	internal init(flags: DispatchWorkItemFlags = [], noescapeBlock: () -> Void) {
 		_block = _swift_dispatch_block_create_noescape(
 			__dispatch_block_flags_t(rawValue: flags.rawValue), noescapeBlock)
 	}

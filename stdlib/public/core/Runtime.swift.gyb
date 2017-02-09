@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,13 +20,11 @@ import SwiftShims
 // Atomics
 //===----------------------------------------------------------------------===//
 
-public typealias _PointerToPointer = UnsafeMutablePointer<UnsafeRawPointer?>
-
 @_transparent
 public // @testable
 func _stdlib_atomicCompareExchangeStrongPtr(
-  object target: _PointerToPointer,
-  expected: _PointerToPointer,
+  object target: UnsafeMutablePointer<UnsafeRawPointer?>,
+  expected: UnsafeMutablePointer<UnsafeRawPointer?>,
   desired: UnsafeRawPointer?) -> Bool {
 
   // We use Builtin.Word here because Builtin.RawPointer can't be nil.
@@ -71,11 +69,16 @@ public // @testable
 func _stdlib_atomicCompareExchangeStrongPtr<T>(
   object target: UnsafeMutablePointer<UnsafeMutablePointer<T>${optional}>,
   expected: UnsafeMutablePointer<UnsafeMutablePointer<T>${optional}>,
-  desired: UnsafeMutablePointer<T>${optional}) -> Bool {
+  desired: UnsafeMutablePointer<T>${optional}
+) -> Bool {
+  let rawTarget = UnsafeMutableRawPointer(target).assumingMemoryBound(
+    to: Optional<UnsafeRawPointer>.self)
+  let rawExpected = UnsafeMutableRawPointer(expected).assumingMemoryBound(
+    to: Optional<UnsafeRawPointer>.self)
   return _stdlib_atomicCompareExchangeStrongPtr(
-    object: unsafeBitCast(target, to: _PointerToPointer.self),
-    expected: unsafeBitCast(expected, to: _PointerToPointer.self),
-    desired: unsafeBitCast(desired, to: Optional<UnsafeRawPointer>.self))
+    object: rawTarget,
+    expected: rawExpected,
+    desired: UnsafeRawPointer(desired))
 }
 % end # optional
 
@@ -87,10 +90,10 @@ func _stdlib_atomicInitializeARCRef(
   desired: AnyObject) -> Bool {
   var expected: UnsafeRawPointer?
   let desiredPtr = Unmanaged.passRetained(desired).toOpaque()
+  let rawTarget = UnsafeMutableRawPointer(target).assumingMemoryBound(
+    to: Optional<UnsafeRawPointer>.self)
   let wonRace = _stdlib_atomicCompareExchangeStrongPtr(
-    object: unsafeBitCast(target, to: _PointerToPointer.self),
-    expected: &expected,
-    desired: desiredPtr)
+    object: rawTarget, expected: &expected, desired: desiredPtr)
   if !wonRace {
     // Some other thread initialized the value.  Balance the retain that we
     // performed on 'desired'.
@@ -225,23 +228,12 @@ public func _swift_stdlib_atomicLoadInt(
 
 @_transparent
 public // @testable
-func _swift_stdlib_atomicLoadPtrImpl(
-  object target: UnsafeMutablePointer<OpaquePointer>
-) -> OpaquePointer? {
-  let value = Builtin.atomicload_seqcst_Word(target._rawValue)
-  return OpaquePointer(bitPattern: Int(value))
-}
-
-@_transparent
-public // @testable
 func _stdlib_atomicLoadARCRef(
   object target: UnsafeMutablePointer<AnyObject?>
 ) -> AnyObject? {
-  let result = _swift_stdlib_atomicLoadPtrImpl(
-    object: unsafeBitCast(target, to: UnsafeMutablePointer<OpaquePointer>.self))
-  if let unwrapped = result {
-    return Unmanaged<AnyObject>.fromOpaque(
-      UnsafePointer(unwrapped)).takeUnretainedValue()
+  let value = Builtin.atomicload_seqcst_Word(target._rawValue)
+  if let unwrapped = UnsafeRawPointer(bitPattern: Int(value)) {
+    return Unmanaged<AnyObject>.fromOpaque(unwrapped).takeUnretainedValue()
   }
   return nil
 }
@@ -251,17 +243,17 @@ func _stdlib_atomicLoadARCRef(
 public func _swift_stdlib_atomicFetch${operation}Int(
   object target: UnsafeMutablePointer<Int>,
   operand: Int) -> Int {
+  let rawTarget = UnsafeMutableRawPointer(target)
 #if arch(i386) || arch(arm)
-  return Int(Int32(bitPattern:
-    _swift_stdlib_atomicFetch${operation}UInt32(
-      object: unsafeBitCast(target, to: UnsafeMutablePointer<UInt32>.self),
-      operand: UInt32(bitPattern: Int32(operand)))))
+  let value = _swift_stdlib_atomicFetch${operation}Int32(
+    object: rawTarget.assumingMemoryBound(to: Int32.self),
+    operand: Int32(operand))
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  return Int(Int64(bitPattern:
-    _swift_stdlib_atomicFetch${operation}UInt64(
-      object: unsafeBitCast(target, to: UnsafeMutablePointer<UInt64>.self),
-      operand: UInt64(bitPattern: Int64(operand)))))
+  let value = _swift_stdlib_atomicFetch${operation}Int64(
+    object: rawTarget.assumingMemoryBound(to: Int64.self),
+    operand: Int64(operand))
 #endif
+  return Int(value)
 }
 % end
 
@@ -348,7 +340,7 @@ internal struct _Buffer72 {
 % for bits in [ 32, 64, 80 ]:
 
 % if bits == 80:
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if (!os(Windows) || CYGWIN) && (arch(i386) || arch(x86_64))
 % end
 
 @_silgen_name("swift_float${bits}ToString")

@@ -744,8 +744,8 @@ character.
 Some less important operators are longer and may also contain one or more
 natural numbers. But it's always important that the demangler can identify the
 end (the last character) of an operator. For example, it's not possible to
-determince the last character if there are two operators ``M`` and ``Ma``:
-``a`` could belong to ``M`` or it could be the first charater of the next
+determine the last character if there are two operators ``M`` and ``Ma``:
+``a`` could belong to ``M`` or it could be the first character of the next
 operator.
 
 The intention of the post-fix order is to optimize for common pre-fixes.
@@ -766,7 +766,7 @@ Globals
   global ::= type 'MP'                   // type metadata pattern
   global ::= type 'Ma'                   // type metadata access function
   global ::= type 'ML'                   // type metadata lazy cache variable
-  global ::= nomianl-type 'Mm'           // class metaclass
+  global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
   global ::= protocol 'Mp'               // protocol descriptor
   global ::= type 'MF'                   // metadata for remote mirrors: field descriptor
@@ -791,6 +791,9 @@ Globals
   global ::= type protocol-conformance 'Wl' // lazy protocol witness table accessor
   global ::= type 'WV'                   // value witness table
   global ::= entity 'Wv' DIRECTNESS      // field offset
+
+  global ::= type 'Wy' // Outlined Copy Function Type
+  global ::= type 'We' // Outlined Consume Function Type
 
   DIRECTNESS ::= 'd'                         // direct
   DIRECTNESS ::= 'i'                         // indirect
@@ -994,7 +997,8 @@ Types
   type ::= context decl-name 'a'             // Type alias (DWARF only)
   type ::= function-signature 'c'            // function type
   type ::= function-signature 'X' FUNCTION-KIND // special function type
-  type ::= type-list+ type 'G'               // bound generic type (one type-list per nesting level of type)
+  type ::= type 'y' (type* '_')* type* 'G'   // bound generic type (one type-list per nesting level of type)
+  type ::= type 'Sg'                         // optional type, shortcut for: type 'ySqG'
   type ::= type 'Xo'                         // @unowned type
   type ::= type 'Xu'                         // @unowned(unsafe) type
   type ::= type 'Xw'                         // @weak type
@@ -1052,8 +1056,6 @@ Types
 
   assoc-type-list ::= assoc-type-name '_' assoc-type-name*
 
-  archetype ::= 'Q' INDEX                    // archetype with depth=0, idx=N
-  archetype ::= 'Qd' INDEX INDEX             // archetype with depth=M+1, idx=N
   archetype ::= context 'Qq' INDEX           // archetype+context (DWARF only)
   archetype ::= associated-type
 
@@ -1156,10 +1158,27 @@ Property behaviors are implemented using private protocol conformances.
   requirement ::= type assoc-type-name 'Rt' GENERIC-PARAM-INDEX     // same-type requirement on associated type
   requirement ::= type assoc-type-list 'RT' GENERIC-PARAM-INDEX     // same-type requirement on associated type at depth
   requirement ::= type substitution 'RS'                            // same-type requirement with substitution
+  requirement ::= type 'Rl' GENERIC-PARAM-INDEX LAYOUT-CONSTRAINT   // layout requirement
+  requirement ::= type assoc-type-name 'Rm' GENERIC-PARAM-INDEX LAYOUT-CONSTRAINT    // layout requirement on associated type
+  requirement ::= type assoc-type-list 'RM' GENERIC-PARAM-INDEX LAYOUT-CONSTRAINT    // layout requirement on associated type at depth
+  requirement ::= type substitution 'RM' LAYOUT-CONSTRAINT                           // layout requirement with substitution
 
   GENERIC-PARAM-INDEX ::= 'z'                // depth = 0,   idx = 0
   GENERIC-PARAM-INDEX ::= INDEX              // depth = 0,   idx = N+1
   GENERIC-PARAM-INDEX ::= 'd' INDEX INDEX    // depth = M+1, idx = N
+
+  LAYOUT-CONSTRAINT ::= 'N'  // NativeRefCountedObject 
+  LAYOUT-CONSTRAINT ::= 'R'  // RefCountedObject 
+  LAYOUT-CONSTRAINT ::= 'T'  // Trivial 
+  LAYOUT-CONSTRAINT ::= 'E' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of exact size 
+  LAYOUT-CONSTRAINT ::= 'e' LAYOUT-SIZE  // Trivial of exact size 
+  LAYOUT-CONSTRAINT ::= 'M' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of size at most N bits 
+  LAYOUT-CONSTRAINT ::= 'm' LAYOUT-SIZE  // Trivial of size at most N bits 
+  LAYOUT-CONSTRAINT ::= 'U'  // Unknown layout
+
+  LAYOUT-SIZE ::= INDEX // Size only
+  LAYOUT-SIZE-AND-ALIGNMENT ::= INDEX INDEX // Size followed by alignment
+
 
 
 A generic signature begins with an optional list of requirements.
@@ -1170,7 +1189,7 @@ values indicates a single generic parameter at the outermost depth::
   x_xCru                           // <T_0_0> T_0_0 -> T_0_0
   d_0__xCr_0_u                     // <T_0_0><T_1_0, T_1_1> T_0_0 -> T_1_1
 
-A generic signature must only preceed an operator character which is different
+A generic signature must only precede an operator character which is different
 from any character in a ``<GENERIC-PARAM-COUNT>``.
 
 Identifiers
@@ -1221,7 +1240,7 @@ A maximum of 26 words in a mangling can be used for substitutions.
 
 ::
 
-  identifier ::= '00' natural '_'? IDENTIFIER-CHAR+  // '_' is inserted if the identifer starts with a digit or '_'.
+  identifier ::= '00' natural '_'? IDENTIFIER-CHAR+  // '_' is inserted if the identifier starts with a digit or '_'.
 
 Identifiers that contain non-ASCII characters are encoded using the Punycode
 algorithm specified in RFC 3492, with the modifications that ``_`` is used
@@ -1231,6 +1250,9 @@ consists of an ``00`` followed by the run length of the encoded string and the
 encoded string itself. For example, the identifier ``vergüenza`` is mangled
 to ``0012vergenza_JFa``. (The encoding in standard Punycode would be
 ``vergenza-95a``)
+
+If the encoded string starts with a digit or an ``_``, an additional ``_`` is
+inserted between the run length and the encoded string.
 
 ::
 
@@ -1273,7 +1295,7 @@ Substitutions
 
 ::
 
-  substitution ::= 'A' INDEX                  // substiution of N+26
+  substitution ::= 'A' INDEX                  // substitution of N+26
   substitution ::= 'A' [a-z]* [A-Z]           // One or more consecutive substitutions of N < 26
 
 
@@ -1342,10 +1364,10 @@ The type is the function type of the specialized function.
 
 ::
 
-  specialization ::= spec-arg* 'Tf' SPEC-INFO ARG-SPEC-KIND* '_' ARG-SPEC-KIND  // Function signature specialization kind
+  specialization ::= spec-arg* 'Tf' SPEC-INFO UNIQUE-ID? ARG-SPEC-KIND* '_' ARG-SPEC-KIND  // Function signature specialization kind
 
 The ``<ARG-SPEC-KIND>`` describes how arguments are specialized.
-Some kinds need arguments, which preceed ``Tf``.
+Some kinds need arguments, which precede ``Tf``.
 
 ::
 
@@ -1362,6 +1384,8 @@ Some kinds need arguments, which preceed ``Tf``.
   PASSID ::= '5'                             // GenericSpecializer,
 
   FRAGILE ::= 'q'
+
+  UNIQUE-ID ::= NATURAL                      // Used to make unique function names
 
   ARG-SPEC-KIND ::= 'n'                      // Unmodified argument
   ARG-SPEC-KIND ::= 'c'                      // Consumes n 'type' arguments which are closed over types in argument order

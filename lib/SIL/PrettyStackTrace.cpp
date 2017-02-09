@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,6 +21,10 @@
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
+
+llvm::cl::opt<bool>
+SILPrintOnError("sil-print-on-error", llvm::cl::init(false),
+                llvm::cl::desc("Printing SIL function bodies in crash diagnostics."));
 
 void swift::printSILLocationDescription(llvm::raw_ostream &out,
                                         SILLocation loc,
@@ -52,11 +56,19 @@ void PrettyStackTraceSILFunction::print(llvm::raw_ostream &out) const {
     return;
   }
 
+  printFunctionInfo(out);
+}
+
+void PrettyStackTraceSILFunction::printFunctionInfo(llvm::raw_ostream &out) const {  
+  out << "\"";
   TheFn->printName(out);
+  out << "\".\n";
 
   if (!TheFn->getLocation().isNull()) {
     out << " for ";
     printSILLocationDescription(out, TheFn->getLocation(),
                                 TheFn->getModule().getASTContext());
   }
+  if (SILPrintOnError)
+    TheFn->print(out);
 }

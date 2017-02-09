@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -449,7 +449,8 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed){
 
 void ConstraintGraph::gatherConstraints(
        TypeVariableType *typeVar,
-       SmallVectorImpl<Constraint *> &constraints) {
+       SmallVectorImpl<Constraint *> &constraints,
+       GatheringKind kind) {
   auto &node = (*this)[CS.getRepresentative(typeVar)];
   auto equivClass = node.getEquivalenceClass();
   llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
@@ -461,16 +462,37 @@ void ConstraintGraph::gatherConstraints(
       constraints.push_back(constraint);
   }
 
-  // Retrieve the constraints from fixed bindings.
-  for (auto typeVar : node.getAdjacencies()) {
-    if (!node.getAdjacency(typeVar).FixedBinding)
-      continue;
+  // Retrieve the constraints from adjacent bindings.
+  for (auto adjTypeVar : node.getAdjacencies()) {
+    switch (kind) {
+    case GatheringKind::EquivalenceClass:
+      if (!node.getAdjacency(adjTypeVar).FixedBinding)
+        continue;
+      break;
 
-    if (!typeVars.insert(typeVar).second)
-      continue;
+    case GatheringKind::AllMentions:
+      break;
+    }
 
-    for (auto constraint : (*this)[typeVar].getConstraints())
-      constraints.push_back(constraint);
+    ArrayRef<TypeVariableType *> adjTypeVarsToVisit;
+    switch (kind) {
+    case GatheringKind::EquivalenceClass:
+      adjTypeVarsToVisit = adjTypeVar;
+      break;
+
+    case GatheringKind::AllMentions:
+      adjTypeVarsToVisit
+        = (*this)[CS.getRepresentative(adjTypeVar)].getEquivalenceClass();
+      break;
+    }
+
+    for (auto adjTypeVarEquiv : adjTypeVarsToVisit) {
+      if (!typeVars.insert(adjTypeVarEquiv).second)
+        continue;
+
+      for (auto constraint : (*this)[adjTypeVarEquiv].getConstraints())
+        constraints.push_back(constraint);
+    }
   }
 }
 
@@ -649,7 +671,8 @@ bool ConstraintGraph::contractEdges() {
 
   for (auto tyvar : tyvars) {
     SmallVector<Constraint *, 4> constraints;
-    gatherConstraints(tyvar, constraints);
+    gatherConstraints(tyvar, constraints,
+                      ConstraintGraph::GatheringKind::EquivalenceClass);
 
     for (auto constraint : constraints) {
       auto kind = constraint->getKind();

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -14,4 +14,4 @@ class Tubb<GenericParamName>: Butt {
   }
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFdCb_dSi_dSi_XFo_dSi_dSi_ : $@convention(thin) (Int, @owned @convention(block) (Int) -> Int) -> Int {
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0SiSiIyByd_SiSiIxyd_TR : $@convention(thin) (Int, @owned @convention(block) (Int) -> Int) -> Int {

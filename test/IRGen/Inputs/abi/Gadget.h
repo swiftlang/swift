@@ -92,3 +92,16 @@ static inline NSNumber *giveMeANumber(void) {
 static inline Class giveMeAMetaclass(void) {
   return [NSString class];
 }
+
+typedef struct FiveByteStruct {
+    BOOL first;
+    BOOL second;
+    BOOL third;
+    BOOL fourth;
+    BOOL fifth;
+} FiveByteStruct;
+
+
+@interface MyClass : NSObject
++ (void)mymethod:(FiveByteStruct)param;
+@end

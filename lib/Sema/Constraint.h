@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -66,9 +66,8 @@ enum class ConstraintKind : char {
   Subtype,
   /// \brief The first type is convertible to the second type.
   Conversion,
-  /// \brief The first type is convertible to the second type using an 'as'
-  /// statement. This differs from 'Conversion' in that it also allows bridging.
-  ExplicitConversion,
+  /// \brief The first type can be bridged to the second type.
+  BridgingConversion,
   /// \brief The first type is the element of an argument tuple that is
   /// convertible to the second type (which represents the corresponding
   /// parameter type).
@@ -83,6 +82,9 @@ enum class ConstraintKind : char {
   /// \brief The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
+  /// \brief The first type must conform to the layout defined by the second
+  /// component representing a layout constraint.
+  Layout,
   /// \brief The first type describes a literal that conforms to the second
   /// type, which is one of the known expressible-by-literal protocols.
   LiteralConformsTo,
@@ -124,6 +126,9 @@ enum class ConstraintKind : char {
   /// \brief The first type is an optional type whose object type is the second
   /// type, preserving lvalue-ness.
   OptionalObject,
+  /// \brief The first type is the same function type as the second type, but
+  /// made @escaping.
+  EscapableFunctionOf,
 };
 
 /// \brief Classification of the different kinds of constraints.
@@ -155,8 +160,6 @@ enum class ConversionRestrictionKind {
   TupleToTuple,
   /// Scalar-to-tuple conversion.
   ScalarToTuple,
-  /// Tuple-to-scalar conversion.
-  TupleToScalar,
   /// Deep equality comparison.
   DeepEquality,
   /// Subclass-to-superclass conversion.
@@ -185,10 +188,6 @@ enum class ConversionRestrictionKind {
   ValueToOptional,
   /// T? -> U? optional to optional conversion (or unchecked to unchecked).
   OptionalToOptional,
-  /// T! -> U? unchecked-optional to optional conversion
-  ImplicitlyUnwrappedOptionalToOptional,
-  /// T? -> U! optional to implicitly unwrapped optional conversion
-  OptionalToImplicitlyUnwrappedOptional,
   /// Implicit forces of implicitly unwrapped optionals to their presumed values
   ForceUnchecked,
   /// Implicit upcast conversion of array types.
@@ -200,10 +199,6 @@ enum class ConversionRestrictionKind {
   SetUpcast,
   /// T:Hashable -> AnyHashable conversion.
   HashableToAnyHashable,
-  /// Implicit bridging from a value type to an Objective-C class.
-  BridgeToObjC,
-  /// Explicit bridging from an Objective-C class to a value type.
-  BridgeFromObjC,
   /// Implicit conversion from a CF type to its toll-free-bridged Objective-C
   /// class type.
   CFTollFreeBridgeToObjC,
@@ -333,11 +328,22 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
       /// \brief The second type.
       Type Second;
+    } Types;
+
+    struct {
+      /// \brief The type of the base.
+      Type First;
+
+      /// \brief The type of the member.
+      Type Second;
 
       /// \brief If non-null, the name of a member of the first type is that
       /// being related to the second type.
       DeclName Member;
-    } Types;
+
+      /// \brief The DC in which the use appears.
+      DeclContext *UseDC;
+    } Member;
 
     /// The set of constraints for a disjunction.
     ArrayRef<Constraint *> Nested;
@@ -348,6 +354,9 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
       /// \brief The overload choice
       OverloadChoice Choice;
+
+      /// \brief The DC in which the use appears.
+      DeclContext *UseDC;
     } Overload;
   };
 
@@ -363,14 +372,19 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new constraint.
+  Constraint(ConstraintKind kind, Type first, Type second,
+             ConstraintLocator *locator,
+             ArrayRef<TypeVariableType *> typeVars);
+
+  /// Construct a new member constraint.
   Constraint(ConstraintKind kind, Type first, Type second, DeclName member,
-             FunctionRefKind functionRefKind,
+             DeclContext *useDC, FunctionRefKind functionRefKind,
              ConstraintLocator *locator,
              ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new overload-binding constraint.
-  Constraint(Type type, OverloadChoice choice, ConstraintLocator *locator,
-             ArrayRef<TypeVariableType *> typeVars);
+  Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a restricted constraint.
   Constraint(ConstraintKind kind, ConversionRestrictionKind restriction,
@@ -390,13 +404,20 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 public:
   /// Create a new constraint.
   static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
-                            Type First, Type Second, DeclName Member,
-                            FunctionRefKind functionRefKind,
+                            Type First, Type Second,
                             ConstraintLocator *locator);
+
+  /// Create a new member constraint.
+  static Constraint *createMember(ConstraintSystem &cs, ConstraintKind kind,
+                                  Type first, Type second, DeclName member,
+                                  DeclContext *useDC,
+                                  FunctionRefKind functionRefKind,
+                                  ConstraintLocator *locator);
 
   /// Create an overload-binding constraint.
   static Constraint *createBindOverload(ConstraintSystem &cs, Type type, 
                                         OverloadChoice choice, 
+                                        DeclContext *useDC,
                                         ConstraintLocator *locator);
 
   /// Create a restricted relational constraint.
@@ -466,12 +487,13 @@ public:
     case ConstraintKind::BindToPointerType:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
-    case ConstraintKind::ExplicitConversion:
+    case ConstraintKind::BridgingConversion:
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::ArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::ConformsTo:
+    case ConstraintKind::Layout:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::SelfObjectOfProtocol:
@@ -485,6 +507,7 @@ public:
       return ConstraintClassification::Member;
 
     case ConstraintKind::DynamicTypeOf:
+    case ConstraintKind::EscapableFunctionOf:
     case ConstraintKind::Defaultable:
       return ConstraintClassification::TypeProperty;
 
@@ -497,18 +520,36 @@ public:
 
   /// \brief Retrieve the first type in the constraint.
   Type getFirstType() const {
-    assert(getKind() != ConstraintKind::Disjunction);
+    switch (getKind()) {
+    case ConstraintKind::Disjunction:
+      llvm_unreachable("disjunction constraints have no type operands");
 
-    if (getKind() == ConstraintKind::BindOverload)
+    case ConstraintKind::BindOverload:
       return Overload.First;
 
-    return Types.First;
+    case ConstraintKind::ValueMember:
+    case ConstraintKind::UnresolvedValueMember:
+      return Member.First;
+
+    default:
+      return Types.First;
+    }
   }
 
   /// \brief Retrieve the second type in the constraint.
   Type getSecondType() const {
-    assert(getKind() != ConstraintKind::Disjunction);
-    return Types.Second;
+    switch (getKind()) {
+    case ConstraintKind::Disjunction:
+    case ConstraintKind::BindOverload:
+      llvm_unreachable("constraint has no second type");
+
+    case ConstraintKind::ValueMember:
+    case ConstraintKind::UnresolvedValueMember:
+      return Member.Second;
+
+    default:
+      return Types.Second;
+    }
   }
 
   /// \brief Retrieve the protocol in a conformance constraint.
@@ -518,7 +559,7 @@ public:
   DeclName getMember() const {
     assert(Kind == ConstraintKind::ValueMember ||
            Kind == ConstraintKind::UnresolvedValueMember);
-    return Types.Member;
+    return Member.Member;
   }
 
   /// \brief Determine whether this constraint kind has a second type.
@@ -549,6 +590,19 @@ public:
     return Overload.Choice;
   }
 
+  /// Retrieve the DC in which the overload was used.
+  DeclContext *getOverloadUseDC() const {
+    assert(Kind == ConstraintKind::BindOverload);
+    return Overload.UseDC;
+  }
+
+  /// Retrieve the DC in which the member was used.
+  DeclContext *getMemberUseDC() const {
+    assert(Kind == ConstraintKind::ValueMember ||
+           Kind == ConstraintKind::UnresolvedValueMember);
+    return Member.UseDC;
+  }
+
   /// \brief Retrieve the locator for this constraint.
   ConstraintLocator *getLocator() const { return Locator; }
 
@@ -574,7 +628,8 @@ public:
   void operator delete(void *mem) { }
 };
 
-} } // end namespace swift::constraints
+} // end namespace constraints
+} // end namespace swift
 
 namespace llvm {
 

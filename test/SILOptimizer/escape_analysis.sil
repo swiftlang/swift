@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -escapes-dump -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -escapes-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
@@ -1431,24 +1431,24 @@ bb3(%6: $X):
 }
 
 // X.deinit
-// CHECK-LABEL: CG of _TFC4main1XD
+// CHECK-LABEL: CG of _T04main1XCfD
 // CHECK:        Arg %0 Esc: A, Succ:
 // CHECKL:      End
-sil @_TFC4main1XD: $@convention(method) (@owned X) -> () {
+sil @_T04main1XCfD: $@convention(method) (@owned X) -> () {
 bb0(%0 : $X):
   %1 = tuple ()
   return %1 : $()
 }
 
 // Z.deinit
-// CHECK-LABEL: CG of _TFC4main1ZD
+// CHECK-LABEL: CG of _T04main1ZCfD
 // CHECK:        Arg %0 Esc: A, Succ: (%0.1)
 // CHECK:        Con %0.1 Esc: A, Succ: (%0.2)
 // CHECK:        Con %0.2 Esc: G, Succ:
 // CHECK:        Val %3 Esc: G, Succ: (%3.1)
 // CHECK:        Con %3.1 Esc: G, Succ: %0.2
 // CHECKL:      End
-sil @_TFC4main1ZD: $@convention(method) (@owned Z) -> () {
+sil @_T04main1ZCfD: $@convention(method) (@owned Z) -> () {
 bb0(%0 : $Z):
   %1 = ref_element_addr %0 : $Z, #Z.x
   %2 = load %1 : $*X
@@ -1459,9 +1459,9 @@ bb0(%0 : $Z):
 }
 
 sil_vtable X {
-  #X.deinit!deallocator: _TFC4main1XD
+  #X.deinit!deallocator: _T04main1XCfD
 }
 
 sil_vtable Z {
-  #Z.deinit!deallocator: _TFC4main1ZD
+  #Z.deinit!deallocator: _T04main1ZCfD
 }

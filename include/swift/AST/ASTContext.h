@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,11 +18,10 @@
 #define SWIFT_AST_ASTCONTEXT_H
 
 #include "llvm/Support/DataTypes.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Identifier.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SearchPathOptions.h"
+#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LangOptions.h"
@@ -44,6 +43,7 @@
 namespace clang {
   class Decl;
   class MacroInfo;
+  class Module;
   class ObjCInterfaceDecl;
 }
 
@@ -59,22 +59,34 @@ namespace swift {
   class ForeignRepresentationInfo;
   class FuncDecl;
   class InFlightDiagnostic;
+  class IterableDeclContext;
   class LazyAbstractFunctionData;
+  class LazyGenericTypeData;
+  class LazyContextData;
+  class LazyMemberLoader;
   class LazyIterableDeclContextData;
   class LazyResolver;
   class PatternBindingDecl;
   class PatternBindingInitializer;
+  class SourceFile;
   class SourceLoc;
   class Type;
   class TypeVariableType;
   class TupleType;
   class FunctionType;
+  class ArchetypeBuilder;
   class ArchetypeType;
   class Identifier;
   class InheritedNameSet;
   class ModuleDecl;
   class ModuleLoader;
   class NominalTypeDecl;
+  class NormalProtocolConformance;
+  class InheritedProtocolConformance;
+  class SpecializedProtocolConformance;
+  enum class ProtocolConformanceState;
+  class Pattern;
+  enum PointerTypeKind : unsigned;
   class PrecedenceGroupDecl;
   class TupleTypeElt;
   class EnumElementDecl;
@@ -86,8 +98,11 @@ namespace swift {
   class DiagnosticEngine;
   class Substitution;
   class TypeCheckerDebugConsumer;
+  struct RawComment;
   class DocComment;
   class SILBoxType;
+  class TypeAliasDecl;
+  class VarDecl;
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -580,6 +595,13 @@ public:
   /// Does nothing in non-asserts (NDEBUG) builds.
   void verifyAllLoadedModules() const;
 
+  /// \brief Check whether the module with a given name can be imported without
+  /// importing it.
+  ///
+  /// Note that even if this check succeeds, errors may still occur if the
+  /// module is loaded in full.
+  bool canImportModule(std::pair<Identifier, SourceLoc> ModulePath);
+
   /// \returns a module with a given name that was already loaded.  If the
   /// module was not loaded, returns nullptr.
   ModuleDecl *getLoadedModule(
@@ -672,7 +694,7 @@ public:
   SpecializedProtocolConformance *
   getSpecializedConformance(Type type,
                             ProtocolConformance *generic,
-                            ArrayRef<Substitution> substitutions);
+                            SubstitutionList substitutions);
 
   /// \brief Produce an inherited conformance, for subclasses of a type
   /// that already conforms to a protocol.
@@ -684,7 +706,7 @@ public:
   getInheritedConformance(Type type, ProtocolConformance *inherited);
 
   /// \brief Create trivial substitutions for the given bound generic type.
-  Optional<ArrayRef<Substitution>>
+  Optional<SubstitutionList>
   createTrivialSubstitutions(BoundGenericType *BGT,
                              DeclContext *gpContext) const;
 
@@ -692,7 +714,7 @@ public:
   void recordKnownProtocols(ModuleDecl *Stdlib);
   
   /// \brief Retrieve the substitutions for a bound generic type, if known.
-  Optional<ArrayRef<Substitution>>
+  Optional<SubstitutionList>
   getSubstitutions(TypeBase *type, DeclContext *gpContext) const;
 
   /// Get the lazy data for the given declaration.
@@ -780,15 +802,6 @@ public:
     return getIdentifier(getSwiftName(kind));
   }
 
-  /// Try to dump the context of the given archetype.
-  void dumpArchetypeContext(ArchetypeType *archetype,
-                            unsigned indent = 0) const;
-
-  /// Try to dump the context of the given archetype.
-  void dumpArchetypeContext(ArchetypeType *archetype,
-                            llvm::raw_ostream &os,
-                            unsigned indent = 0) const;
-
   /// Collect visible clang modules from the ClangModuleLoader. These modules are
   /// not necessarily loaded.
   void getVisibleTopLevelClangModules(SmallVectorImpl<clang::Module*> &Modules) const;
@@ -801,7 +814,8 @@ public:
   /// Retrieve or create the canonical generic environment of a canonical
   /// archetype builder.
   GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
-                                                     ArchetypeBuilder *builder);
+                                                     ArchetypeBuilder *builder,
+                                                     ModuleDecl &module);
 
   /// Retrieve the inherited name set for the given class.
   const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,
@@ -832,27 +846,9 @@ private:
   /// \brief Set the substitutions for the given bound generic type.
   void setSubstitutions(TypeBase *type,
                         DeclContext *gpContext,
-                        ArrayRef<Substitution> Subs) const;
-
-  /// Retrieve the archetype builder and potential archetype
-  /// corresponding to the given archetype type.
-  ///
-  /// This facility is only used by the archetype builder when forming
-  /// archetypes.a
-  std::pair<ArchetypeBuilder *, ArchetypeBuilder::PotentialArchetype *>
-  getLazyArchetype(const ArchetypeType *archetype);
-
-  /// Register information for a lazily-constructed archetype.
-  void registerLazyArchetype(
-         const ArchetypeType *archetype,
-         ArchetypeBuilder &builder,
-         ArchetypeBuilder::PotentialArchetype *potentialArchetype);
-
-  /// Unregister information about the given lazily-constructed archetype.
-  void unregisterLazyArchetype(const ArchetypeType *archetype);
+                        SubstitutionList Subs) const;
 
   friend ArchetypeType;
-  friend ArchetypeBuilder::PotentialArchetype;
 
   /// Provide context-level uniquing for SIL lowered type layouts and boxes.
   friend SILLayout;

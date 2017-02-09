@@ -40,3 +40,14 @@ docs/_build
 CMakeCache.txt
 CMakeFiles
 .atom-build.json
+
+#==============================================================================#
+# Ignore compile database
+#==============================================================================#
+compile_commands.json
+
+# Ignore generated GYB files until we fix the workaround on Windows
+#==============================================================================#
+8
+4
+SortedCFDatabase.def

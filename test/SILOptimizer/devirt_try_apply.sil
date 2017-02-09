@@ -372,7 +372,7 @@ sil [transparent] [thunk] @_TTWC16devirt_try_apply3CP1S_1PS_FS1_3foouRq_S1__fq_F
 bb0(%0 : $*CP1):
   %1 = load %0 : $*CP1
   strong_retain %1 : $CP1
-  %3 = class_method %1 : $CP1, #CP1.foo!1 : (CP1) -> () throws -> Int32 , $@convention(method) (@guaranteed CP1) -> (Int32, @error Error)
+  %3 = class_method %1 : $CP1, #CP1.foo!1 : (CP1) -> () throws -> Int32, $@convention(method) (@guaranteed CP1) -> (Int32, @error Error)
   try_apply %3(%1) : $@convention(method) (@guaranteed CP1) -> (Int32, @error Error), normal bb1, error bb2
 
 bb1(%5 : $Int32):
@@ -459,7 +459,7 @@ bb0(%0 : $Base):
   %6 = load %3 : $*Optional<Int32>
   store %6 to %1 : $*Optional<Int32>
   dealloc_stack %3 : $*Optional<Int32>
-  %9 = class_method %0 : $Base, #Base.foo!1 : (Base) -> () throws -> Int32? , $@convention(method) (@guaranteed Base) -> (Optional<Int32>, @error Error)
+  %9 = class_method %0 : $Base, #Base.foo!1 : (Base) -> () throws -> Int32?, $@convention(method) (@guaranteed Base) -> (Optional<Int32>, @error Error)
   try_apply %9(%0) : $@convention(method) (@guaranteed Base) -> (Optional<Int32>, @error Error), normal bb1, error bb4
 
 bb1(%11 : $Optional<Int32>):
@@ -499,7 +499,7 @@ bb0(%0 : $Base):
   %6 = load %3 : $*Optional<Base>
   store %6 to %1 : $*Optional<Base>
   dealloc_stack %3 : $*Optional<Base>
-  %9 = class_method %0 : $Base, #Base.boo1!1 : (Base) -> () throws -> Base , $@convention(method) (@guaranteed Base) -> (@owned Base, @error Error)
+  %9 = class_method %0 : $Base, #Base.boo1!1 : (Base) -> () throws -> Base, $@convention(method) (@guaranteed Base) -> (@owned Base, @error Error)
   try_apply %9(%0) : $@convention(method) (@guaranteed Base) -> (@owned Base, @error Error), normal bb1, error bb4
 
 bb1(%11 : $Base):
@@ -540,7 +540,7 @@ bb0(%0 : $Base):
   %6 = load %3 : $*Optional<Base>
   store %6 to %1 : $*Optional<Base>
   dealloc_stack %3 : $*Optional<Base>
-  %9 = class_method %0 : $Base, #Base.boo2!1 : (Base) -> () throws -> Base? , $@convention(method) (@guaranteed Base) -> (@owned Optional<Base>, @error Error)
+  %9 = class_method %0 : $Base, #Base.boo2!1 : (Base) -> () throws -> Base?, $@convention(method) (@guaranteed Base) -> (@owned Optional<Base>, @error Error)
   try_apply %9(%0) : $@convention(method) (@guaranteed Base) -> (@owned Optional<Base>, @error Error), normal bb1, error bb4
 
 bb1(%11 : $Optional<Base>):
@@ -629,7 +629,7 @@ bb0:
   %5 = integer_literal $Builtin.Int32, 0
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   store %6 to %0 : $*Int32
-  %8 = class_method %3 : $CP2, #CP2.foo!1 : (CP2) -> () throws -> Int32 , $@convention(method) (@guaranteed CP2) -> (Int32, @error Error)
+  %8 = class_method %3 : $CP2, #CP2.foo!1 : (CP2) -> () throws -> Int32, $@convention(method) (@guaranteed CP2) -> (Int32, @error Error)
   try_apply %8(%3) : $@convention(method) (@guaranteed CP2) -> (Int32, @error Error), normal bb1, error bb4
 
 bb1(%10 : $Int32):
@@ -715,7 +715,7 @@ bb0:
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %7 = enum $Optional<Int32>, #Optional.some!enumelt.1, %6 : $Int32
   store %7 to %0 : $*Optional<Int32>
-  %9 = class_method %3 : $Derived1, #Derived1.foo!1 : (Derived1) -> () throws -> Int32? , $@convention(method) (@guaranteed Derived1) -> (Optional<Int32>, @error Error)
+  %9 = class_method %3 : $Derived1, #Derived1.foo!1 : (Derived1) -> () throws -> Int32?, $@convention(method) (@guaranteed Derived1) -> (Optional<Int32>, @error Error)
   try_apply %9(%3) : $@convention(method) (@guaranteed Derived1) -> (Optional<Int32>, @error Error), normal bb1, error bb4
 
 bb1(%11 : $Optional<Int32>):
@@ -758,7 +758,7 @@ bb0:
   %5 = integer_literal $Builtin.Int32, 0
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   store %6 to %0 : $*Int32
-  %8 = class_method %1 : $CP2, #CP2.foo!1 : (CP2) -> () throws -> Int32 , $@convention(method) (@guaranteed CP2) -> (Int32, @error Error)
+  %8 = class_method %1 : $CP2, #CP2.foo!1 : (CP2) -> () throws -> Int32, $@convention(method) (@guaranteed CP2) -> (Int32, @error Error)
   try_apply %8(%1) : $@convention(method) (@guaranteed CP2) -> (Int32, @error Error), normal bb1, error bb4
 
 bb1(%10 : $Int32):
@@ -827,7 +827,7 @@ sil @test_devirt_try_apply_at_Onone : $@convention(thin) () -> (@owned Optional<
 bb0:
   %2 = alloc_ref $D3
   %3 = upcast %2 : $D3 to $D1
-  %4 = class_method %3 : $D1, #D1.f1!1 : (D1) -> () throws -> Optional<A> , $@convention(method) (@guaranteed D1) -> (@owned Optional<A>, @error Error)
+  %4 = class_method %3 : $D1, #D1.f1!1 : (D1) -> () throws -> Optional<A>, $@convention(method) (@guaranteed D1) -> (@owned Optional<A>, @error Error)
   try_apply %4(%3) : $@convention(method) (@guaranteed D1) -> (@owned Optional<A>, @error Error), normal bb1, error bb2
 
 bb1(%6 : $Optional<A>):

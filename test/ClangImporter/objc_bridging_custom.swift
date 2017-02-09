@@ -218,11 +218,11 @@ func testExplicitConversion(objc: APPManufacturerInfo<NSString>,
                             swift: ManufacturerInfo<NSString>) {
   // Bridging to Swift
   let _ = objc as ManufacturerInfo<NSString>
-  let _ = objc as ManufacturerInfo<NSNumber> // expected-error{{cannot convert value of type 'APPManufacturerInfo<NSString>' to type 'ManufacturerInfo<NSNumber>' in coercion}}
-  let _ = objc as ManufacturerInfo<NSObject> // expected-error{{cannot convert value of type 'APPManufacturerInfo<NSString>' to type 'ManufacturerInfo<NSObject>' in coercion}}
+  let _ = objc as ManufacturerInfo<NSNumber> // expected-error{{'APPManufacturerInfo<NSString>' is not convertible to 'ManufacturerInfo<NSNumber>'; did you mean to use 'as!' to force downcast?}}
+  let _ = objc as ManufacturerInfo<NSObject> // expected-error{{'APPManufacturerInfo<NSString>' is not convertible to 'ManufacturerInfo<NSObject>'; did you mean to use 'as!' to force downcast?}}
 
   // Bridging to Objective-C
   let _ = swift as APPManufacturerInfo<NSString>
-  let _ = swift as APPManufacturerInfo<NSNumber> // expected-error{{cannot convert value of type 'ManufacturerInfo<NSString>' to type 'APPManufacturerInfo<NSNumber>' in coercion}}
-  let _ = swift as APPManufacturerInfo<NSObject> // expected-error{{cannot convert value of type 'ManufacturerInfo<NSString>' to type 'APPManufacturerInfo<NSObject>' in coercion}}
+  let _ = swift as APPManufacturerInfo<NSNumber> // expected-error{{'ManufacturerInfo<NSString>' is not convertible to 'APPManufacturerInfo<NSNumber>'; did you mean to use 'as!' to force downcast?}}
+  let _ = swift as APPManufacturerInfo<NSObject> // expected-error{{'ManufacturerInfo<NSString>' is not convertible to 'APPManufacturerInfo<NSObject>'; did you mean to use 'as!' to force downcast?}}
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -339,7 +339,7 @@ class SILCombine : public SILFunctionTransform {
     }
   }
   
-  virtual void handleDeleteNotification(ValueBase *I) override {
+  void handleDeleteNotification(ValueBase *I) override {
     // Linear searching the tracking list doesn't hurt because usually it only
     // contains a few elements.
     auto Iter = std::find(TrackingList.begin(), TrackingList.end(), I);
@@ -347,7 +347,7 @@ class SILCombine : public SILFunctionTransform {
       TrackingList.erase(Iter);      
   }
   
-  virtual bool needsNotifications() override { return true; }
+  bool needsNotifications() override { return true; }
 
   StringRef getName() override { return "SIL Combine"; }
 };

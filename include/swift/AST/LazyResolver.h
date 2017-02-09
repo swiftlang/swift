@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -56,17 +56,6 @@ public:
   virtual ProtocolConformance *resolveInheritedConformance(
                                  const NormalProtocolConformance *conformance,
                                  ProtocolDecl *inherited) = 0;
-
-  /// Resolve a member type.
-  ///
-  /// \param dc The context in which to resolve the type.
-  /// \param type The type in which we will search for the member type.
-  /// \param name The name of the member type.
-  ///
-  /// \returns the member type, or an empty type if no such type could be
-  /// found.
-  virtual Type resolveMemberType(DeclContext *dc, Type type,
-                                 Identifier name) = 0;
 
   /// Resolve the accessibility of a value.
   ///
@@ -142,10 +131,6 @@ public:
                          const NormalProtocolConformance *conformance,
                          ProtocolDecl *inherited) override {
     return Principal.resolveInheritedConformance(conformance, inherited);
-  }
-
-  Type resolveMemberType(DeclContext *dc, Type type, Identifier name) override {
-    return Principal.resolveMemberType(dc, type, name);
   }
 
   void resolveAccessibility(ValueDecl *VD) override {

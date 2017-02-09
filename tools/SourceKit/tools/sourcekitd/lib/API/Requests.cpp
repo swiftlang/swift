@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -60,7 +60,7 @@ public:
     return get();
   }
 };
-} // anonymous namespace.
+} // anonymous namespace
 
 static LazySKDUID RequestProtocolVersion("source.request.protocol_version");
 
@@ -728,8 +728,12 @@ handleSemanticRequest(RequestDict Req,
 
     int64_t Offset;
     if (!Req.getInt64(KeyOffset, Offset, /*isOptional=*/false)) {
+      int64_t Length = 0;
+      Req.getInt64(KeyLength, Length, /*isOptional=*/true);
+      int64_t Actionables = false;
+      Req.getInt64(KeyActionable, Actionables, /*isOptional=*/true);
       return Lang.getCursorInfo(
-          *SourceFile, Offset, Args,
+          *SourceFile, Offset, Length, Actionables, Args,
           [Rec](const CursorInfo &Info) { reportCursorInfo(Info, Rec); });
     }
     if (auto USR = Req.getString(KeyUSR)) {
@@ -1047,7 +1051,8 @@ public:
 static bool isSwiftPrefixed(StringRef MangledName) {
   if (MangledName.size() < 2)
     return false;
-  return (MangledName[0] == '_' && MangledName[1] == 'T');
+  return MangledName[0] == '_' &&
+         (MangledName[1] == 'T' || MangledName[1] == MANGLING_PREFIX_STR[1]);
 }
 
 static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
@@ -1097,7 +1102,7 @@ static std::string mangleSimpleClass(StringRef moduleName,
   typeNode->addChild(classNode);
   typeManglingNode->addChild(typeNode);
   globalNode->addChild(typeManglingNode);
-  return mangleNode(globalNode, swift::NewMangling::useNewMangling());
+  return mangleNode(globalNode, swift::useNewMangling(globalNode));
 }
 
 static sourcekitd_response_t
@@ -1349,6 +1354,13 @@ static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec) {
     for (auto Name : Info.ModuleGroupArray) {
       auto Entry = Groups.appendDictionary();
       Entry.set(KeyGroupName, Name);
+    }
+  }
+  if (!Info.AvailableActions.empty()) {
+    auto Actions = Elem.setArray(KeyActionable);
+    for (auto Name : Info.AvailableActions) {
+      auto Entry = Actions.appendDictionary();
+      Entry.set(KeyActionName, Name);
     }
   }
   if (!Info.AnnotatedRelatedDeclarations.empty()) {

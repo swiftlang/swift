@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -43,8 +43,7 @@ int apinotes_main(ArrayRef<const char *> Args) {
                                "binary-to-yaml",
                                "Convert binary format to YAML"),
                     clEnumValN(api_notes::ActionType::Dump,
-                            "dump", "Parse and dump the output"),
-                    clEnumValEnd),
+                            "dump", "Parse and dump the output")),
          cl::cat(APINotesCategory));
 
   static cl::opt<std::string>

@@ -2,32 +2,34 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-//  This file provides classes and functions for conveniently working
-//  with ranges, 
-//
-//  reversed returns an iterator_range out of the reverse iterators of a type.
-//
-//  map creates an iterator_range which applies a function to all the elements
-//  in another iterator_range.
-//
-//  IntRange is a template class for iterating over a range of
-//  integers.
-//
-//  indices returns the range of indices from [0..size()) on a
-//  subscriptable type.
-//
-//  Note that this is kept in Swift because it's really only useful in
-//  C++11, and there aren't any major open-source subprojects of LLVM
-//  that can use C++11 yet.
-//
+///
+///  \file
+///
+///  This file provides classes and functions for conveniently working
+///  with ranges,
+///
+///  reversed returns an iterator_range out of the reverse iterators of a type.
+///
+///  map creates an iterator_range which applies a function to all the elements
+///  in another iterator_range.
+///
+///  IntRange is a template class for iterating over a range of
+///  integers.
+///
+///  indices returns the range of indices from [0..size()) on a
+///  subscriptable type.
+///
+///  Note that this is kept in Swift because it's really only useful in
+///  C++11, and there aren't any major open-source subprojects of LLVM
+///  that can use C++11 yet.
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_BASIC_RANGE_H
@@ -176,6 +178,13 @@ static inline IntRange<unsigned> range(unsigned start, unsigned end) {
 /// Returns an Int range [0, end).
 static inline IntRange<unsigned> range(unsigned end) {
   return range(0, end);
+}
+
+/// Returns a reverse Int range (start, end].
+static inline auto reverse_range(unsigned start, unsigned end) ->
+  decltype(reversed(range(start+1, end+1))) {
+  assert(start <= end && "Invalid integral range");
+  return reversed(range(start+1, end+1));
 }
 
 /// A random access range that provides iterators that can be used to iterate

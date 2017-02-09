@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 from contextlib import contextmanager
+from multiprocessing import Lock, Pool, cpu_count
 
 from . import diagnostics
 
@@ -172,3 +173,77 @@ def copytree(src, dest, dry_run=None, echo=True):
     if dry_run:
         return
     shutil.copytree(src, dest)
+
+
+# Initialized later
+lock = None
+
+
+def run(*args, **kwargs):
+    repo_path = os.getcwd()
+    echo_output = kwargs.pop('echo', False)
+    dry_run = kwargs.pop('dry_run', False)
+    env = kwargs.pop('env', None)
+    if dry_run:
+        _echo_command(dry_run, *args, env=env)
+        return(None, 0, args)
+
+    my_pipe = subprocess.Popen(
+        *args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+    (stdout, stderr) = my_pipe.communicate()
+    ret = my_pipe.wait()
+
+    if lock:
+        lock.acquire()
+    if echo_output:
+        print(repo_path)
+        _echo_command(dry_run, *args, env=env)
+        if stdout:
+            print(stdout, end="")
+        if stderr:
+            print(stderr, end="")
+        print()
+    if lock:
+        lock.release()
+
+    if ret != 0:
+        eout = Exception()
+        eout.ret = ret
+        eout.args = args
+        eout.repo_path = repo_path
+        eout.stderr = stderr
+        raise eout
+    return (stdout, 0, args)
+
+
+def run_parallel(fn, pool_args, n_processes=0):
+    def init(l):
+        global lock
+        lock = l
+
+    if n_processes == 0:
+        n_processes = cpu_count() * 2
+
+    l = Lock()
+    print("Running ``%s`` with up to %d processes." %
+          (fn.__name__, n_processes))
+    pool = Pool(processes=n_processes, initializer=init, initargs=(l,))
+    results = pool.map_async(func=fn, iterable=pool_args).get(9999999)
+    pool.close()
+    pool.join()
+    return results
+
+
+def check_parallel_results(results, op):
+    fail_count = 0
+    if results is None:
+        return 0
+    for r in results:
+        if r is not None:
+            if fail_count == 0:
+                print("======%s FAILURES======" % op)
+            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
+            fail_count += 1
+            if r.stderr:
+                print(r.stderr)
+    return fail_count

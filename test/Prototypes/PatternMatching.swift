@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize_none
 
 //===--- Niceties ---------------------------------------------------------===//
 typealias Element_<S: Sequence> = S.Iterator.Element

@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -disable-objc-attr-requires-foundation-module -emit-module %S/Inputs/objc_extension_base.swift -o %t
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -new-mangling-for-tests -primary-file %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -12,7 +12,7 @@ import objc_extension_base
 
 // Check that metadata for nested enums added in extensions to imported classes
 // gets emitted concretely.
-// CHECK: @_TWPOE15objc_extensionsCSo8NSObjectP33_1F05E59585E0BB585FCA206FBFF1A92D8SomeEnums9EquatableS_ =
+// CHECK: @_T0So8NSObjectC15objc_extensionsE8SomeEnum33_1F05E59585E0BB585FCA206FBFF1A92DLLOs9EquatableACWP =
 
 // CHECK: [[CATEGORY_NAME:@.*]] = private unnamed_addr constant [16 x i8] c"objc_extensions\00"
 // CHECK: [[METHOD_TYPE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
@@ -92,7 +92,7 @@ class Hoozit : NSObject {
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(blibble)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[STR:@.*]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void ([[OPAQUE:%.*]]*, i8*)* @_TToFC15objc_extensions6Hoozit7blibblefT_T_ to i8*)
+// CHECK:     i8* bitcast (void ([[OPAQUE:%.*]]*, i8*)* @_T015objc_extensions6HoozitC7blibbleyyFTo to i8*)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
@@ -102,13 +102,13 @@ class Hoozit : NSObject {
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(blobble)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[STR]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void (i8*, i8*)* @_TToZFC15objc_extensions6Hoozit7blobblefT_T_ to i8*)
+// CHECK:     i8* bitcast (void (i8*, i8*)* @_T015objc_extensions6HoozitC7blobbleyyFZTo to i8*)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
 // CHECK-LABEL: @"_CATEGORY__TtC15objc_extensions6Hoozit_$_objc_extensions" = private constant
 // CHECK:   i8* getelementptr inbounds ([16 x i8], [16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
-// CHECK:   %swift.type* {{.*}} @_TMfC15objc_extensions6Hoozit,
+// CHECK:   %swift.type* {{.*}} @_T015objc_extensions6HoozitCMf,
 // CHECK:   {{.*}} @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions",
 // CHECK:   {{.*}} @"_CATEGORY_CLASS_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions",
 // CHECK:   i8* null,
@@ -128,7 +128,7 @@ class SwiftOnly { }
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
 // CHECK:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* @"\01L_selector_data(wibble)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[STR]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void (i8*, i8*)* @_TToFC15objc_extensions9SwiftOnly6wibblefT_T_ to i8*)
+// CHECK:     i8* bitcast (void (i8*, i8*)* @_T015objc_extensions9SwiftOnlyC6wibbleyyFTo to i8*)
 // CHECK:   }] }, section "__DATA, __objc_const", align 8
 extension SwiftOnly {
   @objc func wibble() { }
@@ -164,8 +164,8 @@ class SwiftSubGizmo : SwiftBaseGizmo {
 
   // Don't crash on this call. Emit an objC method call to super.
   //
-  // CHECK-LABEL: define {{.*}} @_TFC15objc_extensions13SwiftSubGizmo4frobfT_T_
-  // CHECK: _TMaC15objc_extensions13SwiftSubGizmo
+  // CHECK-LABEL: define {{.*}} @_T015objc_extensions13SwiftSubGizmoC4frobyyF
+  // CHECK: _T015objc_extensions13SwiftSubGizmoCMa
   // CHECK: objc_msgSendSuper2
   // CHECK: ret
   public override func frob() {

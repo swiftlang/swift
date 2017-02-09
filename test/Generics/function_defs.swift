@@ -46,7 +46,7 @@ protocol OtherEqualComparable {
 }
 
 func otherExistential<T : EqualComparable>(_ t1: T) {
-  var otherEqComp : OtherEqualComparable = t1 // expected-error{{value of type 'T' does not conform to specified type 'OtherEqualComparable'}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}}
+  var otherEqComp : OtherEqualComparable = t1 // expected-error{{value of type 'T' does not conform to specified type 'OtherEqualComparable'}}
   otherEqComp = t1 // expected-error{{value of type 'T' does not conform to 'OtherEqualComparable' in assignment}}
   _ = otherEqComp
   
@@ -295,4 +295,4 @@ func badTypeConformance1<T>(_: T) where Int : EqualComparable {} // expected-err
 func badTypeConformance2<T>(_: T) where T.Blarg : EqualComparable { } // expected-error{{'Blarg' is not a member type of 'T'}}
 
 func badSameType<T, U : GeneratesAnElement, V>(_ : T)
-  where T == U.Element, U.Element == V {} // expected-error{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
+  where T == U.Element, U.Element == V {} // expected-error 2{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}

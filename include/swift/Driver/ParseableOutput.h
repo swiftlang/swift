@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -39,7 +39,7 @@ void emitFinishedMessage(raw_ostream &os, const Job &Cmd, ProcessId Pid,
 
 /// \brief Emits a "signalled" message to the given stream.
 void emitSignalledMessage(raw_ostream &os, const Job &Cmd, ProcessId Pid,
-                          StringRef ErrorMsg, StringRef Output);
+                          StringRef ErrorMsg, StringRef Output, Optional<int> Signal);
 
 /// \brief Emits a "skipped" message to the given stream.
 void emitSkippedMessage(raw_ostream &os, const Job &Cmd);

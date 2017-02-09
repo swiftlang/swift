@@ -95,7 +95,7 @@ public var singlePattern: Int {
   return 2
 }
 
-public func singleDefaultArgument(i i: Int = {
+public func singleDefaultArgument(i: Int = {
   //CHECK-DAG: VFIF10LocalTypes21singleDefaultArgumentFT1iSi_T_A_U_FT_SiL_27SingleDefaultArgumentStruct
   struct SingleDefaultArgumentStruct {
     let sdasi: Int
@@ -158,23 +158,4 @@ public let doubleClosure: () -> () = {
     }
   }
   singleClosure()
-}
-
-@_transparent
-public func transparentFunc() {
-  // CHECK-DAG: VF10LocalTypes15transparentFuncFT_T_L_21TransparentFuncStruct
-  struct TransparentFuncStruct {
-    let tfsi: Int
-  }
-  // CHECK-DAG: CF10LocalTypes15transparentFuncFT_T_L_20TransparentFuncClass
-  class TransparentFuncClass {
-    let tfcs: String
-    init(s: String) {
-      self.tfcs = s
-    }
-  }
-  // CHECK-DAG: OF10LocalTypes15transparentFuncFT_T_L_19TransparentFuncEnum
-  enum TransparentFuncEnum {
-    case TFEI(Int)
-  }
 }

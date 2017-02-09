@@ -3,7 +3,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -17,6 +17,7 @@ import os
 import pipes
 import platform
 import sys
+import time
 
 # FIXME: Instead of modifying the system path in order to enable imports from
 #        other directories, all Python modules related to the build script
@@ -591,6 +592,7 @@ class BuildScriptInvocation(object):
             "--libdispatch-build-type", args.libdispatch_build_variant,
             "--libicu-build-type", args.libicu_build_variant,
             "--xctest-build-type", args.build_variant,
+            "--swiftpm-build-type", args.build_variant,
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
                 args.swift_stdlib_assertions).lower(),
@@ -779,6 +781,12 @@ class BuildScriptInvocation(object):
                 "--toolchain-prefix",
                 swift_build_support.targets.darwin_toolchain_prefix(
                     args.install_prefix),
+                "--host-lipo", toolchain.lipo,
+            ]
+
+        if toolchain.libtool is not None:
+            impl_args += [
+                "--host-libtool", toolchain.libtool,
             ]
 
         # If we have extra_swift_args, combine all of them together and then
@@ -987,6 +995,14 @@ class BuildScriptInvocation(object):
         # Lipo...
         execute_one_impl_action(name="merged-hosts-lipo")
 
+# Provide a short delay so accidentally invoked clean builds can be canceled.
+def clean_delay():
+    sys.stdout.write('Starting clean build in  ')
+    for i in range(3, 0, -1):
+        sys.stdout.write('\b%d' % i)
+        sys.stdout.flush()
+        time.sleep(1)
+    print('\b\b\b\bnow.')
 
 # Main entry point for the preset mode.
 def main_preset():
@@ -1922,6 +1938,16 @@ iterations with -O",
         type=arguments.type.executable,
         metavar="PATH")
     parser.add_argument(
+        "--host-lipo",
+        help="the absolute path to lipo. Default is auto detected.",
+        type=arguments.type.executable,
+        metavar="PATH")
+    parser.add_argument(
+        "--host-libtool",
+        help="the absolute path to libtool. Default is auto detected.",
+        type=arguments.type.executable,
+        metavar="PATH")
+    parser.add_argument(
         "--distcc",
         help="use distcc in pump mode",
         action=arguments.action.optional_bool)
@@ -1955,7 +1981,7 @@ iterations with -O",
         "--clang-user-visible-version",
         help="User-visible version of the embedded Clang and LLVM compilers",
         type=arguments.type.clang_compiler_version,
-        default="3.8.0",
+        default="4.0.0",
         metavar="MAJOR.MINOR.PATCH")
     parser.add_argument(
         "--swift-compiler-version",
@@ -1966,7 +1992,7 @@ iterations with -O",
         "--swift-user-visible-version",
         help="User-visible version of the embedded Swift compiler",
         type=arguments.type.swift_compiler_version,
-        default="3.0",
+        default="3.1",
         metavar="MAJOR.MINOR")
 
     parser.add_argument(
@@ -2049,6 +2075,11 @@ iterations with -O",
                         help="Enable the SIL ownership model",
                         action='store_true')
 
+    parser.add_argument("--force-optimized-typechecker",
+                        help="Force the type checker to be built with "
+                        "optimization",
+                        action='store_true')
+
     parser.add_argument(
         # Explicitly unavailable options here.
         "--build-jobs",
@@ -2093,6 +2124,10 @@ iterations with -O",
         toolchain.cc = args.host_cc
     if args.host_cxx is not None:
         toolchain.cxx = args.host_cxx
+    if args.host_lipo is not None:
+        toolchain.lipo = args.host_lipo
+    if args.host_libtool is not None:
+        toolchain.libtool = args.host_libtool
     if args.cmake is not None:
         toolchain.cmake = args.cmake
 
@@ -2114,6 +2149,7 @@ iterations with -O",
 
     # Clean build directory if requested.
     if args.clean:
+        clean_delay()
         shell.rmtree(invocation.workspace.build_root)
 
     # Create build directory.

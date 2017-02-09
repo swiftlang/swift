@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -31,6 +31,7 @@ namespace swift {
   class ExtensionDecl;
   class NominalTypeDecl;
   class ValueDecl;
+  class SourceLoc;
 
 /// Describes the context in which a name is being printed, which
 /// affects the keywords that need to be escaped.
@@ -295,6 +296,11 @@ public:
 
 bool shouldPrint(const Decl *D, PrintOptions &Options);
 bool shouldPrintPattern(const Pattern *P, PrintOptions &Options);
+
+void printContext(raw_ostream &os, DeclContext *dc);
+
+bool printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
+                          Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS);
 
 } // namespace swift
 

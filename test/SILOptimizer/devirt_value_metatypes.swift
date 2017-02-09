@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -O %s | %FileCheck %s
 
 open class A {
   @inline(never)
@@ -12,7 +12,7 @@ class B: A {
   override class func foo() {}
 }
 
-// CHECK-LABEL: sil [thunk] [always_inline] @_TF22devirt_value_metatypes17testValueMetatypeFCS_1AT_ 
+// CHECK-LABEL: sil [thunk] [always_inline] @_T022devirt_value_metatypes17testValueMetatypeyAA1ACF 
 // CHECK: value_metatype $@thick A.Type
 // CHECK: checked_cast_br
 // CHECK: checked_cast_br
@@ -32,11 +32,11 @@ open class D : C {
   override class func foo() -> Int { return 1 }
 }
 
-// CHECK-LABEL: sil [thunk] [always_inline] @_TF22devirt_value_metatypes5testDFCS_1DSi
+// CHECK-LABEL: sil [thunk] [always_inline] @_T022devirt_value_metatypes5testDSiAA1DCF
 // CHECK-NOT: value_metatype %
 // D.foo is an internal method, D has no subclasses and it is a wmo compilation,
 // therefore D.foo method invocation can be devirtualized.
-// CHECK: function_ref @_TTSf4d___TZFC22devirt_value_metatypes1D3foofT_Si
+// CHECK: function_ref @_T022devirt_value_metatypes1DC3fooSiyFZTf4d_n
 // CHECK-NOT: value_metatype %
 // CHECK-NOT: checked_cast_br
 // CHECK-NOT: class_method
@@ -51,7 +51,7 @@ public final class E : C {
   override class func foo() -> Int { return 1 }
 }
 
-// CHECK-LABEL: sil [thunk] [always_inline] @_TF22devirt_value_metatypes5testEFCS_1ESi
+// CHECK-LABEL: sil [thunk] [always_inline] @_T022devirt_value_metatypes5testESiAA1ECF
 // CHECK-NOT: value_metatype $@thick E.Type
 // CHECK_NOT: checked_cast_br
 // CHECK: function_ref

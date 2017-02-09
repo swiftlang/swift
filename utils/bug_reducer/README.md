@@ -26,12 +26,8 @@ hopefully help fix them/add tests).
 1. A lot of this code was inspired by llvm's bisect tool. This includes a bit of
    the code style, we should clean this up and pythonify these parts of the
    tool.
-2. Once this is done, we should consider implementing function reducing
-   functionality. We already have sil-func-extractor which can reduce functions
-   in modules just how a bugpoint tool would like. We should wire up code to use
-   that tool to reduce functions. After this point, our tool should be good
-   enough for reducing test cases. Later we can implement block/instruction
-   extraction, but this is a first step.
+2. Reduction at a function level is complete, we should look into block/instruction
+   reduction techniques to reduce SIL further.
 3. Then we need to implement miscompile detection support. This implies
    implementing support for codegening code from this tool using swiftc. This
    implies splitting modules into optimized and unoptimized parts. Luckily,
@@ -60,17 +56,19 @@ Then I invoke the bug reducer as follows:
         --module-name=${MODULE_NAME} \
         --work-dir=${PWD}/bug_reducer \
         --module-cache=${PWD}/bug_reducer/module-cache \
+        --reduce-sil \
         ${SWIFT_BUILD_DIR} \
         ${OUTPUT_SIB}
 
-Then the bug_reducer will first attempt to reduce the passes. Then (in a future
-version), it will attempt to reduce the test case by splitting the module
-up. The output will be look something like:
+Then the bug_reducer will first attempt to reduce the passes. Then, it will
+attempt to reduce the test case by splitting the module and only optimizing part
+of it. The output will be look something like:
 
-    *** Found miscompiling passes!
+    *** Successfully Reduced file!
     *** Final File: ${FINAL_SIB_FILE}
-    *** Final Passes: ${FINAL_PASSES}
+    *** Final Functions: ${FINAL_SET_OF_FUNCTIONS}
     *** Repro command line: ${FULL_FINAL_REPRO_CMDLINE}
+    *** Final Passes: ${FINAL_PASSES}
 
 Some notes:
 

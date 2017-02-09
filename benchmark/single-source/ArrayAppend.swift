@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -60,6 +60,21 @@ public func run_ArrayAppendSequence(_ N: Int) {
 // can pre-reserve capacity.
 @inline(never)
 public func run_ArrayAppendArrayOfInt(_ N: Int) {
+  let other = Array(repeating: 1, count: 10_000)
+  for _ in 0..<N {
+    for _ in 0..<10 {
+      var nums = [Int]()
+      for _ in 0..<8 {
+        nums.append(contentsOf: other)
+      }
+    }
+  }
+}
+
+// Identical to run_ArrayAppendArrayOfInt
+// except +=, to check equally performant.
+@inline(never)
+public func run_ArrayPlusEqualArrayOfInt(_ N: Int) {
   let other = Array(repeating: 1, count: 10_000)
   for _ in 0..<N {
     for _ in 0..<10 {
@@ -157,4 +172,140 @@ public func run_ArrayAppendRepeatCol(_ N: Int) {
   }
 }
 
+
+// Append an array as a generic sequence to another array
+@inline(never)
+public func appendFromGeneric<
+  S: Sequence
+>(array: inout [S.Iterator.Element], sequence: S) {
+  array.append(contentsOf: sequence)
+}
+
+@inline(never)
+public func run_ArrayAppendFromGeneric(_ N: Int) {
+  let other = Array(repeating: 1, count: 10_000)
+
+  for _ in 0..<N {
+    for _ in 0..<10 {
+      var nums = [Int]()
+      for _ in 0..<8 {
+        appendFromGeneric(array: &nums, sequence: other)
+      }
+    }
+  }
+}
+
+// Append an array to an array as a generic range replaceable collection.
+@inline(never)
+public func appendToGeneric<
+  R: RangeReplaceableCollection
+>(collection: inout R, array: [R.Iterator.Element]) {
+  collection.append(contentsOf: array)
+}
+
+@inline(never)
+public func run_ArrayAppendToGeneric(_ N: Int) {
+  let other = Array(repeating: 1, count: 10_000)
+
+  for _ in 0..<N {
+    for _ in 0..<10 {
+      var nums = [Int]()
+      for _ in 0..<8 {
+        appendToGeneric(collection: &nums, array: other)
+      }
+    }
+  }
+}
+
+// Append an array as a generic sequence to an array as a generic range
+// replaceable collection.
+@inline(never)
+public func appendToFromGeneric<
+  R: RangeReplaceableCollection, S: Sequence
+>(collection: inout R, sequence: S) 
+where R.Iterator.Element == S.Iterator.Element {
+  collection.append(contentsOf: sequence)
+}
+
+@inline(never)
+public func run_ArrayAppendToFromGeneric(_ N: Int) {
+  let other = Array(repeating: 1, count: 10_000)
+
+  for _ in 0..<N {
+    for _ in 0..<10 {
+      var nums = [Int]()
+      for _ in 0..<8 {
+        appendToFromGeneric(collection: &nums, sequence: other)
+      }
+    }
+  }
+}
+
+// Append a single element array with the += operator
+@inline(never)
+public func run_ArrayPlusEqualSingleElementCollection(_ N: Int) {
+  for _ in 0..<N {
+    for _ in 0..<10 {
+       var nums = [Int]()
+       for _ in 0..<40_000 {
+         nums += [1]
+       }
+    }
+  }
+}
+
+// Append a five element array with the += operator
+@inline(never)
+public func run_ArrayPlusEqualFiveElementCollection(_ N: Int) {
+  for _ in 0..<N {
+    for _ in 0..<10 {
+       var nums = [Int]()
+       for _ in 0..<40_000 {
+         nums += [1, 2, 3, 4, 5]
+       }
+    }
+  }
+}
+
+// Append the utf8 elements of an ascii string to a [UInt8]
+@inline(never)
+public func run_ArrayAppendAscii(_ N: Int) {
+  let s = "the quick brown fox jumps over the lazy dog!"
+  for _ in 0..<N {
+    for _ in 0..<10 {
+       var nums = [UInt8]()
+       for _ in 0..<10_000 {
+         nums += s.utf8
+       }
+    }
+  }
+}
+
+// Append the utf8 elements of an ascii string to a [UInt8]
+@inline(never)
+public func run_ArrayAppendLatin1(_ N: Int) {
+  let s = "the quick brown fox jumps over the lazy dog\u{00A1}"
+  for _ in 0..<N {
+    for _ in 0..<10 {
+       var nums = [UInt8]()
+       for _ in 0..<10_000 {
+         nums += s.utf8
+       }
+    }
+  }
+}
+
+// Append the utf8 elements of an ascii string to a [UInt8]
+@inline(never)
+public func run_ArrayAppendUTF16(_ N: Int) {
+  let s = "the quick brown 🦊 jumps over the lazy dog"
+  for _ in 0..<N {
+    for _ in 0..<10 {
+       var nums = [UInt8]()
+       for _ in 0..<10_000 {
+         nums += s.utf8
+       }
+    }
+  }
+}
 

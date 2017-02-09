@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -103,18 +103,58 @@ void SILBasicBlock::eraseFromParent() {
   getParent()->getBlocks().erase(this);
 }
 
+void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
+  assert(Other->isEntry() == isEntry() &&
+         "Expected to both blocks to be entries or not");
+  if (isEntry()) {
+    assert(args_empty() && "Expected to have no arguments");
+    for (auto *FuncArg : Other->getFunctionArguments()) {
+      createFunctionArgument(FuncArg->getType(),
+                             FuncArg->getDecl());
+    }
+    return;
+  }
+
+  for (auto *PHIArg : Other->getPHIArguments()) {
+    createPHIArgument(PHIArg->getType(), PHIArg->getOwnershipKind(),
+                      PHIArg->getDecl());
+  }
+}
+
+SILFunctionArgument *SILBasicBlock::createFunctionArgument(SILType Ty,
+                                                           const ValueDecl *D) {
+  assert(isEntry() && "Function Arguments can only be in the entry block");
+  SILFunction *Parent = getParent();
+  auto OwnershipKind = ValueOwnershipKind(
+      Parent->getModule(), Ty,
+      Parent->getConventions().getSILArgumentConvention(getNumArguments()));
+  return new (getModule()) SILFunctionArgument(this, Ty, OwnershipKind, D);
+}
+
+SILFunctionArgument *SILBasicBlock::insertFunctionArgument(arg_iterator Iter,
+                                                           SILType Ty,
+                                                           ValueOwnershipKind OwnershipKind,
+                                                           const ValueDecl *D) {
+  assert(isEntry() && "Function Arguments can only be in the entry block");
+  return new (getModule()) SILFunctionArgument(this, Iter, Ty, OwnershipKind, D);
+}
+
 /// Replace the ith BB argument with a new one with type Ty (and optional
 /// ValueDecl D).
-SILArgument *SILBasicBlock::replaceArgument(unsigned i, SILType Ty,
-                                            const ValueDecl *D) {
+SILPHIArgument *SILBasicBlock::replacePHIArgument(unsigned i, SILType Ty,
+                                                  ValueOwnershipKind Kind,
+                                                  const ValueDecl *D) {
+  assert(!isEntry() && "PHI Arguments can not be in the entry block");
   SILModule &M = getParent()->getModule();
+  if (Ty.isTrivial(M))
+    Kind = ValueOwnershipKind::Trivial;
 
   assert(ArgumentList[i]->use_empty() && "Expected no uses of the old BB arg!");
 
   // Notify the delete handlers that this argument is being deleted.
   M.notifyDeleteHandlers(ArgumentList[i]);
 
-  auto *NewArg = new (M) SILArgument(Ty, D);
+  SILPHIArgument *NewArg = new (M) SILPHIArgument(Ty, Kind, D);
   NewArg->setParent(this);
 
   // TODO: When we switch to malloc/free allocation we'll be leaking memory
@@ -124,13 +164,26 @@ SILArgument *SILBasicBlock::replaceArgument(unsigned i, SILType Ty,
   return NewArg;
 }
 
-SILArgument *SILBasicBlock::createArgument(SILType Ty, const ValueDecl *D) {
-  return new (getModule()) SILArgument(this, Ty, D);
+SILPHIArgument *SILBasicBlock::createPHIArgument(SILType Ty,
+                                                 ValueOwnershipKind Kind,
+                                                 const ValueDecl *D) {
+  assert(!isEntry() && "PHI Arguments can not be in the entry block");
+  assert(!getParent()->hasQualifiedOwnership() ||
+         Kind != ValueOwnershipKind::Any);
+  if (Ty.isTrivial(getModule()))
+    Kind = ValueOwnershipKind::Trivial;
+  return new (getModule()) SILPHIArgument(this, Ty, Kind, D);
 }
 
-SILArgument *SILBasicBlock::insertArgument(arg_iterator Iter, SILType Ty,
-                                           const ValueDecl *D) {
-  return new (getModule()) SILArgument(this, Iter, Ty, D);
+SILPHIArgument *SILBasicBlock::insertPHIArgument(arg_iterator Iter, SILType Ty,
+                                                 ValueOwnershipKind Kind,
+                                                 const ValueDecl *D) {
+  assert(!isEntry() && "PHI Arguments can not be in the entry block");
+  assert(!getParent()->hasQualifiedOwnership() ||
+         Kind != ValueOwnershipKind::Any);
+  if (Ty.isTrivial(getModule()))
+    Kind = ValueOwnershipKind::Trivial;
+  return new (getModule()) SILPHIArgument(this, Iter, Ty, Kind, D);
 }
 
 void SILBasicBlock::eraseArgument(int Index) {
@@ -234,4 +287,21 @@ ScopeCloner::getOrCreateClonedScope(const SILDebugScope *OrigScope) {
 
 bool SILBasicBlock::isEntry() const {
   return this == &*getParent()->begin();
+}
+
+SILBasicBlock::PHIArgumentArrayRefTy SILBasicBlock::getPHIArguments() const {
+  using FuncTy = std::function<SILPHIArgument *(SILArgument *)>;
+  FuncTy F = [](SILArgument *A) -> SILPHIArgument * {
+    return cast<SILPHIArgument>(A);
+  };
+  return makeTransformArrayRef(getArguments(), F);
+}
+
+SILBasicBlock::FunctionArgumentArrayRefTy
+SILBasicBlock::getFunctionArguments() const {
+  using FuncTy = std::function<SILFunctionArgument *(SILArgument *)>;
+  FuncTy F = [](SILArgument *A) -> SILFunctionArgument * {
+    return cast<SILFunctionArgument>(A);
+  };
+  return makeTransformArrayRef(getArguments(), F);
 }

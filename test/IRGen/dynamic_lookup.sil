@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 // REQUIRES: CPU=i386_or_x86_64
 // REQUIRES: objc_interop
@@ -14,37 +14,37 @@ class X {
 }
 sil_vtable X {}
 
-sil @_TFC14dynamic_lookup1XD : $@convention(method) (X) -> ()
+sil @_T014dynamic_lookup1XCfD : $@convention(method) (X) -> ()
 
 // [objc] t.X.f (t.X)() -> ()
-sil @_TToFC14dynamic_lookup1X1ffT_T_ : $@convention(objc_method) (X) -> () {
+sil @_T014dynamic_lookup1XC1fyyFTo : $@convention(objc_method) (X) -> () {
 bb0(%0 : $X):
   %3 = tuple ()
   return %3 : $()
 }
 
 // [objc] X.g (ObjectiveC.X.Type)() -> ()
-sil @_TToZFC14dynamic_lookup1X1gfT_T_ : $@convention(thin) (@thick X.Type) -> () {
+sil @_T014dynamic_lookup1XC1gyyFZTo : $@convention(thin) (@thick X.Type) -> () {
 bb0(%0 : $@thick X.Type):
   %14 = tuple ()                                  // user: %15
   return %14 : $()
 }
 
-sil @_TToFC14dynamic_lookup1Xg9subscriptFSiSi : $@convention(objc_method) (Int, X) -> Int {
+sil @_T014dynamic_lookup1XC9subscriptSiSicfgTo : $@convention(objc_method) (Int, X) -> Int {
 bb0(%0 : $Int, %1 : $X):
-  %4 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
+  %4 = function_ref @_T0Si33_convertFromBuiltinIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
   %5 = metatype $@thin Int.Type
   %6 = integer_literal $Builtin.Int64, 5
   %7 = apply %4(%6, %5) : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %9
   return %7 : $Int
 }
 
-sil @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int
+sil @_T0Si33_convertFromBuiltinIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int
 
 // [objc] dynamic_lookup.X.value.getter : Swift.Int
-sil @_TToFC14dynamic_lookup1Xg5valueSi : $@convention(objc_method) (X) -> Int {
+sil @_T014dynamic_lookup1XC5valueSifgTo : $@convention(objc_method) (X) -> Int {
 bb0(%0 : $X):
-  %4 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
+  %4 = function_ref @_T0Si33_convertFromBuiltinIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
   %5 = metatype $@thin Int.Type
   %6 = integer_literal $Builtin.Int64, 5
   %7 = apply %4(%6, %5) : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %9

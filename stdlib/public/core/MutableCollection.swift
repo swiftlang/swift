@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -218,7 +218,7 @@ public protocol _MutableIndexable : _Indexable {
 ///     a[i] = x
 ///     let y = x
 public protocol MutableCollection : _MutableIndexable, Collection {
-  // FIXME: should be constrained to MutableCollection
+  // FIXME(ABI)#181: should be constrained to MutableCollection
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
   /// A collection that represents a contiguous subrange of the collection's
@@ -365,6 +365,30 @@ extension MutableCollection {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
       return MutableSlice(base: self, bounds: bounds)
+    }
+    set {
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
+  }
+}
+
+extension MutableCollection where Self: BidirectionalCollection {
+  public subscript(bounds: Range<Index>) -> MutableBidirectionalSlice<Self> {
+    get {
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      return MutableBidirectionalSlice(base: self, bounds: bounds)
+    }
+    set {
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
+  }
+}
+
+extension MutableCollection where Self: RandomAccessCollection {
+  public subscript(bounds: Range<Index>) -> MutableRandomAccessSlice<Self> {
+    get {
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      return MutableRandomAccessSlice(base: self, bounds: bounds)
     }
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)

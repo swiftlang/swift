@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -522,7 +522,7 @@ public:
   }
 };
 
-} // anonymous namespace.
+} // anonymous namespace
 
 uint64_t SwiftDocumentSemanticInfo::getASTGeneration() const {
   llvm::sys::ScopedLock L(Mtx);
@@ -771,7 +771,8 @@ public:
     : SM(SM), BufferID(BufferID) {}
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type T) override {
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+                          SemaReferenceKind Kind) override {
     if (isa<VarDecl>(D) && D->hasName() && D->getName().str() == "self")
       return true;
 
@@ -788,7 +789,8 @@ public:
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override {
     // We should treat both open and close brackets equally
-    return visitDeclReference(D, Range, nullptr, Type());
+    return visitDeclReference(D, Range, nullptr, nullptr, Type(),
+                              SemaReferenceKind::SubscriptRef);
   }
 
   void annotate(const Decl *D, bool IsRef, CharSourceRange Range) {

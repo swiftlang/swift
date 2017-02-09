@@ -7,16 +7,16 @@ import Swift
 import FunctionInput
 
 // Make sure we can deserialize a SIL function with these various attributes.
-// CHECK: sil public_external @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X, @deallocating X) -> @out X {
+// CHECK: sil public_external @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X) -> @out X {
 
-sil @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X, @deallocating X) -> @out X
+sil @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X) -> @out X
 
 sil @foo_caller : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $X
   %1 = load %0 : $*X
-  %2 = function_ref @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X, @deallocating X) -> @out X
-  apply %2(%0, %0, %0, %0, %1, %1, %1, %1) : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X, @deallocating X) -> @out X
+  %2 = function_ref @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X) -> @out X
+  apply %2(%0, %0, %0, %0, %1, %1, %1) : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X) -> @out X
   dealloc_stack %0 : $*X
   %9999 = tuple()
   return %9999 : $()

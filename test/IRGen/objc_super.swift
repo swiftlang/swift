@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -new-mangling-for-tests %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -17,9 +17,9 @@ import gizmo
 // CHECK: [[GIZMO:%CSo5Gizmo]] = type
 
 class Hoozit : Gizmo {
-  // CHECK: define hidden void @_TFC10objc_super6Hoozit4frobfT_T_([[HOOZIT]]*) {{.*}} {
+  // CHECK: define hidden void @_T010objc_super6HoozitC4frobyyF([[HOOZIT]]*) {{.*}} {
   override func frob() {
-    // CHECK: [[T0:%.*]] = call [[TYPE]]* @_TMaC10objc_super6Hoozit()
+    // CHECK: [[T0:%.*]] = call [[TYPE]]* @_T010objc_super6HoozitCMa()
     // CHECK: [[T1:%.*]] = bitcast [[TYPE]]* [[T0]] to [[CLASS]]*
     // CHECK: store [[CLASS]]* [[T1]], [[CLASS]]** {{.*}}, align 8
     // CHECK: load i8*, i8** @"\01L_selector(frob)"
@@ -28,7 +28,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden void @_TZFC10objc_super6Hoozit5runcefT_T_([[TYPE]]*) {{.*}} {
+  // CHECK: define hidden void @_T010objc_super6HoozitC5runceyyFZ([[TYPE]]*) {{.*}} {
   override class func runce() {
     // CHECK: store [[CLASS]]* @"OBJC_METACLASS_$__TtC10objc_super6Hoozit", [[CLASS]]** {{.*}}, align 8
     // CHECK: load i8*, i8** @"\01L_selector(runce)"
@@ -37,9 +37,9 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden void @_TFC10objc_super6Hoozit5framefT_VSC6NSRect(%VSC6NSRect* noalias nocapture sret, %C10objc_super6Hoozit*) {{.*}} {
+  // CHECK: define hidden void @_T010objc_super6HoozitC5frameSC6NSRectVyF(%VSC6NSRect* noalias nocapture sret, %C10objc_super6Hoozit*) {{.*}} {
   override func frame() -> NSRect {
-    // CHECK: [[T0:%.*]] = call [[TYPE]]* @_TMaC10objc_super6Hoozit()
+    // CHECK: [[T0:%.*]] = call [[TYPE]]* @_T010objc_super6HoozitCMa()
     // CHECK: [[T1:%.*]] = bitcast [[TYPE]]* [[T0]] to [[CLASS]]*
     // CHECK: store [[CLASS]]* [[T1]], [[CLASS]]** {{.*}}, align 8
     // CHECK: load i8*, i8** @"\01L_selector(frame)"
@@ -48,7 +48,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden [[HOOZIT]]* @_TFC10objc_super6HoozitcfT1xSi_S0_(i64, %C10objc_super6Hoozit*) {{.*}} {
+  // CHECK: define hidden [[HOOZIT]]* @_T010objc_super6HoozitCACSi1x_tcfc(i64, %C10objc_super6Hoozit*) {{.*}} {
   init(x:Int) {
     // CHECK: load i8*, i8** @"\01L_selector(init)"
     // CHECK: call [[OPAQUE:.*]]* bitcast (void ()* @objc_msgSendSuper2 to [[OPAQUE:.*]]* (%objc_super*, i8*)*)([[SUPER]]* {{.*}}, i8* {{.*}})
@@ -58,7 +58,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden [[HOOZIT]]* @_TFC10objc_super6HoozitcfT1ySi_S0_(i64, %C10objc_super6Hoozit*) {{.*}} {
+  // CHECK: define hidden [[HOOZIT]]* @_T010objc_super6HoozitCACSi1y_tcfc(i64, %C10objc_super6Hoozit*) {{.*}} {
   init(y:Int) {
     // CHECK: load i8*, i8** @"\01L_selector(initWithBellsOn:)"
     // CHECK: call [[OPAQUE:.*]]* bitcast (void ()* @objc_msgSendSuper2 to [[OPAQUE:.*]]* (%objc_super*, i8*, i64)*)([[SUPER]]* {{.*}}, i8* {{.*}}, i64 {{.*}})
@@ -72,15 +72,15 @@ class Hoozit : Gizmo {
 func acceptFn(_ fn: () -> Void) { }
 
 class PartialApply : Gizmo {
-  // CHECK: define hidden void @_TFC10objc_super12PartialApply4frobfT_T_([[PARTIAL_APPLY_CLASS]]*) {{.*}} {
+  // CHECK: define hidden void @_T010objc_super12PartialApplyC4frobyyF([[PARTIAL_APPLY_CLASS]]*) {{.*}} {
   override func frob() {
-    // CHECK: call void @_TF10objc_super8acceptFnFFT_T_T_(i8* bitcast (void (%swift.refcounted*)* [[PARTIAL_FORWARDING_THUNK:@[A-Za-z0-9_]+]] to i8*), %swift.refcounted* %3)
+    // CHECK: call void @_T010objc_super8acceptFnyyycF(i8* bitcast (void (%swift.refcounted*)* [[PARTIAL_FORWARDING_THUNK:@[A-Za-z0-9_]+]] to i8*), %swift.refcounted* %3)
     acceptFn(super.frob)
   }
   // CHECK: }
 
   // CHECK: define internal void [[PARTIAL_FORWARDING_THUNK]](%swift.refcounted*) #0 {
-  // CHECK: call %swift.type* @_TMaC10objc_super12PartialApply()
+  // CHECK: call %swift.type* @_T010objc_super12PartialApplyCMa()
   // CHECK: @"\01L_selector(frob)"
   // CHECK: call void bitcast (void ()* @objc_msgSendSuper2
   // CHECK: }

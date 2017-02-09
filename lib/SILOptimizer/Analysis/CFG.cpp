@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,6 +14,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 using namespace swift;
@@ -40,8 +41,9 @@ static bool isSafeNonExitTerminator(TermInst *TI) {
 }
 
 static bool isTrapNoReturnFunction(ApplyInst *AI) {
-  const char *fatalName =
-      "_TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_";
+  const char *fatalName = MANGLE_AS_STRING(SELECT_MANGLING(
+                            Fs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_,
+                            s18_fatalErrorMessageys12StaticStringV_AcCSutF));
   auto *Fn = AI->getReferencedFunction();
 
   // We use endswith here since if we specialize fatal error we will always

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 sil_stage canonical
 
 import Builtin
@@ -124,7 +124,7 @@ sil @take_t : $@convention(thin) <T> (@in T) -> ()
 // CHECK-LABEL: define{{( protected)?}} void @dyn_box_a
 sil @dyn_box_a : $@convention(thin) <T> () -> () {
 entry:
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @_TMaV11typed_boxes3Dyn(%swift.type* %T)
+  // CHECK: [[METADATA:%.*]] = call %swift.type* @_T011typed_boxes3DynVMa(%swift.type* %T)
   // CHECK: [[ALLOC:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METADATA]])
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 0
   // CHECK: [[PTR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 1

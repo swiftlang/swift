@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -87,6 +87,10 @@ public:
   /// \returns the type of the declaration in context..
   virtual Type resolveTypeOfDecl(TypeDecl *decl) = 0;
 
+  /// Determine whether the given types are equivalent within the generic
+  /// context.
+  virtual bool areSameType(Type type1, Type type2) = 0;
+
   /// Set the contextual type or the interface type of the parameter.
   virtual void recordParamType(ParamDecl *decl, Type ty) = 0;
 };
@@ -97,10 +101,12 @@ public:
 /// and only trivially resolves dependent member types.
 class DependentGenericTypeResolver : public GenericTypeResolver {
   ArchetypeBuilder &Builder;
+  ArrayRef<GenericTypeParamType *> GenericParams;
 
 public:
-  explicit DependentGenericTypeResolver(ArchetypeBuilder &builder)
-    : Builder(builder) { }
+  DependentGenericTypeResolver(ArchetypeBuilder &builder,
+                               ArrayRef<GenericTypeParamType *> genericParams)
+    : Builder(builder), GenericParams(genericParams) { }
 
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
@@ -115,6 +121,8 @@ public:
   virtual Type resolveTypeOfContext(DeclContext *dc);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
+
+  virtual bool areSameType(Type type1, Type type2);
 
   virtual void recordParamType(ParamDecl *decl, Type ty);
 };
@@ -148,6 +156,8 @@ public:
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
 
+  virtual bool areSameType(Type type1, Type type2);
+
   virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
@@ -161,10 +171,12 @@ public:
 class CompleteGenericTypeResolver : public GenericTypeResolver {
   TypeChecker &TC;
   ArchetypeBuilder &Builder;
+  ArrayRef<GenericTypeParamType *> GenericParams;
 
 public:
-  CompleteGenericTypeResolver(TypeChecker &tc, ArchetypeBuilder &builder)
-    : TC(tc), Builder(builder) { }
+  CompleteGenericTypeResolver(TypeChecker &tc, ArchetypeBuilder &builder,
+                              ArrayRef<GenericTypeParamType *> genericParams)
+    : TC(tc), Builder(builder), GenericParams(genericParams) { }
 
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
@@ -179,6 +191,8 @@ public:
   virtual Type resolveTypeOfContext(DeclContext *dc);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
+
+  virtual bool areSameType(Type type1, Type type2);
 
   virtual void recordParamType(ParamDecl *decl, Type ty);
 };

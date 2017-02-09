@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/../Inputs/custom-modules -import-objc-header %S/Inputs/mixed-target/header.h -typecheck %s -disable-objc-attr-requires-foundation-module -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/../Inputs/custom-modules -import-objc-header %S/Inputs/mixed-target/header.h -typecheck -primary-file %s %S/Inputs/mixed-target/other-file.swift -disable-objc-attr-requires-foundation-module -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/../Inputs/custom-modules -import-objc-header %S/Inputs/mixed-target/header.h -emit-sil -primary-file %s %S/Inputs/mixed-target/other-file.swift -disable-objc-attr-requires-foundation-module -o /dev/null -D SILGEN
 
 // REQUIRES: objc_interop
 
@@ -37,7 +38,9 @@ class ProtoConformer : ForwardClassUser {
 func testProtocolWrapper(_ conformer: ForwardClassUser) {
   conformer.consumeForwardClass(conformer.forward)
 }
-testProtocolWrapper(ProtoConformer())
+func useProtocolWrapper() {
+  testProtocolWrapper(ProtoConformer())
+}
 
 func testStruct(_ p: Point2D) -> Point2D {
   var result = p
@@ -45,9 +48,11 @@ func testStruct(_ p: Point2D) -> Point2D {
   return result
 }
 
+#if !SILGEN
 func testSuppressed() {
   let _: __int128_t? = nil // expected-error{{use of undeclared type '__int128_t'}}
 }
+#endif
 
 func testMacro() {
   _ = CONSTANT as CInt
@@ -58,6 +63,7 @@ func testFoundationOverlay() {
   _ = NSUTF8StringEncoding as UInt // and we should get the overlay version
 }
 
+#if !SILGEN
 func testProtocolNamingConflict() {
   let a: ConflictingName1?
   var b: ConflictingName1Protocol?
@@ -69,9 +75,13 @@ func testProtocolNamingConflict() {
   d = c // expected-error {{cannot assign value of type 'ConflictingName2?' to type 'ConflictingName2Protocol?'}}
   _ = d
 }
+#endif
 
 func testDeclsNestedInObjCContainers() {
   let _: NameInInterface = 0
   let _: NameInProtocol = 0
   let _: NameInCategory = 0
 }
+
+func testReleaseClassWhoseMembersAreNeverLoaded(
+    obj: ClassThatHasAProtocolTypedPropertyButMembersAreNeverLoaded) {}

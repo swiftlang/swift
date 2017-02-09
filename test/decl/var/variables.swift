@@ -48,6 +48,7 @@ var aot2 = aot1          // expected-warning {{variable 'aot2' inferred to have 
 
 
 for item in [AnyObject]() {  // No warning in for-each loop.
+  _ = item
 }
 
 
@@ -99,6 +100,7 @@ func test21081340() {
 if true {
   let s : Int
   s = 42  // should be valid.
+  _ = s
 }
 
 

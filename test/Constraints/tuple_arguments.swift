@@ -3,12 +3,17 @@
 // See test/Compatibility/tuple_arguments.swift for the Swift 3 behavior.
 
 func concrete(_ x: Int) {}
+func concreteLabeled(x: Int) {}
 func concreteTwo(_ x: Int, _ y: Int) {} // expected-note 5 {{'concreteTwo' declared here}}
 func concreteTuple(_ x: (Int, Int)) {}
 
 do {
   concrete(3)
   concrete((3))
+
+  concreteLabeled(x: 3)
+  concreteLabeled(x: (3))
+  concreteLabeled((x: 3)) // expected-error {{missing argument label 'x:' in call}}
 
   concreteTwo(3, 4)
   concreteTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
@@ -37,10 +42,10 @@ do {
 }
 
 do {
-  var a = 3
-  var b = 4
-  var c = (3)
-  var d = (a, b)
+  var a = 3 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  var b = 4 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  var c = (3) // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
+  var d = (a, b) // expected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
 
   concrete(a)
   concrete((a))
@@ -56,6 +61,7 @@ do {
 }
 
 func generic<T>(_ x: T) {}
+func genericLabeled<T>(x: T) {}
 func genericTwo<T, U>(_ x: T, _ y: U) {} // expected-note 5 {{'genericTwo' declared here}}
 func genericTuple<T, U>(_ x: (T, U)) {}
 
@@ -64,6 +70,11 @@ do {
   generic(3, 4) // expected-error {{extra argument in call}}
   generic((3))
   generic((3, 4))
+
+  genericLabeled(x: 3)
+  genericLabeled(x: 3, 4) // expected-error {{extra argument in call}}
+  genericLabeled(x: (3))
+  genericLabeled(x: (3, 4))
 
   genericTwo(3, 4)
   genericTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
@@ -234,6 +245,7 @@ do {
 
 extension Concrete {
   func generic<T>(_ x: T) {}
+  func genericLabeled<T>(x: T) {}
   func genericTwo<T, U>(_ x: T, _ y: U) {} // expected-note 5 {{'genericTwo' declared here}}
   func genericTuple<T, U>(_ x: (T, U)) {}
 }
@@ -245,6 +257,11 @@ do {
   s.generic(3, 4) // expected-error {{extra argument in call}}
   s.generic((3))
   s.generic((3, 4))
+
+  s.genericLabeled(x: 3)
+  s.genericLabeled(x: 3, 4) // expected-error {{extra argument in call}}
+  s.genericLabeled(x: (3))
+  s.genericLabeled(x: (3, 4))
 
   s.genericTwo(3, 4)
   s.genericTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
@@ -362,6 +379,7 @@ do {
 
 extension Concrete {
   mutating func mutatingGeneric<T>(_ x: T) {}
+  mutating func mutatingGenericLabeled<T>(x: T) {}
   mutating func mutatingGenericTwo<T, U>(_ x: T, _ y: U) {} // expected-note 5 {{'mutatingGenericTwo' declared here}}
   mutating func mutatingGenericTuple<T, U>(_ x: (T, U)) {}
 }
@@ -373,6 +391,11 @@ do {
   s.mutatingGeneric(3, 4) // expected-error {{extra argument in call}}
   s.mutatingGeneric((3))
   s.mutatingGeneric((3, 4))
+
+  s.mutatingGenericLabeled(x: 3)
+  s.mutatingGenericLabeled(x: 3, 4) // expected-error {{extra argument in call}}
+  s.mutatingGenericLabeled(x: (3))
+  s.mutatingGenericLabeled(x: (3, 4))
 
   s.mutatingGenericTwo(3, 4)
   s.mutatingGenericTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
@@ -497,12 +520,19 @@ struct InitTuple {
   init(_ x: (Int, Int)) {}
 }
 
+struct InitLabeledTuple {
+  init(x: (Int, Int)) {}
+}
+
 do {
   _ = InitTwo(3, 4)
   _ = InitTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
 
   _ = InitTuple(3, 4) // expected-error {{extra argument in call}}
   _ = InitTuple((3, 4))
+
+  _ = InitLabeledTuple(x: 3, 4) // expected-error {{extra argument in call}}
+  _ = InitLabeledTuple(x: (3, 4))
 }
 
 do {
@@ -520,9 +550,9 @@ do {
 }
 
 do {
-  var a = 3
-  var b = 4
-  var c = (a, b)
+  var a = 3 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  var b = 4 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  var c = (a, b) // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
 
   _ = InitTwo(a, b)
   _ = InitTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
@@ -539,6 +569,10 @@ struct SubscriptTwo {
 
 struct SubscriptTuple {
   subscript(_ x: (Int, Int)) -> Int { get { return 0 } set { } }
+}
+
+struct SubscriptLabeledTuple {
+  subscript(x x: (Int, Int)) -> Int { get { return 0 } set { } }
 }
 
 do {
@@ -565,12 +599,16 @@ do {
   _ = s2[a, b] // expected-error {{extra argument in call}}
   _ = s2[(a, b)]
   _ = s2[d]
+
+  let s3 = SubscriptLabeledTuple()
+  _ = s3[x: 3, 4] // expected-error {{extra argument in call}}
+  _ = s3[x: (3, 4)]
 }
 
 do {
-  var a = 3
-  var b = 4
-  var d = (a, b)
+  var a = 3 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  var b = 4 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  var d = (a, b) // expected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
 
   var s1 = SubscriptTwo()
   _ = s1[a, b]
@@ -586,6 +624,7 @@ do {
 enum Enum {
   case two(Int, Int) // expected-note 5 {{'two' declared here}}
   case tuple((Int, Int))
+  case labeledTuple(x: (Int, Int))
 }
 
 do {
@@ -594,6 +633,9 @@ do {
 
   _ = Enum.tuple(3, 4) // expected-error {{extra argument in call}}
   _ = Enum.tuple((3, 4))
+
+  _ = Enum.labeledTuple(x: 3, 4) // expected-error {{extra argument in call}}
+  _ = Enum.labeledTuple(x: (3, 4))
 }
 
 do {
@@ -628,6 +670,7 @@ struct Generic<T> {}
 
 extension Generic {
   func generic(_ x: T) {}
+  func genericLabeled(x: T) {}
   func genericTwo(_ x: T, _ y: T) {} // expected-note 3 {{'genericTwo' declared here}}
   func genericTuple(_ x: (T, T)) {}
 }
@@ -637,6 +680,9 @@ do {
 
   s.generic(3.0)
   s.generic((3.0))
+
+  s.genericLabeled(x: 3.0)
+  s.genericLabeled(x: (3.0))
 
   s.genericTwo(3.0, 4.0)
   s.genericTwo((3.0, 4.0)) // expected-error {{missing argument for parameter #2 in call}}
@@ -648,6 +694,9 @@ do {
 
   sTwo.generic(3.0, 4.0) // expected-error {{extra argument in call}}
   sTwo.generic((3.0, 4.0))
+
+  sTwo.genericLabeled(x: 3.0, 4.0) // expected-error {{extra argument in call}}
+  sTwo.genericLabeled(x: (3.0, 4.0))
 }
 
 do {
@@ -702,6 +751,7 @@ do {
 
 extension Generic {
   mutating func mutatingGeneric(_ x: T) {}
+  mutating func mutatingGenericLabeled(x: T) {}
   mutating func mutatingGenericTwo(_ x: T, _ y: T) {} // expected-note 3 {{'mutatingGenericTwo' declared here}}
   mutating func mutatingGenericTuple(_ x: (T, T)) {}
 }
@@ -711,6 +761,9 @@ do {
 
   s.mutatingGeneric(3.0)
   s.mutatingGeneric((3.0))
+
+  s.mutatingGenericLabeled(x: 3.0)
+  s.mutatingGenericLabeled(x: (3.0))
 
   s.mutatingGenericTwo(3.0, 4.0)
   s.mutatingGenericTwo((3.0, 4.0)) // expected-error {{missing argument for parameter #2 in call}}
@@ -722,6 +775,9 @@ do {
 
   sTwo.mutatingGeneric(3.0, 4.0) // expected-error {{extra argument in call}}
   sTwo.mutatingGeneric((3.0, 4.0))
+
+  sTwo.mutatingGenericLabeled(x: 3.0, 4.0) // expected-error {{extra argument in call}}
+  sTwo.mutatingGenericLabeled(x: (3.0, 4.0))
 }
 
 do {
@@ -852,6 +908,10 @@ struct GenericInit<T> {
   init(_ x: T) {}
 }
 
+struct GenericInitLabeled<T> {
+  init(x: T) {}
+}
+
 struct GenericInitTwo<T> {
   init(_ x: T, _ y: T) {} // expected-note 10 {{'init' declared here}}
 }
@@ -860,26 +920,42 @@ struct GenericInitTuple<T> {
   init(_ x: (T, T)) {}
 }
 
+struct GenericInitLabeledTuple<T> {
+  init(x: (T, T)) {}
+}
+
 do {
   _ = GenericInit(3, 4) // expected-error {{extra argument in call}}
   _ = GenericInit((3, 4))
+
+  _ = GenericInitLabeled(x: 3, 4) // expected-error {{extra argument in call}}
+  _ = GenericInitLabeled(x: (3, 4))
 
   _ = GenericInitTwo(3, 4)
   _ = GenericInitTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
 
   _ = GenericInitTuple(3, 4) // expected-error {{extra argument in call}}
   _ = GenericInitTuple((3, 4))
+
+  _ = GenericInitLabeledTuple(x: 3, 4) // expected-error {{extra argument in call}}
+  _ = GenericInitLabeledTuple(x: (3, 4))
 }
 
 do {
   _ = GenericInit<(Int, Int)>(3, 4) // expected-error {{extra argument in call}}
   _ = GenericInit<(Int, Int)>((3, 4))
 
+  _ = GenericInitLabeled<(Int, Int)>(x: 3, 4) // expected-error {{extra argument in call}}
+  _ = GenericInitLabeled<(Int, Int)>(x: (3, 4))
+
   _ = GenericInitTwo<Int>(3, 4)
   _ = GenericInitTwo<Int>((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
 
   _ = GenericInitTuple<Int>(3, 4) // expected-error {{extra argument in call}}
   _ = GenericInitTuple<Int>((3, 4))
+
+  _ = GenericInitLabeledTuple<Int>(x: 3, 4) // expected-error {{extra argument in call}}
+  _ = GenericInitLabeledTuple<Int>(x: (3, 4))
 }
 
 do {
@@ -937,9 +1013,9 @@ do {
 }
 
 do {
-  var a = 3
-  var b = 4
-  var c = (a, b)
+  var a = 3 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  var b = 4 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  var c = (a, b) // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
 
   _ = GenericInit<(Int, Int)>(a, b) // expected-error {{extra argument in call}}
   _ = GenericInit<(Int, Int)>((a, b))
@@ -958,8 +1034,16 @@ struct GenericSubscript<T> {
   subscript(_ x: T) -> Int { get { return 0 } set { } }
 }
 
+struct GenericSubscriptLabeled<T> {
+  subscript(x x: T) -> Int { get { return 0 } set { } }
+}
+
 struct GenericSubscriptTwo<T> {
   subscript(_ x: T, _ y: T) -> Int { get { return 0 } set { } } // expected-note {{'subscript' declared here}}
+}
+
+struct GenericSubscriptLabeledTuple<T> {
+  subscript(x x: (T, T)) -> Int { get { return 0 } set { } }
 }
 
 struct GenericSubscriptTuple<T> {
@@ -971,6 +1055,10 @@ do {
   _ = s1[3.0, 4.0] // expected-error {{extra argument in call}}
   _ = s1[(3.0, 4.0)]
 
+  let s1a  = GenericSubscriptLabeled<(Double, Double)>()
+  _ = s1a [x: 3.0, 4.0] // expected-error {{extra argument in call}}
+  _ = s1a [x: (3.0, 4.0)]
+
   let s2 = GenericSubscriptTwo<Double>()
   _ = s2[3.0, 4.0]
   _ = s2[(3.0, 4.0)] // expected-error {{missing argument for parameter #2 in call}}
@@ -978,6 +1066,10 @@ do {
   let s3 = GenericSubscriptTuple<Double>()
   _ = s3[3.0, 4.0] // expected-error {{extra argument in call}}
   _ = s3[(3.0, 4.0)]
+
+  let s3a = GenericSubscriptLabeledTuple<Double>()
+  _ = s3a[x: 3.0, 4.0] // expected-error {{extra argument in call}}
+  _ = s3a[x: (3.0, 4.0)]
 }
 
 do {
@@ -1002,9 +1094,9 @@ do {
 }
 
 do {
-  var a = 3.0
-  var b = 4.0
-  var d = (a, b)
+  var a = 3.0 // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  var b = 4.0 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  var d = (a, b) // expected-warning {{variable 'd' was never mutated; consider changing to 'let' constant}}
 
   var s1 = GenericSubscript<(Double, Double)>()
   _ = s1[a, b] // expected-error {{extra argument in call}}
@@ -1024,6 +1116,7 @@ do {
 
 enum GenericEnum<T> {
   case one(T)
+  case labeled(x: T)
   case two(T, T) // expected-note 10 {{'two' declared here}}
   case tuple((T, T))
 }
@@ -1031,6 +1124,11 @@ enum GenericEnum<T> {
 do {
   _ = GenericEnum.one(3, 4) // expected-error {{extra argument in call}}
   _ = GenericEnum.one((3, 4))
+
+  _ = GenericEnum.labeled(x: 3, 4) // expected-error {{extra argument in call}}
+  _ = GenericEnum.labeled(x: (3, 4))
+  _ = GenericEnum.labeled(3, 4) // expected-error {{extra argument in call}}
+  _ = GenericEnum.labeled((3, 4)) // expected-error {{missing argument label 'x:' in call}}
 
   _ = GenericEnum.two(3, 4)
   _ = GenericEnum.two((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
@@ -1042,6 +1140,11 @@ do {
 do {
   _ = GenericEnum<(Int, Int)>.one(3, 4) // expected-error {{extra argument in call}}
   _ = GenericEnum<(Int, Int)>.one((3, 4))
+
+  _ = GenericEnum<(Int, Int)>.labeled(x: 3, 4) // expected-error {{extra argument in call}}
+  _ = GenericEnum<(Int, Int)>.labeled(x: (3, 4))
+  _ = GenericEnum<(Int, Int)>.labeled(3, 4) // expected-error {{extra argument in call}}
+  _ = GenericEnum<(Int, Int)>.labeled((3, 4)) // expected-error {{missing argument label 'x:' in call}}
 
   _ = GenericEnum<Int>.two(3, 4)
   _ = GenericEnum<Int>.two((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
@@ -1128,6 +1231,7 @@ protocol Protocol {
 
 extension Protocol {
   func requirement(_ x: Element) {}
+  func requirementLabeled(x: Element) {}
   func requirementTwo(_ x: Element, _ y: Element) {} // expected-note 3 {{'requirementTwo' declared here}}
   func requirementTuple(_ x: (Element, Element)) {}
 }
@@ -1141,6 +1245,9 @@ do {
 
   s.requirement(3.0)
   s.requirement((3.0))
+ 
+  s.requirementLabeled(x: 3.0)
+  s.requirementLabeled(x: (3.0))
 
   s.requirementTwo(3.0, 4.0)
   s.requirementTwo((3.0, 4.0)) // expected-error {{missing argument for parameter #2 in call}}
@@ -1152,6 +1259,9 @@ do {
 
   sTwo.requirement(3.0, 4.0) // expected-error {{extra argument in call}}
   sTwo.requirement((3.0, 4.0))
+
+  sTwo.requirementLabeled(x: 3.0, 4.0) // expected-error {{extra argument in call}}
+  sTwo.requirementLabeled(x: (3.0, 4.0))
 }
 
 do {
@@ -1259,6 +1369,10 @@ do {
 // with single 'Any' parameter
 func takesAny(_: Any) {}
 
+enum HasAnyCase {
+  case any(_: Any)
+}
+
 do {
   let fn: (Any) -> () = { _ in }
 
@@ -1267,4 +1381,50 @@ do {
 
   takesAny(123)
   takesAny(data: 123) // expected-error {{extraneous argument label 'data:' in call}}
+
+  _ = HasAnyCase.any(123)
+  _ = HasAnyCase.any(data: 123) // expected-error {{extraneous argument label 'data:' in call}}
 }
+
+// rdar://problem/29739905 - protocol extension methods on Array had
+// ParenType sugar stripped off the element type
+func processArrayOfFunctions(f1: [((Bool, Bool)) -> ()],
+                             f2: [(Bool, Bool) -> ()],
+                             c: Bool) {
+  let p = (c, c)
+
+  f1.forEach { block in
+    block(p)
+    block((c, c))
+    block(c, c) // expected-error {{extra argument in call}}
+  }
+
+  f2.forEach { block in
+  // expected-note@-1 2{{'block' declared here}}
+    block(p) // expected-error {{missing argument for parameter #2 in call}}
+    block((c, c)) // expected-error {{missing argument for parameter #2 in call}}
+    block(c, c)
+  }
+
+  f2.forEach { (block: ((Bool, Bool)) -> ()) in
+  // expected-error@-1 {{cannot convert value of type '(((Bool, Bool)) -> ()) -> ()' to expected argument type '((Bool, Bool) -> ()) -> Void'}}
+    block(p)
+    block((c, c))
+    block(c, c)
+  }
+
+  f2.forEach { (block: (Bool, Bool) -> ()) in
+  // expected-note@-1 2{{'block' declared here}}
+    block(p) // expected-error {{missing argument for parameter #2 in call}}
+    block((c, c)) // expected-error {{missing argument for parameter #2 in call}}
+    block(c, c)
+  }
+}
+
+// expected-error@+1 {{cannot create a single-element tuple with an element label}}
+func singleElementTupleArgument(completion: ((didAdjust: Bool)) -> Void) {
+    // TODO: Error could be improved.
+    // expected-error@+1 {{cannot convert value of type '(didAdjust: Bool)' to expected argument type 'Bool'}}
+    completion((didAdjust: true))
+}
+

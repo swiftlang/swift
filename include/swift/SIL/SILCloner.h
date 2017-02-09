@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -117,7 +117,7 @@ protected:
     
     return Substitution(newReplacement, sub.getConformances());
   }
-  ArrayRef<Substitution> getOpSubstitutions(ArrayRef<Substitution> Subs) {
+  SubstitutionList getOpSubstitutions(SubstitutionList Subs) {
     MutableArrayRef<Substitution> newSubsBuf;
     
     auto copySubs = [&]{
@@ -146,7 +146,8 @@ protected:
     if (!OpenedExistentialSubs.empty()) {
       auto &F = getBuilder().getFunction();
       Ty = Ty.subst(F.getModule(),
-                    OpenedExistentialSubs);
+                    QueryTypeSubstitutionMap{OpenedExistentialSubs},
+                    MakeAbstractConformanceForGenericType());
     }
 
     return Ty;
@@ -159,7 +160,9 @@ protected:
   CanType getASTTypeInClonedContext(CanType ty) {
     // Substitute opened existential types, if we have any.
     if (!OpenedExistentialSubs.empty()) {
-      ty = ty.subst(OpenedExistentialSubs, None)->getCanonicalType();
+      ty = ty.subst(QueryTypeSubstitutionMap{OpenedExistentialSubs},
+                    MakeAbstractConformanceForGenericType())
+          ->getCanonicalType();
     }
     return ty;
   }
@@ -229,8 +232,12 @@ public:
   }
 
   // Register a re-mapping for opened existentials.
-  void registerOpenedExistentialRemapping(ArchetypeType *From, CanType To) {
-    OpenedExistentialSubs.addSubstitution(CanType(From), To);
+  void registerOpenedExistentialRemapping(ArchetypeType *From, ArchetypeType *To) {
+    auto result =
+      OpenedExistentialSubs.insert(std::make_pair(CanArchetypeType(From),
+                                                  CanType(To)));
+    assert(result.second);
+    (void) result;
   }
 
 protected:
@@ -244,7 +251,7 @@ protected:
   // deterministic.
   llvm::MapVector<SILBasicBlock*, SILBasicBlock*> BBMap;
 
-  SubstitutionMap OpenedExistentialSubs;
+  TypeSubstitutionMap OpenedExistentialSubs;
   SILOpenedArchetypesTracker OpenedArchetypesTracker;
 
   /// Set of basic blocks where unreachable was inserted.
@@ -396,9 +403,9 @@ SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
       auto *MappedBB = F.createBasicBlock();
       BBMap.insert(std::make_pair(Succ.getBB(), MappedBB));
       // Create new arguments for each of the original block's arguments.
-      for (auto &Arg : Succ.getBB()->getArguments()) {
-        SILValue MappedArg =
-            MappedBB->createArgument(getOpType(Arg->getType()));
+      for (auto *Arg : Succ.getBB()->getPHIArguments()) {
+        SILValue MappedArg = MappedBB->createPHIArgument(
+            getOpType(Arg->getType()), Arg->getOwnershipKind());
 
         ValueMap.insert(std::make_pair(Arg, MappedArg));
       }
@@ -698,10 +705,19 @@ void SILCloner<ImplClass>::visitStoreBorrowInst(StoreBorrowInst *Inst) {
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitEndBorrowInst(EndBorrowInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-                getBuilder().createEndBorrow(getOpLocation(Inst->getLoc()),
-                                             getOpValue(Inst->getSrc()),
-                                             getOpValue(Inst->getDest())));
+  doPostProcess(
+      Inst, getBuilder().createEndBorrow(getOpLocation(Inst->getLoc()),
+                                         getOpValue(Inst->getBorrowedValue()),
+                                         getOpValue(Inst->getOriginalValue())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitEndBorrowArgumentInst(
+    EndBorrowArgumentInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createEndBorrowArgument(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
 }
 
 template <typename ImplClass>
@@ -1145,11 +1161,29 @@ SILCloner<ImplClass>::visitRetainValueInst(RetainValueInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitUnmanagedRetainValueInst(
+    UnmanagedRetainValueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createUnmanagedRetainValue(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitCopyValueInst(CopyValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
                 getBuilder().createCopyValue(getOpLocation(Inst->getLoc()),
                                              getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitCopyUnownedValueInst(
+    CopyUnownedValueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createCopyUnownedValue(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
 }
 
 template <typename ImplClass>
@@ -1159,6 +1193,15 @@ void SILCloner<ImplClass>::visitReleaseValueInst(ReleaseValueInst *Inst) {
     getBuilder().createReleaseValue(getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getOperand()),
                                     Inst->getAtomicity()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitUnmanagedReleaseValueInst(
+    UnmanagedReleaseValueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createUnmanagedReleaseValue(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
 }
 
 template <typename ImplClass>
@@ -1177,6 +1220,15 @@ void SILCloner<ImplClass>::visitAutoreleaseValueInst(
     getBuilder().createAutoreleaseValue(getOpLocation(Inst->getLoc()),
                                         getOpValue(Inst->getOperand()),
                                         Inst->getAtomicity()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitUnmanagedAutoreleaseValueInst(
+    UnmanagedAutoreleaseValueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createUnmanagedAutoreleaseValue(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>

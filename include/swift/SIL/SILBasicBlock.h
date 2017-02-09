@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,12 +17,17 @@
 #ifndef SWIFT_SIL_BASICBLOCK_H
 #define SWIFT_SIL_BASICBLOCK_H
 
+#include "swift/Basic/Compiler.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/TransformArrayRef.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
+
 class SILFunction;
 class SILArgument;
+class SILPHIArgument;
+class SILFunctionArgument;
 
 class SILBasicBlock :
 public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock> {
@@ -48,7 +53,8 @@ private:
   friend struct llvm::ilist_traits<SILBasicBlock>;
   SILBasicBlock() : Parent(nullptr) {}
   void operator=(const SILBasicBlock &) = delete;
-  void operator delete(void *Ptr, size_t) = delete;
+
+  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
 
   SILBasicBlock(SILFunction *F, SILBasicBlock *afterBB = nullptr);
 
@@ -154,32 +160,65 @@ public:
   const_arg_iterator args_end() const { return ArgumentList.end(); }
 
   ArrayRef<SILArgument *> getArguments() const { return ArgumentList; }
+  using PHIArgumentArrayRefTy =
+      TransformArrayRef<std::function<SILPHIArgument *(SILArgument *)>>;
+  PHIArgumentArrayRefTy getPHIArguments() const;
+  using FunctionArgumentArrayRefTy =
+      TransformArrayRef<std::function<SILFunctionArgument *(SILArgument *)>>;
+  FunctionArgumentArrayRefTy getFunctionArguments() const;
 
   unsigned getNumArguments() const { return ArgumentList.size(); }
   const SILArgument *getArgument(unsigned i) const { return ArgumentList[i]; }
   SILArgument *getArgument(unsigned i) { return ArgumentList[i]; }
 
-  /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and ValueDecl
-  /// \p D.
-  SILArgument *replaceArgument(unsigned i, SILType Ty,
-                               const ValueDecl *D = nullptr);
+  void cloneArgumentList(SILBasicBlock *Other);
 
   /// Erase a specific argument from the arg list.
   void eraseArgument(int Index);
 
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter.
-  SILArgument *createArgument(SILType Ty, const ValueDecl *D = nullptr);
+  SILFunctionArgument *createFunctionArgument(SILType Ty,
+                                              const ValueDecl *D = nullptr);
 
-  /// Insert a new SILArgument with type \p Ty and \p Decl at position \p Pos.
-  SILArgument *insertArgument(arg_iterator Pos, SILType Ty,
-                              const ValueDecl *D = nullptr);
-
-  SILArgument *insertArgument(unsigned Index, SILType Ty,
-                              const ValueDecl *D = nullptr) {
+  SILFunctionArgument *insertFunctionArgument(unsigned Index, SILType Ty,
+                                              ValueOwnershipKind OwnershipKind,
+                                              const ValueDecl *D = nullptr) {
     arg_iterator Pos = ArgumentList.begin();
     std::advance(Pos, Index);
-    return insertArgument(Pos, Ty, D);
+    return insertFunctionArgument(Pos, Ty, OwnershipKind, D);
+  }
+
+  /// Replace the \p{i}th Function arg with a new Function arg with SILType \p
+  /// Ty and ValueDecl \p D.
+  SILFunctionArgument *replaceFunctionArgument(unsigned i, SILType Ty,
+                                               ValueOwnershipKind Kind,
+                                               const ValueDecl *D = nullptr);
+
+  /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and
+  /// ValueDecl
+  /// \p D.
+  SILPHIArgument *replacePHIArgument(unsigned i, SILType Ty,
+                                     ValueOwnershipKind Kind,
+                                     const ValueDecl *D = nullptr);
+
+  /// Allocate a new argument of type \p Ty and append it to the argument
+  /// list. Optionally you can pass in a value decl parameter.
+  SILPHIArgument *createPHIArgument(SILType Ty, ValueOwnershipKind Kind,
+                                    const ValueDecl *D = nullptr);
+
+  /// Insert a new SILPHIArgument with type \p Ty and \p Decl at position \p
+  /// Pos.
+  SILPHIArgument *insertPHIArgument(arg_iterator Pos, SILType Ty,
+                                    ValueOwnershipKind Kind,
+                                    const ValueDecl *D = nullptr);
+
+  SILPHIArgument *insertPHIArgument(unsigned Index, SILType Ty,
+                                    ValueOwnershipKind Kind,
+                                    const ValueDecl *D = nullptr) {
+    arg_iterator Pos = ArgumentList.begin();
+    std::advance(Pos, Index);
+    return insertPHIArgument(Pos, Ty, Kind, D);
   }
 
   /// \brief Remove all block arguments.
@@ -306,6 +345,12 @@ private:
   void insertArgument(arg_iterator Iter, SILArgument *Arg) {
     ArgumentList.insert(Iter, Arg);
   }
+
+  /// Insert a new SILFunctionArgument with type \p Ty and \p Decl at position
+  /// \p Pos.
+  SILFunctionArgument *insertFunctionArgument(arg_iterator Pos, SILType Ty,
+                                              ValueOwnershipKind OwnershipKind,
+                                              const ValueDecl *D = nullptr);
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

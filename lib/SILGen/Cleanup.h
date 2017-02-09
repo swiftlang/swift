@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,20 +14,25 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CLEANUP_H
-#define CLEANUP_H
+#ifndef SWIFT_SILGEN_CLEANUP_H
+#define SWIFT_SILGEN_CLEANUP_H
 
 #include "swift/Basic/DiverseStack.h"
 #include "swift/SIL/SILLocation.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
-  class SILBasicBlock;
-  class SILFunction;
-  class SILValue;
-  
+
+class SILBasicBlock;
+class SILFunction;
+class SILValue;
+
 namespace Lowering {
-  class JumpDest;
-  class SILGenFunction;
+
+class JumpDest;
+class SILGenFunction;
+class ManagedValue;
+class BorrowedManagedValue;
 
 /// The valid states that a cleanup can be in.
 enum class CleanupState {
@@ -46,6 +51,8 @@ enum class CleanupState {
   /// be placed in a dormant state, not a dead state.
   PersistentlyActive
 };
+
+llvm::raw_ostream &operator<<(raw_ostream &os, CleanupState state);
 
 class LLVM_LIBRARY_VISIBILITY Cleanup {
   unsigned allocatedSize;
@@ -67,6 +74,7 @@ public:
   bool isDead() const { return state == CleanupState::Dead; }
 
   virtual void emit(SILGenFunction &Gen, CleanupLocation L) = 0;
+  virtual void dump() const = 0;
 };
 
 /// A cleanup depth is generally used to denote the set of cleanups
@@ -112,7 +120,8 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   void setCleanupState(Cleanup &cleanup, CleanupState state);
 
   friend class CleanupStateRestorationScope;
-  
+  friend class BorrowedManagedValue;
+
 public:
   CleanupManager(SILGenFunction &Gen)
     : Gen(Gen), InnermostScope(Stack.stable_end()) {
@@ -192,6 +201,9 @@ public:
   /// True if there are any active cleanups in the scope between the specified
   /// cleanup handle and the current top of stack.
   bool hasAnyActiveCleanups(CleanupsDepth from);
+
+  /// Dump the output of each cleanup on this stack.
+  void dump() const;
 };
 
 /// An RAII object that allows the state of a cleanup to be

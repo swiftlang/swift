@@ -57,7 +57,7 @@ class Fox : P1 {
 class Box<T : Fox> {
 // CHECK-LABEL: .unpack@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : Fox [explicit]
+// CHECK-NEXT:   τ_0_0 : Fox [explicit]
   func unpack(_ x: X1<T>) {}
 }
 
@@ -75,12 +75,12 @@ struct V<T : Canidae> {}
 
 // CHECK-LABEL: .inferSuperclassRequirement1@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : Canidae
+// CHECK-NEXT:   τ_0_0 : Canidae
 func inferSuperclassRequirement1<T : Carnivora>(_ v: V<T>) {}
 
 // CHECK-LABEL: .inferSuperclassRequirement2@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : Canidae
+// CHECK-NEXT:   τ_0_0 : Canidae
 func inferSuperclassRequirement2<T : Canidae>(_ v: U<T>) {}
 
 // ----------------------------------------------------------------------------
@@ -111,29 +111,27 @@ struct Model_P3_P4_Eq<T : P3, U : P4> where T.P3Assoc == U.P4Assoc {}
 
 // CHECK-LABEL: .inferSameType1@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : P3 [inferred @ {{.*}}:32]
-// CHECK-NEXT:   U : P4 [inferred @ {{.*}}:32]
-// CHECK-NEXT:   T[.P3].P3Assoc : P1 [redundant @ {{.*}}:18]
-// CHECK-NEXT:   T[.P3].P3Assoc : P2 [protocol @ {{.*}}:18]
-// CHECK-NEXT:   T[.P3].P3Assoc == U[.P4].P4Assoc [inferred @ {{.*}}32]
+// CHECK-NEXT:   τ_0_0 : P3 [inferred @ {{.*}}:32]
+// CHECK-NEXT:   τ_0_1 : P4 [inferred @ {{.*}}:32]
+// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P1 [redundant @ {{.*}}:18]
+// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P2 [protocol @ {{.*}}:18]
 func inferSameType1<T, U>(_ x: Model_P3_P4_Eq<T, U>) { }
 
 // CHECK-LABEL: .inferSameType2@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : P3 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:25]
-// CHECK-NEXT:   U : P4 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:33]
-// CHECK-NEXT:   T[.P3].P3Assoc : P1 [redundant @ {{.*}}requirement_inference.swift:{{.*}}:18]
-// CHECK-NEXT:   T[.P3].P3Assoc : P2 [protocol @ {{.*}}requirement_inference.swift:{{.*}}:18]
-// CHECK-NEXT:   T[.P3].P3Assoc == U[.P4].P4Assoc [explicit @ {{.*}}requirement_inference.swift:{{.*}}:75]
-func inferSameType2<T : P3, U : P4>(_: T) where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc {}
+// CHECK-NEXT:   τ_0_0 : P3 [inferred]
+// CHECK-NEXT:   τ_0_1 : P4 [inferred]
+// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P1 [redundant @ {{.*}}requirement_inference.swift:{{.*}}:18]
+// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P2 [protocol @ {{.*}}requirement_inference.swift:{{.*}}:18]
+// CHECK-NEXT:   τ_0_0[.P3].P3Assoc == τ_0_1[.P4].P4Assoc [explicit]
+func inferSameType2<T : P3, U : P4>(_: T, _: U) where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc {}
 
 // CHECK-LABEL: .inferSameType3@
 // CHECK-NEXT: Requirements:
-// CHECK-NEXT:   T : PCommonAssoc1 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:25]
-// CHECK-NEXT:   T : PCommonAssoc2 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:76]
-// CHECK-NEXT:   T[.PCommonAssoc1].CommonAssoc : P1 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:68]
-// CHECK-NEXT:   T[.PCommonAssoc1].CommonAssoc == T[.PCommonAssoc2].CommonAssoc [redundant @ {{.*}}requirement_inference.swift:{{.*}}:76]
-// CHECK-NEXT: Generic signature
+// CHECK-NEXT:   τ_0_0 : PCommonAssoc1 [inferred]
+// CHECK-NEXT:   τ_0_0 : PCommonAssoc2 [inferred]
+// CHECK-NEXT:   τ_0_0[.PCommonAssoc1].CommonAssoc : P1 [explicit @ {{.*}}requirement_inference.swift:{{.*}}:68]
+// CHECK-NEXT: Potential archetypes
 func inferSameType3<T : PCommonAssoc1>(_: T) where T.CommonAssoc : P1, T : PCommonAssoc2 {}
 
 protocol P5 {
@@ -154,4 +152,38 @@ extension P7 where AssocP6.Element : P6,
         AssocP7.AssocP6.Element : P6,
         AssocP6.Element == AssocP7.AssocP6.Element {
   func nestedSameType1() { }
+}
+
+protocol P8 {
+  associatedtype A
+  associatedtype B
+}
+
+protocol P9 : P8 {
+  associatedtype A
+  associatedtype B
+}
+
+protocol P10 {
+  associatedtype A
+  associatedtype C
+}
+
+// CHECK-LABEL: sameTypeConcrete1@
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0 : P9, τ_0_0.A == X3, τ_0_0.B == Int, τ_0_0.C == Int>
+func sameTypeConcrete1<T : P9 & P10>(_: T) where T.A == X3, T.C == T.B, T.C == Int { }
+
+// CHECK-LABEL: sameTypeConcrete2@
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0 : P9, τ_0_0.B == X3, τ_0_0.C == X3>
+func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3 { }
+
+// Note: a standard-library-based stress test to make sure we don't inject
+// any additional requirements.
+// CHECK-LABEL: RangeReplaceableCollection.f()@
+// CHECK: <τ_0_0 where τ_0_0 : MutableCollection, τ_0_0 : RangeReplaceableCollection, τ_0_0.SubSequence == MutableRangeReplaceableSlice<τ_0_0>>
+extension RangeReplaceableCollection where
+  Self: MutableCollection,
+  Self.SubSequence == MutableRangeReplaceableSlice<Self>
+{
+	func f() { }
 }
