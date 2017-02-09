@@ -504,7 +504,7 @@ ValueOwnershipKindVisitor::visitApplyInst(ApplyInst *AI) {
   if (Iter == Results.end())
     return ValueOwnershipKind::Trivial;
 
-  ValueOwnershipKind Base = Iter->getOwnershipKind(M);
+  ValueOwnershipKind Base = Iter->getOwnershipKind(M, Sig);
 
   for (const SILResultInfo &ResultInfo :
        SILFunctionConventions::DirectSILResultRange(next(Iter),
