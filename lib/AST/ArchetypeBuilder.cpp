@@ -1112,8 +1112,10 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
 
     for (auto InheritedProto :
          Proto->getInheritedProtocols(getLazyResolver())) {
-      if (Visited.count(InheritedProto))
+      if (Visited.count(InheritedProto)) {
+        markPotentialArchetypeRecursive(T, InheritedProto, InnerSource);
         continue;
+      }
       if (addConformanceRequirement(T, InheritedProto, InnerSource, Visited))
         return true;
     }
@@ -1479,30 +1481,34 @@ bool ArchetypeBuilder::addSameTypeRequirement(Type Reqt1, Type Reqt2,
   return addSameTypeRequirementToConcrete(T2, Reqt1, Source);
 }
 
+// Local function to mark the given associated type as recursive,
+// diagnosing it if this is the first such occurrence.
+void ArchetypeBuilder::markPotentialArchetypeRecursive(
+    PotentialArchetype *pa, ProtocolDecl *proto, RequirementSource source) {
+  if (pa->isRecursive())
+    return;
+  pa->setIsRecursive();
+
+  // FIXME: Drop this protocol.
+  pa->addConformance(proto, /*updateExistingSource=*/true, source, *this);
+  if (!pa->getParent())
+    return;
+
+  auto assocType = pa->getResolvedAssociatedType();
+  if (!assocType || assocType->isInvalid())
+    return;
+
+  Diags.diagnose(assocType->getLoc(), diag::recursive_requirement_reference);
+
+  // Silence downstream errors referencing this associated type.
+  assocType->setInvalid();
+}
+
 bool ArchetypeBuilder::addAbstractTypeParamRequirements(
        AbstractTypeParamDecl *decl,
        PotentialArchetype *pa,
        RequirementSource::Kind kind,
        llvm::SmallPtrSetImpl<ProtocolDecl *> &visited) {
-  // Local function to mark the given associated type as recursive,
-  // diagnosing it if this is the first such occurrence.
-  auto markRecursive = [&](AssociatedTypeDecl *assocType,
-                           ProtocolDecl *proto,
-                           SourceLoc loc) {
-    if (!pa->isRecursive() && !assocType->isInvalid()) {
-      Diags.diagnose(assocType->getLoc(),
-                     diag::recursive_requirement_reference);
-    }
-    pa->setIsRecursive();
-
-    // Silence downstream errors referencing this associated type.
-    assocType->setInvalid();
-
-    // FIXME: Drop this protocol.
-    pa->addConformance(proto, /*updateExistingSource=*/true,
-                       RequirementSource(kind, loc), *this);
-  };
-
   if (isa<AssociatedTypeDecl>(decl) &&
       decl->hasInterfaceType() &&
       decl->getInterfaceType()->is<ErrorType>())
@@ -1520,25 +1526,22 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
 
     if (archetype) {
       SourceLoc loc = decl->getLoc();
+      RequirementSource source(kind, loc);
 
       // Superclass requirement.
       if (auto superclass = archetype->getSuperclass()) {
-        if (addSuperclassRequirement(pa, superclass,
-                                     RequirementSource(kind, loc)))
+        if (addSuperclassRequirement(pa, superclass, source))
           return true;
       }
 
       // Conformance requirements.
       for (auto proto : archetype->getConformsTo()) {
         if (visited.count(proto)) {
-          if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
-            markRecursive(assocType, proto, loc);
-
+          markPotentialArchetypeRecursive(pa, proto, source);
           continue;
         }
 
-        if (addConformanceRequirement(pa, proto, RequirementSource(kind, loc),
-                                      visited))
+        if (addConformanceRequirement(pa, proto, source, visited))
           return true;
       }
 
@@ -1549,26 +1552,24 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
   // Otherwise, walk the 'inherited' list to identify requirements.
   if (auto resolver = getLazyResolver())
     resolver->resolveInheritanceClause(decl);
-  return visitInherited(decl->getInherited(),
-                        [&](Type inheritedType, SourceLoc loc) -> bool {
+  return visitInherited(decl->getInherited(), [&](Type inheritedType,
+                                                  SourceLoc loc) -> bool {
+    RequirementSource source(kind, loc);
     // Protocol requirement.
     if (auto protocolType = inheritedType->getAs<ProtocolType>()) {
       if (visited.count(protocolType->getDecl())) {
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
-          markRecursive(assocType, protocolType->getDecl(), loc);
+        markPotentialArchetypeRecursive(pa, protocolType->getDecl(), source);
 
         return true;
       }
 
-      return addConformanceRequirement(pa, protocolType->getDecl(),
-                                       RequirementSource(kind, loc),
+      return addConformanceRequirement(pa, protocolType->getDecl(), source,
                                        visited);
     }
 
     // Superclass requirement.
     if (inheritedType->getClassOrBoundGenericClass()) {
-      return addSuperclassRequirement(pa, inheritedType,
-                                      RequirementSource(kind, loc));
+      return addSuperclassRequirement(pa, inheritedType, source);
     }
 
     // Note: anything else is an error, to be diagnosed later.
@@ -1703,6 +1704,10 @@ void ArchetypeBuilder::addRequirement(
 
     // Add each of the protocols.
     for (auto proto : conformsTo) {
+      if (Visited.count(proto)) {
+        markPotentialArchetypeRecursive(pa, proto, source);
+        continue;
+      }
       (void)addConformanceRequirement(pa, proto, source, Visited);
     }
 
