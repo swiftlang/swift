@@ -439,7 +439,8 @@ public:
                                  ProtocolDecl *protocol);
 
   /// Register an externally-supplied protocol conformance.
-  void registerProtocolConformance(ProtocolConformance *conformance);
+  void registerProtocolConformance(ProtocolConformance *conformance,
+                                   bool synthesized = false);
 
   /// Look for conformances to the given protocol.
   ///
