@@ -3851,7 +3851,7 @@ archetype ``$*@opened P``. This pointer can be used with any operation
 on archetypes, such as ``witness_method``.
 
 open_existential_opaque
-`````````````````````
+```````````````````````
 ::
 
   sil-instruction ::= 'open_existential_opaque' sil-operand 'to' sil-type
