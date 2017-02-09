@@ -46,11 +46,6 @@ public protocol AnyUnicodeEncoding {
   /// The maximum number of code units in an encoded unicoded scalar value
   static var maxLengthOfEncodedScalar: UInt { get }
   
-  /// A type that can represent a single UnicodeScalar as it is encoded in this
-  /// encoding.
-  associatedtype EncodedScalar : EncodedScalarProtocol
-  // where Iterator.Element : UnsignedInteger
-
   // FIXME: do we even want these single-scalar parse methods on the thing
   // that's going to be used with type erasure?  You pretty much want to be
   // doing bulk-stuff behind the type erasure boundary, so things like
