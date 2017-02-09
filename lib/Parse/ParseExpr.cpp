@@ -180,6 +180,9 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       }
     }
     SequencedExprs.push_back(Primary.get());
+
+    if (isForConditionalDirective && Tok.isAtStartOfLine())
+      break;
     
 parse_operator:
     switch (Tok.getKind()) {
@@ -320,16 +323,16 @@ parse_operator:
     }
   }
 done:
-  
-  if (SequencedExprs.empty()) {
-    if (isForConditionalDirective) {
-      diagnose(startLoc, diag::expected_close_to_if_directive);
-      return makeParserError();
-    } else {
-      // If we had semantic errors, just fail here.
-      assert(!SequencedExprs.empty());
-    }
+
+  // For conditional directives, we stop parsing after a line break.
+  if (isForConditionalDirective && (SequencedExprs.size() & 1) == 0) {
+    diagnose(getEndOfPreviousLoc(),
+             diag::incomplete_conditional_compilation_directive);
+    return makeParserError();
   }
+
+  // If we had semantic errors, just fail here.
+  assert(!SequencedExprs.empty());
 
   // If we saw no operators, don't build a sequence.
   if (SequencedExprs.size() == 1) {
