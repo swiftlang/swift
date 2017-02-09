@@ -125,8 +125,12 @@ static UIdent DiagKindNote("source.diagnostic.severity.note");
 static UIdent DiagKindWarning("source.diagnostic.severity.warning");
 static UIdent DiagKindError("source.diagnostic.severity.error");
 
-static LazySKDUID NameKindObjc("key.namekind.objc");
-static LazySKDUID NameKindSwift("key.namekind.swift");
+
+static UIdent KindNameObjc("source.lang.name.kind.objc");
+static UIdent KindNameSwift("source.lang.name.kind.swift");
+
+static LazySKDUID SwiftNameKind("source.lang.name.kind.swift");
+static LazySKDUID ObjcNameKind("source.lang.name.kind.objc");
 
 static void onDocumentUpdateNotification(StringRef DocumentName) {
   static UIdent DocumentUpdateNotificationUID(
@@ -778,27 +782,25 @@ handleSemanticRequest(RequestDict Req,
     if (!NK) {
       return Rec(createErrorRequestInvalid("'key.namekind' is required"));
     }
-    if (NK == NameKindObjc) {
-      Input.NameKind = KeyNameKindObjc;
-    } else if (NK == NameKindSwift) {
-      Input.NameKind = KeyNameKindSwift;
-    } else {
-      return Rec(createErrorRequestInvalid("'key.namekind' is an"
-                                           " unrecognized kind"));
-    }
+    if (NK == SwiftNameKind)
+      Input.NameKind = KindNameSwift;
+    else if (NK == ObjcNameKind)
+      Input.NameKind = KindNameObjc;
+    else
+      return Rec(createErrorRequestInvalid("'key.namekind' is unrecognizable"));
     if (auto Base = Req.getString(KeyBaseName)) {
       Input.BaseName = Base.getValue();
     }
-    llvm::SmallVector<const char*, 4> Args;
+    llvm::SmallVector<const char*, 4> ArgParts;
     llvm::SmallVector<const char*, 4> Selectors;
-    Req.getStringArray(KeyArgNames, Args, true);
+    Req.getStringArray(KeyArgNames, ArgParts, true);
     Req.getStringArray(KeySelectorPieces, Selectors, true);
-    if (!Args.empty() && !Selectors.empty()) {
+    if (!ArgParts.empty() && !Selectors.empty()) {
       return Rec(createErrorRequestInvalid("cannot specify 'key.selectorpieces' "
                                            "and 'key.argnames' at the same time"));
     }
-    std::vector<StringRef> Pieces;
-    std::transform(Args.begin(), Args.end(), Pieces.begin(),
+    std::vector<StringRef> Pieces(ArgParts.size() + Selectors.size());
+    std::transform(ArgParts.begin(), ArgParts.end(), Pieces.begin(),
                    [](const char *C) { return StringRef(C); });
     std::transform(Selectors.begin(), Selectors.end(), Pieces.begin(),
                    [](const char *C) { return StringRef(C); });
@@ -1450,7 +1452,13 @@ static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec) {
 static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec) {
   if (Info.IsCancelled)
     return Rec(createErrorRequestCancelled());
+
   ResponseBuilder RespBuilder;
+  if (Info.NameKind.isInvalid())
+    return Rec(RespBuilder.createResponse());
+  if (Info.BaseName.empty() && Info.ArgNames.empty())
+    return Rec(RespBuilder.createResponse());
+
   auto Elem = RespBuilder.getDictionary();
   Elem.set(KeyNameKind, Info.NameKind);
 
@@ -1458,7 +1466,7 @@ static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec
     Elem.set(KeyBaseName, Info.BaseName);
   }
   if (!Info.ArgNames.empty()) {
-    auto Arr = Elem.setArray(Info.NameKind == KeyNameKindSwift ? KeyArgNames :
+    auto Arr = Elem.setArray(Info.NameKind == KindNameSwift ? KeyArgNames :
                              KeySelectorPieces);
     for (auto N : Info.ArgNames) {
       auto NameEle = Arr.appendDictionary();

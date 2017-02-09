@@ -163,6 +163,10 @@ static UIdent KindRangeMultiStatement("source.lang.swift.range.multistatement");
 
 static UIdent KindRangeInvalid("source.lang.swift.range.invalid");
 
+static UIdent KindNameObjc("source.lang.name.kind.objc");
+static UIdent KindNameSwift("source.lang.name.kind.swift");
+
+
 std::unique_ptr<LangSupport>
 SourceKit::createSwiftLangSupport(SourceKit::Context &SKCtx) {
   return std::unique_ptr<LangSupport>(new SwiftLangSupport(SKCtx));
@@ -632,6 +636,20 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
 
 #undef SIMPLE_CASE
 #undef UID_FOR
+}
+
+SourceKit::UIdent SwiftLangSupport::getUIDForNameKind(swift::ide::NameKind Kind) {
+  switch(Kind) {
+  case swift::ide::NameKind::ObjC: return KindNameObjc;
+  case swift::ide::NameKind::Swift: return KindNameSwift;
+  }
+}
+
+swift::ide::NameKind SwiftLangSupport::getNameKindForUID(SourceKit::UIdent Id) {
+  if (Id == KindNameObjc)
+    return swift::ide::NameKind::ObjC;
+  assert(Id == KindNameSwift);
+  return swift::ide::NameKind::Swift;
 }
 
 std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttributes &Attrs) {

@@ -137,8 +137,6 @@ static sourcekitd_uid_t KeyBaseName;
 static sourcekitd_uid_t KeyArgNames;
 static sourcekitd_uid_t KeySelectorPieces;
 static sourcekitd_uid_t KeyNameKind;
-static sourcekitd_uid_t KeyNameKindObjc;
-static sourcekitd_uid_t KeyNameKindSwift;
 
 static sourcekitd_uid_t RequestProtocolVersion;
 static sourcekitd_uid_t RequestDemangle;
@@ -171,6 +169,9 @@ static sourcekitd_uid_t RequestNameTranslation;
 static sourcekitd_uid_t SemaDiagnosticStage;
 
 static sourcekitd_uid_t NoteDocUpdate;
+
+static sourcekitd_uid_t KindNameObjc;
+static sourcekitd_uid_t KindNameSwift;
 
 static SourceKit::Semaphore semaSemaphore(0);
 static sourcekitd_response_t semaResponse;
@@ -262,8 +263,6 @@ static int skt_main(int argc, const char **argv) {
   KeyArgNames = sourcekitd_uid_get_from_cstr("key.argnames");
   KeySelectorPieces = sourcekitd_uid_get_from_cstr("key.selectorpieces");
   KeyNameKind = sourcekitd_uid_get_from_cstr("key.namekind");
-  KeyNameKindObjc = sourcekitd_uid_get_from_cstr("key.namekind.objc");
-  KeyNameKindSwift = sourcekitd_uid_get_from_cstr("key.namekind.swift");
 
   SemaDiagnosticStage = sourcekitd_uid_get_from_cstr("source.diagnostic.stage.swift.sema");
 
@@ -296,6 +295,8 @@ static int skt_main(int argc, const char **argv) {
   RequestDocInfo = sourcekitd_uid_get_from_cstr("source.request.docinfo");
   RequestModuleGroups = sourcekitd_uid_get_from_cstr("source.request.module.groups");
   RequestNameTranslation = sourcekitd_uid_get_from_cstr("source.request.name.translation");
+  KindNameObjc = sourcekitd_uid_get_from_cstr("source.lang.name.kind.objc");
+  KindNameSwift = sourcekitd_uid_get_from_cstr("source.lang.name.kind.swift");
 
   // A test invocation may initialize the options to be used for subsequent
   // invocations.
@@ -580,10 +581,10 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestNameTranslation);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     StringRef BaseName;
-    llvm::SmallVector<StringRef, 4> Args;
+    llvm::SmallVector<StringRef, 4> ArgPices;
     sourcekitd_uid_t ArgName;
     if (!Opts.SwiftName.empty()) {
-      sourcekitd_request_dictionary_set_uid(Req, KeyNameKind, KeyNameKindSwift);
+      sourcekitd_request_dictionary_set_uid(Req, KeyNameKind, KindNameSwift);
       ArgName = KeyArgNames;
       StringRef Text(Opts.SwiftName);
       auto ArgStart = Text.find_first_of('(');
@@ -597,23 +598,23 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
           return 1;
         }
         StringRef AllArgs = Text.substr(ArgStart + 1, ArgEnd - ArgStart - 1);
-        AllArgs.split(Args, ':');
+        AllArgs.split(ArgPices, ':');
         if (!Args.empty()) {
-          if (!Args.back().empty()) {
+          if (!ArgPices.back().empty()) {
             llvm::errs() << "Swift name is malformed.\n";
             return 1;
           }
-          Args.pop_back();
+          ArgPices.pop_back();
         }
       }
     } else if (!Opts.ObjCName.empty()) {
-      sourcekitd_request_dictionary_set_uid(Req, KeyNameKind, KeyNameKindObjc);
+      sourcekitd_request_dictionary_set_uid(Req, KeyNameKind, KindNameObjc);
       BaseName = Opts.ObjCName;
       ArgName = KeySelectorPieces;
     } else if (!Opts.ObjCSelector.empty()) {
-      sourcekitd_request_dictionary_set_uid(Req, KeyNameKind, KeyNameKindObjc);
-      StringRef Name(Opts.ObjCName);
-      Name.split(Args, ':');
+      sourcekitd_request_dictionary_set_uid(Req, KeyNameKind, KindNameObjc);
+      StringRef Name(Opts.ObjCSelector);
+      Name.split(ArgPices, ':');
       ArgName = KeySelectorPieces;
     } else {
       llvm::errs() << "must specify either -swift-name or -objc-name or -objc-selector\n";
@@ -623,9 +624,9 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
       std::string S = BaseName;
       sourcekitd_request_dictionary_set_string(Req, KeyBaseName, S.c_str());
     }
-    if (!Args.empty()) {
+    if (!ArgPices.empty()) {
       sourcekitd_object_t Arr = sourcekitd_request_array_create(nullptr, 0);
-      for (StringRef A: Args) {
+      for (StringRef A: ArgPices) {
         std::string S = A;
         sourcekitd_request_array_set_string(Arr, SOURCEKITD_ARRAY_APPEND,
                                             S.c_str());
@@ -1136,7 +1137,7 @@ static void printNameTranslationInfo(sourcekitd_variant_t Info,
   }
 
   OS << Kind << "\n";
-  OS << BaseName;
+  OS << StringRef(BaseName);
   if (!Args.empty()) {
     OS << "(";
     for (auto A : Args) {
@@ -1150,6 +1151,7 @@ static void printNameTranslationInfo(sourcekitd_variant_t Info,
       OS << ":";
     }
   }
+  OS << '\n';
 }
 
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,

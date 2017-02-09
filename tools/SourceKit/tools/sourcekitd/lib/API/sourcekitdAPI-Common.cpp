@@ -142,8 +142,6 @@ UIdent sourcekitd::KeyBaseName("key.basename");
 UIdent sourcekitd::KeyArgNames("key.argnames");
 UIdent sourcekitd::KeySelectorPieces("key.selectorpieces");
 UIdent sourcekitd::KeyNameKind("key.namekind");
-UIdent sourcekitd::KeyNameKindObjc("key.namekind.objc");
-UIdent sourcekitd::KeyNameKindSwift("key.namekind.swift");
 
 /// \brief Order for the keys to use when emitting the debug description of
 /// dictionaries.
@@ -243,8 +241,6 @@ static UIdent *OrderedKeys[] = {
   &KeyArgNames,
   &KeySelectorPieces,
   &KeyNameKind,
-  &KeyNameKindObjc,
-  &KeyNameKindSwift,
 
 };
 

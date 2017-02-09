@@ -854,10 +854,34 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
 }
 
 /// Returns true for failure to resolve.
-static bool passNameInfoForDecl(const ValueDecl *VD,
+static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo Info,
                     std::function<void(const NameTranslatingInfo &)> Receiver) {
 
+  auto NameKind = SwiftLangSupport::getNameKindForUID(Info.NameKind);
+  if (NameKind == NameKind::Swift) {
 
+    // FIXME: Implement the swift to objc name translation.
+    return true;
+  }
+
+  assert(NameKind == NameKind::ObjC);
+  ClangImporter *Importer = static_cast<ClangImporter *>(VD->getDeclContext()->
+    getASTContext().getClangModuleLoader());
+
+  if (auto *Named = dyn_cast_or_null<clang::NamedDecl>(VD->getClangDecl())) {
+    DeclName Name = Importer->analyzeImportedName(Named, Info.BaseName,
+                                                  Info.ArgNames,
+                                  version::Version::getCurrentLanguageVersion());
+    NameTranslatingInfo Result;
+    Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
+    Result.BaseName = Name.getBaseName().str();
+    std::vector<StringRef> Args(Name.getArgumentNames().size());
+    std::transform(Name.getArgumentNames().begin(), Name.getArgumentNames().end(),
+      Args.begin(), [](Identifier Id) { return Id.str(); });
+    Result.ArgNames = llvm::makeArrayRef(Args);
+    Receiver(Result);
+    return false;
+  }
   return false;
 }
 
@@ -1090,7 +1114,7 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
 
       } else {
         ValueDecl *VD = SemaTok.CtorTyRef ? SemaTok.CtorTyRef : SemaTok.ValueD;
-        bool Failed = passNameInfoForDecl(VD, Receiver);
+        bool Failed = passNameInfoForDecl(VD, Input, Receiver);
         if (Failed) {
           if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
@@ -1302,7 +1326,7 @@ getNameInfo(StringRef InputFile, unsigned Offset, NameTranslatingInfo Input,
                      SwiftArgs, OpArgs);
     }
 
-    IFaceGenRef->accessASTAsync([this, IFaceGenRef, Offset, Receiver] {
+    IFaceGenRef->accessASTAsync([this, IFaceGenRef, Offset, Input, Receiver] {
       SwiftInterfaceGenContext::ResolvedEntity Entity;
       Entity = IFaceGenRef->resolveEntityForOffset(Offset);
       if (Entity.isResolved()) {
@@ -1313,7 +1337,7 @@ getNameInfo(StringRef InputFile, unsigned Offset, NameTranslatingInfo Input,
         } else {
           // FIXME: Should pass the main module for the interface but currently
           // it's not necessary.
-          passNameInfoForDecl(Entity.Dcl, Receiver);
+          passNameInfoForDecl(Entity.Dcl, Input, Receiver);
         }
       } else {
         Receiver({});

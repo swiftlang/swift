@@ -129,8 +129,6 @@ extern SourceKit::UIdent KeyBaseName;
 extern SourceKit::UIdent KeyArgNames;
 extern SourceKit::UIdent KeySelectorPieces;
 extern SourceKit::UIdent KeyNameKind;
-extern SourceKit::UIdent KeyNameKindObjc;
-extern SourceKit::UIdent KeyNameKindSwift;
 
 /// \brief Used for determining the printing order of dictionary keys.
 bool compareDictKeys(SourceKit::UIdent LHS, SourceKit::UIdent RHS);
