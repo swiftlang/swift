@@ -193,6 +193,10 @@ private:
   template<typename F>
   void visitPotentialArchetypes(F f);
 
+  void markPotentialArchetypeRecursive(PotentialArchetype *pa,
+                                       ProtocolDecl *proto,
+                                       RequirementSource source);
+
 public:
   /// Construct a new archetype builder.
   ///
