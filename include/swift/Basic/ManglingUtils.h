@@ -91,8 +91,8 @@ struct WordReplacement {
 /// Current operator characters:   @/=-+*%<>!&|^~ and the special operator '..'
 char translateOperatorChar(char op);
 
-/// Returns a string where all characters of the operator \Op are translated to
-/// their mangled form.
+/// Returns a string where all characters of the operator \p Op are translated
+/// to their mangled form.
 std::string translateOperator(StringRef Op);
 
 /// Mangles an identifier using a generic Mangler class.
