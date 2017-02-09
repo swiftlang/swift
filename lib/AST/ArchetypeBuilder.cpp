@@ -1514,41 +1514,6 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
       decl->getInterfaceType()->is<ErrorType>())
     return false;
 
-  // If this is an associated type that already has an archetype assigned,
-  // use that information.
-  auto *genericEnv = decl->getDeclContext()
-      ->getGenericEnvironmentOfContext();
-  if (isa<AssociatedTypeDecl>(decl) && genericEnv != nullptr) {
-    auto *archetype = genericEnv->mapTypeIntoContext(
-        decl->getDeclaredInterfaceType(),
-        getLookupConformanceFn())
-            ->getAs<ArchetypeType>();
-
-    if (archetype) {
-      SourceLoc loc = decl->getLoc();
-      RequirementSource source(kind, loc);
-
-      // Superclass requirement.
-      if (auto superclass = archetype->getSuperclass()) {
-        if (addSuperclassRequirement(pa, superclass, source))
-          return true;
-      }
-
-      // Conformance requirements.
-      for (auto proto : archetype->getConformsTo()) {
-        if (visited.count(proto)) {
-          markPotentialArchetypeRecursive(pa, proto, source);
-          continue;
-        }
-
-        if (addConformanceRequirement(pa, proto, source, visited))
-          return true;
-      }
-
-      return false;
-    }
-  }
-
   // Otherwise, walk the 'inherited' list to identify requirements.
   if (auto resolver = getLazyResolver())
     resolver->resolveInheritanceClause(decl);
