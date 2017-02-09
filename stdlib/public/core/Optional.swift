@@ -146,7 +146,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///     let possibleNumber: Int? = Int("42")
   ///     let possibleSquare = possibleNumber.map { $0 * $0 }
   ///     print(possibleSquare)
-  ///     // Prints "Optional(1746)"
+  ///     // Prints "Optional(1764)"
   ///
   ///     let noNumber: Int? = nil
   ///     let noSquare = noNumber.map { $0 * $0 }
