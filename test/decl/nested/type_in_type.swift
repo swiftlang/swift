@@ -351,3 +351,13 @@ extension OuterNonGenericClass.InnerNonGenericBase {
 extension OuterNonGenericClass.InnerNonGenericClass1 {
   static let anotherPropUsingMember = originalValue
 }
+
+// rdar://problem/30353095: Extensions of nested types with generic
+// requirements placed on type parameters
+struct OuterWithConstraint<T : HasAssocType> {
+  struct InnerWithConstraint<U : HasAssocType> { }
+}
+
+extension OuterWithConstraint.InnerWithConstraint {
+  func foo<V>(v: V) where T.FirstAssocType == U.SecondAssocType {}
+}

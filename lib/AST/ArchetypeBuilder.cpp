@@ -1654,21 +1654,23 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
 class ArchetypeBuilder::InferRequirementsWalker : public TypeWalker {
   ArchetypeBuilder &Builder;
   SourceLoc Loc;
-  unsigned Depth;
+  unsigned MinDepth;
+  unsigned MaxDepth;
 
   /// We cannot add requirements to archetypes from outer generic parameter
   /// lists.
   bool isOuterArchetype(PotentialArchetype *PA) {
     unsigned ParamDepth = PA->getRootGenericParamKey().Depth;
-    assert(ParamDepth <= Depth);
-    return ParamDepth < Depth;
+    assert(ParamDepth <= MaxDepth);
+    return ParamDepth < MinDepth;
   }
 
 public:
   InferRequirementsWalker(ArchetypeBuilder &builder,
                           SourceLoc loc,
-                          unsigned Depth)
-    : Builder(builder), Loc(loc), Depth(Depth) { }
+                          unsigned MinDepth,
+                          unsigned MaxDepth)
+    : Builder(builder), Loc(loc), MinDepth(MinDepth), MaxDepth(MaxDepth) { }
 
   Action walkToTypePost(Type ty) override {
     auto boundGeneric = ty->getAs<BoundGenericType>();
@@ -1776,14 +1778,13 @@ public:
 };
 
 void ArchetypeBuilder::inferRequirements(TypeLoc type,
-                                         GenericParamList *genericParams) {
+                                         unsigned minDepth,
+                                         unsigned maxDepth) {
   if (!type.getType())
-    return;
-  if (genericParams == nullptr)
     return;
   // FIXME: Crummy source-location information.
   InferRequirementsWalker walker(*this, type.getSourceRange().Start,
-                                 genericParams->getDepth());
+                                 minDepth, maxDepth);
   type.getType().walk(walker);
 }
 
@@ -1791,9 +1792,12 @@ void ArchetypeBuilder::inferRequirements(ParameterList *params,
                                          GenericParamList *genericParams) {
   if (genericParams == nullptr)
     return;
-  
+
+  unsigned depth = genericParams->getDepth();
   for (auto P : *params)
-    inferRequirements(P->getTypeLoc(), genericParams);
+    inferRequirements(P->getTypeLoc(),
+                      /*minDepth=*/depth,
+                      /*maxDepth=*/depth);
 }
 
 /// Perform typo correction on the given nested type, producing the
