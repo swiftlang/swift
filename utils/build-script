@@ -995,6 +995,7 @@ class BuildScriptInvocation(object):
         # Lipo...
         execute_one_impl_action(name="merged-hosts-lipo")
 
+
 # Provide a short delay so accidentally invoked clean builds can be canceled.
 def clean_delay():
     sys.stdout.write('Starting clean build in  ')
@@ -1003,6 +1004,7 @@ def clean_delay():
         sys.stdout.flush()
         time.sleep(1)
     print('\b\b\b\bnow.')
+
 
 # Main entry point for the preset mode.
 def main_preset():
