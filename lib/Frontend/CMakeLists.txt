@@ -13,7 +13,7 @@ add_swift_library(swiftFrontend STATIC
   SerializedDiagnosticConsumer.cpp
   ${AppleHostVersionDetection}
   DEPENDS SwiftOptions
-  LINK_LIBRARIES
+  LINK_LIBS
     swiftSIL
     swiftOption
     swiftParse

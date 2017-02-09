@@ -1,14 +1,10 @@
 
 # On non-Darwin require UUID.
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  set(UUID_INCLUDE "")
-  set(UUID_LIBRARIES "")
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-  set(UUID_INCLUDE "")
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(UUID_LIBRARIES "ole32.lib")
-else()
+elseif(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   find_package(UUID REQUIRED)
-  set(UUID_INCLUDE "-I${UUID_INCLUDE_DIRS}")
+  include_directories(AFTER ${UUID_INCLUDE_DIRS})
 endif()
 
 # Figure out if we can track VC revisions.
@@ -64,6 +60,13 @@ generate_revision_inc(swift_revision_inc Swift "${SWIFT_SOURCE_DIR}")
 set(version_inc_files
   ${llvm_revision_inc} ${clang_revision_inc} ${swift_revision_inc})
 
+set(generated_include_sources UnicodeExtendedGraphemeClusters.cpp.gyb)
+
+handle_gyb_sources(
+    generated_include_targets
+    generated_include_sources
+    "")
+
 add_swift_library(swiftBasic STATIC
   Cache.cpp
   ClusteredBitVector.cpp
@@ -106,11 +109,11 @@ add_swift_library(swiftBasic STATIC
   # Platform-agnostic fallback TaskQueue implementation
   Default/TaskQueue.inc
 
-  UnicodeExtendedGraphemeClusters.cpp.gyb
+  ${generated_include_sources}
 
-  C_COMPILE_FLAGS ${UUID_INCLUDE}
-  LINK_LIBRARIES ${UUID_LIBRARIES}
-  LLVM_COMPONENT_DEPENDS support)
+  LINK_LIBS ${UUID_LIBRARIES}
+  LINK_COMPONENTS support
+  DEPENDS ${generated_include_targets})
 
 message(STATUS "Swift version: ${SWIFT_VERSION}")
 message(STATUS "Swift vendor: ${SWIFT_VENDOR}")

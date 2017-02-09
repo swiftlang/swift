@@ -55,11 +55,10 @@ add_swift_library(swiftAST STATIC
   TypeRepr.cpp
   TypeWalker.cpp
   USRGeneration.cpp
-  LINK_LIBRARIES
+  LINK_LIBS
     swiftMarkup
     swiftBasic
 
-  INTERFACE_LINK_LIBRARIES
     # Clang dependencies.
     # FIXME: Clang should really export these in some reasonable manner.
     clangCodeGen
@@ -81,7 +80,7 @@ add_swift_library(swiftAST STATIC
     clangAPINotes
     clangBasic
 
-  LLVM_COMPONENT_DEPENDS
+  LINK_COMPONENTS
     bitreader bitwriter coroutines coverage irreader debuginfoDWARF
     profiledata instrumentation object objcarcopts mc mcparser
     bitreader bitwriter lto ipo option core support ${LLVM_TARGETS_TO_BUILD}

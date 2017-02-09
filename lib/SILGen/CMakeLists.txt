@@ -28,6 +28,6 @@ add_swift_library(swiftSILGen STATIC
   SILGenProlog.cpp
   SILGenStmt.cpp
   SILGenType.cpp
-  LINK_LIBRARIES
+  LINK_LIBS
     swiftSIL
 )
