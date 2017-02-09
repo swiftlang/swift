@@ -419,6 +419,40 @@ public struct IndexingIterator<
   internal var _position: Elements.Index
 }
 
+//===--- Contiguous Storage Access ----------------------------------------===//
+//
+// We're unsure which idiom will be best for users and implementors of
+// Collections, and which, if any, will be more optimizable, so we have two
+// schemes:
+//
+//   1. a contiguousStorage property that is an optional instance of
+//      ContiguousStorage (below)
+//
+//   2. a withUnsafeElementStorage(_ body: ... ) method whose body takes an
+//      optional UnsafeBufferPointer
+//
+// I can't figure out how to get the first one to support throwing closures.
+// We may not know which one is best until we handle the mutable storage case.
+//
+// Note: this should be for access to *already existing* contiguous storage.
+// Lazily-bridged Arrays will create that storage on demand, so the conformance
+// is imperfect.
+// ===----------------------------------------------------------------------===//
+/// A type that grants access to a collection's contiguous storage.
+public struct ContiguousStorage<Element> {
+  /// Invokes `body` on the contiguous storage and returns the result.
+  public func withUnsafeBufferPointer<R>(
+    _ body: (UnsafeBufferPointer<Element>)->R
+  ) -> R {
+    var r: R!
+    accessor { p in
+      r = body(p)
+    }
+    return r
+  }
+  let accessor: ((UnsafeBufferPointer<Element>)->Void) -> Void
+}
+
 /// A sequence whose elements can be traversed multiple times,
 /// nondestructively, and accessed by indexed subscript.
 ///
@@ -561,6 +595,32 @@ public protocol Collection : _Indexable, Sequence {
   /// type.
   associatedtype Iterator : IteratorProtocol = IndexingIterator<Self>
 
+  /// A type that provides access to sub-structure of the collection
+  associatedtype Segments : _Indexable = EmptyCollection<Self>
+  // where Segments : Collection, Segments.Iterator.Element : Collection,
+  // Segments.Iterator.Element.Iterator.Element == Iterator.Element
+
+  /// The collection's sub-structure, if any
+  ///
+  /// Anything for which a complete traversal can be most easily written using a
+  /// nested loop should provide segments.
+  var segments : Segments? { get }
+
+  /// The collection's contiguous storage, if any
+  ///
+  /// Only non-nil if *all* of the collection's elements are stored contiguously
+  /// in memory.  A collection can vend multiple segments, each vending its own
+  /// non-nil contiguousStorage, if there are multiple contiguous memory
+  /// regions.
+  ///
+  /// Note: a collection may choose to provide only `withUnsafeElementStorage`,
+  /// in which case a default for contiguousStorage will be provided.
+  var contiguousStorage: ContiguousStorage<Iterator.Element>? { get }
+  
+  func withUnsafeElementStorage<R>(
+    _ body: (UnsafeBufferPointer<Iterator.Element>?) throws -> R
+  ) rethrows -> R
+  
   // FIXME(ABI)#179 (Type checker): Needed here so that the `Iterator` is properly deduced from
   // a custom `makeIterator()` function.  Otherwise we get an
   // `IndexingIterator`. <rdar://problem/21539115>
@@ -1179,6 +1239,35 @@ extension Collection where SubSequence == Self {
     let element = first!
     self = self[index(after: startIndex)..<endIndex]
     return element
+  }
+}
+
+/// Default implementation of Segments for collections that don't expose any
+/// sub-structure.
+extension Collection where Segments == EmptyCollection<Self> {
+  public var segments : Segments? { return Segments() }
+}
+
+extension Collection {
+  // Default implementation of contiguousStorage in terms of
+  // withUnsafeElementStorage.  This seems very unlikely to optimize well.
+  public var contiguousStorage: ContiguousStorage<Iterator.Element>? {
+    // FIXME: The straightforward formulation using a closure doesn't work.
+    // <rdar://30448445> Crash compiling CoreAudio
+    func factory(p: UnsafeBufferPointer<Iterator.Element>?)
+    -> ContiguousStorage<Iterator.Element>? {
+      return p == nil ? nil : ContiguousStorage {
+        (body: (UnsafeBufferPointer<Iterator.Element>)->Void) in
+        self.withUnsafeElementStorage { body($0!) }
+      }
+    }
+    return withUnsafeElementStorage(factory)
+  }
+  
+  public func withUnsafeElementStorage<R>(
+    _ body: (UnsafeBufferPointer<Iterator.Element>?) throws -> R
+  ) rethrows -> R {
+    return try body(nil)
   }
 }
 
