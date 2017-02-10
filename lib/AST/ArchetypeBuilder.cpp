@@ -241,6 +241,19 @@ static void maybeAddSameTypeRequirementForNestedType(
         nestedPA, concreteType, fromSource);
 }
 
+/// Walk the members of a protocol.
+///
+/// This is essentially just a call to \c proto->getMembers(), except that
+/// for Objective-C-imported protocols we can simply return an empty declaration
+/// range because the archetype builder only cares about nested types (which
+/// Objective-C protocols don't have).
+static DeclRange getProtocolMembers(ProtocolDecl *proto) {
+  if (proto->hasClangNode())
+    return DeclRange(DeclIterator(), DeclIterator());
+
+  return proto->getMembers();
+}
+
 bool ArchetypeBuilder::PotentialArchetype::addConformance(
        ProtocolDecl *proto, 
        bool updateExistingSource,
@@ -274,7 +287,7 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
 
   // Check whether any associated types in this protocol resolve
   // nested types of this potential archetype.
-  for (auto member : proto->getMembers()) {
+  for (auto member : getProtocolMembers(proto)) {
     auto assocType = dyn_cast<AssociatedTypeDecl>(member);
     if (!assocType)
       continue;
@@ -1121,7 +1134,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
     }
 
     // Add requirements for each of the associated types.
-    for (auto Member : Proto->getMembers()) {
+    for (auto Member : getProtocolMembers(Proto)) {
       if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
         // Add requirements placed directly on this associated type.
         auto AssocPA = T->getNestedType(AssocType, *this);
@@ -1199,7 +1212,7 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
     for (auto &conforms : T->ConformsTo) {
       if (auto superConformance = getSuperConformance(T, conforms.first,
                                                       conforms.second, *this)) {
-        for (auto req : conforms.first->getMembers()) {
+        for (auto req : getProtocolMembers(conforms.first)) {
           auto assocType = dyn_cast<AssociatedTypeDecl>(req);
           if (!assocType) continue;
 
@@ -1851,7 +1864,7 @@ static Identifier typoCorrectNestedType(
   unsigned maxScore = (name.size() + 1) / 3;
   for (const auto &conforms : pa->getParent()->getConformsTo()) {
     auto proto = conforms.first;
-    for (auto member : proto->getMembers()) {
+    for (auto member : getProtocolMembers(proto)) {
       auto assocType = dyn_cast<AssociatedTypeDecl>(member);
       if (!assocType)
         continue;
