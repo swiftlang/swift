@@ -641,7 +641,8 @@ extension String {
   public func getCString(
     _ buffer: inout [CChar], maxLength: Int, encoding: Encoding
   ) -> Bool {
-    return _ns.getCString(&buffer, maxLength: Swift.min(buffer.count, maxLength),
+    return _ns.getCString(&buffer,
+                          maxLength: Swift.min(buffer.count, maxLength),
                           encoding: encoding.rawValue)
   }
 

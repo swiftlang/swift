@@ -423,7 +423,7 @@ extension String {
         UTF8.self, input: smallUTF8)
     case let .large(value):
       let buf = String(_StringCore(_StringBuffer(value)))
-      self = buf[buf.startIndex..<buf.index(after: buf.startIndex)]
+      self = String(buf[buf.startIndex..<buf.index(after: buf.startIndex)])
     }
   }
 }

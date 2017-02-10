@@ -345,7 +345,7 @@ extension String {
     {
         return nil
     }
-    self = wholeString[start..<end]
+    self = String(wholeString[start..<end])
   }
 
   /// The index type for subscripting a string's `utf16` view.

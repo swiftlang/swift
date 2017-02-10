@@ -14,8 +14,8 @@ public struct Substring : RangeReplaceableCollection {
   public typealias Index = String.CharacterView.Index
   public typealias IndexDistance = String.CharacterView.IndexDistance
 
-  internal let base: String
-  internal var bounds: Range<Index>
+  public let base: String
+  public internal(set) var bounds: Range<Index>
 
 
   public init() {
@@ -102,6 +102,13 @@ public struct Substring : RangeReplaceableCollection {
 % end
 }
 
+extension String {
+  // FIXME(strings): at least temporarily remove it to see where it was applied
+  public init(_ substring: Substring) {
+    self = String(substring.base.characters[substring.bounds])
+  }
+}
+
 extension String : RangeReplaceableCollection {
   /// The index type for subscripting a string.
   public typealias Index = CharacterView.Index
@@ -112,6 +119,8 @@ extension String : RangeReplaceableCollection {
   /// In Swift, *reachability* refers to the ability to produce one value from
   /// the other through zero or more applications of `index(after:)`.
   public typealias IndexDistance = CharacterView.IndexDistance
+
+  public typealias SubSequence = Substring
 
   /// The position of the first character in a nonempty string.
   ///
@@ -241,16 +250,16 @@ extension String : RangeReplaceableCollection {
   ///
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-  public subscript(bounds: Range<Index>) -> String {
-    return String(characters[bounds])
+  public subscript(bounds: Range<Index>) -> Substring {
+    return Substring(String(self._core), bounds)
   }
 
   /// Accesses the text in the given range.
   ///
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-  public subscript(bounds: ClosedRange<Index>) -> String {
-    return String(characters[bounds])
+  public subscript(bounds: ClosedRange<Index>) -> Substring {
+    return Substring(String(self._core), bounds)
   }
 }
 

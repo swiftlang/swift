@@ -442,7 +442,7 @@ extension String {
 
     if let start = utf8.startIndex.samePosition(in: wholeString),
        let end = utf8.endIndex.samePosition(in: wholeString) {
-      self = wholeString[start..<end]
+      self = String(wholeString[start..<end])
       return
     }
     return nil
