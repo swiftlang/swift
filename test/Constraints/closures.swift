@@ -515,3 +515,6 @@ func returnsArray() -> [Int] { return [] }
 
 returnsArray().flatMap { $0 }.flatMap { }
 // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}}
+
+// rdar://problem/30271695
+_ = ["hi"].flatMap { $0.isEmpty ? nil : $0 }

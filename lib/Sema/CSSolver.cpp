@@ -1403,6 +1403,24 @@ static bool tryTypeVariableBindings(
               newBindings.push_back({eltType, binding.Kind, None});
           }
         }
+
+        // If we were unsuccessful solving for T?, try solving for T.
+        if (auto objTy = type->getOptionalObjectType()) {
+          if (exploredTypes.insert(objTy->getCanonicalType()).second) {
+            // If T is a type variable, only attempt this if both the
+            // type variable we are trying bindings for, and the type
+            // variable we will attempt to bind, both have the same
+            // polarity with respect to being able to bind lvalues.
+            if (auto otherTypeVar = objTy->getAs<TypeVariableType>()) {
+              if (typeVar->getImpl().canBindToLValue() ==
+                  otherTypeVar->getImpl().canBindToLValue()) {
+                newBindings.push_back({objTy, binding.Kind, None});
+              }
+            } else {
+              newBindings.push_back({objTy, binding.Kind, None});
+            }
+          }
+        }
       }
 
       if (binding.Kind != AllowedBindingKind::Supertypes)
