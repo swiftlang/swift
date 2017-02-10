@@ -3923,7 +3923,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       signature = pointer->getChild(1);
       assert(signature->getKind() == Node::Kind::DependentGenericSignature);
       genericArgs = pointer->getChild(2);
-      assert(signature->getKind() == Node::Kind::TypeList);
+      assert(genericArgs->getKind() == Node::Kind::TypeList);
       
       print(signature);
       Printer << ' ';
