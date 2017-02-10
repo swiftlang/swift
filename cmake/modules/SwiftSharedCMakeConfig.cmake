@@ -197,7 +197,7 @@ macro(swift_common_standalone_build_config_cmark product)
   include_directories("${CMARK_MAIN_INCLUDE_DIR}"
                       "${CMARK_BUILD_INCLUDE_DIR}")
 
-  include(${CMARK_LIBRARY_DIR}/CMarkExports.cmake)
+  include(${${product}_PATH_TO_CMARK_BUILD}/src/CMarkExports.cmake)
 endmacro()
 
 # Common cmake project config for standalone builds.
