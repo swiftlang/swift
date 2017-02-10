@@ -3016,6 +3016,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
       ConfigState.setConditionActive(!foundActive);
     } else {
       // Evaluate the condition.
+      llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
                                                     /*isBasic*/true,
                                                     /*isForDirective*/true);
