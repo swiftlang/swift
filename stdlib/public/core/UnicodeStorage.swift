@@ -22,6 +22,28 @@ public func _debugLog(_ arg0: @autoclosure ()->Any, _ arg1: @autoclosure ()->Any
   print(arg0(), arg1())
 }
 
+/// An index type for views onto random access collections whose elements are
+/// effectively variable-width.
+public protocol UnicodeIndexProtocol {
+  var codeUnitOffset: Int64 { get }
+}
+
+extension UnicodeIndexProtocol {
+  public static func == (l: UnicodeIndexProtocol, r: UnicodeIndexProtocol) -> Bool {
+    return l.codeUnitOffset == r.codeUnitOffset
+  }
+  public static func < (l: UnicodeIndexProtocol, r: UnicodeIndexProtocol) -> Bool {
+    return l.codeUnitOffset < r.codeUnitOffset
+  }
+  
+  public static func == (l: Self, r: Self) -> Bool {
+    return l.codeUnitOffset == r.codeUnitOffset
+  }
+  public static func < (l: Self, r: Self) -> Bool {
+    return l.codeUnitOffset < r.codeUnitOffset
+  }
+}
+
 /// A collection of `CodeUnit`s to be interpreted by some `Encoding`
 public struct UnicodeStorage<
   CodeUnits : RandomAccessCollection,
@@ -60,23 +82,23 @@ extension UnicodeStorage.EncodedScalars {
   // and the next index.  This would obviously be more complicated if
   // the buffer contained more than a single scalar (and it probably
   // should).
-  public struct Index : Comparable {
-    let base: CodeUnits.Index
+  public struct Index : UnicodeIndexProtocol, Comparable {
+    let offset: CodeUnits.IndexDistance
     // FIXME: We might get a much better memory footprint if we used a
     // UInt8 to store the distance between base and next, rather than
     // storing next explicitly.  CodeUnits will be random-access in
     // practice.
-    let next: CodeUnits.Index
+    let nextStride: UInt8
+
+    public var codeUnitOffset: Int64 { return numericCast(offset) }
+    
+    var nextOffset: CodeUnits.IndexDistance {
+      return offset + numericCast(nextStride)
+    }
+    
     // FIXME: there should be an invalid inhabitant we can use in
     // EncodedScalar so as not to waste a separate bool here.
     let scalar: Encoding.EncodedScalar?
-
-    public static func < (lhs: Index, rhs: Index) -> Bool {
-      return lhs.base < rhs.base
-    }
-    public static func == (lhs: Index, rhs: Index) -> Bool {
-      return lhs.base == rhs.base
-    }
   }
 }
 
@@ -84,13 +106,11 @@ extension UnicodeStorage.EncodedScalars {
 extension UnicodeStorage.EncodedScalars : BidirectionalCollection {
   public var startIndex: Index {
     if _slowPath(codeUnits.isEmpty) { return endIndex }
-    let s = codeUnits.startIndex
-    return index(after: Index(base: s, next: s, scalar: nil))
+    return index(after: Index(offset: 0, nextStride: 0, scalar: nil))
   }
   
   public var endIndex: Index {
-    let s = codeUnits.endIndex
-    return Index(base: s, next: s, scalar: nil)
+    return Index(offset: codeUnits.count, nextStride: 0, scalar: nil)
   }
   
   public subscript(i: Index) -> Encoding.EncodedScalar {
@@ -98,21 +118,26 @@ extension UnicodeStorage.EncodedScalars : BidirectionalCollection {
       return r
     }
     return index(after:
-      Index(base: i.base, next: i.base, scalar: nil)).scalar!
+      Index(offset: i.offset, nextStride: 0, scalar: nil)).scalar!
   }
 
   public func index(after i: Index) -> Index {
-    var remainder = codeUnits[i.next..<codeUnits.endIndex]
+    let p = codeUnits.index(atOffset: i.nextOffset)
+    var remainder = codeUnits[p...]
     while true {
       switch Encoding.parse1Forward(remainder, knownCount: 0) {
       case .valid(let scalar, let nextIndex):
-        return Index(base:i.next, next: nextIndex, scalar: scalar)
+        return Index(
+          offset: i.nextOffset,
+          nextStride: numericCast(remainder.offset(of: nextIndex)),
+          scalar: scalar)
       case .error(let nextIndex):
         // FIXME: don't go through UnicodeScalar once this is in the stdlib
         if let replacement = Encoding.encode(
           UTF32.EncodedScalar(UnicodeScalar(0xFFFD)!)) {
           return Index(
-            base:i.next, next: nextIndex,
+            offset: i.nextOffset,
+            nextStride: numericCast(remainder.offset(of: nextIndex)),
             scalar: replacement)
         }
         remainder = remainder.dropFirst()
@@ -123,17 +148,23 @@ extension UnicodeStorage.EncodedScalars : BidirectionalCollection {
   }
 
   public func index(before i: Index) -> Index {
-    var remainder = codeUnits[..<i.base]
+    var remainder = codeUnits[..<codeUnits.index(atOffset: i.offset)]
     while true {
       switch Encoding.parse1Reverse(remainder, knownCount: 0) {
       case .valid(let scalar, let priorIndex):
-        return Index(base: priorIndex, next: i.base, scalar: scalar)
+        let stride = remainder[priorIndex...].count
+        return Index(
+          offset: i.offset - numericCast(stride),
+          nextStride: numericCast(stride),
+          scalar: scalar)
       case .error(let priorIndex):
+        let stride = remainder[priorIndex...].count
         // FIXME: don't go through UnicodeScalar once this is in the stdlib
         if let replacement = Encoding.encode(
           UTF32.EncodedScalar(UnicodeScalar(0xFFFD)!)) {
           return Index(
-            base: priorIndex, next: i.base, 
+            offset: i.offset - numericCast(stride),
+            nextStride: numericCast(stride),
             scalar: replacement)        
         }
         remainder = remainder.dropLast()
@@ -149,12 +180,12 @@ extension UnicodeStorage {
   /// `FromEncoding`, provides a collection of `ToEncoding.CodeUnit`s
   /// representing the same text.
   public struct TranscodedView<ToEncoding : UnicodeEncoding> : BidirectionalCollection {
-    typealias FromEncoding = Encoding
+    public typealias FromEncoding = Encoding
     
     // We could just be a generic typealias as this type, but it turns
     // out to be impossible, or nearly so, to write the init() below.
     // Instead, we wrap an instance of Base.
-    typealias Base = FlattenBidirectionalCollection<
+    public typealias Base = FlattenBidirectionalCollection<
       LazyMapBidirectionalCollection<
         UnicodeStorage<CodeUnits, FromEncoding>.EncodedScalars,
         ToEncoding.EncodedScalar
@@ -171,8 +202,6 @@ extension UnicodeStorage {
         })
     }
     
-    // FIXME: this should go in the extension below but for <rdar://30320012>
-    //typealias SubSequence = BidirectionalSlice<TranscodedView>
     public var startIndex : Base.Index {
       return base.startIndex
     }
@@ -272,7 +301,7 @@ extension UnicodeStorage : _UTextable {
             buffer[u.chunkLength^] = unit
             u.chunkLength += 1
           }
-          u.chunkNativeLimit = codeUnits.offset(of: i.next)^
+          u.chunkNativeLimit = i.nextOffset^
         }
       }
       else {
@@ -291,7 +320,7 @@ extension UnicodeStorage : _UTextable {
             buffer[u.chunkLength^] = unit
             u.chunkLength += 1
           }
-          u.chunkNativeStart = codeUnits.offset(of: i.base)^
+          u.chunkNativeStart = i.codeUnitOffset
           u.chunkOffset = u.chunkLength
         }
         var b = buffer // copy due to https://bugs.swift.org/browse/SR-3782
@@ -353,7 +382,7 @@ extension UnicodeStorage : _UTextable {
     for i in chunkSource.indices {
       chunkOffset += chunkSource[i].utf16.count
       if chunkOffset == u[0].chunkOffset^ {
-        return codeUnits.offset(of: i.next)^
+        return i.nextOffset^
       }
     }
     fatalError("supposed to be unreachable")
@@ -454,10 +483,6 @@ extension UnicodeStorage {
       defer { __swift_stdlib_ubrk_close(bi) }
 
       return storage._withUText { u in
-        let access = u[0].pFuncs[0].access(u, storage.codeUnits.offset(of: i)^, 1)
-        // _debugLog("access result:", access)
-        // _debugLog("ubrk_setUText(breakIterator: \(bi), u: \(u)")
-        // _debugLog("u: \(u.pointee)")
         __swift_stdlib_ubrk_setUText(bi, u, &err)
         _precondition(err.isSuccess, "unexpected ubrk_setUText failure")
         return body(bi)

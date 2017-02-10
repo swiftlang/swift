@@ -366,12 +366,90 @@ protocol AnyUnicode {
   func isInFastCOrDForm(scan: Bool/* = true*/) -> Bool
 }
 
+struct AnyUIntCollection<
+Base: RandomAccessCollection, Element_ : UnsignedInteger
+> : RandomAccessCollection
+where Base.Iterator.Element : UnsignedInteger {
+  typealias IndexDistance = Int64
+  typealias Index = Int64
+  typealias Element = Element_
+  // FIXME: associated type deduction seems to need a hint here.
+  typealias Indices = DefaultRandomAccessIndices<AnyUIntCollection>
+  
+  let base: Base
+
+  var startIndex: Index { return 0 }
+  var endIndex: Index { return numericCast(base.count) }
+  
+  func index(after i: Index) -> Index {
+    return numericCast(
+      base.offset(of: base.index(after: base.index(atOffset: i))))
+  }
+  
+  func index(before i: Index) -> Index {
+    return numericCast(
+      base.offset(of: base.index(before: base.index(atOffset: i))))
+  }
+  
+  func index(_ i: Index, offsetBy n: Int64) -> Index {
+    return numericCast(
+      base.offset(
+        of: base.index(base.index(atOffset: i),
+          offsetBy: numericCast(n))))
+  }
+  
+  subscript(i: Index) -> Element {
+    return numericCast(base[base.index(atOffset: i)])
+  }
+
+  public func withUnsafeElementStorage<R>(
+    _ body: (UnsafeBufferPointer<Element>?) throws -> R
+  ) rethrows -> R {
+    return try base.withUnsafeElementStorage { b in
+      if let b1 = b {
+        if let b2 = b1 as Any as? UnsafeBufferPointer<Element> {
+          return try body(b2)
+        }
+      }
+      return try body(nil)
+    }
+  }
+}
+
+protocol AnyUnicodeEncoding : Swift.AnyUnicodeEncoding {
+  static func utf16View<CodeUnits: RandomAccessCollection>(_: CodeUnits) -> AnyUTF16
+    where CodeUnits.Iterator.Element : UnsignedInteger
+}
+
+extension AnyUnicodeEncoding
+  where Self : UnicodeEncoding,
+  Self.EncodedScalar.Iterator.Element : UnsignedInteger {
+  
+  static func utf16View<CodeUnits: RandomAccessCollection>(codeUnits: CodeUnits) -> AnyUTF16
+  where CodeUnits.Iterator.Element : UnsignedInteger {
+    typealias WidthAdjusted = AnyUIntCollection<CodeUnits, CodeUnit>
+    typealias Storage = UnicodeStorage<WidthAdjusted, Self>
+    
+    let r = Storage.TranscodedView(
+      WidthAdjusted(base: codeUnits),
+      from: self,
+      to: UTF16.self
+    )
+    fatalError()
+  }
+}
+/*
+extension AnyUnicode {
+  var utf16: AnyUTF16 {
+    return 
+  }
+}
+*/
+
 var suite = TestSuite("AnyUnicode")
 suite.test("basics") {
-  let g : [UInt16] = Array(3...7)
-  let h : [UInt8] = Array(3...7)
-  var x = AnyUTF16ZeroExtender(base: g)
-  var y = AnyUTF16ZeroExtender(base: h)
+  let x = AnyUTF16ZeroExtender(base: Array(3...7) as [UInt16])
+  let y = AnyUTF16ZeroExtender(base: Array(3...7) as [UInt8])
   expectTrue(x.elementsEqual(y))
 }
 
