@@ -614,8 +614,17 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     } else if (!Opts.ObjCSelector.empty()) {
       sourcekitd_request_dictionary_set_uid(Req, KeyNameKind, KindNameObjc);
       StringRef Name(Opts.ObjCSelector);
-      Name.split(ArgPices, ':');
+      Name.split(ArgPices, ':', -1, /*keep empty*/false);
       ArgName = KeySelectorPieces;
+      std::transform(ArgPices.begin(), ArgPices.end(), ArgPices.begin(),
+        [Name] (StringRef T) {
+        if (T.data() + T.size() < Name.data() + Name.size() &&
+            *(T.data() + T.size()) == ':') {
+          // Include the colon belonging to the piece.
+          return StringRef(T.data(), T.size() + 1);
+        }
+        return T;
+      });
     } else {
       llvm::errs() << "must specify either -swift-name or -objc-name or -objc-selector\n";
       return 1;
@@ -1141,7 +1150,11 @@ static void printNameTranslationInfo(sourcekitd_variant_t Info,
   if (!Args.empty()) {
     OS << "(";
     for (auto A : Args) {
-      OS << A << ":";
+      StringRef Text(A);
+      if (Text.empty())
+        OS << "_" << ":";
+      else
+        OS << Text << ":";
     }
     OS << ")";
   }

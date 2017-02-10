@@ -866,9 +866,10 @@ getClangDeclarationName(clang::ASTContext &Ctx, NameTranslatingInfo &Info) {
     return clang::DeclarationName(&Ctx.Idents.get(Info.BaseName));
   } else {
     ArrayRef<StringRef> Args = llvm::makeArrayRef(Info.ArgNames);
-    std::vector<clang::IdentifierInfo *> Pieces(Args.size());
+    std::vector<clang::IdentifierInfo *> Pieces(Args.size(), nullptr);
     std::transform(Args.begin(), Args.end(), Pieces.begin(),
-      [&](StringRef T) { return &Ctx.Idents.get(T); });
+      [&](StringRef T) { return &Ctx.Idents.get(T.endswith(":") ?
+        T.substr(0, T.size() - 1) : T); });
     return clang::DeclarationName(Ctx.Selectors.getSelector(
       /*Calculate Args*/std::accumulate(Args.begin(), Args.end(), (unsigned)0,
         [](unsigned I, StringRef T) { return I + (T.endswith(":") ? 1 : 0); }),
