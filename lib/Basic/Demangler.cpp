@@ -114,7 +114,80 @@ static bool isFunctionAttr(Node::Kind kind) {
 } // anonymous namespace
 
 namespace swift {
+namespace Demangle {
+
+//////////////////////////////////
+// Context member functions     //
+//////////////////////////////////
+
+// TODO: these functions are just dummy implementations. After lldb has switched
+// to the new Context API, implement the Context (bumpptr allocation based
+// demangling).
+
+Context::Context() {
+}
+
+Context::~Context() {
+}
+
+void Context::clear() {
+}
+
+NodePointer Context::demangleSymbolAsNode(llvm::StringRef MangledName) {
+  return ::demangleSymbolAsNode(MangledName.data(), MangledName.size());
+}
+
+NodePointer Context::demangleTypeAsNode(llvm::StringRef MangledName) {
+  return ::demangleTypeAsNode(MangledName.data(), MangledName.size());
+}
+
+std::string Context::demangleSymbolAsString(llvm::StringRef MangledName,
+                                            const DemangleOptions &Options) {
+  return ::demangleSymbolAsString(MangledName.data(), MangledName.size(),
+                                  Options);
+}
+
+std::string Context::demangleTypeAsString(llvm::StringRef MangledName,
+                                          const DemangleOptions &Options) {
+  return ::demangleTypeAsString(MangledName.data(), MangledName.size(),
+                                Options);
+}
+
+bool Context::isThunkSymbol(llvm::StringRef MangledName) {
+  return ::isThunkSymbol(MangledName.data(), MangledName.size());
+}
+  
+NodePointer Context::createNode(Node::Kind K) {
+  return NodeFactory::create(K);
+}
+
+NodePointer Context::createNode(Node::Kind K, Node::IndexType Index) {
+  return NodeFactory::create(K, Index);
+}
+
+NodePointer Context::createNode(Node::Kind K, llvm::StringRef Text) {
+  return NodeFactory::create(K, Text);
+}
+
+//////////////////////////////////
+// Node member functions        //
+//////////////////////////////////
+
+void Node::addChild(NodePointer Child, NodeFactory &Factory) {
+  addChild(Child);
+}
+
+void Node::addChild(NodePointer Child, Context &Ctx) {
+  addChild(Child);
+}
+
+} // namespace Demangle
+
 namespace NewMangling {
+
+//////////////////////////////////
+// Demangler member functions   //
+//////////////////////////////////
 
 NodePointer Demangler::demangleTopLevel() {
   if (!nextIf(MANGLING_PREFIX_STR))
