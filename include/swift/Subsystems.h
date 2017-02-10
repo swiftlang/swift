@@ -37,7 +37,7 @@ namespace llvm {
 }
 
 namespace swift {
-  class ArchetypeBuilder;
+  class GenericSignatureBuilder;
   class ASTContext;
   class CodeCompletionCallbacksFactory;
   class Decl;

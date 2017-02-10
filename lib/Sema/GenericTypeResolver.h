@@ -23,7 +23,7 @@
 
 namespace swift {
 
-class ArchetypeBuilder;
+class GenericSignatureBuilder;
 class AssociatedTypeDecl;
 class Identifier;
 class ParamDecl;
@@ -100,11 +100,11 @@ public:
 /// This generic type resolver leaves generic type parameter types alone
 /// and only trivially resolves dependent member types.
 class DependentGenericTypeResolver : public GenericTypeResolver {
-  ArchetypeBuilder &Builder;
+  GenericSignatureBuilder &Builder;
   ArrayRef<GenericTypeParamType *> GenericParams;
 
 public:
-  DependentGenericTypeResolver(ArchetypeBuilder &builder,
+  DependentGenericTypeResolver(GenericSignatureBuilder &builder,
                                ArrayRef<GenericTypeParamType *> genericParams)
     : Builder(builder), GenericParams(genericParams) { }
 
@@ -162,19 +162,19 @@ public:
 };
 
 /// Generic type resolver that performs complete resolution of dependent
-/// types based on a given archetype builder.
+/// types based on a given generic signature builder.
 ///
 /// This generic type resolver should be used after all requirements have been
-/// introduced into the archetype builder, including inferred requirements,
+/// introduced into the generic signature builder, including inferred requirements,
 /// to check the signature of a generic declaration and resolve (for example)
 /// all dependent member refers to archetype members.
 class CompleteGenericTypeResolver : public GenericTypeResolver {
   TypeChecker &TC;
-  ArchetypeBuilder &Builder;
+  GenericSignatureBuilder &Builder;
   ArrayRef<GenericTypeParamType *> GenericParams;
 
 public:
-  CompleteGenericTypeResolver(TypeChecker &tc, ArchetypeBuilder &builder,
+  CompleteGenericTypeResolver(TypeChecker &tc, GenericSignatureBuilder &builder,
                               ArrayRef<GenericTypeParamType *> genericParams)
     : TC(tc), Builder(builder), GenericParams(genericParams) { }
 

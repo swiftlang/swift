@@ -36,7 +36,7 @@
 
 namespace swift {
 
-class ArchetypeBuilder;
+class GenericSignatureBuilder;
 class GenericTypeResolver;
 class NominalTypeDecl;
 class NormalProtocolConformance;
@@ -1140,7 +1140,7 @@ public:
                         DeclContext *dc,
                         GenericSignature *outerSignature,
                         bool allowConcreteGenericParams,
-                        llvm::function_ref<void(ArchetypeBuilder &)>
+                        llvm::function_ref<void(GenericSignatureBuilder &)>
                           inferRequirements);
 
   /// Construct a new generic environment for the given declaration context.
@@ -1160,7 +1160,7 @@ public:
                         bool allowConcreteGenericParams) {
     return checkGenericEnvironment(genericParams, dc, outerSignature,
                                    allowConcreteGenericParams,
-                                   [&](ArchetypeBuilder &) { });
+                                   [&](GenericSignatureBuilder &) { });
   }
 
   /// Validate the signature of a generic type.
@@ -1170,7 +1170,7 @@ public:
 
   /// Check the generic parameters in the given generic parameter list (and its
   /// parent generic parameter lists) according to the given resolver.
-  void checkGenericParamList(ArchetypeBuilder *builder,
+  void checkGenericParamList(GenericSignatureBuilder *builder,
                              GenericParamList *genericParams,
                              GenericSignature *parentSig,
                              GenericTypeResolver *resolver);

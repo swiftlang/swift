@@ -3958,7 +3958,7 @@ public:
   /// \brief Retrieve the nested type with the given name, if it's already
   /// known.
   ///
-  /// This is an implementation detail used by the archetype builder.
+  /// This is an implementation detail used by the generic signature builder.
   Optional<Type> getNestedTypeIfKnown(Identifier Name) const;
 
   /// \brief Check if the archetype contains a nested type with the given name.

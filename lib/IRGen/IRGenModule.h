@@ -73,7 +73,7 @@ namespace clang {
 }
 
 namespace swift {
-  class ArchetypeBuilder;
+  class GenericSignatureBuilder;
   class ASTContext;
   class BraceStmt;
   class CanType;

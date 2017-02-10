@@ -21,7 +21,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -1022,10 +1022,10 @@ RequirementEnvironment::RequirementEnvironment(
           selfType, ProtocolConformanceRef(proto));
   }
 
-  // Construct an archetype builder by collecting the constraints from the
+  // Construct an generic signature builder by collecting the constraints from the
   // requirement and the context of the conformance together, because both
   // define the capabilities of the requirement.
-  ArchetypeBuilder builder(
+  GenericSignatureBuilder builder(
            ctx,
            LookUpConformanceInModule(conformanceDC->getParentModule()));
   SmallVector<GenericTypeParamType*, 4> allGenericParams;
@@ -1135,7 +1135,7 @@ RequirementEnvironment::RequirementEnvironment(
                                                  SubstFlags::UseErrorType);
 
       // FIXME: We really want to check hasTypeParameter here, but the
-      // ArchetypeBuilder isn't ready for that.
+      // GenericSignatureBuilder isn't ready for that.
       if (!first->isTypeParameter()) {
         // When the second is not a type parameter either, drop the requirement.
         // If the types were different, this requirement will be unsatisfiable.
@@ -1153,7 +1153,7 @@ RequirementEnvironment::RequirementEnvironment(
     }
   }
 
-  // Finalize the archetype builder.
+  // Finalize the generic signature builder.
   // FIXME: Pass in a source location for the conformance, perhaps? It seems
   // like this could fail.
   builder.finalize(SourceLoc(), allGenericParams);
