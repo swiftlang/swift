@@ -1074,7 +1074,7 @@ static bool suppressFactoryMethodAsInit(const clang::ObjCMethodDecl *method,
 
 ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                                           ImportNameVersion version,
-                                          Optional<PreferredName> givenName) {
+                                          clang::DeclarationName givenName) {
   ImportedName result;
 
   /// Whether we want a Swift 3 or later name
@@ -1295,8 +1295,11 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     // Map the identifier.
     baseName = D->getDeclName().getAsIdentifierInfo()->getName();
 
-    if (givenName.hasValue())
-      baseName = givenName.getValue().BaseName;
+    if (givenName) {
+      if (!givenName.isIdentifier())
+        return ImportedName();
+      baseName = givenName.getAsIdentifierInfo()->getName();
+    }
 
     // For Objective-C BOOL properties, use the name of the getter
     // which, conventionally, has an "is" prefix.
@@ -1328,15 +1331,20 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     // Map the Objective-C selector directly.
     auto selector = D->getDeclName().getObjCSelector();
 
-    baseName = selector.getNameForSlot(0);
-
     // Respect the given name.
-    if (givenName.hasValue()) {
-      if (givenName.getValue().SelectorPieces.size() != selector.getNumArgs()) {
+    if (givenName) {
+      switch (givenName.getNameKind()) {
+      case clang::DeclarationName::ObjCOneArgSelector:
+      case clang::DeclarationName::ObjCMultiArgSelector:
+      case clang::DeclarationName::ObjCZeroArgSelector:
+        selector = givenName.getObjCSelector();
+        break;
+      default:
         return ImportedName();
       }
-      baseName = givenName.getValue().SelectorPieces[0];
     }
+
+    baseName = selector.getNameForSlot(0);
 
     // We don't support methods with empty first selector pieces.
     if (baseName.empty())
@@ -1372,11 +1380,6 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         argumentNames.push_back(StringRef());
       } else {
         StringRef argName = selector.getNameForSlot(index);
-
-        // Respect given name.
-        if (givenName.hasValue()) {
-          argName = givenName.getValue().SelectorPieces[index];
-        }
         argumentNames.push_back(argName);
       }
     }
@@ -1385,17 +1388,6 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (isInitializer) {
       // Skip over the prefix.
       auto argName = selector.getNameForSlot(0).substr(initializerPrefixLen);
-
-      // Respect the given name.
-      if (givenName.hasValue()) {
-        argName = givenName.getValue().SelectorPieces[0];
-        if (initializerPrefixLen) {
-          if (argName.startswith("init"))
-            argName = argName.substr(initializerPrefixLen);
-          else
-            return ImportedName();
-        }
-      }
 
       // Drop "With" if present after the "init".
       bool droppedWith = false;
@@ -1642,16 +1634,16 @@ NameImporter::importMacroName(const clang::IdentifierInfo *clangIdentifier,
 
 ImportedName NameImporter::importName(const clang::NamedDecl *decl,
                                       ImportNameVersion version,
-                                      Optional<PreferredName> givenName) {
+                                      clang::DeclarationName givenName) {
   CacheKeyType key(decl, version);
-  if (importNameCache.count(key) && !givenName.hasValue()) {
+  if (importNameCache.count(key) && !givenName) {
     ++ImportNameNumCacheHits;
     return importNameCache[key];
   }
   ++ImportNameNumCacheMisses;
   auto res = importNameImpl(decl, version, givenName);
   res.setVersion(version);
-  if (givenName.hasValue())
+  if (!givenName)
     importNameCache[key] = res;
   return res;
 }

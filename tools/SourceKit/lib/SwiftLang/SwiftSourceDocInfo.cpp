@@ -853,36 +853,55 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   return false;
 }
 
+static clang::DeclarationName
+getClangDeclarationName(clang::ASTContext &Ctx, NameTranslatingInfo Info) {
+  assert(SwiftLangSupport::getNameKindForUID(Info.NameKind) == NameKind::ObjC);
+  if (Info.BaseName.empty() == Info.ArgNames.empty()) {
+    // cannot have both.
+    return clang::DeclarationName();
+  }
+  if (!Info.BaseName.empty()) {
+    return clang::DeclarationName(&Ctx.Idents.get(Info.BaseName));
+  } else {
+    unsigned size = Info.ArgNames.size();
+    std::vector<clang::IdentifierInfo *> Pieces(size);
+    std::transform(Info.ArgNames.begin(), Info.ArgNames.end(), Pieces.begin(),
+      [&](StringRef T) { return &Ctx.Idents.get(Info.BaseName); });
+    return clang::DeclarationName(Ctx.Selectors.getSelector(size,
+      Pieces.data()));
+  }
+}
+
 /// Returns true for failure to resolve.
 static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo Info,
                     std::function<void(const NameTranslatingInfo &)> Receiver) {
-
-  auto NameKind = SwiftLangSupport::getNameKindForUID(Info.NameKind);
-  if (NameKind == NameKind::Swift) {
+  switch (SwiftLangSupport::getNameKindForUID(Info.NameKind)) {
+  case NameKind::Swift: {
 
     // FIXME: Implement the swift to objc name translation.
     return true;
   }
+  case NameKind::ObjC: {
+    ClangImporter *Importer = static_cast<ClangImporter *>(VD->getDeclContext()->
+      getASTContext().getClangModuleLoader());
 
-  assert(NameKind == NameKind::ObjC);
-  ClangImporter *Importer = static_cast<ClangImporter *>(VD->getDeclContext()->
-    getASTContext().getClangModuleLoader());
-
-  if (auto *Named = dyn_cast_or_null<clang::NamedDecl>(VD->getClangDecl())) {
-    DeclName Name = Importer->analyzeImportedName(Named, Info.BaseName,
-                                                  Info.ArgNames,
-                                  version::Version::getCurrentLanguageVersion());
-    NameTranslatingInfo Result;
-    Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
-    Result.BaseName = Name.getBaseName().str();
-    std::vector<StringRef> Args(Name.getArgumentNames().size());
-    std::transform(Name.getArgumentNames().begin(), Name.getArgumentNames().end(),
-      Args.begin(), [](Identifier Id) { return Id.str(); });
-    Result.ArgNames = llvm::makeArrayRef(Args);
-    Receiver(Result);
-    return false;
+    if (auto *Named = dyn_cast_or_null<clang::NamedDecl>(VD->getClangDecl())) {
+      DeclName Name = Importer->analyzeImportedName(Named,
+        getClangDeclarationName(Named->getASTContext(), Info), version::Version::
+          getCurrentLanguageVersion());
+      NameTranslatingInfo Result;
+      Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
+      Result.BaseName = Name.getBaseName().str();
+      std::vector<StringRef> Args(Name.getArgumentNames().size());
+      std::transform(Name.getArgumentNames().begin(), Name.getArgumentNames().end(),
+        Args.begin(), [](Identifier Id) { return Id.str(); });
+      Result.ArgNames = llvm::makeArrayRef(Args);
+      Receiver(Result);
+      return false;
+    }
+    return true;
   }
-  return false;
+  }
 }
 
 class CursorRangeInfoConsumer : public SwiftASTConsumer {

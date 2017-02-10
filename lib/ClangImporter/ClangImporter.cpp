@@ -2892,12 +2892,11 @@ void ClangImporter::Implementation::dumpSwiftLookupTables() {
 
 DeclName ClangImporter::
 analyzeImportedName(const clang::NamedDecl *ClangDecl,
-                    StringRef BaseName, ArrayRef<StringRef> SelectorPieces,
+                    clang::DeclarationName PreferredName,
                     version::Version version) {
-  swift::importer::PreferredName Name(BaseName, SelectorPieces);
-  swift::importer::ImportNameVersion Ver =
-    swift::importer::ImportNameVersion::Swift4;
+  ImportNameVersion Ver = ImportNameVersion::Swift4;
   if (version.isVersion3())
-    Ver = swift::importer::ImportNameVersion::Swift3;
-  return Impl.nameImporter->importName(ClangDecl, Ver, Name).getDeclName();
+    Ver = ImportNameVersion::Swift3;
+  return Impl.nameImporter->importName(ClangDecl, Ver, PreferredName).
+    getDeclName();
 }

@@ -38,6 +38,7 @@ namespace clang {
   class Sema;
   class TargetInfo;
   class VisibleDeclConsumer;
+  class DeclarationName;
 }
 
 namespace swift {
@@ -284,8 +285,7 @@ public:
   static bool isModuleImported(const clang::Module *M);
 
   DeclName analyzeImportedName(const clang::NamedDecl *ClangDecl,
-                               StringRef BaseName,
-                               ArrayRef<StringRef> SelectorPieces,
+                               clang::DeclarationName givenName,
                                version::Version version);
 };
 

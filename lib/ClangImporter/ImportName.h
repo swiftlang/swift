@@ -212,7 +212,7 @@ public:
     case ImportedAccessorKind::SubscriptSetter:
       return true;
     }
-    
+
     llvm_unreachable("Invalid ImportedAccessorKind.");
   }
 };
@@ -220,13 +220,6 @@ public:
 /// Strips a trailing "Notification", if present. Returns {} if name doesn't end
 /// in "Notification", or it there would be nothing left.
 StringRef stripNotification(StringRef name);
-
-struct PreferredName {
-  StringRef BaseName;
-  ArrayRef<StringRef> SelectorPieces;
-  PreferredName(StringRef BaseName, ArrayRef<StringRef> SelectorPieces) :
-    BaseName(BaseName), SelectorPieces(SelectorPieces) {}
-};
 
 /// Class to determine the Swift name of foreign entities. Currently fairly
 /// stateless and borrows from the ClangImporter::Implementation, but in the
@@ -258,7 +251,7 @@ public:
   /// Determine the Swift name for a Clang decl
   ImportedName importName(const clang::NamedDecl *decl,
                           ImportNameVersion version,
-                          Optional<PreferredName> givenName = None);
+              clang::DeclarationName PreferredName = clang::DeclarationName());
 
   /// Imports the name of the given Clang macro into Swift.
   Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
@@ -322,7 +315,7 @@ private:
 
   ImportedName importNameImpl(const clang::NamedDecl *,
                               ImportNameVersion version,
-                              Optional<PreferredName> givenName);
+                              clang::DeclarationName);
 };
 
 }
