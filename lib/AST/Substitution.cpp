@@ -95,13 +95,26 @@ Substitution Substitution::subst(ModuleDecl *module,
     // conformances from thin air.  FIXME: gross.
     if (!conformance &&
         proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-      auto classDecl
-        = substReplacement->getClassOrBoundGenericClass();
-      assert(classDecl);
-      SmallVector<ProtocolConformance *, 1> lookupResults;
-      classDecl->lookupConformance(classDecl->getParentModule(),
-                                   proto, lookupResults);
-      conformance = ProtocolConformanceRef(lookupResults.front());
+      auto archetype =
+        dyn_cast<ArchetypeType>(substReplacement->getCanonicalType());
+      // If classDecl is not nullptr, it is a concrete class.
+      auto classDecl = substReplacement->getClassOrBoundGenericClass();
+      if (!classDecl && archetype->getSuperclass()) {
+        // Replacement type is an archetype with a superclass constraint.
+        classDecl = archetype->getSuperclass()->getClassOrBoundGenericClass();
+        assert(classDecl);
+      }
+      if (classDecl) {
+        // Create a concrete conformance based on the conforming class.
+        SmallVector<ProtocolConformance *, 1> lookupResults;
+        classDecl->lookupConformance(classDecl->getParentModule(), proto,
+                                     lookupResults);
+        conformance = ProtocolConformanceRef(lookupResults.front());
+      } else if (archetype && archetype->requiresClass()) {
+        // Replacement type is an archetype with a class constraint.
+        // Create an abstract conformance.
+        conformance = ProtocolConformanceRef(proto);
+      }
     }
 
     assert(conformance);
