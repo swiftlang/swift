@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -O | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-inline-generics=false -enable-sil-verify-all %s -O | %FileCheck %s
 
 // Check some corner cases related to tracking of opened archetypes.
 // For example, the compiler used to crash compiling the "process" function (rdar://28024272)
