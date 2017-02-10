@@ -4002,6 +4002,10 @@ namespace {
       auto *env = Impl.buildGenericEnvironment(result->getGenericParams(), dc);
       result->setGenericEnvironment(env);
 
+      // Compute the requirement signature.
+      if (!result->isRequirementSignatureComputed())
+        result->computeRequirementSignature();
+
       result->setMemberLoader(&Impl, 0);
 
       // Add the protocol decl to ExternalDefinitions so that IRGen can emit
@@ -7075,8 +7079,7 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
   return nullptr;
 }
 
-// Calculate the generic environment from an imported generic param list.
-GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
+GenericSignature *ClangImporter::Implementation::buildGenericSignature(
     GenericParamList *genericParams, DeclContext *dc) {
   ArchetypeBuilder builder(SwiftContext,
                            LookUpConformanceInModule(dc->getParentModule()));
@@ -7094,7 +7097,13 @@ GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
   // TODO: any need to infer requirements?
   builder.finalize(genericParams->getSourceRange().Start, allGenericParams);
 
-  return builder.getGenericSignature()->createGenericEnvironment(
+  return builder.getGenericSignature();
+}
+
+// Calculate the generic environment from an imported generic param list.
+GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
+    GenericParamList *genericParams, DeclContext *dc) {
+  return buildGenericSignature(genericParams, dc)->createGenericEnvironment(
                                                        *dc->getParentModule());
 }
 

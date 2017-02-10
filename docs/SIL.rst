@@ -3735,6 +3735,14 @@ container may use one of several representations:
   * `open_existential_addr`_
   * `deinit_existential_addr`_
 
+- **Opaque existential containers loadable types**: In the SIL Opaque Values
+  mode of operation, we take an opaque value as-is.
+  Said value might be replaced with one of the _addr instructions above
+  before IR generation.
+  The following instructions manipulate "loadable" opaque existential containers:
+  
+  * `open_existential_opaque`_
+
 - **Class existential containers**: If a protocol type is constrained by one or
   more class protocols, then the existential container for that type is
   loadable and referred to in the implementation as a *class existential
@@ -3841,6 +3849,24 @@ container referenced by ``%0``. The protocol conformances associated
 with this existential container are associated directly with the
 archetype ``$*@opened P``. This pointer can be used with any operation
 on archetypes, such as ``witness_method``.
+
+open_existential_opaque
+```````````````````````
+::
+
+  sil-instruction ::= 'open_existential_opaque' sil-operand 'to' sil-type
+
+  %1 = open_existential_opaque %0 : $P to $@opened P
+  // %0 must be of a $P type for non-class protocol or protocol composition
+  //   type P
+  // $@opened P must be a unique archetype that refers to an opened
+  // existential type P.
+  // %1 will be of type $P
+
+Loadable version of the above: Opens-up the existential
+container associated with ``%0``. The protocol conformances associated
+with this existential container are associated directly with the
+archetype ``$@opened P``.
 
 init_existential_ref
 ````````````````````

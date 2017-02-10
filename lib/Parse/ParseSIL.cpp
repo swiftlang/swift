@@ -2026,7 +2026,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   case ValueKind::OpenExistentialAddrInst:
   case ValueKind::OpenExistentialBoxInst:
   case ValueKind::OpenExistentialMetatypeInst:
-  case ValueKind::OpenExistentialRefInst: {
+  case ValueKind::OpenExistentialRefInst:
+  case ValueKind::OpenExistentialOpaqueInst: {
     SILType Ty;
     Identifier ToToken;
     SourceLoc ToLoc;
@@ -2060,6 +2061,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
     case ValueKind::OpenExistentialBoxInst:
       ResultVal = B.createOpenExistentialBox(InstLoc, Val, Ty);
+      break;
+    case ValueKind::OpenExistentialOpaqueInst:
+      ResultVal = B.createOpenExistentialOpaque(InstLoc, Val, Ty);
       break;
 
     default:

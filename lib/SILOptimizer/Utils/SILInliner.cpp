@@ -366,6 +366,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::OpenExistentialBoxInst:
     case ValueKind::OpenExistentialMetatypeInst:
     case ValueKind::OpenExistentialRefInst:
+    case ValueKind::OpenExistentialOpaqueInst:
     case ValueKind::PartialApplyInst:
     case ValueKind::ExistentialMetatypeInst:
     case ValueKind::RefElementAddrInst:

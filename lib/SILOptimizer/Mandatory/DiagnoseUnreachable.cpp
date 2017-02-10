@@ -416,14 +416,7 @@ static SILInstruction *getAsCallToNoReturn(SILInstruction *I) {
       return AI;
   
   if (auto *BI = dyn_cast<BuiltinInst>(I)) {
-    // TODO: We should have an "isNoReturn" bit on Swift's BuiltinInfo, but for
-    // now, let's recognize noreturn intrinsics and builtins specially here.
-    if (BI->getIntrinsicInfo().hasAttribute(llvm::Attribute::NoReturn))
-      return BI;
-    if (BI->getBuiltinInfo().ID == BuiltinValueKind::Unreachable
-        || BI->getBuiltinInfo().ID == BuiltinValueKind::CondUnreachable
-        || BI->getBuiltinInfo().ID == BuiltinValueKind::UnexpectedError
-        || BI->getBuiltinInfo().ID == BuiltinValueKind::ErrorInMain)
+    if (BI->getModule().isNoReturnBuiltinOrIntrinsic(BI->getName()))
       return BI;
   }
   return nullptr;

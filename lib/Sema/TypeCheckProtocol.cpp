@@ -1783,6 +1783,9 @@ namespace {
            ValueDecl *requirement, bool isError,
            std::function<void(NormalProtocolConformance *)> fn);
 
+    void
+    addUsedConformances(ProtocolConformance *conformance,
+                        llvm::SmallPtrSetImpl<ProtocolConformance *> &visited);
     void addUsedConformances(ProtocolConformance *conformance);
 
   public:
@@ -3267,7 +3270,8 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
       : Conformance(conformance), Inferred(inferred) { }
 
     /// Structural mismatches imply that the witness cannot match.
-    bool mismatch(TypeBase *firstType, TypeBase *secondType) {
+    bool mismatch(TypeBase *firstType, TypeBase *secondType,
+                  Type sugaredFirstType) {
       // If either type hit an error, don't stop yet.
       if (firstType->hasError() || secondType->hasError())
         return true;
@@ -3278,7 +3282,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
 
     /// Deduce associated types from dependent member types in the witness.
     bool mismatch(DependentMemberType *firstDepMember,
-                  TypeBase *secondType) {
+                  TypeBase *secondType, Type sugaredFirstType) {
       // If the second type is an error, don't look at it further.
       if (secondType->hasError())
         return true;
@@ -3295,7 +3299,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
 
     /// FIXME: Recheck the type of Self against the second type?
     bool mismatch(GenericTypeParamType *selfParamType,
-                  TypeBase *secondType) {
+                  TypeBase *secondType, Type sugaredFirstType) {
       return true;
     }
   };
@@ -4399,7 +4403,15 @@ static void recordConformanceDependency(DeclContext *DC,
                          DC->isCascadingContextForLookup(InExpression));
 }
 
-void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
+void ConformanceChecker::addUsedConformances(
+    ProtocolConformance *conformance,
+    llvm::SmallPtrSetImpl<ProtocolConformance *> &visited) {
+  // This deduplication cannot be implemented by just checking UsedConformance,
+  // because conformances can be added to UsedConformances outside this
+  // function, meaning their type witness conformances may not be tracked.
+  if (!visited.insert(conformance).second)
+    return;
+
   auto normalConf = conformance->getRootNormalConformance();
 
   if (normalConf->isIncomplete())
@@ -4411,10 +4423,15 @@ void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
                                                TypeDecl *witness) -> bool {
     for (auto nestedConformance : sub.getConformances())
       if (nestedConformance.isConcrete())
-        addUsedConformances(nestedConformance.getConcrete());
+        addUsedConformances(nestedConformance.getConcrete(), visited);
 
     return false;
   });
+}
+
+void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
+  llvm::SmallPtrSet<ProtocolConformance *, 8> visited;
+  addUsedConformances(conformance, visited);
 }
 
 #pragma mark Protocol conformance checking
@@ -5516,9 +5533,10 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     // Special case: explain that 'RawRepresentable' conformance
     // is implied for enums which already declare a raw type.
     if (auto enumDecl = dyn_cast<EnumDecl>(existingDecl)) {
-      if (diag.Protocol->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
-          enumDecl->derivesProtocolConformance(diag.Protocol) &&
-          enumDecl->hasRawType()) {
+      if (diag.Protocol->isSpecificProtocol(KnownProtocolKind::RawRepresentable)
+          && enumDecl->derivesProtocolConformance(diag.Protocol)
+          && enumDecl->hasRawType()
+          && enumDecl->getInherited()[0].getSourceRange().isValid()) {
         diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
                  diag::enum_declares_rawrep_with_raw_type,
                  dc->getDeclaredInterfaceType(), enumDecl->getRawType());

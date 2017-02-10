@@ -1579,6 +1579,9 @@ ERROR(requires_same_type_conflict,none,
 ERROR(requires_generic_param_same_type_does_not_conform,none,
       "same-type constraint type %0 does not conform to required protocol %1",
       (Type, Identifier))
+ERROR(requires_same_concrete_type,none,
+      "generic signature requires types %0 and %1 to be the same", (Type, Type))
+
 ERROR(mutiple_layout_constraints,none,
       "multiple layout constraints cannot be used at the same time: %0 and %1",
       (LayoutConstraint, LayoutConstraint))

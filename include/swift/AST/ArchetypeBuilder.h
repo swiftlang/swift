@@ -144,11 +144,6 @@ private:
                                  RequirementSource Source,
                                 llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
 
-  /// "Expand" all of the archetypes in the generic environment.
-  /// FIXME: This is a hack we need until we're able to lazily create
-  /// archetypes.
-  void expandGenericEnvironment(GenericEnvironment *genericEnv);
-
 public:
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetypes are equivalent.
@@ -169,9 +164,15 @@ private:
                                 Type Superclass,
                                 RequirementSource Source);
 
-  /// \brief Add a new same-type requirement specifying that the given potential
-  /// archetypes should map to the equivalent archetype.
-  bool addSameTypeRequirement(Type T1, Type T2, RequirementSource Source);
+  /// \brief Add a new same-type requirement specifying that the given two
+  /// types should be the same.
+  ///
+  /// \param diagnoseMismatch Callback invoked when the types in the same-type
+  /// requirement mismatch.
+  bool addSameTypeRequirement(
+                        Type T1, Type T2, RequirementSource Source,
+                        PotentialArchetype *basePA,
+                        llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
   /// Add the requirements placed on the given abstract type parameter
   /// to the given potential archetype.
@@ -191,6 +192,10 @@ private:
   /// Visit all of the potential archetypes.
   template<typename F>
   void visitPotentialArchetypes(F f);
+
+  void markPotentialArchetypeRecursive(PotentialArchetype *pa,
+                                       ProtocolDecl *proto,
+                                       RequirementSource source);
 
 public:
   /// Construct a new archetype builder.
@@ -246,7 +251,14 @@ public:
   ///
   /// Adding an already-checked requirement cannot fail. This is used to
   /// re-inject requirements from outer contexts.
-  void addRequirement(const Requirement &req, RequirementSource source);
+  ///
+  /// \returns true if this requirement makes the set of requirements
+  /// inconsistent, in which case a diagnostic will have been issued.
+  bool addRequirement(const Requirement &req, RequirementSource source);
+
+  bool addRequirement(const Requirement &req, RequirementSource source,
+                      PotentialArchetype *basePA,
+                      llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
 
   bool addLayoutRequirement(PotentialArchetype *PAT,
                             LayoutConstraint Layout,
@@ -310,7 +322,12 @@ public:
   /// signature are fully resolved).
   ///
   /// For any type that cannot refer to an archetype, this routine returns null.
-  PotentialArchetype *resolveArchetype(Type type);
+  ///
+  /// A non-null \c basePA is used in place of the "true" potential archetype
+  /// for a GenericTypeParamType, effectively performing a substitution like,
+  /// e.g., Self = <some PA>.
+  PotentialArchetype *resolveArchetype(Type type,
+                                       PotentialArchetype *basePA = nullptr);
 
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -614,6 +631,9 @@ public:
   /// Retrieve the source of the same-type constraint that maps this potential
   /// archetype to a concrete type.
   const RequirementSource &getConcreteTypeSource() const {
+    if (Representative != this)
+      return Representative->getConcreteTypeSource();
+
     return *ConcreteTypeSource;
   }
 

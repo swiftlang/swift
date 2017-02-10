@@ -891,9 +891,9 @@ endif()
 # Find libxml.
 # FIXME: unify with CLANG_HAVE_LIBXML, which is set in LLVM anyway.
 find_package(LibXml2)
-if(LIBXML2_FOUND)
-  set(SWIFT_HAVE_LIBXML 1)
-endif()
+option(SWIFT_HAVE_LIBXML
+    "Whether to build with libxml"
+    ${LIBXML2_FOUND})
 
 # You need libedit linked in order to check if you have el_wgets.
 cmake_push_check_state()
