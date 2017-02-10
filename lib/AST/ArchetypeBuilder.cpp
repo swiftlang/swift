@@ -2657,12 +2657,27 @@ void ArchetypeBuilder::expandGenericEnvironment(GenericEnvironment *env) {
                                                     /*allowUnresolved=*/false);
       auto repInContext =
         env->mapTypeIntoContext(repDepTy, getLookupConformanceFn());
-      assert((inContext->isEqual(repInContext) ||
+      if (!(inContext->isEqual(repInContext) ||
               inContext->hasError() ||
-              repInContext->hasError()) &&
-             "Potential archetype mapping differs from representative!");
+            repInContext->hasError())) {
+        dump(llvm::errs());
+
+        llvm::errs() << "Dependent type:\n";
+        depTy->dump();
+
+        llvm::errs() << "Dependent type in context:\n";
+        inContext->dump();
+
+        llvm::errs() << "Representative dependent type:\n";
+        repDepTy->dump();
+
+        llvm::errs() << "Representative in context:\n";
+        repInContext->dump();
+
+        llvm_unreachable(
+                  "Potential archetype mapping differs from representative!");
+      }
     });
   }
 #endif
 }
-
