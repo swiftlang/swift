@@ -986,39 +986,12 @@ RequirementEnvironment::RequirementEnvironment(
   // parameters of the requirement into a combined context that provides the
   // type parameters of the conformance context and the parameters of the
   // requirement.
-  Type concreteType = conformanceDC->getSelfInterfaceType();
   auto selfType = cast<GenericTypeParamType>(
                             proto->getSelfInterfaceType()->getCanonicalType());
 
-
-  reqToSyntheticEnvMap.addSubstitution(selfType, concreteType);
-
   // 'Self' is always at depth 0, index 0. Anything else is invalid code.
-  if (selfType->getDepth() != 0 || selfType->getIndex() != 0) {
+  if (selfType->getDepth() != 0 || selfType->getIndex() != 0)
     return;
-  }
-
-  // Form the conformance of the interface type of the conformance context
-  // to the requirement's enclosing protocol.
-  ProtocolConformance *specialized = conformance;
-  if (conformance && conformance->getGenericSignature()) {
-    auto concreteSubs =
-      concreteType->gatherAllSubstitutions(conformanceDC->getParentModule(),
-                                           &tc, nullptr);
-    specialized =
-      ctx.getSpecializedConformance(concreteType, conformance, concreteSubs);
-  }
-
-  // Add the conformances for 'Self'.
-  {
-    SmallVector<ProtocolConformanceRef, 1> conformances;
-    if (specialized)
-      reqToSyntheticEnvMap.addConformance(
-          selfType, ProtocolConformanceRef(specialized));
-    else
-      reqToSyntheticEnvMap.addConformance(
-          selfType, ProtocolConformanceRef(proto));
-  }
 
   // Construct an generic signature builder by collecting the constraints from the
   // requirement and the context of the conformance together, because both
@@ -1044,10 +1017,42 @@ RequirementEnvironment::RequirementEnvironment(
 
   // Add the generic signature of the requirement, substituting our concrete
   // type for 'Self'. We don't need the 'Self' requirement or parameter.
-  auto reqEnv = reqDC->getGenericEnvironmentOfContext();
+  auto concreteType = conformanceDC->getSelfInterfaceType();
+
+  reqToSyntheticEnvMap = reqSig->getSubstitutionMap(
+    [selfType, concreteType, depth, &ctx](SubstitutableType *type) -> Type {
+      if (type->isEqual(selfType))
+        return concreteType;
+      auto *genericParam = cast<GenericTypeParamType>(type);
+      if (genericParam->getDepth() != 1)
+        return Type();
+      auto substGenericParam =
+        GenericTypeParamType::get(depth, genericParam->getIndex(), ctx);
+      return substGenericParam;
+    },
+    [selfType, concreteType, conformance, conformanceDC, &ctx, &tc](
+        CanType type, Type replacement, ProtocolType *protoType)
+          -> Optional<ProtocolConformanceRef> {
+      auto proto = protoType->getDecl();
+      if (type->isEqual(selfType)) {
+        ProtocolConformance *specialized = conformance;
+        if (conformance && conformance->getGenericSignature()) {
+          auto concreteSubs =
+            concreteType->gatherAllSubstitutions(conformanceDC->getParentModule(),
+                                                 &tc, nullptr);
+          specialized =
+            ctx.getSpecializedConformance(concreteType, conformance, concreteSubs);
+        }
+
+        if (specialized)
+          return ProtocolConformanceRef(specialized);
+      }
+
+      return ProtocolConformanceRef(proto);
+    });
 
   // First, add the generic parameters from the requirement.
-  for (auto genericParam : reqEnv->getGenericParams().slice(1)) {
+  for (auto genericParam : reqSig->getGenericParams().slice(1)) {
     // The only depth that makes sense is depth == 1, the generic parameters
     // of the requirement itself. Anything else is from invalid code.
     if (genericParam->getDepth() != 1) {
@@ -1060,21 +1065,6 @@ RequirementEnvironment::RequirementEnvironment(
 
     allGenericParams.push_back(substGenericParam);
     builder.addGenericParameter(substGenericParam);
-
-    // Create a substitution from the requirement's generic parameter to the
-    // generic parameter known to the builder.
-    reqToSyntheticEnvMap.addSubstitution(
-      cast<GenericTypeParamType>(genericParam->getCanonicalType()),
-      substGenericParam);
-    if (auto archetypeType
-          = reqEnv->mapTypeIntoContext(genericParam)->getAs<ArchetypeType>()) {
-      // Add substitutions.
-      for (auto proto : archetypeType->getConformsTo()) {
-        reqToSyntheticEnvMap.addConformance(
-            genericParam->getCanonicalType(),
-            ProtocolConformanceRef(proto));
-      }
-    }
   }
 
   // If there were no generic parameters, we're done.
