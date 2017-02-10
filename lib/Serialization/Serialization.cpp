@@ -1110,7 +1110,6 @@ void Serializer::writeGenericEnvironment(const GenericEnvironment *env) {
     }
 
     rawParamIDs.push_back(addTypeRef(paramTy));
-    rawParamIDs.push_back(addTypeRef(env->mapTypeIntoContext(paramTy)));
   }
 
   if (SILMode) {
@@ -3145,44 +3144,15 @@ void Serializer::writeType(Type ty) {
       break;
     }
 
-    SmallVector<DeclID, 4> conformances;
-    for (auto proto : archetypeTy->getConformsTo())
-      conformances.push_back(addDeclRef(proto));
+    auto env = archetypeTy->getGenericEnvironment();
+    assert(env && "Primary archetype without generic environment?");
 
-    TypeID parentOrGenericEnv;
-    DeclID assocTypeOrNameID;
-    if (archetypeTy->getParent()) {
-      parentOrGenericEnv = addTypeRef(archetypeTy->getParent());
-      assocTypeOrNameID = addDeclRef(archetypeTy->getAssocType());
-    } else {
-      parentOrGenericEnv =
-        addGenericEnvironmentRef(archetypeTy->getGenericEnvironment());
-      assocTypeOrNameID = addIdentifierRef(archetypeTy->getName());
-    }
+    GenericEnvironmentID envID = addGenericEnvironmentRef(env);
+    Type interfaceType = env->mapTypeOutOfContext(archetypeTy);
 
     unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
     ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    archetypeTy->isPrimary(),
-                                    parentOrGenericEnv,
-                                    assocTypeOrNameID,
-                                    addTypeRef(archetypeTy->getSuperclass()),
-                                    conformances);
-
-    SmallVector<IdentifierID, 4> nestedTypeNames;
-    SmallVector<TypeID, 4> nestedTypes;
-    for (auto next : archetypeTy->getAllNestedTypes()) {
-      nestedTypeNames.push_back(addIdentifierRef(next.first));
-      nestedTypes.push_back(addTypeRef(next.second));
-    }
-
-    abbrCode = DeclTypeAbbrCodes[ArchetypeNestedTypeNamesLayout::Code];
-    ArchetypeNestedTypeNamesLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                               nestedTypeNames);
-
-    abbrCode = DeclTypeAbbrCodes[ArchetypeNestedTypesLayout::Code];
-    ArchetypeNestedTypesLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                           nestedTypes);
-
+                                    envID, addTypeRef(interfaceType));
     break;
   }
 
@@ -3191,7 +3161,9 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[GenericTypeParamTypeLayout::Code];
     DeclID declIDOrDepth;
     unsigned indexPlusOne;
-    if (genericParam->getDecl()) {
+    if (genericParam->getDecl() &&
+        !(genericParam->getDecl()->getDeclContext()->isModuleScopeContext() &&
+          isDeclXRef(genericParam->getDecl()))) {
       declIDOrDepth = addDeclRef(genericParam->getDecl());
       indexPlusOne = 0;
     } else {
@@ -3456,8 +3428,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<LValueTypeLayout>();
   registerDeclTypeAbbr<InOutTypeLayout>();
   registerDeclTypeAbbr<ArchetypeTypeLayout>();
-  registerDeclTypeAbbr<ArchetypeNestedTypeNamesLayout>();
-  registerDeclTypeAbbr<ArchetypeNestedTypesLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
   registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();

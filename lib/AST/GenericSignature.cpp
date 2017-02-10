@@ -204,9 +204,7 @@ GenericSignature::getCanonicalSignature() const {
 GenericEnvironment *GenericSignature::createGenericEnvironment(
                                                              ModuleDecl &mod) {
   auto *builder = getArchetypeBuilder(mod);
-  auto env = GenericEnvironment::getIncomplete(this, builder);
-  builder->expandGenericEnvironment(env);
-  return env;
+  return GenericEnvironment::getIncomplete(this, builder);
 }
 
 
