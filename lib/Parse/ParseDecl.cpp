@@ -3045,19 +3045,18 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
     if (ConfigState.shouldParse()) {
       ParserStatus Status;
       bool PreviousHadSemi = true;
-      while (Tok.isNot(tok::pound_else, tok::pound_endif, tok::pound_elseif)) {
-        SourceLoc StartLoc = Tok.getLoc();
-        Status |= parseDeclItem(*this, PreviousHadSemi, Flags,
-                                [&](Decl *D) {Decls.push_back(D);});
-        if (StartLoc == Tok.getLoc()) {
-          assert(Status.isError() && "no progress without error?");
+      while (Tok.isNot(tok::pound_else, tok::pound_endif, tok::pound_elseif,
+                       tok::eof)) {
+        if (Tok.is(tok::r_brace)) {
+          diagnose(Tok.getLoc(),
+                   diag::unexpected_rbrace_in_conditional_compilation_block);
+          // If we see '}', following declarations don't look like belong to
+          // the current decl context; skip them.
           skipUntilConditionalBlockClose();
           break;
         }
-        if (Tok.isAny(tok::eof)) {
-          diagnose(Tok, diag::expected_close_to_if_directive);
-          break;
-        }
+        Status |= parseDeclItem(*this, PreviousHadSemi, Flags,
+                                [&](Decl *D) {Decls.push_back(D);});
       }
     } else {
       DiagnosticTransaction DT(Diags);
