@@ -1,4 +1,4 @@
-//===--- ArchetypeBuilder.h - Generic Archetype Builder ---------*- C++ -*-===//
+//===--- GenericSignatureBuilder.h - Generic generic signature builder ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Support for collecting a set of generic requirements, both explicitly stated
-// and inferred, and computing the archetypes and required witness tables from
-// those requirements.
+// Support for collecting a set of generic requirements, whether they are
+// explicitly stated, inferred from a type signature, or implied by other
+// requirements, and computing the canonicalized, minimized generic signature
+// from those requirements.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_ARCHETYPEBUILDER_H
-#define SWIFT_ARCHETYPEBUILDER_H
+#ifndef SWIFT_GENERICSIGNATUREBUILDER_H
+#define SWIFT_GENERICSIGNATUREBUILDER_H
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
@@ -111,7 +112,7 @@ private:
 /// \brief Collects a set of requirements of generic parameters, both explicitly
 /// stated and inferred, and determines the set of archetypes for each of
 /// the generic parameters.
-class ArchetypeBuilder {
+class GenericSignatureBuilder {
 public:
   /// Describes a potential archetype, which stands in for a generic parameter
   /// type or some type derived from it.
@@ -130,8 +131,8 @@ private:
   struct Implementation;
   std::unique_ptr<Implementation> Impl;
 
-  ArchetypeBuilder(const ArchetypeBuilder &) = delete;
-  ArchetypeBuilder &operator=(const ArchetypeBuilder &) = delete;
+  GenericSignatureBuilder(const GenericSignatureBuilder &) = delete;
+  GenericSignatureBuilder &operator=(const GenericSignatureBuilder &) = delete;
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype conforms to the given protocol.
@@ -198,27 +199,27 @@ private:
                                        RequirementSource source);
 
 public:
-  /// Construct a new archetype builder.
+  /// Construct a new generic signature builder.
   ///
   /// \param lookupConformance Conformance-lookup routine that will be used
   /// to satisfy conformance requirements for concrete types.
-  explicit ArchetypeBuilder(ASTContext &ctx,
+  explicit GenericSignatureBuilder(ASTContext &ctx,
                             std::function<GenericFunction> lookupConformance);
 
-  ArchetypeBuilder(ArchetypeBuilder &&);
-  ~ArchetypeBuilder();
+  GenericSignatureBuilder(GenericSignatureBuilder &&);
+  ~GenericSignatureBuilder();
 
   /// Retrieve the AST context.
   ASTContext &getASTContext() const { return Context; }
 
-  /// Retrieve the conformance-lookup function used by this archetype builder.
+  /// Retrieve the conformance-lookup function used by this generic signature builder.
   std::function<GenericFunction> getLookupConformanceFn() const;
 
   /// Retrieve the lazy resolver, if there is one.
   LazyResolver *getLazyResolver() const;
 
   /// Enumerate the requirements that describe the signature of this
-  /// archetype builder.
+  /// generic signature builder.
   ///
   /// \param f A function object that will be passed each requirement
   /// and requirement source.
@@ -338,10 +339,10 @@ public:
   void dump(llvm::raw_ostream &out);
 };
 
-class ArchetypeBuilder::PotentialArchetype {
+class GenericSignatureBuilder::PotentialArchetype {
   /// The parent of this potential archetype (for a nested type) or the
-  /// archetype builder in which this root resides.
-  llvm::PointerUnion<PotentialArchetype*, ArchetypeBuilder*> parentOrBuilder;
+  /// generic signature builder in which this root resides.
+  llvm::PointerUnion<PotentialArchetype*, GenericSignatureBuilder*> parentOrBuilder;
 
   /// The identifier describing this particular archetype.
   ///
@@ -474,7 +475,7 @@ class ArchetypeBuilder::PotentialArchetype {
   }
 
   /// \brief Construct a new potential archetype for a generic parameter.
-  PotentialArchetype(ArchetypeBuilder *builder, GenericParamKey genericParam)
+  PotentialArchetype(GenericSignatureBuilder *builder, GenericParamKey genericParam)
     : parentOrBuilder(builder), identifier(genericParam),
       Representative(this), isUnresolvedNestedType(false),
       IsRecursive(false), Invalid(false),
@@ -488,15 +489,15 @@ class ArchetypeBuilder::PotentialArchetype {
   /// path compression on the way.
   PotentialArchetype *getRepresentative();
 
-  /// Retrieve the archetype builder with which this archetype is associated.
-  ArchetypeBuilder *getBuilder() const {
+  /// Retrieve the generic signature builder with which this archetype is associated.
+  GenericSignatureBuilder *getBuilder() const {
     const PotentialArchetype *pa = this;
     while (auto parent = pa->getParent())
       pa = parent;
-    return pa->parentOrBuilder.get<ArchetypeBuilder *>();
+    return pa->parentOrBuilder.get<GenericSignatureBuilder *>();
   }
 
-  friend class ArchetypeBuilder;
+  friend class GenericSignatureBuilder;
   friend class GenericSignature;
 
   /// \brief Retrieve the debug name of this potential archetype.
@@ -523,11 +524,11 @@ public:
 
   /// Resolve the potential archetype to the given associated type.
   void resolveAssociatedType(AssociatedTypeDecl *assocType,
-                             ArchetypeBuilder &builder);
+                             GenericSignatureBuilder &builder);
 
   /// Determine whether this is a generic parameter.
   bool isGenericParam() const {
-    return parentOrBuilder.is<ArchetypeBuilder *>();
+    return parentOrBuilder.is<GenericSignatureBuilder *>();
   }
 
   /// Retrieve the generic parameter key for a potential archetype that
@@ -577,7 +578,7 @@ public:
   /// \returns true if the conformance was new, false if it already existed.
   bool addConformance(ProtocolDecl *proto, bool updateExistingSource,
                       const RequirementSource &source,
-                      ArchetypeBuilder &builder);
+                      GenericSignatureBuilder &builder);
 
   /// Retrieve the superclass of this archetype.
   Type getSuperclass() const { return Superclass; }
@@ -612,7 +613,7 @@ public:
 
   /// \brief Retrieve the potential archetype to be used as the anchor for
   /// potential archetype computations.
-  PotentialArchetype *getArchetypeAnchor(ArchetypeBuilder &builder);
+  PotentialArchetype *getArchetypeAnchor(GenericSignatureBuilder &builder);
 
   /// Add a same-type constraint between this archetype and the given
   /// other archetype.
@@ -639,15 +640,15 @@ public:
 
   /// \brief Retrieve (or create) a nested type with the given name.
   PotentialArchetype *getNestedType(Identifier Name,
-                                    ArchetypeBuilder &builder);
+                                    GenericSignatureBuilder &builder);
 
   /// \brief Retrieve (or create) a nested type with a known associated type.
   PotentialArchetype *getNestedType(AssociatedTypeDecl *assocType,
-                                    ArchetypeBuilder &builder);
+                                    GenericSignatureBuilder &builder);
 
   /// \brief Retrieve (or build) the type corresponding to the potential
   /// archetype within the given generic environment.
-  Type getTypeInContext(ArchetypeBuilder &builder,
+  Type getTypeInContext(GenericSignatureBuilder &builder,
                         GenericEnvironment *genericEnv);
 
   /// Retrieve the dependent type that describes this potential
@@ -710,7 +711,7 @@ public:
   void dump(llvm::raw_ostream &Out, SourceManager *SrcMgr,
             unsigned Indent);
 
-  friend class ArchetypeBuilder;
+  friend class GenericSignatureBuilder;
 };
 
 } // end namespace swift

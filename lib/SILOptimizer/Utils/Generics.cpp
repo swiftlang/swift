@@ -17,7 +17,7 @@
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/GenericEnvironment.h"
 
 using namespace swift;
@@ -288,7 +288,7 @@ getSignatureWithRequirements(GenericSignature *OrigGenSig,
                              ArrayRef<Requirement> Requirements,
                              SILModule &M) {
   // Form a new generic signature based on the old one.
-  ArchetypeBuilder Builder(M.getASTContext(),
+  GenericSignatureBuilder Builder(M.getASTContext(),
                            LookUpConformanceInModule(M.getSwiftModule()));
 
   // First, add the old generic signature.

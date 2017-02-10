@@ -16,7 +16,7 @@
 
 #include "TypeChecker.h"
 #include "MiscDiagnostics.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
@@ -1608,7 +1608,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   }
 
   // Form a new generic signature based on the old one.
-  ArchetypeBuilder Builder(D->getASTContext(),
+  GenericSignatureBuilder Builder(D->getASTContext(),
                            LookUpConformanceInModule(DC->getParentModule()));
 
   // First, add the old generic signature.

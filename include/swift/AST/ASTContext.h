@@ -74,7 +74,7 @@ namespace swift {
   class TypeVariableType;
   class TupleType;
   class FunctionType;
-  class ArchetypeBuilder;
+  class GenericSignatureBuilder;
   class ArchetypeType;
   class Identifier;
   class InheritedNameSet;
@@ -806,15 +806,15 @@ public:
   /// not necessarily loaded.
   void getVisibleTopLevelClangModules(SmallVectorImpl<clang::Module*> &Modules) const;
 
-  /// Retrieve or create the stored archetype builder for the given
+  /// Retrieve or create the stored generic signature builder for the given
   /// canonical generic signature and module.
-  ArchetypeBuilder *getOrCreateArchetypeBuilder(CanGenericSignature sig,
+  GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(CanGenericSignature sig,
                                                 ModuleDecl *mod);
 
   /// Retrieve or create the canonical generic environment of a canonical
-  /// archetype builder.
+  /// generic signature builder.
   GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
-                                                     ArchetypeBuilder *builder,
+                                                     GenericSignatureBuilder *builder,
                                                      ModuleDecl &module);
 
   /// Retrieve the inherited name set for the given class.

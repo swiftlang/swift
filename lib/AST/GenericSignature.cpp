@@ -16,7 +16,7 @@
 
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
@@ -127,13 +127,13 @@ ASTContext &GenericSignature::getASTContext(
     return requirements.front().getFirstType()->getASTContext();
 }
 
-ArchetypeBuilder *GenericSignature::getArchetypeBuilder(ModuleDecl &mod) {
-  // The archetype builder is associated with the canonical signature.
+GenericSignatureBuilder *GenericSignature::getGenericSignatureBuilder(ModuleDecl &mod) {
+  // The generic signature builder is associated with the canonical signature.
   if (!isCanonical())
-    return getCanonicalSignature()->getArchetypeBuilder(mod);
+    return getCanonicalSignature()->getGenericSignatureBuilder(mod);
 
-  // Archetype builders are stored on the ASTContext.
-  return getASTContext().getOrCreateArchetypeBuilder(CanGenericSignature(this),
+  // generic signature builders are stored on the ASTContext.
+  return getASTContext().getOrCreateGenericSignatureBuilder(CanGenericSignature(this),
                                                      &mod);
 }
 
@@ -203,7 +203,7 @@ GenericSignature::getCanonicalSignature() const {
 
 GenericEnvironment *GenericSignature::createGenericEnvironment(
                                                              ModuleDecl &mod) {
-  auto *builder = getArchetypeBuilder(mod);
+  auto *builder = getGenericSignatureBuilder(mod);
   return GenericEnvironment::getIncomplete(this, builder);
 }
 
@@ -476,7 +476,7 @@ getSubstitutions(const SubstitutionMap &subMap,
 bool GenericSignature::requiresClass(Type type, ModuleDecl &mod) {
   if (!type->isTypeParameter()) return false;
 
-  auto &builder = *getArchetypeBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder(mod);
   auto pa = builder.resolveArchetype(type);
   if (!pa) return false;
 
@@ -501,7 +501,7 @@ bool GenericSignature::requiresClass(Type type, ModuleDecl &mod) {
 Type GenericSignature::getSuperclassBound(Type type, ModuleDecl &mod) {
   if (!type->isTypeParameter()) return nullptr;
 
-  auto &builder = *getArchetypeBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder(mod);
   auto pa = builder.resolveArchetype(type);
   if (!pa) return nullptr;
 
@@ -521,7 +521,7 @@ SmallVector<ProtocolDecl *, 2> GenericSignature::getConformsTo(Type type,
                                                                ModuleDecl &mod) {
   if (!type->isTypeParameter()) return { };
 
-  auto &builder = *getArchetypeBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder(mod);
   auto pa = builder.resolveArchetype(type);
   if (!pa) return { };
 
@@ -553,7 +553,7 @@ bool GenericSignature::isConcreteType(Type type, ModuleDecl &mod) {
 Type GenericSignature::getConcreteType(Type type, ModuleDecl &mod) {
   if (!type->isTypeParameter()) return Type();
 
-  auto &builder = *getArchetypeBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder(mod);
   auto pa = builder.resolveArchetype(type);
   if (!pa) return Type();
 
@@ -567,7 +567,7 @@ LayoutConstraint GenericSignature::getLayoutConstraint(Type type,
                                                        ModuleDecl &mod) {
   if (!type->isTypeParameter()) return LayoutConstraint();
 
-  auto &builder = *getArchetypeBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder(mod);
   auto pa = builder.resolveArchetype(type);
   if (!pa) return LayoutConstraint();
 
@@ -583,7 +583,7 @@ bool GenericSignature::areSameTypeParameterInContext(Type type1, Type type2,
   if (type1.getPointer() == type2.getPointer())
     return true;
 
-  auto &builder = *getArchetypeBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder(mod);
   auto pa1 = builder.resolveArchetype(type1);
   assert(pa1 && "not a valid dependent type of this signature?");
   pa1 = pa1->getRepresentative();
@@ -608,12 +608,12 @@ bool GenericSignature::isCanonicalTypeInContext(Type type, ModuleDecl &mod) {
   if (!type->hasTypeParameter())
     return true;
 
-  auto &builder = *getArchetypeBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder(mod);
   return isCanonicalTypeInContext(type, builder);
 }
 
 bool GenericSignature::isCanonicalTypeInContext(Type type,
-                                                ArchetypeBuilder &builder) {
+                                                GenericSignatureBuilder &builder) {
   // If the type isn't independently canonical, it's certainly not canonical
   // in this context.
   if (!type->isCanonical())
@@ -637,7 +637,7 @@ bool GenericSignature::isCanonicalTypeInContext(Type type,
 }
 
 CanType GenericSignature::getCanonicalTypeInContext(Type type,
-                                                    ArchetypeBuilder &builder) {
+                                                    GenericSignatureBuilder &builder) {
   type = type->getCanonicalType();
 
   // All the contextual canonicality rules apply to type parameters, so if the
@@ -679,15 +679,15 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type,
   if (!type->hasTypeParameter())
     return CanType(type);
 
-  auto &builder = *getArchetypeBuilder(mod);
+  auto &builder = *getGenericSignatureBuilder(mod);
   return getCanonicalTypeInContext(type, builder);
 }
 
 GenericEnvironment *CanGenericSignature::getGenericEnvironment(
                                                      ModuleDecl &module) const {
-  // Archetype builders are stored on the ASTContext.
+  // generic signature builders are stored on the ASTContext.
   return module.getASTContext().getOrCreateCanonicalGenericEnvironment(
-           module.getASTContext().getOrCreateArchetypeBuilder(*this, &module),
+           module.getASTContext().getOrCreateGenericSignatureBuilder(*this, &module),
            module);
 }
 

@@ -25,7 +25,7 @@
 
 namespace swift {
 
-class ArchetypeBuilder;
+class GenericSignatureBuilder;
 class ProtocolConformanceRef;
 class ProtocolType;
 class Substitution;
@@ -74,8 +74,8 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
   static ASTContext &getASTContext(ArrayRef<GenericTypeParamType *> params,
                                    ArrayRef<Requirement> requirements);
 
-  /// Retrieve the archetype builder for the given generic signature.
-  ArchetypeBuilder *getArchetypeBuilder(ModuleDecl &mod);
+  /// Retrieve the generic signature builder for the given generic signature.
+  GenericSignatureBuilder *getGenericSignatureBuilder(ModuleDecl &mod);
 
   friend class ArchetypeType;
 
@@ -237,8 +237,8 @@ public:
 
   /// Return the canonical version of the given type under this generic
   /// signature.
-  CanType getCanonicalTypeInContext(Type type, ArchetypeBuilder &builder);
-  bool isCanonicalTypeInContext(Type type, ArchetypeBuilder &builder);
+  CanType getCanonicalTypeInContext(Type type, GenericSignatureBuilder &builder);
+  bool isCanonicalTypeInContext(Type type, GenericSignatureBuilder &builder);
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,
