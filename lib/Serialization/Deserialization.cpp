@@ -88,7 +88,7 @@ namespace {
           os << IDAndKind{DeclOrOffset.get(), ID};
         }
       }
-      os << "in '" << getNameOfModule(MF) << "'\n";
+      os << " in '" << getNameOfModule(MF) << "'\n";
     }
   };
 
@@ -4329,6 +4329,11 @@ Type ModuleFile::getType(TypeID TID) {
     error();
     return nullptr;
   }
+
+#ifndef NDEBUG
+  PrettyStackTraceType(ctx, "deserializing", typeOrOffset.get());
+  assert(!typeOrOffset.get()->hasError());
+#endif
 
   // Invoke the callback on the deserialized type.
   DeserializedTypeCallback(typeOrOffset);
