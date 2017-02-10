@@ -514,4 +514,8 @@ let _: ((Int?) -> Void) = { (arg: Int!) in }
 func returnsArray() -> [Int] { return [] }
 
 returnsArray().flatMap { $0 }.flatMap { }
-// expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}}
+// expected-warning@-1 {{expression of type 'Int' is unused}}
+// expected-warning@-2 {{result of call to 'flatMap' is unused}}
+
+// rdar://problem/30271695
+_ = ["hi"].flatMap { $0.isEmpty ? nil : $0 }
