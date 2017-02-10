@@ -1187,3 +1187,40 @@ class r24314506 {  // expected-error {{class 'r24314506' has no initializers}}
 }
 
 
+// https://bugs.swift.org/browse/SR-3893
+// Generic type is not inferenced from its initial value for properties with
+// will/didSet
+struct SR3893Box<Foo> {
+  let value: Foo
+}
+
+struct SR3893 {
+  // Each of these "bad" properties used to produce errors.
+  var bad: SR3893Box = SR3893Box(value: 0) {
+    willSet {
+      print(newValue.value)
+    }
+  }
+
+  var bad2: SR3893Box = SR3893Box(value: 0) {
+    willSet(new) {
+      print(new.value)
+    }
+  }
+
+  var bad3: SR3893Box = SR3893Box(value: 0) {
+    didSet {
+      print(oldValue.value)
+    }
+  }
+
+  var good: SR3893Box<Int> = SR3893Box(value: 0) {
+    didSet {
+      print(oldValue.value)
+    }
+  }
+
+  var plain: SR3893Box = SR3893Box(value: 0)
+}
+
+
