@@ -13,6 +13,12 @@
 import _SwiftDispatchOverlayShims
 
 public struct DispatchTime : Comparable {
+	private static let timebaseInfo: mach_timebase_info_data_t = {
+		var info = mach_timebase_info_data_t(numer: 1, denom: 1)
+		mach_timebase_info(&info)
+		return info
+	}()
+ 
 	public let rawValue: dispatch_time_t
 
 	public static func now() -> DispatchTime {
@@ -44,7 +50,11 @@ public struct DispatchTime : Comparable {
 	}
 
 	public var uptimeNanoseconds: UInt64 {
-		return UInt64(self.rawValue)
+		var result = self.rawValue
+		if (DispatchTime.timebaseInfo.numer != DispatchTime.timebaseInfo.denom) {
+			result = result * UInt64(DispatchTime.timebaseInfo.numer) / UInt64(DispatchTime.timebaseInfo.denom)
+		}
+		return result
 	}
 }
 
