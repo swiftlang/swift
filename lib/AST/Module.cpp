@@ -685,14 +685,16 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
 
     if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
       if (archetype->requiresClass())
-        return ProtocolConformanceRef(protocol);
+        return ProtocolConformanceRef(
+          ctx.getArchetypeConformance(archetype, protocol));
 
       return None;
     }
 
     for (auto ap : archetype->getConformsTo()) {
       if (ap == protocol || ap->inheritsFrom(protocol))
-        return ProtocolConformanceRef(protocol);
+        return ProtocolConformanceRef(
+          ctx.getArchetypeConformance(archetype, protocol));
     }
 
     return None;
