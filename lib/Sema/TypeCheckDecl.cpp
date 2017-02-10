@@ -4796,6 +4796,7 @@ public:
           auto *newValueParam = firstParamPattern->get(0);
           newValueParam->setType(valueTy);
           newValueParam->setInterfaceType(valueIfaceTy);
+          newValueParam->getTypeLoc().setType(valueTy);
         } else if (FD->isGetter() && FD->isImplicit()) {
           FD->getBodyResultTypeLoc().setType(valueIfaceTy, true);
         }
