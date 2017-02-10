@@ -6,9 +6,6 @@ handle_gyb_sources(
     ${SWIFT_HOST_VARIANT_ARCH})
 
 add_swift_unittest(SwiftBasicTests
-  ValueEnumeratorTest.cpp
-  OptionSetTest.cpp
-  RangeTest.cpp
   BlotMapVectorTest.cpp
   ClusteredBitVectorTest.cpp
   DemangleTest.cpp
@@ -16,8 +13,10 @@ add_swift_unittest(SwiftBasicTests
   EncodedSequenceTest.cpp
   FileSystemTest.cpp
   ImmutablePointerSetTest.cpp
+  OptionSetTest.cpp
   PointerIntEnumTest.cpp
   PrefixMapTest.cpp
+  RangeTest.cpp
   SourceManagerTest.cpp
   StringExtrasTest.cpp
   SuccessorMapTest.cpp
@@ -25,6 +24,7 @@ add_swift_unittest(SwiftBasicTests
   TransformArrayRefTest.cpp
   TreeScopedHashTableTest.cpp
   UnicodeTest.cpp
+  ValueEnumeratorTest.cpp
   ${generated_tests}
   )
 
