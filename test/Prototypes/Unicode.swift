@@ -123,6 +123,8 @@ t.test("basic") {
   let s16to8 = UnicodeStorage.TranscodedView(s16, from: UTF16.self, to: UTF8.self)
   let s8to16 = UnicodeStorage.TranscodedView(s8, from: UTF8.self, to: UTF16.self)
   let s8Vto16 = UnicodeStorage.TranscodedView(s8, from: ValidUTF8.self, to: UTF16.self)
+  print(Array(s32))
+  print(Array(s16to32))
   expectTrue(s32.elementsEqual(s16to32))
   expectTrue(s8.elementsEqual(s16to8))
   expectTrue(s16.elementsEqual(s8to16))

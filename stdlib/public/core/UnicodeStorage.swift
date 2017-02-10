@@ -25,6 +25,15 @@ public func _debugLog(_ arg0: @autoclosure ()->Any, _ arg1: @autoclosure ()->Any
 /// An index type for views onto random access collections whose elements are
 /// effectively variable-width.
 public protocol UnicodeIndexProtocol {
+
+  // FIXME: it's not clear that there is always enough information to construct
+  // these from just an offset without also using the Collection into which they
+  // are indexing (e.g. when an index caches information).  If so, this
+  // requirement would need to be replaced by a requirement on the collection.
+  // In all such scenarios we've found *so far*, indices can have an empty cache
+  // that will be filled on demand without loss of efficiency.
+  init(codeUnitOffset: Int64)
+  
   var codeUnitOffset: Int64 { get }
 }
 
@@ -90,6 +99,20 @@ extension UnicodeStorage.EncodedScalars {
     // practice.
     let nextStride: UInt8
 
+    public init(codeUnitOffset: Int64) {
+      self.init(offset: numericCast(codeUnitOffset))
+    }
+    
+    internal init(
+      offset: CodeUnits.IndexDistance,
+      nextStride: UInt8 = 0,
+      scalar: Encoding.EncodedScalar? = nil
+    ) {
+      self.offset = offset
+      self.nextStride = nextStride
+      self.scalar = scalar
+    }
+    
     public var codeUnitOffset: Int64 { return numericCast(offset) }
     
     var nextOffset: CodeUnits.IndexDistance {
@@ -100,17 +123,37 @@ extension UnicodeStorage.EncodedScalars {
     // EncodedScalar so as not to waste a separate bool here.
     let scalar: Encoding.EncodedScalar?
   }
+
+  internal func _base(_ i: Index) -> CodeUnits.Index {
+    return codeUnits.index(atOffset: i.offset)
+  }
+  
+  internal func _next(_ i: Index) -> CodeUnits.Index {
+    return codeUnits.index(atOffset: i.nextOffset)
+  }
+  
+  internal func _index(
+    base: CodeUnits.Index, next: CodeUnits.Index, scalar: Encoding.EncodedScalar?
+  ) -> Index {
+    return Index(
+      offset: codeUnits.offset(of: base),
+      nextStride: numericCast(codeUnits[base..<next].count),
+      scalar: scalar
+    )
+  }
 }
 
 /// Collection Conformance
 extension UnicodeStorage.EncodedScalars : BidirectionalCollection {
   public var startIndex: Index {
     if _slowPath(codeUnits.isEmpty) { return endIndex }
-    return index(after: Index(offset: 0, nextStride: 0, scalar: nil))
+    let s = codeUnits.startIndex
+    return index(after: _index(base: s, next: s, scalar: nil))
   }
   
   public var endIndex: Index {
-    return Index(offset: codeUnits.count, nextStride: 0, scalar: nil)
+    let s = codeUnits.endIndex
+    return _index(base: s, next: s, scalar: nil)
   }
   
   public subscript(i: Index) -> Encoding.EncodedScalar {
@@ -118,29 +161,26 @@ extension UnicodeStorage.EncodedScalars : BidirectionalCollection {
       return r
     }
     return index(after:
-      Index(offset: i.offset, nextStride: 0, scalar: nil)).scalar!
+      _index(base: _base(i), next: _next(i), scalar: nil)
+    ).scalar!
   }
 
   public func index(after i: Index) -> Index {
-    let p = codeUnits.index(atOffset: i.nextOffset)
-    var remainder = codeUnits[p...]
+    var remainder = codeUnits[_next(i)..<codeUnits.endIndex]
     while true {
       switch Encoding.parse1Forward(remainder, knownCount: 0) {
       case .valid(let scalar, let nextIndex):
-        return Index(
-          offset: i.nextOffset,
-          nextStride: numericCast(remainder.offset(of: nextIndex)),
-          scalar: scalar)
+        return _index(base: _next(i), next: nextIndex, scalar: scalar)
       case .error(let nextIndex):
         // FIXME: don't go through UnicodeScalar once this is in the stdlib
         if let replacement = Encoding.encode(
           UTF32.EncodedScalar(UnicodeScalar(0xFFFD)!)) {
-          return Index(
-            offset: i.nextOffset,
-            nextStride: numericCast(remainder.offset(of: nextIndex)),
-            scalar: replacement)
+          return _index(base: _next(i), next: nextIndex, scalar: replacement)
         }
-        remainder = remainder.dropFirst()
+        // If we get here, the encoding couldn't represent a replacement
+        // character, so the best we can do is to drop that scalar on the floor
+        // and keep going.
+        remainder = codeUnits[nextIndex...]
       case .emptyInput:
         return endIndex
       }
@@ -148,26 +188,21 @@ extension UnicodeStorage.EncodedScalars : BidirectionalCollection {
   }
 
   public func index(before i: Index) -> Index {
-    var remainder = codeUnits[..<codeUnits.index(atOffset: i.offset)]
+    var remainder = codeUnits[..<_base(i)]
     while true {
       switch Encoding.parse1Reverse(remainder, knownCount: 0) {
       case .valid(let scalar, let priorIndex):
-        let stride = remainder[priorIndex...].count
-        return Index(
-          offset: i.offset - numericCast(stride),
-          nextStride: numericCast(stride),
-          scalar: scalar)
+        return _index(base: priorIndex, next: _base(i), scalar: scalar)
       case .error(let priorIndex):
-        let stride = remainder[priorIndex...].count
         // FIXME: don't go through UnicodeScalar once this is in the stdlib
         if let replacement = Encoding.encode(
           UTF32.EncodedScalar(UnicodeScalar(0xFFFD)!)) {
-          return Index(
-            offset: i.offset - numericCast(stride),
-            nextStride: numericCast(stride),
-            scalar: replacement)        
+          return _index(base: priorIndex, next: _base(i), scalar: replacement)        
         }
-        remainder = remainder.dropLast()
+        // If we get here, the encoding couldn't represent a replacement
+        // character, so the best we can do is to drop that scalar on the floor
+        // and keep going.
+        remainder = codeUnits[..<priorIndex]
       case .emptyInput:
         fatalError("Indexing past start of code units")
       }
@@ -247,6 +282,7 @@ extension UnicodeStorage : _UTextable {
     _ deep: Bool, _ status: UnsafeMutablePointer<_UErrorCode>?
   ) ->  UnsafeMutablePointer<_UText> {
     UnsafeMutablePointer(mutating: src)[0].validate()
+    _sanityCheck(!deep, "deep cloning not supported")
     // _debugLog("_clone with dst = \(String(describing: dst))")
     // _debugLog("src: \(src[0])")
     let r = dst
@@ -258,6 +294,14 @@ extension UnicodeStorage : _UTextable {
     return r
   }
 
+  // A helper for translating indices out of the result of _parsedSuffix
+  internal var _indexBase
+    : UnicodeStorage<CodeUnits.SubSequence, Encoding>.EncodedScalars {
+    return UnicodeStorage<
+      CodeUnits.SubSequence, Encoding
+    >(codeUnits[...]).scalars
+  }
+  
   internal func _access(
     _ u: inout _UText, _ nativeTargetIndex: Int64, _ forward: Bool
   ) -> Bool {
@@ -280,6 +324,8 @@ extension UnicodeStorage : _UTextable {
       return true
     }
     // _debugLog("_access: filling buffer")
+
+    // FIXME: should we use parseForward/parseReverse on some slice?
     
     guard (0...codeUnits.count^).contains(nativeTargetIndex)
     else { return false }
@@ -301,7 +347,7 @@ extension UnicodeStorage : _UTextable {
             buffer[u.chunkLength^] = unit
             u.chunkLength += 1
           }
-          u.chunkNativeLimit = i.nextOffset^
+          u.chunkNativeLimit = codeUnits.offset(of: _indexBase._next(i))^
         }
       }
       else {
@@ -320,7 +366,7 @@ extension UnicodeStorage : _UTextable {
             buffer[u.chunkLength^] = unit
             u.chunkLength += 1
           }
-          u.chunkNativeStart = i.codeUnitOffset
+          u.chunkNativeStart = codeUnits.offset(of: _indexBase._base(i))^
           u.chunkOffset = u.chunkLength
         }
         var b = buffer // copy due to https://bugs.swift.org/browse/SR-3782
@@ -382,7 +428,7 @@ extension UnicodeStorage : _UTextable {
     for i in chunkSource.indices {
       chunkOffset += chunkSource[i].utf16.count
       if chunkOffset == u[0].chunkOffset^ {
-        return i.nextOffset^
+        return codeUnits.offset(of: _indexBase._next(i))^
       }
     }
     fatalError("supposed to be unreachable")

@@ -39,6 +39,8 @@ case emptyInput
   }
 }
 
+// FIXME: closure-taking methods should rethrow.
+
 public protocol AnyUnicodeEncoding {
   // FIXME: a single scalar might not be the most efficient buffer to use here.
   // SIMD instructions can be used to decode UTF-8 much more efficiently, which
