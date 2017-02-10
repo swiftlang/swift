@@ -313,14 +313,9 @@ bool GenericSignatureBuilder::PotentialArchetype::addConformance(
     // Otherwise, create a new potential archetype for this associated type
     // and make it equivalent to the first potential archetype we encountered.
     auto otherPA = new PotentialArchetype(this, assocType);
-    otherPA->addSameTypeConstraint(known->second.front(), redundantSource);
-
-    // Update the equivalence class.
-    auto frontRep = known->second.front()->getRepresentative();
-    otherPA->Representative = frontRep;
-    frontRep->EquivalenceClass.push_back(otherPA);
-
     known->second.push_back(otherPA);
+    builder.addSameTypeRequirementBetweenArchetypes(known->second.front(),
+                                                    otherPA, redundantSource);
 
     // If there's a superclass constraint that conforms to the protocol,
     // add the appropriate same-type relationship.
@@ -630,11 +625,8 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
 
         // Produce a same-type constraint between the two same-named
         // potential archetypes.
-        pa->addSameTypeConstraint(nested.front(), redundantSource);
-
-        auto frontRep = nested.front()->getRepresentative();
-        pa->Representative = frontRep;
-        frontRep->EquivalenceClass.push_back(pa);
+        builder.addSameTypeRequirementBetweenArchetypes(pa, existing,
+                                                        redundantSource);
       } else {
         nested.push_back(pa);
 
