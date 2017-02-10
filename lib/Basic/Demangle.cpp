@@ -295,11 +295,11 @@ static StringRef toString(ValueWitnessKind k) {
 }
 
 /// The main class for parsing a demangling tree out of a mangled string.
-class Demangler {
+class OldDemangler {
   std::vector<NodePointer> Substitutions;
   NameSource Mangled;
 public:  
-  Demangler(llvm::StringRef mangled) : Mangled(mangled) {}
+  OldDemangler(llvm::StringRef mangled) : Mangled(mangled) {}
 
 /// Try to demangle a child node of the given kind.  If that fails,
 /// return; otherwise add it to the parent.
@@ -2402,7 +2402,7 @@ NodePointer
 swift::Demangle::demangleSymbolAsNode(const char *MangledName,
                                       size_t MangledNameLength,
                                       const DemangleOptions &Options) {
-  Demangler demangler(StringRef(MangledName, MangledNameLength));
+  OldDemangler demangler(StringRef(MangledName, MangledNameLength));
   return demangler.demangleTopLevel();
 }
 
@@ -2410,7 +2410,7 @@ NodePointer
 swift::Demangle::demangleTypeAsNode(const char *MangledName,
                                     size_t MangledNameLength,
                                     const DemangleOptions &Options) {
-  Demangler demangler(StringRef(MangledName, MangledNameLength));
+  OldDemangler demangler(StringRef(MangledName, MangledNameLength));
   return demangler.demangleTypeName();
 }
 
