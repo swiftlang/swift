@@ -499,12 +499,28 @@ bool SILModule::linkFunction(StringRef Name, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Name);
 }
 
-SILFunction *SILModule::hasFunction(StringRef Name, SILLinkage Linkage) {
-  assert((Linkage == SILLinkage::Public ||
-          Linkage == SILLinkage::PublicExternal) &&
-         "Only a lookup of public functions is supported currently");
+/// Check if a given SIL linkage matches the required linkage.
+/// If the required linkage is Private, then anything matches it.
+static bool isMatchingLinkage(SILLinkage ActualLinkage,
+                              Optional<SILLinkage> Linkage) {
+  if (!Linkage)
+    return true;
+  return ActualLinkage == Linkage;
+}
+
+bool SILModule::hasFunction(StringRef Name) {
+  if (lookUpFunction(Name))
+    return true;
+  SILLinkerVisitor Visitor(*this, getSILLoader(),
+                           SILModule::LinkingMode::LinkNormal);
+  return Visitor.hasFunction(Name);
+}
+
+SILFunction *SILModule::findFunction(StringRef Name,
+                                     Optional<SILLinkage> Linkage) {
 
   SILFunction *F = nullptr;
+  SILLinkage RequiredLinkage = Linkage ? *Linkage : SILLinkage::Private;
 
   // First, check if there is a function with a required name in the
   // current module.
@@ -512,10 +528,10 @@ SILFunction *SILModule::hasFunction(StringRef Name, SILLinkage Linkage) {
 
   // Nothing to do if the current module has a required function
   // with a proper linkage already.
-  if (CurF && CurF->getLinkage() == Linkage) {
+  if (CurF && isMatchingLinkage(CurF->getLinkage(), Linkage)) {
     F = CurF;
   } else {
-    assert((!CurF || CurF->getLinkage() != Linkage) &&
+    assert((!CurF || CurF->getLinkage() != RequiredLinkage) &&
            "hasFunction should be only called for functions that are not "
            "contained in the SILModule yet or do not have a required linkage");
   }
@@ -528,7 +544,7 @@ SILFunction *SILModule::hasFunction(StringRef Name, SILLinkage Linkage) {
       // name is present in the current module.
       // This is done to reduce the amount of IO from the
       // swift module file.
-      if (!Visitor.hasFunction(Name, Linkage))
+      if (!Visitor.hasFunction(Name, RequiredLinkage))
         return nullptr;
       // The function in the current module will be changed.
       F = CurF;
@@ -538,13 +554,14 @@ SILFunction *SILModule::hasFunction(StringRef Name, SILLinkage Linkage) {
     // or if it is known to exist, perform a lookup.
     if (!F) {
       // Try to load the function from other modules.
-      F = Visitor.lookupFunction(Name, Linkage);
+      F = Visitor.lookupFunction(Name, RequiredLinkage);
       // Bail if nothing was found and we are not sure if
       // this function exists elsewhere.
       if (!F)
         return nullptr;
       assert(F && "SILFunction should be present in one of the modules");
-      assert(F->getLinkage() == Linkage && "SILFunction has a wrong linkage");
+      assert(isMatchingLinkage(F->getLinkage(), Linkage) &&
+             "SILFunction has a wrong linkage");
     }
   }
 
@@ -556,9 +573,19 @@ SILFunction *SILModule::hasFunction(StringRef Name, SILLinkage Linkage) {
           SILOptions::SILOptMode::Optimize) {
     F->convertToDeclaration();
   }
-  if (F->isExternalDeclaration())
+  if (F->isExternalDeclaration()) {
     F->setFragile(IsFragile_t::IsNotFragile);
-  F->setLinkage(Linkage);
+    if (isAvailableExternally(F->getLinkage()) &&
+        !hasPublicVisibility(F->getLinkage()) && !Linkage) {
+      // We were just asked if a given function exists anywhere.
+      // It is not going to be used by the current module.
+      // Since external non-public function declarations should not
+      // exist, strip the "external" part from the linkage.
+      F->setLinkage(stripExternalFromLinkage(F->getLinkage()));
+    }
+  }
+  if (Linkage)
+    F->setLinkage(RequiredLinkage);
   return F;
 }
 
