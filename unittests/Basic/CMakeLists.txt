@@ -11,20 +11,20 @@ add_swift_unittest(SwiftBasicTests
   RangeTest.cpp
   BlotMapVectorTest.cpp
   ClusteredBitVectorTest.cpp
-  Demangle.cpp
+  DemangleTest.cpp
   EditorPlaceholderTest.cpp
   EncodedSequenceTest.cpp
-  FileSystemTests.cpp
-  ImmutablePointerSetTests.cpp
+  FileSystemTest.cpp
+  ImmutablePointerSetTest.cpp
   PointerIntEnumTest.cpp
   PrefixMapTest.cpp
-  SourceManager.cpp
+  SourceManagerTest.cpp
   StringExtrasTest.cpp
   SuccessorMapTest.cpp
-  ThreadSafeRefCntPointerTests.cpp
-  TransformArrayRef.cpp
-  TreeScopedHashTableTests.cpp
-  Unicode.cpp
+  ThreadSafeRefCntPointerTest.cpp
+  TransformArrayRefTest.cpp
+  TreeScopedHashTableTest.cpp
+  UnicodeTest.cpp
   ${generated_tests}
   )
 
