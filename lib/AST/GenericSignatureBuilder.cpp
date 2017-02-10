@@ -136,13 +136,19 @@ std::string GenericSignatureBuilder::PotentialArchetype::getDebugName() const {
   // Nested types.
   result += parent->getDebugName();
 
-  // When building the name for debugging purposes, include the
-  // protocol into which the associated type was resolved.
+  // When building the name for debugging purposes, include the protocol into
+  // which the associated type or type alias was resolved.
+  ProtocolDecl *proto = nullptr;
   if (auto assocType = getResolvedAssociatedType()) {
+    proto = assocType->getProtocol();
+  } else if (auto typeAlias = getTypeAliasDecl()) {
+    proto = typeAlias->getParent()->getAsProtocolOrProtocolExtensionContext();
+  }
+
+  if (proto) {
     result.push_back('[');
     result.push_back('.');
-    result.append(assocType->getProtocol()->getName().str().begin(),
-                  assocType->getProtocol()->getName().str().end());
+    result.append(proto->getName().str().begin(), proto->getName().str().end());
     result.push_back(']');
   }
 
