@@ -17,7 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "ForeignRepresentationInfo.h"
 #include "swift/Strings.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -208,15 +208,15 @@ struct ASTContext::Implementation {
   /// Stores information about lazy deserialization of various declarations.
   llvm::DenseMap<const Decl *, LazyContextData *> LazyContexts;
 
-  /// Stored archetype builders for canonical generic signatures.
+  /// Stored generic signature builders for canonical generic signatures.
   llvm::DenseMap<std::pair<GenericSignature *, ModuleDecl *>,
-                 std::unique_ptr<ArchetypeBuilder>>
-    ArchetypeBuilders;
+                 std::unique_ptr<GenericSignatureBuilder>>
+    GenericSignatureBuilders;
 
   /// Canonical generic environments for canonical generic signatures.
   ///
-  /// The keys are the archetype builders in \c ArchetypeBuilders.
-  llvm::DenseMap<ArchetypeBuilder *, GenericEnvironment *>
+  /// The keys are the generic signature builders in \c GenericSignatureBuilders.
+  llvm::DenseMap<GenericSignatureBuilder *, GenericEnvironment *>
     CanonicalGenericEnvironments;
 
   /// The set of property names that show up in the defining module of a
@@ -1243,30 +1243,30 @@ void ASTContext::getVisibleTopLevelClangModules(
     collectAllModules(Modules);
 }
 
-ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
+GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
                                                       CanGenericSignature sig,
                                                       ModuleDecl *mod) {
-  // Check whether we already have an archetype builder for this
+  // Check whether we already have an generic signature builder for this
   // signature and module.
-  auto known = Impl.ArchetypeBuilders.find({sig, mod});
-  if (known != Impl.ArchetypeBuilders.end())
+  auto known = Impl.GenericSignatureBuilders.find({sig, mod});
+  if (known != Impl.GenericSignatureBuilders.end())
     return known->second.get();
 
-  // Create a new archetype builder with the given signature.
-  auto builder = new ArchetypeBuilder(*this, LookUpConformanceInModule(mod));
+  // Create a new generic signature builder with the given signature.
+  auto builder = new GenericSignatureBuilder(*this, LookUpConformanceInModule(mod));
   builder->addGenericSignature(sig);
   builder->finalize(SourceLoc(), sig->getGenericParams(),
                     /*allowConcreteGenericParams=*/true);
 
-  // Store this archetype builder (no generic environment yet).
-  Impl.ArchetypeBuilders[{sig, mod}] =
-    std::unique_ptr<ArchetypeBuilder>(builder);
+  // Store this generic signature builder (no generic environment yet).
+  Impl.GenericSignatureBuilders[{sig, mod}] =
+    std::unique_ptr<GenericSignatureBuilder>(builder);
 
   return builder;
 }
 
 GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
-                                                    ArchetypeBuilder *builder,
+                                                    GenericSignatureBuilder *builder,
                                                     ModuleDecl &module) {
   auto known = Impl.CanonicalGenericEnvironments.find(builder);
   if (known != Impl.CanonicalGenericEnvironments.end())
@@ -3542,7 +3542,7 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
 
 GenericEnvironment *GenericEnvironment::getIncomplete(
                                                   GenericSignature *signature,
-                                                  ArchetypeBuilder *builder) {
+                                                  GenericSignatureBuilder *builder) {
   auto &ctx = signature->getASTContext();
 
   // Allocate and construct the new environment.

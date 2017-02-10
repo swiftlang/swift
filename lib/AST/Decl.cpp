@@ -16,7 +16,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -3028,7 +3028,7 @@ void ProtocolDecl::computeRequirementSignature() {
   RequirementSource source(RequirementSource::ProtocolRequirementSignatureSelf,
                            getLoc());
 
-  ArchetypeBuilder builder(getASTContext(), LookUpConformanceInModule(module));
+  GenericSignatureBuilder builder(getASTContext(), LookUpConformanceInModule(module));
   builder.addGenericParameter(selfType);
   builder.addRequirement(requirement, source);
   builder.finalize(SourceLoc(), { selfType });

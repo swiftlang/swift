@@ -21,13 +21,13 @@
 #include "GenericTypeResolver.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ReferencedNameTracker.h"
@@ -4813,8 +4813,8 @@ public:
 
       auto *sig = TC.validateGenericFuncSignature(FD);
 
-      // Create a fresh archetype builder.
-      ArchetypeBuilder builder(
+      // Create a fresh generic signature builder.
+      GenericSignatureBuilder builder(
                              FD->getASTContext(),
                              LookUpConformanceInModule(FD->getModuleContext()));
       auto *parentSig = FD->getDeclContext()->getGenericSignatureOfContext();
@@ -6459,7 +6459,7 @@ public:
 
       auto *sig = TC.validateGenericFuncSignature(CD);
 
-      ArchetypeBuilder builder(
+      GenericSignatureBuilder builder(
                              CD->getASTContext(),
                              LookUpConformanceInModule(CD->getModuleContext()));
       auto *parentSig = CD->getDeclContext()->getGenericSignatureOfContext();
@@ -7398,7 +7398,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   });
 
   // Local function used to infer requirements from the extended type.
-  auto inferExtendedTypeReqs = [&](ArchetypeBuilder &builder) {
+  auto inferExtendedTypeReqs = [&](GenericSignatureBuilder &builder) {
     builder.inferRequirements(TypeLoc::withoutLoc(extInterfaceType),
                               /*minDepth=*/0,
                               /*maxDepth=*/genericParams->getDepth());

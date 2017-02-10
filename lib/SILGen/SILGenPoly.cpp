@@ -81,7 +81,7 @@
 #include "SILGen.h"
 #include "Scope.h"
 #include "swift/Basic/Fallthrough.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -2492,7 +2492,7 @@ buildThunkSignature(SILGenFunction &gen,
     return genericSig;
   }
 
-  ArchetypeBuilder builder(ctx, LookUpConformanceInModule(mod));
+  GenericSignatureBuilder builder(ctx, LookUpConformanceInModule(mod));
 
   // Add the existing generic signature.
   int depth = 0;
