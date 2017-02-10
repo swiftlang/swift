@@ -252,6 +252,15 @@ if(PYTHONINTERP_FOUND)
               "--param" "test_sdk_overlay_dir=${SWIFTLIB_DIR}/${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
         endif()
 
+        execute_process(COMMAND
+            "${PYTHON_EXECUTABLE}" "-c" "import psutil"
+            RESULT_VARIABLE python_psutil_status
+            TIMEOUT 1 # second
+            ERROR_QUIET)
+        if(NOT python_psutil_status)
+          list(APPEND LIT_ARGS "--timeout=3000") # 50 minutes
+        endif()
+
         list(APPEND LIT_ARGS "--xunit-xml-output=${SWIFT_TEST_RESULTS_DIR}/lit-tests.xml")
 
         foreach(test_subset ${TEST_SUBSETS})
