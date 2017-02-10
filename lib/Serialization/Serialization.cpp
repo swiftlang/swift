@@ -2719,6 +2719,12 @@ void Serializer::writeDecl(const Decl *D) {
                             contextID,
                             param->isLet(),
                             addTypeRef(interfaceType));
+
+    if (interfaceType->hasError()) {
+      param->getDeclContext()->dumpContext();
+      interfaceType->dump();
+      llvm_unreachable("error in interface type of parameter");
+    }
     break;
   }
 
