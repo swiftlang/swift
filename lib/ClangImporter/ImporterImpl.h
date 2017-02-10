@@ -705,6 +705,10 @@ public:
   Decl *importMirroredDecl(const clang::NamedDecl *decl, DeclContext *dc,
                            Version version, ProtocolDecl *proto);
 
+  /// \brief Utility function for building simple generic signatures.
+  GenericSignature *buildGenericSignature(GenericParamList *genericParams,
+                                          DeclContext *dc);
+
   /// \brief Utility function for building simple generic environments.
   GenericEnvironment *buildGenericEnvironment(GenericParamList *genericParams,
                                               DeclContext *dc);
