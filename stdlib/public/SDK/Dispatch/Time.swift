@@ -33,8 +33,12 @@ public struct DispatchTime : Comparable {
 	///   - uptimeNanoseconds: The number of nanoseconds since boot, excluding
 	///                        time the system spent asleep
 	/// - Returns: A new `DispatchTime`
-	/// - Discussion: This clock is the same as the value returned by 
+	/// - Discussion: This clock is the same as the value returned by
 	///               `mach_absolute_time` when converted into nanoseconds.
+	///               Note that `DispatchTime(uptimeNanoseconds: 0)` is
+	///               equivalent to `DispatchTime.now()`, that is, its value
+	///               represents the number of nanoseconds since boot (excluding
+	///               system sleep time), not zero nanoseconds since boot.
 	public init(uptimeNanoseconds: UInt64) {
 		self.rawValue = dispatch_time_t(uptimeNanoseconds)
 	}
