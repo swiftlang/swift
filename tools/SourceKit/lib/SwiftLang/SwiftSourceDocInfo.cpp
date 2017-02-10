@@ -38,6 +38,8 @@
 
 #include "llvm/Support/MemoryBuffer.h"
 
+#include <numeric>
+
 using namespace SourceKit;
 using namespace swift;
 using namespace swift::ide;
@@ -854,7 +856,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
 }
 
 static clang::DeclarationName
-getClangDeclarationName(clang::ASTContext &Ctx, NameTranslatingInfo Info) {
+getClangDeclarationName(clang::ASTContext &Ctx, NameTranslatingInfo &Info) {
   assert(SwiftLangSupport::getNameKindForUID(Info.NameKind) == NameKind::ObjC);
   if (Info.BaseName.empty() == Info.ArgNames.empty()) {
     // cannot have both.
@@ -863,17 +865,19 @@ getClangDeclarationName(clang::ASTContext &Ctx, NameTranslatingInfo Info) {
   if (!Info.BaseName.empty()) {
     return clang::DeclarationName(&Ctx.Idents.get(Info.BaseName));
   } else {
-    unsigned size = Info.ArgNames.size();
-    std::vector<clang::IdentifierInfo *> Pieces(size);
-    std::transform(Info.ArgNames.begin(), Info.ArgNames.end(), Pieces.begin(),
-      [&](StringRef T) { return &Ctx.Idents.get(Info.BaseName); });
-    return clang::DeclarationName(Ctx.Selectors.getSelector(size,
+    ArrayRef<StringRef> Args = llvm::makeArrayRef(Info.ArgNames);
+    std::vector<clang::IdentifierInfo *> Pieces(Args.size());
+    std::transform(Args.begin(), Args.end(), Pieces.begin(),
+      [&](StringRef T) { return &Ctx.Idents.get(T); });
+    return clang::DeclarationName(Ctx.Selectors.getSelector(
+      /*Calculate Args*/std::accumulate(Args.begin(), Args.end(), (unsigned)0,
+        [](unsigned I, StringRef T) { return I + (T.endswith(":") ? 1 : 0); }),
       Pieces.data()));
   }
 }
 
 /// Returns true for failure to resolve.
-static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo Info,
+static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
                     std::function<void(const NameTranslatingInfo &)> Receiver) {
   switch (SwiftLangSupport::getNameKindForUID(Info.NameKind)) {
   case NameKind::Swift: {
@@ -892,10 +896,11 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo Info,
       NameTranslatingInfo Result;
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
       Result.BaseName = Name.getBaseName().str();
-      std::vector<StringRef> Args(Name.getArgumentNames().size());
-      std::transform(Name.getArgumentNames().begin(), Name.getArgumentNames().end(),
-        Args.begin(), [](Identifier Id) { return Id.str(); });
-      Result.ArgNames = llvm::makeArrayRef(Args);
+      Result.ArgNames.resize(Name.getArgumentNames().size());
+      std::transform(Name.getArgumentNames().begin(),
+                     Name.getArgumentNames().end(),
+                     Result.ArgNames.begin(),
+                     [](Identifier Id) { return Id.str(); });
       Receiver(Result);
       return false;
     }
@@ -1082,7 +1087,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
 static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
                         unsigned Offset, SwiftInvocationRef Invok,
                         bool TryExistingAST,
-                        NameTranslatingInfo Input,
+                        NameTranslatingInfo &Input,
                         std::function<void(const NameTranslatingInfo &)> Receiver) {
   assert(Invok);
 
@@ -1096,7 +1101,7 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
                      bool TryExistingAST, NameTranslatingInfo Input,
                      std::function<void(const NameTranslatingInfo &)> Receiver)
     : CursorRangeInfoConsumer(InputFile, Offset, 0, Lang, ASTInvok,
-                              TryExistingAST), Input(Input),
+                              TryExistingAST), Input(std::move(Input)),
       Receiver(std::move(Receiver)){ }
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
@@ -1327,7 +1332,7 @@ getRangeInfo(StringRef InputFile, unsigned Offset, unsigned Length,
 }
 
 void SwiftLangSupport::
-getNameInfo(StringRef InputFile, unsigned Offset, NameTranslatingInfo Input,
+getNameInfo(StringRef InputFile, unsigned Offset, NameTranslatingInfo &Input,
             ArrayRef<const char *> Args,
             std::function<void(const NameTranslatingInfo &)> Receiver) {
 
@@ -1354,9 +1359,10 @@ getNameInfo(StringRef InputFile, unsigned Offset, NameTranslatingInfo Input,
         if (Entity.Mod) {
           // Module is ignored
         } else {
+          NameTranslatingInfo NewInput = Input;
           // FIXME: Should pass the main module for the interface but currently
           // it's not necessary.
-          passNameInfoForDecl(Entity.Dcl, Input, Receiver);
+          passNameInfoForDecl(Entity.Dcl, NewInput, Receiver);
         }
       } else {
         Receiver({});

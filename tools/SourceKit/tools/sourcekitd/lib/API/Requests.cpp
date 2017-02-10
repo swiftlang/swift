@@ -799,12 +799,11 @@ handleSemanticRequest(RequestDict Req,
       return Rec(createErrorRequestInvalid("cannot specify 'key.selectorpieces' "
                                            "and 'key.argnames' at the same time"));
     }
-    std::vector<StringRef> Pieces(ArgParts.size() + Selectors.size());
-    std::transform(ArgParts.begin(), ArgParts.end(), Pieces.begin(),
+    Input.ArgNames.resize(ArgParts.size() + Selectors.size());
+    std::transform(ArgParts.begin(), ArgParts.end(), Input.ArgNames.begin(),
                    [](const char *C) { return StringRef(C); });
-    std::transform(Selectors.begin(), Selectors.end(), Pieces.begin(),
+    std::transform(Selectors.begin(), Selectors.end(), Input.ArgNames.begin(),
                    [](const char *C) { return StringRef(C); });
-    Input.ArgNames = llvm::makeArrayRef(Pieces);
     return Lang.getNameInfo(*SourceFile, Offset, Input, Args,
       [Rec](const NameTranslatingInfo &Info) { reportNameInfo(Info, Rec); });
   }

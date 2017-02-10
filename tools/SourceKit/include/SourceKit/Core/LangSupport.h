@@ -295,7 +295,7 @@ struct NameTranslatingInfo {
   bool IsCancelled = false;
   UIdent NameKind;
   StringRef BaseName;
-  ArrayRef<StringRef> ArgNames;
+  std::vector<StringRef> ArgNames;
 };
 
 struct RelatedIdentsInfo {
@@ -470,7 +470,7 @@ public:
 
 
   virtual void getNameInfo(StringRef Filename, unsigned Offset,
-                           NameTranslatingInfo Input,
+                           NameTranslatingInfo &Input,
                            ArrayRef<const char *> Args,
                 std::function<void(const NameTranslatingInfo &)> Receiver) = 0;
 
