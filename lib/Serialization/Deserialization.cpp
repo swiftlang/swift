@@ -2835,6 +2835,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto paramTy = getType(interfaceTypeID);
     if (paramTy->hasError()) {
+      // FIXME: This should never happen, because we don't serialize
+      // error types.
+      DC->dumpContext();
+      paramTy->dump();
       error();
       return nullptr;
     }
