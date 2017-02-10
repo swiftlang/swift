@@ -1337,6 +1337,10 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       case clang::DeclarationName::ObjCOneArgSelector:
       case clang::DeclarationName::ObjCMultiArgSelector:
       case clang::DeclarationName::ObjCZeroArgSelector:
+
+        // Make sure the given name has the right count of arguments.
+        if (selector.getNumArgs() != givenName.getObjCSelector().getNumArgs())
+          return ImportedName();
         selector = givenName.getObjCSelector();
         break;
       default:

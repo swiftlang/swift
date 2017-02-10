@@ -869,7 +869,7 @@ getClangDeclarationName(clang::ASTContext &Ctx, NameTranslatingInfo &Info) {
     std::vector<clang::IdentifierInfo *> Pieces(Args.size(), nullptr);
     std::transform(Args.begin(), Args.end(), Pieces.begin(),
       [&](StringRef T) { return &Ctx.Idents.get(T.endswith(":") ?
-        T.substr(0, T.size() - 1) : T); });
+                                                T.drop_back() : T); });
     return clang::DeclarationName(Ctx.Selectors.getSelector(
       /*Calculate Args*/std::accumulate(Args.begin(), Args.end(), (unsigned)0,
         [](unsigned I, StringRef T) { return I + (T.endswith(":") ? 1 : 0); }),
@@ -1138,8 +1138,7 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
       if (SemaTok.Mod) {
 
       } else {
-        ValueDecl *VD = SemaTok.CtorTyRef ? SemaTok.CtorTyRef : SemaTok.ValueD;
-        bool Failed = passNameInfoForDecl(VD, Input, Receiver);
+        bool Failed = passNameInfoForDecl(SemaTok.ValueD, Input, Receiver);
         if (Failed) {
           if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
