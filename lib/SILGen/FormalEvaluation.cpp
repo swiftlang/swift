@@ -24,6 +24,15 @@ using namespace Lowering;
 void FormalEvaluation::_anchor() {}
 
 //===----------------------------------------------------------------------===//
+//                      Shared Borrow Formal Evaluation
+//===----------------------------------------------------------------------===//
+
+void SharedBorrowFormalEvaluation::finish(SILGenFunction &gen) {
+  gen.B.createEndBorrow(CleanupLocation::get(loc), borrowedValue,
+                        originalValue);
+}
+
+//===----------------------------------------------------------------------===//
 //                          Formal Evaluation Scope
 //===----------------------------------------------------------------------===//
 
