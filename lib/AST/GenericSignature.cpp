@@ -217,6 +217,18 @@ ASTContext &GenericSignature::getASTContext() const {
   return getASTContext(getGenericParams(), getRequirements());
 }
 
+Optional<ProtocolConformanceRef>
+GenericSignature::lookupConformance(CanType type, ProtocolDecl *proto) const {
+  // FIXME: Actually implement this properly.
+  auto *M = proto->getParentModule();
+
+  if (type->isTypeParameter())
+    return ProtocolConformanceRef(proto);
+
+  return M->lookupConformance(type, proto,
+                              M->getASTContext().getLazyResolver());
+}
+
 bool GenericSignature::enumeratePairedRequirements(
                llvm::function_ref<bool(Type, ArrayRef<Requirement>)> fn) const {
   // We'll be walking through the list of requirements.

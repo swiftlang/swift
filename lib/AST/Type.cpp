@@ -2992,15 +2992,10 @@ Optional<ProtocolConformanceRef>
 LookUpConformanceInSignature::operator()(CanType dependentType,
                                          Type conformingReplacementType,
                                          ProtocolType *conformedProtocol) const {
-  // FIXME: Actually implement this properly.
-  auto *M = conformedProtocol->getDecl()->getParentModule();
-
-  if (conformingReplacementType->isTypeParameter())
-    return ProtocolConformanceRef(conformedProtocol->getDecl());
-
-  return M->lookupConformance(conformingReplacementType,
-                              conformedProtocol->getDecl(),
-                              M->getASTContext().getLazyResolver());
+  // FIXME: Should pass dependentType instead, once
+  // GenericSignature::lookupConformance() does the right thing
+  return Sig.lookupConformance(conformingReplacementType->getCanonicalType(),
+                               conformedProtocol->getDecl());
 }
 
 Type DependentMemberType::substBaseType(ModuleDecl *module,
