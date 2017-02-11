@@ -792,14 +792,14 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
 }
 
 static bool hasUsefulRoleInSystemModule(SymbolRoleSet roles) {
-  return roles | (SymbolRoleSet)SymbolRole::Definition |
+  return roles & ((SymbolRoleSet)SymbolRole::Definition |
   (SymbolRoleSet)SymbolRole::Declaration |
   (SymbolRoleSet)SymbolRole::RelationChildOf |
   (SymbolRoleSet)SymbolRole::RelationBaseOf |
   (SymbolRoleSet)SymbolRole::RelationOverrideOf |
   (SymbolRoleSet)SymbolRole::RelationExtendedBy |
   (SymbolRoleSet)SymbolRole::RelationAccessorOf |
-  (SymbolRoleSet)SymbolRole::RelationIBTypeOf;
+  (SymbolRoleSet)SymbolRole::RelationIBTypeOf);
 }
 
 bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
@@ -814,7 +814,7 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
     if (initVarRefIndexSymbols(getCurrentExpr(), D, Loc, Info))
       return true;
   } else {
-    if (initIndexSymbol(D, Loc, /*isRef=*/true, Info))
+    if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
       return true;
   }
 
@@ -999,7 +999,7 @@ bool IndexSwiftASTWalker::initFuncRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
   if (!CurrentE)
     return false;
 
-  // FIXME: the below check maintains existing indexing behaviour with
+  // FIXME: the below check maintains existing indexing behavior with
   // pseudo/accessor output but seems incorrect. E.g otherGlobal in:
   // let global = otherGlobal
   // will not have a parent expression so no accessor call is reported

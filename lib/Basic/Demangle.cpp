@@ -295,11 +295,11 @@ static StringRef toString(ValueWitnessKind k) {
 }
 
 /// The main class for parsing a demangling tree out of a mangled string.
-class Demangler {
+class OldDemangler {
   std::vector<NodePointer> Substitutions;
   NameSource Mangled;
 public:  
-  Demangler(llvm::StringRef mangled) : Mangled(mangled) {}
+  OldDemangler(llvm::StringRef mangled) : Mangled(mangled) {}
 
 /// Try to demangle a child node of the given kind.  If that fails,
 /// return; otherwise add it to the parent.
@@ -2337,19 +2337,21 @@ private:
 
 
 bool
-swift::Demangle::isSwiftSymbol(const char *mangledName,
-                               size_t mangledNameLength) {
-  StringRef Name(mangledName, mangledNameLength);
+swift::Demangle::isSwiftSymbol(const char *mangledName) {
   // The old mangling.
-  if (Name.startswith("_T"))
+  if (mangledName[0] == '_' && mangledName[1] == 'T')
     return true;
 
 #ifndef NO_NEW_DEMANGLING
   // The new mangling.
-  if (Name.startswith(MANGLING_PREFIX_STR))
-    return true;
-#endif // !NO_NEW_DEMANGLING
+  for (unsigned i = 0; i < sizeof(MANGLING_PREFIX_STR) - 1; i++) {
+    if (mangledName[i] != MANGLING_PREFIX_STR[i])
+      return false;
+  }
+  return true;
+#else // !NO_NEW_DEMANGLING
   return false;
+#endif // !NO_NEW_DEMANGLING
 }
 
 bool
@@ -2400,7 +2402,7 @@ NodePointer
 swift::Demangle::demangleSymbolAsNode(const char *MangledName,
                                       size_t MangledNameLength,
                                       const DemangleOptions &Options) {
-  Demangler demangler(StringRef(MangledName, MangledNameLength));
+  OldDemangler demangler(StringRef(MangledName, MangledNameLength));
   return demangler.demangleTopLevel();
 }
 
@@ -2408,7 +2410,7 @@ NodePointer
 swift::Demangle::demangleTypeAsNode(const char *MangledName,
                                     size_t MangledNameLength,
                                     const DemangleOptions &Options) {
-  Demangler demangler(StringRef(MangledName, MangledNameLength));
+  OldDemangler demangler(StringRef(MangledName, MangledNameLength));
   return demangler.demangleTypeName();
 }
 
@@ -3921,7 +3923,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       signature = pointer->getChild(1);
       assert(signature->getKind() == Node::Kind::DependentGenericSignature);
       genericArgs = pointer->getChild(2);
-      assert(signature->getKind() == Node::Kind::TypeList);
+      assert(genericArgs->getKind() == Node::Kind::TypeList);
       
       print(signature);
       Printer << ' ';

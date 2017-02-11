@@ -280,14 +280,39 @@ public:
   }
 };
 
+class FixedSizeArchetypeTypeInfo
+  : public PODSingleScalarTypeInfo<FixedSizeArchetypeTypeInfo, LoadableTypeInfo>,
+    public ArchetypeTypeInfoBase
+{
+  FixedSizeArchetypeTypeInfo(llvm::Type *type, Size size, Alignment align,
+                             const SpareBitVector &spareBits,
+                             ArrayRef<ProtocolEntry> protocols)
+      : PODSingleScalarTypeInfo(type, size, spareBits, align),
+        ArchetypeTypeInfoBase(this + 1, protocols) {}
+
+public:
+  static const FixedSizeArchetypeTypeInfo *
+  create(llvm::Type *type, Size size, Alignment align,
+         const SpareBitVector &spareBits, ArrayRef<ProtocolEntry> protocols) {
+    void *buffer = operator new(sizeof(FixedSizeArchetypeTypeInfo) +
+                                protocols.size() * sizeof(ProtocolEntry));
+    return ::new (buffer)
+        FixedSizeArchetypeTypeInfo(type, size, align, spareBits, protocols);
+  }
+};
+
 } // end anonymous namespace
 
 /// Return the ArchetypeTypeInfoBase information from the TypeInfo for any
 /// archetype.
 static const ArchetypeTypeInfoBase &
 getArchetypeInfo(IRGenFunction &IGF, CanArchetypeType t, const TypeInfo &ti) {
-  if (t->requiresClass())
+  LayoutConstraint LayoutInfo = t->getLayoutConstraint();
+  if (t->requiresClass() || (LayoutInfo && LayoutInfo->isRefCountedObject()))
     return ti.as<ClassArchetypeTypeInfo>();
+  if (LayoutInfo && LayoutInfo->isFixedSizeTrivial())
+    return ti.as<FixedSizeArchetypeTypeInfo>();
+  // TODO: Handle LayoutConstraintInfo::Trivial
   return ti.as<OpaqueArchetypeTypeInfo>();
 }
 
@@ -374,9 +399,12 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
     protocols.push_back(ProtocolEntry(protocol, impl));
   }
 
+  LayoutConstraint LayoutInfo = archetype->getLayoutConstraint();
+
   // If the archetype is class-constrained, use a class pointer
   // representation.
-  if (archetype->requiresClass()) {
+  if (archetype->requiresClass() ||
+      (LayoutInfo && LayoutInfo->isRefCountedObject())) {
     ReferenceCounting refcount;
     llvm::PointerType *reprTy;
 
@@ -410,6 +438,28 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
                                       spareBits,
                                       IGM.getPointerAlignment(),
                                       protocols, refcount);
+  }
+
+  // If the archetype is trivial fixed-size layout-constrained, use a fixed size
+  // representation.
+  if (LayoutInfo && LayoutInfo->isFixedSizeTrivial()) {
+    Size size(LayoutInfo->getTrivialSizeInBytes());
+    Alignment align(LayoutInfo->getTrivialSizeInBytes());
+    auto spareBits =
+      SpareBitVector::getConstant(size.getValueInBits(), false);
+    // Get an integer type of the required size.
+    auto ProperlySizedIntTy = SILType::getBuiltinIntegerType(
+        size.getValueInBits(), IGM.getSwiftModule()->getASTContext());
+    auto storageType = IGM.getStorageType(ProperlySizedIntTy);
+    return FixedSizeArchetypeTypeInfo::create(storageType, size, align,
+                                              spareBits, protocols);
+  }
+
+  // If the archetype is a trivial layout-constrained, use a POD
+  // representation. This type is not loadable, but it is known
+  // to be a POD.
+  if (LayoutInfo && LayoutInfo->isAddressOnlyTrivial()) {
+    // TODO: Create NonFixedSizeArchetypeTypeInfo and return it.
   }
 
   // Otherwise, for now, always use an opaque indirect type.

@@ -385,6 +385,21 @@ func inoutAccessOfStaticProperty<T : Beverage>(_ t: T.Type) {
   increment(&t.abv)
 }
 
+// Test for materializeForSet vs overriden computed property of classes.
+class BaseForOverride {
+  var valueStored: Int
+  var valueComputed: Int { get { } set { } }
+
+  init(valueStored: Int) {
+    self.valueStored = valueStored
+  }
+}
+
+class DerivedForOverride : BaseForOverride {
+  override var valueStored: Int { get { } set { } }
+  override var valueComputed: Int { get { } set { } }
+}
+
 // Test for materializeForSet vs static properties of classes.
 
 class ReferenceBeer {
@@ -513,6 +528,15 @@ func testMaterializedSetter() {
   // CHECK: function_ref @_T017materializeForSet10FooClosureV8computedSiSiSiccSgfs
   f.computed = f.computed
 }
+
+// CHECK-LABEL: sil_vtable DerivedForOverride {
+// CHECK:   #BaseForOverride.valueComputed!getter.1: (BaseForOverride) -> () -> Int : _T017materializeForSet07DerivedB8OverrideC13valueComputedSifg
+// CHECK:   #BaseForOverride.valueComputed!setter.1: (BaseForOverride) -> (Int) -> () : _T017materializeForSet07DerivedB8OverrideC13valueComputedSifs
+// CHECK:   #BaseForOverride.valueComputed!materializeForSet.1: (BaseForOverride) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T017materializeForSet07DerivedB8OverrideC13valueComputedSifm
+// CHECK:   #BaseForOverride.valueStored!getter.1: (BaseForOverride) -> () -> Int : _T017materializeForSet07DerivedB8OverrideC11valueStoredSifg
+// CHECK:   #BaseForOverride.valueStored!setter.1: (BaseForOverride) -> (Int) -> () : _T017materializeForSet07DerivedB8OverrideC11valueStoredSifs
+// CHECK:   #BaseForOverride.valueStored!materializeForSet.1: (BaseForOverride) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T017materializeForSet07DerivedB8OverrideC11valueStoredSifm
+// CHECK: }
 
 // CHECK-LABEL: sil_witness_table hidden Bill: Totalled module materializeForSet {
 // CHECK:   method #Totalled.total!getter.1: {{.*}} : @_T017materializeForSet4BillVAA8TotalledAaaDP5totalSifgTW

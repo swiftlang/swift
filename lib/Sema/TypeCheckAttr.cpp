@@ -16,7 +16,7 @@
 
 #include "TypeChecker.h"
 #include "MiscDiagnostics.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
@@ -179,10 +179,19 @@ public:
       }
     }
 
-    // Accept and remove the 'final' attribute from members of protocol
-    // extensions.
+    if (isa<ClassDecl>(D))
+      return;
+
+    // 'final' only makes sense in the context of a class
+    // declaration or a protocol extension.  Reject it on global functions,
+    // structs, enums, etc.
     if (D->getDeclContext()->getAsProtocolExtensionContext()) {
+      // Accept and remove the 'final' attribute from members of protocol
+      // extensions.
       D->getAttrs().removeAttribute(attr);
+    } else if (!D->getDeclContext()->getAsClassOrClassExtensionContext()) {
+      diagnoseAndRemoveAttr(attr, diag::member_cannot_be_final);
+      return;
     }
   }
 
@@ -996,15 +1005,6 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
   if (isa<ClassDecl>(D))
     return;
 
-  // 'final' only makes sense in the context of a class
-  // declaration or a protocol extension.  Reject it on global functions,
-  // structs, enums, etc.
-  if (!D->getDeclContext()->getAsClassOrClassExtensionContext() &&
-      !D->getDeclContext()->getAsProtocolExtensionContext()) {
-    TC.diagnose(attr->getLocation(), diag::member_cannot_be_final);
-    return;
-  }
-
   // We currently only support final on var/let, func and subscript
   // declarations.
   if (!isa<VarDecl>(D) && !isa<FuncDecl>(D) && !isa<SubscriptDecl>(D)) {
@@ -1608,7 +1608,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   }
 
   // Form a new generic signature based on the old one.
-  ArchetypeBuilder Builder(D->getASTContext(),
+  GenericSignatureBuilder Builder(D->getASTContext(),
                            LookUpConformanceInModule(DC->getParentModule()));
 
   // First, add the old generic signature.

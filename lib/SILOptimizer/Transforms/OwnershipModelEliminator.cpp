@@ -66,6 +66,7 @@ struct OwnershipModelEliminatorVisitor
   }
   bool visitUnmanagedRetainValueInst(UnmanagedRetainValueInst *URVI);
   bool visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *URVI);
+  bool visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *UAVI);
 };
 
 } // end anonymous namespace
@@ -165,6 +166,16 @@ bool OwnershipModelEliminatorVisitor::visitUnmanagedReleaseValueInst(
   // operation will delegate to the appropriate strong_release, etc.
   B.emitDestroyValueOperation(URVI->getLoc(), URVI->getOperand());
   URVI->eraseFromParent();
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitUnmanagedAutoreleaseValueInst(
+    UnmanagedAutoreleaseValueInst *UAVI) {
+  // Now that we have set the unqualified ownership flag, destroy value
+  // operation will delegate to the appropriate strong_release, etc.
+  B.createAutoreleaseValue(UAVI->getLoc(), UAVI->getOperand(),
+                           Atomicity::Atomic);
+  UAVI->eraseFromParent();
   return true;
 }
 

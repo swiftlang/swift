@@ -73,7 +73,7 @@ public:
   Callee &getMutableCallee() { return CurCallee; }
   const Callee &getCallee() const { return CurCallee; }
 
-  ArrayRef<Substitution> getSubstitutions() const {
+  SubstitutionList getSubstitutions() const {
     return CurCallee.getSubstitutions();
   }
 

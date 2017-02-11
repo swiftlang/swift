@@ -21,7 +21,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -1022,10 +1022,10 @@ RequirementEnvironment::RequirementEnvironment(
           selfType, ProtocolConformanceRef(proto));
   }
 
-  // Construct an archetype builder by collecting the constraints from the
+  // Construct an generic signature builder by collecting the constraints from the
   // requirement and the context of the conformance together, because both
   // define the capabilities of the requirement.
-  ArchetypeBuilder builder(
+  GenericSignatureBuilder builder(
            ctx,
            LookUpConformanceInModule(conformanceDC->getParentModule()));
   SmallVector<GenericTypeParamType*, 4> allGenericParams;
@@ -1135,7 +1135,7 @@ RequirementEnvironment::RequirementEnvironment(
                                                  SubstFlags::UseErrorType);
 
       // FIXME: We really want to check hasTypeParameter here, but the
-      // ArchetypeBuilder isn't ready for that.
+      // GenericSignatureBuilder isn't ready for that.
       if (!first->isTypeParameter()) {
         // When the second is not a type parameter either, drop the requirement.
         // If the types were different, this requirement will be unsatisfiable.
@@ -1153,14 +1153,15 @@ RequirementEnvironment::RequirementEnvironment(
     }
   }
 
-  // Finalize the archetype builder.
+  // Finalize the generic signature builder.
   // FIXME: Pass in a source location for the conformance, perhaps? It seems
   // like this could fail.
-  builder.finalize(SourceLoc());
+  builder.finalize(SourceLoc(), allGenericParams);
 
   // Produce the generic signature and environment.
   syntheticSignature = builder.getGenericSignature();
-  syntheticEnvironment = builder.getGenericEnvironment(syntheticSignature);
+  syntheticEnvironment = syntheticSignature->createGenericEnvironment(
+                                             *conformanceDC->getParentModule());
 }
 
 static RequirementMatch
@@ -1190,8 +1191,7 @@ matchWitness(TypeChecker &tc,
     auto reqGenericEnv = reqEnvironment.getSyntheticEnvironment();
     Type selfTy = proto->getSelfInterfaceType().subst(reqSubs);
     if (reqGenericEnv)
-      selfTy = reqGenericEnv->mapTypeIntoContext(dc->getParentModule(),
-                                                 selfTy);
+      selfTy = reqGenericEnv->mapTypeIntoContext(selfTy);
 
         // Open up the type of the requirement.
     reqLocator = cs->getConstraintLocator(
@@ -1219,8 +1219,7 @@ matchWitness(TypeChecker &tc,
         continue;
 
       if (reqGenericEnv) {
-        replacedInReq = reqGenericEnv->mapTypeIntoContext(dc->getParentModule(),
-                                                          replacedInReq);
+        replacedInReq = reqGenericEnv->mapTypeIntoContext(replacedInReq);
       }
 
       cs->addConstraint(ConstraintKind::Bind, replacement.second, replacedInReq,
@@ -1784,6 +1783,9 @@ namespace {
            ValueDecl *requirement, bool isError,
            std::function<void(NormalProtocolConformance *)> fn);
 
+    void
+    addUsedConformances(ProtocolConformance *conformance,
+                        llvm::SmallPtrSetImpl<ProtocolConformance *> &visited);
     void addUsedConformances(ProtocolConformance *conformance);
 
   public:
@@ -2336,6 +2338,67 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
       typeDecl);
 }
 
+bool swift::
+printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
+                     Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS) {
+
+  // FIXME: Infer body indentation from the source rather than hard-coding
+  // 4 spaces.
+  ASTContext &Ctx = Requirement->getASTContext();
+  std::string ExtraIndent = "    ";
+  StringRef CurrentIndent = Lexer::getIndentationForLine(Ctx.SourceMgr,
+                                                         TypeLoc);
+  std::string StubIndent = CurrentIndent.str() + ExtraIndent;
+
+  ExtraIndentStreamPrinter Printer(OS, StubIndent);
+  Printer.printNewline();
+
+  Accessibility Access =
+    std::min(
+      /* Access of the context */
+      Adopter->getAsNominalTypeOrNominalTypeExtensionContext()->getFormalAccess(),
+      /* Access of the protocol */
+      Requirement->getDeclContext()->getAsProtocolOrProtocolExtensionContext()->
+        getFormalAccess());
+  if (Access == Accessibility::Public)
+    Printer << "public ";
+
+  if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
+    Printer << "typealias " << MissingTypeWitness->getName() << " = <#type#>";
+    Printer << "\n";
+  } else {
+    if (isa<ConstructorDecl>(Requirement)) {
+      if (auto CD = Adopter->getAsClassOrClassExtensionContext()) {
+        if (!CD->isFinal() && Adopter->isExtensionContext()) {
+          // In this case, user should mark class as 'final' or define
+          // 'required' initializer directly in the class definition.
+          return false;
+        } else if (!CD->isFinal()) {
+          Printer << "required ";
+        } else if (Adopter->isExtensionContext()) {
+          Printer << "convenience ";
+        }
+      }
+    }
+
+    PrintOptions Options = PrintOptions::printForDiagnostics();
+    Options.AccessibilityFilter = Accessibility::Private;
+    Options.PrintAccessibility = false;
+    Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
+    Options.setBaseType(AdopterTy);
+    Options.CurrentModule = Adopter->getParentModule();
+    if (!Adopter->isExtensionContext()) {
+      // Create a variable declaration instead of a computed property in
+      // nominal types
+      Options.PrintPropertyAccessors = false;
+    }
+    Requirement->print(Printer, Options);
+    Printer << "\n";
+  }
+  return true;
+}
+
+
 /// Generates a note for a protocol requirement for which no witness was found
 /// and provides a fixit to add a stub to the adopter
 static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
@@ -2356,72 +2419,26 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
     llvm_unreachable("Unknown adopter kind");
   }
 
-  // FIXME: Infer body indentation from the source rather than hard-coding
-  // 4 spaces.
   ASTContext &Ctx = Requirement->getASTContext();
   auto &Diags = Ctx.Diags;
-  std::string ExtraIndent = "    ";
-  StringRef CurrentIndent = Lexer::getIndentationForLine(Ctx.SourceMgr,
-                                                         TypeLoc);
-  std::string StubIndent = CurrentIndent.str() + ExtraIndent;
-
   std::string FixitString;
   llvm::raw_string_ostream FixitStream(FixitString);
-  ExtraIndentStreamPrinter Printer(FixitStream, StubIndent);
-  Printer.printNewline();
 
-  Accessibility Access = std::min(
-    /* Access of the context */
-    Adopter->getAsNominalTypeOrNominalTypeExtensionContext()->getFormalAccess(),
-    /* Access of the protocol */
-    Requirement->getDeclContext()
-      ->getAsProtocolOrProtocolExtensionContext()->getFormalAccess());
-  if (Access == Accessibility::Public)
-    Printer << "public ";
+  bool AddFixit = printRequirementStub(Requirement, Adopter,
+                                       Conformance->getType(), TypeLoc,
+                                       FixitStream);
 
   if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
-    Printer << "typealias " << MissingTypeWitness->getName() << " = <#type#>";
-    Printer << "\n";
-
     Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
                    MissingTypeWitness->getName())
       .fixItInsertAfter(FixitLocation, FixitStream.str());
   } else {
-    bool AddFixit = true;
-    if (isa<ConstructorDecl>(Requirement)) {
-      if (auto CD = Adopter->getAsClassOrClassExtensionContext()) {
-        if (!CD->isFinal() && Adopter->isExtensionContext()) {
-          // In this case, user should mark class as 'final' or define 
-          // 'required' initializer directly in the class definition.
-          AddFixit = false;
-        } else if (!CD->isFinal()) {
-          Printer << "required ";
-        } else if (Adopter->isExtensionContext()) {
-          Printer << "convenience ";
-        }
-      }
-    }
-
     // Point out the requirement that wasn't met.
     auto diag = Diags.diagnose(Requirement, diag::no_witnesses,
                                getRequirementKind(Requirement),
                                Requirement->getFullName(),
                                RequirementType, AddFixit);
     if (AddFixit) {
-      PrintOptions Options = PrintOptions::printForDiagnostics();
-      Options.AccessibilityFilter = Accessibility::Private;
-      Options.PrintAccessibility = false;
-      Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
-      Options.setBaseType(Conformance->getType());
-      Options.CurrentModule = Adopter->getParentModule();
-      if (!Adopter->isExtensionContext()) {
-        // Create a variable declaration instead of a computed property in
-        // nominal types
-        Options.PrintPropertyAccessors = false;
-      }
-      Requirement->print(Printer, Options);
-      Printer << "\n";
-
       diag.fixItInsertAfter(FixitLocation, FixitStream.str());
     }
   }
@@ -2884,7 +2901,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                        AssociatedTypeDecl *assocType) {
   // Look for a member type with the same name as the associated type.
   auto candidates = TC.lookupMemberType(DC, Adoptee, assocType->getName(),
-                                        /*lookup=*/None);
+                                        /*options=*/None);
 
   // If there aren't any candidates, we're done.
   if (!candidates) {
@@ -3196,7 +3213,9 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   }
 
   ModuleDecl *module = conformance->getDeclContext()->getParentModule();
-  auto resultType = type.subst(module, substitutions, SubstFlags::UseErrorType);
+  auto resultType = type.subst(QueryTypeSubstitutionMap{substitutions},
+                               LookUpConformanceInModule(module),
+                               SubstFlags::UseErrorType);
   if (!resultType->hasError()) return resultType;
 
   // Map error types with original types *back* to the original, dependent type.
@@ -3251,7 +3270,8 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
       : Conformance(conformance), Inferred(inferred) { }
 
     /// Structural mismatches imply that the witness cannot match.
-    bool mismatch(TypeBase *firstType, TypeBase *secondType) {
+    bool mismatch(TypeBase *firstType, TypeBase *secondType,
+                  Type sugaredFirstType) {
       // If either type hit an error, don't stop yet.
       if (firstType->hasError() || secondType->hasError())
         return true;
@@ -3262,7 +3282,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
 
     /// Deduce associated types from dependent member types in the witness.
     bool mismatch(DependentMemberType *firstDepMember,
-                  TypeBase *secondType) {
+                  TypeBase *secondType, Type sugaredFirstType) {
       // If the second type is an error, don't look at it further.
       if (secondType->hasError())
         return true;
@@ -3279,7 +3299,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
 
     /// FIXME: Recheck the type of Self against the second type?
     bool mismatch(GenericTypeParamType *selfParamType,
-                  TypeBase *secondType) {
+                  TypeBase *secondType, Type sugaredFirstType) {
       return true;
     }
   };
@@ -3649,8 +3669,9 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
     TC.validateDecl(assocType);
     Type defaultType = assocType->getDefaultDefinitionLoc().getType().subst(
-                         DC->getParentModule(),
-                         substitutions);
+        QueryTypeSubstitutionMap{substitutions},
+        LookUpConformanceInModule(DC->getParentModule()));
+
     if (!defaultType)
       return Type();
 
@@ -4382,7 +4403,15 @@ static void recordConformanceDependency(DeclContext *DC,
                          DC->isCascadingContextForLookup(InExpression));
 }
 
-void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
+void ConformanceChecker::addUsedConformances(
+    ProtocolConformance *conformance,
+    llvm::SmallPtrSetImpl<ProtocolConformance *> &visited) {
+  // This deduplication cannot be implemented by just checking UsedConformance,
+  // because conformances can be added to UsedConformances outside this
+  // function, meaning their type witness conformances may not be tracked.
+  if (!visited.insert(conformance).second)
+    return;
+
   auto normalConf = conformance->getRootNormalConformance();
 
   if (normalConf->isIncomplete())
@@ -4394,10 +4423,15 @@ void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
                                                TypeDecl *witness) -> bool {
     for (auto nestedConformance : sub.getConformances())
       if (nestedConformance.isConcrete())
-        addUsedConformances(nestedConformance.getConcrete());
+        addUsedConformances(nestedConformance.getConcrete(), visited);
 
     return false;
   });
+}
+
+void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
+  llvm::SmallPtrSet<ProtocolConformance *, 8> visited;
+  addUsedConformances(conformance, visited);
 }
 
 #pragma mark Protocol conformance checking
@@ -5078,7 +5112,7 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
     // Hack: If we've used a conformance to the _BridgedStoredNSError
     // protocol, also use the RawRepresentable and _ErrorCodeProtocol
     // conformances on the Code associated type witness.
-    if (auto codeType = ProtocolConformance::getTypeWitnessByName(
+    if (auto codeType = ProtocolConformanceRef::getTypeWitnessByName(
                           type, *conformance, Context.Id_Code, this)) {
       (void)conformsToProtocol(codeType, errorCodeProto, dc,
                                ConformanceCheckFlags::Used);
@@ -5093,7 +5127,7 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
                      (ConformanceCheckFlags::SuppressDependencyTracking|
                       ConformanceCheckFlags::Used));
   if (conformance && conformance->isConcrete()) {
-    if (Type errorType = ProtocolConformance::getTypeWitnessByName(
+    if (Type errorType = ProtocolConformanceRef::getTypeWitnessByName(
           type, *conformance, Context.Id_ErrorType, this)) {
       (void)conformsToProtocol(errorType, bridgedStoredNSError, dc,
                                ConformanceCheckFlags::Used);
@@ -5499,9 +5533,10 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     // Special case: explain that 'RawRepresentable' conformance
     // is implied for enums which already declare a raw type.
     if (auto enumDecl = dyn_cast<EnumDecl>(existingDecl)) {
-      if (diag.Protocol->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
-          enumDecl->derivesProtocolConformance(diag.Protocol) &&
-          enumDecl->hasRawType()) {
+      if (diag.Protocol->isSpecificProtocol(KnownProtocolKind::RawRepresentable)
+          && enumDecl->derivesProtocolConformance(diag.Protocol)
+          && enumDecl->hasRawType()
+          && enumDecl->getInherited()[0].getSourceRange().isValid()) {
         diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
                  diag::enum_declares_rawrep_with_raw_type,
                  dc->getDeclaredInterfaceType(), enumDecl->getRawType());

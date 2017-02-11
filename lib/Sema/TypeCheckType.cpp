@@ -264,6 +264,11 @@ findDeclContextForType(TypeChecker &TC,
     if (ownerDC == parentDC)
       return std::make_tuple(parentDC, parentNominal, true);
 
+    if (isa<ExtensionDecl>(parentDC) && typeDecl == parentNominal) {
+      assert(parentDC->getParent()->isModuleScopeContext());
+      return std::make_tuple(parentDC, parentNominal, true);
+    }
+
     // FIXME: Horrible hack. Don't allow us to reference a generic parameter
     // from a context outside a ProtocolDecl.
     if (isa<ProtocolDecl>(parentDC) && isa<GenericTypeParamDecl>(typeDecl))
@@ -394,15 +399,14 @@ Type TypeChecker::resolveTypeInContext(
 
   bool hasDependentType = typeDecl->getDeclaredInterfaceType()
       ->hasTypeParameter();
+  // If we found a generic parameter, map to the archetype if there is one.
+  if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
+    return resolver->resolveGenericTypeParamType(
+        genericParam->getDeclaredInterfaceType()
+            ->castTo<GenericTypeParamType>());
+  }
 
   if (!foundNominal || !hasDependentType) {
-    // If we found a generic parameter, map to the archetype if there is one.
-    if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
-      return resolver->resolveGenericTypeParamType(
-          genericParam->getDeclaredInterfaceType()
-              ->castTo<GenericTypeParamType>());
-    }
-
     // If this is a typealias not in type context, we still need the
     // interface type; the typealias might be in a function context, and
     // its underlying type might reference outer generic parameters.
@@ -645,7 +649,9 @@ Type TypeChecker::applyUnboundGenericArguments(
 
     // Apply substitutions to the interface type of the typealias.
     type = TAD->getDeclaredInterfaceType();
-    return type.subst(dc->getParentModule(), subs, SubstFlags::UseErrorType);
+    return type.subst(QueryTypeSubstitutionMap{subs},
+                      LookUpConformanceInModule(dc->getParentModule()),
+                      SubstFlags::UseErrorType);
   }
   
   // Form the bound generic type.
@@ -701,7 +707,7 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
         diag.fixItInsertAfter(loc, genericArgsToAdd);
     }
   }
-  tc.diagnose(unbound->getDecl()->getLoc(), diag::generic_type_declared_here,
+  tc.diagnose(unbound->getDecl(), diag::generic_type_declared_here,
               unbound->getDecl()->getName());
 }
 
@@ -1095,7 +1101,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     }
 
     // Otherwise, check for an ambiguity.
-    if (!current->isEqual(type)) {
+    if (!resolver->areSameType(current, type)) {
       isAmbiguous = true;
       break;
     }
@@ -2647,13 +2653,19 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   
   // If this is the top level of a function input list, peel off the
   // ImmediateFunctionInput marker and install a FunctionInput one instead.
-  //
-  // If we have a single ParenType though, don't clear these bits; we
-  // still want to parse the type contained therein as if it were in
-  // parameter position, meaning function types are not @escaping by
-  // default.
   auto elementOptions = options;
-  if (!repr->isParenType()) {
+  if (repr->isParenType()) {
+    // If we have a single ParenType, don't clear the context bits; we
+    // still want to parse the type contained therein as if it were in
+    // parameter position, meaning function types are not @escaping by
+    // default. We still want to reduce `ImmediateFunctionInput` to
+    // `FunctionInput` so that e.g. ((foo: Int)) -> Int is considered a
+    // tuple argument rather than a labeled Int argument.
+    if (isImmediateFunctionInput) {
+      elementOptions -= TR_ImmediateFunctionInput;
+      elementOptions |= TR_FunctionInput;
+    }
+  } else {
     elementOptions = withoutContext(elementOptions, true);
     if (isImmediateFunctionInput)
       elementOptions |= TR_FunctionInput;
@@ -2951,8 +2963,9 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   if (!parentTy)
     return memberType;
 
-  auto subs = parentTy->getContextSubstitutions(member->getDeclContext());
-  return memberType.subst(module, subs, SubstFlags::UseErrorType);
+  auto subs = parentTy->getContextSubstitutionMap(
+      module, member->getDeclContext());
+  return memberType.subst(subs, SubstFlags::UseErrorType);
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {

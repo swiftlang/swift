@@ -224,19 +224,18 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     // Get the substitutions from the generic signature of
     // the extension to the interface types of the base type's
     // declaration.
-    TypeSubstitutionMap subMap;
-    if (!BaseType->isExistentialType())
-      subMap = BaseType->getContextSubstitutions(Ext);
     auto *M = DC->getParentModule();
+    SubstitutionMap subMap;
+    if (!BaseType->isExistentialType())
+      subMap = BaseType->getContextSubstitutionMap(M, Ext);
 
     assert(Ext->getGenericSignature() && "No generic signature.");
     for (auto Req : Ext->getGenericSignature()->getRequirements()) {
       auto Kind = Req.getKind();
 
-      Type First = Req.getFirstType().subst(
-          M, subMap, SubstOptions());
-      Type Second = Req.getSecondType().subst(
-          M, subMap, SubstOptions());
+      Type First = Req.getFirstType().subst(subMap);
+      Type Second = Req.getSecondType().subst(subMap);
+
       if (!First || !Second) {
         // Substitution with interface type bases can only fail
         // if a concrete type fails to conform to a protocol.
@@ -874,9 +873,9 @@ class PrintAST : public ASTVisitor<PrintAST> {
       assert(DC->isTypeContext());
 
       // Get the substitutions from our base type.
-      auto subMap = CurrentType->getContextSubstitutions(DC);
       auto *M = DC->getParentModule();
-      T = T.subst(M, subMap, SubstFlags::DesugarMemberTypes);
+      auto subMap = CurrentType->getContextSubstitutionMap(M, DC);
+      T = T.subst(subMap, SubstFlags::DesugarMemberTypes);
     }
 
     printType(T);
@@ -995,9 +994,9 @@ public:
     Type OldType = CurrentType;
     if (CurrentType && (Old != nullptr || Options.PrintAsMember)) {
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        CurrentType = NTD->getDeclaredInterfaceType().subst(
-            Options.CurrentModule,
-            CurrentType->getContextSubstitutions(NTD->getDeclContext()));
+        auto Subs = CurrentType->getContextSubstitutionMap(
+          Options.CurrentModule, NTD->getDeclContext());
+        CurrentType = NTD->getDeclaredInterfaceType().subst(Subs);
       }
     }
 
@@ -1268,16 +1267,18 @@ void PrintAST::printSingleDepthOfGenericSignature(
   bool printParams = (flags & PrintParams);
   bool printRequirements = (flags & PrintRequirements);
 
-  TypeSubstitutionMap subMap;
-  ModuleDecl *M = nullptr;
-
+  SubstitutionMap subMap;
   if (CurrentType) {
     if (!CurrentType->isExistentialType()) {
       auto *DC = Current->getInnermostDeclContext()->getInnermostTypeContext();
-      subMap = CurrentType->getContextSubstitutions(DC);
-      M = DC->getParentModule();
+      auto *M = DC->getParentModule();
+      subMap = CurrentType->getContextSubstitutionMap(M, DC);
     }
   }
+
+  auto substParam = [&](Type param) -> Type {
+    return param.subst(subMap);
+  };
 
   if (printParams) {
     // Print the generic parameters.
@@ -1290,7 +1291,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         Printer << ", ";
 
       if (!subMap.empty()) {
-        if (auto argTy = Type(param).subst(M, subMap))
+        if (auto argTy = substParam(param))
           printType(argTy);
         else
           printType(param);
@@ -1322,10 +1323,10 @@ void PrintAST::printSingleDepthOfGenericSignature(
       }
 
       if (!subMap.empty()) {
-        if (Type subFirst = first.subst(M, subMap))
+        if (Type subFirst = substParam(first))
           first = subFirst;
         if (second) {
-          if (Type subSecond = second.subst(M, subMap))
+          if (Type subSecond = substParam(second))
             second = subSecond;
           if (!(first->is<ArchetypeType>() || first->isTypeParameter()) &&
               !(second->is<ArchetypeType>() || second->isTypeParameter()))
@@ -4120,7 +4121,10 @@ void Requirement::dump() const {
   }
 
   if (getFirstType()) llvm::errs() << getFirstType() << " ";
-  if (getSecondType()) llvm::errs() << getSecondType();
+  if (getKind() != RequirementKind::Layout && getSecondType())
+    llvm::errs() << getSecondType();
+  else if (getLayoutConstraint())
+    llvm::errs() << getLayoutConstraint();
   llvm::errs() << "\n";
 }
 

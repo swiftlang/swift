@@ -189,27 +189,6 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
   skipUntil(tok::eof);
 }
 
-static void diagnoseDiscardedClosure(Parser &P, ASTNode &Result) {
-  // If we parsed a bare closure as an expression, it will be a discarded value
-  // expression and the type checker will complain.
-
-  if (isa<AbstractClosureExpr>(P.CurDeclContext))
-    // Inside a closure expression, an expression which syntactically looks
-    // like a discarded value expression, can become the return value of the
-    // closure.  Don't attempt recovery.
-    return;
-
-  if (auto *E = Result.dyn_cast<Expr *>()) {
-    if (auto *CE = dyn_cast<ClosureExpr>(E)) {
-      if (!CE->hasAnonymousClosureVars())
-        // Parameters are explicitly specified, and could be used in the body,
-        // don't attempt recovery.
-        return;
-      P.diagnose(CE->getBody()->getLBraceLoc(), diag::brace_stmt_invalid);
-    }
-  }
-}
-
 ///   brace-item:
 ///     decl
 ///     expr
@@ -369,8 +348,6 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       // This prevents potential ambiguities with trailing closure syntax.
       if (Tok.is(tok::l_brace)) {
         diagnose(Tok, diag::statement_begins_with_closure);
-        diagnose(Tok, diag::discard_result_of_closure)
-          .fixItInsert(Tok.getLoc(), "_ = ");
       }
 
       ParserStatus Status = parseExprOrStmt(Result);
@@ -388,7 +365,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                  Result.is<Stmt*>() ? diag::illegal_top_level_stmt
                                     : diag::illegal_top_level_expr);
       }
-      diagnoseDiscardedClosure(*this, Result);
+
       if (!Result.isNull()) {
         // NOTE: this is a 'virtual' brace statement which does not have
         //       explicit '{' or '}', so the start and end locations should be
@@ -411,7 +388,6 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       BraceItemsStatus |= ExprOrStmtStatus;
       if (ExprOrStmtStatus.isError())
         NeedParseErrorRecovery = true;
-      diagnoseDiscardedClosure(*this, Result);
       if (!Result.isNull())
         Entries.push_back(Result);
     }
@@ -484,8 +460,6 @@ void Parser::parseTopLevelCodeDeclDelayed() {
   // prevents potential ambiguities with trailing closure syntax.
   if (Tok.is(tok::l_brace)) {
     diagnose(Tok, diag::statement_begins_with_closure);
-    diagnose(Tok, diag::discard_result_of_closure)
-      .fixItInsert(Tok.getLoc(), "_ = ");
   }
 
   parseExprOrStmt(Result);
@@ -1810,11 +1784,6 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
     if (isElse) {
       ConfigState.setConditionActive(!foundActive);
     } else {
-      if (Tok.isAtStartOfLine()) {
-        diagnose(ClauseLoc, diag::expected_conditional_compilation_expression,
-                 !Clauses.empty());
-      }
-
       // Evaluate the condition.
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
                                                     /*basic*/true,

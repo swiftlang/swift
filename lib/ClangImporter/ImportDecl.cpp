@@ -18,7 +18,7 @@
 #include "ImporterImpl.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
@@ -4002,6 +4002,10 @@ namespace {
       auto *env = Impl.buildGenericEnvironment(result->getGenericParams(), dc);
       result->setGenericEnvironment(env);
 
+      // Compute the requirement signature.
+      if (!result->isRequirementSignatureComputed())
+        result->computeRequirementSignature();
+
       result->setMemberLoader(&Impl, 0);
 
       // Add the protocol decl to ExternalDefinitions so that IRGen can emit
@@ -7075,25 +7079,32 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
   return nullptr;
 }
 
-// Calculate the generic environment from an imported generic param list.
-GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
+GenericSignature *ClangImporter::Implementation::buildGenericSignature(
     GenericParamList *genericParams, DeclContext *dc) {
-  ArchetypeBuilder builder(SwiftContext,
+  GenericSignatureBuilder builder(SwiftContext,
                            LookUpConformanceInModule(dc->getParentModule()));
-  for (auto param : *genericParams)
+  SmallVector<GenericTypeParamType *, 4> allGenericParams;
+  for (auto param : *genericParams) {
     builder.addGenericParameter(param);
+    allGenericParams.push_back(
+      param->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
+  }
   for (auto param : *genericParams) {
     bool result = builder.addGenericParameterRequirements(param);
     assert(!result);
     (void) result;
   }
   // TODO: any need to infer requirements?
-  builder.finalize(genericParams->getSourceRange().Start);
+  builder.finalize(genericParams->getSourceRange().Start, allGenericParams);
 
-  auto *sig = builder.getGenericSignature();
-  auto *env = builder.getGenericEnvironment(sig);
+  return builder.getGenericSignature();
+}
 
-  return env;
+// Calculate the generic environment from an imported generic param list.
+GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
+    GenericParamList *genericParams, DeclContext *dc) {
+  return buildGenericSignature(genericParams, dc)->createGenericEnvironment(
+                                                       *dc->getParentModule());
 }
 
 DeclContext *

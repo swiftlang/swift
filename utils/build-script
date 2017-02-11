@@ -259,10 +259,6 @@ class BuildScriptInvocation(object):
             args.stdlib_deployment_targets = [
                 target.name for target in stdlib_targets]
 
-        # Propagate the default build variant.
-        if args.cmark_build_variant is None:
-            args.cmark_build_variant = args.build_variant
-
         if args.llvm_build_variant is None:
             args.llvm_build_variant = args.build_variant
 
@@ -271,6 +267,9 @@ class BuildScriptInvocation(object):
 
         if args.swift_stdlib_build_variant is None:
             args.swift_stdlib_build_variant = args.build_variant
+
+        if args.cmark_build_variant is None:
+            args.cmark_build_variant = args.swift_build_variant
 
         if args.lldb_build_variant is None:
             args.lldb_build_variant = args.build_variant
@@ -781,6 +780,12 @@ class BuildScriptInvocation(object):
                 "--toolchain-prefix",
                 swift_build_support.targets.darwin_toolchain_prefix(
                     args.install_prefix),
+                "--host-lipo", toolchain.lipo,
+            ]
+
+        if toolchain.libtool is not None:
+            impl_args += [
+                "--host-libtool", toolchain.libtool,
             ]
 
         # If we have extra_swift_args, combine all of them together and then
@@ -989,6 +994,7 @@ class BuildScriptInvocation(object):
         # Lipo...
         execute_one_impl_action(name="merged-hosts-lipo")
 
+
 # Provide a short delay so accidentally invoked clean builds can be canceled.
 def clean_delay():
     sys.stdout.write('Starting clean build in  ')
@@ -997,6 +1003,7 @@ def clean_delay():
         sys.stdout.flush()
         time.sleep(1)
     print('\b\b\b\bnow.')
+
 
 # Main entry point for the preset mode.
 def main_preset():
@@ -1932,6 +1939,16 @@ iterations with -O",
         type=arguments.type.executable,
         metavar="PATH")
     parser.add_argument(
+        "--host-lipo",
+        help="the absolute path to lipo. Default is auto detected.",
+        type=arguments.type.executable,
+        metavar="PATH")
+    parser.add_argument(
+        "--host-libtool",
+        help="the absolute path to libtool. Default is auto detected.",
+        type=arguments.type.executable,
+        metavar="PATH")
+    parser.add_argument(
         "--distcc",
         help="use distcc in pump mode",
         action=arguments.action.optional_bool)
@@ -2059,6 +2076,11 @@ iterations with -O",
                         help="Enable the SIL ownership model",
                         action='store_true')
 
+    parser.add_argument("--force-optimized-typechecker",
+                        help="Force the type checker to be built with "
+                        "optimization",
+                        action='store_true')
+
     parser.add_argument(
         # Explicitly unavailable options here.
         "--build-jobs",
@@ -2103,6 +2125,10 @@ iterations with -O",
         toolchain.cc = args.host_cc
     if args.host_cxx is not None:
         toolchain.cxx = args.host_cxx
+    if args.host_lipo is not None:
+        toolchain.lipo = args.host_lipo
+    if args.host_libtool is not None:
+        toolchain.libtool = args.host_libtool
     if args.cmake is not None:
         toolchain.cmake = args.cmake
 

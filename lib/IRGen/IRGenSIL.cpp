@@ -865,6 +865,7 @@ public:
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *i);
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *i);
   void visitOpenExistentialRefInst(OpenExistentialRefInst *i);
+  void visitOpenExistentialOpaqueInst(OpenExistentialOpaqueInst *i);
   void visitInitExistentialAddrInst(InitExistentialAddrInst *i);
   void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *i);
   void visitInitExistentialRefInst(InitExistentialRefInst *i);
@@ -895,6 +896,9 @@ public:
     llvm_unreachable("unimplemented");
   }
   void visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *i) {
+    llvm_unreachable("unimplemented");
+  }
+  void visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *i) {
     llvm_unreachable("unimplemented");
   }
   void visitMarkDependenceInst(MarkDependenceInst *i);
@@ -1846,7 +1850,7 @@ static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
 
 static llvm::Value *emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
                                               CanSILFunctionType origCalleeType,
-                                              ArrayRef<Substitution> subs) {
+                                              SubstitutionList subs) {
   auto &M = *IGF.getSwiftModule();
   llvm::Value *wtable;
 
@@ -1888,7 +1892,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
                                          CanSILFunctionType substCalleeType,
                                          const LoweredValue &lv,
                                          llvm::Value *selfValue,
-                                         ArrayRef<Substitution> substitutions,
+                                         SubstitutionList substitutions,
                                          WitnessMetadata *witnessMetadata,
                                          Explosion &args) {
   llvm::Value *calleeFn, *calleeData;
@@ -2075,8 +2079,11 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 
   // Pass the generic arguments.
   if (hasPolymorphicParameters(origCalleeType)) {
+    SubstitutionMap subMap;
+    if (auto genericSig = origCalleeType->getGenericSignature())
+      subMap = genericSig->getSubstitutionMap(site.getSubstitutions());
     emitPolymorphicArguments(*this, origCalleeType, substCalleeType,
-                             site.getSubstitutions(), &witnessMetadata, llArgs);
+                             subMap, &witnessMetadata, llArgs);
   }
 
   // Add all those arguments.
@@ -2142,7 +2149,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 /// applying to 'v'.
 static std::tuple<llvm::Value*, llvm::Value*, CanSILFunctionType>
 getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
-                              ArrayRef<Substitution> subs) {
+                              SubstitutionList subs) {
   LoweredValue &lv = IGF.getLoweredValue(v);
   auto fnType = v->getType().castTo<SILFunctionType>();
 
@@ -3746,7 +3753,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     auto DbgTy = DebugTypeInfo::getLocalVariable(
         CurSILFn->getDeclContext(), Decl,
         i->getBoxType()->getFieldType(IGM.getSILModule(), 0).getSwiftType(),
-          type, /*unwrap = */false);
+          type, /*Unwrap=*/false);
     IGM.DebugInfo->emitVariableDeclaration(
         Builder,
         emitShadowCopy(boxWithAddr.getAddress(), i->getDebugScope(), Name, 0),
@@ -4493,6 +4500,11 @@ void IRGenSILFunction::visitOpenExistentialMetatypeInst(
   Explosion result;
   result.add(metatype);
   setLoweredExplosion(i, result);
+}
+
+void IRGenSILFunction::visitOpenExistentialOpaqueInst(
+    OpenExistentialOpaqueInst *i) {
+  llvm_unreachable("unsupported instruction during IRGen");
 }
 
 void IRGenSILFunction::visitProjectBlockStorageInst(ProjectBlockStorageInst *i){

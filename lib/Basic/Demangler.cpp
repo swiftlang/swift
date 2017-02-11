@@ -27,6 +27,12 @@
 using namespace swift;
 using swift::Demangle::FunctionSigSpecializationParamKind;
 
+[[noreturn]]
+static void demangler_unreachable(const char *Message) {
+  fprintf(stderr, "fatal error: %s\n", Message);
+  std::abort();
+}
+
 namespace {
 
 static bool isDeclName(Node::Kind kind) {
@@ -108,7 +114,80 @@ static bool isFunctionAttr(Node::Kind kind) {
 } // anonymous namespace
 
 namespace swift {
+namespace Demangle {
+
+//////////////////////////////////
+// Context member functions     //
+//////////////////////////////////
+
+// TODO: these functions are just dummy implementations. After lldb has switched
+// to the new Context API, implement the Context (bumpptr allocation based
+// demangling).
+
+Context::Context() {
+}
+
+Context::~Context() {
+}
+
+void Context::clear() {
+}
+
+NodePointer Context::demangleSymbolAsNode(llvm::StringRef MangledName) {
+  return ::demangleSymbolAsNode(MangledName.data(), MangledName.size());
+}
+
+NodePointer Context::demangleTypeAsNode(llvm::StringRef MangledName) {
+  return ::demangleTypeAsNode(MangledName.data(), MangledName.size());
+}
+
+std::string Context::demangleSymbolAsString(llvm::StringRef MangledName,
+                                            const DemangleOptions &Options) {
+  return ::demangleSymbolAsString(MangledName.data(), MangledName.size(),
+                                  Options);
+}
+
+std::string Context::demangleTypeAsString(llvm::StringRef MangledName,
+                                          const DemangleOptions &Options) {
+  return ::demangleTypeAsString(MangledName.data(), MangledName.size(),
+                                Options);
+}
+
+bool Context::isThunkSymbol(llvm::StringRef MangledName) {
+  return ::isThunkSymbol(MangledName.data(), MangledName.size());
+}
+  
+NodePointer Context::createNode(Node::Kind K) {
+  return NodeFactory::create(K);
+}
+
+NodePointer Context::createNode(Node::Kind K, Node::IndexType Index) {
+  return NodeFactory::create(K, Index);
+}
+
+NodePointer Context::createNode(Node::Kind K, llvm::StringRef Text) {
+  return NodeFactory::create(K, Text);
+}
+
+//////////////////////////////////
+// Node member functions        //
+//////////////////////////////////
+
+void Node::addChild(NodePointer Child, NodeFactory &Factory) {
+  addChild(Child);
+}
+
+void Node::addChild(NodePointer Child, Context &Ctx) {
+  addChild(Child);
+}
+
+} // namespace Demangle
+
 namespace NewMangling {
+
+//////////////////////////////////
+// Demangler member functions   //
+//////////////////////////////////
 
 NodePointer Demangler::demangleTopLevel() {
   if (!nextIf(MANGLING_PREFIX_STR))
@@ -116,16 +195,9 @@ NodePointer Demangler::demangleTopLevel() {
 
   NodePointer topLevel = NodeFactory::create(Node::Kind::Global);
 
-  int Idx = 0;
-  while (!Text.empty()) {
-    NodePointer Node = demangleOperator();
-    if (!Node)
-      break;
-    pushNode(Node);
-    Idx++;
-  }
+  parseAndPushNodes();
 
-  // Let a trailing '_' be part of the not demangled suffix. 
+  // Let a trailing '_' be part of the not demangled suffix.
   popNode(Node::Kind::FirstElementMarker);
 
   size_t EndPos = (NodeStack.empty() ? 0 : NodeStack.back().Pos);
@@ -165,6 +237,26 @@ NodePointer Demangler::demangleTopLevel() {
   }
 
   return topLevel;
+}
+
+NodePointer Demangler::demangleType() {
+  parseAndPushNodes();
+
+  if (NodePointer Result = popNode())
+    return Result;
+
+  return NodeFactory::create(Node::Kind::Suffix, Text);
+}
+
+void Demangler::parseAndPushNodes() {
+  int Idx = 0;
+  while (!Text.empty()) {
+    NodePointer Node = demangleOperator();
+    if (!Node)
+      break;
+    pushNode(Node);
+    Idx++;
+  }
 }
 
 NodePointer Demangler::changeKind(NodePointer Node, Node::Kind NewKind) {
@@ -1644,7 +1736,7 @@ NodePointer Demangler::demangleGenericRequirement() {
         return nullptr;
       name = "m";
     } else {
-      llvm_unreachable("Unknown layout constraint");
+      demangler_unreachable("Unknown layout constraint");
     }
 
     auto NameNode = NodeFactory::create(Node::Kind::Identifier, name);
@@ -1658,7 +1750,7 @@ NodePointer Demangler::demangleGenericRequirement() {
   }
   }
 
-  llvm_unreachable("Unhandled TypeKind in switch.");
+  demangler_unreachable("Unhandled TypeKind in switch.");
 }
 
 NodePointer Demangler::demangleGenericType() {

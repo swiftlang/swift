@@ -149,6 +149,10 @@ set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
   "Define the maximum number of linker jobs for swift.")
 
+option(SWIFT_FORCE_OPTIMIZED_TYPECHECKER "Override the optimization setting of
+  the type checker so that it always compiles with optimization. This eases
+  debugging after type checking occurs by speeding up type checking" FALSE)
+
 #
 # User-configurable Android specific options.
 #
@@ -318,13 +322,15 @@ endfunction()
 # We migth be using the wrong version of a command, so record them all.
 function(print_versions)
   find_version("cmake" "--version" TRUE)
-  find_version(${CMAKE_COMMAND} "--version" FALSE)
 
-  if(CMAKE_MAKE_PROGRAM MATCHES "ninja")
-    find_version("ninja" "--version" TRUE)
-    find_version(${CMAKE_MAKE_PROGRAM} "--version" FALSE)
-  elseif(CMAKE_MAKE_PROGRAM MATCHES "make")
-    find_version("make" "--version" TRUE)
+  message(STATUS "Finding version for: ${CMAKE_COMMAND}")
+  message(STATUS "Found version: ${CMAKE_VERSION}")
+  message(STATUS "")
+
+  get_filename_component(CMAKE_MAKE_PROGRAM_BN "${CMAKE_MAKE_PROGRAM}" NAME_WE)
+  if(${CMAKE_MAKE_PROGRAM_BN} STREQUAL "ninja" OR
+     ${CMAKE_MAKE_PROGRAM_BN} STREQUAL "make")
+    find_version(${CMAKE_MAKE_PROGRAM_BN} "--version" TRUE)
     find_version(${CMAKE_MAKE_PROGRAM} "--version" FALSE)
   endif()
 
@@ -333,11 +339,14 @@ function(print_versions)
     find_version("${SWIFT_PATH_TO_CMARK_BUILD}/src/cmark" "--version" FALSE)
   endif()
 
-  find_version(${CMAKE_C_COMPILER} "--version" FALSE)
-  find_version(${CMAKE_CXX_COMPILER} "--version" FALSE)
-endfunction()
+  message(STATUS "Finding version for: ${CMAKE_C_COMPILER}")
+  message(STATUS "Found version: ${CMAKE_C_COMPILER_VERSION}")
+  message(STATUS "")
 
-print_versions()
+  message(STATUS "Finding version for: ${CMAKE_CXX_COMPILER}")
+  message(STATUS "Found version: ${CMAKE_CXX_COMPILER_VERSION}")
+  message(STATUS "")
+endfunction()
 
 
 set(SWIFT_BUILT_STANDALONE FALSE)
@@ -381,6 +390,9 @@ set(CMAKE_CXX_ARCHIVE_FINISH "")
 include(CheckCXXSourceRuns)
 include(CMakeParseArguments)
 include(CMakePushCheckState)
+
+print_versions()
+
 include(SwiftComponents)
 include(SwiftHandleGybSources)
 include(SwiftSetIfArchBitness)
@@ -402,7 +414,11 @@ endif()
 # lipo is used to create universal binaries.
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   include(SwiftDarwin)
-  find_toolchain_tool(LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
+  if(SWIFT_LIPO)
+    set(LIPO ${SWIFT_LIPO})
+  else()
+    find_toolchain_tool(LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
+  endif()
 endif()
 
 if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")
@@ -875,9 +891,9 @@ endif()
 # Find libxml.
 # FIXME: unify with CLANG_HAVE_LIBXML, which is set in LLVM anyway.
 find_package(LibXml2)
-if(LIBXML2_FOUND)
-  set(SWIFT_HAVE_LIBXML 1)
-endif()
+option(SWIFT_HAVE_LIBXML
+    "Whether to build with libxml"
+    ${LIBXML2_FOUND})
 
 # You need libedit linked in order to check if you have el_wgets.
 cmake_push_check_state()

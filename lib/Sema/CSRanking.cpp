@@ -74,6 +74,9 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
     case SK_ScalarPointerConversion:
       log << "scalar-to-pointer conversion";
       break;
+    case SK_EmptyExistentialConversion:
+      log << "empty-existential conversion";
+      break;
     }
     log << ")\n";
   }
@@ -672,9 +675,6 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
             fewerEffectiveParameters = true;
             continue;
           }
-
-          // Labels must match.
-          if (params1[i].Label != params2[i].Label) return false;
 
           // If one parameter is variadic and the other is not...
           if (params1[i].isVariadic() != params2[i].isVariadic()) {

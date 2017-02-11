@@ -73,7 +73,7 @@ namespace clang {
 }
 
 namespace swift {
-  class ArchetypeBuilder;
+  class GenericSignatureBuilder;
   class ASTContext;
   class BraceStmt;
   class CanType;
@@ -770,7 +770,7 @@ public:
   llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
                                              CanSILFunctionType origCalleeType,
                                              CanSILFunctionType substCalleeType,
-                                             ArrayRef<Substitution> subs,
+                                             SubstitutionList subs,
                                              const HeapLayout &layout);
   llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
 

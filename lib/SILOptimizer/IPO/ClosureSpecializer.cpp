@@ -356,7 +356,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   FullApplySite NewAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
     NewAI = Builder.createTryApply(AI.getLoc(), FRI, LoweredType,
-                                   ArrayRef<Substitution>(),
+                                   SubstitutionList(),
                                    NewArgs,
                                    TAI->getNormalBB(), TAI->getErrorBB());
     // If we passed in the original closure as @owned, then insert a release
@@ -371,7 +371,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     }
   } else {
     NewAI = Builder.createApply(AI.getLoc(), FRI, LoweredType,
-                                ResultType, ArrayRef<Substitution>(),
+                                ResultType, SubstitutionList(),
                                 NewArgs, cast<ApplyInst>(AI)->isNonThrowing());
     // If we passed in the original closure as @owned, then insert a release
     // right after NewAI. This is to balance the +1 from being an @owned
@@ -559,7 +559,6 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
       ClosureUser->isThunk(), ClosureUser->getClassVisibility(),
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
-  Fn->setDeclCtx(ClosureUser->getDeclContext());
   if (ClosureUser->hasUnqualifiedOwnership()) {
     Fn->setUnqualifiedOwnership();
   }

@@ -18,7 +18,6 @@
 
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -159,12 +158,6 @@ public:
   std::pair<const Substitution &, TypeDecl *>
   getTypeWitnessSubstAndDecl(AssociatedTypeDecl *assocType,
                              LazyResolver *resolver) const;
-
-  static Type
-  getTypeWitnessByName(Type type,
-                       ProtocolConformanceRef conformance,
-                       Identifier name,
-                       LazyResolver *resolver);
 
   /// Apply the given function object to each type witness within this
   /// protocol conformance.
@@ -535,7 +528,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   /// The substitutions applied to the generic conformance to produce this
   /// conformance.
-  ArrayRef<Substitution> GenericSubstitutions;
+  SubstitutionList GenericSubstitutions;
 
   /// The mapping from associated type requirements to their substitutions.
   ///
@@ -547,7 +540,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   SpecializedProtocolConformance(Type conformingType,
                                  ProtocolConformance *genericConformance,
-                                 ArrayRef<Substitution> substitutions);
+                                 SubstitutionList substitutions);
 
 public:
   /// Get the generic conformance from which this conformance was derived,
@@ -558,7 +551,7 @@ public:
 
   /// Get the substitutions used to produce this specialized conformance from
   /// the generic conformance.
-  ArrayRef<Substitution> getGenericSubstitutions() const {
+  SubstitutionList getGenericSubstitutions() const {
     return GenericSubstitutions;
   }
 

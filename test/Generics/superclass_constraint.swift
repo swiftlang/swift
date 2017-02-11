@@ -32,8 +32,9 @@ func f8<T : GA<A>>(_: T) where T : GA<B> {} // expected-error{{generic parameter
 func f9<T : GA<A>>(_: T) where T : GB<A> {}
 func f10<T : GB<A>>(_: T) where T : GA<A> {}
 
-func f11<T : GA<T>>(_: T) { } // expected-error{{superclass constraint 'GA<T>' is recursive}}
-func f12<T : GA<U>, U : GB<T>>(_: T, _: U) { } // expected-error{{superclass constraint 'GB<T>' is recursive}}
+// FIXME: Extra diagnostics because we're re-building the archetype builder.
+func f11<T : GA<T>>(_: T) { } // expected-error 2{{superclass constraint 'T' : 'GA<T>' is recursive}}
+func f12<T : GA<U>, U : GB<T>>(_: T, _: U) { } // expected-error 2{{superclass constraint 'U' : 'GB<T>' is recursive}} // expected-error 2{{superclass constraint 'T' : 'GA<U>' is recursive}}
 func f13<T : U, U : GA<T>>(_: T, _: U) { } // expected-error{{inheritance from non-protocol, non-class type 'U'}}
 
 // rdar://problem/24730536
@@ -64,17 +65,15 @@ extension P2 where Self.T : C {
 
 // CHECK: superclassConformance1
 // CHECK: Requirements:
-// CHECK-NEXT: T : C [explicit @
-// CHECK-NEXT: T : P3 [inherited @
-// CHECK-NEXT: T[.P3].T == C.T [redundant]
+// CHECK-NEXT: τ_0_0 : C [explicit @
+// CHECK-NEXT: τ_0_0 : P3 [inherited @
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C>
 func superclassConformance1<T>(t: T) where T : C, T : P3 {}
 
 // CHECK: superclassConformance2
 // CHECK: Requirements:
-// CHECK-NEXT: T : C [explicit @
-// CHECK-NEXT: T : P3 [inherited @
-// CHECK-NEXT: T[.P3].T == C.T [redundant]
+// CHECK-NEXT: τ_0_0 : C [explicit @
+// CHECK-NEXT: τ_0_0 : P3 [inherited @
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C>
 func superclassConformance2<T>(t: T) where T : C, T : P3 {}
 
@@ -84,7 +83,7 @@ class C2 : C, P4 { }
 
 // CHECK: superclassConformance3
 // CHECK: Requirements:
-// CHECK-NEXT: T : C2 [explicit @
-// CHECK-NEXT: T : P4 [inherited @
+// CHECK-NEXT: τ_0_0 : C2 [explicit @
+// CHECK-NEXT: τ_0_0 : P4 [inherited @
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C2>
 func superclassConformance3<T>(t: T) where T : C, T : P4, T : C2 {}

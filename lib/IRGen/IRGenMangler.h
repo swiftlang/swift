@@ -162,6 +162,13 @@ public:
 
   std::string manglePartialApplyForwarder(StringRef FuncName);
 
+  std::string mangleTypeForMetadata(Type type) {
+    return mangleTypeWithoutPrefix(type);
+  }
+
+  std::string mangleTypeForReflection(Type Ty, ModuleDecl *Module,
+                                      bool isSingleFieldOfBox);
+
 protected:
 
   std::string mangleTypeSymbol(Type type, const char *Op) {

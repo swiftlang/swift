@@ -33,7 +33,7 @@ class CanGenericSignature;
 class ModuleDecl;
 class NominalTypeDecl;
 class ProtocolDecl;
-class Substitution;
+class SubstitutionMap;
 
 namespace irgen {
 class Address;
@@ -54,7 +54,7 @@ emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
                                         CanGenericSignature signature,
                                         ModuleDecl &module,
                                         GenericRequirement requirement,
-                                        ArrayRef<Substitution> subs);
+                                        const SubstitutionMap &subs);
 
 using EmitGenericRequirementFn =
   llvm::function_ref<llvm::Value*(GenericRequirement reqt)>;
@@ -141,10 +141,10 @@ public:
     llvm::function_ref<void(unsigned requirementIndex,
                             CanType type,
                             Optional<ProtocolConformanceRef> conf)>;
-  void enumerateFulfillments(IRGenModule &IGM, ArrayRef<Substitution> subs,
+  void enumerateFulfillments(IRGenModule &IGM, const SubstitutionMap &subs,
                              FulfillmentCallback callback);
 
-  void emitInitOfBuffer(IRGenFunction &IGF, ArrayRef<Substitution> subs,
+  void emitInitOfBuffer(IRGenFunction &IGF, const SubstitutionMap &subs,
                         Address buffer);
 
   void bindFromBuffer(IRGenFunction &IGF, Address buffer,

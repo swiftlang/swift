@@ -129,7 +129,7 @@ parameters. Among other things, this means:
    as case sensitivity based on whether the operation is localized.
 4. Removing correctness traps like `localizedCaseInsensitiveCompare` (see
     guidance in the
-    [Internationalization and Localization Guide](https://developer.apple.com/library/content/documentation/MacOSX/Conceptual/BPInternational/InternationalizingYourCode/InternationalizingYourCode.html).
+    [Internationalization and Localization Guide](https://developer.apple.com/library/content/documentation/MacOSX/Conceptual/BPInternational/InternationalizingYourCode/InternationalizingYourCode.html)).
 
 Along with appropriate documentation updates, these changes will make localized
 operations more teachable, comprehensible, and approachable, thereby lowering a
@@ -579,7 +579,7 @@ The downside of having two types is the inconvenience of sometimes having a
 `Substring` when you need a `String`, and vice-versa. It is likely this would
 be a significantly bigger problem than with `Array` and `ArraySlice`, as
 slicing of `String` is such a common operation. It is especially relevant to
-existing code that assumes `String` is the currency type – that is, the default
+existing code that assumes `String` is the currency type -- that is, the default
 string type used for everyday exchange between APIs. To ease the pain of type
 mismatches, `Substring` should be a subtype of `String` in the same way that
 `Int` is a subtype of `Optional<Int>`. This would give users an implicit

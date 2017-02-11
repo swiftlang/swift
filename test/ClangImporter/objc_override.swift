@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 
@@ -88,3 +88,6 @@ class FailSub : FailBase {
   override class func processValue() {} // expected-error {{overriding a throwing @objc method with a non-throwing method is not supported}}
 }
 
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected note produced: overridden declaration is here
+// <unknown>:0: error: unexpected note produced: setter for 'boolProperty' declared here

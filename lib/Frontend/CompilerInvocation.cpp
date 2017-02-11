@@ -178,6 +178,11 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   Opts.PrintStats |= Args.hasArg(OPT_print_stats);
   Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
+#if defined(NDEBUG) && !defined(LLVM_ENABLE_STATS)
+  if (Opts.PrintStats || Opts.PrintClangStats)
+    Diags.diagnose(SourceLoc(), diag::stats_disabled);
+#endif
+
   Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
   Opts.DebugTimeExpressionTypeChecking |=
     Args.hasArg(OPT_debug_time_expression_type_checking);
@@ -1067,6 +1072,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
     Opts.VerifyMode = DiagnosticOptions::Verify;
   if (Args.hasArg(OPT_verify_apply_fixes))
     Opts.VerifyMode = DiagnosticOptions::VerifyAndApplyFixes;
+  Opts.VerifyIgnoreUnknown |= Args.hasArg(OPT_verify_ignore_unknown);
   Opts.SkipDiagnosticPasses |= Args.hasArg(OPT_disable_diagnostic_passes);
   Opts.ShowDiagnosticsAfterFatalError |=
     Args.hasArg(OPT_show_diagnostics_after_fatal);

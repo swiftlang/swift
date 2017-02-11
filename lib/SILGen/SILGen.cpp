@@ -492,7 +492,9 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
     return emitted;
 
   // Note: Do not provide any SILLocation. You can set it afterwards.
-  auto *F = M.getOrCreateFunction((Decl*)nullptr, constant, forDefinition);
+  auto *F = M.getOrCreateFunction(constant.hasDecl() ? constant.getDecl()
+                                                     : (Decl *)nullptr,
+                                  constant, forDefinition);
 
   assert(F && "SILFunction should have been defined");
 
@@ -596,7 +598,6 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
 
   // Create a debug scope for the function using astNode as source location.
   F->setDebugScope(new (M) SILDebugScope(Loc, F));
-  F->setDeclContext(astNode);
 
   DEBUG(llvm::dbgs() << "lowering ";
         F->printName(llvm::dbgs());
@@ -1251,7 +1252,7 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
 }
 
 void
-SILGenModule::useConformancesFromSubstitutions(ArrayRef<Substitution> subs) {
+SILGenModule::useConformancesFromSubstitutions(SubstitutionList subs) {
   for (auto &sub : subs) {
     for (auto conformance : sub.getConformances())
       useConformance(conformance);

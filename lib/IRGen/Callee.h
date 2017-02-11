@@ -63,7 +63,7 @@ namespace irgen {
     /// Prepare a callee for a known function with a known data pointer.
     static Callee forKnownFunction(CanSILFunctionType origFnType,
                                    CanSILFunctionType substFnType,
-                                   ArrayRef<Substitution> subs,
+                                   SubstitutionList subs,
                                    llvm::Value *fn, llvm::Value *data,
                                    ForeignFunctionInfo foreignInfo) {
       // Invariant on the function pointer.
@@ -89,7 +89,7 @@ namespace irgen {
     CanSILFunctionType getSubstFunctionType() const { return SubstFnType; }
 
     bool hasSubstitutions() const { return !Substitutions.empty(); }
-    ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
+    SubstitutionList getSubstitutions() const { return Substitutions; }
 
     llvm::Value *getFunction() const { return FnPtr; }
 

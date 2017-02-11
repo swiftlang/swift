@@ -212,12 +212,17 @@ func tuple_with_ref_ignore_return() {
   tuple_with_ref_elements()
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T08lifetime23tuple_with_ref_elementsAA3ValV_AA3RefC_ADtAFtyF
   // CHECK: [[TUPLE:%[0-9]+]] = apply [[FUNC]]
-  // CHECK: [[T0:%[0-9]+]] = tuple_extract [[TUPLE]] : {{.*}}, 0
-  // CHECK: [[T1_0:%[0-9]+]] = tuple_extract [[TUPLE]] : {{.*}}, 1
-  // CHECK: [[T1_1:%[0-9]+]] = tuple_extract [[TUPLE]] : {{.*}}, 2
-  // CHECK: [[T2:%[0-9]+]] = tuple_extract [[TUPLE]] : {{.*}}, 3
-  // CHECK: destroy_value [[T2]]
-  // CHECK: destroy_value [[T1_0]]
+  // CHECK: [[BORROWED_TUPLE:%.*]] = begin_borrow [[TUPLE]]
+  // CHECK: [[T0:%[0-9]+]] = tuple_extract [[BORROWED_TUPLE]] : {{.*}}, 0
+  // CHECK: [[T1_0:%[0-9]+]] = tuple_extract [[BORROWED_TUPLE]] : {{.*}}, 1
+  // CHECK: [[T1_0_COPY:%.*]] = copy_value [[T1_0]]
+  // CHECK: [[T1_1:%[0-9]+]] = tuple_extract [[BORROWED_TUPLE]] : {{.*}}, 2
+  // CHECK: [[T2:%[0-9]+]] = tuple_extract [[BORROWED_TUPLE]] : {{.*}}, 3
+  // CHECK: [[T2_COPY:%.*]] = copy_value [[T2]]
+  // CHECK: end_borrow [[BORROWED_TUPLE]] from [[TUPLE]]
+  // CHECK: destroy_value [[TUPLE]]
+  // CHECK: destroy_value [[T2_COPY]]
+  // CHECK: destroy_value [[T1_0_COPY]]
   // CHECK: return
 }
 
@@ -362,9 +367,10 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   // CHECK: [[R2:%[0-9]+]] = load [copy] [[PR]]
   // CHECK: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
   // CHECK: [[ALEPH_PROP_TEMP:%[0-9]+]] = alloc_stack $Aleph
+  // CHECK: [[BORROWED_R2:%.*]] = begin_borrow [[R2]]
   // CHECK: [[T0:%.*]] = address_to_pointer [[ALEPH_PROP_TEMP]]
-  // CHECK: [[MATERIALIZE_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.aleph_prop!materializeForSet.1 :
-  // CHECK: [[MATERIALIZE:%.*]] = apply [[MATERIALIZE_METHOD]]([[T0]], [[STORAGE]], [[R2]])
+  // CHECK: [[MATERIALIZE_METHOD:%[0-9]+]] = class_method [[BORROWED_R2]] : $RefWithProp, #RefWithProp.aleph_prop!materializeForSet.1 :
+  // CHECK: [[MATERIALIZE:%.*]] = apply [[MATERIALIZE_METHOD]]([[T0]], [[STORAGE]], [[BORROWED_R2]])
   // CHECK: [[PTR:%.*]] = tuple_extract [[MATERIALIZE]] : {{.*}}, 0
   // CHECK: [[OPTCALLBACK:%.*]] = tuple_extract [[MATERIALIZE]] : {{.*}}, 1
   // CHECK: [[ADDR:%.*]] = pointer_to_address [[PTR]]
@@ -399,8 +405,10 @@ class Foo<T> {
 
     x = bar()
     // CHECK: function_ref @_T08lifetime3barSiyF : $@convention(thin) () -> Int
-    // CHECK: [[THIS_X:%[0-9]+]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.x
+    // CHECK: [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
+    // CHECK: [[THIS_X:%[0-9]+]] = ref_element_addr [[BORROWED_THIS]] : {{.*}}, #Foo.x
     // CHECK: assign {{.*}} to [[THIS_X]]
+    // CHECK: end_borrow [[BORROWED_THIS]] from [[THIS]]
 
     z = Foo<T>.makeT()
     // CHECK: [[FOOMETA:%[0-9]+]] = metatype $@thick Foo<T>.Type
@@ -408,7 +416,10 @@ class Foo<T> {
     // CHECK: ref_element_addr
 
     // -- cleanup this lvalue and return this
-    // CHECK: return [[THIS]]
+    // CHECK: [[THIS_RESULT:%.*]] = copy_value [[THIS]]
+    // -- TODO: This copy should be unnecessary.
+    // CHECK: destroy_value [[THIS]]
+    // CHECK: return [[THIS_RESULT]]
 
   // -- allocating entry point
   // CHECK-LABEL: sil hidden @_T08lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
@@ -430,11 +441,13 @@ class Foo<T> {
     // CHECK:   [[THIS:%[0-9]+]] = mark_uninitialized [rootself] [[THISIN]]
 
     // -- First we initialize #Foo.y.
-    // CHECK:   [[THIS_Y:%.*]] = ref_element_addr [[THIS]] : $Foo<T>, #Foo.y
+    // CHECK:   [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
+    // CHECK:   [[THIS_Y:%.*]] = ref_element_addr [[BORROWED_THIS]] : $Foo<T>, #Foo.y
     // CHECK:   [[THIS_Y_1:%.*]] = tuple_element_addr [[THIS_Y]] : $*(Int, Ref), 0
     // CHECK:   assign {{.*}} to [[THIS_Y_1]] : $*Int
     // CHECK:   [[THIS_Y_2:%.*]] = tuple_element_addr [[THIS_Y]] : $*(Int, Ref), 1
     // CHECK:   assign {{.*}} to [[THIS_Y_2]] : $*Ref
+    // CHECK:   end_borrow [[BORROWED_THIS]] from [[THIS]]
 
     // -- Then we create a box that we will use to perform a copy_addr into #Foo.x a bit later.
     // CHECK:   [[CHIADDR:%[0-9]+]] = alloc_box ${ var Int }, var, name "chi"
@@ -442,13 +455,17 @@ class Foo<T> {
     // CHECK:   store [[CHI]] to [trivial] [[PCHI]]
 
     // -- Then we initialize #Foo.z
-    // CHECK:   [[THIS_Z:%.*]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.z
+    // CHECK:   [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
+    // CHECK:   [[THIS_Z:%.*]] = ref_element_addr [[BORROWED_THIS]] : {{.*}}, #Foo.z
     // CHECK:   copy_addr [take] {{.*}} to [[THIS_Z]]
+    // CHECK:   end_borrow [[BORROWED_THIS]] from [[THIS]]
 
     // -- Then initialize #Foo.x using the earlier stored value of CHI to THIS_Z.
     x = chi
-    // CHECK:   [[THIS_X:%[0-9]+]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.x
+    // CHECK:   [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
+    // CHECK:   [[THIS_X:%[0-9]+]] = ref_element_addr [[BORROWED_THIS]] : {{.*}}, #Foo.x
     // CHECK:   copy_addr [[PCHI]] to [[THIS_X]]
+    // CHECK:   end_borrow [[BORROWED_THIS]] from [[THIS]]
 
     // -- cleanup chi
     // CHECK: destroy_value [[CHIADDR]]
@@ -682,18 +699,25 @@ func tuple_explosion() {
   int(tuple().0)
   // CHECK: [[F:%[0-9]+]] = function_ref @_T08lifetime5tupleSi_AA3RefCtyF
   // CHECK: [[TUPLE:%[0-9]+]] = apply [[F]]()
-  // CHECK: [[T1:%[0-9]+]] = tuple_extract [[TUPLE]] : {{.*}}, 1
-  // CHECK: destroy_value [[T1]]
+  // CHECK: [[BORROWED_TUPLE:%.*]] = begin_borrow [[TUPLE]]
+  // CHECK: [[T1:%[0-9]+]] = tuple_extract [[BORROWED_TUPLE]] : {{.*}}, 1
+  // CHECK: [[T1_COPY:%.*]] = copy_value [[T1]]
+  // CHECK: end_borrow [[BORROWED_TUPLE]] from [[TUPLE]]
+  // CHECK: destroy_value [[T1_COPY]]
   // CHECK-NOT: tuple_extract [[TUPLE]] : {{.*}}, 1
   // CHECK-NOT: destroy_value
 
   ref(tuple().1)
   // CHECK: [[F:%[0-9]+]] = function_ref @_T08lifetime5tupleSi_AA3RefCtyF
   // CHECK: [[TUPLE:%[0-9]+]] = apply [[F]]()
-  // CHECK: [[T1:%[0-9]+]] = tuple_extract [[TUPLE]] : {{.*}}, 1
+  // CHECK: [[BORROWED_TUPLE:%.*]] = begin_borrow [[TUPLE]]
+  // CHECK: [[T1:%[0-9]+]] = tuple_extract [[BORROWED_TUPLE]] : {{.*}}, 1
+  // CHECK: [[T1_COPY:%.*]] = copy_value [[T1]]
+  // CHECK: end_borrow [[BORROWED_TUPLE]] from [[TUPLE]]
+  // CHECK: destroy_value [[TUPLE]]
   // CHECK-NOT: destroy_value [[T1]]
   // CHECK-NOT: tuple_extract [[TUPLE]] : {{.*}}, 1
-  // CHECK-NOT: destroy_value
+  // CHECK-NOT: destroy_value [[TUPLE]]
 }
 
 class C {

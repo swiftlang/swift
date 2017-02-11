@@ -1033,6 +1033,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::ReleaseValueInst:
   case ValueKind::UnmanagedReleaseValueInst:
   case ValueKind::AutoreleaseValueInst:
+  case ValueKind::UnmanagedAutoreleaseValueInst:
   case ValueKind::SetDeallocatingInst:
   case ValueKind::DeallocStackInst:
   case ValueKind::DeallocRefInst:
@@ -1205,6 +1206,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::OpenExistentialRefInst:
   case ValueKind::OpenExistentialMetatypeInst:
   case ValueKind::OpenExistentialBoxInst:
+  case ValueKind::OpenExistentialOpaqueInst:
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::UncheckedAddrCastInst:
   case ValueKind::UncheckedTrivialBitCastInst:

@@ -30,6 +30,8 @@ class AbstractClosureExpr;
 enum class SpecializationKind : uint8_t {
   Generic,
   NotReAbstractedGeneric,
+  Partial,
+  NotReAbstractedPartial,
   FunctionSignature,
 };
 
@@ -72,6 +74,12 @@ protected:
       break;
     case SpecializationKind::NotReAbstractedGeneric:
       M.append("r");
+      break;
+    case SpecializationKind::Partial:
+      M.append("p");
+      break;
+    case SpecializationKind::NotReAbstractedPartial:
+      M.append("P");
       break;
     case SpecializationKind::FunctionSignature:
       M.append("f");
@@ -135,7 +143,7 @@ class GenericSpecializationMangler :
 
   friend class SpecializationMangler<GenericSpecializationMangler>;
 
-  ArrayRef<Substitution> Subs;
+  SubstitutionList Subs;
 
 public:
 
@@ -145,14 +153,44 @@ public:
   };
 
   GenericSpecializationMangler(Mangle::Mangler &M, SILFunction *F,
-                               ArrayRef<Substitution> Subs,
+                               SubstitutionList Subs, IsFragile_t Fragile,
+                               ReAbstractionMode isReAbstracted = ReAbstracted)
+      : SpecializationMangler(isReAbstracted == ReAbstracted
+                                  ? SpecializationKind::Generic
+                                  : SpecializationKind::NotReAbstractedGeneric,
+                              SpecializationPass::GenericSpecializer, M,
+                              Fragile, F),
+        Subs(Subs) {
+  }
+
+private:
+  void mangleSpecialization();
+};
+
+class PartialSpecializationMangler :
+  public SpecializationMangler<PartialSpecializationMangler> {
+
+  friend class SpecializationMangler<PartialSpecializationMangler>;
+
+  CanSILFunctionType SpecializedFnTy;
+public:
+
+  enum ReAbstractionMode {
+    ReAbstracted,
+    NotReabstracted
+  };
+
+  PartialSpecializationMangler(Mangle::Mangler &M,
+                               SILFunction *F,
+                               CanSILFunctionType SpecializedFnTy,
                                IsFragile_t Fragile,
                                ReAbstractionMode isReAbstracted = ReAbstracted)
     : SpecializationMangler(isReAbstracted == ReAbstracted ?
-                              SpecializationKind::Generic :
-                              SpecializationKind::NotReAbstractedGeneric,
+                              SpecializationKind::Partial :
+                              SpecializationKind::NotReAbstractedPartial,
                             SpecializationPass::GenericSpecializer,
-                            M, Fragile, F), Subs(Subs) {}
+                            M, Fragile, F), SpecializedFnTy(SpecializedFnTy) {
+    }
 
 private:
   void mangleSpecialization();

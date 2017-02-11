@@ -3,7 +3,7 @@
 // No space next to the '#if'
 
 #if
-// expected-error@-1 {{expected a condition to follow #if}}
-class D {} // expected-error {{expected #else or #endif at end of conditional compilation block}}
+// expected-error@-1 {{incomplete condition in conditional compilation directive}}
+class D {}
 #endif
 // expected-error@-1 {{unexpected conditional compilation block terminator}}

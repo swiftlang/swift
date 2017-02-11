@@ -191,6 +191,12 @@ class Remangler {
     return Child;
   }
 
+  Node *skipType(Node *node) {
+    if (node->getKind() == Node::Kind::Type)
+      return getSingleChild(node);
+    return node;
+  }
+
   Node *getChildOfType(Node *node) {
     assert(node->getKind() == Node::Kind::Type);
     return getSingleChild(node);
@@ -242,8 +248,7 @@ class Remangler {
   }
 
   void manglePureProtocol(Node *Proto) {
-    if (Proto->getKind() == Node::Kind::Type)
-      Proto = getSingleChild(Proto, Node::Kind::Protocol);
+    Proto = skipType(Proto);
     mangleChildNodes(Proto);
   }
 
@@ -461,14 +466,13 @@ void Remangler::mangleArchetype(Node *node) {
 }
 
 void Remangler::mangleArgumentTuple(Node *node) {
-  Node *Ty = getSingleChild(node, Node::Kind::Type);
-  Node *Child = getSingleChild(Ty);
+  Node *Child = skipType(getSingleChild(node));
   if (Child->getKind() == Node::Kind::NonVariadicTuple &&
       Child->getNumChildren() == 0) {
     Buffer << 'y';
     return;
   }
-  mangleSingleChildNode(Ty);
+  mangle(Child);
 }
 
 void Remangler::mangleAssociatedType(Node *node) {
@@ -1359,7 +1363,7 @@ void Remangler::mangleProtocolConformance(Node *node) {
 }
 
 void Remangler::mangleProtocolDescriptor(Node *node) {
-  manglePureProtocol(getSingleChild(node, Node::Kind::Type));
+  manglePureProtocol(getSingleChild(node));
   Buffer << "Mp";
 }
 

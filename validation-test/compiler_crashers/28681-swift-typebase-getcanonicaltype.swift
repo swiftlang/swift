@@ -6,5 +6,4 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -emit-ir
-// REQUIRES: asserts
-#if0 *
+d}func a(UInt=1 + 1 as?Int){{{{{{{{{{{{func b(UInt=1 + 1 + 1 + 1 as?Int){{{{{{{{{{{{{{(a{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{

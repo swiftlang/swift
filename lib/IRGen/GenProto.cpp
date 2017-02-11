@@ -623,49 +623,6 @@ void irgen::setProtocolWitnessTableName(IRGenModule &IGM, llvm::Value *wtable,
   wtable->setName(name);
 }
 
-/// Return the index of the given dependent type in the list of all
-/// dependent types.
-///
-/// This will be its index in the list of substitutions.
-static unsigned getDependentTypeIndex(CanGenericSignature generics,
-                                      ModuleDecl &M, CanType type) {
-  assert(type->isTypeParameter());
-
-  // Make a pass over all the dependent types.
-  unsigned index = 0;
-  for (auto depTy : generics->getAllDependentTypes()) {
-    if (depTy->isEqual(type))
-      return index;
-    index++;
-  }
-
-  llvm_unreachable("didn't find dependent type in all-dependent-types list");
-}
-
-/// Return the index of the given protocol conformance in the list of all
-/// protocol conformances for the given dependent type in the given signature.
-///
-/// This will be its index in the list of protocol conformances on the
-/// dependent type's substitution.
-static unsigned
-getProtocolConformanceIndex(CanGenericSignature generics, ModuleDecl &M,
-                            CanType type, ProtocolDecl *protocol) {
-  assert(type->isTypeParameter());
-
-  // Make a pass over all the dependent types.
-  unsigned index = 0;
-  for (auto reqt : generics->getRequirements()) {
-    if (reqt.getKind() == RequirementKind::Conformance &&
-        reqt.getFirstType()->isEqual(type)) {
-      if (reqt.getSecondType()->getAnyNominal() == protocol)
-        return index;
-      index++;
-    }
-  }
-
-  llvm_unreachable("didn't find dependent type in all-dependent-types list");
-}
-
 namespace {
   /// A concrete witness table, together with its known layout.
   class WitnessTable {
@@ -2037,15 +1994,12 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     auto &requirement = requirements.getRequirements()[reqtIndex];
 
     auto module = IGF.getSwiftModule();
-    auto generics = generic->getDecl()->getGenericSignatureOfContext()
-                                      ->getCanonicalSignature();
-
-    auto argIndex =
-      getDependentTypeIndex(generics, *module, requirement.TypeParameter);
-    Substitution sub = generic->gatherAllSubstitutions(module, nullptr)[argIndex];
+    auto subs = generic->getContextSubstitutionMap(module,
+                                                   generic->getDecl());
+    auto sub = requirement.TypeParameter.subst(subs)->getCanonicalType();
 
     // In either case, we need to change the type.
-    sourceKey.Type = sub.getReplacement()->getCanonicalType();
+    sourceKey.Type = sub;
 
     // If this is a type argument, we've fully updated sourceKey.
     if (component.getKind() == Component::Kind::NominalTypeArgument) {
@@ -2060,10 +2014,8 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     // conformance kind.
     } else {
       assert(requirement.Protocol && "index mismatch!");
-      auto confIndex = getProtocolConformanceIndex(generics, *module,
-                                                   requirement.TypeParameter,
-                                                   requirement.Protocol);
-      auto conformance = sub.getConformances()[confIndex];
+      auto conformance = *subs.lookupConformance(requirement.TypeParameter,
+                                                 requirement.Protocol);
       assert(conformance.getRequirement() == requirement.Protocol);
       sourceKey.Kind = LocalTypeDataKind::forProtocolWitnessTable(conformance);
 
@@ -2339,7 +2291,7 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
 }
 
 static CanType getSubstSelfType(CanSILFunctionType origFnType,
-                                ArrayRef<Substitution> subs) {
+                                const SubstitutionMap &subs) {
   // Grab the apparent 'self' type.  If there isn't a 'self' type,
   // we're not going to try to access this anyway.
   assert(!origFnType->getParameters().empty());
@@ -2366,8 +2318,7 @@ static CanType getSubstSelfType(CanSILFunctionType origFnType,
   // SIL function type to make that work, which could be managed by having a
   // "substituted generic signature" concept.
   if (!subs.empty()) {
-    auto subMap = origFnType->getGenericSignature()->getSubstitutionMap(subs);
-    inputType = inputType.subst(subMap)->getCanonicalType();
+    inputType = inputType.subst(subs)->getCanonicalType();
   }
   
   return inputType;
@@ -2381,11 +2332,11 @@ namespace {
                              CanSILFunctionType polyFn)
       : PolymorphicConvention(IGF.IGM, polyFn), IGF(IGF) {}
 
-    void emit(CanSILFunctionType substFnType, ArrayRef<Substitution> subs,
+    void emit(CanSILFunctionType substFnType, const SubstitutionMap &subs,
               WitnessMetadata *witnessMetadata, Explosion &out);
 
   private:
-    void emitEarlySources(ArrayRef<Substitution> subs, Explosion &out) {
+    void emitEarlySources(const SubstitutionMap &subs, Explosion &out) {
       for (auto &source : getSources()) {
         switch (source.getKind()) {
         // Already accounted for in the parameters.
@@ -2415,7 +2366,7 @@ namespace {
 void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
                                      CanSILFunctionType origFnType,
                                      CanSILFunctionType substFnType,
-                                     ArrayRef<Substitution> subs,
+                                     const SubstitutionMap &subs,
                                      WitnessMetadata *witnessMetadata,
                                      Explosion &out) {
   EmitPolymorphicArguments(IGF, origFnType).emit(substFnType, subs,
@@ -2423,7 +2374,7 @@ void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
 }
 
 void EmitPolymorphicArguments::emit(CanSILFunctionType substFnType,
-                                    ArrayRef<Substitution> subs,
+                                    const SubstitutionMap &subs,
                                     WitnessMetadata *witnessMetadata,
                                     Explosion &out) {
   // Add all the early sources.
@@ -2469,7 +2420,7 @@ NecessaryBindings
 NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
                                           CanSILFunctionType origType,
                                           CanSILFunctionType substType,
-                                          ArrayRef<Substitution> subs) {
+                                          const SubstitutionMap &subs) {
   NecessaryBindings bindings;
 
   // Bail out early if we don't have polymorphic parameters.
@@ -2482,21 +2433,11 @@ NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
   //  - unfulfilled requirements
   convention.enumerateUnfulfilledRequirements(
                                         [&](GenericRequirement requirement) {
-    auto depTyIndex =
-      getDependentTypeIndex(origType->getGenericSignature(),
-                            *IGM.getSwiftModule(),
-                            requirement.TypeParameter);
-
-    auto &sub = subs[depTyIndex];
-    CanType type = sub.getReplacement()->getCanonicalType();
+    CanType type = requirement.TypeParameter.subst(subs)->getCanonicalType();
 
     if (requirement.Protocol) {
-      auto confIndex =
-        getProtocolConformanceIndex(origType->getGenericSignature(),
-                                    *IGM.getSwiftModule(),
-                                    requirement.TypeParameter,
-                                    requirement.Protocol);
-      auto conf = sub.getConformances()[confIndex];
+      auto conf = *subs.lookupConformance(requirement.TypeParameter,
+                                          requirement.Protocol);
       bindings.addProtocolConformance(type, conf);
     } else {
       bindings.addTypeMetadata(type);
@@ -2583,23 +2524,16 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
 
 void
 GenericTypeRequirements::enumerateFulfillments(IRGenModule &IGM,
-                                               ArrayRef<Substitution> subs,
+                                               const SubstitutionMap &subs,
                                                FulfillmentCallback callback) {
   if (empty()) return;
 
-  auto signature =
-    TheDecl->getGenericSignatureOfContext()->getCanonicalSignature();
   for (auto reqtIndex : indices(getRequirements())) {
     auto &reqt = getRequirements()[reqtIndex];
-    auto typeIndex = getDependentTypeIndex(signature, *IGM.getSwiftModule(),
-                                           reqt.TypeParameter);
-    auto &sub = subs[typeIndex];
-    CanType type = sub.getReplacement()->getCanonicalType();
+    CanType type = reqt.TypeParameter.subst(subs)->getCanonicalType();
     if (reqt.Protocol) {
-      auto confIndex =
-        getProtocolConformanceIndex(signature, *IGM.getSwiftModule(),
-                                    reqt.TypeParameter, reqt.Protocol);
-      auto conformance = sub.getConformances()[confIndex];
+      auto conformance = *subs.lookupConformance(reqt.TypeParameter,
+                                                 reqt.Protocol);
       callback(reqtIndex, type, conformance);
     } else {
       callback(reqtIndex, type, None);
@@ -2608,7 +2542,7 @@ GenericTypeRequirements::enumerateFulfillments(IRGenModule &IGM,
 }
 
 void GenericTypeRequirements::emitInitOfBuffer(IRGenFunction &IGF,
-                                               ArrayRef<Substitution> subs,
+                                               const SubstitutionMap &subs,
                                                Address buffer) {
   if (Requirements.empty()) return;
 
@@ -2652,11 +2586,9 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
                                                CanGenericSignature generics,
                                                ModuleDecl &module,
                                                GenericRequirement requirement,
-                                               ArrayRef<Substitution> subs) {
+                                               const SubstitutionMap &subs) {
   CanType depTy = requirement.TypeParameter;
-  auto typeIndex = getDependentTypeIndex(generics, module, depTy);
-  const Substitution &sub = subs[typeIndex];
-  CanType argType = sub.getReplacement()->getCanonicalType();
+  CanType argType = depTy.subst(subs)->getCanonicalType();
 
   if (!requirement.Protocol) {
     auto argMetadata = IGF.emitTypeMetadataRef(argType);
@@ -2664,8 +2596,7 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
   }
 
   auto proto = requirement.Protocol;
-  auto protoIndex = getProtocolConformanceIndex(generics, module, depTy, proto);
-  auto conformance = sub.getConformances()[protoIndex];
+  auto conformance = *subs.lookupConformance(depTy, proto);
   assert(conformance.getRequirement() == proto);
   llvm::Value *metadata = nullptr;
   auto wtable = emitWitnessTableRef(IGF, argType, &metadata, conformance);

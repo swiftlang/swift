@@ -176,6 +176,16 @@ public:
     }
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
+
+  GenericSignature *getGenericSignature() const {
+    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      return afd->getGenericSignature();
+    }
+    if (auto ce = TheFunction.dyn_cast<AbstractClosureExpr *>()) {
+      return ce->getGenericSignatureOfContext();
+    }
+    llvm_unreachable("unexpected AnyFunctionRef representation");
+  }
 };
 #if SWIFT_COMPILER_IS_MSVC
 #pragma warning(pop)

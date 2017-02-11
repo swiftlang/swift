@@ -1478,7 +1478,8 @@ bool TypeChecker::getDefaultGenericArgumentsString(
     ArrayRef<ProtocolDecl *> protocols =
         genericParam->getConformingProtocols();
 
-    if (Type superclass = genericParam->getSuperclass()) {
+    Type superclass = genericParam->getSuperclass();
+    if (superclass && !superclass->hasError()) {
       if (protocols.empty()) {
         superclass.print(genericParamText);
         return;

@@ -30,7 +30,7 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
 
 SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                         SILModule &M,
-                                        ArrayRef<Substitution> subs,
+                                        SubstitutionList subs,
                                         ParameterConvention calleeConvention) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())

@@ -93,6 +93,13 @@ namespace {
     void emit(SILGenFunction &gen, CleanupLocation loc) override {
       gen.getWritebackStack()[Depth].performWriteback(gen, /*isFinal*/ false);
     }
+
+    void dump() const override {
+#ifndef NDEBUG
+      llvm::errs() << "LValueWritebackCleanup\n"
+                   << "State: " << getState() << "Depth: " << Depth << "\n";
+#endif
+    }
   };
 } // end anonymous namespace
 
@@ -230,20 +237,21 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
 
   // Otherwise, we need to emit a get and set.  Borrow the base for
   // the getter.
-  ManagedValue getterBase = (base ? base.borrow() : ManagedValue());
+  BorrowedManagedValue borrowedBase(gen, base, loc);
 
   // Clone anything else about the component that we might need in the
   // writeback.
   auto clonedComponent = clone(gen, loc);
 
-  // Emit a 'get' into a temporary.
-  ManagedValue temporary = emitGetIntoTemporary(gen, loc, getterBase,
-                                                std::move(*this));
+  // Emit a 'get' into a temporary and then pop the borrow of base.
+  ManagedValue temporary =
+      emitGetIntoTemporary(gen, loc, borrowedBase, std::move(*this));
+  std::move(borrowedBase).cleanup();
 
   // Push a writeback for the temporary.
   pushWriteback(gen, loc, std::move(clonedComponent), base,
                 MaterializedLValue(temporary));
-  return temporary.borrow();
+  return temporary.unmanagedBorrow();
 }
 
 void LogicalPathComponent::writeback(SILGenFunction &gen, SILLocation loc,
@@ -427,8 +435,10 @@ namespace {
              "base for ref element component must be an object");
       assert(base.getType().hasReferenceSemantics() &&
              "base for ref element component must be a reference type");
-      auto Res = gen.B.createRefElementAddr(loc, base.getValue(), Field,
-                                            SubstFieldType);
+      // Borrow the ref element addr.
+      base = base.borrow(gen, loc);
+      auto Res = gen.B.createRefElementAddr(loc, base.getUnmanagedValue(),
+                                            Field, SubstFieldType);
       return ManagedValue::forLValue(Res);
     }
 
@@ -691,7 +701,7 @@ namespace {
     AccessorBasedComponent(PathComponent::KindTy kind,
                            AbstractStorageDecl *decl,
                            bool isSuper, bool isDirectAccessorUse,
-                           ArrayRef<Substitution> substitutions,
+                           SubstitutionList substitutions,
                            CanType baseFormalType,
                            LValueTypeData typeData,
                            Expr *subscriptIndexExpr,
@@ -750,7 +760,7 @@ namespace {
 
      GetterSetterComponent(AbstractStorageDecl *decl,
                            bool isSuper, bool isDirectAccessorUse,
-                           ArrayRef<Substitution> substitutions,
+                           SubstitutionList substitutions,
                            CanType baseFormalType,
                            LValueTypeData typeData,
                            Expr *subscriptIndexExpr = nullptr,
@@ -865,7 +875,7 @@ namespace {
 
       // If the base is a +1 r-value, just borrow it for materializeForSet.
       // prepareAccessorArgs will copy it if necessary.
-      ManagedValue borrowedBase = (base ? base.borrow() : ManagedValue());
+      BorrowedManagedValue borrowedBase(gen, base, loc);
 
       // Clone the component without cloning the indices.  We don't actually
       // consume them in writeback().
@@ -911,6 +921,11 @@ namespace {
         materialized.temporary = ManagedValue::forUnmanaged(
             gen.B.createMarkDependence(loc, temporary, base.getValue()));
       }
+
+      // Now that we have emitted the materializeForSet and created a dependence
+      // on the base from the temporary value, we can end the shared borrow of
+      // the base scope if we performed one.
+      std::move(borrowedBase).cleanup();
 
       // TODO: maybe needsWriteback should be a thin function pointer
       // to which we pass the base?  That would let us use direct
@@ -1190,7 +1205,7 @@ namespace {
   public:
      AddressorComponent(AbstractStorageDecl *decl,
                         bool isSuper, bool isDirectAccessorUse,
-                        ArrayRef<Substitution> substitutions,
+                        SubstitutionList substitutions,
                         CanType baseFormalType, LValueTypeData typeData,
                         SILType substFieldType,
                         Expr *subscriptIndexExpr = nullptr,
@@ -1438,7 +1453,7 @@ LValue LValue::forAddress(ManagedValue address,
 
 void LValue::addMemberComponent(SILGenFunction &gen, SILLocation loc,
                                 AbstractStorageDecl *storage,
-                                ArrayRef<Substitution> subs,
+                                SubstitutionList subs,
                                 bool isSuper,
                                 AccessKind accessKind,
                                 AccessSemantics accessSemantics,
@@ -1579,9 +1594,9 @@ LValue SILGenLValue::visitExpr(Expr *e, AccessKind accessKind) {
   llvm_unreachable("unimplemented lvalue expr");
 }
 
-ArrayRef<Substitution>
+SubstitutionList
 SILGenModule::getNonMemberVarDeclSubstitutions(VarDecl *var) {
-  ArrayRef<Substitution> substitutions;
+  SubstitutionList substitutions;
   auto *dc = var->getDeclContext();
   if (auto *genericEnv = dc->getGenericEnvironmentOfContext())
     substitutions = genericEnv->getForwardingSubstitutions();
@@ -1714,8 +1729,10 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
   assert(!entry.HasBeenConsumed && "opaque value already consumed");
   entry.HasBeenConsumed = true;
 
+  RegularLocation loc(e);
   LValue lv;
-  lv.add<ValueComponent>(entry.Value.borrow(), getValueTypeData(gen, e));
+  lv.add<ValueComponent>(entry.Value.borrow(gen, loc),
+                         getValueTypeData(gen, e));
   return lv;
 }
 
@@ -1785,7 +1802,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
 
 void LValue::addMemberVarComponent(SILGenFunction &gen, SILLocation loc,
                                    VarDecl *var,
-                                   ArrayRef<Substitution> subs,
+                                   SubstitutionList subs,
                                    bool isSuper,
                                    AccessKind accessKind,
                                    AccessSemantics accessSemantics,
@@ -1886,7 +1903,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
 
 void LValue::addMemberSubscriptComponent(SILGenFunction &gen, SILLocation loc,
                                          SubscriptDecl *decl,
-                                         ArrayRef<Substitution> subs,
+                                         SubstitutionList subs,
                                          bool isSuper,
                                          AccessKind accessKind,
                                          AccessSemantics accessSemantics,
@@ -2018,7 +2035,7 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
   SILGenLValue sgl(*this);
   LValue lv;
 
-  ArrayRef<Substitution> subs =
+  SubstitutionList subs =
       base.getType().gatherAllSubstitutions(SGM.M);
 
   LValueTypeData baseTypeData = getValueTypeData(baseFormalType,
@@ -2066,7 +2083,8 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
 
   if (varStorageType.is<ReferenceStorageType>()) {
     auto formalRValueType =
-      ivar->getType()->getRValueType()->getReferenceStorageReferent()
+      ivar->getDeclContext()->mapTypeIntoContext(ivar->getInterfaceType())
+          ->getReferenceStorageReferent()
           ->getCanonicalType();
     auto typeData =
       getPhysicalStorageTypeData(SGM, ivar, formalRValueType);

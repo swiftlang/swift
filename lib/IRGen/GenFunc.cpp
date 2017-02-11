@@ -698,7 +698,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                    CanSILFunctionType origType,
                                    CanSILFunctionType substType,
                                    CanSILFunctionType outType,
-                                   ArrayRef<Substitution> subs,
+                                   SubstitutionList subs,
                                    HeapLayout const *layout,
                                    ArrayRef<ParameterConvention> conventions) {
   llvm::AttributeSet outAttrs;
@@ -848,7 +848,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
          && "should have substitutions iff original function is generic");
   WitnessMetadata witnessMetadata;
   if (hasPolymorphicParameters(origType)) {
-    emitPolymorphicArguments(subIGF, origType, substType, subs,
+    auto subMap = origType->getGenericSignature()->getSubstitutionMap(subs);
+    emitPolymorphicArguments(subIGF, origType, substType, subMap,
                              &witnessMetadata, polyArgs);
   }
 
@@ -1153,7 +1154,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                            llvm::Value *fnContext,
                                            Explosion &args,
                                            ArrayRef<SILParameterInfo> params,
-                                           ArrayRef<Substitution> subs,
+                                           SubstitutionList subs,
                                            CanSILFunctionType origType,
                                            CanSILFunctionType substType,
                                            CanSILFunctionType outType,
@@ -1169,8 +1170,11 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   SmallVector<ParameterConvention, 4> argConventions;
 
   // Reserve space for polymorphic bindings.
+  SubstitutionMap subMap;
+  if (auto genericSig = origType->getGenericSignature())
+    subMap = genericSig->getSubstitutionMap(subs);
   auto bindings = NecessaryBindings::forFunctionInvocations(IGF.IGM,
-                                                     origType, substType, subs);
+                                                   origType, substType, subMap);
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;
     auto bindingsSize = bindings.getBufferSize(IGF.IGM);

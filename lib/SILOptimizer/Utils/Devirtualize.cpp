@@ -427,82 +427,54 @@ getSubstitutionsForCallee(SILModule &M,
   if (!baseCalleeType->isPolymorphic())
     return;
 
-  auto derivedClass = derivedSelfType;
-  if (auto metatypeType = dyn_cast<MetatypeType>(derivedClass))
-    derivedClass = CanType(metatypeType->getInstanceType());
-
-  SubstitutionMap subMap;
-
-  if (auto origCalleeSig = AI.getOrigCalleeType()->getGenericSignature()) {
-    auto calleeSelfType = AI.getSubstCalleeType()->getSelfParameter().getType();
-    if (auto metatypeType = dyn_cast<MetatypeType>(calleeSelfType))
-      calleeSelfType = CanType(metatypeType->getInstanceType());
-    auto *calleeClassDecl = calleeSelfType->getClassOrBoundGenericClass();
-    assert(calleeClassDecl && "self is not a class type");
-
-    auto origSubs = AI.getSubstitutions();
-
-    // Add generic parameters from the method itself, ignoring any generic
-    // parameters from the derived class.
-    unsigned minDepth = 0;
-    if (auto derivedClassSig = calleeClassDecl->getGenericSignatureOfContext())
-      minDepth = derivedClassSig->getGenericParams().back()->getDepth() + 1;
-
-    for (auto depTy : origCalleeSig->getAllDependentTypes()) {
-      // Grab the next substitution.
-      auto sub = origSubs.front();
-      origSubs = origSubs.slice(1);
-
-      // If the dependent type doesn't contain any generic parameter with
-      // a depth of at least the minimum, skip this type.
-      auto canTy = depTy->getCanonicalType();
-      auto hasInnerGenericParameter = [minDepth](Type type) -> bool {
-        if (auto gp = type->getAs<GenericTypeParamType>()) {
-          return gp->getDepth() >= minDepth;
-        }
-        return false;
-      };
-
-      if (!Type(canTy.getPointer()).findIf(hasInnerGenericParameter))
-        continue;
-
-      // Otherwise, record the replacement and conformances for the mapped
-      // type.
-      if (isa<SubstitutableType>(canTy)) {
-        subMap.addSubstitution(cast<SubstitutableType>(canTy),
-                               sub.getReplacement());
-      }
-
-      for (auto conformance : sub.getConformances())
-        subMap.addConformance(canTy, conformance);
-    }
-    assert(origSubs.empty());
-  }
-
   // Add any generic substitutions for the base class.
-  auto baseSelfType = baseCalleeType->getSelfParameter().getType();
-  if (auto metatypeType = dyn_cast<MetatypeType>(baseSelfType))
-    baseSelfType = CanType(metatypeType->getInstanceType());
+  Type baseSelfType = baseCalleeType->getSelfParameter().getType();
+  if (auto metatypeType = baseSelfType->getAs<MetatypeType>())
+    baseSelfType = metatypeType->getInstanceType();
 
-  auto *baseClassDecl = baseSelfType.getClassOrBoundGenericClass();
+  auto *baseClassDecl = baseSelfType->getClassOrBoundGenericClass();
   assert(baseClassDecl && "not a class method");
 
+  unsigned baseDepth = 0;
+  SubstitutionMap baseSubMap;
   if (auto baseClassSig = baseClassDecl->getGenericSignatureOfContext()) {
+    baseDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
+
     // Compute the type of the base class, starting from the
     // derived class type and the type of the method's self
     // parameter.
-    auto baseClass = derivedClass->getSuperclassForDecl(baseClassDecl, nullptr)
-        ->getCanonicalType();
-    auto baseClassSubs = baseClass->gatherAllSubstitutions(
-        M.getSwiftModule(), nullptr);
-
-    // Decompose the base class substitutions, adding them to the same
-    // substitution maps as above.
-    baseClassSig->getSubstitutionMap(baseClassSubs, subMap);
+    Type derivedClass = derivedSelfType;
+    if (auto metatypeType = derivedClass->getAs<MetatypeType>())
+      derivedClass = metatypeType->getInstanceType();
+    baseSubMap = derivedClass->getContextSubstitutionMap(
+        M.getSwiftModule(), baseClassDecl);
   }
 
-  // Build the new substitutions using the base method signature.
+  SubstitutionMap origSubMap;
+  if (auto origCalleeSig = AI.getOrigCalleeType()->getGenericSignature())
+    origSubMap = origCalleeSig->getSubstitutionMap(AI.getSubstitutions());
+
+  Type calleeSelfType = AI.getOrigCalleeType()->getSelfParameter().getType();
+  if (auto metatypeType = calleeSelfType->getAs<MetatypeType>())
+    calleeSelfType = metatypeType->getInstanceType();
+  auto *calleeClassDecl = calleeSelfType->getClassOrBoundGenericClass();
+  assert(calleeClassDecl && "self is not a class type");
+
+  // Add generic parameters from the method itself, ignoring any generic
+  // parameters from the derived class.
+  unsigned origDepth = 0;
+  if (auto calleeClassSig = calleeClassDecl->getGenericSignatureOfContext())
+    origDepth = calleeClassSig->getGenericParams().back()->getDepth() + 1;
+
   auto baseCalleeSig = baseCalleeType->getGenericSignature();
+
+  auto subMap = SubstitutionMap::combineSubstitutionMaps(baseSubMap,
+                                                         origSubMap,
+                                                         baseDepth,
+                                                         origDepth,
+                                                         baseCalleeSig);
+
+  // Build the new substitutions using the base method signature.
   baseCalleeSig->getSubstitutions(subMap, newSubs);
 }
 
@@ -773,12 +745,12 @@ DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
 //                        Witness Method Optimization
 //===----------------------------------------------------------------------===//
 
-static ArrayRef<Substitution>
+static SubstitutionList
 getSubstitutionsForProtocolConformance(ProtocolConformanceRef CRef) {
   auto C = CRef.getConcrete();
 
   // Walk down to the base NormalProtocolConformance.
-  ArrayRef<Substitution> Subs;
+  SubstitutionList Subs;
   const ProtocolConformance *ParentC = C;
   while (!isa<NormalProtocolConformance>(ParentC)) {
     switch (ParentC->getKind()) {
@@ -833,108 +805,47 @@ static void getWitnessMethodSubstitutions(
     ProtocolConformanceRef conformanceRef,
     GenericSignature *requirementSig,
     GenericSignature *witnessThunkSig,
-    ArrayRef<Substitution> origSubs,
+    SubstitutionList origSubs,
     bool isDefaultWitness,
     SmallVectorImpl<Substitution> &newSubs) {
 
   if (witnessThunkSig == nullptr)
     return;
 
-  assert(!conformanceRef.isAbstract());
+  if (isDefaultWitness) {
+    newSubs.append(origSubs.begin(), origSubs.end());
+    return;
+  }
 
+  assert(!conformanceRef.isAbstract());
   auto conformance = conformanceRef.getConcrete();
 
-  // Otherwise, we need to build new caller-side substitutions
-  // written in terms of the witness thunk's generic signature,
-  // mapping to the archetypes of the caller.
-  SubstitutionMap subMap;
-
   // Take apart substitutions from the conforming type.
-  ArrayRef<Substitution> witnessSubs;
+  SubstitutionList witnessSubs;
   auto *rootConformance = conformance->getRootNormalConformance();
   auto *witnessSig = rootConformance->getGenericSignature();
-  unsigned depth = 0;
-  if (isDefaultWitness) {
-    // For default witnesses, we substitute all of Self.
-    auto gp = cast<GenericTypeParamType>(witnessThunkSig->getGenericParams()
-                                                 .front()->getCanonicalType());
-    subMap.addSubstitution(gp, origSubs.front().getReplacement());
-    for (auto conformance : origSubs.front().getConformances())
-      subMap.addConformance(gp, conformance);
 
-    // For default witnesses, innermost generic parameters are always at
-    // depth 1.
-    depth = 1;
-  } else {
-    // If `Self` maps to a bound generic type, this gives us the
-    // substitutions for the concrete type's generic parameters.
-    witnessSubs = getSubstitutionsForProtocolConformance(conformanceRef);
+  // If `Self` maps to a bound generic type, this gives us the
+  // substitutions for the concrete type's generic parameters.
+  witnessSubs = getSubstitutionsForProtocolConformance(conformanceRef);
 
-    if (!witnessSubs.empty()) {
-      witnessSig->getSubstitutionMap(witnessSubs, subMap);
-      depth = witnessSig->getGenericParams().back()->getDepth() + 1;
-    }
+  SubstitutionMap baseSubMap;
+  unsigned baseDepth = 0;
+  if (!witnessSubs.empty()) {
+    baseSubMap = witnessSig->getSubstitutionMap(witnessSubs);
+    baseDepth = witnessSig->getGenericParams().back()->getDepth() + 1;
   }
 
   // Next, take apart caller-side substitutions.
-  //
-  // Note that the Self-derived dependent types appearing on the left
-  // hand side of the map are dropped.
-  // FIXME: This won't be correct if the requirement itself adds 'Self'
-  // requirements. We should be working from the substitutions in the witness.
-  //
-  // Also note that we rebuild the generic parameters in the requirement
-  // to provide them with the required depth for the thunk itself.
-  if (requirementSig->getGenericParams().back()->getDepth() > 0) {
-    // Local function to replace generic parameters within the requirement
-    // signature with the generic parameter we want to use in the substitution
-    // map:
-    //   - If the generic parameter is 'Self', return a null type so we don't
-    //     add any substitution.
-    //   - Otherwise, reset the generic parameter's depth one level deeper than
-    //     the deepest generic parameter in the conformance.
-    //
-    // This local function is meant to be used with Type::transform();
-    auto replaceGenericParameter = [&](Type type) -> Type {
-      if (auto gp = type->getAs<GenericTypeParamType>()) {
-        if (gp->getDepth() == 0) return Type();
-        return GenericTypeParamType::get(depth, gp->getIndex(),
-                                         M.getASTContext());
-      }
+  auto origDepth = 1;
+  auto origSubMap = requirementSig->getSubstitutionMap(origSubs);
 
-      return type;
-    };
+  auto subMap = SubstitutionMap::combineSubstitutionMaps(baseSubMap,
+                                                         origSubMap,
+                                                         baseDepth,
+                                                         origDepth,
+                                                         witnessThunkSig);
 
-    // Walk through the substitutions and dependent types.
-    ArrayRef<Substitution> subs = origSubs;
-    for (auto origDepTy : requirementSig->getAllDependentTypes()) {
-      // Grab the next substitution.
-      auto sub = subs.front();
-      subs = subs.slice(1);
-
-      // Map the generic parameters in the dependent type into the witness
-      // thunk's depth.
-      auto mappedDepTy = origDepTy.transform(replaceGenericParameter);
-
-      // If the dependent type was rooted in 'Self', it will come out null;
-      // skip it.
-      if (!mappedDepTy) continue;
-
-      // Otherwise, record the replacement and conformances for the mapped
-      // type.
-      auto canTy = mappedDepTy->getCanonicalType();
-      if (isa<SubstitutableType>(canTy)) {
-        subMap.addSubstitution(cast<SubstitutableType>(canTy),
-                               sub.getReplacement());
-      }
-      for (auto conformance : sub.getConformances())
-        subMap.addConformance(canTy, conformance);
-    }
-    assert(subs.empty() && "Did not consume all substitutions");
-  }
-
-  // Now, apply both sets of substitutions computed above to the
-  // forwarding substitutions of the witness thunk.
   witnessThunkSig->getSubstitutions(subMap, newSubs);
 }
 
@@ -946,7 +857,7 @@ static void getWitnessMethodSubstitutions(ApplySite AI, SILFunction *F,
   auto requirementSig = AI.getOrigCalleeType()->getGenericSignature();
   auto witnessThunkSig = F->getLoweredFunctionType()->getGenericSignature();
 
-  ArrayRef<Substitution> origSubs = AI.getSubstitutions();
+  SubstitutionList origSubs = AI.getSubstitutions();
 
   bool isDefaultWitness =
     F->getLoweredFunctionType()->getRepresentation()

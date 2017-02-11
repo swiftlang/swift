@@ -40,12 +40,11 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
   // Create a new empty function.
   SILFunction *NewF = Orig->getModule().createFunction(
       getSpecializedLinkage(Orig, Orig->getLinkage()), NewName,
-      ReInfo.getSpecializedType(), nullptr,
+      ReInfo.getSpecializedType(), ReInfo.getSpecializedGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), Orig->isTransparent(),
       Fragile, Orig->isThunk(), Orig->getClassVisibility(),
       Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
-      Orig->getDebugScope(), Orig->getDeclContext());
-  NewF->setDeclCtx(Orig->getDeclContext());
+      Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     NewF->addSemanticsAttr(Attr);
   }

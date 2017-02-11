@@ -487,18 +487,17 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
 
   DEBUG(llvm::dbgs() << "  -> create specialized function " << Name << "\n");
 
-  NewF = M.createFunction(
-      linkage, Name, createOptimizedSILFunctionType(), nullptr,
-      F->getLocation(), F->isBare(), F->isTransparent(), F->isFragile(),
-      F->isThunk(), F->getClassVisibility(), F->getInlineStrategy(),
-      F->getEffectsKind(), nullptr, F->getDebugScope(), F->getDeclContext());
+  NewF = M.createFunction(linkage, Name, createOptimizedSILFunctionType(),
+                          nullptr, F->getLocation(), F->isBare(),
+                          F->isTransparent(), F->isFragile(), F->isThunk(),
+                          F->getClassVisibility(), F->getInlineStrategy(),
+                          F->getEffectsKind(), nullptr, F->getDebugScope());
   if (F->hasUnqualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();
   }
 
   // Then we transfer the body of F to NewF.
   NewF->spliceBody(F);
-  NewF->setDeclCtx(F->getDeclContext());
 
   // Array semantic clients rely on the signature being as in the original
   // version.
@@ -552,7 +551,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
     auto *ErrorArg =
         ErrorBlock->createPHIArgument(Error, ValueOwnershipKind::Owned);
-    Builder.createTryApply(Loc, FRI, LoweredType, ArrayRef<Substitution>(),
+    Builder.createTryApply(Loc, FRI, LoweredType, SubstitutionList(),
                            ThunkArgs, NormalBlock, ErrorBlock);
 
     Builder.setInsertionPoint(ErrorBlock);
@@ -560,7 +559,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     Builder.setInsertionPoint(NormalBlock);
   } else {
     ReturnValue = Builder.createApply(Loc, FRI, LoweredType, ResultType,
-                                      ArrayRef<Substitution>(), ThunkArgs,
+                                      SubstitutionList(), ThunkArgs,
                                       false);
   }
 

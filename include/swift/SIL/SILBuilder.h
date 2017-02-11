@@ -209,7 +209,7 @@ public:
 
   static SILType getPartialApplyResultType(SILType Ty, unsigned ArgCount,
                                          SILModule &M,
-                                         ArrayRef<Substitution> subs,
+                                         SubstitutionList subs,
                                          ParameterConvention calleeConvention);
 
   //===--------------------------------------------------------------------===//
@@ -319,7 +319,7 @@ public:
   }
 
   ApplyInst *createApply(SILLocation Loc, SILValue Fn, SILType SubstFnTy,
-                         SILType Result, ArrayRef<Substitution> Subs,
+                         SILType Result, SubstitutionList Subs,
                          ArrayRef<SILValue> Args, bool isNonThrowing) {
     return insert(ApplyInst::create(getSILDebugLocation(Loc), Fn, SubstFnTy,
                                     Result, Subs, Args, isNonThrowing, F,
@@ -331,11 +331,11 @@ public:
     SILFunctionConventions conventions(Fn->getType().castTo<SILFunctionType>(),
                                        getModule());
     return createApply(Loc, Fn, Fn->getType(), conventions.getSILResultType(),
-                       ArrayRef<Substitution>(), Args, isNonThrowing);
+                       SubstitutionList(), Args, isNonThrowing);
   }
 
   TryApplyInst *createTryApply(SILLocation Loc, SILValue fn, SILType substFnTy,
-                               ArrayRef<Substitution> subs,
+                               SubstitutionList subs,
                                ArrayRef<SILValue> args, SILBasicBlock *normalBB,
                                SILBasicBlock *errorBB) {
     return insertTerminator(TryApplyInst::create(getSILDebugLocation(Loc),
@@ -346,7 +346,7 @@ public:
 
   PartialApplyInst *createPartialApply(SILLocation Loc, SILValue Fn,
                                        SILType SubstFnTy,
-                                       ArrayRef<Substitution> Subs,
+                                       SubstitutionList Subs,
                                        ArrayRef<SILValue> Args,
                                        SILType ClosureTy) {
     return insert(PartialApplyInst::create(getSILDebugLocation(Loc), Fn,
@@ -355,7 +355,7 @@ public:
   }
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
-                             ArrayRef<Substitution> Subs,
+                             SubstitutionList Subs,
                              ArrayRef<SILValue> Args) {
     return insert(BuiltinInst::create(getSILDebugLocation(Loc), Name,
                                       ResultTy, Subs, Args, F));
@@ -557,10 +557,10 @@ public:
   MarkUninitializedBehaviorInst *
   createMarkUninitializedBehavior(SILLocation Loc,
                                   SILValue initStorageFunc,
-                                  ArrayRef<Substitution> initStorageSubs,
+                                  SubstitutionList initStorageSubs,
                                   SILValue storage,
                                   SILValue setterFunc,
-                                  ArrayRef<Substitution> setterSubs,
+                                  SubstitutionList setterSubs,
                                   SILValue self,
                                   SILType ty) {
     return insert(MarkUninitializedBehaviorInst::create(F.getModule(),
@@ -848,6 +848,12 @@ public:
         getSILDebugLocation(Loc), operand, atomicity));
   }
 
+  UnmanagedAutoreleaseValueInst *
+  createUnmanagedAutoreleaseValue(SILLocation Loc, SILValue operand) {
+    return insert(new (F.getModule()) UnmanagedAutoreleaseValueInst(
+                      getSILDebugLocation(Loc), operand));
+  }
+
   SetDeallocatingInst *createSetDeallocating(SILLocation Loc,
                                             SILValue operand,
                                             Atomicity atomicity) {
@@ -1080,6 +1086,16 @@ public:
     return I;
   }
 
+  OpenExistentialOpaqueInst *createOpenExistentialOpaque(SILLocation Loc,
+                                                         SILValue Operand,
+                                                         SILType SelfTy) {
+    auto *I = insert(new (F.getModule()) OpenExistentialOpaqueInst(
+        getSILDebugLocation(Loc), Operand, SelfTy));
+    if (OpenedArchetypesTracker)
+      OpenedArchetypesTracker->registerOpenedArchetypes(I);
+    return I;
+  }
+
   OpenExistentialMetatypeInst *createOpenExistentialMetatype(SILLocation Loc,
                                                              SILValue operand,
                                                              SILType selfTy) {
@@ -1159,7 +1175,7 @@ public:
   InitBlockStorageHeaderInst *
   createInitBlockStorageHeader(SILLocation Loc, SILValue BlockStorage,
                                SILValue InvokeFunction, SILType BlockType,
-                               ArrayRef<Substitution> Subs) {
+                               SubstitutionList Subs) {
     return insert(InitBlockStorageHeaderInst::create(F,
       getSILDebugLocation(Loc), BlockStorage, InvokeFunction, BlockType, Subs));
   }

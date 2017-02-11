@@ -5,7 +5,26 @@ sil_stage canonical
 
 import Builtin
 
+//////////////////
+// Declarations //
+//////////////////
+
 sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
+class RefWithInt {
+  var value: Builtin.Int32
+
+  init()
+}
+
+enum Optional<T> {
+case some(T)
+case none
+}
+
+///////////
+// Tests //
+///////////
 
 // This checks if the dataflow verifier asserts when we have two consuming users
 // in the same block.
@@ -120,6 +139,36 @@ bb0(%0 : @owned $Builtin.NativeObject):
   %2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   destroy_value %0 : $Builtin.NativeObject
   end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: Function: 'ref_element_addr_requires_borrow'
+// CHECK: Have operand with incompatible ownership?!
+// CHECK: Value:   %0 = argument of bb0 : $RefWithInt
+// CHECK: BaseValue:    %0 = argument of bb0 : $RefWithInt
+// CHECK: User:   %1 = ref_element_addr %0 : $RefWithInt, #RefWithInt.value
+// CHECK: Conv: owned
+sil @ref_element_addr_requires_borrow : $@convention(thin) (@owned RefWithInt) -> () {
+bb0(%0 : @owned $RefWithInt):
+  %1 = ref_element_addr %0 : $RefWithInt, #RefWithInt.value
+  destroy_value %0 : $RefWithInt
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we catch that in the case where unchecked_enum_data is
+// propagating forward @owned ownership, that we catch a double consumed.
+//
+// CHECK-LABEL: Function: 'unchecked_enum_data_propagates_ownership'
+// CHECK: Found over consume?!
+// CHECK: Value: %0 = argument of bb0 : $Optional<Builtin.NativeObject>
+// CHECK: User: destroy_value %0 : $Optional<Builtin.NativeObject>
+// CHECK: Block: bb0
+sil @unchecked_enum_data_propagates_ownership : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> () {
+bb0(%0 : @owned $Optional<Builtin.NativeObject>):
+  %1 = unchecked_enum_data %0 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1
+  destroy_value %0 : $Optional<Builtin.NativeObject>
   %9999 = tuple()
   return %9999 : $()
 }

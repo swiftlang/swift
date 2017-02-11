@@ -21,6 +21,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/SearchPathOptions.h"
+#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LangOptions.h"
@@ -73,7 +74,7 @@ namespace swift {
   class TypeVariableType;
   class TupleType;
   class FunctionType;
-  class ArchetypeBuilder;
+  class GenericSignatureBuilder;
   class ArchetypeType;
   class Identifier;
   class InheritedNameSet;
@@ -693,7 +694,7 @@ public:
   SpecializedProtocolConformance *
   getSpecializedConformance(Type type,
                             ProtocolConformance *generic,
-                            ArrayRef<Substitution> substitutions);
+                            SubstitutionList substitutions);
 
   /// \brief Produce an inherited conformance, for subclasses of a type
   /// that already conforms to a protocol.
@@ -705,7 +706,7 @@ public:
   getInheritedConformance(Type type, ProtocolConformance *inherited);
 
   /// \brief Create trivial substitutions for the given bound generic type.
-  Optional<ArrayRef<Substitution>>
+  Optional<SubstitutionList>
   createTrivialSubstitutions(BoundGenericType *BGT,
                              DeclContext *gpContext) const;
 
@@ -713,7 +714,7 @@ public:
   void recordKnownProtocols(ModuleDecl *Stdlib);
   
   /// \brief Retrieve the substitutions for a bound generic type, if known.
-  Optional<ArrayRef<Substitution>>
+  Optional<SubstitutionList>
   getSubstitutions(TypeBase *type, DeclContext *gpContext) const;
 
   /// Get the lazy data for the given declaration.
@@ -805,15 +806,16 @@ public:
   /// not necessarily loaded.
   void getVisibleTopLevelClangModules(SmallVectorImpl<clang::Module*> &Modules) const;
 
-  /// Retrieve or create the stored archetype builder for the given
+  /// Retrieve or create the stored generic signature builder for the given
   /// canonical generic signature and module.
-  ArchetypeBuilder *getOrCreateArchetypeBuilder(CanGenericSignature sig,
+  GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(CanGenericSignature sig,
                                                 ModuleDecl *mod);
 
   /// Retrieve or create the canonical generic environment of a canonical
-  /// archetype builder.
+  /// generic signature builder.
   GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
-                                                     ArchetypeBuilder *builder);
+                                                     GenericSignatureBuilder *builder,
+                                                     ModuleDecl &module);
 
   /// Retrieve the inherited name set for the given class.
   const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,
@@ -844,7 +846,7 @@ private:
   /// \brief Set the substitutions for the given bound generic type.
   void setSubstitutions(TypeBase *type,
                         DeclContext *gpContext,
-                        ArrayRef<Substitution> Subs) const;
+                        SubstitutionList Subs) const;
 
   friend ArchetypeType;
 

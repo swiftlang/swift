@@ -322,29 +322,11 @@ void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
   recursivelyDeleteTriviallyDeadInstructions(OldApply, true);
 }
 
-bool swift::hasTypeParameterTypes(SubstitutionMap &SubsMap) {
-  // Check whether any of the substitutions are dependent.
-  for (auto &entry : SubsMap.getMap())
-    if (entry.second->hasArchetype())
-      return true;
-
-  return false;
-}
-
-bool swift::hasArchetypes(ArrayRef<Substitution> Subs) {
+bool swift::hasArchetypes(SubstitutionList Subs) {
   // Check whether any of the substitutions are dependent.
   for (auto &sub : Subs)
     if (sub.getReplacement()->hasArchetype())
       return true;
-  return false;
-}
-
-bool swift::hasDynamicSelfTypes(const SubstitutionMap &SubsMap) {
-  // Check whether any of the substitutions are refer to dynamic self.
-  for (auto &entry : SubsMap.getMap())
-    if (entry.second->hasDynamicSelfType())
-      return true;
-
   return false;
 }
 
@@ -1002,7 +984,7 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
   auto fnConv = FRIConvertFromBuiltin->getConventions();
   auto STResultType = fnConv.getSILResultType();
   return Builder.createApply(AI->getLoc(), FRIConvertFromBuiltin, FnTy,
-                             STResultType, ArrayRef<Substitution>(), Arguments,
+                             STResultType, SubstitutionList(), Arguments,
                              false);
 }
 
@@ -1481,7 +1463,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   auto *FuncRef = Builder.createFunctionRef(Loc, BridgedFunc);
 
   auto MetaTy = MetatypeType::get(Target, MetatypeRepresentation::Thick);
-  auto SILMetaTy = M.Types.getTypeLowering(MetaTy, 0).getLoweredType();
+  auto SILMetaTy = M.Types.getTypeLowering(MetaTy).getLoweredType();
   auto *MetaTyVal = Builder.createMetatype(Loc, SILMetaTy);
   SmallVector<SILValue, 1> Args;
 
@@ -1615,10 +1597,26 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   // Generate code to invoke _bridgeToObjectiveC
   SILBuilderWithScope Builder(Inst);
 
-  auto Members = Source.getNominalOrBoundGenericNominal()->lookupDirect(
-      M.getASTContext().Id_bridgeToObjectiveC);
-  assert(Members.size() == 1 &&
-         "There should be exactly one implementation of _bridgeToObjectiveC");
+  auto *NTD = Source.getNominalOrBoundGenericNominal();
+  assert(NTD);
+  SmallVector<ValueDecl *, 4> FoundMembers;
+  ArrayRef<ValueDecl *> Members;
+  Members = NTD->lookupDirect(M.getASTContext().Id_bridgeToObjectiveC);
+  if (Members.empty()) {
+    if (NTD->getDeclContext()->lookupQualified(
+        NTD->getDeclaredType(), M.getASTContext().Id_bridgeToObjectiveC,
+          NLOptions::NL_ProtocolMembers, nullptr, FoundMembers)) {
+      Members = FoundMembers;
+      // Returned members are starting with the most specialized ones.
+      // Thus, the first element is what we are looking for.
+      Members = Members.take_front(1);
+    }
+  }
+
+  // There should be exactly one implementation of _bridgeToObjectiveC.
+  if (Members.size() != 1)
+    return nullptr;
+
   auto BridgeFuncDecl = Members.front();
   auto BridgeFuncDeclRef = SILDeclRef(BridgeFuncDecl);
   ModuleDecl *Mod = M.getASTContext().getLoadedModule(
@@ -1640,8 +1638,10 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   auto MemberDeclRef = SILDeclRef(Results.front());
   auto *BridgedFunc = M.getOrCreateFunction(Loc, MemberDeclRef,
                                             ForDefinition_t::NotForDefinition);
-  assert(BridgedFunc &&
-         "Implementation of _bridgeToObjectiveC could not be found");
+
+  // Implementation of _bridgeToObjectiveC could not be found.
+  if (!BridgedFunc)
+    return nullptr;
 
   if (Inst->getFunction()->isFragile() &&
       !BridgedFunc->hasValidLinkageForFragileRef())
@@ -1659,7 +1659,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     return nullptr;
 
   // Get substitutions, if source is a bound generic type.
-  ArrayRef<Substitution> Subs =
+  SubstitutionList Subs =
       Source->gatherAllSubstitutions(
           M.getSwiftModule(), nullptr);
 

@@ -15,6 +15,11 @@ import tokenize
 
 from bisect import bisect
 
+try:
+    basestring
+except NameError:
+    basestring = str
+
 
 def get_line_starts(s):
     """Return a list containing the start index of each line in s.
@@ -716,7 +721,8 @@ class Code(ASTNode):
 
         # If we got a result, the code was an expression, so append
         # its value
-        if result is not None and result != '':
+        if result is not None \
+                or (isinstance(result, basestring) and result != ''):
             from numbers import Number, Integral
             result_string = None
             if isinstance(result, Number) and not isinstance(result, Integral):

@@ -486,7 +486,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     // For a designated initializer, we know that the static type being
     // allocated is the type of the class that defines the designated
     // initializer.
-    selfValue = B.createAllocRef(Loc, selfTy, useObjCAllocation, false, {}, {});
+    selfValue = B.createAllocRef(Loc, selfTy, useObjCAllocation, false,
+                                 ArrayRef<SILType>(), ArrayRef<SILValue>());
   }
   args.push_back(selfValue);
 
@@ -502,9 +503,9 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   ManagedValue initVal;
   SILType initTy;
 
-  ArrayRef<Substitution> subs;
+  SubstitutionList subs;
   // Call the initializer.
-  ArrayRef<Substitution> forwardingSubs;
+  SubstitutionList forwardingSubs;
   if (auto *genericEnv = ctor->getGenericEnvironmentOfContext())
     forwardingSubs = genericEnv->getForwardingSubstitutions();
   std::tie(initVal, initTy, subs)
@@ -895,7 +896,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         FullExpr scope(Cleanups, entry.getPattern());
 
         // Get the substitutions for the constructor context.
-        ArrayRef<Substitution> subs;
+        SubstitutionList subs;
         auto *genericEnv = dc->getGenericEnvironmentOfContext();
 
         DeclContext *typeDC = dc;

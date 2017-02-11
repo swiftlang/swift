@@ -669,6 +669,9 @@ void irgen::emitAssignWithTakeCall(IRGenFunction &IGF,
 void irgen::emitDestroyCall(IRGenFunction &IGF,
                             SILType T,
                             Address object) {
+  // If T is a trivial/POD type, nothing needs to be done.
+  if (T.getObjectType().isTrivial(IGF.getSILModule()))
+    return;
   auto metadata = IGF.emitTypeMetadataRefForLayout(T);
   llvm::Value *fn = IGF.emitValueWitnessForLayout(T,
                                    ValueWitness::Destroy);
@@ -683,6 +686,9 @@ void irgen::emitDestroyArrayCall(IRGenFunction &IGF,
                                  SILType T,
                                  Address object,
                                  llvm::Value *count) {
+  // If T is a trivial/POD type, nothing needs to be done.
+  if (T.getObjectType().isTrivial(IGF.getSILModule()))
+    return;
   auto metadata = IGF.emitTypeMetadataRefForLayout(T);
   llvm::Value *fn = IGF.emitValueWitnessForLayout(T,
                                    ValueWitness::DestroyArray);

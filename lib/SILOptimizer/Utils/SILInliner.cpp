@@ -345,6 +345,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::UnmanagedReleaseValueInst:
     case ValueKind::DestroyValueInst:
     case ValueKind::AutoreleaseValueInst:
+    case ValueKind::UnmanagedAutoreleaseValueInst:
     case ValueKind::DynamicMethodBranchInst:
     case ValueKind::DynamicMethodInst:
     case ValueKind::EnumInst:
@@ -365,6 +366,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::OpenExistentialBoxInst:
     case ValueKind::OpenExistentialMetatypeInst:
     case ValueKind::OpenExistentialRefInst:
+    case ValueKind::OpenExistentialOpaqueInst:
     case ValueKind::PartialApplyInst:
     case ValueKind::ExistentialMetatypeInst:
     case ValueKind::RefElementAddrInst:
