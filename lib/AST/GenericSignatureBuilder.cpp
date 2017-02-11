@@ -616,22 +616,11 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
       llvm::TinyPtrVector<PotentialArchetype *> &nested =
           NestedTypes[nestedName];
       if (!nested.empty()) {
-        auto existing = nested.front();
-        if (existing->getTypeAliasDecl() && !pa->getTypeAliasDecl()) {
-          // If we found a typealias first, and now have an associatedtype
-          // with the same name, it was a Swift 2 style declaration of the
-          // type an inherited associatedtype should be bound to. In such a
-          // case we want to make sure the associatedtype is frontmost to
-          // generate generics/witness lists correctly, and the alias
-          // will be unused/useless for generic constraining anyway.
-          nested.insert(nested.begin(), pa);
-        } else {
-          nested.push_back(pa);
-        }
+        nested.push_back(pa);
 
         // Produce a same-type constraint between the two same-named
         // potential archetypes.
-        builder.addSameTypeRequirementBetweenArchetypes(pa, existing,
+        builder.addSameTypeRequirementBetweenArchetypes(pa, nested.front(),
                                                         redundantSource);
       } else {
         nested.push_back(pa);
