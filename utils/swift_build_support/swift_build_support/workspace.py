@@ -55,25 +55,25 @@ def compute_build_subdir(args):
     # FIXME: mangle LLDB build configuration into the directory name.
     if (llvm_build_dir_label == swift_build_dir_label and
             llvm_build_dir_label == swift_stdlib_build_dir_label and
-            llvm_build_dir_label == cmark_build_dir_label):
+            swift_build_dir_label == cmark_build_dir_label):
         # Use a simple directory name if all projects use the same build
         # type.
         build_subdir += "-" + llvm_build_dir_label
     elif (llvm_build_dir_label != swift_build_dir_label and
             llvm_build_dir_label == swift_stdlib_build_dir_label and
-            llvm_build_dir_label == cmark_build_dir_label):
+            swift_build_dir_label == cmark_build_dir_label):
         # Swift build type differs.
         build_subdir += "-" + llvm_build_dir_label
         build_subdir += "+swift-" + swift_build_dir_label
     elif (llvm_build_dir_label == swift_build_dir_label and
             llvm_build_dir_label != swift_stdlib_build_dir_label and
-            llvm_build_dir_label == cmark_build_dir_label):
+            swift_build_dir_label == cmark_build_dir_label):
         # Swift stdlib build type differs.
         build_subdir += "-" + llvm_build_dir_label
         build_subdir += "+stdlib-" + swift_stdlib_build_dir_label
     elif (llvm_build_dir_label == swift_build_dir_label and
             llvm_build_dir_label == swift_stdlib_build_dir_label and
-            llvm_build_dir_label != cmark_build_dir_label):
+            swift_build_dir_label != cmark_build_dir_label):
         # cmark build type differs.
         build_subdir += "-" + llvm_build_dir_label
         build_subdir += "+cmark-" + cmark_build_dir_label
