@@ -192,7 +192,7 @@ public class _SwiftNativeNSString {}
 
 @objc
 public protocol _NSStringCore :
-    _NSCopying, _NSFastEnumeration {
+    _NSCopying {
 
   // The following methods should be overridden when implementing an
   // NSString subclass.
@@ -202,6 +202,7 @@ public protocol _NSStringCore :
   func characterAtIndex(_ index: Int) -> UInt16
 
   // We also override the following methods for efficiency.
+  func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>?
 }
 
 /// An `NSString` built around a slice of contiguous Swift `String` storage.
