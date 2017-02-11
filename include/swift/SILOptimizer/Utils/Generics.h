@@ -71,18 +71,25 @@ class ReabstractionInfo {
 
   // Set of the substitutions used by the caller's apply instruction before
   // any transformations performed by the generic specializer.
-  // It uses archetypes.
+  //
+  // Maps caller's generic parameters to caller's archetypes.
   SubstitutionList OriginalParamSubs;
 
   // Set of substitutions to be used by the caller's apply when it calls a
   // specialized function.
-  // It uses archetypes.
+  //
+  // Maps caller's generic parameters to caller's archetypes.
+  //
+  // FIXME: How is this different from OriginalParamSubs? Right now both
+  // are identical.
   SubstitutionList CallerParamSubs;
 
-  // Set of substitutions to be used by the cloner during cloning.
-  // It maps to concrete types for any types which were replaced by
-  // concrete types in the caller's apply substitution list. All other
-  // types are replaced by their respective archetypes.
+  // Replaces archetypes of the original callee with archetypes
+  // or concrete types, if they were made concrete) of the specialized
+  // callee.
+  //
+  // Maps original callee's generic parameters to specialized
+  // callee archetypes.
   SubstitutionList ClonerParamSubs;
 
   // Reference to the original generic non-specialized function.
@@ -96,6 +103,9 @@ class ReabstractionInfo {
 
   // Substitutions to be used for creating a new function type
   // for the specialized function.
+  //
+  // Maps original callee's generic parameters to specialized callee's
+  // generic parameters.
   // It uses interface types.
   SubstitutionMap CallerInterfaceSubs;
 
