@@ -223,6 +223,7 @@ extension UnicodeStorage : _UTextable {
     _ dst: UnsafeMutablePointer<_UText>?, _ src: UnsafePointer<_UText>,
     _ deep: Bool, _ status: UnsafeMutablePointer<_UErrorCode>?
   ) ->  UnsafeMutablePointer<_UText> {
+    _sanityCheck(!deep, "deep cloning not supported")
     UnsafeMutablePointer(mutating: src)[0].validate()
     // _debugLog("_clone with dst = \(String(describing: dst))")
     // _debugLog("src: \(src[0])")
@@ -282,7 +283,6 @@ extension UnicodeStorage : _UTextable {
           }
           u.chunkNativeLimit = codeUnits.offset(of: i.next)^
         }
-    _sanityCheck(!deep, "deep cloning not supported")
       }
       else {
         let chunkSource
