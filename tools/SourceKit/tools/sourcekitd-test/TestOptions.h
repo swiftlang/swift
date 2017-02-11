@@ -50,6 +50,7 @@ enum class SourceKitRequest {
   PrintDiags,
   ExtractComment,
   ModuleGroups,
+  NameTranslation,
 };
 
 struct TestOptions {
@@ -75,6 +76,9 @@ struct TestOptions {
   llvm::SmallVector<std::string, 4> RequestOptions;
   llvm::ArrayRef<const char *> CompilerArgs;
   std::string USR;
+  std::string SwiftName;
+  std::string ObjCName;
+  std::string ObjCSelector;
   bool CheckInterfaceIsASCII = false;
   bool UsedSema = false;
   bool PrintRequest = true;

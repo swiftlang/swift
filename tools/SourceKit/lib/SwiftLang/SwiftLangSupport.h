@@ -49,6 +49,11 @@ namespace ide {
   enum class SyntaxStructureElementKind : uint8_t;
   enum class RangeKind : int8_t;
   class CodeCompletionConsumer;
+
+  enum class NameKind {
+    ObjC,
+    Swift,
+  };
 }
 }
 
@@ -257,6 +262,9 @@ public:
 
   static std::vector<UIdent> UIDsFromDeclAttributes(const swift::DeclAttributes &Attrs);
 
+  static SourceKit::UIdent getUIDForNameKind(swift::ide::NameKind Kind);
+
+  static swift::ide::NameKind getNameKindForUID(SourceKit::UIdent Id);
 
   static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS);
 
@@ -380,6 +388,11 @@ public:
                      ArrayRef<const char *> Args,
                      std::function<void(const CursorInfo &)> Receiver) override;
 
+  void getNameInfo(StringRef Filename, unsigned Offset,
+                   NameTranslatingInfo &Input,
+                   ArrayRef<const char *> Args,
+                   std::function<void(const NameTranslatingInfo &)> Receiver) override;
+
   void getRangeInfo(StringRef Filename, unsigned Offset, unsigned Length,
                     ArrayRef<const char *> Args,
                     std::function<void(const RangeInfo&)> Receiver) override;
@@ -411,7 +424,7 @@ namespace trace {
   void initTraceInfo(trace::SwiftInvocation &SwiftArgs,
                      StringRef InputFile,
                      ArrayRef<const char *> Args);
-  
+
   void initTraceFiles(trace::SwiftInvocation &SwiftArgs,
                       swift::CompilerInstance &CI);
 }

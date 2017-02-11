@@ -1073,7 +1073,8 @@ static bool suppressFactoryMethodAsInit(const clang::ObjCMethodDecl *method,
 }
 
 ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
-                                          ImportNameVersion version) {
+                                          ImportNameVersion version,
+                                          clang::DeclarationName givenName) {
   ImportedName result;
 
   /// Whether we want a Swift 3 or later name
@@ -1112,7 +1113,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
     method->getOverriddenMethods(overriddenMethods);
     for (auto overridden : overriddenMethods) {
-      const auto overriddenName = importName(overridden, version);
+      const auto overriddenName = importName(overridden, version, givenName);
       if (overriddenName.getDeclName())
         overriddenNames.push_back({overridden, overriddenName});
     }
@@ -1144,7 +1145,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         if (!knownProperties.insert(overriddenProperty).second)
           continue;
 
-        const auto overriddenName = importName(overriddenProperty, version);
+        const auto overriddenName = importName(overriddenProperty, version,
+                                               givenName);
         if (overriddenName.getDeclName())
           overriddenNames.push_back({overriddenProperty, overriddenName});
       }
@@ -1293,6 +1295,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     // Map the identifier.
     baseName = D->getDeclName().getAsIdentifierInfo()->getName();
 
+    if (givenName) {
+      if (!givenName.isIdentifier())
+        return ImportedName();
+      baseName = givenName.getAsIdentifierInfo()->getName();
+    }
+
     // For Objective-C BOOL properties, use the name of the getter
     // which, conventionally, has an "is" prefix.
     if (swift3OrLaterName) {
@@ -1322,6 +1330,24 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     // Map the Objective-C selector directly.
     auto selector = D->getDeclName().getObjCSelector();
+
+    // Respect the given name.
+    if (givenName) {
+      switch (givenName.getNameKind()) {
+      case clang::DeclarationName::ObjCOneArgSelector:
+      case clang::DeclarationName::ObjCMultiArgSelector:
+      case clang::DeclarationName::ObjCZeroArgSelector:
+
+        // Make sure the given name has the right count of arguments.
+        if (selector.getNumArgs() != givenName.getObjCSelector().getNumArgs())
+          return ImportedName();
+        selector = givenName.getObjCSelector();
+        break;
+      default:
+        return ImportedName();
+      }
+    }
+
     baseName = selector.getNameForSlot(0);
 
     // We don't support methods with empty first selector pieces.
@@ -1435,9 +1461,24 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     auto enumInfo = getEnumInfo(enumDecl);
 
     StringRef removePrefix = enumInfo.getConstantNamePrefix();
-    if (!removePrefix.empty() && baseName.startswith(removePrefix)) {
-      baseName = baseName.substr(removePrefix.size());
-      strippedPrefix = true;
+    if (!removePrefix.empty()) {
+      if (baseName.startswith(removePrefix)) {
+        baseName = baseName.substr(removePrefix.size());
+        strippedPrefix = true;
+      } else if (givenName) {
+        // Calculate the new prefix.
+        // What if the preferred name causes longer prefix?
+        StringRef subPrefix = [](StringRef LHS, StringRef RHS) {
+          if(LHS.size() > RHS.size())
+            std::swap(LHS, RHS) ;
+          return StringRef(LHS.data(), std::mismatch(LHS.begin(), LHS.end(),
+            RHS.begin()).first - LHS.begin());
+        }(removePrefix, baseName);
+        if (!subPrefix.empty()) {
+          baseName = baseName.substr(subPrefix.size());
+          strippedPrefix = true;
+        }
+      }
     }
   }
 
@@ -1611,15 +1652,17 @@ NameImporter::importMacroName(const clang::IdentifierInfo *clangIdentifier,
 }
 
 ImportedName NameImporter::importName(const clang::NamedDecl *decl,
-                                      ImportNameVersion version) {
+                                      ImportNameVersion version,
+                                      clang::DeclarationName givenName) {
   CacheKeyType key(decl, version);
-  if (importNameCache.count(key)) {
+  if (importNameCache.count(key) && !givenName) {
     ++ImportNameNumCacheHits;
     return importNameCache[key];
   }
   ++ImportNameNumCacheMisses;
-  auto res = importNameImpl(decl, version);
+  auto res = importNameImpl(decl, version, givenName);
   res.setVersion(version);
-  importNameCache[key] = res;
+  if (!givenName)
+    importNameCache[key] = res;
   return res;
 }
