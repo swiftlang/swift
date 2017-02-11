@@ -357,6 +357,8 @@ inline bool SILModuleConventions::isIndirectSILResult(SILResultInfo result,
   case ResultConvention::Autoreleased:
     return false;
   }
+
+  llvm_unreachable("Unhandled ResultConvention in switch.");
 }
 
 inline SILType SILModuleConventions::getSILParamType(SILParameterInfo param,
