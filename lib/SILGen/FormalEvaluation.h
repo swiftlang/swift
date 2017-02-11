@@ -15,6 +15,7 @@
 
 #include "Cleanup.h"
 #include "swift/Basic/DiverseStack.h"
+#include "swift/SIL/SILValue.h"
 #include "llvm/ADT/Optional.h"
 
 namespace swift {
@@ -57,6 +58,21 @@ public:
   Kind getKind() const { return kind; }
 
   virtual void finish(SILGenFunction &gen) = 0;
+};
+
+class SharedBorrowFormalEvaluation : public FormalEvaluation {
+  SILValue originalValue;
+  SILValue borrowedValue;
+
+public:
+  SharedBorrowFormalEvaluation(SILLocation loc, CleanupHandle cleanup,
+                               SILValue originalValue, SILValue borrowedValue)
+      : FormalEvaluation(sizeof(*this), FormalEvaluation::Shared, loc, cleanup),
+        originalValue(originalValue), borrowedValue(borrowedValue) {}
+  void finish(SILGenFunction &gen) override;
+
+  SILValue getBorrowedValue() const { return borrowedValue; }
+  SILValue getOriginalValue() const { return originalValue; }
 };
 
 class FormalEvaluationContext {
