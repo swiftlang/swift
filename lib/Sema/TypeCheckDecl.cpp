@@ -3268,8 +3268,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   // declared property type in context.
   auto sig = behaviorProto->getGenericSignatureOfContext();
   auto map = sig->getSubstitutionMap(interfaceSubs);
-  auto substValueTy = behavior->ValueDecl->getInterfaceType()
-    .subst(map, SubstOptions());
+  auto substValueTy = behavior->ValueDecl->getInterfaceType().subst(map);
   
   if (!substValueTy->isEqual(decl->getInterfaceType())) {
     TC.diagnose(behavior->getLoc(),
