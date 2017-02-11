@@ -2891,12 +2891,8 @@ void ClangImporter::Implementation::dumpSwiftLookupTables() {
 }
 
 DeclName ClangImporter::
-analyzeImportedName(const clang::NamedDecl *ClangDecl,
-                    clang::DeclarationName PreferredName,
-                    version::Version version) {
-  ImportNameVersion Ver = ImportNameVersion::Swift4;
-  if (version.isVersion3())
-    Ver = ImportNameVersion::Swift3;
-  return Impl.nameImporter->importName(ClangDecl, Ver, PreferredName).
+importName(const clang::NamedDecl *D,
+           clang::DeclarationName preferredName) {
+  return Impl.importFullName(D, Impl.CurrentVersion, preferredName).
     getDeclName();
 }

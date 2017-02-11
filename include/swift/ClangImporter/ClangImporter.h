@@ -42,7 +42,6 @@ namespace clang {
 }
 
 namespace swift {
-namespace version { class Version; }
 class ASTContext;
 class ClangImporterOptions;
 class ClangModuleUnit;
@@ -284,9 +283,8 @@ public:
   /// Given a Clang module, decide whether this module is imported already.
   static bool isModuleImported(const clang::Module *M);
 
-  DeclName analyzeImportedName(const clang::NamedDecl *ClangDecl,
-                               clang::DeclarationName givenName,
-                               version::Version version);
+  DeclName importName(const clang::NamedDecl *D,
+                      clang::DeclarationName givenName);
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,

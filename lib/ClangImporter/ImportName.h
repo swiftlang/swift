@@ -251,7 +251,8 @@ public:
   /// Determine the Swift name for a Clang decl
   ImportedName importName(const clang::NamedDecl *decl,
                           ImportNameVersion version,
-              clang::DeclarationName PreferredName = clang::DeclarationName());
+                          clang::DeclarationName preferredName =
+                            clang::DeclarationName());
 
   /// Imports the name of the given Clang macro into Swift.
   Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,

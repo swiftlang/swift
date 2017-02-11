@@ -891,9 +891,8 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
       getASTContext().getClangModuleLoader());
 
     if (auto *Named = dyn_cast_or_null<clang::NamedDecl>(VD->getClangDecl())) {
-      DeclName Name = Importer->analyzeImportedName(Named,
-        getClangDeclarationName(Named->getASTContext(), Info), version::Version::
-          getCurrentLanguageVersion());
+      DeclName Name = Importer->importName(Named,
+        getClangDeclarationName(Named->getASTContext(), Info));
       NameTranslatingInfo Result;
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
       Result.BaseName = Name.getBaseName().str();
