@@ -1568,20 +1568,11 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       auto assocType = depMemTy->getAssocType();
       assert(depMemTy->getAssocType() && "Expected associated type!");
 
+      // FIXME: It's kind of weird in general that we have to look
+      // through lvalue, inout and IUO types here
       Type lookupBaseType = newBase->getLValueOrInOutObjectType();
-      if (!lookupBaseType->mayHaveMembers()) return type;
 
-      auto result = assocType->getDeclaredInterfaceType()
-          .subst(cs.DC->getParentModule(),
-                 lookupBaseType->getContextSubstitutions(
-                    assocType->getDeclContext()));
-
-
-      if (result)
-        return result;
-
-      if (!lookupBaseType->getImplicitlyUnwrappedOptionalObjectType())
-        return DependentMemberType::get(ErrorType::get(newBase), assocType);
+      auto *module = cs.DC->getParentModule();
 
       // "Force" the IUO for substitution purposes. We can end up in
       // this situation if we use the results of overload resolution
@@ -1589,15 +1580,23 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       // IUO-typed entity.
       while (auto objectType =
              lookupBaseType->getImplicitlyUnwrappedOptionalObjectType()) {
+        // If we're accessing a type member of the IUO itself,
+        // stop here. Ugh...
+        if (module->lookupConformance(lookupBaseType,
+                                      assocType->getProtocol(),
+                                      &cs.getTypeChecker())) {
+          break;
+        }
+
         lookupBaseType = objectType;
       }
 
       if (!lookupBaseType->mayHaveMembers()) return type;
 
-      result = assocType->getDeclaredInterfaceType()
-          .subst(cs.DC->getParentModule(),
-                 lookupBaseType->getContextSubstitutions(
-                    assocType->getDeclContext()));
+      auto subs = lookupBaseType->getContextSubstitutionMap(
+          cs.DC->getParentModule(),
+          assocType->getDeclContext());
+      auto result = assocType->getDeclaredInterfaceType().subst(subs);
 
       if (result)
         return result;
@@ -1650,3 +1649,16 @@ Type Solution::simplifyType(Type type) const {
         return known->second;
       });
 }
+
+size_t Solution::getTotalMemory() const {
+  return sizeof(*this) +
+    typeBindings.getMemorySize() +
+    overloadChoices.getMemorySize() +
+    ConstraintRestrictions.getMemorySize() +
+    llvm::capacity_in_bytes(Fixes) +
+    DisjunctionChoices.getMemorySize() +
+    OpenedTypes.getMemorySize() +
+    OpenedExistentialTypes.getMemorySize() +
+    (DefaultedConstraints.size() * sizeof(void*));
+}
+

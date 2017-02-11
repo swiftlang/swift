@@ -1388,9 +1388,6 @@ bool GenericRequirementsCheckListener::shouldCheck(RequirementKind kind,
   return true;
 }
 
-void GenericRequirementsCheckListener::diagnosed(
-    const Requirement *requirement) {}
-
 bool TypeChecker::
 solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
                    FreeTypeVariableBinding allowFreeTypeVariables,
@@ -2102,9 +2099,11 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
           cast<AssociatedTypeDecl>(
             sequenceProto->lookupDirect(ctx.Id_Iterator).front());
 
+        auto subs = sequenceType->getContextSubstitutionMap(
+          cs.DC->getParentModule(),
+          sequenceProto);
         iteratorType = iteratorAssocType->getDeclaredInterfaceType()
-            .subst(cs.DC->getParentModule(),
-                   sequenceType->getContextSubstitutions(sequenceProto));
+          .subst(subs);
 
         if (iteratorType) {
           auto iteratorProto =
@@ -2120,7 +2119,6 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
           elementType = iteratorType->getTypeOfMember(
                           cs.DC->getParentModule(),
                           elementAssocType,
-                          &tc,
                           elementAssocType->getDeclaredInterfaceType());
         }
       }

@@ -85,7 +85,7 @@ static void emitCompareBuiltin(IRGenFunction &IGF, Explosion &result,
 static void emitTypeTraitBuiltin(IRGenFunction &IGF,
                                  Explosion &out,
                                  Explosion &args,
-                                 ArrayRef<Substitution> substitutions,
+                                 SubstitutionList substitutions,
                                  TypeTraitResult (TypeBase::*trait)()) {
   assert(substitutions.size() == 1
          && "type trait should have gotten single type parameter");
@@ -118,7 +118,7 @@ getLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
 void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
                             SILType resultType,
                             Explosion &args, Explosion &out,
-                            ArrayRef<Substitution> substitutions) {
+                            SubstitutionList substitutions) {
   // Decompose the function's name into a builtin name and type list.
   const BuiltinInfo &Builtin = IGF.getSILModule().getBuiltinInfo(FnId);
 

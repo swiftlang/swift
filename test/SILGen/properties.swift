@@ -190,13 +190,15 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // -- val.ref.val_prop
   // CHECK: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
   // CHECK: [[VAL_REF_VAL_PROP_TEMP:%.*]] = alloc_stack $Val
+  // CHECK: [[VAL_REF_BORROWED:%.*]] = begin_borrow [[VAL_REF]]
   // CHECK: [[T0:%.*]] = address_to_pointer [[VAL_REF_VAL_PROP_TEMP]] : $*Val to $Builtin.RawPointer
   // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!materializeForSet.1 : (Ref) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?)
-  // CHECK: [[MAT_RESULT:%[0-9]+]] = apply [[MAT_VAL_PROP_METHOD]]([[T0]], [[STORAGE]], [[VAL_REF]])
+  // CHECK: [[MAT_RESULT:%[0-9]+]] = apply [[MAT_VAL_PROP_METHOD]]([[T0]], [[STORAGE]], [[VAL_REF_BORROWED]])
   // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
   // CHECK: [[OPT_CALLBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 1  
   // CHECK: [[T1:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Val
   // CHECK: [[VAL_REF_VAL_PROP_MAT:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
+  // CHECK: end_borrow [[VAL_REF_BORROWED]] from [[VAL_REF]]
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[LD:%[0-9]+]] = load [copy] [[VAL_REF_VAL_PROP_MAT]]
   // -- val.ref.val_prop.z_tuple
@@ -845,21 +847,34 @@ class GenericClass<T> {
   init() { fatalError("scaffold") }
 }
 
-// CHECK-LABEL: sil hidden @_T010properties12genericPropsyAA12GenericClassCySSGF 
+// => SEMANTIC SIL TODO: The applies in this function will need to have arg
+// borrowed. They do not today.
+//
+// CHECK-LABEL: sil hidden @_T010properties12genericPropsyAA12GenericClassCySSGF : $@convention(thin) (@owned GenericClass<String>) -> () {
 func genericProps(_ x: GenericClass<String>) {
-  // CHECK: class_method %0 : $GenericClass<String>, #GenericClass.x!getter.1
+  // CHECK: bb0([[ARG:%.*]] : $GenericClass<String>):
+  // CHECK:   class_method [[ARG]] : $GenericClass<String>, #GenericClass.x!getter.1
+  // CHECK:   apply {{.*}}<String>({{.*}}, [[ARG]]) : $@convention(method) <τ_0_0> (@guaranteed GenericClass<τ_0_0>) -> @out τ_0_0
   let _ = x.x
-  // CHECK: class_method %0 : $GenericClass<String>, #GenericClass.y!getter.1
+  // CHECK:   class_method [[ARG]] : $GenericClass<String>, #GenericClass.y!getter.1
+  // CHECK:   apply {{.*}}<String>([[ARG]]) : $@convention(method) <τ_0_0> (@guaranteed GenericClass<τ_0_0>) -> Int
   let _ = x.y
-  // CHECK: [[Z:%.*]] = ref_element_addr %0 : $GenericClass<String>, #GenericClass.z
-  // CHECK: load [copy] [[Z]] : $*String
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   [[Z:%.*]] = ref_element_addr [[BORROWED_ARG]] : $GenericClass<String>, #GenericClass.z
+  // CHECK:   [[LOADED_Z:%.*]] = load [copy] [[Z]] : $*String
+  // CHECK:   destroy_value [[LOADED_Z]]
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK:   destroy_value [[ARG]]
   let _ = x.z
 }
 
 // CHECK-LABEL: sil hidden @_T010properties28genericPropsInGenericContext{{[_0-9a-zA-Z]*}}F
 func genericPropsInGenericContext<U>(_ x: GenericClass<U>) {
-  // CHECK: [[Z:%.*]] = ref_element_addr %0 : $GenericClass<U>, #GenericClass.z
-  // CHECK: copy_addr [[Z]] {{.*}} : $*U
+  // CHECK: bb0([[ARG:%.*]] : $GenericClass<U>):
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   [[Z:%.*]] = ref_element_addr [[BORROWED_ARG]] : $GenericClass<U>, #GenericClass.z
+  // CHECK:   copy_addr [[Z]] {{.*}} : $*U
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   let _ = x.z
 }
 

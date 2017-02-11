@@ -1436,7 +1436,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       Type elementType;
       if (auto argType = elt->getArgumentInterfaceType())
         elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
-                                              elt, this, argType);
+                                              elt, argType);
       else
         elementType = TupleType::getEmpty(Context);
       Pattern *sub = EEP->getSubPattern();

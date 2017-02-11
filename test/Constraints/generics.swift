@@ -439,3 +439,7 @@ func sr3525_2(t: SR_3525<Int>) {
 func sr3525_3<T>(t: SR_3525<T>) {
   let _ = sr3525_arg_gen(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
 }
+
+class testStdlibType {
+  let _: Array // expected-error {{reference to generic type 'Array' requires arguments in <...>}} {{15-15=<Any>}}
+}

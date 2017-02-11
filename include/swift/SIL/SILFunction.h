@@ -130,14 +130,11 @@ private:
   GenericEnvironment *GenericEnv;
 
   /// The forwarding substitutions, lazily computed.
-  Optional<ArrayRef<Substitution>> ForwardingSubs;
+  Optional<SubstitutionList> ForwardingSubs;
 
   /// The collection of all BasicBlocks in the SILFunction. Empty for external
   /// function references.
   BlockListType BlockList;
-
-  /// The declcontext of this function.
-  DeclContext *DeclCtx;
 
   /// The owning declaration of this function's clang node, if applicable.
   ValueDecl *ClangNodeOwner = nullptr;
@@ -218,35 +215,25 @@ private:
   /// after the pass runs, we only see a semantic-arc world.
   bool HasQualifiedOwnership = true;
 
-  SILFunction(SILModule &module, SILLinkage linkage,
-              StringRef mangledName, CanSILFunctionType loweredType,
-              GenericEnvironment *genericEnv,
-              Optional<SILLocation> loc,
-              IsBare_t isBareSILFunction,
-              IsTransparent_t isTrans,
-              IsFragile_t isFragile,
-              IsThunk_t isThunk,
-              ClassVisibility_t classVisibility,
-              Inline_t inlineStrategy, EffectsKind E,
-              SILFunction *insertBefore,
-              const SILDebugScope *debugScope,
-              DeclContext *DC);
+  SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
+              CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
+              Optional<SILLocation> loc, IsBare_t isBareSILFunction,
+              IsTransparent_t isTrans, IsFragile_t isFragile, IsThunk_t isThunk,
+              ClassVisibility_t classVisibility, Inline_t inlineStrategy,
+              EffectsKind E, SILFunction *insertBefore,
+              const SILDebugScope *debugScope);
 
-  static SILFunction *create(SILModule &M, SILLinkage linkage, StringRef name,
-                             CanSILFunctionType loweredType,
-                             GenericEnvironment *genericEnv,
-                             Optional<SILLocation> loc,
-                             IsBare_t isBareSILFunction,
-                             IsTransparent_t isTrans,
-                             IsFragile_t isFragile,
-                             IsThunk_t isThunk = IsNotThunk,
-                             ClassVisibility_t classVisibility = NotRelevant,
-                             Inline_t inlineStrategy = InlineDefault,
-                             EffectsKind EffectsKindAttr =
-                               EffectsKind::Unspecified,
-                             SILFunction *InsertBefore = nullptr,
-                             const SILDebugScope *DebugScope = nullptr,
-                             DeclContext *DC = nullptr);
+  static SILFunction *
+  create(SILModule &M, SILLinkage linkage, StringRef name,
+         CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
+         Optional<SILLocation> loc, IsBare_t isBareSILFunction,
+         IsTransparent_t isTrans, IsFragile_t isFragile,
+         IsThunk_t isThunk = IsNotThunk,
+         ClassVisibility_t classVisibility = NotRelevant,
+         Inline_t inlineStrategy = InlineDefault,
+         EffectsKind EffectsKindAttr = EffectsKind::Unspecified,
+         SILFunction *InsertBefore = nullptr,
+         const SILDebugScope *DebugScope = nullptr);
 
 public:
   ~SILFunction();
@@ -439,10 +426,9 @@ public:
   bool isExternallyUsedSymbol() const;
 
   /// Get the DeclContext of this function. (Debug info only).
-  DeclContext *getDeclContext() const { return DeclCtx; }
-  void setDeclContext(Decl *D);
-  void setDeclContext(Expr *E);
-  void setDeclCtx(DeclContext *D) { DeclCtx = D; }
+  DeclContext *getDeclContext() const {
+    return getLocation().getAsDeclContext();
+  }
 
   /// \returns True if the function is marked with the @_semantics attribute
   /// and has special semantics that the optimizer can use to optimize the
@@ -636,7 +622,7 @@ public:
 
   /// Return the identity substitutions necessary to forward this call if it is
   /// generic.
-  ArrayRef<Substitution> getForwardingSubstitutions();
+  SubstitutionList getForwardingSubstitutions();
 
   //===--------------------------------------------------------------------===//
   // Block List Access

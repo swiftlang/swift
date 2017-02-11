@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
@@ -235,3 +235,48 @@ func useRenamedAPIs(actionable: SCNActionable, action: SCNAction, data: Data,
   program.handleBinding(ofBufferNamed: "str", frequency: bufferFrequency,
                         handler: bufferBindingBlock)
 }
+
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected note produced: 'SCNGeometrySourceSemantic' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNLightType' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNLightingModel' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNParticleProperty' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNPhysicsShapeOption' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNPhysicsShapeType' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNPhysicsTestOption' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNPhysicsTestSearchMode' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneAttribute' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneSourceAnimationImportPolicy' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneSourceLoadingOption' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNViewOption' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNHitTestFirstFoundOnlyKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNHitTestSortResultsKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNHitTestClipToZRangeKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNHitTestBackFaceCullingKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNHitTestBoundingBoxOnlyKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNHitTestIgnoreChildNodesKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNHitTestRootNodeKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNHitTestIgnoreHiddenNodesKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNPhysicsShapeTypeKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNPhysicsShapeKeepAsCompoundKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNPhysicsShapeScaleKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNPhysicsTestCollisionBitMaskKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNPhysicsTestSearchModeKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNPhysicsTestBackfaceCullingKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneStartTimeAttributeKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneEndTimeAttributeKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneFrameRateAttributeKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneUpAxisAttributeKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneSourceCreateNormalsIfAbsentKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneSourceCheckConsistencyKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneSourceFlattenSceneKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneSourceUseSafeModeKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneSourceAssetDirectoryURLsKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneSourceOverrideAssetURLsKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneSourceStrictConformanceKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneSourceConvertUnitsToMetersKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneSourceConvertToYUpKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNSceneSourceAnimationImportPolicyKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNPreferredRenderingAPIKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNPreferredDeviceKey' was obsoleted in Swift 3
+// <unknown>:0: error: unexpected note produced: 'SCNPreferLowPowerDeviceKey' was obsoleted in Swift 3

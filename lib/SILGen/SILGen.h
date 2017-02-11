@@ -429,7 +429,7 @@ public:
   void useConformance(ProtocolConformanceRef conformance);
 
   /// Mark protocol conformances from the given set of substitutions as used.
-  void useConformancesFromSubstitutions(ArrayRef<Substitution> subs);
+  void useConformancesFromSubstitutions(SubstitutionList subs);
 
   /// Emit a `mark_function_escape` instruction for top-level code when a
   /// function or closure at top level refers to script globals.
@@ -438,7 +438,7 @@ public:
 
   /// Get the substitutions necessary to invoke a non-member (global or local)
   /// property.
-  ArrayRef<Substitution>
+  SubstitutionList
   getNonMemberVarDeclSubstitutions(VarDecl *var);
 
 private:

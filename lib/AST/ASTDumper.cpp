@@ -2645,7 +2645,7 @@ void ProtocolConformanceRef::dump(llvm::raw_ostream &out,
   }
 }
 
-void swift::dump(const ArrayRef<Substitution> &subs) {
+void swift::dump(SubstitutionList subs) {
   unsigned i = 0;
   for (const auto &s : subs) {
     llvm::errs() << i++ << ": ";

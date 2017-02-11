@@ -272,11 +272,6 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   return finalize();
 }
 
-std::string ASTMangler::mangleTypeAsUSR(Type type) {
-  appendType(type);
-  return finalize();
-}
-
 std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {
   appendContext(type);
   return finalize();
@@ -1362,11 +1357,6 @@ void ASTMangler::appendGenericSignatureParts(
   appendOperator("r", StringRef(OpStorage.data(), OpStorage.size()));
 }
 
-bool ASTMangler::
-checkGenericParamsOrder(ArrayRef<GenericTypeParamType *> params) {
-  return Mangle::Mangler::checkGenericParamsOrder(params);
-}
-
 void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
   auto assocTy = dmt->getAssocType();
 
@@ -1533,11 +1523,9 @@ void ASTMangler::appendDeclType(const ValueDecl *decl) {
 
   // Mangle the generic signature, if any.
   if (!genericParams.empty() || !requirements.empty()) {
-    if (checkGenericParamsOrder(genericParams)) {
-      appendGenericSignatureParts(genericParams, initialParamDepth,
-                                  requirements);
-      appendOperator("u");
-    }
+    appendGenericSignatureParts(genericParams, initialParamDepth,
+                                requirements);
+    appendOperator("u");
   }
 }
 
@@ -1714,9 +1702,8 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
 
   // Mangle the generic signature, if any.
   if (!genericParams.empty() || !requirements.empty()) {
-    if (checkGenericParamsOrder(genericParams))
-      appendGenericSignatureParts(genericParams, initialParamDepth,
-                                  requirements);
+    appendGenericSignatureParts(genericParams, initialParamDepth,
+                                requirements);
   }
   appendOperator("F");
   if (decl->isStatic())

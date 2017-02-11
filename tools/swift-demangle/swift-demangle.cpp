@@ -79,14 +79,14 @@ static llvm::StringRef substrAfter(llvm::StringRef whole,
 }
 
 static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
+                     swift::Demangle::Context &DCtx,
                      const swift::Demangle::DemangleOptions &options) {
   bool hadLeadingUnderscore = false;
   if (name.startswith("__")) {
     hadLeadingUnderscore = true;
     name = name.substr(1);
   }
-  swift::Demangle::NodePointer pointer =
-      swift::demangle_wrappers::demangleSymbolAsNode(name);
+  swift::Demangle::NodePointer pointer = DCtx.demangleSymbolAsNode(name);
   if (ExpandMode || TreeOnly) {
     llvm::outs() << "Demangling for " << name << '\n';
     swift::demangle_wrappers::NodeDumper(pointer).print(llvm::outs());
@@ -127,7 +127,8 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
 
     if (Classify) {
       std::string Classifications;
-      if (!swift::Demangle::isSwiftSymbol(name.data(), name.size()))
+      std::string cName = name.str();
+      if (!swift::Demangle::isSwiftSymbol(cName.c_str()))
         Classifications += 'N';
       if (swift::Demangle::isThunkSymbol(name.data(), name.size()))
         Classifications += 'T';
@@ -136,19 +137,21 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     }
     llvm::outs() << (string.empty() ? name : llvm::StringRef(string));
   }
+  DCtx.clear();
 }
 
 static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   // This doesn't handle Unicode symbols, but maybe that's okay.
   llvm::Regex maybeSymbol("(_T|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
 
+  swift::Demangle::Context DCtx;
   for (std::string mangled; std::getline(std::cin, mangled);) {
     llvm::StringRef inputContents(mangled);
 
     llvm::SmallVector<llvm::StringRef, 1> matches;
     while (maybeSymbol.match(inputContents, &matches)) {
       llvm::outs() << substrBefore(inputContents, matches.front());
-      demangle(llvm::outs(), matches.front(), options);
+      demangle(llvm::outs(), matches.front(), DCtx, options);
       inputContents = substrAfter(inputContents, matches.front());
     }
 
@@ -175,8 +178,9 @@ int main(int argc, char **argv) {
     CompactMode = true;
     return demangleSTDIN(options);
   } else {
+    swift::Demangle::Context DCtx;
     for (llvm::StringRef name : InputNames) {
-      demangle(llvm::outs(), name, options);
+      demangle(llvm::outs(), name, DCtx, options);
       llvm::outs() << '\n';
     }
 

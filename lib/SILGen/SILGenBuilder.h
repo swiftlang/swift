@@ -61,22 +61,22 @@ public:
   using SILBuilder::createApply;
 
   ApplyInst *createApply(SILLocation Loc, SILValue Fn, SILType SubstFnTy,
-                         SILType Result, ArrayRef<Substitution> Subs,
+                         SILType Result, SubstitutionList Subs,
                          ArrayRef<SILValue> Args);
 
   TryApplyInst *createTryApply(SILLocation loc, SILValue fn, SILType substFnTy,
-                               ArrayRef<Substitution> subs,
+                               SubstitutionList subs,
                                ArrayRef<SILValue> args, SILBasicBlock *normalBB,
                                SILBasicBlock *errorBB);
 
   PartialApplyInst *createPartialApply(SILLocation Loc, SILValue Fn,
                                        SILType SubstFnTy,
-                                       ArrayRef<Substitution> Subs,
+                                       SubstitutionList Subs,
                                        ArrayRef<SILValue> Args,
                                        SILType ClosureTy);
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
-                             ArrayRef<Substitution> Subs,
+                             SubstitutionList Subs,
                              ArrayRef<SILValue> Args);
 
   // Existential containers use the conformances needed by the existential
@@ -120,6 +120,21 @@ public:
 
   ManagedValue createUnsafeCopyUnownedValue(SILLocation Loc,
                                             ManagedValue OriginalValue);
+  ManagedValue createOwnedPHIArgument(SILType Type);
+
+  using SILBuilder::createAllocRef;
+  ManagedValue createAllocRef(SILLocation Loc, SILType RefType, bool objc, bool canAllocOnStack,
+                              ArrayRef<SILType> ElementTypes,
+                              ArrayRef<ManagedValue> ElementCountOperands);
+  using SILBuilder::createAllocRefDynamic;
+  ManagedValue createAllocRefDynamic(SILLocation Loc, ManagedValue Operand, SILType RefType, bool objc,
+                                     ArrayRef<SILType> ElementTypes,
+                                     ArrayRef<ManagedValue> ElementCountOperands);
+
+  using SILBuilder::createTupleExtract;
+  ManagedValue createTupleExtract(SILLocation Loc, ManagedValue Value, unsigned Index,
+                                  SILType Type);
+  ManagedValue createTupleExtract(SILLocation Loc, ManagedValue Value, unsigned Index);
 };
 
 } // namespace Lowering

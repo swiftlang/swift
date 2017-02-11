@@ -167,8 +167,10 @@ class HasThrowingInit {
 }
 // CHECK-LABEL: sil hidden @_TFC6errors15HasThrowingInitc{{.*}} : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error Error) {
 // CHECK:      [[T0:%.*]] = mark_uninitialized [rootself] %1 : $HasThrowingInit
-// CHECK-NEXT: [[T1:%.*]] = ref_element_addr [[T0]] : $HasThrowingInit
+// CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
+// CHECK-NEXT: [[T1:%.*]] = ref_element_addr [[BORROWED_T0]] : $HasThrowingInit
 // CHECK-NEXT: assign %0 to [[T1]] : $*Int
+// CHECK-NEXT: end_borrow [[BORROWED_T0]] from [[T0]]
 // CHECK-NEXT: [[T0_RET:%.*]] = copy_value [[T0]]
 // CHECK-NEXT: destroy_value [[T0]]
 // CHECK-NEXT: return [[T0_RET]] : $HasThrowingInit
@@ -232,15 +234,18 @@ struct DoomedStruct : Doomed {
 // CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
 // CHECK:      [[SELF:%.*]] = load [take] [[TEMP]] : $*DoomedClass
-// CHECK:      [[T0:%.*]] = class_method [[SELF]] : $DoomedClass, #DoomedClass.check!1 : (DoomedClass) -> () throws -> (), $@convention(method) (@guaranteed DoomedClass) -> @error Error
-// CHECK-NEXT: try_apply [[T0]]([[SELF]])
+// CHECK:      [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+// CHECK:      [[T0:%.*]] = class_method [[BORROWED_SELF]] : $DoomedClass, #DoomedClass.check!1 : (DoomedClass) -> () throws -> (), $@convention(method) (@guaranteed DoomedClass) -> @error Error
+// CHECK-NEXT: try_apply [[T0]]([[BORROWED_SELF]])
 // CHECK:    bb1([[T0:%.*]] : $()):
 // CHECK:      [[T0:%.*]] = tuple ()
+// CHECK:      end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK:      destroy_value [[SELF]] : $DoomedClass
 // CHECK:      dealloc_stack [[TEMP]]
 // CHECK:      return [[T0]] : $()
 // CHECK:    bb2([[T0:%.*]] : $Error):
 // CHECK:      builtin "willThrow"([[T0]] : $Error)
+// CHECK:      end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK:      destroy_value [[SELF]] : $DoomedClass
 // CHECK:      dealloc_stack [[TEMP]]
 // CHECK:      throw [[T0]] : $Error
@@ -265,9 +270,11 @@ struct HappyStruct : Doomed {
 // CHECK:      [[TEMP:%.*]] = alloc_stack $HappyClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
 // CHECK:      [[SELF:%.*]] = load [take] [[TEMP]] : $*HappyClass
-// CHECK:      [[T0:%.*]] = class_method [[SELF]] : $HappyClass, #HappyClass.check!1 : (HappyClass) -> () -> (), $@convention(method) (@guaranteed HappyClass) -> ()
-// CHECK:      [[T1:%.*]] = apply [[T0]]([[SELF]])
+// CHECK:      [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+// CHECK:      [[T0:%.*]] = class_method [[BORROWED_SELF]] : $HappyClass, #HappyClass.check!1 : (HappyClass) -> () -> (), $@convention(method) (@guaranteed HappyClass) -> ()
+// CHECK:      [[T1:%.*]] = apply [[T0]]([[BORROWED_SELF]])
 // CHECK:      [[T1:%.*]] = tuple ()
+// CHECK:      end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK:      destroy_value [[SELF]] : $HappyClass
 // CHECK:      dealloc_stack [[TEMP]]
 // CHECK:      return [[T1]] : $()
@@ -400,8 +407,12 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK:         [[N:%.*]] = integer_literal $Builtin.Word, 4
 // CHECK:         [[T0:%.*]] = function_ref @_TFs27_allocateUninitializedArray
 // CHECK:         [[T1:%.*]] = apply [[T0]]<Cat>([[N]])
-// CHECK:         [[ARRAY:%.*]] = tuple_extract [[T1]] :  $(Array<Cat>, Builtin.RawPointer), 0
-// CHECK:         [[T2:%.*]] = tuple_extract [[T1]] :  $(Array<Cat>, Builtin.RawPointer), 1
+// CHECK:         [[BORROWED_T1:%.*]] = begin_borrow [[T1]]
+// CHECK:         [[BORROWED_ARRAY:%.*]] = tuple_extract [[BORROWED_T1]] :  $(Array<Cat>, Builtin.RawPointer), 0
+// CHECK:         [[ARRAY:%.*]] = copy_value [[BORROWED_ARRAY]]
+// CHECK:         [[T2:%.*]] = tuple_extract [[BORROWED_T1]] :  $(Array<Cat>, Builtin.RawPointer), 1
+// CHECK:         end_borrow [[BORROWED_T1]] from [[T1]]
+// CHECK:         destroy_value [[T1]]
 // CHECK:         [[ELT0:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Cat
 //   Element 0.
 // CHECK:         [[T0:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error Error)
@@ -636,8 +647,12 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[ADDRESSOR:%.*]] = function_ref @_TFV6errors11OwnedBridgeaO9subscriptFSSVS_5Pylon :
 // CHECK-NEXT: [[T0:%.*]] = apply [[ADDRESSOR]]([[ARG2_COPY]], [[ARG1]])
-// CHECK-NEXT: [[T1:%.*]] = tuple_extract [[T0]] : {{.*}}, 0
-// CHECK-NEXT: [[OWNER:%.*]] = tuple_extract [[T0]] : {{.*}}, 1
+// CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
+// CHECK-NEXT: [[T1:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 0
+// CHECK-NEXT: [[BORROWED_OWNER:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 1
+// CHECK-NEXT: [[OWNER:%.*]] = copy_value [[BORROWED_OWNER]]
+// CHECK-NEXT: end_borrow [[BORROWED_T0]] from [[T0]]
+// CHECK-NEXT: destroy_value [[T0]]
 // CHECK-NEXT: [[T3:%.*]] = struct_extract [[T1]]
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
@@ -670,8 +685,12 @@ func supportStructure(_ b: inout PinnedBridge, name: String) throws {
 // CHECK-NEXT:   // function_ref
 // CHECK-NEXT:   [[ADDRESSOR:%.*]] = function_ref @_TFV6errors12PinnedBridgeap9subscriptFSSVS_5Pylon :
 // CHECK-NEXT:   [[T0:%.*]] = apply [[ADDRESSOR]]([[ARG2_COPY]], [[ARG1]])
-// CHECK-NEXT:   [[T1:%.*]] = tuple_extract [[T0]] : {{.*}}, 0
-// CHECK-NEXT:   [[OWNER:%.*]] = tuple_extract [[T0]] : {{.*}}, 1
+// CHECK-NEXT:   [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
+// CHECK-NEXT:   [[T1:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 0
+// CHECK-NEXT:   [[BORROWED_OWNER:%.*]] = tuple_extract [[BORROWED_T0]] : {{.*}}, 1
+// CHECK-NEXT:   [[OWNER:%.*]] = copy_value [[BORROWED_OWNER]]
+// CHECK-NEXT:   end_borrow [[BORROWED_T0]] from [[T0]]
+// CHECK-NEXT:   destroy_value [[T0]]
 // CHECK-NEXT:   [[T3:%.*]] = struct_extract [[T1]]
 // CHECK-NEXT:   [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT:   [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]

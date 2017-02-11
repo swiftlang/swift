@@ -14,7 +14,6 @@
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -89,7 +88,7 @@ namespace {
           os << IDAndKind{DeclOrOffset.get(), ID};
         }
       }
-      os << "in '" << getNameOfModule(MF) << "'\n";
+      os << " in '" << getNameOfModule(MF) << "'\n";
     }
   };
 
@@ -565,8 +564,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
     ASTContext &ctx = getContext();
     Type conformingType = getType(conformingTypeID);
     if (genericEnv) {
-      conformingType = genericEnv->mapTypeIntoContext(getAssociatedModule(),
-                                                      conformingType);
+      conformingType = genericEnv->mapTypeIntoContext(conformingType);
     }
 
     PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
@@ -600,8 +598,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
     ASTContext &ctx = getContext();
     Type conformingType = getType(conformingTypeID);
     if (genericEnv) {
-      conformingType = genericEnv->mapTypeIntoContext(getAssociatedModule(),
-                                                      conformingType);
+      conformingType = genericEnv->mapTypeIntoContext(conformingType);
     }
 
     PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
@@ -762,8 +759,7 @@ ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor,
 
   auto replacementTy = getType(replacementID);
   if (genericEnv) {
-    replacementTy = genericEnv->mapTypeIntoContext(getAssociatedModule(),
-                                                   replacementTy);
+    replacementTy = genericEnv->mapTypeIntoContext(replacementTy);
   }
 
   SmallVector<ProtocolConformanceRef, 4> conformanceBuf;
@@ -935,7 +931,7 @@ void ModuleFile::readGenericRequirements(
                                           size, alignment);
 
       auto first = getType(rawTypeID);
-      LayoutConstraintInfo layoutInfo;
+      LayoutConstraint layout;
       LayoutConstraintKind kind = LayoutConstraintKind::UnknownLayout;
       switch (rawKind) {
       default: {
@@ -969,13 +965,13 @@ void ModuleFile::readGenericRequirements(
       }
       }
 
+      ASTContext &ctx = getContext();
       if (kind != LayoutConstraintKind::TrivialOfAtMostSize &&
           kind != LayoutConstraintKind::TrivialOfExactSize)
-        layoutInfo = LayoutConstraintInfo(kind);
+        layout = LayoutConstraint::getLayoutConstraint(kind, ctx);
       else
-        layoutInfo = LayoutConstraintInfo(kind, size, alignment);
-
-      auto layout = getContext().AllocateObjectCopy(layoutInfo);
+        layout =
+            LayoutConstraint::getLayoutConstraint(kind, size, alignment, ctx);
 
       requirements.push_back(
           Requirement(RequirementKind::Layout, first, layout));
@@ -1060,7 +1056,6 @@ ModuleFile::getGenericSignatureOrEnvironment(
   DeserializingEntityRAII deserializingEntity(*this);
 
   SmallVector<GenericTypeParamType *, 4> paramTypes;
-  SmallVector<uint64_t, 4> rawContextTypeIDs;
   {
     using namespace decls_block;
 
@@ -1085,15 +1080,9 @@ ModuleFile::getGenericSignatureOrEnvironment(
       ArrayRef<uint64_t> rawParamIDs;
       GenericEnvironmentLayout::readRecord(scratch, rawParamIDs);
 
-      if (rawParamIDs.size() % 2 != 0) {
-        error();
-        return result;
-      }
-
-      for (unsigned i = 0, n = rawParamIDs.size(); i != n; i += 2) {
+      for (unsigned i = 0, n = rawParamIDs.size(); i != n; ++i) {
         auto paramTy = getType(rawParamIDs[i])->castTo<GenericTypeParamType>();
         paramTypes.push_back(paramTy);
-        rawContextTypeIDs.push_back(rawParamIDs[i+1]);
       }
       break;
     }
@@ -1103,12 +1092,12 @@ ModuleFile::getGenericSignatureOrEnvironment(
       SILGenericEnvironmentLayout::readRecord(scratch, rawParamIDs);
       lastRecordOffset.reset();
 
-      if (rawParamIDs.size() % 3 != 0) {
+      if (rawParamIDs.size() % 2 != 0) {
         error();
         return result;
       }
 
-      for (unsigned i = 0, n = rawParamIDs.size(); i != n; i += 3) {
+      for (unsigned i = 0, n = rawParamIDs.size(); i != n; i += 2) {
         Identifier name = getIdentifier(rawParamIDs[i]);
         auto paramTy = getType(rawParamIDs[i+1])->castTo<GenericTypeParamType>();
 
@@ -1124,7 +1113,6 @@ ModuleFile::getGenericSignatureOrEnvironment(
         }
 
         paramTypes.push_back(paramTy);
-        rawContextTypeIDs.push_back(rawParamIDs[i+2]);
       }
       break;
     }
@@ -1161,17 +1149,9 @@ ModuleFile::getGenericSignatureOrEnvironment(
 
   // Form the generic environment. Record it now so that deserialization of
   // the archetypes in the environment can refer to this environment.
-  auto genericEnv = GenericEnvironment::getIncomplete(signature, nullptr);
+  auto genericEnv = signature->createGenericEnvironment(*getAssociatedModule());
   envOrOffset = genericEnv;
 
-  // Fill in the interface type -> context type mappings to complete the
-  // generic environment.
-  // FIXME: Eventually, these mappings will go away.
-  assert(paramTypes.size() == rawContextTypeIDs.size());
-  for (unsigned i : indices(paramTypes))
-    genericEnv->addMapping(paramTypes[i], getType(rawContextTypeIDs[i]));
-
-  // The generic environment is complete.
   return genericEnv;
 }
 
@@ -2839,6 +2819,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto paramTy = getType(interfaceTypeID);
     if (paramTy->hasError()) {
+      // FIXME: This should never happen, because we don't serialize
+      // error types.
+      DC->dumpContext();
+      paramTy->dump();
       error();
       return nullptr;
     }
@@ -3063,12 +3047,20 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     handleInherited(proto, rawProtocolAndInheritedIDs.slice(numProtocols));
 
-    if (auto genericParams = maybeReadGenericParams(DC))
-      proto->setGenericParams(genericParams);
+    auto genericParams = maybeReadGenericParams(DC);
+    assert(genericParams && "protocol with no generic parameters?");
+    proto->setGenericParams(genericParams);
+
+    SmallVector<Requirement, 4> requirements;
+    readGenericRequirements(requirements, DeclTypeCursor);
 
     if (isImplicit)
       proto->setImplicit();
     proto->computeType();
+
+    auto signature = GenericSignature::get(
+                               { proto->getProtocolSelfType() }, requirements);
+    proto->setRequirementSignature(signature);
 
     proto->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     proto->setCircularityCheck(CircularityCheck::Checked);
@@ -3870,96 +3862,26 @@ Type ModuleFile::getType(TypeID TID) {
   }
 
   case decls_block::ARCHETYPE_TYPE: {
-    uint8_t isPrimary;
-    TypeID parentOrGenericEnvID;
-    DeclID assocTypeOrNameID;
-    TypeID superclassID;
-    ArrayRef<uint64_t> rawConformanceIDs;
+    GenericEnvironmentID envID;
+    TypeID interfaceTypeID;
 
-    decls_block::ArchetypeTypeLayout::readRecord(scratch, isPrimary,
-                                                 parentOrGenericEnvID,
-                                                 assocTypeOrNameID,
-                                                 superclassID,
-                                                 rawConformanceIDs);
+    decls_block::ArchetypeTypeLayout::readRecord(scratch, envID,
+                                                 interfaceTypeID);
 
-    GenericEnvironment *genericEnv = nullptr;
-    ArchetypeType *parent = nullptr;
-    if (isPrimary) {
-      genericEnv = getGenericEnvironment(parentOrGenericEnvID);
-    } else {
-      parent = getType(parentOrGenericEnvID)->castTo<ArchetypeType>();
-    }
-
-    Type superclass;
-    superclass = getType(superclassID);
-
-    // TODO: Read layout.
-    LayoutConstraint layout;
-
-    SmallVector<ProtocolDecl *, 4> conformances;
-    for (DeclID protoID : rawConformanceIDs)
-      conformances.push_back(cast<ProtocolDecl>(getDecl(protoID)));
-
-    // See if we triggered deserialization through our conformances.
-    if (typeOrOffset.isComplete())
-      break;
-
-    ArchetypeType *archetype;
-    if (parent) {
-      auto assocTypeDecl = cast<AssociatedTypeDecl>(getDecl(assocTypeOrNameID));
-      archetype = ArchetypeType::getNew(ctx, parent, assocTypeDecl,
-                                        conformances, superclass, layout);
-    } else {
-      archetype = ArchetypeType::getNew(ctx, genericEnv,
-                                        getIdentifier(assocTypeOrNameID),
-                                        conformances, superclass, layout);
-    }
-
-    typeOrOffset = archetype;
-    
-    // Read the associated type names.
-    auto entry = DeclTypeCursor.advance();
-    if (entry.Kind != llvm::BitstreamEntry::Record) {
+    auto env = getGenericEnvironment(envID);
+    if (!env) {
       error();
       break;
     }
 
-    scratch.clear();
-    unsigned kind = DeclTypeCursor.readRecord(entry.ID, scratch);
-    if (kind != decls_block::ARCHETYPE_NESTED_TYPE_NAMES) {
-      error();
-      break;
-    }
-    
-    ArrayRef<uint64_t> rawNameIDs;
-    decls_block::ArchetypeNestedTypeNamesLayout::readRecord(scratch,
-                                                            rawNameIDs);
-    
-    // Read the associated type ids.
-    entry = DeclTypeCursor.advance();
-    if (entry.Kind != llvm::BitstreamEntry::Record) {
-      error();
-      break;
-    }
+    Type interfaceType = getType(interfaceTypeID);
+    Type contextType = env->mapTypeIntoContext(interfaceType);
+    typeOrOffset = contextType;
 
-    SmallVector<uint64_t, 16> scratch2;
-    kind = DeclTypeCursor.readRecord(entry.ID, scratch2);
-    if (kind != decls_block::ARCHETYPE_NESTED_TYPES) {
+    if (contextType->hasError()) {
       error();
       break;
     }
-
-    ArrayRef<uint64_t> rawTypeIDs;
-    decls_block::ArchetypeNestedTypesLayout::readRecord(scratch2, rawTypeIDs);
-    
-    // Build the nested types array.
-    SmallVector<std::pair<Identifier, Type>, 4> nestedTypes;
-    for_each(rawNameIDs, rawTypeIDs,
-             [&](IdentifierID nameID, TypeID nestedID) {
-      Type type = getType(nestedID);
-      nestedTypes.push_back(std::make_pair(getIdentifier(nameID), type));
-    });
-    archetype->setNestedTypes(ctx, nestedTypes);
 
     break;
   }
@@ -4326,6 +4248,11 @@ Type ModuleFile::getType(TypeID TID) {
     return nullptr;
   }
 
+#ifndef NDEBUG
+  PrettyStackTraceType(ctx, "deserializing", typeOrOffset.get());
+  assert(!typeOrOffset.get()->hasError());
+#endif
+
   // Invoke the callback on the deserialized type.
   DeserializedTypeCallback(typeOrOffset);
 
@@ -4452,14 +4379,9 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       // Form the generic signature for the synthetic environment.
       syntheticSig = GenericSignature::get(genericParams, requirements);
 
-      // Create an archetype builder, which will help us create the
-      // synthetic environment.
-      ArchetypeBuilder builder(
-                         getContext(),
-                         LookUpConformanceInModule(getAssociatedModule()));
-      builder.addGenericSignature(syntheticSig);
-      builder.finalize(SourceLoc());
-      syntheticEnv = builder.getGenericEnvironment(syntheticSig);
+      // Create the synthetic environment.
+      syntheticEnv =
+        syntheticSig->createGenericEnvironment(*getAssociatedModule());
 
       // Requirement -> synthetic map.
       hasReqToSyntheticMap = true;

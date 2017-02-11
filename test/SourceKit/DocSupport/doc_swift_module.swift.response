@@ -16,9 +16,9 @@ class C1 : Prot {
         case case1
     }
 
-    func extfoo()
-
     func foo1()
+
+    func extfoo()
 
     subscript(_ index: Int) -> Int { get }
 }
@@ -42,9 +42,9 @@ class C2 : cake.C1 {
         case case1
     }
 
-    func extfoo()
-
     func foo1()
+
+    func extfoo()
 
     subscript(_ index: Int) -> Int { get }
 }
@@ -307,17 +307,17 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 232,
-    key.length: 6
+    key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 246,
+    key.offset: 244,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 251,
-    key.length: 4
+    key.offset: 249,
+    key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
@@ -501,17 +501,17 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 503,
-    key.length: 6
+    key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 517,
+    key.offset: 515,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 522,
-    key.length: 4
+    key.offset: 520,
+    key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
@@ -1279,21 +1279,21 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "extfoo()",
-        key.usr: "s:Fe4cakeRxS_4Protwx7ElementzSirS0_6extfooFT_T_::SYNTHESIZED::s:C4cake2C1",
-        key.original_usr: "s:Fe4cakeRxS_4Protwx7ElementzSirS0_6extfooFT_T_",
-        key.offset: 227,
-        key.length: 13,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>extfoo</decl.name>()</decl.function.method.instance>"
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo1()",
         key.usr: "s:FE4cakePS_4Prot4foo1FT_T_::SYNTHESIZED::s:C4cake2C1",
         key.original_usr: "s:FE4cakePS_4Prot4foo1FT_T_",
-        key.offset: 246,
+        key.offset: 227,
         key.length: 11,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo1</decl.name>()</decl.function.method.instance>"
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "extfoo()",
+        key.usr: "s:Fe4cakeRxS_4Protwx7ElementzSirS0_6extfooFT_T_::SYNTHESIZED::s:C4cake2C1",
+        key.original_usr: "s:Fe4cakeRxS_4Protwx7ElementzSirS0_6extfooFT_T_",
+        key.offset: 244,
+        key.length: 13,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>extfoo</decl.name>()</decl.function.method.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.subscript,
@@ -1420,21 +1420,21 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "extfoo()",
-        key.usr: "s:Fe4cakeRxS_4Protwx7ElementzSirS0_6extfooFT_T_::SYNTHESIZED::s:C4cake2C2",
-        key.original_usr: "s:Fe4cakeRxS_4Protwx7ElementzSirS0_6extfooFT_T_",
-        key.offset: 498,
-        key.length: 13,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>extfoo</decl.name>()</decl.function.method.instance>"
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo1()",
         key.usr: "s:FE4cakePS_4Prot4foo1FT_T_::SYNTHESIZED::s:C4cake2C2",
         key.original_usr: "s:FE4cakePS_4Prot4foo1FT_T_",
-        key.offset: 517,
+        key.offset: 498,
         key.length: 11,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo1</decl.name>()</decl.function.method.instance>"
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "extfoo()",
+        key.usr: "s:Fe4cakeRxS_4Protwx7ElementzSirS0_6extfooFT_T_::SYNTHESIZED::s:C4cake2C2",
+        key.original_usr: "s:Fe4cakeRxS_4Protwx7ElementzSirS0_6extfooFT_T_",
+        key.offset: 515,
+        key.length: 13,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>extfoo</decl.name>()</decl.function.method.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.subscript,

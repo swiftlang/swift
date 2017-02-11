@@ -30,7 +30,7 @@
 
 using namespace swift;
 
-Witness::Witness(ValueDecl *decl, ArrayRef<Substitution> substitutions,
+Witness::Witness(ValueDecl *decl, SubstitutionList substitutions,
                  GenericEnvironment *syntheticEnv,
                  SubstitutionMap reqToSynthesizedEnvMap) {
   auto &ctx = decl->getASTContext();
@@ -94,6 +94,40 @@ ProtocolConformanceRef::getInherited(ProtocolDecl *parent) const {
   llvm_unreachable("unhandled ProtocolConformanceRef");
 }
 
+Type
+ProtocolConformanceRef::getTypeWitnessByName(Type type,
+                                             ProtocolConformanceRef conformance,
+                                             Identifier name,
+                                             LazyResolver *resolver) {
+  // For an archetype, retrieve the nested type with the appropriate
+  // name. There are no conformance tables.
+  if (auto archetype = type->getAs<ArchetypeType>()) {
+    return archetype->getNestedType(name);
+  }
+
+  // Find the named requirement.
+  AssociatedTypeDecl *assocType = nullptr;
+  auto members = conformance.getRequirement()->lookupDirect(name);
+  for (auto member : members) {
+    assocType = dyn_cast<AssociatedTypeDecl>(member);
+    if (assocType)
+      break;
+  }
+
+  // FIXME: Shouldn't this be a hard error?
+  if (!assocType)
+    return nullptr;
+
+  if (conformance.isAbstract())
+    return DependentMemberType::get(type, assocType);
+
+  auto concrete = conformance.getConcrete();
+  if (!concrete->hasTypeWitness(assocType, resolver)) {
+    return nullptr;
+  }
+  return concrete->getTypeWitness(assocType, resolver).getReplacement();
+}
+
 void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
                                         AllocationArena arena,
                                         unsigned alignment) {
@@ -152,40 +186,6 @@ const Substitution &
 ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType, 
                                     LazyResolver *resolver) const {
   return getTypeWitnessSubstAndDecl(assocType, resolver).first;
-}
-
-Type
-ProtocolConformance::getTypeWitnessByName(Type type,
-                                          ProtocolConformanceRef conformance,
-                                          Identifier name,
-                                          LazyResolver *resolver) {
-  // For an archetype, retrieve the nested type with the appropriate
-  // name. There are no conformance tables.
-  if (auto archetype = type->getAs<ArchetypeType>()) {
-    return archetype->getNestedType(name);
-  }
-
-  // Find the named requirement.
-  AssociatedTypeDecl *assocType = nullptr;
-  auto members = conformance.getRequirement()->lookupDirect(name);
-  for (auto member : members) {
-    assocType = dyn_cast<AssociatedTypeDecl>(member);
-    if (assocType)
-      break;
-  }
-
-  // FIXME: Shouldn't this be a hard error?
-  if (!assocType)
-    return nullptr;
-
-  if (conformance.isAbstract())
-    return DependentMemberType::get(type, assocType);
-
-  auto concrete = conformance.getConcrete();
-  if (!concrete->hasTypeWitness(assocType, resolver)) {
-    return nullptr;
-  }
-  return concrete->getTypeWitness(assocType, resolver).getReplacement();
 }
 
 Witness ProtocolConformance::getWitness(ValueDecl *requirement,
@@ -351,7 +351,7 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
 SpecializedProtocolConformance::SpecializedProtocolConformance(
     Type conformingType,
     ProtocolConformance *genericConformance,
-    ArrayRef<Substitution> substitutions)
+    SubstitutionList substitutions)
   : ProtocolConformance(ProtocolConformanceKind::Specialized, conformingType,
                         // FIXME: interface type should be passed in.
                         // assumes specialized conformance is always fully
@@ -381,13 +381,10 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   }
 
   // Otherwise, perform substitutions to create this witness now.
-  auto conformingDC = getDeclContext();
-  auto conformingModule = conformingDC->getParentModule();
-
   auto *genericEnv = GenericConformance->getGenericEnvironment();
 
   auto substitutionMap =
-      genericEnv->getSubstitutionMap(conformingModule, GenericSubstitutions);
+      genericEnv->getSubstitutionMap(GenericSubstitutions);
 
   auto genericWitnessAndDecl
     = GenericConformance->getTypeWitnessSubstAndDecl(assocType, resolver);
@@ -406,6 +403,9 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
     TypeWitnesses[assocType] = genericWitnessAndDecl;
     return TypeWitnesses[assocType];
   }
+
+  auto conformingDC = getDeclContext();
+  auto conformingModule = conformingDC->getParentModule();
 
   // Gather the conformances for the type witness. These should never fail.
   // FIXME: We should just be able to use the SubstitutionMap from above,
@@ -542,10 +542,10 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
 
     auto *env = conformingDC->getGenericEnvironmentOfContext();
 
-    auto subMap = env->getSubstitutionMap(conformingModule, subs);
+    auto subMap = env->getSubstitutionMap(subs);
 
     auto r = inherited->subst(conformingModule, getType(),
-                              QueryTypeSubstitutionMap{subMap.getMap()},
+                              QuerySubstitutionMap{subMap},
                               LookUpConformanceInSubstitutionMap(subMap));
     assert(getType()->isEqual(r->getType())
            && "substitution didn't produce conformance for same type?!");
@@ -628,14 +628,10 @@ void NominalTypeDecl::prepareConformanceTable() const {
     if (resolver)
       resolver->resolveRawType(theEnum);
     if (theEnum->hasRawType()) {
-      if (auto rawRepresentable = ctx.getProtocol(KnownProtocolKind::RawRepresentable)) {
-
-        // The presence of a raw type is an explicit declaration that
-        // the compiler should derive a RawRepresentable conformance.
-        auto conformance = ctx.getConformance(mutableThis->getDeclaredTypeInContext(), rawRepresentable,
-                                              mutableThis->getNameLoc(), mutableThis->getInnermostDeclContext(),
-                                              ProtocolConformanceState::Incomplete);
-        ConformanceTable->registerProtocolConformance(conformance);
+      if (auto rawRepresentable =
+            ctx.getProtocol(KnownProtocolKind::RawRepresentable)) {
+        ConformanceTable->addSynthesizedConformance(mutableThis,
+                                                    rawRepresentable);
       }
     }
   }

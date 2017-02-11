@@ -49,8 +49,12 @@ tupleWithDefaults(x: (x,x))
 
 // CHECK: [[VARIADIC_FIRST:%.*]] = function_ref @_T020scalar_to_tuple_args13variadicFirstySaySiG_dtF
 // CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> (@owned Array<τ_0_0>, Builtin.RawPointer)
-// CHECK: [[ARRAY:%.*]] = tuple_extract [[ALLOC_ARRAY]] {{.*}}, 0
-// CHECK: [[MEMORY:%.*]] = tuple_extract [[ALLOC_ARRAY]] {{.*}}, 1
+// CHECK: [[BORROWED_ALLOC_ARRAY:%.*]] = begin_borrow [[ALLOC_ARRAY]]
+// CHECK: [[BORROWED_ARRAY:%.*]] = tuple_extract [[BORROWED_ALLOC_ARRAY]] {{.*}}, 0
+// CHECK: [[ARRAY:%.*]] = copy_value [[BORROWED_ARRAY]]
+// CHECK: [[MEMORY:%.*]] = tuple_extract [[BORROWED_ALLOC_ARRAY]] {{.*}}, 1
+// CHECK: end_borrow [[BORROWED_ALLOC_ARRAY]] from [[ALLOC_ARRAY]]
+// CHECK: destroy_value [[ALLOC_ARRAY]]
 // CHECK: [[ADDR:%.*]] = pointer_to_address [[MEMORY]]
 // CHECK: [[X:%.*]] = load [trivial] [[X_ADDR]]
 // CHECK: store [[X]] to [trivial] [[ADDR]]
@@ -59,7 +63,10 @@ variadicFirst(x)
 
 // CHECK: [[VARIADIC_SECOND:%.*]] = function_ref @_T020scalar_to_tuple_args14variadicSecondySi_SaySiGdtF
 // CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> (@owned Array<τ_0_0>, Builtin.RawPointer)
-// CHECK: [[ARRAY:%.*]] = tuple_extract [[ALLOC_ARRAY]] {{.*}}, 0
+// CHECK: [[BORROWED_ALLOC_ARRAY:%.*]] = begin_borrow [[ALLOC_ARRAY]]
+// CHECK: [[BORROWED_ARRAY:%.*]] = tuple_extract [[BORROWED_ALLOC_ARRAY]] {{.*}}, 0
+// CHECK: [[ARRAY:%.*]] = copy_value [[BORROWED_ARRAY]]
+// CHECK: end_borrow [[BORROWED_ALLOC_ARRAY]] from [[ALLOC_ARRAY]]
 // CHECK: [[X:%.*]] = load [trivial] [[X_ADDR]]
 // CHECK: apply [[VARIADIC_SECOND]]([[X]], [[ARRAY]])
 variadicSecond(x)

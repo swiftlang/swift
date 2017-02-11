@@ -322,6 +322,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_SynthesizedProtocol:
   case DAK_ShowInInterface:
   case DAK_Rethrows:
+  case DAK_Infix:
     return false;
   default:
     break;

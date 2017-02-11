@@ -18,14 +18,14 @@
 #define SWIFT_AST_GENERIC_SIGNATURE_H
 
 #include "swift/AST/Requirement.h"
-#include "swift/AST/Substitution.h"
+#include "swift/AST/SubstitutionList.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
 
-class ArchetypeBuilder;
+class GenericSignatureBuilder;
 class ProtocolConformanceRef;
 class ProtocolType;
 class Substitution;
@@ -74,8 +74,8 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
   static ASTContext &getASTContext(ArrayRef<GenericTypeParamType *> params,
                                    ArrayRef<Requirement> requirements);
 
-  /// Retrieve the archetype builder for the given generic signature.
-  ArchetypeBuilder *getArchetypeBuilder(ModuleDecl &mod);
+  /// Retrieve the generic signature builder for the given generic signature.
+  GenericSignatureBuilder *getGenericSignatureBuilder(ModuleDecl &mod);
 
   friend class ArchetypeType;
 
@@ -135,11 +135,13 @@ public:
 
   /// Build an interface type substitution map from a vector of Substitutions
   /// that correspond to the generic parameters in this generic signature.
-  SubstitutionMap getSubstitutionMap(ArrayRef<Substitution> args) const;
+  SubstitutionMap getSubstitutionMap(SubstitutionList args) const;
 
-  /// Same as above, but updates an existing map.
-  void getSubstitutionMap(ArrayRef<Substitution> args,
-                          SubstitutionMap &subMap) const;
+  /// Build an interface type substitution map from a type substitution function
+  /// and conformance lookup function.
+  SubstitutionMap
+  getSubstitutionMap(TypeSubstitutionFn subs,
+                     LookupConformanceFn lookupConformance) const;
 
   using GenericFunction = auto(CanType canType, Type conformingReplacementType,
     ProtocolType *conformedProtocol)
@@ -188,6 +190,11 @@ public:
   /// Canonicalize the components of a generic signature.
   CanGenericSignature getCanonicalSignature() const;
 
+  /// Create a new generic environment that provides fresh contextual types
+  /// (archetypes) that correspond to the interface types in this generic
+  /// signature.
+  GenericEnvironment *createGenericEnvironment(ModuleDecl &mod);
+
   /// Uniquing for the ASTContext.
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericParams(), getRequirements());
@@ -217,11 +224,6 @@ public:
   /// constraint.
   LayoutConstraint getLayoutConstraint(Type type, ModuleDecl &mod);
 
-  /// Return the preferred representative of the given type parameter within
-  /// this generic signature.  This may yield a concrete type or a
-  /// different type parameter.
-  Type getRepresentative(Type type, ModuleDecl &mod);
-
   /// Return whether two type parameters represent the same type under this
   /// generic signature.
   ///
@@ -235,8 +237,8 @@ public:
 
   /// Return the canonical version of the given type under this generic
   /// signature.
-  CanType getCanonicalTypeInContext(Type type, ArchetypeBuilder &builder);
-  bool isCanonicalTypeInContext(Type type, ArchetypeBuilder &builder);
+  CanType getCanonicalTypeInContext(Type type, GenericSignatureBuilder &builder);
+  bool isCanonicalTypeInContext(Type type, GenericSignatureBuilder &builder);
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,

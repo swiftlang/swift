@@ -73,9 +73,7 @@ bool SILType::isReferenceCounted(SILModule &M) const {
 
 bool SILType::isNoReturnFunction() const {
   if (auto funcTy = dyn_cast<SILFunctionType>(getSwiftRValueType()))
-    return funcTy->getDirectFormalResultsType()
-        .getSwiftRValueType()
-        ->isUninhabited();
+    return funcTy->isNoReturnFunction();
 
   return false;
 }
@@ -319,8 +317,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   }
 
   auto substEltTy =
-    getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(),
-                                          elt, nullptr,
+    getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(), elt,
                                           elt->getArgumentInterfaceType());
   auto loweredTy =
     M.Types.getLoweredType(M.Types.getAbstractionPattern(elt), substEltTy);
@@ -341,7 +338,7 @@ bool SILType::isAddressOnly(SILModule &M) const {
 }
 
 SILType SILType::substGenericArgs(SILModule &M,
-                                  ArrayRef<Substitution> Subs) const {
+                                  SubstitutionList Subs) const {
   SILFunctionType *fnTy = getSwiftRValueType()->castTo<SILFunctionType>();
   if (Subs.empty()) {
     assert(!fnTy->isPolymorphic() && "function type without subs must not "
@@ -354,7 +351,7 @@ SILType SILType::substGenericArgs(SILModule &M,
   return SILType::getPrimitiveObjectType(canFnTy);
 }
 
-ArrayRef<Substitution> SILType::gatherAllSubstitutions(SILModule &M) {
+SubstitutionList SILType::gatherAllSubstitutions(SILModule &M) {
   return getSwiftRValueType()->gatherAllSubstitutions(M.getSwiftModule(),
                                                       nullptr);
 }
@@ -577,8 +574,8 @@ SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
     auto *env = getLayout()->getGenericSignature()
       .getGenericEnvironment(*M.getSwiftModule());
     auto substMap =
-      env->getSubstitutionMap(M.getSwiftModule(), getGenericArgs());
-    fieldTy = env->mapTypeIntoContext(M.getSwiftModule(), fieldTy)
+      env->getSubstitutionMap(getGenericArgs());
+    fieldTy = env->mapTypeIntoContext(fieldTy)
       ->getCanonicalType();
     
     fieldTy = SILType::getPrimitiveObjectType(fieldTy)
@@ -627,4 +624,8 @@ bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
     return type.isAddressOnly(M);
 
   return false;
+}
+
+bool SILFunctionType::isNoReturnFunction() {
+  return getDirectFormalResultsType().getSwiftRValueType()->isUninhabited();
 }

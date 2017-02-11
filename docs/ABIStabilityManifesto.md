@@ -426,7 +426,7 @@ Issue tracking alone doesn't effectively communicate the overall progress and wh
 
 ### <a name="platform-abis"></a>Standard ABIs
 
-[Apple ARM64 iOS platform ABI](https://developer.apple.com/library/content/documentation/Xcode/Conceptual/iPhoneOSABIReference/Articles/ARM64FunctionCallingConventions.html) is an vendor-specific variant of [ARM's AAPCS64](http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf).
+[Apple ARM64 iOS platform ABI](https://developer.apple.com/library/content/documentation/Xcode/Conceptual/iPhoneOSABIReference/Articles/ARM64FunctionCallingConventions.html) is a vendor-specific variant of [ARM's AAPCS64](http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf).
 
 [Apple ARM32 iOS platform ABI](https://developer.apple.com/library/content/documentation/Xcode/Conceptual/iPhoneOSABIReference/Articles/ARMv7FunctionCallingConventions.html) is similarly a variant of [ARM's AAPCS](http://infocenter.arm.com/help/topic/com.arm.doc.ihi0042f/IHI0042F_aapcs.pdf).
 

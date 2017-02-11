@@ -144,7 +144,7 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
     return false;
 
   CanSILFunctionType DeallocType = Dealloc->getLoweredFunctionType();
-  ArrayRef<Substitution> AllocSubsts = AllocType.gatherAllSubstitutions(M);
+  SubstitutionList AllocSubsts = AllocType.gatherAllSubstitutions(M);
 
   assert(!AllocSubsts.empty() == DeallocType->isPolymorphic() &&
          "dealloc of generic class is not polymorphic or vice versa");

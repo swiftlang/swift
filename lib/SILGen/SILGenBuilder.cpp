@@ -73,7 +73,7 @@ MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
 
 ApplyInst *SILGenBuilder::createApply(SILLocation Loc, SILValue Fn,
                                       SILType SubstFnTy, SILType Result,
-                                      ArrayRef<Substitution> Subs,
+                                      SubstitutionList Subs,
                                       ArrayRef<SILValue> Args) {
   getSILGenModule().useConformancesFromSubstitutions(Subs);
   return SILBuilder::createApply(Loc, Fn, SubstFnTy, Result, Subs, Args, false);
@@ -81,7 +81,7 @@ ApplyInst *SILGenBuilder::createApply(SILLocation Loc, SILValue Fn,
 
 TryApplyInst *SILGenBuilder::createTryApply(SILLocation loc, SILValue Fn,
                                             SILType substFnTy,
-                                            ArrayRef<Substitution> subs,
+                                            SubstitutionList subs,
                                             ArrayRef<SILValue> args,
                                             SILBasicBlock *normalBB,
                                             SILBasicBlock *errorBB) {
@@ -92,7 +92,7 @@ TryApplyInst *SILGenBuilder::createTryApply(SILLocation loc, SILValue Fn,
 
 PartialApplyInst *SILGenBuilder::createPartialApply(
     SILLocation Loc, SILValue Fn, SILType SubstFnTy,
-    ArrayRef<Substitution> Subs, ArrayRef<SILValue> Args, SILType ClosureTy) {
+    SubstitutionList Subs, ArrayRef<SILValue> Args, SILType ClosureTy) {
   getSILGenModule().useConformancesFromSubstitutions(Subs);
   return SILBuilder::createPartialApply(Loc, Fn, SubstFnTy, Subs, Args,
                                         ClosureTy);
@@ -100,7 +100,7 @@ PartialApplyInst *SILGenBuilder::createPartialApply(
 
 BuiltinInst *SILGenBuilder::createBuiltin(SILLocation Loc, Identifier Name,
                                           SILType ResultTy,
-                                          ArrayRef<Substitution> Subs,
+                                          SubstitutionList Subs,
                                           ArrayRef<SILValue> Args) {
   getSILGenModule().useConformancesFromSubstitutions(Subs);
   return SILBuilder::createBuiltin(Loc, Name, ResultTy, Subs, Args);
@@ -182,4 +182,57 @@ SILGenBuilder::createUnsafeCopyUnownedValue(SILLocation Loc,
       SILType::getPrimitiveObjectType(UnmanagedType.getReferentType()));
   SILBuilder::createUnmanagedRetainValue(Loc, Result);
   return gen.emitManagedRValueWithCleanup(Result);
+}
+
+ManagedValue SILGenBuilder::createOwnedPHIArgument(SILType Type) {
+  SILPHIArgument *Arg =
+      getInsertionBB()->createPHIArgument(Type, ValueOwnershipKind::Owned);
+  return gen.emitManagedRValueWithCleanup(Arg);
+}
+
+ManagedValue SILGenBuilder::createAllocRef(SILLocation Loc, SILType RefType, bool objc, bool canAllocOnStack,
+                                           ArrayRef<SILType> InputElementTypes,
+                                           ArrayRef<ManagedValue> InputElementCountOperands) {
+  llvm::SmallVector<SILType, 8> ElementTypes(InputElementTypes.begin(),
+                                             InputElementTypes.end());
+  llvm::SmallVector<SILValue, 8> ElementCountOperands;
+  std::transform(std::begin(InputElementCountOperands),
+                 std::end(InputElementCountOperands),
+                 std::back_inserter(ElementCountOperands),
+                 [](ManagedValue M) -> SILValue { return M.getValue(); });
+
+  AllocRefInst *ARI =
+    SILBuilder::createAllocRef(Loc, RefType, objc, canAllocOnStack,
+                               ElementTypes, ElementCountOperands);
+  return gen.emitManagedRValueWithCleanup(ARI);
+}
+
+ManagedValue SILGenBuilder::createAllocRefDynamic(SILLocation Loc, ManagedValue Operand, SILType RefType, bool objc,
+                                                  ArrayRef<SILType> InputElementTypes,
+                                                  ArrayRef<ManagedValue> InputElementCountOperands) {
+  llvm::SmallVector<SILType, 8> ElementTypes(InputElementTypes.begin(),
+                                             InputElementTypes.end());
+  llvm::SmallVector<SILValue, 8> ElementCountOperands;
+  std::transform(std::begin(InputElementCountOperands),
+                 std::end(InputElementCountOperands),
+                 std::back_inserter(ElementCountOperands),
+                 [](ManagedValue M) -> SILValue { return M.getValue(); });
+
+  AllocRefDynamicInst *ARDI =
+    SILBuilder::createAllocRefDynamic(Loc, Operand.getValue(), RefType, objc,
+                                      ElementTypes, ElementCountOperands);
+  return gen.emitManagedRValueWithCleanup(ARDI);
+}
+
+ManagedValue SILGenBuilder::createTupleExtract(SILLocation Loc, ManagedValue Base, unsigned Index,
+                                               SILType Type) {
+  ManagedValue BorrowedBase = gen.emitManagedBeginBorrow(Loc, Base.getValue());
+  SILValue TupleExtract =
+    SILBuilder::createTupleExtract(Loc, BorrowedBase.getValue(), Index, Type);
+  return ManagedValue::forUnmanaged(TupleExtract);
+}
+
+ManagedValue SILGenBuilder::createTupleExtract(SILLocation Loc, ManagedValue Value, unsigned Index) {
+  SILType Type = Value.getType().getTupleElementType(Index);
+  return createTupleExtract(Loc, Value, Index, Type);
 }

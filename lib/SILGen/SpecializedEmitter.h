@@ -41,7 +41,7 @@ public:
   /// have already been emitted.
   using EarlyEmitter = ManagedValue (SILGenFunction &,
                                      SILLocation,
-                                     ArrayRef<Substitution>,
+                                     SubstitutionList,
                                      Expr *argument,
                                      CanFunctionType formalApplyType,
                                      SGFContext);
@@ -50,7 +50,7 @@ public:
   /// have already been emitted.
   using LateEmitter = ManagedValue (SILGenFunction &,
                                     SILLocation,
-                                    ArrayRef<Substitution>,
+                                    SubstitutionList,
                                     ArrayRef<ManagedValue>,
                                     CanFunctionType formalApplyType,
                                     SGFContext);

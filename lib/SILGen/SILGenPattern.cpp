@@ -1803,8 +1803,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       // Reabstract to the substituted type, if needed.
 
       CanType substEltTy =
-        sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
-                                    formalElt, nullptr,
+        sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(), formalElt,
                                     formalElt->getArgumentInterfaceType())
                   ->getCanonicalType();
 

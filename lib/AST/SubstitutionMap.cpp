@@ -10,17 +10,56 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the SubstitutionMap class.
+// This file defines the SubstitutionMap class. A SubstitutionMap packages
+// together a set of replacement types and protocol conformances for
+// specializing generic types.
+//
+// SubstitutionMaps either have type parameters or archetypes as keys,
+// based on whether they were built from a GenericSignature or a
+// GenericEnvironment.
+//
+// To specialize a type, call Type::subst() with the right SubstitutionMap.
 //
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 
 using namespace swift;
+
+bool SubstitutionMap::hasArchetypes() const {
+  for (auto &entry : subMap)
+    if (entry.second->hasArchetype())
+      return true;
+  return false;
+}
+
+bool SubstitutionMap::hasDynamicSelf() const {
+  for (auto &entry : subMap)
+    if (entry.second->hasDynamicSelfType())
+      return true;
+  return false;
+}
+
+Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
+  auto known = subMap.find(type);
+  if (known != subMap.end() && known->second)
+    return known->second;
+
+  // Not known.
+  return Type();
+}
+
+void SubstitutionMap::
+addSubstitution(CanSubstitutableType type, Type replacement) {
+  auto result = subMap.insert(std::make_pair(type, replacement));
+  assert(result.second || result.first->second->isEqual(replacement));
+  (void) result;
+}
 
 template<typename T>
 Optional<T> SubstitutionMap::forEachParent(
@@ -93,12 +132,12 @@ Optional<T> SubstitutionMap::forEachConformance(
             return found;
         }
       } else {
-       auto sub = conformance.getConcrete()->getTypeWitnessSubstAndDecl(
+        auto sub = conformance.getConcrete()->getTypeWitnessSubstAndDecl(
                                            protoAssocType, nullptr).first;
-       for (auto subConformance : sub.getConformances()) {
-         if (auto found = fn(subConformance))
-           return found;
-       }
+        for (auto subConformance : sub.getConformances()) {
+          if (auto found = fn(subConformance))
+            return found;
+        }
       }
     }
 
@@ -130,7 +169,8 @@ SubstitutionMap::lookupConformance(
                          CanType type, ProtocolDecl *proto,
                          llvm::SmallPtrSetImpl<CanType> *visitedParents) const {
   // Local function to either record an abstract conformance or return a
-  // concrete conformance. This allows us to
+  // concrete conformance. This allows us to check multiple parents and
+  // find the most specific conformance that applies.
   Optional<ProtocolConformanceRef> abstractConformance;
   auto recordOrReturn = [&](ProtocolConformanceRef conformance)
       -> Optional<ProtocolConformanceRef> {
@@ -165,13 +205,6 @@ SubstitutionMap::lookupConformance(
 }
 
 void SubstitutionMap::
-addSubstitution(CanSubstitutableType type, Type replacement) {
-  auto result = subMap.insert(std::make_pair(type, replacement));
-  assert(result.second || result.first->second->isEqual(replacement));
-  (void) result;
-}
-
-void SubstitutionMap::
 addConformance(CanType type, ProtocolConformanceRef conformance) {
   conformanceMap[type.getPointer()].push_back(conformance);
 }
@@ -187,6 +220,24 @@ void SubstitutionMap::
 addParent(CanType type, CanType parent, AssociatedTypeDecl *assocType) {
   assert(type && parent && assocType);
   parentMap[type.getPointer()].push_back(std::make_pair(parent, assocType));
+}
+
+SubstitutionMap
+SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
+                                          Type selfType,
+                                          ProtocolConformanceRef conformance) {
+  auto protocolSelfType = protocol->getSelfInterfaceType();
+  return protocol->getGenericSignature()->getSubstitutionMap(
+    [&](SubstitutableType *type) -> Type {
+      assert(type->isEqual(protocolSelfType));
+      return selfType;
+    },
+    [&](CanType origType, Type replacementType, ProtocolType *protoType)
+      -> ProtocolConformanceRef {
+      assert(origType->isEqual(protocolSelfType) &&
+             protoType->getDecl() == protocol);
+      return conformance;
+    });
 }
 
 SubstitutionMap
@@ -217,76 +268,74 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
                                           GenericSignature *derivedSig,
                                           Optional<SubstitutionMap> derivedSubs,
                                           LazyResolver *resolver) {
-  SubstitutionMap subMap;
-
   if (baseSig == nullptr)
-    return subMap;
+    return SubstitutionMap();
 
-  unsigned minDepth = 0;
+  auto *M = baseClass->getParentModule();
 
-  // Get the substitutions for the self type.
-  if (auto *genericSig = baseClass->getGenericSignature()) {
+  unsigned baseDepth = 0;
+  SubstitutionMap baseSubMap;
+  if (auto *baseClassSig = baseClass->getGenericSignature()) {
+    baseDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
+
     auto derivedClassTy = derivedClass->getDeclaredInterfaceType();
     if (derivedSubs)
       derivedClassTy = derivedClassTy.subst(*derivedSubs);
     auto baseClassTy = derivedClassTy->getSuperclassForDecl(baseClass, resolver);
 
-    auto *M = baseClass->getParentModule();
-    auto subs = baseClassTy->gatherAllSubstitutions(M, resolver);
-    genericSig->getSubstitutionMap(subs, subMap);
-
-    minDepth = genericSig->getGenericParams().back()->getDepth() + 1;
+    baseSubMap = baseClassTy->getContextSubstitutionMap(M, baseClass);
   }
 
-  // Map the innermost generic parameters of the derived function to
-  // the base.
-  auto baseParams = baseSig->getInnermostGenericParams();
-  if (baseParams.back()->getDepth() >= minDepth) {
-    assert(derivedSig);
-    auto derivedParams = derivedSig->getInnermostGenericParams();
+  unsigned origDepth = 0;
+  if (auto *derivedClassSig = derivedClass->getGenericSignature())
+    origDepth = derivedClassSig->getGenericParams().back()->getDepth() + 1;
 
-    assert(baseParams.size() == derivedParams.size());
+  SubstitutionMap origSubMap;
+  if (derivedSubs)
+    origSubMap = *derivedSubs;
+  else if (derivedSig) {
+    origSubMap = derivedSig->getSubstitutionMap(
+        [](SubstitutableType *type) -> Type { return type; },
+        MakeAbstractConformanceForGenericType());
+  }
 
-    for (unsigned i = 0, e = derivedParams.size(); i < e; i++) {
-      auto paramTy = cast<GenericTypeParamType>(baseParams[i]->getCanonicalType());
-      assert(paramTy->getDepth() >= minDepth);
-      Type replacementTy = derivedParams[i];
-      if (derivedSubs)
-        replacementTy = replacementTy.subst(*derivedSubs);
-      subMap.addSubstitution(paramTy, replacementTy);
+  return combineSubstitutionMaps(baseSubMap, origSubMap,
+                                 baseDepth, origDepth,
+                                 baseSig);
+}
+
+SubstitutionMap
+SubstitutionMap::combineSubstitutionMaps(const SubstitutionMap &baseSubMap,
+                                         const SubstitutionMap &origSubMap,
+                                         unsigned baseDepth,
+                                         unsigned origDepth,
+                                         GenericSignature *baseSig) {
+  auto replaceGenericParameter = [&](Type type) -> Type {
+    if (auto gp = type->getAs<GenericTypeParamType>()) {
+      if (gp->getDepth() < baseDepth) return Type();
+      return GenericTypeParamType::get(gp->getDepth() + origDepth - baseDepth,
+                                       gp->getIndex(),
+                                       baseSig->getASTContext());
     }
 
-    auto isRootedInInnermostParameter = [&](Type t) -> bool {
-      while (auto *dmt = t->getAs<DependentMemberType>())
-        t = dmt->getBase();
-      return t->castTo<GenericTypeParamType>()->getDepth() >= minDepth;
-    };
+    return type;
+  };
 
-    // Add trivial conformances for the above.
-    // FIXME: This should be less awkward.
-    baseSig->enumeratePairedRequirements(
-      [&](Type t, ArrayRef<Requirement> reqs) -> bool {
-        auto canTy = t->getCanonicalType();
-
-        if (isRootedInInnermostParameter(t)) {
-          for (unsigned i = 0, e = reqs.size(); i < e; i++) {
-            auto reqt = reqs[i];
-            assert(reqt.getKind() == RequirementKind::Conformance);
-            auto *proto = reqt.getSecondType()
-                ->castTo<ProtocolType>()->getDecl();
-            if (derivedSubs)
-              subMap.addConformance(canTy, *derivedSubs->lookupConformance(
-                                                                 canTy, proto));
-            else
-              subMap.addConformance(canTy, ProtocolConformanceRef(proto));
-          }
-        }
-
-        return false;
+  return baseSig->getSubstitutionMap(
+    [&](SubstitutableType *type) {
+      auto replacement = replaceGenericParameter(type);
+      if (replacement)
+        return Type(replacement).subst(origSubMap);
+      return Type(type).subst(baseSubMap);
+    },
+    [&](CanType type, Type substType, ProtocolType *conformedProtocol) {
+      auto replacement = type.transform(replaceGenericParameter);
+      if (replacement)
+        return origSubMap.lookupConformance(replacement->getCanonicalType(),
+                                            conformedProtocol->getDecl());
+      return baseSubMap.lookupConformance(type,
+                                          conformedProtocol->getDecl());
     });
-  }
-
-  return subMap;
 }
 
 void SubstitutionMap::dump(llvm::raw_ostream &out) const {

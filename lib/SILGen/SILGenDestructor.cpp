@@ -59,7 +59,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
     SILValue baseSelf = B.createUpcast(cleanupLoc, selfValue, baseSILTy);
     ManagedValue dtorValue;
     SILType dtorTy;
-    ArrayRef<Substitution> subs
+    SubstitutionList subs
       = superclassTy->gatherAllSubstitutions(SGM.M.getSwiftModule(), nullptr);
     std::tie(dtorValue, dtorTy, subs)
       = emitSiblingMethodRef(cleanupLoc, baseSelf, dtorConstant, subs);
@@ -91,7 +91,7 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
   auto classTy = selfValue->getType();
   ManagedValue dtorValue;
   SILType dtorTy;
-  ArrayRef<Substitution> subs = classTy.gatherAllSubstitutions(SGM.M);
+  SubstitutionList subs = classTy.gatherAllSubstitutions(SGM.M);
   std::tie(dtorValue, dtorTy, subs)
     = emitSiblingMethodRef(loc, selfValue, dtorConstant, subs);
 
@@ -185,7 +185,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // Call the superclass's -dealloc.
   SILType superclassSILTy = getLoweredLoadableType(superclassTy);
   SILValue superSelf = B.createUpcast(cleanupLoc, selfValue, superclassSILTy);
-  ArrayRef<Substitution> subs
+  SubstitutionList subs
     = superclassTy->gatherAllSubstitutions(SGM.M.getSwiftModule(), nullptr);
   auto substDtorType = superclassDtorType.castTo<SILFunctionType>()
     ->substGenericArgs(SGM.M, subs);

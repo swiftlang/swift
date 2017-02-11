@@ -117,7 +117,7 @@ namespace swift {
     /// \brief Enable the iterative type checker.
     bool IterativeTypeChecker = false;
 
-    /// Debug the generic signatures computed by the archetype builder.
+    /// Debug the generic signatures computed by the generic signature builder.
     bool DebugGenericSignatures = false;
 
     /// Triggers llvm fatal_error if typechecker tries to typecheck a decl or an
@@ -133,7 +133,7 @@ namespace swift {
 
     /// \brief The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
-    unsigned SolverMemoryThreshold = 33554432; /* 32 * 1024 * 1024 */
+    unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
 
     unsigned SolverBindingThreshold = 1024 * 1024;
 

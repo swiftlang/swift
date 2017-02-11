@@ -1186,11 +1186,13 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
     GenericVisitor(DeclContext *dc, TypeSubstitutionMap &archetypesMap)
       : dc(dc), archetypesMap(archetypesMap) {}
     
-    bool mismatch(TypeBase *paramType, TypeBase *argType) {
+    bool mismatch(TypeBase *paramType, TypeBase *argType,
+                  Type sugaredFirstType) {
       return paramType->isEqual(argType);
     }
     
-    bool mismatch(SubstitutableType *paramType, TypeBase *argType) {
+    bool mismatch(SubstitutableType *paramType, TypeBase *argType,
+                  Type sugaredFirstType) {
       Type type = paramType;
       if (type->is<GenericTypeParamType>()) {
         assert(dc);
@@ -3686,10 +3688,11 @@ static Type isRawRepresentable(Type fromType,
   if (!conformance)
     return Type();
 
-  Type rawTy = ProtocolConformance::getTypeWitnessByName(fromType,
-                                                         *conformance,
-                                              CS->getASTContext().Id_RawValue,
-                                                         &CS->TC);
+  Type rawTy = ProtocolConformanceRef::getTypeWitnessByName(
+      fromType,
+      *conformance,
+      CS->getASTContext().Id_RawValue,
+      &CS->TC);
   return rawTy;
 }
 
@@ -4056,9 +4059,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
                                   ConformanceCheckFlags::InExpression)) {
         Type errorCodeType = expr->getType();
         Type errorType =
-          ProtocolConformance::getTypeWitnessByName(errorCodeType, *conformance,
-                                                    TC.Context.Id_ErrorType,
-                                                    &TC)->getCanonicalType();
+          ProtocolConformanceRef::getTypeWitnessByName(errorCodeType, *conformance,
+                                                       TC.Context.Id_ErrorType,
+                                                       &TC)->getCanonicalType();
         if (errorType) {
           auto diag = diagnose(expr->getLoc(), diag::cannot_throw_error_code,
                                errorCodeType, errorType);
@@ -5738,31 +5741,23 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     return false;
 
   class RequirementsListener : public GenericRequirementsCheckListener {
-  private:
-    bool DiagnosedAny = false;
-
   public:
     bool shouldCheck(RequirementKind kind, Type first, Type second) override {
       // This means that we have encountered requirement which references
       // generic parameter not used in the arguments, we can't diagnose it here.
       return !(first->hasTypeParameter() || first->isTypeVariableOrMember());
     }
-
-    void diagnosed(const Requirement *requirement) override {
-      DiagnosedAny = true;
-    }
-
-    bool foundProblems() const { return DiagnosedAny; }
   };
 
   RequirementsListener genericReqListener;
-  TC.checkGenericArguments(env->getOwningDeclContext(), argExpr->getLoc(),
-                           AFD->getLoc(), AFD->getInterfaceType(),
-                           env->getGenericSignature(), substitutions, nullptr,
-                           ConformanceCheckFlags::SuppressDependencyTracking,
-                           &genericReqListener);
+  auto result =
+    TC.checkGenericArguments(env->getOwningDeclContext(), argExpr->getLoc(),
+                             AFD->getLoc(), AFD->getInterfaceType(),
+                             env->getGenericSignature(), substitutions, nullptr,
+                             ConformanceCheckFlags::SuppressDependencyTracking,
+                             &genericReqListener);
 
-  return genericReqListener.foundProblems();
+  return !result.second;
 }
 
 /// When initializing Unsafe[Mutable]Pointer<T> from Unsafe[Mutable]RawPointer,
@@ -5869,34 +5864,41 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (!isUnresolvedOrTypeVarType(fnType) &&
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
     
-    // If the argument is a trailing ClosureExpr (i.e. {....}) and it is on a
-    // different line than the callee, then the "real" issue is that the user
-    // forgot to write "do" before their brace stmt.
-    if (auto *PE = dyn_cast<ParenExpr>(callExpr->getArg()))
-      if (PE->hasTrailingClosure() && isa<ClosureExpr>(PE->getSubExpr())) {
-        auto &SM = CS->getASTContext().SourceMgr;
-        if (SM.getLineNumber(callExpr->getFn()->getEndLoc()) !=
-            SM.getLineNumber(PE->getStartLoc())) {
-          diagnose(PE->getStartLoc(), diag::expected_do_in_statement)
-            .fixItInsert(PE->getStartLoc(), "do ");
-          return true;
+    auto arg = callExpr->getArg();
+
+    {
+      auto diag = diagnose(arg->getStartLoc(),
+                           diag::cannot_call_non_function_value,
+                           fnExpr->getType());
+      diag.highlight(fnExpr->getSourceRange());
+
+      // If the argument is an empty tuple, then offer a
+      // fix-it to remove the empty tuple and use the value
+      // directly.
+      if (auto tuple = dyn_cast<TupleExpr>(arg)) {
+        if (tuple->getNumElements() == 0) {
+          diag.fixItRemove(arg->getSourceRange());
         }
       }
-    
-    auto arg = callExpr->getArg();
-    auto diag = diagnose(arg->getStartLoc(),
-                         diag::cannot_call_non_function_value,
-                         fnExpr->getType());
-    diag.highlight(fnExpr->getSourceRange());
-    
-    // If the argument is an empty tuple, then offer a
-    // fix-it to remove the empty tuple and use the value
-    // directly.
-    if (auto tuple = dyn_cast<TupleExpr>(arg)) {
-      if (tuple->getNumElements() == 0) {
-        diag.fixItRemove(arg->getSourceRange());
-      }
     }
+
+    // If the argument is a trailing ClosureExpr (i.e. {....}) and it is on
+    // the line after the callee, then it's likely the user forgot to
+    // write "do" before their brace stmt.
+    // Note that line differences of more than 1 are diagnosed during parsing.
+    if (auto *PE = dyn_cast<ParenExpr>(arg))
+      if (PE->hasTrailingClosure() && isa<ClosureExpr>(PE->getSubExpr())) {
+        auto *closure = cast<ClosureExpr>(PE->getSubExpr());
+        auto &SM = CS->getASTContext().SourceMgr;
+        if (closure->hasAnonymousClosureVars() &&
+            closure->getParameters()->size() == 0 &&
+            1 + SM.getLineNumber(callExpr->getFn()->getEndLoc()) ==
+            SM.getLineNumber(closure->getStartLoc())) {
+          diagnose(closure->getStartLoc(), diag::brace_stmt_suggest_do)
+            .fixItInsert(closure->getStartLoc(), "do ");
+        }
+      }
+
     return true;
   }
   
@@ -6699,12 +6701,12 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
       return true;
     }
 
-    contextualElementType = ProtocolConformance::getTypeWitnessByName(
-                                                 contextualType,
-                                                 *Conformance,
-                                                 CS->getASTContext().Id_Element,
-                                                 &CS->TC)
-                              ->getDesugaredType();
+    contextualElementType = ProtocolConformanceRef::getTypeWitnessByName(
+        contextualType,
+        *Conformance,
+        CS->getASTContext().Id_Element,
+        &CS->TC)
+      ->getDesugaredType();
     elementTypePurpose = CTP_ArrayElement;
   }
 
@@ -6750,17 +6752,17 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
     }
 
     contextualKeyType =
-      ProtocolConformance::getTypeWitnessByName(contextualType,
-                                                *Conformance,
-                                                CS->getASTContext().Id_Key,
-                                                &CS->TC)
+      ProtocolConformanceRef::getTypeWitnessByName(contextualType,
+                                                   *Conformance,
+                                                   CS->getASTContext().Id_Key,
+                                                   &CS->TC)
         ->getDesugaredType();
 
     contextualValueType =
-      ProtocolConformance::getTypeWitnessByName(contextualType,
-                                                *Conformance,
-                                                CS->getASTContext().Id_Value,
-                                                &CS->TC)
+      ProtocolConformanceRef::getTypeWitnessByName(contextualType,
+                                                   *Conformance,
+                                                   CS->getASTContext().Id_Value,
+                                                   &CS->TC)
         ->getDesugaredType();
 
     assert(contextualKeyType && contextualValueType &&
@@ -7884,7 +7886,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     // Fall through to produce diagnostics.
   }
 
-  if (getExpressionTooComplex()) {
+  if (getExpressionTooComplex(viable)) {
     TC.diagnose(expr->getLoc(), diag::expression_too_complex).
       highlight(expr->getSourceRange());
     return true;

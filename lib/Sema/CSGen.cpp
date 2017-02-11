@@ -3232,9 +3232,10 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   SmallVector<Type, 3> TypeScratch;
 
   // Prepare type substitution map.
-  TypeSubstitutionMap Substitutions = BaseTy->getContextSubstitutions(ED);
+  SubstitutionMap Substitutions = BaseTy->getContextSubstitutionMap(
+    DC.getParentModule(), ED);
   auto resolveType = [&](Type Ty) {
-    return Ty.subst(DC.getParentModule(), Substitutions);
+    return Ty.subst(Substitutions);
   };
 
   auto createMemberConstraint = [&](Requirement &Req, ConstraintKind Kind) {

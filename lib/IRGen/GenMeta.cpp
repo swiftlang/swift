@@ -208,7 +208,7 @@ namespace {
       }
 
       auto subs =
-        type->gatherAllSubstitutions(IGF.IGM.getSwiftModule(), nullptr);
+        type->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), decl);
       requirements.enumerateFulfillments(IGF.IGM, subs,
                                 [&](unsigned reqtIndex, CanType type,
                                     Optional<ProtocolConformanceRef> conf) {
@@ -2031,6 +2031,9 @@ void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
     break;
   case llvm::Triple::COFF:
     var->setSection(".rdata");
+    break;
+  case llvm::Triple::Wasm:
+    llvm_unreachable("web assembly object format is not supported.");
     break;
   }
 }

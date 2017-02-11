@@ -1,4 +1,4 @@
-//===--- ArchetypeBuilder.cpp - Generic Requirement Builder ---------------===//
+//===--- GenericSignatureBuilder.cpp - Generic Requirement Builder ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,7 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -24,6 +24,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
@@ -88,11 +89,11 @@ static void updateRequirementSource(RequirementSource &source,
     source = newSource;
 }
 
-struct ArchetypeBuilder::Implementation {
+struct GenericSignatureBuilder::Implementation {
   /// Function used to look up conformances.
   std::function<GenericFunction> LookupConformance;
 
-  /// The generic parameters that this archetype builder is working with.
+  /// The generic parameters that this generic signature builder is working with.
   SmallVector<GenericTypeParamType *, 4> GenericParams;
 
   /// The potential archetypes for the generic parameters in \c GenericParams.
@@ -106,22 +107,13 @@ struct ArchetypeBuilder::Implementation {
   /// The nested types that have been renamed.
   SmallVector<PotentialArchetype *, 4> RenamedNestedTypes;
 
-  /// Potential archetypes for which we are currently performing
-  /// substitutions of their superclasses. Used to detect recursion in
-  /// superclass substitutions.
-  llvm::DenseSet<std::pair<GenericEnvironment *,
-                           ArchetypeBuilder::PotentialArchetype *>>
-    SuperclassSubs;
-
-  /// Potential archetypes for which we are currently performing
-  /// substitutions of their concrete types. Used to detect recursion in
-  /// concrete type substitutions.
-  llvm::DenseSet<std::pair<GenericEnvironment *,
-                           ArchetypeBuilder::PotentialArchetype *>>
-    ConcreteSubs;
+#ifndef NDEBUG
+  /// Whether we've already finalized the builder.
+  bool finalized = false;
+#endif
 };
 
-ArchetypeBuilder::PotentialArchetype::~PotentialArchetype() {
+GenericSignatureBuilder::PotentialArchetype::~PotentialArchetype() {
   for (const auto &nested : NestedTypes) {
     for (auto pa : nested.second) {
       if (pa != this)
@@ -130,63 +122,50 @@ ArchetypeBuilder::PotentialArchetype::~PotentialArchetype() {
   }
 }
 
-void ArchetypeBuilder::PotentialArchetype::buildFullName(
-       bool forDebug,
-       SmallVectorImpl<char> &result) const {
-  if (auto parent = getParent()) {
-    parent->buildFullName(forDebug, result);
+std::string GenericSignatureBuilder::PotentialArchetype::getDebugName() const {
+  llvm::SmallString<64> result;
 
-    // When building the name for debugging purposes, include the
-    // protocol into which the associated type was resolved.
-    if (forDebug) {
-      if (auto assocType = getResolvedAssociatedType()) {
-        result.push_back('[');
-        result.push_back('.');
-        result.append(assocType->getProtocol()->getName().str().begin(), 
-                      assocType->getProtocol()->getName().str().end());
-        result.push_back(']');
-      }
-    }
-
-    result.push_back('.');
+  auto parent = getParent();
+  if (!parent) {
+    return GenericTypeParamType::get(getGenericParamKey().Depth,
+                                     getGenericParamKey().Index,
+                                     getBuilder()->getASTContext())->getName()
+             .str();
   }
-  result.append(getName().str().begin(), getName().str().end());
-}
 
-Identifier ArchetypeBuilder::PotentialArchetype::getName() const { 
-  if (auto assocType = NameOrAssociatedType.dyn_cast<AssociatedTypeDecl *>())
-    return assocType->getName();
-  if (auto typeAlias = NameOrAssociatedType.dyn_cast<TypeAliasDecl *>())
-    return typeAlias->getName();
-  return NameOrAssociatedType.get<Identifier>();
-}
+  // Nested types.
+  result += parent->getDebugName();
 
-std::string ArchetypeBuilder::PotentialArchetype::getFullName() const {
-  llvm::SmallString<64> result;
-  buildFullName(false, result);
+  // When building the name for debugging purposes, include the
+  // protocol into which the associated type was resolved.
+  if (auto assocType = getResolvedAssociatedType()) {
+    result.push_back('[');
+    result.push_back('.');
+    result.append(assocType->getProtocol()->getName().str().begin(),
+                  assocType->getProtocol()->getName().str().end());
+    result.push_back(']');
+  }
+
+  result.push_back('.');
+  result.append(getNestedName().str().begin(), getNestedName().str().end());
+
   return result.str().str();
 }
 
-std::string ArchetypeBuilder::PotentialArchetype::getDebugName() const {
-  llvm::SmallString<64> result;
-  buildFullName(true, result);
-  return result.str().str();
-}
-
-unsigned ArchetypeBuilder::PotentialArchetype::getNestingDepth() const {
+unsigned GenericSignatureBuilder::PotentialArchetype::getNestingDepth() const {
   unsigned Depth = 0;
   for (auto P = getParent(); P; P = P->getParent())
     ++Depth;
   return Depth;
 }
 
-void ArchetypeBuilder::PotentialArchetype::resolveAssociatedType(
+void GenericSignatureBuilder::PotentialArchetype::resolveAssociatedType(
        AssociatedTypeDecl *assocType,
-       ArchetypeBuilder &builder) {
-  assert(!NameOrAssociatedType.is<AssociatedTypeDecl *>() &&
-         "associated type is already resolved");
-  NameOrAssociatedType = assocType;
-  assert(assocType->getName() == getName());
+       GenericSignatureBuilder &builder) {
+  assert(!getResolvedAssociatedType() && "associated type is already resolved");
+  isUnresolvedNestedType = false;
+  identifier.assocTypeOrAlias = assocType;
+  assert(assocType->getName() == getNestedName());
   assert(builder.Impl->NumUnresolvedNestedTypes > 0 &&
          "Mismatch in number of unresolved nested types");
   --builder.Impl->NumUnresolvedNestedTypes;
@@ -203,13 +182,13 @@ void ArchetypeBuilder::PotentialArchetype::resolveAssociatedType(
 /// \param conformsSource The requirement source for the conformance to the
 /// given protocol.
 ///
-/// \param builder The archetype builder in which the potential archetype
+/// \param builder The generic signature builder in which the potential archetype
 /// resides.
 static ProtocolConformance *getSuperConformance(
-                              ArchetypeBuilder::PotentialArchetype *pa,
+                              GenericSignatureBuilder::PotentialArchetype *pa,
                               ProtocolDecl *proto,
                               RequirementSource &conformsSource,
-                              ArchetypeBuilder &builder) {
+                              GenericSignatureBuilder &builder) {
   // Get the superclass constraint.
   Type superclass = pa->getSuperclass();
   if (!superclass) return nullptr;
@@ -236,10 +215,10 @@ static ProtocolConformance *getSuperConformance(
 /// If there is a same-type requirement to be added for the given nested type
 /// due to a superclass constraint on the parent type, add it now.
 static void maybeAddSameTypeRequirementForNestedType(
-              ArchetypeBuilder::PotentialArchetype *nestedPA,
+              GenericSignatureBuilder::PotentialArchetype *nestedPA,
               RequirementSource fromSource,
               ProtocolConformance *superConformance,
-              ArchetypeBuilder &builder) {
+              GenericSignatureBuilder &builder) {
   // If there's no super conformance, we're done.
   if (!superConformance) return;
 
@@ -263,11 +242,24 @@ static void maybeAddSameTypeRequirementForNestedType(
         nestedPA, concreteType, fromSource);
 }
 
-bool ArchetypeBuilder::PotentialArchetype::addConformance(
+/// Walk the members of a protocol.
+///
+/// This is essentially just a call to \c proto->getMembers(), except that
+/// for Objective-C-imported protocols we can simply return an empty declaration
+/// range because the generic signature builder only cares about nested types (which
+/// Objective-C protocols don't have).
+static DeclRange getProtocolMembers(ProtocolDecl *proto) {
+  if (proto->hasClangNode())
+    return DeclRange(DeclIterator(), DeclIterator());
+
+  return proto->getMembers();
+}
+
+bool GenericSignatureBuilder::PotentialArchetype::addConformance(
        ProtocolDecl *proto, 
        bool updateExistingSource,
        const RequirementSource &source,
-       ArchetypeBuilder &builder) {
+       GenericSignatureBuilder &builder) {
   auto rep = getRepresentative();
   if (rep != this)
     return rep->addConformance(proto, updateExistingSource, source, builder);
@@ -296,7 +288,7 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
 
   // Check whether any associated types in this protocol resolve
   // nested types of this potential archetype.
-  for (auto member : proto->getMembers()) {
+  for (auto member : getProtocolMembers(proto)) {
     auto assocType = dyn_cast<AssociatedTypeDecl>(member);
     if (!assocType)
       continue;
@@ -339,7 +331,7 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
   return true;
 }
 
-auto ArchetypeBuilder::PotentialArchetype::getRepresentative()
+auto GenericSignatureBuilder::PotentialArchetype::getRepresentative()
                                              -> PotentialArchetype *{
   // Find the representative.
   PotentialArchetype *Result = Representative;
@@ -359,8 +351,8 @@ auto ArchetypeBuilder::PotentialArchetype::getRepresentative()
 
 /// Canonical ordering for dependent types in generic signatures.
 static int compareDependentTypes(
-                             ArchetypeBuilder::PotentialArchetype * const* pa,
-                             ArchetypeBuilder::PotentialArchetype * const* pb) {
+                             GenericSignatureBuilder::PotentialArchetype * const* pa,
+                             GenericSignatureBuilder::PotentialArchetype * const* pb) {
   auto a = *pa, b = *pb;
 
   // Fast-path check for equality.
@@ -391,7 +383,8 @@ static int compareDependentTypes(
     return compareBases;
 
   // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
-  if (int compareNames = a->getName().str().compare(b->getName().str()))
+  if (int compareNames = a->getNestedName().str().compare(
+                                                      b->getNestedName().str()))
     return compareNames;
 
   if (auto *aa = a->getResolvedAssociatedType()) {
@@ -454,7 +447,7 @@ static int compareDependentTypes(
 
 /// Determine whether there is a concrete type anywhere in the path to the root.
 static bool hasConcreteTypeInPath(
-                               const ArchetypeBuilder::PotentialArchetype *pa) {
+                               const GenericSignatureBuilder::PotentialArchetype *pa) {
   for (; pa; pa = pa->getParent()) {
     if (pa->isConcreteType()) return true;
   }
@@ -465,8 +458,8 @@ static bool hasConcreteTypeInPath(
 /// Whether this potential archetype makes a better archetype anchor than
 /// the given archetype anchor.
 static bool isBetterArchetypeAnchor(
-                              const ArchetypeBuilder::PotentialArchetype *pa,
-                              const ArchetypeBuilder::PotentialArchetype *pb) {
+                              const GenericSignatureBuilder::PotentialArchetype *pa,
+                              const GenericSignatureBuilder::PotentialArchetype *pb) {
   // If one potential archetype has a concrete type in its path but the other
   // does not, prefer the one that does not.
   auto aConcrete = hasConcreteTypeInPath(pa);
@@ -474,13 +467,36 @@ static bool isBetterArchetypeAnchor(
   if (aConcrete != bConcrete)
     return bConcrete;
 
-  auto mutablePA = const_cast<ArchetypeBuilder::PotentialArchetype *>(pa);
-  auto mutablePB = const_cast<ArchetypeBuilder::PotentialArchetype *>(pb);
+  auto mutablePA = const_cast<GenericSignatureBuilder::PotentialArchetype *>(pa);
+  auto mutablePB = const_cast<GenericSignatureBuilder::PotentialArchetype *>(pb);
   return compareDependentTypes(&mutablePA, &mutablePB) < 0;
 }
 
-auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
+/// Rebuild the given potential archetype based on anchors.
+static GenericSignatureBuilder::PotentialArchetype*rebuildPotentialArchetypeAnchor(
+                                    GenericSignatureBuilder::PotentialArchetype *pa,
+                                    GenericSignatureBuilder &builder) {
+  if (auto parent = pa->getParent()) {
+    auto parentAnchor =
+      rebuildPotentialArchetypeAnchor(parent->getArchetypeAnchor(builder),
+                                      builder);
+    if (parent == parentAnchor) return pa;
+
+    if (auto assocType = pa->getResolvedAssociatedType())
+      return parentAnchor->getNestedType(assocType, builder);
+
+    return parentAnchor->getNestedType(pa->getNestedName(), builder);
+  }
+
+  return pa;
+}
+
+auto GenericSignatureBuilder::PotentialArchetype::getArchetypeAnchor(
+                                                      GenericSignatureBuilder &builder)
        -> PotentialArchetype * {
+  // Rebuild the potential archetype anchor for this type, so the equivalence
+  // class will contain the anchor.
+  (void)rebuildPotentialArchetypeAnchor(this, builder);
 
   // Find the best archetype within this equivalence class.
   PotentialArchetype *rep = getRepresentative();
@@ -502,17 +518,63 @@ auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
   return best;
 }
 
-auto ArchetypeBuilder::PotentialArchetype::getNestedType(
-       Identifier nestedName,
-       ArchetypeBuilder &builder) -> PotentialArchetype * {
-  // Retrieve the nested type from the representation of this set.
-  if (Representative != this)
-    return getRepresentative()->getNestedType(nestedName, builder);
+// Give a nested type the appropriately resolved concrete type, based off a
+// parent PA that has a concrete type.
+static void concretizeNestedTypeFromConcreteParent(
+    GenericSignatureBuilder::PotentialArchetype *parent,
+    GenericSignatureBuilder::PotentialArchetype *nestedPA, GenericSignatureBuilder &builder,
+    llvm::function_ref<ProtocolConformanceRef(ProtocolDecl *)>
+        lookupConformance) {
+  auto concreteParent = parent->getConcreteType();
+  assert(concreteParent &&
+         "attempting to resolve concrete nested type of non-concrete PA");
 
-    // If we already have a nested type with this name, return it.
+  // These requirements are all redundant: they're implied by the concrete
+  // parent.
+  auto Source = RequirementSource(RequirementSource::Redundant,
+                                  parent->getConcreteTypeSource().getLoc());
+
+  auto assocType = nestedPA->getResolvedAssociatedType();
+
+  if (auto *concreteArchetype = concreteParent->getAs<ArchetypeType>()) {
+    Type witnessType =
+        concreteArchetype->getNestedType(nestedPA->getNestedName());
+    builder.addSameTypeRequirementToConcrete(nestedPA, witnessType, Source);
+  } else if (assocType) {
+    auto conformance = lookupConformance(assocType->getProtocol());
+
+    Type witnessType;
+    if (conformance.isConcrete()) {
+      witnessType = conformance.getConcrete()
+                        ->getTypeWitness(assocType, builder.getLazyResolver())
+                        .getReplacement();
+    } else {
+      witnessType = DependentMemberType::get(concreteParent, assocType);
+    }
+
+    if (auto witnessPA = builder.resolveArchetype(witnessType)) {
+      builder.addSameTypeRequirementBetweenArchetypes(nestedPA, witnessPA,
+                                                      Source);
+    } else {
+      builder.addSameTypeRequirementToConcrete(nestedPA, witnessType, Source);
+    }
+  }
+}
+
+auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
+       Identifier nestedName,
+       GenericSignatureBuilder &builder) -> PotentialArchetype * {
+  // If we already have a nested type with this name, return it.
   if (!NestedTypes[nestedName].empty()) {
     return NestedTypes[nestedName].front();
   }
+
+  // Find the same nested type within the representative (unless we are
+  // the representative, of course!).
+  PotentialArchetype *repNested = nullptr;
+  auto rep = getRepresentative();
+  if (rep != this)
+    repNested = rep->getNestedType(nestedName, builder);
 
   RequirementSource redundantSource(RequirementSource::Redundant,
                                     SourceLoc());
@@ -520,7 +582,9 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
   // Attempt to resolve this nested type to an associated type
   // of one of the protocols to which the parent potential
   // archetype conforms.
-  for (auto &conforms : ConformsTo) {
+  SmallVector<std::pair<ProtocolDecl *, RequirementSource>, 4>
+    conformsTo(rep->ConformsTo.begin(), rep->ConformsTo.end());
+  for (auto &conforms : conformsTo) {
     for (auto member : conforms.first->lookupDirect(nestedName)) {
       PotentialArchetype *pa;
       
@@ -571,8 +635,14 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
         auto frontRep = nested.front()->getRepresentative();
         pa->Representative = frontRep;
         frontRep->EquivalenceClass.push_back(pa);
-      } else
+      } else {
         nested.push_back(pa);
+
+        if (repNested) {
+          builder.addSameTypeRequirementBetweenArchetypes(pa, repNested,
+                                                          redundantSource);
+        }
+      }
 
       // If there's a superclass constraint that conforms to the protocol,
       // add the appropriate same-type relationship.
@@ -591,17 +661,55 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
     ++builder.Impl->NumUnresolvedNestedTypes;
   }
 
-  return nested.front();
+  auto nestedPA = nested.front();
+
+  // We know something concrete about the parent PA, so we need to propagate
+  // that information to this new archetype.
+  if (isConcreteType()) {
+    concretizeNestedTypeFromConcreteParent(
+        this, nestedPA, builder,
+        [&](ProtocolDecl *proto) -> ProtocolConformanceRef {
+          auto depTy = nestedPA->getDependentType({}, /*allowUnresolved=*/true)
+                           ->getCanonicalType();
+          auto protocolTy =
+              proto->getDeclaredInterfaceType()->castTo<ProtocolType>();
+          auto conformance = builder.getLookupConformanceFn()(
+              depTy, getConcreteType(), protocolTy);
+          assert(conformance &&
+                 "failed to find PA's conformance to known protocol");
+          return *conformance;
+        });
+  }
+
+  return nestedPA;
 }
 
-auto ArchetypeBuilder::PotentialArchetype::getNestedType(
+auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
                             AssociatedTypeDecl *assocType,
-                            ArchetypeBuilder &builder) -> PotentialArchetype * {
-  return getNestedType(assocType->getName(), builder);
+                            GenericSignatureBuilder &builder) -> PotentialArchetype * {
+  // Add the requirement that this type conform to the protocol of the
+  // associated type. We treat this as "inferred" because it comes from the
+  // structure of the type---there will be an explicit or implied requirement
+  // somewhere else.
+  bool failed = builder.addConformanceRequirement(
+                  this, assocType->getProtocol(),
+                  RequirementSource(RequirementSource::Inferred, SourceLoc()));
+  (void)failed;
+
+  // Trigger the construction of nested types with this name.
+  auto fallback = getNestedType(assocType->getName(), builder);
+
+  // Find the nested type that resolved to this associated type.
+  for (const auto &nested : NestedTypes[assocType->getName()]) {
+    if (nested->getResolvedAssociatedType() == assocType) return nested;
+  }
+
+  assert(failed && "unable to find nested type that we know is there");
+  return fallback;
 }
 
-Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
-                                               ArchetypeBuilder &builder,
+Type GenericSignatureBuilder::PotentialArchetype::getTypeInContext(
+                                               GenericSignatureBuilder &builder,
                                                GenericEnvironment *genericEnv) {
   ArrayRef<GenericTypeParamType *> genericParams =
     genericEnv->getGenericParams();
@@ -609,7 +717,7 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
   // Retrieve the archetype from the archetype anchor in this equivalence class.
   // The anchor must not have any concrete parents (otherwise we would just
   // use the representative).
-  auto archetypeAnchor = getArchetypeAnchor();
+  auto archetypeAnchor = getArchetypeAnchor(builder);
   if (archetypeAnchor != this)
     return archetypeAnchor->getTypeInContext(builder, genericEnv);
 
@@ -618,55 +726,15 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 
   // Return a concrete type or archetype we've already resolved.
   if (Type concreteType = representative->getConcreteType()) {
-    // If the concrete type doesn't involve type parameters, just return it.
-    if (!concreteType->hasTypeParameter())
-      return concreteType;
-
     // Otherwise, substitute in the archetypes in the environment.
-
-    // If we're already substituting into the concrete type, mark this
-    // potential archetype as having a recursive concrete type.
-    if (representative->RecursiveConcreteType ||
-        !builder.Impl->ConcreteSubs.insert({genericEnv, representative})
-          .second) {
-      // Complain about the recursion, if we haven't done so already.
-      if (!representative->RecursiveConcreteType) {
-        ctx.Diags.diagnose(representative->ConcreteTypeSource->getLoc(),
-                           diag::recursive_same_type_constraint,
-                           getDependentType(genericParams,
-                                            /*allowUnresolved=*/true),
-                           concreteType);
-
-        representative->RecursiveConcreteType = true;
-      }
-
+    // If this has a recursive type, return an error type.
+    if (representative->RecursiveConcreteType) {
       return ErrorType::get(getDependentType(genericParams,
                                              /*allowUnresolved=*/true));
     }
 
-    SWIFT_DEFER {
-      builder.Impl->ConcreteSubs.erase({genericEnv, representative});
-    };
-
     return genericEnv->mapTypeIntoContext(concreteType,
                                           builder.getLookupConformanceFn());
-  }
-
-  // Check that we haven't referenced this type while substituting into the
-  // superclass.
-  if (!representative->RecursiveSuperclassType &&
-      representative->getSuperclass() &&
-      builder.Impl->SuperclassSubs.count({genericEnv, representative})
-        > 0) {
-    if (representative->SuperclassSource->getLoc().isValid()) {
-      ctx.Diags.diagnose(representative->SuperclassSource->getLoc(),
-                         diag::recursive_superclass_constraint,
-                         representative->getSuperclass());
-    }
-
-    representative->RecursiveSuperclassType = true;
-    return ErrorType::get(getDependentType(genericParams,
-                                           /*allowUnresolved=*/true));
   }
 
   // Local function to check whether we have a generic parameter that has
@@ -719,18 +787,13 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 
 
       // Otherwise, it's a concrete type.
-
-      // FIXME: THIS ASSIGNMENT IS REALLY WEIRD. We shouldn't be discovering
-      // that a same-type constraint affects this so late in the game.
-      representative->ConcreteTypeSource = parent->ConcreteTypeSource;
-
       return genericEnv->mapTypeIntoContext(memberType,
                                             builder.getLookupConformanceFn());
     }
 
     // Check whether the parent already has a nested type with this name. If
     // so, return it directly.
-    if (auto nested = ParentArchetype->getNestedTypeIfKnown(getName()))
+    if (auto nested = ParentArchetype->getNestedTypeIfKnown(getNestedName()))
       return *nested;
 
     // We will build the archetype below.
@@ -743,17 +806,18 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
   // type parameters, substitute them.
   Type superclass = representative->getSuperclass();
   if (superclass && superclass->hasTypeParameter()) {
-    (void)builder.Impl->SuperclassSubs.insert({genericEnv, representative});
-    SWIFT_DEFER {
-      builder.Impl->SuperclassSubs.erase({genericEnv, representative});
-    };
-    superclass = genericEnv->mapTypeIntoContext(superclass,
-                                                builder.getLookupConformanceFn());
+    if (representative->RecursiveSuperclassType) {
+      superclass = ErrorType::get(superclass);
+    } else {
+      superclass = genericEnv->mapTypeIntoContext(
+                                              superclass,
+                                              builder.getLookupConformanceFn());
 
-    // We might have recursively recorded the archetype; if so, return early.
-    // FIXME: This should be detectable before we end up building archetypes.
-    if (auto result = getAlreadyRecoveredGenericParam())
-      return result;
+      // We might have recursively recorded the archetype; if so, return early.
+      // FIXME: This should be detectable before we end up building archetypes.
+      if (auto result = getAlreadyRecoveredGenericParam())
+        return result;
+    }
   }
 
   LayoutConstraint layout = representative->getLayout();
@@ -798,10 +862,12 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
                                  superclass, layout);
 
     // Register this archetype with its parent.
-    ParentArchetype->registerNestedType(getName(), arch);
+    ParentArchetype->registerNestedType(getNestedName(), arch);
   } else {
     // Create a top-level archetype.
-    arch = ArchetypeType::getNew(ctx, genericEnv, getName(), Protos,
+    Identifier name =
+      genericParams[getGenericParamKey().findIndexIn(genericParams)]->getName();
+    arch = ArchetypeType::getNew(ctx, genericEnv, name, Protos,
                                  superclass, layout);
 
     // Register the archetype with the generic environment.
@@ -814,7 +880,7 @@ Type ArchetypeBuilder::PotentialArchetype::getTypeInContext(
 void ArchetypeType::resolveNestedType(
                                     std::pair<Identifier, Type> &nested) const {
   auto genericEnv = getGenericEnvironment();
-  auto &builder = *genericEnv->getArchetypeBuilder();
+  auto &builder = *genericEnv->getGenericSignatureBuilder();
 
   Type interfaceType =
     genericEnv->mapTypeOutOfContext(const_cast<ArchetypeType *>(this));
@@ -827,7 +893,7 @@ void ArchetypeType::resolveNestedType(
   nested.second = result;
 }
 
-Type ArchetypeBuilder::PotentialArchetype::getDependentType(
+Type GenericSignatureBuilder::PotentialArchetype::getDependentType(
                                 ArrayRef<GenericTypeParamType *> genericParams,
                                 bool allowUnresolved) {
   if (auto parent = getParent()) {
@@ -845,24 +911,29 @@ Type ArchetypeBuilder::PotentialArchetype::getDependentType(
       return ErrorType::get(getDependentType(genericParams,
                                              /*allowUnresolved=*/true));
 
-    return DependentMemberType::get(parentType, getName());
+    return DependentMemberType::get(parentType, getNestedName());
   }
   
   assert(isGenericParam() && "Not a generic parameter?");
 
+  unsigned index = getGenericParamKey().findIndexIn(genericParams);
+
   // FIXME: This is a temporary workaround.
   if (genericParams.empty()) {
-    return getGenericParam();
+    return getBuilder()->Impl->GenericParams[index];
   }
 
-  return genericParams[getGenericParamKey().findIndexIn(genericParams)];
+  return genericParams[index];
 }
 
-void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
+void GenericSignatureBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
                                                 SourceManager *SrcMgr,
                                                 unsigned Indent) {
   // Print name.
-  Out.indent(Indent) << getName();
+  if (Indent == 0 || isGenericParam())
+    Out << getDebugName();
+  else
+    Out.indent(Indent) << getNestedName();
 
   // Print superclass.
   if (Superclass) {
@@ -891,7 +962,21 @@ void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
   }
 
   if (Representative != this) {
-    Out << " [represented by " << getRepresentative()->getFullName() << "]";
+    Out << " [represented by " << getRepresentative()->getDebugName() << "]";
+  }
+
+  if (EquivalenceClass.size() > 1) {
+    Out << " [equivalence class ";
+    bool isFirst = true;
+    for (auto equiv : EquivalenceClass) {
+      if (equiv == this) continue;
+
+      if (isFirst) isFirst = false;
+      else Out << ", ";
+
+      Out << equiv->getDebugName();
+    }
+    Out << "]";
   }
 
   Out << "\n";
@@ -904,16 +989,16 @@ void ArchetypeBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
   }
 }
 
-ArchetypeBuilder::ArchetypeBuilder(
+GenericSignatureBuilder::GenericSignatureBuilder(
                                ASTContext &ctx,
                                std::function<GenericFunction> lookupConformance)
   : Context(ctx), Diags(Context.Diags), Impl(new Implementation) {
   Impl->LookupConformance = std::move(lookupConformance);
 }
 
-ArchetypeBuilder::ArchetypeBuilder(ArchetypeBuilder &&) = default;
+GenericSignatureBuilder::GenericSignatureBuilder(GenericSignatureBuilder &&) = default;
 
-ArchetypeBuilder::~ArchetypeBuilder() {
+GenericSignatureBuilder::~GenericSignatureBuilder() {
   if (!Impl)
     return;
 
@@ -922,16 +1007,20 @@ ArchetypeBuilder::~ArchetypeBuilder() {
 }
 
 std::function<GenericFunction>
-ArchetypeBuilder::getLookupConformanceFn() const {
+GenericSignatureBuilder::getLookupConformanceFn() const {
   return Impl->LookupConformance;
 }
 
-LazyResolver *ArchetypeBuilder::getLazyResolver() const { 
+LazyResolver *GenericSignatureBuilder::getLazyResolver() const { 
   return Context.getLazyResolver();
 }
 
-auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
+auto GenericSignatureBuilder::resolveArchetype(Type type, PotentialArchetype *basePA)
+    -> PotentialArchetype * {
   if (auto genericParam = type->getAs<GenericTypeParamType>()) {
+    if (basePA)
+      return basePA;
+
     unsigned index = GenericParamKey(genericParam).findIndexIn(
                                                            Impl->GenericParams);
     if (index < Impl->GenericParams.size())
@@ -941,7 +1030,7 @@ auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
   }
 
   if (auto dependentMember = type->getAs<DependentMemberType>()) {
-    auto base = resolveArchetype(dependentMember->getBase());
+    auto base = resolveArchetype(dependentMember->getBase(), basePA);
     if (!base)
       return nullptr;
 
@@ -954,31 +1043,12 @@ auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
   return nullptr;
 }
 
-auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
-                                           Identifier ParamName)
-       -> PotentialArchetype *
-{
-  GenericParamKey Key(GenericParam);
-  assert(Impl->GenericParams.empty() ||
-         ((Key.Depth == Impl->GenericParams.back()->getDepth() &&
-           Key.Index == Impl->GenericParams.back()->getIndex() + 1) ||
-          (Key.Depth > Impl->GenericParams.back()->getDepth() &&
-           Key.Index == 0)));
-
-  // Create a potential archetype for this type parameter.
-  auto PA = new PotentialArchetype(GenericParam, ParamName);
-  Impl->GenericParams.push_back(GenericParam);
-  Impl->PotentialArchetypes.push_back(PA);
-  return PA;
-}
-
-void ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
+void GenericSignatureBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
   addGenericParameter(
-       GenericParam->getDeclaredInterfaceType()->castTo<GenericTypeParamType>(),
-       GenericParam->getName());
+     GenericParam->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
 }
 
-bool ArchetypeBuilder::addGenericParameterRequirements(GenericTypeParamDecl *GenericParam) {
+bool GenericSignatureBuilder::addGenericParameterRequirements(GenericTypeParamDecl *GenericParam) {
   GenericParamKey Key(GenericParam);
   auto PA = Impl->PotentialArchetypes[Key.findIndexIn(Impl->GenericParams)];
   
@@ -989,24 +1059,28 @@ bool ArchetypeBuilder::addGenericParameterRequirements(GenericTypeParamDecl *Gen
                                           visited);
 }
 
-void ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
-  auto name = GenericParam->getName();
-  // Trim '$' so that archetypes are more readily discernible from abstract
-  // parameters.
-  if (name.str().startswith("$"))
-    name = Context.getIdentifier(name.str().slice(1, name.str().size()));
-  
-  addGenericParameter(GenericParam, name);
+void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
+  GenericParamKey Key(GenericParam);
+  assert(Impl->GenericParams.empty() ||
+         ((Key.Depth == Impl->GenericParams.back()->getDepth() &&
+           Key.Index == Impl->GenericParams.back()->getIndex() + 1) ||
+          (Key.Depth > Impl->GenericParams.back()->getDepth() &&
+           Key.Index == 0)));
+
+  // Create a potential archetype for this type parameter.
+  auto PA = new PotentialArchetype(this, GenericParam);
+  Impl->GenericParams.push_back(GenericParam);
+  Impl->PotentialArchetypes.push_back(PA);
 }
 
-bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
+bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
                                                  ProtocolDecl *Proto,
                                                  RequirementSource Source) {
   llvm::SmallPtrSet<ProtocolDecl *, 8> Visited;
   return addConformanceRequirement(PAT, Proto, Source, Visited);
 }
 
-bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
+bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
                                                  ProtocolDecl *Proto,
                                                  RequirementSource Source,
                                llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited) {
@@ -1017,57 +1091,73 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   if (!T->addConformance(Proto, /*updateExistingSource=*/true, Source, *this))
     return false;
 
-  // Conformances to inherit protocols are explicit in a protocol requirement
-  // signature, but inferred from this conformance otherwise.
-  auto InnerKind =
-      Source.getKind() == RequirementSource::ProtocolRequirementSignatureSelf
-          ? RequirementSource::Explicit
-          : RequirementSource::Redundant;
-  RequirementSource InnerSource(InnerKind, Source.getLoc());
-
   bool inserted = Visited.insert(Proto).second;
   assert(inserted);
   (void) inserted;
 
-  // Add all of the inherited protocol requirements, recursively.
-  if (auto resolver = getLazyResolver())
-    resolver->resolveInheritedProtocols(Proto);
-  for (auto InheritedProto : Proto->getInheritedProtocols(getLazyResolver())) {
-    if (Visited.count(InheritedProto))
-      continue;
-    if (addConformanceRequirement(T, InheritedProto, InnerSource, Visited))
-      return true;
-  }
+  // Requirements introduced by the main protocol are explicit in a protocol
+  // requirement signature, but inferred from this conformance otherwise.
+  auto Kind =
+      Source.getKind() == RequirementSource::ProtocolRequirementSignatureSelf
+          ? RequirementSource::Explicit
+          : RequirementSource::Protocol;
 
-  // Add requirements for each of the associated types.
-  // FIXME: This should use the generic signature, not walk the members.
-  for (auto Member : Proto->getMembers()) {
-    if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
-      // Add requirements placed directly on this associated type.
-      auto AssocPA = T->getNestedType(AssocType, *this);
-      // Requirements introduced by the main protocol are explicit in a protocol
-      // requirement signature, but inferred from this conformance otherwise.
-      auto Kind = Source.getKind() ==
-                          RequirementSource::ProtocolRequirementSignatureSelf
-                      ? RequirementSource::Explicit
-                      : RequirementSource::Protocol;
+  // Use the requirement signature to avoid rewalking the entire protocol.  This
+  // cannot compute the requirement signature directly, because that may be
+  // infinitely recursive: this code is also used to construct it.
+  if (Proto->isRequirementSignatureComputed()) {
+    auto reqSig = Proto->getRequirementSignature();
 
-      if (AssocPA != T) {
-        if (addAbstractTypeParamRequirements(AssocType, AssocPA, Kind, Visited))
-          return true;
+    for (auto req : reqSig->getRequirements()) {
+      RequirementSource InnerSource(Kind, Source.getLoc());
+      addRequirement(req, InnerSource, T, Visited);
+    }
+  } else {
+    // Conformances to inherit protocols are explicit in a protocol requirement
+    // signature, but inferred from this conformance otherwise.
+    auto InnerKind =
+        Source.getKind() == RequirementSource::ProtocolRequirementSignatureSelf
+            ? RequirementSource::Explicit
+            : RequirementSource::Redundant;
+    RequirementSource InnerSource(InnerKind, Source.getLoc());
+    // Add all of the inherited protocol requirements, recursively.
+    if (auto resolver = getLazyResolver())
+      resolver->resolveInheritedProtocols(Proto);
+
+    for (auto InheritedProto :
+         Proto->getInheritedProtocols(getLazyResolver())) {
+      if (Visited.count(InheritedProto)) {
+        markPotentialArchetypeRecursive(T, InheritedProto, InnerSource);
+        continue;
       }
-
-      continue;
+      if (addConformanceRequirement(T, InheritedProto, InnerSource, Visited))
+        return true;
     }
 
-    // FIXME: Requirement declarations.
+    // Add requirements for each of the associated types.
+    for (auto Member : getProtocolMembers(Proto)) {
+      if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
+        // Add requirements placed directly on this associated type.
+        auto AssocPA = T->getNestedType(AssocType, *this);
+
+        if (AssocPA != T) {
+          if (addAbstractTypeParamRequirements(AssocType, AssocPA, Kind,
+                                               Visited))
+            return true;
+        }
+
+        continue;
+      }
+
+      // FIXME: Requirement declarations.
+    }
   }
-  
+
   Visited.erase(Proto);
   return false;
 }
 
-bool ArchetypeBuilder::addLayoutRequirement(PotentialArchetype *PAT,
+bool GenericSignatureBuilder::addLayoutRequirement(PotentialArchetype *PAT,
                                             LayoutConstraint Layout,
                                             RequirementSource Source) {
   // Add the requirement to the representative.
@@ -1095,7 +1185,7 @@ bool ArchetypeBuilder::addLayoutRequirement(PotentialArchetype *PAT,
   return false;
 }
 
-bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
+bool GenericSignatureBuilder::addSuperclassRequirement(PotentialArchetype *T,
                                                 Type Superclass,
                                                 RequirementSource Source) {
   T = T->getRepresentative();
@@ -1123,7 +1213,7 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
     for (auto &conforms : T->ConformsTo) {
       if (auto superConformance = getSuperConformance(T, conforms.first,
                                                       conforms.second, *this)) {
-        for (auto req : conforms.first->getMembers()) {
+        for (auto req : getProtocolMembers(conforms.first)) {
           auto assocType = dyn_cast<AssociatedTypeDecl>(req);
           if (!assocType) continue;
 
@@ -1175,7 +1265,8 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
     // constraint.
     } else if (!Superclass->isExactSuperclassOf(T->Superclass, nullptr)) {
       Diags.diagnose(Source.getLoc(),
-                     diag::requires_superclass_conflict, T->getName(),
+                     diag::requires_superclass_conflict,
+                     T->getDependentType(/*FIXME: */{ }, true),
                      T->Superclass, Superclass)
         .highlight(T->SuperclassSource->getLoc());
       return true;
@@ -1194,7 +1285,7 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
   return false;
 }
 
-void ArchetypeBuilder::PotentialArchetype::addSameTypeConstraint(
+void GenericSignatureBuilder::PotentialArchetype::addSameTypeConstraint(
                                              PotentialArchetype *otherPA,
                                              const RequirementSource &source) {
   // If the types are the same, there's nothing to do.
@@ -1211,7 +1302,7 @@ void ArchetypeBuilder::PotentialArchetype::addSameTypeConstraint(
     updateRequirementSource(insertedIntoOther.first->second, source);
 }
 
-bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
+bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
        PotentialArchetype *OrigT1,
        PotentialArchetype *OrigT2,
        RequirementSource Source) 
@@ -1238,13 +1329,17 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   Type concrete2 = T2->getConcreteType();
   
   if (concrete1 && concrete2) {
-    if (!concrete1->isEqual(concrete2)) {
-      StringRef Name = T1->getFullName();
-      Diags.diagnose(Source.getLoc(), diag::requires_same_type_conflict,
-                     Name, concrete1, concrete2);
-      return true;
-      
-    }
+    bool mismatch =
+      addSameTypeRequirement(concrete1, concrete2, Source, nullptr,
+        [&](Type type1, Type type2) {
+          Diags.diagnose(Source.getLoc(),
+                         diag::requires_same_type_conflict,
+                         T1->getDependentType(/*FIXME: */{ }, true), type1,
+                         type2);
+
+        });
+
+    if (mismatch) return true;
   } else if (concrete1) {
     assert(!T2->ConcreteType
            && "already formed archetype for concrete-constrained parameter");
@@ -1289,18 +1384,20 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
 
   // Recursively merge the associated types of T2 into T1.
   RequirementSource redundantSource(RequirementSource::Redundant, SourceLoc());
-  for (auto T2Nested : T2->NestedTypes) {
-    auto T1Nested = T1->getNestedType(T2Nested.first, *this);
-    if (addSameTypeRequirementBetweenArchetypes(T1Nested,
-                                                T2Nested.second.front(),
-                                                redundantSource))
-      return true;
+  for (auto equivT2 : T2->EquivalenceClass) {
+    for (auto T2Nested : equivT2->NestedTypes) {
+      auto T1Nested = T1->getNestedType(T2Nested.first, *this);
+      if (addSameTypeRequirementBetweenArchetypes(T1Nested,
+                                                  T2Nested.second.front(),
+                                                  redundantSource))
+        return true;
+    }
   }
 
   return false;
 }
 
-bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
+bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
        PotentialArchetype *T,
        Type Concrete,
        RequirementSource Source) {
@@ -1310,12 +1407,17 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   // If we've already been bound to a type, we're either done, or we have a
   // problem.
   if (auto oldConcrete = T->getConcreteType()) {
-    if (!oldConcrete->isEqual(Concrete)) {
-      StringRef Name = T->getFullName();
-      Diags.diagnose(Source.getLoc(), diag::requires_same_type_conflict,
-                     Name, oldConcrete, Concrete);
-      return true;
-    }
+    bool mismatch =
+      addSameTypeRequirement(oldConcrete, Concrete, Source, nullptr,
+        [&](Type type1, Type type2) {
+          Diags.diagnose(Source.getLoc(),
+                         diag::requires_same_type_conflict,
+                         T->getDependentType(/*FIXME: */{ }, true), type1,
+                         type2);
+
+        });
+
+    if (mismatch) return true;
     return false;
   }
   
@@ -1347,6 +1449,8 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
 
   // Make sure the concrete type fulfills the superclass requirement
   // of the archetype.
+  RequirementSource redundantSource(RequirementSource::Redundant,
+                                    Source.getLoc());
   if (T->Superclass) {
     if (!T->Superclass->isExactSuperclassOf(Concrete, getLazyResolver())) {
       Diags.diagnose(Source.getLoc(), diag::type_does_not_inherit,
@@ -1356,156 +1460,128 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
         .highlight(T->SuperclassSource->getLoc());
       return true;
     }
+
+    // The superclass requirement is made redundant by the concrete type
+    // assignment.
+    updateRequirementSource(*T->SuperclassSource, redundantSource);
   }
 
-  // Recursively resolve the associated types to their concrete types.
-  for (auto nested : T->getNestedTypes()) {
-    AssociatedTypeDecl *assocType
-      = nested.second.front()->getResolvedAssociatedType();
-    if (auto *concreteArchetype = Concrete->getAs<ArchetypeType>()) {
-      Type witnessType = concreteArchetype->getNestedType(nested.first);
-      addSameTypeRequirementToConcrete(nested.second.front(), witnessType,
-                                       Source);
-    } else if (assocType) {
-      assert(conformances.count(assocType->getProtocol()) > 0
-             && "missing conformance?");
-      auto conformance = conformances.find(assocType->getProtocol())->second;
-      Type witnessType;
-      if (conformance.isConcrete()) {
-        witnessType = conformance.getConcrete()
-                        ->getTypeWitness(assocType, getLazyResolver())
-                        .getReplacement();
-      } else {
-        witnessType = DependentMemberType::get(Concrete, assocType);
-      }
-
-      if (auto witnessPA = resolveArchetype(witnessType)) {
-        addSameTypeRequirementBetweenArchetypes(nested.second.front(),
-                                                witnessPA,
-                                                Source);
-      } else {
-        addSameTypeRequirementToConcrete(nested.second.front(),
-                                         witnessType,
-                                         Source);
-      }
+  // Eagerly resolve any existing nested types to their concrete forms (others
+  // will be "concretized" as they are constructed, in getNestedType).
+  for (auto equivT : T->EquivalenceClass) {
+    for (auto nested : equivT->getNestedTypes()) {
+      concretizeNestedTypeFromConcreteParent(
+          equivT, nested.second.front(), *this,
+          [&](ProtocolDecl *proto) -> ProtocolConformanceRef {
+            return conformances.find(proto)->second;
+          });
     }
   }
-  
+
   return false;
 }
-                                                               
-bool ArchetypeBuilder::addSameTypeRequirement(Type Reqt1, Type Reqt2,
-                                              RequirementSource Source) {
-  // Find the potential archetypes.
-  PotentialArchetype *T1 = resolveArchetype(Reqt1);
-  PotentialArchetype *T2 = resolveArchetype(Reqt2);
-  
-  // Require that at least one side of the requirement be a potential archetype.
-  if (!T1 && !T2) {
-    Diags.diagnose(Source.getLoc(), diag::requires_no_same_type_archetype);
-    return true;
-  }
-  
-  // If both sides of the requirement are open archetypes, combine them.
-  if (T1 && T2)
-    return addSameTypeRequirementBetweenArchetypes(T1, T2, Source);
-  
-  // Otherwise, we're binding an open archetype.
-  if (T1)
-    return addSameTypeRequirementToConcrete(T1, Reqt2, Source);
-  return addSameTypeRequirementToConcrete(T2, Reqt1, Source);
+
+bool GenericSignatureBuilder::addSameTypeRequirement(
+                        Type type1, Type type2,
+                        RequirementSource source,
+                        PotentialArchetype *basePA,
+                        llvm::function_ref<void(Type, Type)> diagnoseMismatch) {
+  // Local class to handle matching the two sides of the same-type constraint.
+  class ReqTypeMatcher : public TypeMatcher<ReqTypeMatcher> {
+    GenericSignatureBuilder &builder;
+    RequirementSource source;
+    PotentialArchetype *basePA;
+    llvm::function_ref<void(Type, Type)> diagnoseMismatch;
+
+  public:
+    ReqTypeMatcher(GenericSignatureBuilder &builder,
+                   RequirementSource source,
+                   PotentialArchetype *basePA,
+                   llvm::function_ref<void(Type, Type)> diagnoseMismatch)
+      : builder(builder), source(source), basePA(basePA),
+        diagnoseMismatch(diagnoseMismatch) { }
+
+    bool mismatch(TypeBase *firstType, TypeBase *secondType,
+                  Type sugaredFirstType) {
+      // Find the potential archetypes.
+      PotentialArchetype *pa1 = builder.resolveArchetype(firstType, basePA);
+      PotentialArchetype *pa2 = builder.resolveArchetype(secondType, basePA);
+
+      // If both sides of the requirement are type parameters, equate them.
+      if (pa1 && pa2)
+        return !builder.addSameTypeRequirementBetweenArchetypes(pa1, pa2,
+                                                                source);
+
+      // If just one side is a type parameter, map it to a concrete type.
+      if (pa1)
+        return !builder.addSameTypeRequirementToConcrete(pa1, secondType,
+                                                         source);
+      if (pa2)
+        return !builder.addSameTypeRequirementToConcrete(pa2, sugaredFirstType,
+                                                         source);
+
+      diagnoseMismatch(sugaredFirstType, secondType);
+      return false;
+    }
+  } matcher(*this, source, basePA, diagnoseMismatch);
+
+  return !matcher.match(type1, type2);
 }
 
-bool ArchetypeBuilder::addAbstractTypeParamRequirements(
+// Local function to mark the given associated type as recursive,
+// diagnosing it if this is the first such occurrence.
+void GenericSignatureBuilder::markPotentialArchetypeRecursive(
+    PotentialArchetype *pa, ProtocolDecl *proto, RequirementSource source) {
+  if (pa->isRecursive())
+    return;
+  pa->setIsRecursive();
+
+  // FIXME: Drop this protocol.
+  pa->addConformance(proto, /*updateExistingSource=*/true, source, *this);
+  if (!pa->getParent())
+    return;
+
+  auto assocType = pa->getResolvedAssociatedType();
+  if (!assocType || assocType->isInvalid())
+    return;
+
+  Diags.diagnose(assocType->getLoc(), diag::recursive_requirement_reference);
+
+  // Silence downstream errors referencing this associated type.
+  assocType->setInvalid();
+}
+
+bool GenericSignatureBuilder::addAbstractTypeParamRequirements(
        AbstractTypeParamDecl *decl,
        PotentialArchetype *pa,
        RequirementSource::Kind kind,
        llvm::SmallPtrSetImpl<ProtocolDecl *> &visited) {
-  // Local function to mark the given associated type as recursive,
-  // diagnosing it if this is the first such occurrence.
-  auto markRecursive = [&](AssociatedTypeDecl *assocType,
-                           ProtocolDecl *proto,
-                           SourceLoc loc) {
-    if (!pa->isRecursive() && !assocType->isInvalid()) {
-      Diags.diagnose(assocType->getLoc(),
-                     diag::recursive_requirement_reference);
-    }
-    pa->setIsRecursive();
-
-    // Silence downstream errors referencing this associated type.
-    assocType->setInvalid();
-
-    // FIXME: Drop this protocol.
-    pa->addConformance(proto, /*updateExistingSource=*/true,
-                       RequirementSource(kind, loc), *this);
-  };
-
   if (isa<AssociatedTypeDecl>(decl) &&
       decl->hasInterfaceType() &&
       decl->getInterfaceType()->is<ErrorType>())
     return false;
 
-  // If this is an associated type that already has an archetype assigned,
-  // use that information.
-  auto *genericEnv = decl->getDeclContext()
-      ->getGenericEnvironmentOfContext();
-  if (isa<AssociatedTypeDecl>(decl) && genericEnv != nullptr) {
-    auto *archetype = genericEnv->mapTypeIntoContext(
-        decl->getDeclaredInterfaceType(),
-        getLookupConformanceFn())
-            ->getAs<ArchetypeType>();
-
-    if (archetype) {
-      SourceLoc loc = decl->getLoc();
-
-      // Superclass requirement.
-      if (auto superclass = archetype->getSuperclass()) {
-        if (addSuperclassRequirement(pa, superclass,
-                                     RequirementSource(kind, loc)))
-          return true;
-      }
-
-      // Conformance requirements.
-      for (auto proto : archetype->getConformsTo()) {
-        if (visited.count(proto)) {
-          if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
-            markRecursive(assocType, proto, loc);
-
-          continue;
-        }
-
-        if (addConformanceRequirement(pa, proto, RequirementSource(kind, loc),
-                                      visited))
-          return true;
-      }
-
-      return false;
-    }
-  }
-
   // Otherwise, walk the 'inherited' list to identify requirements.
   if (auto resolver = getLazyResolver())
     resolver->resolveInheritanceClause(decl);
-  return visitInherited(decl->getInherited(),
-                        [&](Type inheritedType, SourceLoc loc) -> bool {
+  return visitInherited(decl->getInherited(), [&](Type inheritedType,
+                                                  SourceLoc loc) -> bool {
+    RequirementSource source(kind, loc);
     // Protocol requirement.
     if (auto protocolType = inheritedType->getAs<ProtocolType>()) {
       if (visited.count(protocolType->getDecl())) {
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
-          markRecursive(assocType, protocolType->getDecl(), loc);
+        markPotentialArchetypeRecursive(pa, protocolType->getDecl(), source);
 
         return true;
       }
 
-      return addConformanceRequirement(pa, protocolType->getDecl(),
-                                       RequirementSource(kind, loc),
+      return addConformanceRequirement(pa, protocolType->getDecl(), source,
                                        visited);
     }
 
     // Superclass requirement.
     if (inheritedType->getClassOrBoundGenericClass()) {
-      return addSuperclassRequirement(pa, inheritedType,
-                                      RequirementSource(kind, loc));
+      return addSuperclassRequirement(pa, inheritedType, source);
     }
 
     // Note: anything else is an error, to be diagnosed later.
@@ -1513,7 +1589,7 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
   });
 }
 
-bool ArchetypeBuilder::visitInherited(
+bool GenericSignatureBuilder::visitInherited(
        ArrayRef<TypeLoc> inheritedTypes,
        llvm::function_ref<bool(Type, SourceLoc)> visitor) {
   // Local function that (recursively) adds inherited types.
@@ -1539,7 +1615,7 @@ bool ArchetypeBuilder::visitInherited(
   return isInvalid;
 }
 
-bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
+bool GenericSignatureBuilder::addRequirement(const RequirementRepr &Req) {
   switch (Req.getKind()) {
   case RequirementReprKind::LayoutConstraint: {
     // FIXME: Need to do something here.
@@ -1594,84 +1670,109 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
   }
 
   case RequirementReprKind::SameType:
-    return addSameTypeRequirement(Req.getFirstType(), 
-                                  Req.getSecondType(),
-                                  RequirementSource(RequirementSource::Explicit,
-                                                    Req.getEqualLoc()));
+    // Require that at least one side of the requirement contain a type
+    // parameter.
+    if (!Req.getFirstType()->hasTypeParameter() &&
+        !Req.getSecondType()->hasTypeParameter()) {
+      Diags.diagnose(Req.getEqualLoc(), diag::requires_no_same_type_archetype)
+        .highlight(Req.getFirstTypeLoc().getSourceRange())
+        .highlight(Req.getSecondTypeLoc().getSourceRange());
+      return true;
+    }
+
+    return addRequirement(Requirement(RequirementKind::SameType,
+                                      Req.getFirstType(),
+                                      Req.getSecondType()),
+                          RequirementSource(RequirementSource::Explicit,
+                                            Req.getEqualLoc()));
   }
 
   llvm_unreachable("Unhandled requirement?");
 }
 
-void ArchetypeBuilder::addRequirement(const Requirement &req, 
+bool GenericSignatureBuilder::addRequirement(const Requirement &req,
                                       RequirementSource source) {
+  llvm::SmallPtrSet<ProtocolDecl *, 8> Visited;
+  return addRequirement(req, source, nullptr, Visited);
+}
+
+bool GenericSignatureBuilder::addRequirement(
+    const Requirement &req, RequirementSource source,
+    PotentialArchetype *basePA,
+    llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited) {
   switch (req.getKind()) {
   case RequirementKind::Superclass: {
-    PotentialArchetype *pa = resolveArchetype(req.getFirstType());
-    if (!pa) return;
+    // FIXME: Diagnose this.
+    PotentialArchetype *pa = resolveArchetype(req.getFirstType(), basePA);
+    if (!pa) return false;
 
     assert(req.getSecondType()->getClassOrBoundGenericClass());
-    addSuperclassRequirement(pa, req.getSecondType(), source);
-    return;
+    return addSuperclassRequirement(pa, req.getSecondType(), source);
   }
 
   case RequirementKind::Layout: {
-    PotentialArchetype *pa = resolveArchetype(req.getFirstType());
-    if (!pa) return;
+    // FIXME: Diagnose this.
+    PotentialArchetype *pa = resolveArchetype(req.getFirstType(), basePA);
+    if (!pa) return false;
 
-    bool invalid = addLayoutRequirement(pa, req.getLayoutConstraint(), source);
-    assert(!invalid && "Re-introducing invalid requirement");
-    (void)invalid;
-
-    return;
+    return addLayoutRequirement(pa, req.getLayoutConstraint(), source);
   }
 
   case RequirementKind::Conformance: {
-    PotentialArchetype *pa = resolveArchetype(req.getFirstType());
-    if (!pa) return;
+    // FIXME: Diagnose this.
+    PotentialArchetype *pa = resolveArchetype(req.getFirstType(), basePA);
+    if (!pa) return false;
 
     SmallVector<ProtocolDecl *, 4> conformsTo;
-    bool existential = req.getSecondType()->isExistentialType(conformsTo);
-    assert(existential && "Re-introducing invalid requirement");
-    (void)existential;
+    (void)req.getSecondType()->isExistentialType(conformsTo);
 
     // Add each of the protocols.
     for (auto proto : conformsTo) {
-      bool invalid = addConformanceRequirement(pa, proto, source);
-      assert(!invalid && "Re-introducing invalid requirement");
-      (void)invalid;
+      if (Visited.count(proto)) {
+        markPotentialArchetypeRecursive(pa, proto, source);
+        continue;
+      }
+      if (addConformanceRequirement(pa, proto, source, Visited)) return true;
     }
 
-    return;
+    return false;
   }
 
   case RequirementKind::SameType:
-    addSameTypeRequirement(req.getFirstType(), req.getSecondType(), source);
-    return;
+    return addSameTypeRequirement(
+             req.getFirstType(), req.getSecondType(), source, basePA,
+             [&](Type type1, Type type2) {
+               if (source.getLoc().isValid())
+                 Diags.diagnose(source.getLoc(),
+                                diag::requires_same_concrete_type, type1,
+                                type2);
+             });
   }
 
   llvm_unreachable("Unhandled requirement?");
 }
 
 /// AST walker that infers requirements from type representations.
-class ArchetypeBuilder::InferRequirementsWalker : public TypeWalker {
-  ArchetypeBuilder &Builder;
+class GenericSignatureBuilder::InferRequirementsWalker : public TypeWalker {
+  GenericSignatureBuilder &Builder;
   SourceLoc Loc;
-  unsigned Depth;
+  unsigned MinDepth;
+  unsigned MaxDepth;
 
   /// We cannot add requirements to archetypes from outer generic parameter
   /// lists.
   bool isOuterArchetype(PotentialArchetype *PA) {
     unsigned ParamDepth = PA->getRootGenericParamKey().Depth;
-    assert(ParamDepth <= Depth);
-    return ParamDepth < Depth;
+    assert(ParamDepth <= MaxDepth);
+    return ParamDepth < MinDepth;
   }
 
 public:
-  InferRequirementsWalker(ArchetypeBuilder &builder,
+  InferRequirementsWalker(GenericSignatureBuilder &builder,
                           SourceLoc loc,
-                          unsigned Depth)
-    : Builder(builder), Loc(loc), Depth(Depth) { }
+                          unsigned MinDepth,
+                          unsigned MaxDepth)
+    : Builder(builder), Loc(loc), MinDepth(MinDepth), MaxDepth(MaxDepth) { }
 
   Action walkToTypePost(Type ty) override {
     auto boundGeneric = ty->getAs<BoundGenericType>();
@@ -1778,32 +1879,34 @@ public:
   }
 };
 
-void ArchetypeBuilder::inferRequirements(TypeLoc type,
-                                         GenericParamList *genericParams) {
+void GenericSignatureBuilder::inferRequirements(TypeLoc type,
+                                         unsigned minDepth,
+                                         unsigned maxDepth) {
   if (!type.getType())
-    return;
-  if (genericParams == nullptr)
     return;
   // FIXME: Crummy source-location information.
   InferRequirementsWalker walker(*this, type.getSourceRange().Start,
-                                 genericParams->getDepth());
+                                 minDepth, maxDepth);
   type.getType().walk(walker);
 }
 
-void ArchetypeBuilder::inferRequirements(ParameterList *params,
+void GenericSignatureBuilder::inferRequirements(ParameterList *params,
                                          GenericParamList *genericParams) {
   if (genericParams == nullptr)
     return;
-  
+
+  unsigned depth = genericParams->getDepth();
   for (auto P : *params)
-    inferRequirements(P->getTypeLoc(), genericParams);
+    inferRequirements(P->getTypeLoc(),
+                      /*minDepth=*/depth,
+                      /*maxDepth=*/depth);
 }
 
 /// Perform typo correction on the given nested type, producing the
 /// corrected name (if successful).
 static Identifier typoCorrectNestedType(
-                    ArchetypeBuilder::PotentialArchetype *pa) {
-  StringRef name = pa->getName().str();
+                    GenericSignatureBuilder::PotentialArchetype *pa) {
+  StringRef name = pa->getNestedName().str();
 
   // Look through all of the associated types of all of the protocols
   // to which the parent conforms.
@@ -1812,7 +1915,7 @@ static Identifier typoCorrectNestedType(
   unsigned maxScore = (name.size() + 1) / 3;
   for (const auto &conforms : pa->getParent()->getConformsTo()) {
     auto proto = conforms.first;
-    for (auto member : proto->getMembers()) {
+    for (auto member : getProtocolMembers(proto)) {
       auto assocType = dyn_cast<AssociatedTypeDecl>(member);
       if (!assocType)
         continue;
@@ -1851,7 +1954,139 @@ static Identifier typoCorrectNestedType(
 }
 
 void
-ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
+GenericSignatureBuilder::finalize(SourceLoc loc,
+                           ArrayRef<GenericTypeParamType *> genericParams,
+                           bool allowConcreteGenericParams) {
+  assert(!Impl->finalized && "Already finalized builder");
+#ifndef NDEBUG
+  Impl->finalized = true;
+#endif
+
+  // Local function (+ cache) describing the set of potential archetypes
+  // directly referenced by the concrete same-type constraint of the given
+  // potential archetype. Both the inputs and results are the representatives
+  // of their equivalence classes.
+  llvm::DenseMap<PotentialArchetype *,
+                 SmallPtrSet<PotentialArchetype *, 4>> concretePAs;
+  auto getConcreteReferencedPAs
+      = [&](PotentialArchetype *pa) -> SmallPtrSet<PotentialArchetype *, 4> {
+    assert(pa == pa->getRepresentative() && "Only use with representatives");
+    auto known = concretePAs.find(pa);
+    if (known != concretePAs.end())
+      return known->second;
+
+    SmallPtrSet<PotentialArchetype *, 4> referencedPAs;
+    if (!pa->isConcreteType() || !pa->getConcreteType()->hasTypeParameter())
+      return referencedPAs;
+
+    if (auto concreteType = pa->getConcreteType()) {
+      if (concreteType->hasTypeParameter()) {
+        concreteType.visit([&](Type type) {
+          if (type->isTypeParameter()) {
+            if (auto referencedPA = resolveArchetype(type)) {
+              referencedPAs.insert(referencedPA->getRepresentative());
+            }
+          }
+        });
+      }
+    }
+
+    concretePAs[pa] = referencedPAs;
+    return referencedPAs;
+  };
+
+  /// Check whether the given type references the archetype.
+  auto isRecursiveConcreteType = [&](PotentialArchetype *archetype,
+                                     bool isSuperclass) {
+    SmallPtrSet<PotentialArchetype *, 4> visited;
+    SmallVector<PotentialArchetype *, 4> stack;
+    stack.push_back(archetype);
+    visited.insert(archetype);
+
+    // Check whether the specific type introduces recursion.
+    auto checkTypeRecursion = [&](Type type) {
+      if (!type->hasTypeParameter()) return false;
+
+      return type.findIf([&](Type type) {
+        if (type->isTypeParameter()) {
+          if (auto referencedPA = resolveArchetype(type)) {
+            referencedPA = referencedPA->getRepresentative();
+            if (referencedPA == archetype) return true;
+
+            if (visited.insert(referencedPA).second)
+              stack.push_back(referencedPA);
+          }
+        }
+
+        return false;
+      });
+    };
+
+    while (!stack.empty()) {
+      auto pa = stack.back();
+      stack.pop_back();
+
+      // If we're checking superclasses, do so now.
+      if (isSuperclass) {
+        if (auto superclass = pa->getSuperclass()) {
+          if (checkTypeRecursion(superclass)) return true;
+        }
+      }
+
+      // Otherwise, look for the potential archetypes referenced by
+      // same-type constraints.
+      for (auto referencedPA : getConcreteReferencedPAs(pa)) {
+        // If we found a reference to the original archetype, it's recursive.
+        if (referencedPA == archetype) return true;
+
+        if (visited.insert(referencedPA).second)
+          stack.push_back(referencedPA);
+      }
+    }
+
+    return false;
+  };
+
+  // Check for recursive same-type bindings and superclass constraints.
+  visitPotentialArchetypes([&](PotentialArchetype *archetype) {
+    if (archetype != archetype->getRepresentative()) return;
+
+    // Check for recursive same-type bindings.
+    if (archetype->isConcreteType()) {
+      if (isRecursiveConcreteType(archetype, /*isSuperclass=*/false)) {
+        if (archetype->ConcreteTypeSource->getLoc().isValid())
+          Diags.diagnose(archetype->ConcreteTypeSource->getLoc(),
+                         diag::recursive_same_type_constraint,
+                         archetype->getDependentType(genericParams,
+                                                     /*allowUnresolved=*/true),
+                         archetype->getConcreteType());
+
+        archetype->RecursiveConcreteType = true;
+      }
+    }
+
+    // Check for recursive superclass bindings.
+    if (archetype->getSuperclass()) {
+      if (isRecursiveConcreteType(archetype, /*isSuperclass=*/true)) {
+        if (archetype->SuperclassSource->getLoc().isValid())
+          Diags.diagnose(archetype->SuperclassSource->getLoc(),
+                         diag::recursive_superclass_constraint,
+                         archetype->getDependentType(genericParams,
+                                                     /*allowUnresolved=*/true),
+                         archetype->getSuperclass());
+
+        archetype->RecursiveSuperclassType = true;
+      }
+    }
+  });
+
+  // Create anchors for all of the potential archetypes.
+  // FIXME: This is because we might be missing some from the equivalence
+  // classes. It is an egregious hack.
+  visitPotentialArchetypes([&](PotentialArchetype *archetype) {
+    (void)archetype->getArchetypeAnchor(*this);
+  });
+
   SmallPtrSet<PotentialArchetype *, 4> visited;
 
   // Check for generic parameters which have been made concrete or equated
@@ -1882,7 +2117,8 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
 
         Diags.diagnose(Source->getLoc(),
                        diag::requires_generic_param_made_equal_to_concrete,
-                       rep->getName());
+                       rep->getDependentType(genericParams,
+                                             /*allowUnresolved=*/true));
         continue;
       }
 
@@ -1911,7 +2147,8 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
 
         Diags.diagnose(constraintLoc,
                        diag::requires_generic_params_made_equal,
-                       pa->getName(), other->getName());
+                       pa->getDependentType(genericParams, true),
+                       other->getDependentType(genericParams, true));
         break;
       }
     }
@@ -1948,16 +2185,18 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
   }
 }
 
-bool ArchetypeBuilder::diagnoseRemainingRenames(SourceLoc loc) {
+bool GenericSignatureBuilder::diagnoseRemainingRenames(
+                              SourceLoc loc,
+                              ArrayRef<GenericTypeParamType *> genericParams) {
   bool invalid = false;
 
   for (auto pa : Impl->RenamedNestedTypes) {
     if (pa->alreadyDiagnosedRename()) continue;
 
     Diags.diagnose(loc, diag::invalid_member_type_suggest,
-                   pa->getParent()->getDependentType(/*FIXME: */{ },
+                   pa->getParent()->getDependentType(genericParams,
                                                      /*allowUnresolved=*/true),
-                   pa->getOriginalName(), pa->getName());
+                   pa->getOriginalName(), pa->getNestedName());
     invalid = true;
   }
 
@@ -1965,7 +2204,7 @@ bool ArchetypeBuilder::diagnoseRemainingRenames(SourceLoc loc) {
 }
 
 template<typename F>
-void ArchetypeBuilder::visitPotentialArchetypes(F f) {
+void GenericSignatureBuilder::visitPotentialArchetypes(F f) {
   // Stack containing all of the potential archetypes to visit.
   SmallVector<PotentialArchetype *, 4> stack;
   llvm::SmallPtrSet<PotentialArchetype *, 4> visited;
@@ -1994,8 +2233,8 @@ void ArchetypeBuilder::visitPotentialArchetypes(F f) {
 }
 
 namespace {
-  using PotentialArchetype = ArchetypeBuilder::PotentialArchetype;
-}
+  using PotentialArchetype = GenericSignatureBuilder::PotentialArchetype;
+} // end anonymous namespace
 
 /// Perform a depth-first search from the given potential archetype through
 /// the *implicit* same-type constraints.
@@ -2098,17 +2337,39 @@ static SmallVector<PotentialArchetype *, 2> getSameTypeComponentAnchors(
   return componentAnchors;
 }
 
-void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
+void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
                      void (RequirementKind kind,
                            PotentialArchetype *archetype,
-                           ArchetypeBuilder::RequirementRHS constraint,
+                           GenericSignatureBuilder::RequirementRHS constraint,
                            RequirementSource source)> f) {
-  // First, collect all archetypes, and sort them.
+  // Collect all archetypes.
   SmallVector<PotentialArchetype *, 8> archetypes;
   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
     archetypes.push_back(archetype);
   });
 
+  // Remove any invalid potential archetypes or archetypes whose parents are
+  // concrete; they have no requirements.
+  archetypes.erase(
+    std::remove_if(archetypes.begin(), archetypes.end(),
+      [&](PotentialArchetype *archetype) -> bool {
+        // Invalid archetypes are never representatives in well-formed or
+        // corrected signature, so we don't need to visit them.
+        if (archetype->isInvalid())
+          return true;
+
+        // If there is a concrete type above us, there are no requirements to
+        // emit.
+        if (archetype->getParent() &&
+            hasConcreteTypeInPath(archetype->getParent()))
+          return true;
+
+        // Keep it.
+        return false;
+      }),
+    archetypes.end());
+
+  // Sort the archetypes in canonical order.
   llvm::array_pod_sort(archetypes.begin(), archetypes.end(),
                        compareDependentTypes);
 
@@ -2128,25 +2389,12 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
     };
 
   for (auto *archetype : archetypes) {
-    // Invalid archetypes are never representatives in well-formed or corrected
-    // signature, so we don't need to visit them.
-    if (archetype->isInvalid())
-      continue;
-
-    // If this type is equivalent to a concrete type, emit the same-type
-    // constraint.
-    auto rep = archetype->getRepresentative();
-    if (auto concreteType = rep->getConcreteType()) {
-      f(RequirementKind::SameType, archetype, concreteType,
-        rep->getConcreteTypeSource());
-      continue;
-    }
-
     // Check whether this archetype is one of the anchors within its
-    // connected component. If so, we may need to emit an archetype anchor.
+    // connected component. If so, we may need to emit a same-type constraint.
     //
     // FIXME: O(n) in the number of implied connected components within the
     // equivalence class. The equivalence class should be small, but...
+    auto rep = archetype->getRepresentative();
     auto componentAnchors = getSameTypeComponentAnchors(rep);
     auto knownAnchor = std::find(componentAnchors.begin(),
                                  componentAnchors.end(),
@@ -2154,6 +2402,14 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
     std::function<void()> deferredSameTypeRequirement;
 
     if (knownAnchor != componentAnchors.end()) {
+      // If this equivalance class is bound to a concrete type, equate the
+      // anchor with a concrete type.
+      if (auto concreteType = rep->getConcreteType()) {
+        f(RequirementKind::SameType, archetype, concreteType,
+          rep->getConcreteTypeSource());
+        continue;
+      }
+
       // If we're at the last anchor in the component, do nothing;
       auto nextAnchor = knownAnchor;
       ++nextAnchor;
@@ -2173,7 +2429,7 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
     };
 
     // If this is not the archetype anchor, we're done.
-    if (archetype != archetype->getArchetypeAnchor())
+    if (archetype != archetype->getArchetypeAnchor(*this))
       continue;
 
     // If we have a superclass, produce a superclass requirement
@@ -2212,15 +2468,15 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
   };
 }
 
-void ArchetypeBuilder::dump() {
+void GenericSignatureBuilder::dump() {
   dump(llvm::errs());
 }
 
-void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
+void GenericSignatureBuilder::dump(llvm::raw_ostream &out) {
   out << "Requirements:";
   enumerateRequirements([&](RequirementKind kind,
                             PotentialArchetype *archetype,
-                            ArchetypeBuilder::RequirementRHS constraint,
+                            GenericSignatureBuilder::RequirementRHS constraint,
                             RequirementSource source) {
     switch (kind) {
     case RequirementKind::Conformance:
@@ -2253,9 +2509,15 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
     }
   });
   out << "\n";
+
+  out << "Potential archetypes:\n";
+  for (auto pa : Impl->PotentialArchetypes) {
+    pa->dump(out, &Context.SourceMgr, 2);
+  }
+  out << "\n";
 }
 
-void ArchetypeBuilder::addGenericSignature(GenericSignature *sig) {
+void GenericSignatureBuilder::addGenericSignature(GenericSignature *sig) {
   if (!sig) return;
 
   RequirementSource::Kind sourceKind = RequirementSource::Explicit;
@@ -2270,12 +2532,12 @@ void ArchetypeBuilder::addGenericSignature(GenericSignature *sig) {
 
 /// Collect the set of requirements placed on the given generic parameters and
 /// their associated types.
-static void collectRequirements(ArchetypeBuilder &builder,
+static void collectRequirements(GenericSignatureBuilder &builder,
                                 ArrayRef<GenericTypeParamType *> params,
                                 SmallVectorImpl<Requirement> &requirements) {
   builder.enumerateRequirements([&](RequirementKind kind,
-          ArchetypeBuilder::PotentialArchetype *archetype,
-          ArchetypeBuilder::RequirementRHS type,
+          GenericSignatureBuilder::PotentialArchetype *archetype,
+          GenericSignatureBuilder::RequirementRHS type,
           RequirementSource source) {
     // Filter out redundant requirements.
     switch (source.getKind()) {
@@ -2318,7 +2580,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
       return;
     } else {
       // ...or to a dependent type.
-      repTy = type.get<ArchetypeBuilder::PotentialArchetype *>()
+      repTy = type.get<GenericSignatureBuilder::PotentialArchetype *>()
           ->getDependentType(params, /*allowUnresolved=*/false);
     }
 
@@ -2329,7 +2591,9 @@ static void collectRequirements(ArchetypeBuilder &builder,
   });
 }
 
-GenericSignature *ArchetypeBuilder::getGenericSignature() {
+GenericSignature *GenericSignatureBuilder::getGenericSignature() {
+  assert(Impl->finalized && "Must finalize builder first");
+
   // Collect the requirements placed on the generic parameter types.
   SmallVector<Requirement, 4> requirements;
   collectRequirements(*this, Impl->GenericParams, requirements);
@@ -2337,51 +2601,3 @@ GenericSignature *ArchetypeBuilder::getGenericSignature() {
   auto sig = GenericSignature::get(Impl->GenericParams, requirements);
   return sig;
 }
-
-GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
-                                                  GenericSignature *signature) {
-  // Create the generic environment, which will be lazily populated with
-  // archetypes.
-  auto genericEnv = GenericEnvironment::getIncomplete(signature, this);
-
-  // Force the creation of all of the archetypes.
-  // FIXME: This isn't a well-formed notion with recursive protocol constraints.
-  visitPotentialArchetypes([&](PotentialArchetype *pa) {
-    if (auto archetype =
-          genericEnv->mapTypeIntoContext(
-              pa->getDependentType(signature->getGenericParams(),
-                                   /*allowUnresolved=*/false),
-              getLookupConformanceFn())
-            ->getAs<ArchetypeType>())
-      (void)archetype->getAllNestedTypes();
-  });
-  genericEnv->clearArchetypeBuilder();
-
-#ifndef NDEBUG
-  // FIXME: This property should be maintained when there are errors, too.
-  if (!Diags.hadAnyError()) {
-    auto genericParams = signature->getGenericParams();
-    visitPotentialArchetypes([&](PotentialArchetype *pa) {
-      if (pa->isConcreteType()) return;
-
-      auto depTy = pa->getDependentType(genericParams,
-                                        /*allowUnresolved=*/false);
-      auto inContext = genericEnv->mapTypeIntoContext(depTy,
-                                                      getLookupConformanceFn());
-
-      auto repDepTy = pa->getRepresentative()->getDependentType(
-                                                    genericParams,
-                                                    /*allowUnresolved=*/false);
-      auto repInContext =
-        genericEnv->mapTypeIntoContext(repDepTy, getLookupConformanceFn());
-      assert((inContext->isEqual(repInContext) ||
-              inContext->hasError() ||
-              repInContext->hasError()) &&
-             "Potential archetype mapping differs from representative!");
-    });
-  }
-#endif
-
-  return genericEnv;
-}
-

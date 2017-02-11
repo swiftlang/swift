@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 310; // Last change: static/non-static values
+const uint16_t VERSION_MINOR = 313; // Last change: generic environments
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -642,12 +642,8 @@ namespace decls_block {
 
   using ArchetypeTypeLayout = BCRecordLayout<
     ARCHETYPE_TYPE,
-    BCFixed<1>,          // whether this is a primary archetype or not
-    TypeIDField,         // parent if non-primary, generic env if primary
-    DeclIDField,         // associated type decl if non-primary, name if primary
-    TypeIDField,         // superclass
-    BCArray<DeclIDField> // conformances
-    // Trailed by the nested types record.
+    GenericEnvironmentIDField, // generic environment
+    TypeIDField                // interface type
   >;
 
   using OpenedExistentialTypeLayout = BCRecordLayout<
@@ -660,16 +656,6 @@ namespace decls_block {
     TypeIDField          // self type
   >;
 
-  using ArchetypeNestedTypeNamesLayout = BCRecordLayout<
-    ARCHETYPE_NESTED_TYPE_NAMES,
-    BCArray<IdentifierIDField>
-  >;
-
-  using ArchetypeNestedTypesLayout = BCRecordLayout<
-    ARCHETYPE_NESTED_TYPES,
-    BCArray<TypeIDField>
-  >;
-  
   using ProtocolCompositionTypeLayout = BCRecordLayout<
     PROTOCOL_COMPOSITION_TYPE,
     BCArray<TypeIDField> // protocols
@@ -1098,13 +1084,13 @@ namespace decls_block {
 
   using GenericEnvironmentLayout = BCRecordLayout<
     GENERIC_ENVIRONMENT,
-    BCArray<TypeIDField>         // (sugared interface type, contextual type)
+    BCArray<TypeIDField>         // sugared interface types
   >;
 
   using SILGenericEnvironmentLayout = BCRecordLayout<
     SIL_GENERIC_ENVIRONMENT,
     BCArray<TypeIDField>         // (generic parameter name, sugared interface
-                                 //  type, contextual type) triples
+                                 //  type) pairs
   >;
 
   using GenericRequirementLayout = BCRecordLayout<

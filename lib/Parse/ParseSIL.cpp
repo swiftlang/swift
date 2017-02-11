@@ -1661,7 +1661,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
       }
     }
 
-    if (performTypeLocChecking(Ty, /*isSILType=*/ false, genericEnv))
+    if (performTypeLocChecking(Ty, /*IsSILType=*/ false, genericEnv))
       return true;
 
     // Pick the ValueDecl that has the right type.
@@ -2026,7 +2026,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   case ValueKind::OpenExistentialAddrInst:
   case ValueKind::OpenExistentialBoxInst:
   case ValueKind::OpenExistentialMetatypeInst:
-  case ValueKind::OpenExistentialRefInst: {
+  case ValueKind::OpenExistentialRefInst:
+  case ValueKind::OpenExistentialOpaqueInst: {
     SILType Ty;
     Identifier ToToken;
     SourceLoc ToLoc;
@@ -2060,6 +2061,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
     case ValueKind::OpenExistentialBoxInst:
       ResultVal = B.createOpenExistentialBox(InstLoc, Val, Ty);
+      break;
+    case ValueKind::OpenExistentialOpaqueInst:
+      ResultVal = B.createOpenExistentialOpaque(InstLoc, Val, Ty);
       break;
 
     default:
@@ -2104,6 +2108,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     UNARY_INSTRUCTION(EndBorrowArgument)
     UNARY_INSTRUCTION(UnmanagedReleaseValue)
     UNARY_INSTRUCTION(UnmanagedRetainValue)
+    UNARY_INSTRUCTION(UnmanagedAutoreleaseValue)
     REFCOUNTING_INSTRUCTION(StrongPin)
     REFCOUNTING_INSTRUCTION(StrongRetain)
     REFCOUNTING_INSTRUCTION(StrongRelease)

@@ -85,7 +85,7 @@ entry(%z : $*Z, %x : $*Foo):
   return %m : $@thick Foo.Type
 }
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @generic_type_generic_method_witness(%swift.opaque* noalias nocapture, %swift.type* %Z, %C19sil_witness_methods3Bar** noalias nocapture dereferenceable({{.*}}), %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @generic_type_generic_method_witness(%swift.opaque* noalias nocapture, %swift.type* %Z, %C19sil_witness_methods3Bar{{(.1)?}}** noalias nocapture dereferenceable(8), %swift.type* %Self, i8** %SelfWitnessTable)
 sil @generic_type_generic_method_witness : $@convention(witness_method) <T, U, V, Z> (@in Z, @in Bar<T, U, V>) -> @thick Bar<T, U, V>.Type {
 entry(%z : $*Z, %x : $*Bar<T, U, V>):
   %t = metatype $@thick T.Type

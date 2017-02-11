@@ -16,7 +16,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -2051,7 +2051,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
 
     auto *genericEnv = decl->getGenericEnvironmentOfContext();
     return GenericEnvironment::mapTypeIntoContext(
-        decl->getModuleContext(), genericEnv, interfaceType);
+        genericEnv, interfaceType);
   }
 
   // Get the parent type.
@@ -2453,6 +2453,11 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
     auto ctor = dyn_cast<ConstructorDecl>(member);
     if (!ctor)
       continue;
+
+    // Swift initializers added in extensions of Objective-C classes can never
+    // be overrides.
+    if (hasClangNode() && !ctor->hasClangNode())
+      return false;
 
     // Resolve this initializer, if needed.
     if (!ctor->hasInterfaceType())
@@ -3000,16 +3005,22 @@ void ProtocolDecl::createGenericParamsIfMissing() {
     setGenericParams(createGenericParams(this));
 }
 
-GenericSignature *ProtocolDecl::getRequirementSignature() {
+void ProtocolDecl::computeRequirementSignature() {
+  assert(!RequirementSignature && "already computed requirement signature");
+
   auto module = getParentModule();
 
   auto genericSig = getGenericSignature();
   // The signature should look like <Self where Self : ThisProtocol>, and we
   // reuse the two parts of it because the parameter and the requirement are
   // exactly what we need.
-  assert(genericSig->getGenericParams().size() == 1 &&
-         genericSig->getRequirements().size() == 1 &&
-         "getRequirementSignature with unexpected generic signature");
+  auto validSig = genericSig->getGenericParams().size() == 1 &&
+                  genericSig->getRequirements().size() == 1;
+  if (!validSig) {
+    // This doesn't look like a protocol we can handle, so some other error must
+    // have occured (usually a protocol nested within another declaration)
+    return;
+  }
 
   auto selfType = genericSig->getGenericParams()[0];
   auto requirement = genericSig->getRequirements()[0];
@@ -3017,11 +3028,12 @@ GenericSignature *ProtocolDecl::getRequirementSignature() {
   RequirementSource source(RequirementSource::ProtocolRequirementSignatureSelf,
                            getLoc());
 
-  ArchetypeBuilder builder(getASTContext(), LookUpConformanceInModule(module));
+  GenericSignatureBuilder builder(getASTContext(), LookUpConformanceInModule(module));
   builder.addGenericParameter(selfType);
   builder.addRequirement(requirement, source);
-
-  return builder.getGenericSignature();
+  builder.finalize(SourceLoc(), { selfType });
+  
+  RequirementSignature = builder.getGenericSignature();
 }
 
 /// Returns the default witness for a requirement, or nullptr if there is

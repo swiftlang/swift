@@ -85,7 +85,7 @@ struct FloatElement : HasElt {
   typealias Element = Float
 }
 @_specialize(where T == FloatElement)
-@_specialize(where T == IntElement) // expected-error{{generic parameter T.Element cannot be equal to both 'Float' and 'IntElement.Element' (aka 'Int')}}
+@_specialize(where T == IntElement) // expected-error{{generic parameter 'T.Element' cannot be equal to both 'Float' and 'Int'}}
 func sameTypeRequirement<T : HasElt>(_ t: T) where T.Element == Float {}
 
 @_specialize(where T == Sub)
@@ -155,7 +155,8 @@ func funcWithForbiddenSpecializeRequirement<T>(_ t: T) {
 }
 
 @_specialize(where T: _Trivial(32), T: _Trivial(64), T: _Trivial, T: _RefCountedObject) // expected-error{{multiple layout constraints cannot be used at the same time: '_Trivial(64)' and '_Trivial(32)'}} expected-note{{previous layout constraint declaration '_Trivial(32)' was here}} expected-error{{multiple layout constraints cannot be used at the same time: '_Trivial' and '_Trivial(32)'}} expected-note{{previous layout constraint declaration '_Trivial(32)' was here}} expected-error{{multiple layout constraints cannot be used at the same time: '_RefCountedObject' and '_Trivial(32)'}} expected-note{{previous layout constraint declaration '_Trivial(32)' was here}}
-@_specialize(where Array<T> == Int) // expected-error{{neither type in same-type refers to a generic parameter or associated type}} expected-error{{Only requirements on generic parameters are supported by '_specialize' attribute}}
+@_specialize(where Array<T> == Int) // expected-error{{Only requirements on generic parameters are supported by '_specialize' attribute}}
+// expected-error@-1{{generic signature requires types 'Array<T>' and 'Int' to be the same}}
 @_specialize(where T.Element == Int) // expected-error{{Only requirements on generic parameters are supported by '_specialize' attribute}}
 public func funcWithComplexSpecializeRequirements<T: ProtocolWithDep>(t: T) -> Int {
   return 55555
@@ -219,4 +220,30 @@ public func copy3<S>(_ s: S) -> S {
 }
 
 public func funcWithWhereClause<T>(t: T) where T:P, T: _Trivial(64) { // expected-error{{layout constraints are only allowed inside '_specialize' attributes}}
+}
+
+// rdar://problem/29333056
+public protocol P1 {
+  associatedtype DP1
+  associatedtype DP11
+}
+
+public protocol P2 {
+  associatedtype DP2 : P1
+}
+
+public struct H<T> {
+}
+
+public struct MyStruct3 : P1 {
+  public typealias DP1 = Int
+  public typealias DP11 = H<Int>
+}
+
+public struct MyStruct4 : P2 {
+  public typealias DP2 = MyStruct3
+}
+
+@_specialize(where T==MyStruct4)
+public func foo<T: P2>(_ t: T) where T.DP2.DP11 == H<T.DP2.DP1> {
 }

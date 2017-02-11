@@ -180,6 +180,9 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       }
     }
     SequencedExprs.push_back(Primary.get());
+
+    if (isForConditionalDirective && Tok.isAtStartOfLine())
+      break;
     
 parse_operator:
     switch (Tok.getKind()) {
@@ -320,16 +323,16 @@ parse_operator:
     }
   }
 done:
-  
-  if (SequencedExprs.empty()) {
-    if (isForConditionalDirective) {
-      diagnose(startLoc, diag::expected_close_to_if_directive);
-      return makeParserError();
-    } else {
-      // If we had semantic errors, just fail here.
-      assert(!SequencedExprs.empty());
-    }
+
+  // For conditional directives, we stop parsing after a line break.
+  if (isForConditionalDirective && (SequencedExprs.size() & 1) == 0) {
+    diagnose(getEndOfPreviousLoc(),
+             diag::incomplete_conditional_compilation_directive);
+    return makeParserError();
   }
+
+  // If we had semantic errors, just fail here.
+  assert(!SequencedExprs.empty());
 
   // If we saw no operators, don't build a sequence.
   if (SequencedExprs.size() == 1) {
@@ -2447,12 +2450,23 @@ Expr *Parser::parseExprAnonClosureArg() {
   // generate the anonymous variables we need.
   auto closure = dyn_cast_or_null<ClosureExpr>(
       dyn_cast<AbstractClosureExpr>(CurDeclContext));
-  if (!closure || closure->getParameters()) {
-    // FIXME: specialize diagnostic when there were closure parameters.
-    // We can be fairly smart here.
-    diagnose(Loc, closure ? diag::anon_closure_arg_in_closure_with_args
-                          : diag::anon_closure_arg_not_in_closure);
+  if (!closure) {
+    diagnose(Loc, diag::anon_closure_arg_not_in_closure);
     return new (Context) ErrorExpr(Loc);
+  }
+  // When the closure already has explicit parameters, offer their names as
+  // replacements.
+  if (auto *params = closure->getParameters()) {
+    if (ArgNo < params->size() && params->get(ArgNo)->hasName()) {
+      auto paramName = params->get(ArgNo)->getNameStr();
+      diagnose(Loc, diag::anon_closure_arg_in_closure_with_args_typo, paramName)
+        .fixItReplace(Loc, paramName);
+      return new (Context) DeclRefExpr(params->get(ArgNo), DeclNameLoc(Loc),
+                                       /*Implicit=*/false);
+    } else {
+      diagnose(Loc, diag::anon_closure_arg_in_closure_with_args);
+      return new (Context) ErrorExpr(Loc);
+    }
   }
 
   auto leftBraceLoc = AnonClosureVars.back().first;
@@ -2634,13 +2648,21 @@ ParserResult<Expr> Parser::parseTrailingClosure(SourceRange calleeRange) {
   if (closure.isNull())
     return makeParserError();
 
-  // Track the original end location of the expression we're trailing so
-  // we can warn about excess newlines.
-  auto origLineCol = SourceMgr.getLineAndColumn(calleeRange.End);
-  auto braceLineCol = SourceMgr.getLineAndColumn(braceLoc);
-  if (((int)braceLineCol.first - (int)origLineCol.first) > 1) {
-    diagnose(braceLoc, diag::trailing_closure_excess_newlines);
-    diagnose(calleeRange.Start, diag::trailing_closure_call_here);
+  // Warn if the trailing closure is separated from its callee by more than
+  // one line. A single-line separation is acceptable for a trailing closure
+  // call, and will be diagnosed later only if the call fails to typecheck.
+  auto origLine = SourceMgr.getLineNumber(calleeRange.End);
+  auto braceLine = SourceMgr.getLineNumber(braceLoc);
+  if (braceLine > origLine + 1) {
+    diagnose(braceLoc, diag::trailing_closure_after_newlines);
+    diagnose(calleeRange.Start, diag::trailing_closure_callee_here);
+    
+    auto *CE = dyn_cast<ClosureExpr>(closure.get());
+    if (CE && CE->hasAnonymousClosureVars() &&
+        CE->getParameters()->size() == 0) {
+      diagnose(braceLoc, diag::brace_stmt_suggest_do)
+        .fixItInsert(braceLoc, "do ");
+    }
   }
 
   return closure;

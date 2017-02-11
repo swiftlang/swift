@@ -117,7 +117,7 @@ protected:
     
     return Substitution(newReplacement, sub.getConformances());
   }
-  ArrayRef<Substitution> getOpSubstitutions(ArrayRef<Substitution> Subs) {
+  SubstitutionList getOpSubstitutions(SubstitutionList Subs) {
     MutableArrayRef<Substitution> newSubsBuf;
     
     auto copySubs = [&]{
@@ -146,7 +146,8 @@ protected:
     if (!OpenedExistentialSubs.empty()) {
       auto &F = getBuilder().getFunction();
       Ty = Ty.subst(F.getModule(),
-                    OpenedExistentialSubs);
+                    QueryTypeSubstitutionMap{OpenedExistentialSubs},
+                    MakeAbstractConformanceForGenericType());
     }
 
     return Ty;
@@ -159,7 +160,9 @@ protected:
   CanType getASTTypeInClonedContext(CanType ty) {
     // Substitute opened existential types, if we have any.
     if (!OpenedExistentialSubs.empty()) {
-      ty = ty.subst(OpenedExistentialSubs, None)->getCanonicalType();
+      ty = ty.subst(QueryTypeSubstitutionMap{OpenedExistentialSubs},
+                    MakeAbstractConformanceForGenericType())
+          ->getCanonicalType();
     }
     return ty;
   }
@@ -230,7 +233,11 @@ public:
 
   // Register a re-mapping for opened existentials.
   void registerOpenedExistentialRemapping(ArchetypeType *From, ArchetypeType *To) {
-    OpenedExistentialSubs.addSubstitution(CanArchetypeType(From), CanType(To));
+    auto result =
+      OpenedExistentialSubs.insert(std::make_pair(CanArchetypeType(From),
+                                                  CanType(To)));
+    assert(result.second);
+    (void) result;
   }
 
 protected:
@@ -244,7 +251,7 @@ protected:
   // deterministic.
   llvm::MapVector<SILBasicBlock*, SILBasicBlock*> BBMap;
 
-  SubstitutionMap OpenedExistentialSubs;
+  TypeSubstitutionMap OpenedExistentialSubs;
   SILOpenedArchetypesTracker OpenedArchetypesTracker;
 
   /// Set of basic blocks where unreachable was inserted.
@@ -1215,6 +1222,15 @@ void SILCloner<ImplClass>::visitAutoreleaseValueInst(
                                         Inst->getAtomicity()));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitUnmanagedAutoreleaseValueInst(
+    UnmanagedAutoreleaseValueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createUnmanagedAutoreleaseValue(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitSetDeallocatingInst(SetDeallocatingInst *Inst) {
@@ -1464,6 +1480,23 @@ SILCloner<ImplClass>::visitOpenExistentialAddrInst(OpenExistentialAddrInst *Inst
     getBuilder().createOpenExistentialAddr(getOpLocation(Inst->getLoc()),
                                        getOpValue(Inst->getOperand()),
                                        getOpType(Inst->getType())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitOpenExistentialOpaqueInst(
+    OpenExistentialOpaqueInst *Inst) {
+  // Create a new archetype for this opened existential type.
+  auto archetypeTy =
+      Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
+  registerOpenedExistentialRemapping(
+      archetypeTy,
+      ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));
+
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst, getBuilder().createOpenExistentialOpaque(
+                          getOpLocation(Inst->getLoc()),
+                          getOpValue(Inst->getOperand()),
+                          getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>

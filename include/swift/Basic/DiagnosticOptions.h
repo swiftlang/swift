@@ -30,6 +30,10 @@ public:
     VerifyAndApplyFixes
   } VerifyMode = NoVerify;
 
+  /// Indicates whether to allow diagnostics for \c <unknown> locations if
+  /// \c VerifyMode is not \c NoVerify.
+  bool VerifyIgnoreUnknown = false;
+
   /// Indicates whether diagnostic passes should be skipped.
   bool SkipDiagnosticPasses = false;
 

@@ -677,7 +677,12 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
       emitClassHeapMetadataRef(IGF, classType, MetadataValueType::ObjCClass,
                                /*allow uninitialized*/ true);
     StackAllocSize = -1;
-    return emitObjCAllocObjectCall(IGF, metadata, selfType.getSwiftRValueType());
+    auto &ti = IGF.getTypeInfo(selfType);
+    assert(ti.getSchema().size() == 1);
+    assert(!ti.getSchema().containsAggregate());
+    auto destType = ti.getSchema()[0].getScalarType();
+    auto *val = emitObjCAllocObjectCall(IGF, metadata, selfType.getSwiftRValueType());
+    return IGF.Builder.CreateBitCast(val, destType);
   }
 
   llvm::Value *metadata =

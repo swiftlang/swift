@@ -147,7 +147,7 @@ cmpOperandsIgnoringConsts(const Instruction *L, const Instruction *R,
   return 0;
 }
 
-// Test whether two basic blocks have equivalent behaviour.
+// Test whether two basic blocks have equivalent behavior.
 int SwiftFunctionComparator::
 cmpBasicBlocksIgnoringConsts(const BasicBlock *BBL, const BasicBlock *BBR) {
   BasicBlock::const_iterator InstL = BBL->begin(), InstLE = BBL->end();
@@ -178,7 +178,7 @@ cmpBasicBlocksIgnoringConsts(const BasicBlock *BBL, const BasicBlock *BBR) {
   return 0;
 }
 
-// Test whether the two functions have equivalent behaviour.
+// Test whether the two functions have equivalent behavior.
 int SwiftFunctionComparator::compareIngoringConsts() {
   beginCompare();
 

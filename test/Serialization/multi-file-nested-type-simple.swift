@@ -13,6 +13,8 @@
 // RUN: %target-swift-frontend -emit-module -module-name Multi %t/multi-file.swiftmodule %t/multi-file-2.swiftmodule -o %t -print-stats 2>&1 | %FileCheck -check-prefix=DISABLED %s
 // RUN: %target-swift-frontend -emit-module -module-name Multi %t/multi-file-2.swiftmodule %t/multi-file.swiftmodule -o %t -print-stats 2>&1 | %FileCheck -check-prefix=DISABLED %s
 
+// REQUIRES: asserts
+
 // CHECK: 4 Serialization - # of same-module nested types resolved without lookup
 // DISABLED: Statistics
 // DISABLED-NOT: same-module nested types resolved without lookup

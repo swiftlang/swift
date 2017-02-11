@@ -44,6 +44,11 @@ Type QueryTypeSubstitutionMap::operator()(SubstitutableType *type) const {
   return Type();
 }
 
+Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
+  auto key = cast<SubstitutableType>(type->getCanonicalType());
+  return subMap.lookupSubstitution(key);
+}
+
 bool TypeLoc::isError() const {
   assert(wasValidated() && "Type not yet validated");
   return getType()->hasError() || getType()->getCanonicalType()->hasError();
@@ -1175,7 +1180,7 @@ CanType TypeBase::getCanonicalType() {
   case TypeKind::GenericTypeParam: {
     GenericTypeParamType *gp = cast<GenericTypeParamType>(this);
     auto gpDecl = gp->getDecl();
-
+    assert(gpDecl->getDepth() != 0xFFFF && "parameter hasn't been validated");
     Result = GenericTypeParamType::get(gpDecl->getDepth(), gpDecl->getIndex(),
                                        gpDecl->getASTContext());
     break;
@@ -2650,6 +2655,9 @@ void ArchetypeType::populateNestedTypes() const {
   llvm::SmallPtrSet<Identifier, 4> knownNestedTypes;
   ProtocolType::visitAllProtocols(getConformsTo(),
                                   [&](ProtocolDecl *proto) -> bool {
+    // Objective-C protocols don't have type members.
+    if (proto->hasClangNode()) return false;
+
     for (auto member : proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         if (knownNestedTypes.insert(assocType->getName()).second)
@@ -2829,9 +2837,12 @@ Type ProtocolCompositionType::get(const ASTContext &C,
 }
 
 FunctionType *
-GenericFunctionType::substGenericArgs(ArrayRef<Substitution> args) {
-  auto subs = getGenericSignature()->getSubstitutionMap(args);
+GenericFunctionType::substGenericArgs(SubstitutionList args) {
+  return substGenericArgs(getGenericSignature()->getSubstitutionMap(args));
+}
 
+FunctionType *
+GenericFunctionType::substGenericArgs(const SubstitutionMap &subs) {
   Type input = getInput().subst(subs);
   Type result = getResult().subst(subs);
   return FunctionType::get(input, result, getExtInfo());
@@ -2909,9 +2920,8 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
   LazyResolver *resolver = substBase->getASTContext().getLazyResolver();
   if (assocType) {
     auto proto = assocType->getProtocol();
-    // FIXME: Introduce substituted type node here?
     Optional<ProtocolConformanceRef> conformance
-      = lookupConformances(origBase ? origBase->getCanonicalType() : CanType(),
+      = lookupConformances(origBase->getCanonicalType(),
                            substBase,
                            proto->getDeclaredType());
 
@@ -2950,9 +2960,12 @@ Optional<ProtocolConformanceRef>
 LookUpConformanceInModule::operator()(CanType dependentType,
                                       Type conformingReplacementType,
                                       ProtocolType *conformedProtocol) const {
+  if (conformingReplacementType->isTypeParameter())
+    return ProtocolConformanceRef(conformedProtocol->getDecl());
+
   return M->lookupConformance(conformingReplacementType,
-                  conformedProtocol->getDecl(),
-                  conformingReplacementType->getASTContext().getLazyResolver());
+                              conformedProtocol->getDecl(),
+                              M->getASTContext().getLazyResolver());
 }
 
 Optional<ProtocolConformanceRef>
@@ -2972,6 +2985,21 @@ MakeAbstractConformanceForGenericType::operator()(CanType dependentType,
   return ProtocolConformanceRef(conformedProtocol->getDecl());
 }
 
+Optional<ProtocolConformanceRef>
+LookUpConformanceInSignature::operator()(CanType dependentType,
+                                         Type conformingReplacementType,
+                                         ProtocolType *conformedProtocol) const {
+  // FIXME: Actually implement this properly.
+  auto *M = conformedProtocol->getDecl()->getParentModule();
+
+  if (conformingReplacementType->isTypeParameter())
+    return ProtocolConformanceRef(conformedProtocol->getDecl());
+
+  return M->lookupConformance(conformingReplacementType,
+                              conformedProtocol->getDecl(),
+                              M->getASTContext().getLazyResolver());
+}
+
 Type DependentMemberType::substBaseType(ModuleDecl *module,
                                         Type substBase,
                                         LazyResolver *resolver) {
@@ -2984,7 +3012,7 @@ Type DependentMemberType::substBaseType(Type substBase,
       substBase->hasTypeParameter())
     return this;
 
-  return getMemberForBaseType(lookupConformance, Type(), substBase,
+  return getMemberForBaseType(lookupConformance, getBase(), substBase,
                               getAssocType(), getName(), None);
 }
 
@@ -3085,19 +3113,10 @@ static Type substType(Type derivedType,
   });
 }
 
-Type Type::subst(ModuleDecl *module,
-                 const TypeSubstitutionMap &substitutions,
-                 SubstOptions options) const {
-  return substType(*this,
-                   QueryTypeSubstitutionMap{substitutions},
-                   LookUpConformanceInModule(module),
-                   options);
-}
-
 Type Type::subst(const SubstitutionMap &substitutions,
                  SubstOptions options) const {
   return substType(*this,
-                   QueryTypeSubstitutionMap{substitutions.getMap()},
+                   QuerySubstitutionMap{substitutions},
                    LookUpConformanceInSubstitutionMap(substitutions),
                    options);
 }
@@ -3213,6 +3232,16 @@ TypeSubstitutionMap TypeBase::getContextSubstitutions(const DeclContext *dc) {
   return substitutions;
 }
 
+SubstitutionMap TypeBase::getContextSubstitutionMap(
+  ModuleDecl *module, const DeclContext *dc) {
+  auto *genericSig = dc->getGenericSignatureOfContext();
+  if (genericSig == nullptr)
+    return SubstitutionMap();
+  return genericSig->getSubstitutionMap(
+      QueryTypeSubstitutionMap{getContextSubstitutions(dc)},
+      LookUpConformanceInModule(module));
+}
+
 TypeSubstitutionMap TypeBase::getMemberSubstitutions(const ValueDecl *member) {
   auto *memberDC = member->getDeclContext();
 
@@ -3241,16 +3270,27 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const ValueDecl *member) {
   return substitutions;
 }
 
+SubstitutionMap TypeBase::getMemberSubstitutionMap(
+  ModuleDecl *module, const ValueDecl *member) {
+  auto *genericSig = member->getInnermostDeclContext()
+      ->getGenericSignatureOfContext();
+  if (genericSig == nullptr)
+    return SubstitutionMap();
+  return genericSig->getSubstitutionMap(
+      QueryTypeSubstitutionMap{getMemberSubstitutions(member)},
+      LookUpConformanceInModule(module));
+}
+
 Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
-                               LazyResolver *resolver, Type memberType) {
+                               Type memberType) {
   // If no member type was provided, use the member's type.
   if (!memberType)
     memberType = member->getInterfaceType();
 
   assert(memberType);
 
-  auto substitutions = getMemberSubstitutions(member);
-  return memberType.subst(module, substitutions, SubstFlags::UseErrorType);
+  auto substitutions = getMemberSubstitutionMap(module, member);
+  return memberType.subst(substitutions, SubstFlags::UseErrorType);
 }
 
 Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
@@ -3997,7 +4037,7 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
 //
 
 void SILBoxType::Profile(llvm::FoldingSetNodeID &id, SILLayout *Layout,
-                         ArrayRef<Substitution> Args) {
+                         SubstitutionList Args) {
   id.AddPointer(Layout);
   for (auto &arg : Args) {
     id.AddPointer(arg.getReplacement().getPointer());
@@ -4007,7 +4047,7 @@ void SILBoxType::Profile(llvm::FoldingSetNodeID &id, SILLayout *Layout,
 }
 
 SILBoxType::SILBoxType(ASTContext &C,
-                       SILLayout *Layout, ArrayRef<Substitution> Args)
+                       SILLayout *Layout, SubstitutionList Args)
 : TypeBase(TypeKind::SILBox, &C,
            getRecursivePropertiesFromSubstitutions(Args)),
   Layout(Layout),
@@ -4027,7 +4067,7 @@ SILBoxType::SILBoxType(ASTContext &C,
 }
 
 RecursiveTypeProperties SILBoxType::
-getRecursivePropertiesFromSubstitutions(ArrayRef<Substitution> Params) {
+getRecursivePropertiesFromSubstitutions(SubstitutionList Params) {
   RecursiveTypeProperties props;
   for (auto &param : Params) {
     props |= param.getReplacement()->getRecursiveProperties();

@@ -104,7 +104,7 @@ struct MaterializeForSetEmitter {
   FuncDecl *Witness;
   AbstractStorageDecl *WitnessStorage;
   AbstractionPattern WitnessStoragePattern;
-  ArrayRef<Substitution> WitnessSubs;
+  SubstitutionList WitnessSubs;
 
   CanGenericSignature GenericSig;
   GenericEnvironment *GenericEnv;
@@ -127,7 +127,7 @@ struct MaterializeForSetEmitter {
 private:
 
   MaterializeForSetEmitter(SILGenModule &SGM, SILLinkage linkage,
-                           FuncDecl *witness, ArrayRef<Substitution> subs,
+                           FuncDecl *witness, SubstitutionList subs,
                            Type selfInterfaceType, Type selfType)
     : SGM(SGM),
       Linkage(linkage),
@@ -173,7 +173,7 @@ public:
                   Type selfInterfaceType, Type selfType,
                   GenericEnvironment *genericEnv,
                   FuncDecl *requirement, FuncDecl *witness,
-                  ArrayRef<Substitution> witnessSubs) {
+                  SubstitutionList witnessSubs) {
     MaterializeForSetEmitter emitter(SGM, linkage, witness, witnessSubs,
                                      selfInterfaceType, selfType);
 
@@ -207,7 +207,7 @@ public:
   static MaterializeForSetEmitter
   forConcreteImplementation(SILGenModule &SGM,
                             FuncDecl *witness,
-                            ArrayRef<Substitution> witnessSubs) {
+                            SubstitutionList witnessSubs) {
     auto *dc = witness->getDeclContext();
     Type selfInterfaceType = dc->getSelfInterfaceType();
     Type selfType = witness->mapTypeIntoContext(selfInterfaceType);
@@ -387,8 +387,8 @@ public:
   /// substitution according to the witness substitutions.
   CanType getSubstWitnessInterfaceType(CanType type) {
     auto subs = SubstSelfType->getRValueInstanceType()
-        ->getMemberSubstitutions(WitnessStorage);
-    return type.subst(SGM.SwiftModule, subs)->getCanonicalType();
+        ->getMemberSubstitutionMap(SGM.SwiftModule, WitnessStorage);
+    return type.subst(subs)->getCanonicalType();
   }
 
 };
@@ -746,6 +746,12 @@ namespace {
     void emit(SILGenFunction &gen, CleanupLocation loc) override {
       gen.B.createDeallocValueBuffer(loc, ValueType, Buffer);
     }
+    void dump() const override {
+#ifndef NDEBUG
+      llvm::errs() << "DeallocateValueBuffer\n"
+                   << "State: " << getState() << "Buffer: " << Buffer << "\n";
+#endif
+    }
   }; 
 } // end anonymous namespace
 
@@ -827,7 +833,7 @@ maybeEmitMaterializeForSetThunk(ProtocolConformance *conformance,
                                 GenericEnvironment *genericEnv,
                                 FuncDecl *requirement,
                                 FuncDecl *witness,
-                                ArrayRef<Substitution> witnessSubs) {
+                                SubstitutionList witnessSubs) {
 
   MaterializeForSetEmitter emitter
     = MaterializeForSetEmitter::forWitnessThunk(

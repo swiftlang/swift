@@ -120,10 +120,17 @@ namespace {
     void emit(SILGenFunction &gen, CleanupLocation l) override {
       gen.B.emitDestroyValueOperation(l, closure);
     }
+    void dump() const override {
+#ifndef NDEBUG
+      llvm::errs() << "CleanupClosureConstant\n"
+                   << "State:" << getState() << "\n"
+                   << "closure:" << closure << "\n";
+#endif
+    }
   };
 } // end anonymous namespace
 
-ArrayRef<Substitution> SILGenFunction::getForwardingSubstitutions() {
+SubstitutionList SILGenFunction::getForwardingSubstitutions() {
   return F.getForwardingSubstitutions();
 }
 
@@ -214,6 +221,15 @@ public:
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     gen.B.createEndBorrow(l, borrowed, original);
   }
+
+  void dump() const override {
+#ifndef NDEBUG
+    llvm::errs() << "EndBorrowCleanup "
+                 << "State:" << getState() << "\n"
+                 << "original:" << original << "\n"
+                 << "borrowed:" << borrowed << "\n";
+#endif
+  }
 };
 } // end anonymous namespace
 
@@ -229,6 +245,14 @@ public:
     else
       gen.B.emitDestroyValueOperation(l, v);
   }
+
+  void dump() const override {
+#ifndef NDEBUG
+    llvm::errs() << "ReleaseValueCleanup\n"
+                 << "State:" << getState() << "\n"
+                 << "Value:" << v << "\n";
+#endif
+  }
 };
 } // end anonymous namespace
 
@@ -241,6 +265,14 @@ public:
 
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     gen.B.createDeallocStack(l, Addr);
+  }
+
+  void dump() const override {
+#ifndef NDEBUG
+    llvm::errs() << "DeallocStackCleanup\n"
+                 << "State:" << getState() << "\n"
+                 << "Addr:" << Addr << "\n";
+#endif
   }
 };
 } // end anonymous namespace
@@ -255,6 +287,15 @@ public:
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     gen.destroyLocalVariable(l, Var);
   }
+
+  void dump() const override {
+#ifndef NDEBUG
+    llvm::errs() << "DestroyLocalVariable\n"
+                 << "State:" << getState() << "\n";
+    // TODO: Make sure we dump var.
+    llvm::errs() << "\n";
+#endif
+  }
 };
 } // end anonymous namespace
 
@@ -267,6 +308,15 @@ public:
 
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     gen.deallocateUninitializedLocalVariable(l, Var);
+  }
+
+  void dump() const override {
+#ifndef NDEBUG
+    llvm::errs() << "DeallocateUninitializedLocalVariable\n"
+                 << "State:" << getState() << "\n";
+    // TODO: Make sure we dump var.
+    llvm::errs() << "\n";
+#endif
   }
 };
 } // end anonymous namespace
@@ -763,7 +813,7 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   // Reabstract to the substituted type, if needed.
   CanType substEltTy =
     value.getSwiftType()->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
-                                      ElementDecl, nullptr,
+                                      ElementDecl,
                                       ElementDecl->getArgumentInterfaceType())
       ->getCanonicalType();
 
@@ -1195,6 +1245,14 @@ namespace {
                                           existentialAddr);
         break;
       }
+    }
+
+    void dump() const override {
+#ifndef NDEBUG
+      llvm::errs() << "DeinitExistentialCleanup\n"
+                   << "State:" << getState() << "\n"
+                   << "Value:" << existentialAddr << "\n";
+#endif
     }
   };
 } // end anonymous namespace
@@ -1694,7 +1752,7 @@ static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
                                          GenericEnvironment *genericEnv,
                                          SILDeclRef requirement,
                                          SILDeclRef witness,
-                                         ArrayRef<Substitution> witnessSubs) {
+                                         SubstitutionList witnessSubs) {
   if (auto witnessFn = dyn_cast<FuncDecl>(witness.getDecl())) {
     if (witnessFn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
       auto reqFn = cast<FuncDecl>(requirement.getDecl());
@@ -1736,7 +1794,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   auto reqtOrigTy
     = cast<GenericFunctionType>(requirementInfo.LoweredInterfaceType);
   CanAnyFunctionType reqtSubstTy;
-  ArrayRef<Substitution> witnessSubs;
+  SubstitutionList witnessSubs;
   if (witness.requiresSubstitution()) {
     genericEnv = witness.getSyntheticEnvironment();
     witnessSubs = witness.getSubstitutions();
@@ -1760,25 +1818,22 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     genericEnv = witnessRef.getDecl()->getInnermostDeclContext()
                    ->getGenericEnvironmentOfContext();
 
-    auto selfTy = cast<GenericTypeParamType>(
-                    conformance->getProtocol()->getSelfInterfaceType()
-                                                          ->getCanonicalType());
-
     Type concreteTy = conformance->getInterfaceType();
-
-    SubstitutionMap reqtSubs;
-    reqtSubs.addSubstitution(selfTy, concreteTy);
 
     // FIXME: conformance substitutions should be in terms of interface types
     auto concreteSubs = concreteTy->gatherAllSubstitutions(M.getSwiftModule(),
                                                            nullptr, nullptr);
     auto specialized = conformance;
-    ASTContext &ctx = getASTContext();
-    if (conformance->getGenericSignature())
+    if (conformance->getGenericSignature()) {
+      ASTContext &ctx = getASTContext();
       specialized = ctx.getSpecializedConformance(concreteTy, conformance,
                                                   concreteSubs);
+    }
 
-    reqtSubs.addConformance(selfTy, ProtocolConformanceRef(specialized));
+    auto reqtSubs = SubstitutionMap::getProtocolSubstitutions(
+        conformance->getProtocol(),
+        concreteTy,
+        ProtocolConformanceRef(specialized));
 
     auto input = reqtOrigTy->getInput().subst(reqtSubs)->getCanonicalType();
     auto result = reqtOrigTy->getResult().subst(reqtSubs)->getCanonicalType();
@@ -1867,7 +1922,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     }
 
     selfType = GenericEnvironment::mapTypeIntoContext(
-        M.getSwiftModule(), genericEnv, selfInterfaceType);
+        genericEnv, selfInterfaceType);
   }
 
   SILGenFunction gen(*this, *f);

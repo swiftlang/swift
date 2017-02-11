@@ -1861,11 +1861,11 @@ Type ClangImporter::Implementation::importMethodType(
       // Get the substitutions that we need to access a member of
       // 'origDC' on 'dc'.
       auto subs = dc->getDeclaredTypeInContext()
-          ->getContextSubstitutions(origDC);
+          ->getContextSubstitutionMap(dc->getParentModule(), origDC);
 
       // Apply them to the interface type to produce the final
       // substituted type.
-      type = type.subst(dc->getParentModule(), subs);
+      type = type.subst(subs);
     }
     return type;
   };
@@ -2170,11 +2170,11 @@ Type ClangImporter::Implementation::importAccessorMethodType(
       // Get the substitutions that we need to access a member of
       // 'origDC' on 'dc'.
       auto subs = dc->getDeclaredTypeInContext()
-          ->getContextSubstitutions(origDC);
+          ->getContextSubstitutionMap(dc->getParentModule(), origDC);
 
       // Apply them to the interface type to produce the final
       // substituted type.
-      type = type.subst(dc->getParentModule(), subs);
+      type = type.subst(subs);
     }
     return type;
   };

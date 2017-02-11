@@ -7,6 +7,8 @@
 // RUN: %target-swift-frontend -emit-module -module-name Multi %t/multi-file-2.swiftmodule %t/multi-file.swiftmodule %t/multi-file-3.swiftmodule -o %t -print-stats 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -emit-module -module-name Multi %t/multi-file-2.swiftmodule %t/multi-file-3.swiftmodule %t/multi-file.swiftmodule -o %t -print-stats 2>&1 | %FileCheck %s
 
+// REQUIRES: asserts
+
 // CHECK: Statistics
 // CHECK: 1 Serialization - # of same-module nested types resolved without lookup
 

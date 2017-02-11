@@ -242,7 +242,7 @@ bool FulfillmentMap::searchBoundGenericTypeMetadata(IRGenModule &IGM,
 
   GenericTypeRequirements requirements(IGM, type->getDecl());
   requirements.enumerateFulfillments(
-      IGM, type->gatherAllSubstitutions(IGM.getSwiftModule(), nullptr),
+      IGM, type->getContextSubstitutionMap(IGM.getSwiftModule(), type->getDecl()),
       [&](unsigned reqtIndex, CanType arg,
           Optional<ProtocolConformanceRef> conf) {
     // Skip uninteresting type arguments.

@@ -170,9 +170,11 @@ final class ConformingClass : X {
   // -- load and copy_value 'self' from inout witness 'self' parameter
   // CHECK:    [[ARG3_LOADED:%.*]] = load [copy] [[ARG3]] : $*ConformingClass
   // CHECK:    [[ARG2_LOADED:%.*]] = load [take] [[ARG2]] : $*ConformingClass
-  // CHECK:    [[FUNC:%.*]] = function_ref @_T09witnesses15ConformingClassC9selfTypes{{[_0-9a-zA-Z]*}}F 
-  // CHECK:    [[FUNC_RESULT:%.*]] = apply [[FUNC]]([[ARG2_LOADED]], [[ARG3_LOADED]]) : $@convention(method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
+  // CHECK:    [[FUNC:%.*]] = function_ref @_T09witnesses15ConformingClassC9selfTypes{{[_0-9a-zA-Z]*}}F
+  // CHECK:    [[BORROWED_ARG3_LOADED:%.*]] = begin_borrow [[ARG3_LOADED]]
+  // CHECK:    [[FUNC_RESULT:%.*]] = apply [[FUNC]]([[ARG2_LOADED]], [[BORROWED_ARG3_LOADED]]) : $@convention(method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
   // CHECK:    store [[FUNC_RESULT]] to [init] [[ARG1]] : $*ConformingClass
+  // CHECK:    end_borrow [[BORROWED_ARG3_LOADED]] from [[ARG3_LOADED]]
   // CHECK:    destroy_value [[ARG3_LOADED]]
   // CHECK:  } // end sil function '_T09witnesses15ConformingClassCAA1XAaaDP9selfTypes{{[_0-9a-zA-Z]*}}FTW'
   func loadable(x: Loadable) -> Loadable { return x }
@@ -188,7 +190,9 @@ extension ConformingClass : ClassBounded { }
 // CHECK-NEXT:    [[C1_COPY:%.*]] = copy_value [[C1]]
 // CHECK-NEXT:    function_ref
 // CHECK-NEXT:    [[FUN:%.*]] = function_ref @_T09witnesses15ConformingClassC9selfTypes{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FUN]]([[C0]], [[C1_COPY]]) : $@convention(method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
+// CHECK-NEXT:    [[BORROWED_C1_COPY:%.*]] = begin_borrow [[C1_COPY]]
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[FUN]]([[C0]], [[BORROWED_C1_COPY]]) : $@convention(method) (@owned ConformingClass, @guaranteed ConformingClass) -> @owned ConformingClass
+// CHECK-NEXT:    end_borrow [[BORROWED_C1_COPY]] from [[C1_COPY]]
 // CHECK-NEXT:    destroy_value [[C1_COPY]]
 // CHECK-NEXT:    return [[RESULT]] : $ConformingClass
 // CHECK-NEXT:  }
@@ -450,13 +454,17 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // If the witness is in a base class of the conforming class, make sure we have a bit_cast in there:
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_T09witnesses34PropertyRequirementWitnessFromBaseCAA0bC0AaaDP5widthSifmTW : {{.*}} {
-  // CHECK: upcast
-  // CHECK-NEXT: [[METH:%.*]] = class_method {{%.*}} : $PropertyRequirementBase, #PropertyRequirementBase.width!materializeForSet.1
-  // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]
+  // CHECK: bb0({{.*}} : $Builtin.RawPointer, {{.*}} : $*Builtin.UnsafeValueBuffer, [[ARG2:%.*]] : $*PropertyRequirementWitnessFromBase):
+  // CHECK-NEXT: [[ARG2_LOADED:%[0-9][0-9]*]] = load [copy] [[ARG2]]
+  // CHECK-NEXT: [[CAST_ARG2_LOADED:%[0-9][0-9]*]] = upcast [[ARG2_LOADED]] : $PropertyRequirementWitnessFromBase to $PropertyRequirementBase
+  // CHECK-NEXT: [[BORROWED_CAST_ARG2_LOADED:%[0-9][0-9]*]] = begin_borrow [[CAST_ARG2_LOADED]] : $PropertyRequirementBase
+  // CHECK-NEXT: [[METH:%.*]] = class_method [[BORROWED_CAST_ARG2_LOADED]] : $PropertyRequirementBase, #PropertyRequirementBase.width!materializeForSet.1
+  // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]({{.*}}, {{.*}}, [[BORROWED_CAST_ARG2_LOADED]]) : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed PropertyRequirementBase) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   // CHECK-NEXT: [[CAR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 0
   // CHECK-NEXT: [[CADR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 1
   // CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[CAR]] : {{.*}}, [[CADR]] : {{.*}})
-  // CHECK-NEXT: destroy_value
+  // CHECK-NEXT: end_borrow [[BORROWED_CAST_ARG2_LOADED]] from [[CAST_ARG2_LOADED]]
+  // CHECK-NEXT: destroy_value [[ARG2_LOADED]]
   // CHECK-NEXT: return [[TUPLE]]
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_T09witnesses34PropertyRequirementWitnessFromBaseCAA0bC0AaaDP6heightSifmZTW : {{.*}} {
@@ -469,12 +477,16 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK-NEXT: return [[TUPLE]]
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_T09witnesses34PropertyRequirementWitnessFromBaseCAA0bC0AaaDP5depthSifmTW
-  // CHECK: [[METH:%.*]] = class_method {{%.*}} : $PropertyRequirementWitnessFromBase, #PropertyRequirementWitnessFromBase.depth!materializeForSet.1
-  // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]
+  // CHECK: bb0({{.*}} : $Builtin.RawPointer, {{.*}} : $*Builtin.UnsafeValueBuffer, [[ARG2:%.*]] : $*PropertyRequirementWitnessFromBase):
+  // CHECK: [[ARG2_LOADED:%[0-9][0-9]*]] = load [copy] [[ARG2]]
+  // CHECK: [[METH:%.*]] = class_method [[ARG2_LOADED]] : $PropertyRequirementWitnessFromBase, #PropertyRequirementWitnessFromBase.depth!materializeForSet.1
+  // CHECK-NEXT: [[BORROWED_ARG2_LOADED:%.*]] = begin_borrow [[ARG2_LOADED]]
+  // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]({{.*}}, {{.*}}, [[BORROWED_ARG2_LOADED]]) : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed PropertyRequirementWitnessFromBase) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   // CHECK-NEXT: tuple_extract
   // CHECK-NEXT: tuple_extract
   // CHECK-NEXT: [[RES:%.*]] = tuple
-  // CHECK-NEXT: destroy_value
+  // CHECK-NEXT: end_borrow [[BORROWED_ARG2_LOADED]] from [[ARG2_LOADED]]
+  // CHECK-NEXT: destroy_value [[ARG2_LOADED]]
   // CHECK-NEXT: return [[RES]]
 }
 
@@ -492,9 +504,11 @@ class CrashableBase {
 // CHECK-NEXT: copy_addr %0 to [initialization] [[BOX]] : $*GenericCrashable<τ_0_0>
 // CHECK-NEXT: [[SELF:%.*]] = load [take] [[BOX]] : $*GenericCrashable<τ_0_0>
 // CHECK-NEXT: [[BASE:%.*]] = upcast [[SELF]] : $GenericCrashable<τ_0_0> to $CrashableBase
-// CHECK-NEXT: [[FN:%.*]] = class_method [[BASE]] : $CrashableBase, #CrashableBase.crash!1 : (CrashableBase) -> () -> (), $@convention(method) (@guaranteed CrashableBase) -> ()
-// CHECK-NEXT: apply [[FN]]([[BASE]]) : $@convention(method) (@guaranteed CrashableBase) -> ()
+// CHECK-NEXT: [[BORROWED_BASE:%.*]] = begin_borrow [[BASE]]
+// CHECK-NEXT: [[FN:%.*]] = class_method [[BORROWED_BASE]] : $CrashableBase, #CrashableBase.crash!1 : (CrashableBase) -> () -> (), $@convention(method) (@guaranteed CrashableBase) -> ()
+// CHECK-NEXT: apply [[FN]]([[BORROWED_BASE]]) : $@convention(method) (@guaranteed CrashableBase) -> ()
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
+// CHECK-NEXT: end_borrow [[BORROWED_BASE]] from [[BASE]]
 // CHECK-NEXT: destroy_value [[SELF]] : $GenericCrashable<τ_0_0>
 // CHECK-NEXT: dealloc_stack [[BOX]] : $*GenericCrashable<τ_0_0>
 // CHECK-NEXT: return [[RESULT]] : $()

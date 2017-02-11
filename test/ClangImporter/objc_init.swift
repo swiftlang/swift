@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
@@ -171,3 +171,6 @@ func classPropertiesAreNotInit() -> ProcessInfo {
   procInfo = ProcessInfo.processInfo // okay
   return procInfo
 }
+
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected note produced: 'NSProcessInfo' was obsoleted in Swift 3

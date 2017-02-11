@@ -52,20 +52,13 @@ void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
   }
 }
 
-SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
-                                 StringRef name,
-                                 CanSILFunctionType loweredType,
-                                 GenericEnvironment *genericEnv,
-                                 Optional<SILLocation> loc,
-                                 IsBare_t isBareSILFunction,
-                                 IsTransparent_t isTrans,
-                                 IsFragile_t isFragile,
-                                 IsThunk_t isThunk,
-                                 ClassVisibility_t classVisibility,
-                                 Inline_t inlineStrategy, EffectsKind E,
-                                 SILFunction *insertBefore,
-                                 const SILDebugScope *debugScope,
-                                 DeclContext *DC) {
+SILFunction *SILFunction::create(
+    SILModule &M, SILLinkage linkage, StringRef name,
+    CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
+    Optional<SILLocation> loc, IsBare_t isBareSILFunction,
+    IsTransparent_t isTrans, IsFragile_t isFragile, IsThunk_t isThunk,
+    ClassVisibility_t classVisibility, Inline_t inlineStrategy, EffectsKind E,
+    SILFunction *insertBefore, const SILDebugScope *debugScope) {
   // Get a StringMapEntry for the function.  As a sop to error cases,
   // allow the name to have an empty string.
   llvm::StringMapEntry<SILFunction*> *entry = nullptr;
@@ -75,11 +68,10 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
     name = entry->getKey();
   }
 
-  auto fn = new (M) SILFunction(M, linkage, name,
-                                loweredType, genericEnv, loc,
-                                isBareSILFunction, isTrans, isFragile, isThunk,
-                                classVisibility, inlineStrategy, E,
-                                insertBefore, debugScope, DC);
+  auto fn = new (M)
+      SILFunction(M, linkage, name, loweredType, genericEnv, loc,
+                  isBareSILFunction, isTrans, isFragile, isThunk,
+                  classVisibility, inlineStrategy, E, insertBefore, debugScope);
 
   if (entry) entry->setValue(fn);
   return fn;
@@ -93,11 +85,11 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          IsThunk_t isThunk, ClassVisibility_t classVisibility,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
-                         const SILDebugScope *DebugScope, DeclContext *DC)
+                         const SILDebugScope *DebugScope)
     : Module(Module), Name(Name), LoweredType(LoweredType),
-      GenericEnv(genericEnv), DeclCtx(DC), DebugScope(DebugScope),
-      Bare(isBareSILFunction), Transparent(isTrans), Fragile(isFragile),
-      Thunk(isThunk), ClassVisibility(classVisibility), GlobalInitFlag(false),
+      GenericEnv(genericEnv), DebugScope(DebugScope), Bare(isBareSILFunction),
+      Transparent(isTrans), Fragile(isFragile), Thunk(isThunk),
+      ClassVisibility(classVisibility), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
       KeepAsPublic(false), EffectsKindAttr(E) {
   if (InsertBefore)
@@ -138,25 +130,6 @@ SILFunction::~SILFunction() {
          "Function cannot be deleted while function_ref's still exist");
 }
 
-void SILFunction::setDeclContext(Decl *D) {
-  if (!D)
-    return;
-  switch (D->getKind()) {
-  // These four dual-inherit from DeclContext.
-  case DeclKind::Func:        DeclCtx = cast<FuncDecl>(D); break;
-  case DeclKind::Constructor: DeclCtx = cast<ConstructorDecl>(D); break;
-  case DeclKind::Extension:   DeclCtx = cast<ExtensionDecl>(D);   break;
-  case DeclKind::Destructor:  DeclCtx = cast<DestructorDecl>(D);  break;
-  default:
-    DeclCtx = D->getDeclContext();
-  }
-  assert(DeclCtx);
-}
-
-void SILFunction::setDeclContext(Expr *E) {
-  DeclCtx = dyn_cast_or_null<AbstractClosureExpr>(E);
-}
-
 bool SILFunction::hasForeignBody() const {
   if (!hasClangNode()) return false;
   return SILDeclRef::isClangGenerated(getClangNode());
@@ -187,9 +160,7 @@ bool SILFunction::shouldOptimize() const {
 
 Type SILFunction::mapTypeIntoContext(Type type) const {
   return GenericEnvironment::mapTypeIntoContext(
-      getModule().getSwiftModule(),
-      getGenericEnvironment(),
-      type);
+      getGenericEnvironment(), type);
 }
 
 namespace {
@@ -286,7 +257,7 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
                                                SILType type) const {
   return doSubstDependentSILType(M,
     [&](CanType t) {
-      return mapTypeIntoContext(M.getSwiftModule(), t)->getCanonicalType();
+      return mapTypeIntoContext(t)->getCanonicalType();
     },
     type);
 }
@@ -560,7 +531,7 @@ void SILFunction::convertToDeclaration() {
   getBlocks().clear();
 }
 
-ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
+SubstitutionList SILFunction::getForwardingSubstitutions() {
   if (ForwardingSubs)
     return *ForwardingSubs;
 
