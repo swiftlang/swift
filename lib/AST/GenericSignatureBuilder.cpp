@@ -922,13 +922,11 @@ Type GenericSignatureBuilder::PotentialArchetype::getDependentType(
   
   assert(isGenericParam() && "Not a generic parameter?");
 
-  unsigned index = getGenericParamKey().findIndexIn(genericParams);
-
   // FIXME: This is a temporary workaround.
-  if (genericParams.empty()) {
-    return getBuilder()->Impl->GenericParams[index];
-  }
+  if (genericParams.empty())
+    genericParams = getBuilder()->Impl->GenericParams;
 
+  unsigned index = getGenericParamKey().findIndexIn(genericParams);
   return genericParams[index];
 }
 
