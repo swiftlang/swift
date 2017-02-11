@@ -230,6 +230,9 @@ namespace {
     RetTy visitInOutType(CanInOutType type) {
       llvm_unreachable("shouldn't get an inout type here");
     }
+    RetTy visitErrorType(CanErrorType type) {
+      llvm_unreachable("shouldn't get an error type here");
+    }
 
     // Dependent types should be contextualized before visiting.
 

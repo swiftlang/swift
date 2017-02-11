@@ -1313,6 +1313,7 @@ TypeBase *TypeBase::getDesugaredType() {
 #define UNCHECKED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
   case TypeKind::Tuple:
   case TypeKind::Function:
   case TypeKind::GenericFunction:
@@ -1476,6 +1477,7 @@ bool TypeBase::isSpelledLike(Type other) {
 #define UNCHECKED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
   case TypeKind::Enum:
   case TypeKind::Struct:
   case TypeKind::Class:

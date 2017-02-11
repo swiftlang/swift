@@ -1155,6 +1155,9 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
   PrettyStackTraceType stackTrace(IGM.Context, "converting", ty);
 
   switch (ty->getKind()) {
+  case TypeKind::Error:
+    llvm_unreachable("found an ErrorType in IR-gen");
+
 #define UNCHECKED_TYPE(id, parent) \
   case TypeKind::id: \
     llvm_unreachable("found a " #id "Type in IR-gen");
