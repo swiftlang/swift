@@ -59,7 +59,7 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee) {
 
 SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name,
                                                     bool declarationOnly,
-                                                    SILLinkage Linkage) {
+                                                    Optional<SILLinkage> Linkage) {
   // It is possible that one module has a declaration of a SILFunction, while
   // another has the full definition.
   SILFunction *retVal = nullptr;
@@ -67,9 +67,9 @@ SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name,
     if (auto Func = Des->lookupSILFunction(Name, declarationOnly)) {
       DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
             << Des->getModuleIdentifier().str() << "\n");
-      if (Linkage != SILLinkage::Private) {
+      if (Linkage) {
         // This is not the linkage we are looking for.
-        if (Func->getLinkage() != Linkage) {
+        if (Func->getLinkage() != *Linkage) {
           DEBUG(llvm::dbgs()
                 << "Wrong linkage for Function: " << Func->getName() << " : "
                 << (int)Func->getLinkage() << "\n");
@@ -86,7 +86,8 @@ SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name,
   return retVal;
 }
 
-bool SerializedSILLoader::hasSILFunction(StringRef Name, SILLinkage Linkage) {
+bool SerializedSILLoader::hasSILFunction(StringRef Name,
+                                         Optional<SILLinkage> Linkage) {
   // It is possible that one module has a declaration of a SILFunction, while
   // another has the full definition.
   SILFunction *retVal = nullptr;

@@ -430,12 +430,19 @@ public:
   bool linkFunction(StringRef Name,
                     LinkingMode LinkAll = LinkingMode::LinkNormal);
 
-  /// Check if a given function exists in the module,
-  /// i.e. it can be linked by linkFunction.
+  /// Check if a given function exists in any of the modules with a
+  /// required linkage, i.e. it can be linked by linkFunction.
+  ///
+  /// If linkage parameter is none, then the linkage of the function
+  /// with a given name does not matter.
   ///
   /// \return null if this module has no such function. Otherwise
   /// the declaration of a function.
-  SILFunction *hasFunction(StringRef Name, SILLinkage Linkage);
+  SILFunction *findFunction(StringRef Name, Optional<SILLinkage> Linkage);
+
+  /// Check if a given function exists in the module,
+  /// i.e. it can be linked by linkFunction.
+  bool hasFunction(StringRef Name);
 
   /// Link in all Witness Tables in the module.
   void linkAllWitnessTables();
