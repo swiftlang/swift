@@ -1019,12 +1019,8 @@ LazyResolver *GenericSignatureBuilder::getLazyResolver() const {
   return Context.getLazyResolver();
 }
 
-auto GenericSignatureBuilder::resolveArchetype(Type type, PotentialArchetype *basePA)
-    -> PotentialArchetype * {
+auto GenericSignatureBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
   if (auto genericParam = type->getAs<GenericTypeParamType>()) {
-    if (basePA)
-      return basePA;
-
     unsigned index = GenericParamKey(genericParam).findIndexIn(
                                                            Impl->GenericParams);
     if (index < Impl->GenericParams.size())
@@ -1034,7 +1030,7 @@ auto GenericSignatureBuilder::resolveArchetype(Type type, PotentialArchetype *ba
   }
 
   if (auto dependentMember = type->getAs<DependentMemberType>()) {
-    auto base = resolveArchetype(dependentMember->getBase(), basePA);
+    auto base = resolveArchetype(dependentMember->getBase());
     if (!base)
       return nullptr;
 
@@ -1112,9 +1108,15 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   if (Proto->isRequirementSignatureComputed()) {
     auto reqSig = Proto->getRequirementSignature();
 
-    for (auto req : reqSig->getRequirements()) {
+    auto concreteSelf = T->getDependentType({}, /*allowUnresolved=*/true);
+    auto subMap = SubstitutionMap::getProtocolSubstitutions(
+        Proto, concreteSelf, ProtocolConformanceRef(Proto));
+
+    for (auto rawReq : reqSig->getRequirements()) {
+      auto req = rawReq.subst(subMap);
+      assert(req && "substituting Self in requirement shouldn't fail");
       RequirementSource InnerSource(Kind, Source.getLoc());
-      addRequirement(req, InnerSource, T, Visited);
+      addRequirement(*req, InnerSource, Visited);
     }
   } else {
     // Conformances to inherit protocols are explicit in a protocol requirement
@@ -1333,9 +1335,8 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   Type concrete2 = T2->getConcreteType();
   
   if (concrete1 && concrete2) {
-    bool mismatch =
-      addSameTypeRequirement(concrete1, concrete2, Source, nullptr,
-        [&](Type type1, Type type2) {
+    bool mismatch = addSameTypeRequirement(
+        concrete1, concrete2, Source, [&](Type type1, Type type2) {
           Diags.diagnose(Source.getLoc(),
                          diag::requires_same_type_conflict,
                          T1->getDependentType(/*FIXME: */{ }, true), type1,
@@ -1411,9 +1412,8 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
   // If we've already been bound to a type, we're either done, or we have a
   // problem.
   if (auto oldConcrete = T->getConcreteType()) {
-    bool mismatch =
-      addSameTypeRequirement(oldConcrete, Concrete, Source, nullptr,
-        [&](Type type1, Type type2) {
+    bool mismatch = addSameTypeRequirement(
+        oldConcrete, Concrete, Source, [&](Type type1, Type type2) {
           Diags.diagnose(Source.getLoc(),
                          diag::requires_same_type_conflict,
                          T->getDependentType(/*FIXME: */{ }, true), type1,
@@ -1486,30 +1486,25 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
 }
 
 bool GenericSignatureBuilder::addSameTypeRequirement(
-                        Type type1, Type type2,
-                        RequirementSource source,
-                        PotentialArchetype *basePA,
-                        llvm::function_ref<void(Type, Type)> diagnoseMismatch) {
+    Type type1, Type type2, RequirementSource source,
+    llvm::function_ref<void(Type, Type)> diagnoseMismatch) {
   // Local class to handle matching the two sides of the same-type constraint.
   class ReqTypeMatcher : public TypeMatcher<ReqTypeMatcher> {
     GenericSignatureBuilder &builder;
     RequirementSource source;
-    PotentialArchetype *basePA;
     llvm::function_ref<void(Type, Type)> diagnoseMismatch;
 
   public:
-    ReqTypeMatcher(GenericSignatureBuilder &builder,
-                   RequirementSource source,
-                   PotentialArchetype *basePA,
+    ReqTypeMatcher(GenericSignatureBuilder &builder, RequirementSource source,
                    llvm::function_ref<void(Type, Type)> diagnoseMismatch)
-      : builder(builder), source(source), basePA(basePA),
-        diagnoseMismatch(diagnoseMismatch) { }
+        : builder(builder), source(source), diagnoseMismatch(diagnoseMismatch) {
+    }
 
     bool mismatch(TypeBase *firstType, TypeBase *secondType,
                   Type sugaredFirstType) {
       // Find the potential archetypes.
-      PotentialArchetype *pa1 = builder.resolveArchetype(firstType, basePA);
-      PotentialArchetype *pa2 = builder.resolveArchetype(secondType, basePA);
+      PotentialArchetype *pa1 = builder.resolveArchetype(firstType);
+      PotentialArchetype *pa2 = builder.resolveArchetype(secondType);
 
       // If both sides of the requirement are type parameters, equate them.
       if (pa1 && pa2)
@@ -1527,7 +1522,7 @@ bool GenericSignatureBuilder::addSameTypeRequirement(
       diagnoseMismatch(sugaredFirstType, secondType);
       return false;
     }
-  } matcher(*this, source, basePA, diagnoseMismatch);
+  } matcher(*this, source, diagnoseMismatch);
 
   return !matcher.match(type1, type2);
 }
@@ -1697,17 +1692,16 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr &Req) {
 bool GenericSignatureBuilder::addRequirement(const Requirement &req,
                                       RequirementSource source) {
   llvm::SmallPtrSet<ProtocolDecl *, 8> Visited;
-  return addRequirement(req, source, nullptr, Visited);
+  return addRequirement(req, source, Visited);
 }
 
 bool GenericSignatureBuilder::addRequirement(
     const Requirement &req, RequirementSource source,
-    PotentialArchetype *basePA,
     llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited) {
   switch (req.getKind()) {
   case RequirementKind::Superclass: {
     // FIXME: Diagnose this.
-    PotentialArchetype *pa = resolveArchetype(req.getFirstType(), basePA);
+    PotentialArchetype *pa = resolveArchetype(req.getFirstType());
     if (!pa) return false;
 
     assert(req.getSecondType()->getClassOrBoundGenericClass());
@@ -1716,7 +1710,7 @@ bool GenericSignatureBuilder::addRequirement(
 
   case RequirementKind::Layout: {
     // FIXME: Diagnose this.
-    PotentialArchetype *pa = resolveArchetype(req.getFirstType(), basePA);
+    PotentialArchetype *pa = resolveArchetype(req.getFirstType());
     if (!pa) return false;
 
     return addLayoutRequirement(pa, req.getLayoutConstraint(), source);
@@ -1724,7 +1718,7 @@ bool GenericSignatureBuilder::addRequirement(
 
   case RequirementKind::Conformance: {
     // FIXME: Diagnose this.
-    PotentialArchetype *pa = resolveArchetype(req.getFirstType(), basePA);
+    PotentialArchetype *pa = resolveArchetype(req.getFirstType());
     if (!pa) return false;
 
     SmallVector<ProtocolDecl *, 4> conformsTo;
@@ -1744,7 +1738,7 @@ bool GenericSignatureBuilder::addRequirement(
 
   case RequirementKind::SameType:
     return addSameTypeRequirement(
-             req.getFirstType(), req.getSecondType(), source, basePA,
+             req.getFirstType(), req.getSecondType(), source,
              [&](Type type1, Type type2) {
                if (source.getLoc().isValid())
                  Diags.diagnose(source.getLoc(),
@@ -1804,25 +1798,21 @@ public:
 
     // Handle the requirements.
     RequirementSource source(RequirementSource::Inferred, Loc);
-    for (const auto &req : genericSig->getRequirements()) {
-      switch (req.getKind()) {
-      case RequirementKind::SameType: {
-        auto firstType = req.getFirstType().subst(
-                           getTypeSubstitution,
-                           Builder.getLookupConformanceFn());
-        if (!firstType)
-          break;
+    for (const auto &rawReq : genericSig->getRequirements()) {
+      auto req =
+          rawReq.subst(getTypeSubstitution, Builder.getLookupConformanceFn());
+      if (!req)
+        continue;
 
+      switch (req->getKind()) {
+      case RequirementKind::SameType: {
+        auto firstType = req->getFirstType();
         auto firstPA = Builder.resolveArchetype(firstType);
 
         if (firstPA && isOuterArchetype(firstPA))
           return Action::Continue;
 
-        auto secondType = req.getSecondType().subst(
-                           getTypeSubstitution,
-                           Builder.getLookupConformanceFn());
-        if (!secondType)
-          break;
+        auto secondType = req->getSecondType();
         auto secondPA = Builder.resolveArchetype(secondType);
 
         if (firstPA && secondPA) {
@@ -1843,12 +1833,7 @@ public:
       case RequirementKind::Superclass:
       case RequirementKind::Layout:
       case RequirementKind::Conformance: {
-        auto subjectType = req.getFirstType().subst(
-                             getTypeSubstitution,
-                             Builder.getLookupConformanceFn());
-        if (!subjectType)
-          break;
-
+        auto subjectType = req->getFirstType();
         auto subjectPA = Builder.resolveArchetype(subjectType);
         if (!subjectPA) {
           break;
@@ -1857,19 +1842,19 @@ public:
         if (isOuterArchetype(subjectPA))
           return Action::Continue;
 
-        if (req.getKind() == RequirementKind::Conformance) {
-          auto proto = req.getSecondType()->castTo<ProtocolType>();
+        if (req->getKind() == RequirementKind::Conformance) {
+          auto proto = req->getSecondType()->castTo<ProtocolType>();
           if (Builder.addConformanceRequirement(subjectPA, proto->getDecl(),
                                                 source)) {
             return Action::Stop;
           }
-        } else if (req.getKind() == RequirementKind::Layout) {
-          if (Builder.addLayoutRequirement(subjectPA, req.getLayoutConstraint(),
-                                           source)) {
+        } else if (req->getKind() == RequirementKind::Layout) {
+          if (Builder.addLayoutRequirement(
+                  subjectPA, req->getLayoutConstraint(), source)) {
             return Action::Stop;
           }
         } else {
-          if (Builder.addSuperclassRequirement(subjectPA, req.getSecondType(),
+          if (Builder.addSuperclassRequirement(subjectPA, req->getSecondType(),
                                                source)) {
             return Action::Stop;
           }
