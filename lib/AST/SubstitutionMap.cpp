@@ -24,6 +24,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -106,6 +107,8 @@ Optional<T> SubstitutionMap::forEachConformance(
 
   // Local function to performance a (recursive) search for an associated type
   // of the given name in the given conformance and all inherited conformances.
+  //
+  // FIXME: This function is shameful and gross. Kill it with fire.
   std::function<Optional<T>(ProtocolConformanceRef, DeclName,
                                  llvm::SmallPtrSetImpl<ProtocolDecl *> &)>
     searchInConformance;
@@ -128,6 +131,24 @@ Optional<T> SubstitutionMap::forEachConformance(
     if (protoAssocType) {
       if (conformance.isAbstract()) {
         for (auto assocProto : protoAssocType->getConformingProtocols()) {
+          // If we have an abstract conformance of an archetype to a
+          // protocol, check the archetype's generic signature for
+          // stashed conformances.
+          if (auto archetype = conformance.getArchetype()) {
+            if (auto *genericEnv = archetype->getGenericEnvironment()) {
+              auto *genericSig = genericEnv->getGenericSignature();
+
+              // FIXME: Pass the original type and not the replacement
+              // type (nested) when GenericSignature::lookupConformance()
+              // is implemented properly.
+              auto nested = archetype->getNestedType(protoAssocType->getName());
+              if (auto subConformance = genericSig->lookupConformance(
+                    nested->getCanonicalType(), assocProto))
+                if (auto found = fn(*subConformance))
+                  return found;
+            }
+          }
+
           if (auto found = fn(ProtocolConformanceRef(assocProto)))
             return found;
         }
