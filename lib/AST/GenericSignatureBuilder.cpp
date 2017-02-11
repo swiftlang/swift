@@ -1842,22 +1842,29 @@ public:
         if (isOuterArchetype(subjectPA))
           return Action::Continue;
 
-        if (req->getKind() == RequirementKind::Conformance) {
+        switch (req->getKind()) {
+        case RequirementKind::Conformance: {
           auto proto = req->getSecondType()->castTo<ProtocolType>();
           if (Builder.addConformanceRequirement(subjectPA, proto->getDecl(),
                                                 source)) {
             return Action::Stop;
           }
-        } else if (req->getKind() == RequirementKind::Layout) {
+          break;
+        }
+        case RequirementKind::Layout:
           if (Builder.addLayoutRequirement(
                   subjectPA, req->getLayoutConstraint(), source)) {
             return Action::Stop;
           }
-        } else {
+          break;
+        case RequirementKind::Superclass:
           if (Builder.addSuperclassRequirement(subjectPA, req->getSecondType(),
                                                source)) {
             return Action::Stop;
           }
+          break;
+        case RequirementKind::SameType:
+          llvm_unreachable("covered by outer switch");
         }
         break;
       }
