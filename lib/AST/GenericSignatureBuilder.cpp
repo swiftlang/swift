@@ -350,15 +350,32 @@ auto GenericSignatureBuilder::PotentialArchetype::getRepresentative()
   return Result;
 }
 
+/// Determine whether there is a concrete type anywhere in the path to the root.
+static bool hasConcreteTypeInPath(
+                       const GenericSignatureBuilder::PotentialArchetype *pa) {
+  for (; pa; pa = pa->getParent()) {
+    if (pa->isConcreteType()) return true;
+  }
+
+  return false;
+}
+
 /// Canonical ordering for dependent types in generic signatures.
 static int compareDependentTypes(
-                             GenericSignatureBuilder::PotentialArchetype * const* pa,
-                             GenericSignatureBuilder::PotentialArchetype * const* pb) {
+                     GenericSignatureBuilder::PotentialArchetype * const* pa,
+                     GenericSignatureBuilder::PotentialArchetype * const* pb) {
   auto a = *pa, b = *pb;
 
   // Fast-path check for equality.
   if (a == b)
     return 0;
+
+  // If one potential archetype has a concrete type in its path but the other
+  // does not, prefer the one that does not.
+  auto aConcrete = hasConcreteTypeInPath(a);
+  auto bConcrete = hasConcreteTypeInPath(b);
+  if (aConcrete != bConcrete)
+    return aConcrete ? 1 : -1;
 
   // Ordering is as follows:
   // - Generic params
@@ -446,28 +463,11 @@ static int compareDependentTypes(
   llvm_unreachable("potential archetype total order failure");
 }
 
-/// Determine whether there is a concrete type anywhere in the path to the root.
-static bool hasConcreteTypeInPath(
-                               const GenericSignatureBuilder::PotentialArchetype *pa) {
-  for (; pa; pa = pa->getParent()) {
-    if (pa->isConcreteType()) return true;
-  }
-
-  return false;
-}
-
 /// Whether this potential archetype makes a better archetype anchor than
 /// the given archetype anchor.
 static bool isBetterArchetypeAnchor(
                               const GenericSignatureBuilder::PotentialArchetype *pa,
                               const GenericSignatureBuilder::PotentialArchetype *pb) {
-  // If one potential archetype has a concrete type in its path but the other
-  // does not, prefer the one that does not.
-  auto aConcrete = hasConcreteTypeInPath(pa);
-  auto bConcrete = hasConcreteTypeInPath(pb);
-  if (aConcrete != bConcrete)
-    return bConcrete;
-
   auto mutablePA = const_cast<GenericSignatureBuilder::PotentialArchetype *>(pa);
   auto mutablePB = const_cast<GenericSignatureBuilder::PotentialArchetype *>(pb);
   return compareDependentTypes(&mutablePA, &mutablePB) < 0;
