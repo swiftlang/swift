@@ -50,7 +50,7 @@ struct LValueWritebackCleanup : Cleanup {
     lvalue.performWriteback(gen, /*isFinal*/ false);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "LValueWritebackCleanup\n"
                  << "State: " << getState() << "Depth: " << Depth.getDepth()
