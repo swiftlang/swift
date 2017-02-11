@@ -186,7 +186,7 @@ Type GenericEnvironment::mapTypeOutOfContext(Type type) const {
 
 Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
                                                 SubstitutableType *type) const {
-  if (auto gp = type->getCanonicalType()->getAs<GenericTypeParamType>()) {
+  if (auto gp = type->getAs<GenericTypeParamType>()) {
     // Find the index into the parallel arrays of generic parameters and
     // context types.
     auto genericParams = self->Signature->getGenericParams();
@@ -286,6 +286,9 @@ Type GenericEnvironment::QueryArchetypeToInterfaceSubstitutions::operator()(
 Type GenericEnvironment::mapTypeIntoContext(
                                 Type type,
                                 LookupConformanceFn lookupConformance) const {
+  assert(!type->hasOpenedExistential() &&
+         "Opened existentials are special and so are you");
+
   Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
                            lookupConformance,
                            (SubstFlags::AllowLoweredTypes|
