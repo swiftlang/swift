@@ -499,6 +499,14 @@ bool SILModule::linkFunction(StringRef Name, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Name);
 }
 
+bool SILModule::hasFunction(StringRef Name) {
+  if (lookUpFunction(Name))
+    return true;
+  SILLinkerVisitor Visitor(*this, getSILLoader(),
+                           SILModule::LinkingMode::LinkNormal);
+  return Visitor.hasFunction(Name);
+}
+
 /// Check if a given SIL linkage matches the required linkage.
 /// If the required linkage is Private, then anything matches it.
 static bool isMatchingLinkage(SILLinkage ActualLinkage,
@@ -508,19 +516,15 @@ static bool isMatchingLinkage(SILLinkage ActualLinkage,
   return ActualLinkage == Linkage;
 }
 
-bool SILModule::hasFunction(StringRef Name) {
-  if (lookUpFunction(Name))
-    return true;
-  SILLinkerVisitor Visitor(*this, getSILLoader(),
-                           SILModule::LinkingMode::LinkNormal);
-  return Visitor.hasFunction(Name);
-}
-
 SILFunction *SILModule::findFunction(StringRef Name,
                                      Optional<SILLinkage> Linkage) {
+  assert(Linkage);
+  auto RequiredLinkage = *Linkage;
+  assert((RequiredLinkage == SILLinkage::Public ||
+          RequiredLinkage == SILLinkage::PublicExternal) &&
+         "Only a lookup of public functions is supported currently");
 
   SILFunction *F = nullptr;
-  SILLinkage RequiredLinkage = Linkage ? *Linkage : SILLinkage::Private;
 
   // First, check if there is a function with a required name in the
   // current module.
@@ -565,27 +569,20 @@ SILFunction *SILModule::findFunction(StringRef Name,
     }
   }
 
-  // If a function exists already and it is a non-optimizing
-  // compilation, simply convert it into an external declaration,
+  // If an external public function representing a pre-specialization
+  // exists already and it is a non-optimizing compilation,
+  // simply convert it into an external declaration,
   // so that a compiled version from the shared library is used.
+  // It is important to remove its body here, because it may
+  // contain references to non-public functions.
   if (F->isDefinition() &&
       F->getModule().getOptions().Optimization <
           SILOptions::SILOptMode::Optimize) {
     F->convertToDeclaration();
   }
-  if (F->isExternalDeclaration()) {
+  if (F->isExternalDeclaration())
     F->setFragile(IsFragile_t::IsNotFragile);
-    if (isAvailableExternally(F->getLinkage()) &&
-        !hasPublicVisibility(F->getLinkage()) && !Linkage) {
-      // We were just asked if a given function exists anywhere.
-      // It is not going to be used by the current module.
-      // Since external non-public function declarations should not
-      // exist, strip the "external" part from the linkage.
-      F->setLinkage(stripExternalFromLinkage(F->getLinkage()));
-    }
-  }
-  if (Linkage)
-    F->setLinkage(RequiredLinkage);
+  F->setLinkage(RequiredLinkage);
   return F;
 }
 
