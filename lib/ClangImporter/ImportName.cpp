@@ -1461,9 +1461,24 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     auto enumInfo = getEnumInfo(enumDecl);
 
     StringRef removePrefix = enumInfo.getConstantNamePrefix();
-    if (!removePrefix.empty() && baseName.startswith(removePrefix)) {
-      baseName = baseName.substr(removePrefix.size());
-      strippedPrefix = true;
+    if (!removePrefix.empty()) {
+      if (baseName.startswith(removePrefix)) {
+        baseName = baseName.substr(removePrefix.size());
+        strippedPrefix = true;
+      } else if (givenName) {
+        // Calculate the new prefix.
+        // What if the preferred name causes longer prefix?
+        StringRef subPrefix = [](StringRef LHS, StringRef RHS) {
+          if(LHS.size() > RHS.size())
+            std::swap(LHS, RHS) ;
+          return StringRef(LHS.data(), std::mismatch(LHS.begin(), LHS.end(),
+            RHS.begin()).first - LHS.begin());
+        }(removePrefix, baseName);
+        if (!subPrefix.empty()) {
+          baseName = baseName.substr(subPrefix.size());
+          strippedPrefix = true;
+        }
+      }
     }
   }
 
