@@ -2889,3 +2889,10 @@ void ClangImporter::Implementation::dumpSwiftLookupTables() {
   llvm::errs() << "<<Bridging header lookup table>>\n";
   BridgingHeaderLookupTable->dump();
 }
+
+DeclName ClangImporter::
+importName(const clang::NamedDecl *D,
+           clang::DeclarationName preferredName) {
+  return Impl.importFullName(D, Impl.CurrentVersion, preferredName).
+    getDeclName();
+}

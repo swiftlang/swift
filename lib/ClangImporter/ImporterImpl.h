@@ -607,8 +607,10 @@ public:
   ///
   /// \param D The Clang declaration whose name should be imported.
   importer::ImportedName importFullName(const clang::NamedDecl *D,
-                                        Version version) {
-    return getNameImporter().importName(D, version);
+                                        Version version,
+                                        clang::DeclarationName givenName =
+                                          clang::DeclarationName()) {
+    return getNameImporter().importName(D, version, givenName);
   }
 
   /// Print an imported name as a string suitable for the swift_name attribute,
