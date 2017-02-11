@@ -22,7 +22,6 @@
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/AST/CanTypeVisitor.h"
-#include "swift/Basic/Fallthrough.h"
 
 using namespace swift;
 using namespace Lowering;

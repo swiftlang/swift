@@ -14,7 +14,6 @@
 #include "swift/LLVMPasses/Passes.h"
 #include "ARCEntryPointBuilder.h"
 #include "LLVMARCOpts.h"
-#include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Verifier.h"

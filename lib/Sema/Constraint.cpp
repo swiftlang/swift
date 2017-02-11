@@ -19,7 +19,7 @@
 #include "ConstraintSystem.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Compiler.h"
-#include "swift/Basic/Fallthrough.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
@@ -480,7 +480,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::OptionalObject:
   case ConstraintKind::Defaultable:
     constraint->getSecondType()->getTypeVariables(typeVars);
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case ConstraintKind::BindOverload:
   case ConstraintKind::ConformsTo:

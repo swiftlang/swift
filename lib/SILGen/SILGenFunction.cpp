@@ -18,7 +18,6 @@
 #include "SILGenFunction.h"
 #include "RValue.h"
 #include "Scope.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"

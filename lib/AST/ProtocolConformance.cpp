@@ -13,8 +13,8 @@
 // This file implements the protocol conformance data structures.
 //
 //===----------------------------------------------------------------------===//
+
 #include "ConformanceLookupTable.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/LazyResolver.h"

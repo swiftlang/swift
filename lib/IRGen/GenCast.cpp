@@ -28,7 +28,6 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 
-#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"

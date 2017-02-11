@@ -25,8 +25,8 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/StringExtras.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -1047,7 +1047,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           PlatformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
           break;
         }
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
 
       case IsIntroduced:
       case IsObsoleted: {
@@ -2183,14 +2183,14 @@ Parser::parseDecl(ParseDeclOptions Flags,
       }
 
       // Otherwise this is not a context-sensitive keyword.
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case tok::pound_if:
     case tok::pound_sourceLocation:
     case tok::pound_line:
       // We see some attributes right before these pounds.
       // TODO: Emit dedicated errors for them.
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     // Obvious nonsense.
     default:
@@ -3413,7 +3413,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
 
     case AccessorKind::IsMutableAddressor:
       D->setAddressorKind(addressorKind);
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case AccessorKind::IsSetter:
     case AccessorKind::IsWillSet:

@@ -24,6 +24,7 @@
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 
 #define DEBUG_TYPE "Serialization"
@@ -1504,7 +1505,7 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
           pathTrace.removeLast();
         }
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     }
     case XREF_VALUE_PATH_PIECE:
     case XREF_INITIALIZER_PATH_PIECE: {

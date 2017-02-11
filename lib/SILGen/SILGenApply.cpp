@@ -21,11 +21,11 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/Module.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -2430,7 +2430,7 @@ RValue SILGenFunction::emitApply(
         B.createAutoreleaseValue(loc, lifetimeExtendedSelf, Atomicity::Atomic);
         hasAlreadyLifetimeExtendedSelf = true;
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case ResultConvention::Unowned:
       // Unretained. Retain the value.

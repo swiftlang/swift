@@ -23,6 +23,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -2522,7 +2523,7 @@ namespace {
         }
 
         // Fall through to build the member reference.
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
       }
 
       case OverloadChoiceKind::Decl:

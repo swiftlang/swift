@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "arc-sequence-opts"
+
 #include "RefCountState.h"
 #include "ARCMatchingSet.h"
 #include "swift/Basic/BlotMapVector.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Utils/Local.h"

@@ -35,6 +35,7 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -1553,7 +1554,7 @@ checkWitness(AccessScope requiredAccessScope,
         if (!Proto->isObjC())
           break;
 
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
 
       case OTK_Optional:
         return CheckKind::ConstructorFailability;

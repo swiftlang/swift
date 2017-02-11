@@ -23,11 +23,11 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeLoc.h"
-#include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <functional>
@@ -2183,7 +2183,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       // Imported classes and protocols are not representable in C.
       if (isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal))
         return failure();
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case ForeignLanguage::ObjectiveC:
       if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {

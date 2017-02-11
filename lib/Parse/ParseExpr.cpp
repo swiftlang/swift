@@ -21,8 +21,8 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/StringExtras.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -461,7 +461,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
     // expression (and that may not always be an expression).
     diagnose(Tok, diag::invalid_postfix_operator);
     Tok.setKind(tok::oper_prefix);
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case tok::oper_prefix:
     Operator = parseExprOperator();
     break;
@@ -1091,7 +1091,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     diagnose(Tok.getLoc(), diag::string_literal_no_atsign)
       .fixItRemove(Tok.getLoc());
     consumeToken(tok::at_sign);
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
       
   case tok::string_literal:  // "foo"
     Result = parseExprStringLiteral();
@@ -1128,7 +1128,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     diagnose(Tok.getLoc(), diag::snake_case_deprecated,
              Tok.getText(), replacement)
       .fixItReplace(Tok.getLoc(), replacement);
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   }
   case tok::pound_column:
   case tok::pound_file:
@@ -1169,7 +1169,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       break;
     }
 
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case tok::kw_self:     // self
   case tok::kw_Self:     // Self
     Result = makeParserResult(parseExprIdentifier());

@@ -17,7 +17,6 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/Basic/Fallthrough.h"
 
 using namespace swift;
 using namespace Lowering;

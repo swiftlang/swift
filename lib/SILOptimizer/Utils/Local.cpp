@@ -22,12 +22,12 @@
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
-#include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Compiler.h"
 #include <deque>
 
 using namespace swift;
@@ -2722,7 +2722,7 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
       if (ND->getEffectiveAccess() == Accessibility::Open)
         return false;
     }
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case Accessibility::Internal:
     return M.isWholeModule();
   case Accessibility::FilePrivate:

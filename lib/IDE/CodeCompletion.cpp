@@ -21,7 +21,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -40,8 +39,9 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
 #include <string>
 
@@ -464,7 +464,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case ChunkKind::Equal:
     case ChunkKind::Whitespace:
       AnnotatedTextChunk = C.isAnnotation();
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case ChunkKind::CallParameterName:
     case ChunkKind::CallParameterInternalName:
     case ChunkKind::CallParameterColon:
@@ -4777,7 +4777,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::StmtOrExpr:
     addDeclKeywords(Sink);
     addStmtKeywords(Sink, MaybeFuncBody);
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case CompletionKind::AssignmentRHS:
   case CompletionKind::ReturnStmtExpr:
   case CompletionKind::PostfixExprBeginning:
@@ -5183,7 +5183,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::KeyPathExprDot:
     Lookup.setHaveDot(SourceLoc());
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case CompletionKind::KeyPathExpr: {
     Lookup.setIsKeyPathExpr();

@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "sil-inst-utils"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/Basic/NullablePtr.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"

@@ -36,10 +36,10 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/Basic/Fallthrough.h"
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/AST/Attr.h"
@@ -1169,7 +1169,7 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       }
 
       // Fall through to the trivial-implementation case.
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case StoredWithTrivialAccessors:
     case AddressedWithTrivialAccessors: {

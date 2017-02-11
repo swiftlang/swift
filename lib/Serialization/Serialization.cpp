@@ -25,7 +25,6 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Dwarf.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -46,6 +45,7 @@
 #include "llvm/Bitcode/RecordLayout.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -1580,7 +1580,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
 
   case DeclContextKind::FileUnit:
     DC = cast<FileUnit>(DC)->getParentModule();
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case DeclContextKind::Module:
     abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
