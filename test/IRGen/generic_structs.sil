@@ -8,7 +8,7 @@ import Builtin
 //    of the metadata pattern, and no independent vwtable symbol
 // CHECK-NOT: @_T015generic_structs13SingleDynamicVWV
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private constant [34 x i8] c"V15generic_structs13SingleDynamic\00"
+// CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private constant [34 x i8] c"15generic_structs13SingleDynamicV\00"
 // CHECK: [[SINGLEDYNAMIC_FIELDS:@.*]] = private constant [3 x i8] c"x\00\00"
 // CHECK: @_T015generic_structs13SingleDynamicVMn = hidden constant <{ {{.*}} i32 }> <{
 // --       name
@@ -49,7 +49,7 @@ import Builtin
 
 // -- Nominal type descriptor for generic struct with protocol requirements
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[DYNAMICWITHREQUIREMENTS_NAME:@.*]] = private constant [44 x i8] c"V15generic_structs23DynamicWithRequirements\00"
+// CHECK: [[DYNAMICWITHREQUIREMENTS_NAME:@.*]] = private constant [44 x i8] c"15generic_structs23DynamicWithRequirementsV\00"
 // CHECK: [[DYNAMICWITHREQUIREMENTS_FIELDS:@.*]] = private constant [5 x i8] c"x\00y\00\00"
 // CHECK: @_T015generic_structs23DynamicWithRequirementsVMn = hidden constant <{ {{.*}} i32 }> <{
 // --       name

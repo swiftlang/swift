@@ -397,11 +397,11 @@ public:
   }
 
   bool isAnyObject() const {
-    return MangledName == "Ps9AnyObject_";
+    return MangledName == "s9AnyObject_p";
   }
 
   bool isError() const {
-    return MangledName == "Ps5Error_";
+    return MangledName == "s5Error_p";
   }
 
   const std::string &getMangledName() const {
