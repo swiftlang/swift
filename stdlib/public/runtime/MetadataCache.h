@@ -217,7 +217,7 @@ template <class ValueTy> class MetadataCache {
       return KeyDataRef::forArguments(getKeyDataBuffer(), KeyLength);
     }
 
-    long getKeyIntValueForDump() const {
+    intptr_t getKeyIntValueForDump() const {
       return Hash;
     }
 
