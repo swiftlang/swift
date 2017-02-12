@@ -395,7 +395,7 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
 
   // Apply the substitution we computed above
   auto specializedType
-    = genericWitness.getReplacement().subst(substitutionMap, None);
+    = genericWitness.getReplacement().subst(substitutionMap);
   if (!specializedType)
     specializedType = ErrorType::get(genericWitness.getReplacement());
 

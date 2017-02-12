@@ -3086,6 +3086,12 @@ static Type substType(Type derivedType,
 
     auto archetype = cast<ArchetypeType>(substOrig);
 
+    // Opened existentials cannot be substituted in this manner,
+    // but if they appear in the original type this is not an
+    // error.
+    if (archetype->isOpenedExistential())
+      return Type(type);
+
     // For archetypes, we can substitute the parent (if present).
     auto parent = archetype->getParent();
     if (!parent) {
