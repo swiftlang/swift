@@ -495,28 +495,23 @@ static GenericSignatureBuilder::PotentialArchetype*rebuildPotentialArchetypeAnch
 auto GenericSignatureBuilder::PotentialArchetype::getArchetypeAnchor(
                                                       GenericSignatureBuilder &builder)
        -> PotentialArchetype * {
-  // Rebuild the potential archetype anchor for this type, so the equivalence
-  // class will contain the anchor.
+  // Rebuild the potential archetype anchor for this type, so we'll know that
+  // we've seen the anchor.
   (void)rebuildPotentialArchetypeAnchor(this, builder);
 
-  // Find the best archetype within this equivalence class.
-  PotentialArchetype *rep = getRepresentative();
-  auto best = rep;
-  for (auto pa : rep->getEquivalenceClass()) {
-    if (isBetterArchetypeAnchor(pa, best))
-      best = pa;
-  }
+  // The repesentative is the archetype anchor.
+  PotentialArchetype *anchor = getRepresentative();
 
 #ifndef NDEBUG
   // Make sure that we did, in fact, get one that is better than all others.
-  for (auto pa : rep->getEquivalenceClass()) {
-    assert((pa == best || isBetterArchetypeAnchor(best, pa)) &&
-           !isBetterArchetypeAnchor(pa, best) &&
+  for (auto pa : anchor->getEquivalenceClass()) {
+    assert((pa == anchor || isBetterArchetypeAnchor(anchor, pa)) &&
+           !isBetterArchetypeAnchor(pa, anchor) &&
            "archetype anchor isn't a total order");
   }
 #endif
 
-  return best;
+  return anchor;
 }
 
 // Give a nested type the appropriately resolved concrete type, based off a
@@ -1305,12 +1300,6 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   if (T1 == T2)
     return false;
 
-  // Decide which potential archetype is to be considered the representative.
-  // It doesn't specifically matter which we use, but it's a minor optimization
-  // to prefer the canonical type.
-  if (compareDependentTypes(&T2, &T1) < 0)
-    std::swap(T1, T2);
-
   // Merge any concrete constraints.
   Type concrete1 = T1->getConcreteType();
   Type concrete2 = T2->getConcreteType();
@@ -1337,6 +1326,12 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
     T1->ConcreteType = concrete2;
     T1->ConcreteTypeSource = T2->ConcreteTypeSource;
   }
+
+  // Decide which potential archetype is to be considered the representative.
+  // It doesn't specifically matter which we use, but it's a minor optimization
+  // to prefer the canonical type.
+  if (compareDependentTypes(&T2, &T1) < 0)
+    std::swap(T1, T2);
 
   // Don't mark requirements as redundant if they come from one of our
   // child archetypes. This is a targeted fix -- more general cases
