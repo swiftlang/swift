@@ -1145,11 +1145,11 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   auto sig = BehaviorConformance->getProtocol()->getGenericSignatureOfContext();
 
   auto interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
-  auto SubstStorageInterfaceTy = StorageTy.subst(interfaceMap, SubstOptions());
+  auto SubstStorageInterfaceTy = StorageTy.subst(interfaceMap);
   assert(SubstStorageInterfaceTy && "storage type substitution failed?!");
 
   auto contextMap = sig->getSubstitutionMap(SelfContextSubs);
-  auto SubstStorageContextTy = StorageTy.subst(contextMap, SubstOptions());
+  auto SubstStorageContextTy = StorageTy.subst(contextMap);
   assert(SubstStorageContextTy && "storage type substitution failed?!");
 
   auto DC = VD->getDeclContext();
@@ -1293,7 +1293,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   GenericEnvironment *genericEnv = nullptr;
 
   auto interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
-  auto SubstInterfaceTy = ParameterTy.subst(interfaceMap, SubstOptions());
+  auto SubstInterfaceTy = ParameterTy.subst(interfaceMap);
   assert(SubstInterfaceTy && "storage type substitution failed?!");
   
   auto contextMap = sig->getSubstitutionMap(SelfContextSubs);
@@ -1333,9 +1333,9 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   for (unsigned i : indices(*DeclaredParams)) {
     auto declaredParam = DeclaredParams->get(i);
     auto declaredParamTy = declaredParam->getInterfaceType();
-    auto interfaceTy = declaredParamTy.subst(interfaceMap, SubstOptions());
+    auto interfaceTy = declaredParamTy.subst(interfaceMap);
     assert(interfaceTy);
-    auto contextTy = declaredParamTy.subst(contextMap, SubstOptions());
+    auto contextTy = declaredParamTy.subst(contextMap);
     assert(contextTy);
 
     SmallString<64> ParamNameBuf;
@@ -2040,7 +2040,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
       // Apply the superclass substitutions to produce a contextual
       // type in terms of the derived class archetypes.
-      auto paramSubstTy = paramTy.subst(subsMap, SubstOptions());
+      auto paramSubstTy = paramTy.subst(subsMap);
       decl->setType(paramSubstTy);
 
       // Map it to an interface type in terms of the derived class

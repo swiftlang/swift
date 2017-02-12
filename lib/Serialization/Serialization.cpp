@@ -1212,20 +1212,8 @@ void Serializer::writeNormalConformance(
         for (auto gp : genericSig->getGenericParams())
           data.push_back(addTypeRef(gp));
 
-        // Mapping from the requirement's interface types to the interface
-        // types of the synthetic environment.
-        auto reqSignature =
-          req->getInnermostDeclContext()->getGenericSignatureOfContext();
-        const auto &reqToSyntheticMap = witness.getRequirementToSyntheticMap();
-        for (auto reqGP : reqSignature->getGenericParams()) {
-          auto canonicalGP =
-            cast<GenericTypeParamType>(reqGP->getCanonicalType());
-          data.push_back(
-            addTypeRef(Type(canonicalGP).subst(reqToSyntheticMap)));
-          auto conformances = reqToSyntheticMap.getConformances(canonicalGP);
-          data.push_back(conformances.size());
-          // Conformances come at the end.
-        }
+        auto reqToSyntheticSubs = witness.getRequirementToSyntheticSubs();
+        data.push_back(reqToSyntheticSubs.size());
 
         // Requirements come at the end.
       } else {
@@ -1278,18 +1266,10 @@ void Serializer::writeNormalConformance(
      writeGenericRequirements(genericSig->getRequirements(),
                               DeclTypeAbbrCodes);
 
-     // Write conformances for the requirement-to-synthetic environment map.
-     auto reqSignature =
-       req->getInnermostDeclContext()->getGenericSignatureOfContext();
-     const auto &reqToSyntheticMap = witness.getRequirementToSyntheticMap();
-     for (auto reqGP : reqSignature->getGenericParams()) {
-       auto canonicalGP =
-         cast<GenericTypeParamType>(reqGP->getCanonicalType());
-       auto conformances = reqToSyntheticMap.getConformances(canonicalGP);
-       for (auto conformance : conformances) {
-         writeConformance(conformance, DeclTypeAbbrCodes);
-       }
-     }
+     // Write requirement-to-synthetic substitutions.
+     writeSubstitutions(witness.getRequirementToSyntheticSubs(),
+                        DeclTypeAbbrCodes,
+                        nullptr);
    }
 
    // Write the witness substitutions.

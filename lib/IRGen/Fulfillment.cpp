@@ -19,6 +19,7 @@
 #include "IRGenModule.h"
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/TypeLowering.h"
 #include "GenericRequirement.h"
 

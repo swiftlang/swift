@@ -1799,10 +1799,11 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     genericEnv = witness.getSyntheticEnvironment();
     witnessSubs = witness.getSubstitutions();
 
-    const SubstitutionMap &reqtSubs
-      = witness.getRequirementToSyntheticMap();
-    auto input = reqtOrigTy->getInput().subst(reqtSubs)->getCanonicalType();
-    auto result = reqtOrigTy->getResult().subst(reqtSubs)->getCanonicalType();
+    auto reqtSubs = witness.getRequirementToSyntheticSubs();
+    auto reqtSubMap = reqtOrigTy->getGenericSignature()
+        ->getSubstitutionMap(reqtSubs);
+    auto input = reqtOrigTy->getInput().subst(reqtSubMap);
+    auto result = reqtOrigTy->getResult().subst(reqtSubMap);
 
     if (genericEnv) {
       auto *genericSig = genericEnv->getGenericSignature();
@@ -1811,8 +1812,10 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                  reqtOrigTy->getExtInfo())
           ->getCanonicalType());
     } else {
-      reqtSubstTy = CanFunctionType::get(input, result,
-                                         reqtOrigTy->getExtInfo());
+      reqtSubstTy = cast<FunctionType>(
+        FunctionType::get(input, result,
+                          reqtOrigTy->getExtInfo())
+          ->getCanonicalType());
     }
   } else {
     genericEnv = witnessRef.getDecl()->getInnermostDeclContext()

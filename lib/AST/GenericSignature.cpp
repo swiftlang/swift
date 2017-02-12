@@ -217,6 +217,18 @@ ASTContext &GenericSignature::getASTContext() const {
   return getASTContext(getGenericParams(), getRequirements());
 }
 
+Optional<ProtocolConformanceRef>
+GenericSignature::lookupConformance(CanType type, ProtocolDecl *proto) const {
+  // FIXME: Actually implement this properly.
+  auto *M = proto->getParentModule();
+
+  if (type->isTypeParameter())
+    return ProtocolConformanceRef(proto);
+
+  return M->lookupConformance(type, proto,
+                              M->getASTContext().getLazyResolver());
+}
+
 bool GenericSignature::enumeratePairedRequirements(
                llvm::function_ref<bool(Type, ArrayRef<Requirement>)> fn) const {
   // We'll be walking through the list of requirements.
@@ -321,9 +333,8 @@ bool GenericSignature::enumeratePairedRequirements(
   return enumerateGenericParamsUpToDependentType(CanType());
 }
 
-static void populateParentMap(const GenericSignature *sig,
-                              SubstitutionMap &subMap) {
-  for (auto reqt : sig->getRequirements()) {
+void GenericSignature::populateParentMap(SubstitutionMap &subMap) const {
+  for (auto reqt : getRequirements()) {
     if (reqt.getKind() != RequirementKind::SameType)
       continue;
 
@@ -368,7 +379,7 @@ GenericSignature::getSubstitutionMap(SubstitutionList subs) const {
   }
 
   assert(subs.empty() && "did not use all substitutions?!");
-  populateParentMap(this, result);
+  populateParentMap(result);
   return result;
 }
 
@@ -402,7 +413,7 @@ getSubstitutionMap(TypeSubstitutionFn subs,
     return false;
   });
 
-  populateParentMap(this, subMap);
+  populateParentMap(subMap);
   return subMap;
 }
 
