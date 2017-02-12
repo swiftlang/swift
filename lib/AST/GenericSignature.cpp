@@ -333,9 +333,8 @@ bool GenericSignature::enumeratePairedRequirements(
   return enumerateGenericParamsUpToDependentType(CanType());
 }
 
-static void populateParentMap(const GenericSignature *sig,
-                              SubstitutionMap &subMap) {
-  for (auto reqt : sig->getRequirements()) {
+void GenericSignature::populateParentMap(SubstitutionMap &subMap) const {
+  for (auto reqt : getRequirements()) {
     if (reqt.getKind() != RequirementKind::SameType)
       continue;
 
@@ -380,7 +379,7 @@ GenericSignature::getSubstitutionMap(SubstitutionList subs) const {
   }
 
   assert(subs.empty() && "did not use all substitutions?!");
-  populateParentMap(this, result);
+  populateParentMap(result);
   return result;
 }
 
@@ -414,7 +413,7 @@ getSubstitutionMap(TypeSubstitutionFn subs,
     return false;
   });
 
-  populateParentMap(this, subMap);
+  populateParentMap(subMap);
   return subMap;
 }
 

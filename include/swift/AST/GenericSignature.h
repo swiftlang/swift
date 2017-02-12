@@ -77,6 +77,8 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
   /// Retrieve the generic signature builder for the given generic signature.
   GenericSignatureBuilder *getGenericSignatureBuilder(ModuleDecl &mod);
 
+  void populateParentMap(SubstitutionMap &subMap) const;
+
   friend class ArchetypeType;
 
 public:
