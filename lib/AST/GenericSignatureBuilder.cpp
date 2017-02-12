@@ -463,16 +463,6 @@ static int compareDependentTypes(
   llvm_unreachable("potential archetype total order failure");
 }
 
-/// Whether this potential archetype makes a better archetype anchor than
-/// the given archetype anchor.
-static bool isBetterArchetypeAnchor(
-                              const GenericSignatureBuilder::PotentialArchetype *pa,
-                              const GenericSignatureBuilder::PotentialArchetype *pb) {
-  auto mutablePA = const_cast<GenericSignatureBuilder::PotentialArchetype *>(pa);
-  auto mutablePB = const_cast<GenericSignatureBuilder::PotentialArchetype *>(pb);
-  return compareDependentTypes(&mutablePA, &mutablePB) < 0;
-}
-
 /// Rebuild the given potential archetype based on anchors.
 static GenericSignatureBuilder::PotentialArchetype*rebuildPotentialArchetypeAnchor(
                                     GenericSignatureBuilder::PotentialArchetype *pa,
@@ -505,8 +495,8 @@ auto GenericSignatureBuilder::PotentialArchetype::getArchetypeAnchor(
 #ifndef NDEBUG
   // Make sure that we did, in fact, get one that is better than all others.
   for (auto pa : anchor->getEquivalenceClass()) {
-    assert((pa == anchor || isBetterArchetypeAnchor(anchor, pa)) &&
-           !isBetterArchetypeAnchor(pa, anchor) &&
+    assert((pa == anchor || compareDependentTypes(&anchor, &pa) < 0) &&
+           compareDependentTypes(&pa, &anchor) >= 0 &&
            "archetype anchor isn't a total order");
   }
 #endif
