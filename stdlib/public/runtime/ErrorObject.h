@@ -27,6 +27,9 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
 #include "SwiftHashableSupport.h"
+
+#include "llvm/Support/Compiler.h"
+
 #include <atomic>
 #if SWIFT_OBJC_INTEROP
 # include <CoreFoundation/CoreFoundation.h>
@@ -205,9 +208,8 @@ SWIFT_RUNTIME_EXPORT
 void swift_errorInMain(SwiftError *object);
 SWIFT_RUNTIME_EXPORT
 void swift_willThrow(SwiftError *object);
-SWIFT_RUNTIME_EXPORT
-void swift_unexpectedError(SwiftError *object)
-    __attribute__((__noreturn__));
+SWIFT_RUNTIME_EXPORT LLVM_ATTRIBUTE_NORETURN
+void swift_unexpectedError(SwiftError *object);
 
 #if SWIFT_OBJC_INTEROP
 

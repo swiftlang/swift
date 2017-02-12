@@ -1274,7 +1274,9 @@ TypeDecl *ModuleFile::lookupNestedType(Identifier name,
     auto declOrOffset = Decls[entry.first - 1];
     if (!declOrOffset.isComplete())
       continue;
-    if (declOrOffset != parent)
+
+    Decl *decl = declOrOffset;
+    if (decl != parent)
       continue;
     return cast<TypeDecl>(getDecl(entry.second));
   }
