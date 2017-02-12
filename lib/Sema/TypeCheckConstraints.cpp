@@ -26,6 +26,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Parse/Lexer.h"

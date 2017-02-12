@@ -19,6 +19,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Fallthrough.h"

@@ -4362,8 +4362,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     GenericEnvironment *syntheticEnv = nullptr;
 
     // Requirement -> synthetic map.
-    SubstitutionMap reqToSyntheticMap;
-    bool hasReqToSyntheticMap = false;
+    SmallVector<Substitution, 4> reqToSyntheticSubs;
     if (unsigned numGenericParams = *rawIDIter++) {
       // Generic parameters of the synthetic environment.
       SmallVector<GenericTypeParamType *, 2> genericParams;
@@ -4383,21 +4382,11 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       syntheticEnv =
         syntheticSig->createGenericEnvironment(*getAssociatedModule());
 
-      // Requirement -> synthetic map.
-      hasReqToSyntheticMap = true;
-      auto reqSignature =
-        req->getInnermostDeclContext()->getGenericSignatureOfContext();
-      for (auto reqGP : reqSignature->getGenericParams()) {
-        auto canonicalGP =
-          cast<GenericTypeParamType>(reqGP->getCanonicalType());
-        auto concreteTy = getType(*rawIDIter++);
-        reqToSyntheticMap.addSubstitution(canonicalGP, concreteTy);
-
-        if (unsigned numConformances = *rawIDIter++) {
-          while (numConformances--) {
-            reqToSyntheticMap.addConformance(
-                canonicalGP, readConformance(DeclTypeCursor));
-          }
+      // Requirement -> synthetic substitutions.
+      if (unsigned numReqSubstitutions = *rawIDIter++) {
+        while (numReqSubstitutions--) {
+          auto sub = maybeReadSubstitution(DeclTypeCursor, nullptr);
+          reqToSyntheticSubs.push_back(*sub);
         }
       }
     }
@@ -4413,14 +4402,14 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
     // Handle simple witnesses.
     if (witnessSubstitutions.empty() && !syntheticSig && !syntheticEnv &&
-        !hasReqToSyntheticMap) {
+        reqToSyntheticSubs.empty()) {
       conformance->setWitness(req, Witness(witness));
       continue;
     }
 
     // Set the witness.
     conformance->setWitness(req, Witness(witness, witnessSubstitutions,
-                                         syntheticEnv, reqToSyntheticMap));
+                                         syntheticEnv, reqToSyntheticSubs));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 

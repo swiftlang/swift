@@ -60,8 +60,8 @@ namespace {
   class RequirementEnvironment {
     GenericSignature *syntheticSignature = nullptr;
     GenericEnvironment *syntheticEnvironment = nullptr;
+    GenericSignature *reqSig = nullptr;
     SubstitutionMap reqToSyntheticEnvMap;
-    bool valid = true;
 
   public:
     /// Create a new environment for matching the given requirement within a
@@ -82,26 +82,18 @@ namespace {
 
     /// Retrieve the synthetic generic environment.
     GenericEnvironment *getSyntheticEnvironment() const {
-      assert(valid && "Already stole from this generic environment");
       return syntheticEnvironment;
+    }
+
+    /// Retrieve the generic signature of the requirement.
+    const GenericSignature *getRequirementSignature() const {
+      return reqSig;
     }
 
     /// Retrieve the substitution map that maps the interface types of the
     /// requirement to the interface types of the synthetic environment.
     const SubstitutionMap &getRequirementToSyntheticMap() const {
-      assert(valid && "Already stole from this generic environment");
       return reqToSyntheticEnvMap;
-    }
-
-    /// Take the substitution map that maps the interface types of the
-    /// requirement to the interface types of the synthetic environment.
-    ///
-    /// This can only be done once, and makes the requirement environment
-    /// invalid.
-    SubstitutionMap &&takeRequirementToSyntheticMap() {
-      assert(valid && "Already stole from this generic environment");
-      valid = false;
-      return std::move(reqToSyntheticEnvMap);
     }
   };
 
@@ -419,11 +411,13 @@ namespace {
 
     swift::Witness getWitness(ASTContext &ctx,
                               RequirementEnvironment &&reqEnvironment) const {
-      auto environment = reqEnvironment.getSyntheticEnvironment();
-      auto map = reqEnvironment.takeRequirementToSyntheticMap();
+      SmallVector<Substitution, 2> syntheticSubs;
+      auto syntheticEnv = reqEnvironment.getSyntheticEnvironment();
+      reqEnvironment.getRequirementSignature()->getSubstitutions(
+          reqEnvironment.getRequirementToSyntheticMap(),
+          syntheticSubs);
       return swift::Witness(this->Witness, WitnessSubstitutions,
-                            environment,
-                            map);
+                            syntheticEnv, syntheticSubs);
     }
 
     /// Classify the provided optionality issues for use in diagnostics.
@@ -981,6 +975,10 @@ RequirementEnvironment::RequirementEnvironment(
                                            DeclContext *conformanceDC,
                                            ValueDecl *req,
                                            ProtocolConformance *conformance) {
+
+  auto reqDC = req->getInnermostDeclContext();
+  reqSig = reqDC->getGenericSignatureOfContext();
+
   ASTContext &ctx = tc.Context;
   auto proto = cast<ProtocolDecl>(req->getDeclContext());
 
@@ -1046,8 +1044,6 @@ RequirementEnvironment::RequirementEnvironment(
 
   // Add the generic signature of the requirement, substituting our concrete
   // type for 'Self'. We don't need the 'Self' requirement or parameter.
-  auto reqDC = req->getInnermostDeclContext();
-  auto reqSig = reqDC->getGenericSignatureOfContext();
   auto reqEnv = reqDC->getGenericEnvironmentOfContext();
 
   // First, add the generic parameters from the requirement.
@@ -1187,9 +1183,10 @@ matchWitness(TypeChecker &tc,
     // the required type and the witness type.
     cs.emplace(tc, dc, ConstraintSystemOptions());
 
-    auto &reqSubs = reqEnvironment.getRequirementToSyntheticMap();
     auto reqGenericEnv = reqEnvironment.getSyntheticEnvironment();
-    Type selfTy = proto->getSelfInterfaceType().subst(reqSubs);
+    auto &reqSubMap = reqEnvironment.getRequirementToSyntheticMap();
+
+    Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
     if (reqGenericEnv)
       selfTy = reqGenericEnv->mapTypeIntoContext(selfTy);
 
@@ -1211,7 +1208,7 @@ matchWitness(TypeChecker &tc,
     // For any type parameters we replaced in the witness, map them
     // to the corresponding archetypes in the witness's context.
     for (const auto &replacement : reqReplacements) {
-      auto replacedInReq = replacement.first.subst(reqSubs);
+      auto replacedInReq = replacement.first.subst(reqSubMap);
 
       // If substitution failed, skip the requirement. This only occurs in
       // invalid code.

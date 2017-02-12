@@ -1354,13 +1354,18 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   // continue to break. In general, we need to detect cycles in the
   // archetype graph and not propagate requirement source information
   // along back edges.
-  bool creatingCycle = false;
+  bool updateExistingSource = true;
   auto T2Parent = T2;
   while (T2Parent != nullptr) {
     if (T2Parent->getRepresentative() == T1)
-      creatingCycle = true;
+      updateExistingSource = false;
     T2Parent = T2Parent->getParent();
   }
+
+  // Another targeted fix -- don't drop conformances from generic
+  // parameters.
+  if (T1->getParent() == nullptr)
+    updateExistingSource = false;
 
   // Make T1 the representative of T2, merging the equivalence classes.
   T2->Representative = T1;
@@ -1375,7 +1380,7 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
 
   // Add all of the protocol conformance requirements of T2 to T1.
   for (auto conforms : T2->ConformsTo) {
-    T1->addConformance(conforms.first, /*updateExistingSource=*/!creatingCycle,
+    T1->addConformance(conforms.first, updateExistingSource,
                        conforms.second, *this);
   }
 

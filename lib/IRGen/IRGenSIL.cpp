@@ -35,6 +35,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/PrettyStackTrace.h"
