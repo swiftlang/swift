@@ -53,7 +53,8 @@ SILGenFunction::~SILGenFunction() {
   assert(!ThrowDest.isValid() &&
          "SILGenFunction did not emit throw destination");
 
-  freeWritebackStack();
+  assert((!WritebackStack || WritebackStack->empty()) &&
+         "entries remaining on writeback stack at end of function!");
 }
 
 //===----------------------------------------------------------------------===//
