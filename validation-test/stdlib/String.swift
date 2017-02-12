@@ -1452,7 +1452,7 @@ StringTests.test("String.replaceSubrange()/characters/range") {
     var theString = test.original
     let c = test.original.characters
     let rangeToReplace = test.rangeSelection.range(in: c)
-    let newCharacters : [Character] = test.newElements.characters.map { $0 }
+    let newCharacters : [Character] = Array(test.newElements.characters)
     theString.replaceSubrange(rangeToReplace, with: newCharacters)
     expectEqual(
       test.expected,
