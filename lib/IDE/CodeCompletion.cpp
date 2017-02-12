@@ -1354,6 +1354,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     case DeclContextKind::TopLevelCodeDecl:
       return typeCheckTopLevelCodeDecl(cast<TopLevelCodeDecl>(DC));
     }
+
+    llvm_unreachable("Unhandled DeclContextKind in switch.");
   }
 
   /// \returns true on success, false on failure.
