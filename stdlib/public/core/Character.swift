@@ -460,13 +460,19 @@ extension Character : Comparable {
 }
 
 extension Character {
-  public init<S: Sequence>(_ s: S) where S.Iterator.Element == UnicodeScalar {
+  public init<S: Sequence>(_ scalars: S) where S.Iterator.Element == UnicodeScalar {
     // FIXME: Horribly inefficient, but the stuff to make it fast is private.
     // FIXME: Also, constructing "👩‍❤️‍👩" is foiled by precondition checks
-    var r = ""
-    for scalar in s {
-      r += String(scalar)
-    }
-    self = Character(r)
+    let string = String(String.UnicodeScalarView(scalars))
+    // TBD: failable initializer, precondition, or neither?
+    assert(string.characters.count == 1)
+    self = string.first!
   } 
+  
+  // FIXME: Horribly inefficient, but the stuff to make it fast is private.
+  // TBD: set or get-only?
+  public var unicodeScalars: String.UnicodeScalarView {
+    return String(self).unicodeScalars
+  }
 }
+
