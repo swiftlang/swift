@@ -113,7 +113,7 @@ In order to allow for cross-module optimizations for modules that are distribute
 
 Resilient types are required to have opaque layout when exposed outside their resilience domain. Inside a resilience domain, this requirement is lifted and their layout may be statically known or opaque as determined by their type (see [previous section](#opaque-layout)).
 
-Annotations may be applied to a library's types in future versions of that library, in which case the annotations are versioned, yet the library remains binary compatible. How how this will impact the ABI is still under investigation [[SR-xxxx]()].
+Annotations may be applied to a library's types in future versions of that library, in which case the annotations are versioned, yet the library remains binary compatible. How how this will impact the ABI is still under investigation [[SR-3911](https://bugs.swift.org/browse/SR-3911)].
 
 
 #### <a name="abstraction-levels"></a>Abstraction Levels
@@ -131,7 +131,7 @@ What follows is a breakdown of the different kinds of types in Swift and what ne
 
 The layout algorithm for structs should result in an efficient use of space, possibly by laying out fields in a different order than declared [[SR-3723](https://bugs.swift.org/browse/SR-3723)]. We may want a fully declaration-order-agnostic algorithm to allow data members to be reordered in source without breaking binary compatibility [[SR-3724](https://bugs.swift.org/browse/SR-3724)]. We also need to consider whether, by default, we want to ensure struct data members are addressable (i.e. byte-aligned) or if we'd rather do bit-packing to save space [[SR-3725](https://bugs.swift.org/browse/SR-3725)].
 
-Zero sized structs do not take up any space as data members and struct members may be laid out in the padding of sub-structs. We may want to explore whether there are implementation benefits to capping alignment at some number, e.g. 16 on many platforms [[SR-xxxx]()].
+Zero sized structs do not take up any space as data members and struct members may be laid out in the padding of sub-structs. We may want to explore whether there are implementation benefits to capping alignment at some number, e.g. 16 on many platforms [[SR-3912](https://bugs.swift.org/browse/SR-3912)].
 
 #### <a name="tuples"></a>Tuples
 
@@ -219,9 +219,9 @@ While data layout specifies the layout of objects of a given type, *type metadat
 
 Swift keeps metadata records for every *concrete type*. Concrete types include all non-generic types as well as generic types with concrete type parameters. These records are created by the compiler as well as lazily created at run time (e.g. for generic type instantiations). This metadata stores information about its type, discussed in each section below.
 
-A potential approach to stability mechanism is to provide metadata read/write functions alongside the runtime to interact with metadata, giving some freedom to the underlying structures to grow and change. This effectively makes large portions of metadata opaque. But, certain fields require access to be as efficient as possible (e.g. dynamic casts, calling into witness tables) and the performance hit from going through an intermediary function would be unacceptable. Thus, we will probably freeze the performance-critical parts and use accessor functions for the rest [[SR-xxxx]()].
+A potential approach to stability mechanism is to provide metadata read/write functions alongside the runtime to interact with metadata, giving some freedom to the underlying structures to grow and change. This effectively makes large portions of metadata opaque. But, certain fields require access to be as efficient as possible (e.g. dynamic casts, calling into witness tables) and the performance hit from going through an intermediary function would be unacceptable. Thus, we will probably freeze the performance-critical parts and use accessor functions for the rest [[SR-3923](https://bugs.swift.org/browse/SR-3923)].
 
-Metadata has many historical artifacts in its representation that we want to clean up [[SR-xxxx]()]. We also want to make small tweaks to present more semantic information in the metadata, to enable better future tooling and features such as reflection [[SR-xxxx]()]. Some of these need to be done before declaring ABI stability and some may be additive.
+Metadata has many historical artifacts in its representation that we want to clean up [[SR-3924](https://bugs.swift.org/browse/SR-3924)]. We also want to make small tweaks to present more semantic information in the metadata, to enable better future tooling and features such as reflection [[SR-3925](https://bugs.swift.org/browse/SR-3925)]. Some of these need to be done before declaring ABI stability and some may be additive.
 
 #### Declaring Stability
 
@@ -237,7 +237,7 @@ At run time, objects only have concrete types. If the type in source code is gen
 
 ### <a name="value-metadata"></a>Value Metadata
 
-Named value types store the type name (currently mangled but we are investigating un-mangled [[SR-xxxx]()]) and a pointer to the type's parent for nested types.
+Named value types store the type name (currently mangled but we are investigating un-mangled [[SR-3926](https://bugs.swift.org/browse/SR-3926)]) and a pointer to the type's parent for nested types.
 
 Value type metadata also has kind-specific entries. Struct metadata stores information about its fields, field offsets, field names, and field metadata. Enum metadata stores information about its cases, payload sizes, and payload metadata. Tuple metadata stores information about its elements and labels.
 
@@ -247,7 +247,7 @@ Every concrete type has a *value witness table* that provides information about 
 
 The value witness table stores whether a type is trivial and/or bitwise movable, whether there are extra inhabitants and if so how to store and retrieve them, etc. For enums, the value witness table will also provide functionality for interacting with the discriminator. There may be more efficient ways of representing enums that simplify this functionality (or provide a fast path), and that's under investigation [[SR-xxxx]()].
 
-These value witness tables may be constructed statically for known values or dynamically for some generic values. While every unique type in Swift has a unique metadata pointer, value witness tables can be shared by types so long as the information provided is identical (i.e. same layout). Value witness tables always represent a type at its highest [abstraction level](#abstraction-levels). The value witness table entries and structure need to be locked down for ABI stability [[SR-xxxx]()].
+These value witness tables may be constructed statically for known values or dynamically for some generic values. While every unique type in Swift has a unique metadata pointer, value witness tables can be shared by types so long as the information provided is identical (i.e. same layout). Value witness tables always represent a type at its highest [abstraction level](#abstraction-levels). The value witness table entries and structure need to be locked down for ABI stability [[SR-3927](https://bugs.swift.org/browse/SR-3927)].
 
 ### <a name="class-metadata"></a>Class Metadata
 
@@ -259,7 +259,7 @@ Following that are superclass members, parent type metadata, generic parameter m
 
 Invoking a non-final instance method involves calling a function that is not known at compile time: it must be resolved at run time. This is solved through the use of a *vtable*, or virtual method table (so called because overridable methods are also known as "virtual" methods). A *vtable* is a table of function pointers to a class or subclass's implementation of overridable methods. If the vtable is determined to be part of ABI, it needs a layout algorithm that also provides flexibility for library evolution.
 
-Alternatively, we may decide to perform inter-module calls through opaque *thunks*, or compiler-created intermediary functions, which then perform either direct or vtable dispatch as needed [[SR-xxxx]()]. This enables greater library evolution without breaking binary compatibility by allowing internal class hierarchies to change. This would also unify non-final method dispatch between open and non-open classes while still allowing for aggressive compiler optimizations like de-virtualization for non-open classes. This approach would make vtables not be ABI, as that part of the type metadata would effectively be opaque to another module.
+Alternatively, we may decide to perform inter-module calls through opaque *thunks*, or compiler-created intermediary functions, which then perform either direct or vtable dispatch as needed [[SR-3928](https://bugs.swift.org/browse/SR-3928)]. This enables greater library evolution without breaking binary compatibility by allowing internal class hierarchies to change. This would also unify non-final method dispatch between open and non-open classes while still allowing for aggressive compiler optimizations like de-virtualization for non-open classes. This approach would make vtables not be ABI, as that part of the type metadata would effectively be opaque to another module.
 
 ### Protocol and Existential Metadata
 
@@ -292,15 +292,15 @@ There are many ways to improve the existing mangling without major impact on exi
 
 ### Compact Manglings
 
-Minor tweaks to shorten the mangling can have a beneficial impact on all Swift program binary sizes. These tweaks should compact existing manglings while preserving a simple unique mapping. One example is not distinguishing between struct/enum in mangling structures, which would also provide more library evolution freedom [[SR-xxxx]()]. We are considering dropping some internal witness table symbols when they don't provide any meaningful information conducive to debugging [[SR-xxxx]()]. We are currently overhauling word substitutions in mangling, with the goal of reducing as much redundancy in names as possible [[SR-xxxx]()].
+Minor tweaks to shorten the mangling can have a beneficial impact on all Swift program binary sizes. These tweaks should compact existing manglings while preserving a simple unique mapping. One example is not distinguishing between struct/enum in mangling structures, which would also provide more library evolution freedom [[SR-3930](https://bugs.swift.org/browse/SR-3930)]. We are considering dropping some internal witness table symbols when they don't provide any meaningful information conducive to debugging [[SR-3931](https://bugs.swift.org/browse/SR-3931)]. We are currently overhauling word substitutions in mangling, with the goal of reducing as much redundancy in names as possible [[SR-xxxx]()].
 
-There are other aggressive directions to investigate as well, such as mangling based on a known overload set for non-resilient functions. This does have the downside of making manglings unstable when new overloads are added, so its benefits would have to be carefully weighed [[SR-xxxx]()].
+There are other aggressive directions to investigate as well, such as mangling based on a known overload set for non-resilient functions. This does have the downside of making manglings unstable when new overloads are added, so its benefits would have to be carefully weighed [[SR-3933](https://bugs.swift.org/browse/SR-3933)].
 
 Any more ambitious reimagining of how to store symbols such as aggressive whole-library symbol name compression would have to be done in tight coupling with existing low level tools. Unfortunately, this might make some of the more ambitious options infeasible in time for ABI stability. They could be rolled out as ABI-additive using deployment target checking in the future.
 
 ### Suffix Differentiation
 
-There are many existing low level tools and formats that store and consume the symbol information, and some of them use efficient storage techniques such as tries. Suffix differentiation is about adjusting the mangling in ways that take advantage of them: by distinguishing manglings through suffixes, i.e. having common shared prefixes. This is currently underway and is resulting in binary size reductions for platforms that use these techniques [[SR-xxxx]()].
+There are many existing low level tools and formats that store and consume the symbol information, and some of them use efficient storage techniques such as tries. Suffix differentiation is about adjusting the mangling in ways that take advantage of them: by distinguishing manglings through suffixes, i.e. having common shared prefixes. This is currently underway and is resulting in binary size reductions for platforms that use these techniques [[SR-3932](https://bugs.swift.org/browse/SR-3932)].
 
 ## <a name="calling-convention"></a>Calling Convention
 
@@ -341,13 +341,13 @@ Function signature lowering is the mapping of a function's source-language type,
 
 ABI stability requires nailing down and fully specifying this algorithm so that future Swift versions can lower Swift types to the same physical call signature as prior Swift versions. More in-depth descriptions and rationale of function signature lowering can be found in the [function signature lowering docs](https://github.com/apple/swift/blob/master/docs/CallingConvention.rst#function-signature-lowering).
 
-Lowering the result value is usually done first, with a certain number of registers designated to hold the result value if it fits, otherwise the result value is passed on the stack. A good heuristic is needed for the limit and is architecture specific (e.g. 4 registers on modern 64-bit architectures) [[SR-xxxx]()].
+Lowering the result value is usually done first, with a certain number of registers designated to hold the result value if it fits, otherwise the result value is passed on the stack. A good heuristic is needed for the limit and is architecture specific (e.g. 4 registers on modern 64-bit architectures) [[SR-3946](https://bugs.swift.org/browse/SR-3946)].
 
 Next comes lowering parameters, which proceeds greedily by trying to fit values into registers from left-to-right, though some parameters may be re-ordered. For example, closures are best placed at the end to take advantage of ABI compatibility between thick closures and thin ones without a context.
 
 Some values must be passed and returned indirectly as they are *address only*. Address only values include [non-bitwise-copyable](#type-properties) values, values with [opaque layout](#opaque-layout), and non-class-constrained [existential values](#existential-containers). Even if the runtime type would normally be passed in a register, or even if the type is statically known at the call-site, if the callee receives or returns values with opaque layout, they must be passed or returned indirectly.
 
-We should investigate whether it makes sense to split values with partially opaque layout by passing the non-opaque parts in registers [[SR-xxxx]()].
+We should investigate whether it makes sense to split values with partially opaque layout by passing the non-opaque parts in registers [[SR-3947](https://bugs.swift.org/browse/SR-3947)].
 
 Parameter ownership is not reflected in the physical calling convention, though it will be noted in the mangling of the function name. Default argument expressions will not be ABI, as they will be emitted into the caller. This means that a library can add, modify, or remove default argument expressions without breaking binary compatibility (though modifying/removing may break source compatibility).
 
@@ -410,7 +410,7 @@ This tradeoff between performance and flexibility also affects the ability to de
 
 While the standard library is already ensuring source stability, it will be changing many of its fundamental underlying representations this year. When ABI stability lands, the standard library will be severely limited in the kinds of changes it can make to existing APIs and non-resilient types. Getting the standard library in the right place is of critical importance.
 
-The programming model for String is still being redesigned [[SR-xxxx]()], and many types such as Int are undergoing implementation changes [[SR-xxxx]()]. At the same time, the standard library is simultaneously switching to new compiler features such as conditional conformances to clean up and deliver the best APIs [[SR-xxxx]()].
+The programming model for String is still being redesigned [[SR-xxxx]()], and many types such as Int are undergoing implementation changes [[SR-3196](https://bugs.swift.org/browse/SR-3196)]. At the same time, the standard library is simultaneously switching to new compiler features such as conditional conformances to clean up and deliver the best APIs [[SR-xxxx]()].
 
 Another goal of Swift is to improve the applicability of Swift to systems programming. Ownership semantics may make a large impact, including things such as improved `inout` semantics that allow for efficient and safe array slicing. Providing the right abstractions for efficient use of contiguous memory is still under investigation [[SR-xxxx]()].
 
