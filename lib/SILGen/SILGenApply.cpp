@@ -5086,10 +5086,6 @@ struct AccessorBaseArgPreparer final {
   ArgumentSource prepare();
 
 private:
-  bool isDirectGuaranteed() const {
-    return selfParam.getConvention() == ParameterConvention::Direct_Guaranteed;
-  }
-
   /// Prepare our base if we have an address base.
   ArgumentSource prepareAccessorAddressBaseArg();
   /// Prepare our base if we have an object base.
