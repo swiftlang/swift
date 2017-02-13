@@ -1,0 +1,16 @@
+// RUN: %target-sil-opt -address-lowering -enable-sil-opaque-values -emit-sorted-sil -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
+
+import Builtin
+
+sil_stage canonical
+// CHECK: sil_stage lowered
+
+// CHECK-LABEL: sil hidden @addrlower_identity : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK: bb0(%0 : $*T, %1 : $*T):
+// CHECK: copy_addr [take] %1 to [initialization] %0 : $*T
+// CHECK: return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'addrlower_identity'
+sil hidden @addrlower_identity : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $T):
+  return %0 : $T
+}
