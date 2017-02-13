@@ -3406,7 +3406,7 @@ void AbstractStorageDecl::setInvalidBracesRange(SourceRange BracesRange) {
 }
 
 ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
-               LazyResolver *resolver) const {
+               LazyResolver *resolver, Identifier preferredName) const {
   // If the getter has an @objc attribute with a name, use that.
   if (auto getter = getGetter()) {
     if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>()) {
@@ -3430,11 +3430,16 @@ ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
 
   // The getter selector is the property name itself.
   auto var = cast<VarDecl>(this);
-  return VarDecl::getDefaultObjCGetterSelector(ctx, var->getObjCPropertyName());
+  auto name = var->getObjCPropertyName();
+
+  // Use preferred name is specified.
+  if (preferredName)
+    name = preferredName;
+  return VarDecl::getDefaultObjCGetterSelector(ctx, name);
 }
 
 ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
-               LazyResolver *resolver) const {
+               LazyResolver *resolver, Identifier preferredName) const {
   // If the setter has an @objc attribute with a name, use that.
   auto setter = getSetter();
   auto objcAttr = setter ? setter->getAttrs().getAttribute<ObjCAttr>()
@@ -3464,9 +3469,10 @@ ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
   // The setter selector for, e.g., 'fooBar' is 'setFooBar:', with the
   // property name capitalized and preceded by 'set'.
   auto var = cast<VarDecl>(this);
-  auto result = VarDecl::getDefaultObjCSetterSelector(
-                  ctx, 
-                  var->getObjCPropertyName());
+  Identifier Name = var->getObjCPropertyName();
+  if (preferredName)
+    Name = preferredName;
+  auto result = VarDecl::getDefaultObjCSetterSelector(ctx, Name);
 
   // Cache the result, so we don't perform string manipulation again.
   if (objcAttr)
@@ -4320,7 +4326,7 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
 }
 
 ObjCSelector AbstractFunctionDecl::getObjCSelector(
-               LazyResolver *resolver) const {
+               LazyResolver *resolver, DeclName preferredName) const {
   // If there is an @objc attribute with a name, use that name.
   auto objc = getAttrs().getAttribute<ObjCAttr>();
   if (objc) {
@@ -4329,15 +4335,27 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
   }
 
   auto &ctx = getASTContext();
+  auto baseName = getName();
   auto argNames = getFullName().getArgumentNames();
+
+  // Use the preferred name if specified
+  if (preferrredName) {
+    // Return invalid selector if argument count doesn't match.
+    if (argNames.size() != preferredName.getArgumentNames().size()) {
+      return ObjCSelector();
+    }
+    baseName = preferredName.getBaseName();
+    argNames = preferredName.getArgumentNames();
+  }
 
   auto func = dyn_cast<FuncDecl>(this);
   if (func) {
     // For a getter or setter, go through the variable or subscript decl.
     if (func->isGetterOrSetter()) {
       auto asd = cast<AbstractStorageDecl>(func->getAccessorStorageDecl());
-      return func->isGetter() ? asd->getObjCGetterSelector(resolver)
-                              : asd->getObjCSetterSelector(resolver);
+      return func->isGetter() ?
+        asd->getObjCGetterSelector(resolver, baseName) :
+        asd->getObjCSetterSelector(resolver, baseName);
     }
   }
 
@@ -4373,12 +4391,12 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
 
   // If we have no arguments, it's a nullary selector.
   if (numSelectorPieces == 0) {
-    return ObjCSelector(ctx, 0, getName());
+    return ObjCSelector(ctx, 0, baseName);
   }
 
  // If it's a unary selector with no name for the first argument, we're done.
   if (numSelectorPieces == 1 && argNames.size() == 1 && argNames[0].empty()) {
-    return ObjCSelector(ctx, 1, getName());
+    return ObjCSelector(ctx, 1, baseName);
   }
 
   /// Collect the selector pieces.
@@ -4403,7 +4421,7 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
 
     // For the first selector piece, attach either the first parameter
     // or "AndReturnError" to the base name, if appropriate.
-    auto firstPiece = getName();
+    auto firstPiece = baseName;
     llvm::SmallString<32> scratch;
     scratch += firstPiece.str();
     if (errorConvention && piece == errorConvention->getErrorParameterIndex()) {

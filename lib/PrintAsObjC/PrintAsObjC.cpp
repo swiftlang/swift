@@ -2633,3 +2633,23 @@ bool swift::printAsObjC(llvm::raw_ostream &os, ModuleDecl *M,
   llvm::PrettyStackTraceString trace("While generating Objective-C header");
   return ModuleWriter(*M, bridgingHeader, minRequiredAccess).writeToStream(os);
 }
+
+std::pair<DeclName, ObjCSelector> swift::
+getObjCNameForSwiftDecl(ValueDecl *VD, DeclName PreferredName) {
+  ASTContext &Ctx = VD->getASTContext();
+  LazyResolver *Resolver = Ctx.getLazyResolver();
+  if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD)) {
+    return {DeclName(), FD->getObjCSelector(Resolver, PreferredName)};
+  } else if (auto *VAD = dyn_cast<VarDecl>(VD)) {
+    if (PreferredName)
+      return {PreferredName, ObjCSelector()};
+    return {DeclName(VAD->getObjCPropertyName()), ObjCSelector()};
+  } else if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
+    return getObjCNameForSwiftDecl(SD->getGetter(), PreferredName);
+  } else {
+    if (auto Name = getNameForObjC(VD, CustomNamesOnly) {
+      return {DeclName(Ctx.getIdentifier(Name)), ObjCSelector()};
+    }
+    return {PreferredName, ObjCSelector()};
+  }
+}
