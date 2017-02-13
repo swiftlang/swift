@@ -53,50 +53,12 @@
             }
         },
         "next" : {
-            "aliases": ["next", "master-next", "stable-next"],
-            "repos": {
-                "llvm": "stable-next",
-                "clang": "stable-next",
-                "compiler-rt": "stable-next",
-                "swift": "master-next",
-                "lldb": "stable-next",
-                "cmark": "master",
-                "llbuild": "master",
-                "swiftpm": "master",
-                "swift-corelibs-xctest": "master",
-                "swift-corelibs-foundation": "master",
-                "swift-corelibs-libdispatch": "master",
-                "swift-integration-tests": "master",
-                "swift-xcode-playground-support": "master",
-                "ninja": "release"
-            }
-        },
-        "next-upstream" : {
-            "aliases": ["next-upstream"],
+            "aliases": ["next", "master-next", "stable-next", "upstream", "next-upstream"],
             "repos": {
                 "llvm": "upstream-with-swift",
                 "clang": "upstream-with-swift",
                 "compiler-rt": "upstream-with-swift",
                 "swift": "master-next",
-                "lldb": "upstream-with-swift",
-                "cmark": "master",
-                "llbuild": "master-next",
-                "swiftpm": "master-next",
-                "swift-corelibs-xctest": "master-next",
-                "swift-corelibs-foundation": "master-next",
-                "swift-corelibs-libdispatch": "master-next",
-                "swift-integration-tests": "master-next",
-                "swift-xcode-playground-support": "master-next",
-                "ninja": "release"
-            }
-        },
-        "upstream": {
-            "aliases": ["upstream"],
-            "repos": {
-                "llvm": "upstream-with-swift",
-                "clang": "upstream-with-swift",
-                "compiler-rt": "upstream-with-swift",
-                "swift": "master",
                 "lldb": "upstream-with-swift",
                 "cmark": "master",
                 "llbuild": "master",
