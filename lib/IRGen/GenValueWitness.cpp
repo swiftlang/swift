@@ -899,10 +899,10 @@ static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
     Address src(&*(it++), IGM.getPointerAlignment());
 
     llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
-    IGF.emitNativeStrongRetain(newValue);
+    IGF.emitNativeStrongRetain(newValue, getAtomicity(IGF));
     llvm::Value *oldValue = IGF.Builder.CreateLoad(dest, "old");
     IGF.Builder.CreateStore(newValue, dest);
-    IGF.emitNativeStrongRelease(oldValue);
+    IGF.emitNativeStrongRelease(oldValue, getAtomicity(IGF));
 
     IGF.Builder.CreateRet(dest.getAddress());
   });
@@ -925,7 +925,7 @@ static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
     llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
     llvm::Value *oldValue = IGF.Builder.CreateLoad(dest, "old");
     IGF.Builder.CreateStore(newValue, dest);
-    IGF.emitNativeStrongRelease(oldValue);
+    IGF.emitNativeStrongRelease(oldValue, getAtomicity(IGF));
 
     IGF.Builder.CreateRet(dest.getAddress());
   });
@@ -945,7 +945,7 @@ static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
     Address src(&*(it++), IGM.getPointerAlignment());
 
     llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
-    IGF.emitNativeStrongRetain(newValue);
+    IGF.emitNativeStrongRetain(newValue, getAtomicity(IGF));
     IGF.Builder.CreateStore(newValue, dest);
 
     IGF.Builder.CreateRet(dest.getAddress());
@@ -960,7 +960,7 @@ static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
                                        IGM.VoidTy, argTys,
                                        [&](IRGenFunction &IGF) {
     Address arg(&*IGF.CurFn->arg_begin(), IGM.getPointerAlignment());
-    IGF.emitNativeStrongRelease(IGF.Builder.CreateLoad(arg));
+    IGF.emitNativeStrongRelease(IGF.Builder.CreateLoad(arg), getAtomicity(IGF));
     IGF.Builder.CreateRetVoid();
   });
 }

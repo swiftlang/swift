@@ -750,7 +750,7 @@ public:
                   Explosion &out) const override {
     // Load the instance pointer, which is unknown-refcounted.
     llvm::Value *instance = asDerived().loadValue(IGF, address);
-    asDerived().emitValueRetain(IGF, instance, Atomicity::Atomic);
+    asDerived().emitValueRetain(IGF, instance, getAtomicity(IGF));
     out.add(instance);
 
     // Load the witness table pointers.
@@ -772,7 +772,7 @@ public:
     Address instanceAddr = asDerived().projectValue(IGF, address);
     llvm::Value *old = IGF.Builder.CreateLoad(instanceAddr);
     IGF.Builder.CreateStore(e.claimNext(), instanceAddr);
-    asDerived().emitValueRelease(IGF, old, Atomicity::Atomic);
+    asDerived().emitValueRelease(IGF, old, getAtomicity(IGF));
 
     // Store the witness table pointers.
     asDerived().emitStoreOfTables(IGF, e, address);
@@ -821,7 +821,7 @@ public:
 
   void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
     llvm::Value *value = asDerived().loadValue(IGF, addr);
-    asDerived().emitValueRelease(IGF, value, Atomicity::Atomic);
+    asDerived().emitValueRelease(IGF, value, getAtomicity(IGF));
   }
 
   void packIntoEnumPayload(IRGenFunction &IGF,
@@ -937,12 +937,12 @@ public:
 
   void emitValueRetain(IRGenFunction &IGF, llvm::Value *value,
                        Atomicity atomicity) const {
-    IGF.emitUnownedRetain(value, Refcounting);
+    IGF.emitUnownedRetain(value, Refcounting, atomicity);
   }
 
   void emitValueRelease(IRGenFunction &IGF, llvm::Value *value,
                         Atomicity atomicity) const {
-    IGF.emitUnownedRelease(value, Refcounting);
+    IGF.emitUnownedRelease(value, Refcounting, atomicity);
   }
 
   void emitValueFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
@@ -1077,24 +1077,29 @@ public:
     (void)e.claim(getNumStoredProtocols());
   }
 
-  void strongRetainUnowned(IRGenFunction &IGF, Explosion &e) const override {
-    IGF.emitStrongRetainUnowned(e.claimNext(), Refcounting);
+  void strongRetainUnowned(IRGenFunction &IGF, Explosion &e,
+                           Atomicity atomicity) const override {
+    IGF.emitStrongRetainUnowned(e.claimNext(), Refcounting, atomicity);
     (void)e.claim(getNumStoredProtocols());
   }
 
   void strongRetainUnownedRelease(IRGenFunction &IGF,
-                                  Explosion &e) const override {
-    IGF.emitStrongRetainAndUnownedRelease(e.claimNext(), Refcounting);
+                                  Explosion &e,
+                                  Atomicity atomicity) const override {
+    IGF.emitStrongRetainAndUnownedRelease(e.claimNext(), Refcounting,
+                                          atomicity);
     (void)e.claim(getNumStoredProtocols());
   }
 
-  void unownedRetain(IRGenFunction &IGF, Explosion &e) const override {
-    IGF.emitUnownedRetain(e.claimNext(), Refcounting);
+  void unownedRetain(IRGenFunction &IGF, Explosion &e,
+                     Atomicity atomicity) const override {
+    IGF.emitUnownedRetain(e.claimNext(), Refcounting, atomicity);
     (void)e.claim(getNumStoredProtocols());
   }
 
-  void unownedRelease(IRGenFunction &IGF, Explosion &e) const override {
-    IGF.emitUnownedRelease(e.claimNext(), Refcounting);
+  void unownedRelease(IRGenFunction &IGF, Explosion &e,
+                      Atomicity atomicity) const override {
+    IGF.emitUnownedRelease(e.claimNext(), Refcounting, atomicity);
     (void)e.claim(getNumStoredProtocols());
   }
 

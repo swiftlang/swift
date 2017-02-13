@@ -639,6 +639,8 @@ namespace Lowering {
   LLVM_LIBRARY_VISIBILITY bool usesObjCAllocator(ClassDecl *theClass);
 }
 
+bool isAtomic(SILModule &Module);
+
 } // end swift namespace
 
 #endif

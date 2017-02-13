@@ -1750,6 +1750,8 @@ public:
   }
 };
 
+Atomicity getAtomicity(SILBuilder &Builder);
+
 } // end swift namespace
 
 #endif

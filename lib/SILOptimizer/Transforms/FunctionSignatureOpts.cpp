@@ -760,19 +760,19 @@ OwnedToGuaranteedAddArgumentRelease(ArgumentDescriptor &AD, SILBuilder &Builder,
     Builder.setInsertionPoint(&*std::next(SILBasicBlock::iterator(Call)));
     Builder.createReleaseValue(RegularLocation(SourceLoc()),
                                F->getArguments()[AD.Index],
-                               Atomicity::Atomic);
+                               getAtomicity(Builder));
   } else {
     SILBasicBlock *NormalBB = dyn_cast<TryApplyInst>(Call)->getNormalBB();
     Builder.setInsertionPoint(&*NormalBB->begin());
     Builder.createReleaseValue(RegularLocation(SourceLoc()),
                                F->getArguments()[AD.Index],
-                               Atomicity::Atomic);
+                               getAtomicity(Builder));
 
     SILBasicBlock *ErrorBB = dyn_cast<TryApplyInst>(Call)->getErrorBB();
     Builder.setInsertionPoint(&*ErrorBB->begin());
     Builder.createReleaseValue(RegularLocation(SourceLoc()),
                                F->getArguments()[AD.Index],
-                               Atomicity::Atomic);
+                               getAtomicity(Builder));
   }
 }
 
@@ -790,12 +790,12 @@ OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD, SILBuilder &Builder,
   if (isa<ApplyInst>(Call)) {
     Builder.setInsertionPoint(&*std::next(SILBasicBlock::iterator(Call)));
     Builder.createRetainValue(RegularLocation(SourceLoc()), Call,
-                              Atomicity::Atomic);
+                              getAtomicity(Builder));
   } else {
     SILBasicBlock *NormalBB = dyn_cast<TryApplyInst>(Call)->getNormalBB();
     Builder.setInsertionPoint(&*NormalBB->begin());
     Builder.createRetainValue(RegularLocation(SourceLoc()),
-                              NormalBB->getArgument(0), Atomicity::Atomic);
+                              NormalBB->getArgument(0), getAtomicity(Builder));
   }
 }
 

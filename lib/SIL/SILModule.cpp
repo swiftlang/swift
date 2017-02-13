@@ -30,6 +30,10 @@
 using namespace swift;
 using namespace Lowering;
 
+bool swift::isAtomic(SILModule &Module) {
+  return ! Module.getOptions().AssumeSingleThreaded;
+}
+
 class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
   void didDeserialize(ModuleDecl *M, SILFunction *fn) override {
     updateLinkage(fn);
