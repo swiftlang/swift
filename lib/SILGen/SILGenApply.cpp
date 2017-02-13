@@ -2465,9 +2465,9 @@ RValue SILGenFunction::emitApply(
         // We assume that unowned inner pointers, autoreleased values, and
         // indirect values are never returned in tuples.
         // FIXME: can this assertion be removed without lowered addresses?
-        assert(directResult.getConvention() == ResultConvention::Owned ||
-               directResult.getConvention() == ResultConvention::Unowned ||
-               !substFnConv.useLoweredAddresses());
+        assert(directResult.getConvention() == ResultConvention::Owned
+               || directResult.getConvention() == ResultConvention::Unowned
+               || !substFnConv.useLoweredAddresses());
         copiedResults.push_back({v, directResult});
         ++Index;
       }
