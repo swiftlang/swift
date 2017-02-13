@@ -1,8 +1,10 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../../Inputs/resilient_protocol.swift
 // RUN: %target-swift-frontend -typecheck -verify -enable-resilience -I %t %s
 
 import resilient_struct
+import resilient_protocol
 
 // Point is @_fixed_layout -- this is OK
 extension Point {
@@ -62,6 +64,13 @@ public struct Animal {
   // case from memberwise initialization, and DI explodes the value type
   @_inlineable public init(other: Animal) {
   // expected-error@-1 {{initializer of non-'@_fixed_layout' type 'Animal' is '@_inlineable' and must delegate to another initializer}}
+    self = other
+  }
+}
+
+// Protocol extension initializers are OK too
+extension OtherResilientProtocol {
+  public init(other: Self) {
     self = other
   }
 }
