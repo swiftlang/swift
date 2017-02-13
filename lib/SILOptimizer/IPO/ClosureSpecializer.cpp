@@ -744,6 +744,13 @@ void ClosureSpecializer::gatherCallSites(
         if (!ApplyCallee || ApplyCallee->isExternalDeclaration())
           continue;
 
+        // Don't specialize non-fragile callees if the caller is fragile;
+        // the specialized callee will have shared linkage, and thus cannot
+        // be referenced from the fragile caller.
+        if (Caller->isFragile() &&
+            !ApplyCallee->hasValidLinkageForFragileInline())
+          continue;
+
         // Ok, we know that we can perform the optimization but not whether or
         // not the optimization is profitable. Find the index of the argument
         // corresponding to our partial apply.
