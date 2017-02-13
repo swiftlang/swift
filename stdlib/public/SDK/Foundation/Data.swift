@@ -1731,9 +1731,8 @@ extension Data : DataBridgeType {
     }
     
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSData?) -> Data {
-        var result: Data?
-        _forceBridgeFromObjectiveC(source!, result: &result)
-        return result!
+        guard let src = source else { return Data() }
+        return Data(referencing: src)
     }
 }
 
