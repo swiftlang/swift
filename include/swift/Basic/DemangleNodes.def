@@ -25,7 +25,6 @@
 #endif
 
 CONTEXT_NODE(Allocator)
-NODE(Archetype)
 NODE(ArgumentTuple)
 NODE(AssociatedType)
 NODE(AssociatedTypeRef)

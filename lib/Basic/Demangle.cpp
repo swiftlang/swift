@@ -2494,7 +2494,6 @@ private:
   /// production.
   bool isSimpleType(NodePointer pointer) {
     switch (pointer->getKind()) {
-    case Node::Kind::Archetype:
     case Node::Kind::AssociatedType:
     case Node::Kind::AssociatedTypeRef:
     case Node::Kind::BoundGenericClass:
@@ -3631,14 +3630,6 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       Printer << "Any";
     else
       printChildren(type_list, " & ");
-    return;
-  }
-  case Node::Kind::Archetype: {
-    Printer << pointer->getText();
-    if (pointer->hasChildren()) {
-      Printer << " : ";
-      print(pointer->getChild(0));
-    }
     return;
   }
   case Node::Kind::AssociatedType:
