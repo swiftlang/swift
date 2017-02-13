@@ -2416,16 +2416,27 @@ public:
 /// TypeAliasDecl's always have 'MetatypeType' type.
 ///
 class TypeAliasDecl : public GenericTypeDecl {
-  SourceLoc TypeAliasLoc;           // The location of the 'typealias' keyword
+  /// The location of the 'typealias' keyword
+  SourceLoc TypeAliasLoc;
+
+  /// The location of the equal '=' token
+  SourceLoc EqualLoc;
+
+  /// The location of the right-hand side of the typealias binding
   TypeLoc UnderlyingTy;
 
 public:
-  TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
+  TypeAliasDecl(SourceLoc TypeAliasLoc, SourceLoc EqualLoc, Identifier Name,
                 SourceLoc NameLoc, GenericParamList *GenericParams,
                 DeclContext *DC);
 
   SourceLoc getStartLoc() const { return TypeAliasLoc; }
   SourceRange getSourceRange() const;
+
+  /// Returns the location of the equal '=' token
+  SourceLoc getEqualLoc() const {
+    return EqualLoc;
+  }
 
   TypeLoc &getUnderlyingTypeLoc() {
     return UnderlyingTy;
