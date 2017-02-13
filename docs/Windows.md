@@ -130,8 +130,7 @@ cmake -G "Ninja" "%swift_source_dir%/swift"^
  -DSWIFT_INCLUDE_DOCS=FALSE^
  -DSWIFT_INCLUDE_TESTS=FALSE^
  -DSWIFT_BUILD_SDK_OVERLAY=FALSE^
- -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE^
- -DPYTHON_EXECUTABLE="python"
+ -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE
 popd
 cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
 ```
