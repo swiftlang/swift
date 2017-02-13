@@ -2203,7 +2203,7 @@ SILValue ResultPlanner::execute(SILValue innerResult) {
     {
       Scope S(Gen.Cleanups, CleanupLocation::get(Loc));
 
-      // First create a rvalue cleanup for our direct result.
+      // First create an rvalue cleanup for our direct result.
       assert(innerResult.getOwnershipKind() == ValueOwnershipKind::Owned ||
              innerResult.getOwnershipKind() == ValueOwnershipKind::Trivial);
       ManagedValue ownedInnerResult = Gen.emitManagedRValueWithCleanup(innerResult);

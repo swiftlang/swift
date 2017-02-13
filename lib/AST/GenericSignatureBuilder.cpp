@@ -1,4 +1,4 @@
-//===--- GenericSignatureBuilder.cpp - Generic Requirement Builder ---------------===//
+//===--- GenericSignatureBuilder.cpp - Generic Requirement Builder --------===//
 //
 // This source file is part of the Swift.org open source project
 //
