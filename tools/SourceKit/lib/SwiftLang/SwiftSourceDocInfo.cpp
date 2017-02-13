@@ -877,14 +877,39 @@ getClangDeclarationName(clang::ASTContext &Ctx, NameTranslatingInfo &Info) {
   }
 }
 
+static DeclName
+getSwiftDeclName(ASTContext &Ctx, NameTranslatingInfo &Info) {
+  assert(SwiftLangSupport::getNameKindForUID(Info.NameKind) == NameKind::Swift);
+  std::vector<Identifier> Args(Info.ArgNames.size(), Identifier());
+  std::transform(Info.ArgNames.begin(), Info.ArgNames.end(), Args.begin(),
+                 [](StringRef T) { return Ctx.getIdentifier(T)});
+  return DeclName(Ctx, Ctx.getIdentifier(Info.BaseName),
+                  llvm::makeArrayRef(Args));
+}
+
 /// Returns true for failure to resolve.
 static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
                     std::function<void(const NameTranslatingInfo &)> Receiver) {
   switch (SwiftLangSupport::getNameKindForUID(Info.NameKind)) {
   case NameKind::Swift: {
-
-    // FIXME: Implement the swift to objc name translation.
-    return true;
+    NameTranslatingInfo Result;
+    auto Ctx = VD->getDeclContext()->getASTContext();
+    auto ResultPair = getObjCNameForSwiftDecl(VD, getSwiftDeclName(Ctx, Info));
+    if (DeclName Name = ResultPair.getFirst()) {
+      Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::ObjC);
+      Result.BaseName = Name.getBaseName().str();
+      Receiver(Result);
+      return false;
+    } else if (ObjCSelector Selector = ResultPair.getSecond()) {
+      Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::ObjC);
+      unsigned N = Selector.getSelectorPieces();
+      std::vector<StringRef> Pieces(N, StringRef());
+      
+    } else {
+      Receiver(Result);
+      return true;
+    }
+    return false;
   }
   case NameKind::ObjC: {
     ClangImporter *Importer = static_cast<ClangImporter *>(VD->getDeclContext()->

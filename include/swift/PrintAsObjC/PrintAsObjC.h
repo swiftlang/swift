@@ -28,7 +28,7 @@ namespace swift {
   bool printAsObjC(raw_ostream &out, ModuleDecl *M, StringRef bridgingHeader,
                    Accessibility minRequiredAccess);
 
-  std::pair<DeclName, ObjCSelector> getObjCNameForSwiftDecl(ValueDecl *VD,
+  std::pair<DeclName, ObjCSelector> getObjCNameForSwiftDecl(const ValueDecl *VD,
     DeclName PreferredName);
 }
 
