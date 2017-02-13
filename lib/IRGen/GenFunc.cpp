@@ -251,7 +251,7 @@ namespace {
       Address dataAddr = projectData(IGF, address);
       auto data = IGF.Builder.CreateLoad(dataAddr);
       if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRetain(data);
+        IGF.emitNativeStrongRetain(data, IGF.getDefaultAtomicity());
       e.add(data);
     }
 
@@ -332,20 +332,24 @@ namespace {
         IGF.emitNativeStrongRelease(context, atomicity);
     }
 
-    void strongRetainUnowned(IRGenFunction &IGF, Explosion &e) const override {
+    void strongRetainUnowned(IRGenFunction &IGF, Explosion &e,
+                             Atomicity atomicity) const override {
       llvm_unreachable("unowned references to functions are not supported");
     }
 
     void strongRetainUnownedRelease(IRGenFunction &IGF,
-                                    Explosion &e) const override {
-      llvm_unreachable("unowned references to functions are not supported");
-    }
-    
-    void unownedRetain(IRGenFunction &IGF, Explosion &e) const override {
+                                    Explosion &e,
+                                    Atomicity atomicity) const override {
       llvm_unreachable("unowned references to functions are not supported");
     }
 
-    void unownedRelease(IRGenFunction &IGF, Explosion &e) const override {
+    void unownedRetain(IRGenFunction &IGF, Explosion &e,
+                       Atomicity atomicity) const override {
+      llvm_unreachable("unowned references to functions are not supported");
+    }
+
+    void unownedRelease(IRGenFunction &IGF, Explosion &e,
+                        Atomicity atomicity) const override {
       llvm_unreachable("unowned references to functions are not supported");
     }
 
@@ -372,7 +376,7 @@ namespace {
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       auto data = IGF.Builder.CreateLoad(projectData(IGF, addr));
       if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRelease(data);
+        IGF.emitNativeStrongRelease(data, IGF.getDefaultAtomicity());
     }
 
     void packIntoEnumPayload(IRGenFunction &IGF,
@@ -877,7 +881,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     switch (argConvention) {
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Direct_Owned:
-      if (!consumesContext) subIGF.emitNativeStrongRetain(rawData);
+      if (!consumesContext) subIGF.emitNativeStrongRetain(rawData, subIGF.getDefaultAtomicity());
       break;
 
     case ParameterConvention::Indirect_In_Guaranteed:
@@ -885,7 +889,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       dependsOnContextLifetime = true;
       if (outType->getCalleeConvention() ==
             ParameterConvention::Direct_Unowned) {
-        subIGF.emitNativeStrongRetain(rawData);
+        subIGF.emitNativeStrongRetain(rawData, subIGF.getDefaultAtomicity());
         consumesContext = true;
       }
       break;
@@ -1026,7 +1030,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // so we can tail call. The safety of this assumes that neither this release
     // nor any of the loads can throw.
     if (consumesContext && !dependsOnContextLifetime && rawData)
-      subIGF.emitNativeStrongRelease(rawData);
+      subIGF.emitNativeStrongRelease(rawData, subIGF.getDefaultAtomicity());
   }
 
   // Derive the callee function pointer.  If we found a function
@@ -1125,7 +1129,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   
   // If the parameters depended on the context, consume the context now.
   if (rawData && consumesContext && dependsOnContextLifetime)
-    subIGF.emitNativeStrongRelease(rawData);
+    subIGF.emitNativeStrongRelease(rawData, subIGF.getDefaultAtomicity());
   
   // FIXME: Reabstract the result value as substituted.
 

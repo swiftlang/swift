@@ -1190,7 +1190,7 @@ namespace {
       if (!isFinal)
         baseValue = gen.B.createCopyValue(loc, baseValue);
 
-      gen.B.createStrongUnpin(loc, baseValue, Atomicity::Atomic);
+      gen.B.createStrongUnpin(loc, baseValue, gen.B.getDefaultAtomicity());
     }
 
     void print(raw_ostream &OS) const override {
@@ -2166,7 +2166,7 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
     assert(unownedType->isLoadable(ResilienceExpansion::Maximal));
     (void) unownedType;
 
-    B.createStrongRetainUnowned(loc, src, Atomicity::Atomic);
+    B.createStrongRetainUnowned(loc, src, B.getDefaultAtomicity());
     return B.createUnownedToRef(loc, src,
                 SILType::getPrimitiveObjectType(unownedType.getReferentType()));
   }
@@ -2227,9 +2227,9 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
 
     auto unownedValue =
         gen.B.emitLoadValueOperation(loc, src, LoadOwnershipQualifier::Take);
-    gen.B.createStrongRetainUnowned(loc, unownedValue, Atomicity::Atomic);
+    gen.B.createStrongRetainUnowned(loc, unownedValue, gen.B.getDefaultAtomicity());
     if (isTake)
-      gen.B.createUnownedRelease(loc, unownedValue, Atomicity::Atomic);
+      gen.B.createUnownedRelease(loc, unownedValue, gen.B.getDefaultAtomicity());
     return gen.B.createUnownedToRef(
         loc, unownedValue,
         SILType::getPrimitiveObjectType(unownedType.getReferentType()));
@@ -2292,7 +2292,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
 
     auto unownedValue =
       gen.B.createRefToUnowned(loc, value, storageType.getObjectType());
-    gen.B.createUnownedRetain(loc, unownedValue, Atomicity::Atomic);
+    gen.B.createUnownedRetain(loc, unownedValue, gen.B.getDefaultAtomicity());
     emitUnloweredStoreOfCopy(gen.B, loc, unownedValue, dest, isInit);
     gen.B.emitDestroyValueOperation(loc, value);
     return;
@@ -2394,7 +2394,7 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
     (void) unownedType;
 
     SILValue unowned = B.createRefToUnowned(loc, semanticValue, storageType);
-    B.createUnownedRetain(loc, unowned, Atomicity::Atomic);
+    B.createUnownedRetain(loc, unowned, B.getDefaultAtomicity());
     B.emitDestroyValueOperation(loc, semanticValue);
     return unowned;
   }
