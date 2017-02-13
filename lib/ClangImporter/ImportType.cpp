@@ -1524,13 +1524,13 @@ Type ClangImporter::Implementation::importFunctionReturnType(
     DeclContext *dc,
     const clang::FunctionDecl *clangDecl,
     bool allowNSUIntegerAsInt) {
- // CF function results can be managed if they are audited or
+  // CF function results can be managed if they are audited or
   // the ownership convention is explicitly declared.
+  assert(clangDecl && "expected to have a decl to import");
   bool isAuditedResult =
-    (clangDecl &&
-     (clangDecl->hasAttr<clang::CFAuditedTransferAttr>() ||
-      clangDecl->hasAttr<clang::CFReturnsRetainedAttr>() ||
-      clangDecl->hasAttr<clang::CFReturnsNotRetainedAttr>()));
+    (clangDecl->hasAttr<clang::CFAuditedTransferAttr>() ||
+     clangDecl->hasAttr<clang::CFReturnsRetainedAttr>() ||
+     clangDecl->hasAttr<clang::CFReturnsNotRetainedAttr>());
 
   // Check if we know more about the type from our whitelists.
   OptionalTypeKind OptionalityOfReturn;
