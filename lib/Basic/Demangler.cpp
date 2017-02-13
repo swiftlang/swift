@@ -18,11 +18,10 @@
 #include "swift/Basic/ManglingUtils.h"
 #include "swift/Basic/ManglingMacros.h"
 #include "swift/Basic/Punycode.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Range.h"
 #include "swift/Strings.h"
 #include "llvm/Support/ErrorHandling.h"
-
+#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using swift::Demangle::FunctionSigSpecializationParamKind;
@@ -225,7 +224,7 @@ NodePointer Demangler::demangleTopLevel() {
             break;
           }
         }
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
       default:
         Parent->addChild(Nd);
         break;

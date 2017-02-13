@@ -23,13 +23,13 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "clang/AST/Type.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -2276,7 +2276,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
             goto capture_value;
 
           // Otherwise, transitively capture the accessors.
-          SWIFT_FALLTHROUGH;
+          LLVM_FALLTHROUGH;
 
         case VarDecl::Computed: {
           collectFunctionCaptures(capturedVar->getGetter());

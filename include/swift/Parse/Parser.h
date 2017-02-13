@@ -20,7 +20,6 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/DiagnosticsParse.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"

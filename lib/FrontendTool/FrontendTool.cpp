@@ -33,7 +33,6 @@
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Edit.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Basic/SourceManager.h"

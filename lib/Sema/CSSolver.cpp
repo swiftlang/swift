@@ -17,10 +17,12 @@
 #include "ConstraintGraph.h"
 #include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <memory>
 #include <tuple>
+
 using namespace swift;
 using namespace constraints;
 
@@ -866,7 +868,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       if (tc.Context.LangOpts.EffectiveLanguageVersion[0] >= 4)
         continue;
 
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
         
     case ConstraintKind::Layout:
     case ConstraintKind::LiteralConformsTo: {

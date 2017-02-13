@@ -18,6 +18,7 @@
 #include "ConstraintSystem.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace constraints;
@@ -1486,7 +1487,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           return SolutionKind::Solved;
         }
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case ConstraintKind::Subtype:
       // Subtype constraints are subject for edge contraction,
@@ -1521,7 +1522,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         assignFixedType(typeVar2, type1);
         return SolutionKind::Solved;
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:

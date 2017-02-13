@@ -23,9 +23,10 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/STLExtras.h"
+#include "llvm/Support/Compiler.h"
 #include <algorithm>
+
 using namespace swift;
 
 const ASTScope *ASTScope::getActiveContinuation() const {
@@ -951,7 +952,7 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
 
   case DeclKind::Protocol:
     cast<ProtocolDecl>(decl)->createGenericParamsIfMissing();
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case DeclKind::Class:
   case DeclKind::Enum:

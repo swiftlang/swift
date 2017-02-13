@@ -33,6 +33,7 @@
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -44,7 +45,6 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/ColorUtils.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/STLExtras.h"
@@ -926,7 +926,7 @@ bool SDKNode::operator==(const SDKNode &Other) const {
         return false;
       if (Left->isThrowing() ^ Right->isThrowing())
         return false;
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     }
     case SDKNodeKind::TypeDecl:
     case SDKNodeKind::Var:
@@ -937,7 +937,7 @@ bool SDKNode::operator==(const SDKNode &Other) const {
         return false;
       if (Left->getOwnership() != Right->getOwnership())
         return false;
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     }
     case SDKNodeKind::Root: {
       return getPrintedName() == Other.getPrintedName() &&

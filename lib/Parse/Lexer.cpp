@@ -17,9 +17,9 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Identifier.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/ADT/SmallString.h"
@@ -1106,7 +1106,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     }
     // Move the pointer back to EOF.
     --CurPtr;
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case '\n':  // String literals cannot have \n or \r in them.
   case '\r':
     if (EmitDiagnostics)

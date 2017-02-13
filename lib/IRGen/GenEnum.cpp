@@ -106,11 +106,11 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/Analysis/CFG.h"
+#include "llvm/Support/Compiler.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 
 #include "GenMeta.h"
@@ -4100,7 +4100,7 @@ namespace {
         // Takes can be done by primitive copy in these case.
         if (isTake)
           return emitPrimitiveCopy(IGF, dest, src, T);
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
         
       case Normal: {
         // If the enum is loadable, do this directly using values, since we

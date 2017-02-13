@@ -29,7 +29,6 @@
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Token.h"
-#include "swift/Basic/Fallthrough.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "clang/Lex/Preprocessor.h"
@@ -37,6 +36,7 @@
 #include "clang/AST/TypeVisitor.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace importer;
@@ -693,7 +693,7 @@ namespace {
           if (underlyingResult.AbstractType->getAnyNominal() ==
               Impl.SwiftContext.getIntDecl())
             break;
-          SWIFT_FALLTHROUGH;
+          LLVM_FALLTHROUGH;
         default:
           if (!underlyingResult.AbstractType->isEqual(mappedType)) {
             underlyingResult.AbstractType->dump();

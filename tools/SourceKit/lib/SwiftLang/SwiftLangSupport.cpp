@@ -19,7 +19,6 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Config.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CodeCompletionCache.h"
