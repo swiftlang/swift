@@ -1110,7 +1110,7 @@ static SILFunction *lookupExistingSpecialization(SILModule &M,
   // Only check that this function exists, but don't read
   // its body. It can save some compile-time.
   if (isWhitelistedSpecialization(FunctionName))
-    return M.findFunction(FunctionName, SILLinkage::PublicExternal);
+    return M.hasFunction(FunctionName, SILLinkage::PublicExternal);
 
   return nullptr;
 }

@@ -92,8 +92,8 @@ public:
   SILFunction *lookupSILFunction(SILFunction *Callee);
   SILFunction *
   lookupSILFunction(StringRef Name, bool declarationOnly = false,
-                    Optional<SILLinkage> linkage = None);
-  bool hasSILFunction(StringRef Name, Optional<SILLinkage> linkage = None);
+                    SILLinkage linkage = SILLinkage::Private);
+  bool hasSILFunction(StringRef Name, SILLinkage linkage = SILLinkage::Private);
   SILVTable *lookupVTable(Identifier Name);
   SILVTable *lookupVTable(const ClassDecl *C) {
     return lookupVTable(C->getName());
