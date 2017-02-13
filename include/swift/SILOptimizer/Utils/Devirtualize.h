@@ -46,7 +46,6 @@ typedef std::pair<ValueBase *, ApplySite> DevirtualizationResult;
 DevirtualizationResult tryDevirtualizeApply(FullApplySite AI);
 DevirtualizationResult tryDevirtualizeApply(FullApplySite AI,
                                             ClassHierarchyAnalysis *CHA);
-bool canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA);
 bool isNominalTypeWithUnboundGenericParameters(SILType Ty, SILModule &M);
 bool canDevirtualizeClassMethod(FullApplySite AI, SILType ClassInstanceType);
 SILFunction *getTargetClassMethod(SILModule &M, SILType ClassOrMetatypeType,

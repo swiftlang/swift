@@ -93,7 +93,7 @@ static SILInstruction *findOnlyApply(SILFunction *F) {
 ///
 /// TODO: we should teach the demangler to understand this suffix.
 static std::string getUniqueName(std::string Name, SILModule &M) {
-  if (!M.hasFunction(Name))
+  if (!M.lookUpFunction(Name))
     return Name;
   return getUniqueName(Name + "_unique_suffix", M);
 }
@@ -372,7 +372,7 @@ std::string FunctionSignatureTransform::createOptimizedSILFunctionName() {
   do {
     New = NewFM.mangle(UniqueID);
     ++UniqueID;
-  } while (M.hasFunction(New));
+  } while (M.lookUpFunction(New));
 
   return NewMangling::selectMangling(Old, New);
 }
