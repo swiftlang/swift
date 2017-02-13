@@ -118,7 +118,7 @@ public:
     SILFunction *lookupSILFunction(SILFunction *InFunc);
     SILFunction *lookupSILFunction(StringRef Name,
                                    bool declarationOnly = false);
-    bool hasSILFunction(StringRef Name, Optional<SILLinkage> Linkage = None);
+    bool hasSILFunction(StringRef Name, SILLinkage Linkage);
     SILVTable *lookupVTable(Identifier Name);
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);
     SILDefaultWitnessTable *

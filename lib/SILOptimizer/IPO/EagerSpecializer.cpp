@@ -287,7 +287,7 @@ public:
         substConv(ReInfo.getSubstitutedType(), GenericFunc->getModule()),
         Builder(*GenericFunc), Loc(GenericFunc->getLocation()) {
     Builder.setCurrentDebugScope(GenericFunc->getDebugScope());
-    IsClassF = Builder.getModule().findFunction(
+    IsClassF = Builder.getModule().hasFunction(
       "_swift_isClassOrObjCExistentialType", SILLinkage::PublicExternal);
     assert(IsClassF);
   }

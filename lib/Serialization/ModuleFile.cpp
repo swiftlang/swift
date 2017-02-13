@@ -14,6 +14,7 @@
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
@@ -340,6 +341,66 @@ public:
 };
 
 /// Used to deserialize entries in the on-disk decl hash table.
+class ModuleFile::ExtensionTableInfo {
+  ModuleFile &File;
+public:
+  using internal_key_type = StringRef;
+  using external_key_type = Identifier;
+  using data_type = SmallVector<std::pair<StringRef, DeclID>, 8>;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  internal_key_type GetInternalKey(external_key_type ID) {
+    return ID.str();
+  }
+
+  hash_value_type ComputeHash(internal_key_type key) {
+    return llvm::HashString(key);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
+    unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+    return { keyLength, dataLength };
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    return StringRef(reinterpret_cast<const char *>(data), length);
+  }
+
+  data_type ReadData(internal_key_type key, const uint8_t *data,
+                     unsigned length) {
+    data_type result;
+    const uint8_t *limit = data + length;
+    while (data < limit) {
+      DeclID offset = endian::readNext<uint32_t, little, unaligned>(data);
+
+      int32_t nameIDOrLength =
+          endian::readNext<int32_t, little, unaligned>(data);
+      StringRef moduleNameOrMangledBase;
+      if (nameIDOrLength < 0) {
+        const ModuleDecl *module = File.getModule(-nameIDOrLength);
+        moduleNameOrMangledBase = module->getName().str();
+      } else {
+        moduleNameOrMangledBase =
+            StringRef(reinterpret_cast<const char *>(data), nameIDOrLength);
+        data += nameIDOrLength;
+      }
+
+      result.push_back({ moduleNameOrMangledBase, offset });
+    }
+
+    return result;
+  }
+
+  explicit ExtensionTableInfo(ModuleFile &file) : File(file) {}
+};
+
+/// Used to deserialize entries in the on-disk decl hash table.
 class ModuleFile::LocalDeclTableInfo {
 public:
   using internal_key_type = StringRef;
@@ -430,6 +491,17 @@ ModuleFile::readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData) {
   using OwnedTable = std::unique_ptr<SerializedDeclTable>;
   return OwnedTable(SerializedDeclTable::Create(base + tableOffset,
                                                 base + sizeof(uint32_t), base));
+}
+
+std::unique_ptr<ModuleFile::SerializedExtensionTable>
+ModuleFile::readExtensionTable(ArrayRef<uint64_t> fields, StringRef blobData) {
+  uint32_t tableOffset;
+  index_block::DeclListLayout::readRecord(fields, tableOffset);
+  auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+  using OwnedTable = std::unique_ptr<SerializedExtensionTable>;
+  return OwnedTable(SerializedExtensionTable::Create(base + tableOffset,
+    base + sizeof(uint32_t), base, ExtensionTableInfo(*this)));
 }
 
 std::unique_ptr<ModuleFile::SerializedLocalDeclTable>
@@ -569,7 +641,7 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         PrecedenceGroupDecls = readDeclTable(scratch, blobData);
         break;
       case index_block::EXTENSIONS:
-        ExtensionDecls = readDeclTable(scratch, blobData);
+        ExtensionDecls = readExtensionTable(scratch, blobData);
         break;
       case index_block::CLASS_MEMBERS:
         ClassMembersByName = readDeclTable(scratch, blobData);
@@ -1437,9 +1509,25 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
   if (iter == ExtensionDecls->end())
     return;
 
-  for (auto item : *iter) {
-    if (item.first == getKindForTable(nominal))
-      (void)getDecl(item.second);
+  if (nominal->hasAccessibility() &&
+      nominal->getEffectiveAccess() < Accessibility::Internal) {
+    if (nominal->getModuleScopeContext() != getFile())
+      return;
+  }
+
+  if (nominal->getParent()->isModuleScopeContext()) {
+    Identifier moduleName = nominal->getParentModule()->getName();
+    for (auto item : *iter) {
+      if (item.first == moduleName.str())
+        (void)getDecl(item.second);
+    }
+  } else {
+    std::string mangledName =
+        NewMangling::ASTMangler().mangleNominalType(nominal);
+    for (auto item : *iter) {
+      if (item.first == mangledName)
+        (void)getDecl(item.second);
+    }
   }
 }
 
