@@ -350,16 +350,6 @@ auto GenericSignatureBuilder::PotentialArchetype::getRepresentative()
   return Result;
 }
 
-/// Determine whether there is a concrete type anywhere in the path to the root.
-static bool hasConcreteTypeInPath(
-                       const GenericSignatureBuilder::PotentialArchetype *pa) {
-  for (; pa; pa = pa->getParent()) {
-    if (pa->isConcreteType()) return true;
-  }
-
-  return false;
-}
-
 /// Canonical ordering for dependent types in generic signatures.
 static int compareDependentTypes(
                      GenericSignatureBuilder::PotentialArchetype * const* pa,
@@ -369,13 +359,6 @@ static int compareDependentTypes(
   // Fast-path check for equality.
   if (a == b)
     return 0;
-
-  // If one potential archetype has a concrete type in its path but the other
-  // does not, prefer the one that does not.
-  auto aConcrete = hasConcreteTypeInPath(a);
-  auto bConcrete = hasConcreteTypeInPath(b);
-  if (aConcrete != bConcrete)
-    return aConcrete ? 1 : -1;
 
   // Ordering is as follows:
   // - Generic params
