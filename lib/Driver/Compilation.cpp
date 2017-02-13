@@ -747,10 +747,7 @@ int Compilation::performSingleCommand(const Job *Cmd) {
 
   for (auto &envPair : Cmd->getExtraEnvironment()) {
 #if defined(_MSC_VER)
-    llvm::SmallString<256> envStr = StringRef(envPair.first);
-    envStr.append(StringRef("="));
-    envStr.append(StringRef(envPair.second));
-    _putenv(envStr.c_str());
+    _putenv_s(envPair.first, envPair.second);
 #else
     setenv(envPair.first, envPair.second, /*replacing=*/true);
 #endif
