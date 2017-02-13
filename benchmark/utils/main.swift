@@ -41,13 +41,14 @@ import CharacterLiteralsSmall
 import Chars
 import ClassArrayGetter
 import DeadArray
-import DictTest
-import DictTest2
-import DictTest3
 import DictionaryBridge
 import DictionaryLiteral
 import DictionaryRemove
 import DictionarySwap
+import DictTest
+import DictTest2
+import DictTest3
+import DropLast
 import ErrorHandling
 import Fibonacci
 import GlobalClass
@@ -62,10 +63,10 @@ import MapReduce
 import Memset
 import MonteCarloE
 import MonteCarloPi
+import NopDeinit
 import NSDictionaryCastToSwift
 import NSError
 import NSStringConversion
-import NopDeinit
 import ObjectAllocation
 import ObjectiveCBridging
 import ObjectiveCBridgingStubs
@@ -82,11 +83,11 @@ import PopFrontGeneric
 import Prims
 import ProtocolDispatch
 import ProtocolDispatch2
-import RC4
-import RGBHistogram
 import RangeAssignment
+import RC4
 import RecursiveOwnedParameter
 import ReversedCollections
+import RGBHistogram
 import SetTests
 import SevenBoom
 import Sim2DArray
@@ -95,11 +96,12 @@ import SortStrings
 import StackPromo
 import StaticArray
 import StrComplexWalk
-import StrToInt
 import StringBuilder
 import StringInterpolation
 import StringTests
 import StringWalk
+import StrToInt
+import Suffix
 import SuperChars
 import TwoSum
 import TypeFlood
@@ -121,9 +123,9 @@ precommitTests = [
   "ArrayAppendReserved": run_ArrayAppendReserved,
   "ArrayAppendSequence": run_ArrayAppendSequence,
   "ArrayAppendStrings": run_ArrayAppendStrings,
-  "ArrayAppendASCII": run_ArrayAppendAscii,  
-  "ArrayAppendLatin1": run_ArrayAppendLatin1,  
-  "ArrayAppendUTF16": run_ArrayAppendUTF16,  
+  "ArrayAppendASCII": run_ArrayAppendAscii,
+  "ArrayAppendLatin1": run_ArrayAppendLatin1,
+  "ArrayAppendUTF16": run_ArrayAppendUTF16,
   "ArrayAppendToFromGeneric": run_ArrayAppendToFromGeneric,
   "ArrayAppendToGeneric": run_ArrayAppendToGeneric,
   "ArrayPlusEqualSingleElementCollection": run_ArrayPlusEqualSingleElementCollection,
@@ -161,6 +163,9 @@ precommitTests = [
   "DictionaryRemoveOfObjects": run_DictionaryRemoveOfObjects,
   "DictionarySwap": run_DictionarySwap,
   "DictionarySwapOfObjects": run_DictionarySwapOfObjects,
+  "DropLastAnySequence": run_DropLastAnySequence,
+  "DropLastCountableRange": run_DropLastCountableRange,
+  "DropLastSequence": run_DropLastSequence,
   "ErrorHandling": run_ErrorHandling,
   "GlobalClass": run_GlobalClass,
   "Hanoi": run_Hanoi,
@@ -273,6 +278,9 @@ precommitTests = [
   "StringInterpolation": run_StringInterpolation,
   "StringWalk": run_StringWalk,
   "StringWithCString": run_StringWithCString,
+  "SuffixAnySequence": run_SuffixAnySequence,
+  "SuffixCountableRange": run_SuffixCountableRange,
+  "SuffixSequence": run_SuffixSequence,
   "SuperChars": run_SuperChars,
   "TwoSum": run_TwoSum,
   "TypeFlood": run_TypeFlood,
