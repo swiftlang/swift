@@ -2340,12 +2340,6 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
         if (archetype->isInvalid())
           return true;
 
-        // If there is a concrete type above us, there are no requirements to
-        // emit.
-        if (archetype->getParent() &&
-            hasConcreteTypeInPath(archetype->getParent()))
-          return true;
-
         // Keep it.
         return false;
       }),
@@ -2388,7 +2382,9 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
       // anchor with a concrete type.
       if (auto concreteType = rep->getConcreteType()) {
         f(RequirementKind::SameType, archetype, concreteType,
-          rep->getConcreteTypeSource());
+          knownAnchor == componentAnchors.begin()
+            ? rep->getConcreteTypeSource()
+            : RequirementSource(RequirementSource::Explicit, SourceLoc()));
         continue;
       }
 
