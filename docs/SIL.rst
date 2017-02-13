@@ -3741,6 +3741,7 @@ container may use one of several representations:
   before IR generation.
   The following instructions manipulate "loadable" opaque existential containers:
   
+  * `init_existential_opaque`_
   * `open_existential_opaque`_
 
 - **Class existential containers**: If a protocol type is constrained by one or
@@ -3814,6 +3815,21 @@ is uninitialized, ``deinit_existential_addr`` must be used to do so. A fully
 initialized existential container can be destroyed with ``destroy_addr`` as
 usual. It is undefined behavior to ``destroy_addr`` a partially-initialized
 existential container.
+
+init_existential_opaque
+```````````````````````
+::
+
+  sil-instruction ::= 'init_existential_opaque' sil-operand ':' sil-type ','
+                                             sil-type
+
+  %1 = init_existential_opaque %0 : $L' : $C, $P
+  // %0 must be of loadable type $L', lowered from AST type $L, conforming to
+  //    protocol(s) $P
+  // %1 will be of type $P
+
+Loadable version of the above: Inits-up the existential
+container prepared to contain a value of type ``$P``.
 
 deinit_existential_addr
 ```````````````````````

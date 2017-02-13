@@ -225,3 +225,20 @@ func s140______forEachStmt() {
   for _ in 1..<42 {
   }
 }
+
+func s150___________anyArg(_: Any) {}
+
+// Tests init of opaque existentials
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s160_______callAnyArgyyF : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[INT_TYPE:%.*]] = metatype $@thin Int.Type
+// CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.Int2048, 42
+// CHECK:   [[INT_ARG:%.*]] = apply %{{.*}}([[INT_LIT]], [[INT_TYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK:   [[INIT_OPAQUE:%.*]] = init_existential_opaque [[INT_ARG]] : $Int, $Int, $Any
+// CHECK:   apply %{{.*}}([[INIT_OPAQUE]]) : $@convention(thin) (@in Any) -> ()
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s160_______callAnyArgyyF'
+func s160_______callAnyArg() {
+  s150___________anyArg(42)
+}
