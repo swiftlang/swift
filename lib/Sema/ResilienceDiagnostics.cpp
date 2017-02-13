@@ -119,6 +119,14 @@ void TypeChecker::diagnoseResilientValueConstructor(ConstructorDecl *ctor) {
   auto nominalDecl = ctor->getDeclContext()
     ->getAsNominalTypeOrNominalTypeExtensionContext();
 
+  // These restrictions only apply to structs and enums, and not protocol
+  // extensions.
+  if (isa<ProtocolDecl>(nominalDecl))
+    return;
+
+  assert(isa<StructDecl>(nominalDecl) ||
+         isa<EnumDecl>(nominalDecl));
+
   bool isDelegating =
       (ctor->getDelegatingOrChainedInitKind(&Diags) ==
        ConstructorDecl::BodyInitKind::Delegating);
