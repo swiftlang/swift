@@ -2451,7 +2451,7 @@ RValue SILGenFunction::emitApply(
     {
       Scope S(Cleanups, CleanupLocation::get(loc));
 
-      // First create a rvalue cleanup for our direct result.
+      // First create an rvalue cleanup for our direct result.
       ManagedValue managedDirectResult = emitManagedRValueWithCleanup(rawDirectResult);
       // Then borrow the managed direct result.
       ManagedValue borrowedDirectResult = managedDirectResult.borrow(*this, loc);

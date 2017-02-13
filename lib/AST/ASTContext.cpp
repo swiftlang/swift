@@ -1246,7 +1246,7 @@ void ASTContext::getVisibleTopLevelClangModules(
 GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
                                                       CanGenericSignature sig,
                                                       ModuleDecl *mod) {
-  // Check whether we already have an generic signature builder for this
+  // Check whether we already have a generic signature builder for this
   // signature and module.
   auto known = Impl.GenericSignatureBuilders.find({sig, mod});
   if (known != Impl.GenericSignatureBuilders.end())

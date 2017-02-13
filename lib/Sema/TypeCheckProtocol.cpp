@@ -994,7 +994,7 @@ RequirementEnvironment::RequirementEnvironment(
   if (selfType->getDepth() != 0 || selfType->getIndex() != 0)
     return;
 
-  // Construct an generic signature builder by collecting the constraints from the
+  // Construct a generic signature builder by collecting the constraints from the
   // requirement and the context of the conformance together, because both
   // define the capabilities of the requirement.
   GenericSignatureBuilder builder(
