@@ -2279,6 +2279,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     }
 
     auto aliasDecl = new (TC.Context) TypeAliasDecl(SourceLoc(),
+                                                    SourceLoc(),
                                                     assocType->getName(),
                                                     SourceLoc(),
                                                     /*genericparams*/nullptr, 
