@@ -19,6 +19,7 @@
 #include "ConstraintGraph.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace constraints;
@@ -1378,7 +1379,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
           *this, locator, boundType, choice, refType, openedFullType))
       break;
     
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:

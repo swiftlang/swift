@@ -26,7 +26,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -39,6 +38,7 @@
 #include "llvm/IR/Value.h"
 #include "llvm/IR/GlobalAlias.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ConvertUTF.h"
 
@@ -1838,7 +1838,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
     assert(definitionType == nullptr);
     // FIXME: don't just fall through; force the creation of a weak
     // definition so that we can emit a relative reference.
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case SymbolReferenceKind::Absolute:
     return { getAddrOfLLVMVariable(entity, alignment, definitionType,

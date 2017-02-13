@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Runtime/Reflection.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/HeapObject.h"
@@ -21,6 +20,7 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Portability.h"
 #include "Private.h"
+#include "llvm/Support/Compiler.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -1084,7 +1084,7 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
       if (obj->metadata->getKind() == MetadataKind::Class)
         return getImplementationForClass(Value);
     }
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   }
 
   /// TODO: Implement specialized mirror witnesses for all kinds.

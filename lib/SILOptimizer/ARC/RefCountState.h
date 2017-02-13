@@ -15,7 +15,6 @@
 
 #include "RCStateTransition.h"
 #include "swift/Basic/type_traits.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/ImmutablePointerSet.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"

@@ -21,7 +21,6 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/Version.h"
@@ -1357,7 +1356,7 @@ void Driver::buildActions(const ToolChain &TC,
           AllLinkerInputs.push_back(Current.release());
           break;
         }
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
       case types::TY_Image:
       case types::TY_dSYM:
       case types::TY_Dependencies:

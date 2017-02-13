@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace constraints;
@@ -1185,7 +1186,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
 
     case SolutionCompareResult::Worse:
       losers[bestIdx] = true;
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case SolutionCompareResult::Incomparable:
       // If we're not supposed to minimize the result set, just return eagerly.

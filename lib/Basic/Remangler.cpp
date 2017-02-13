@@ -22,11 +22,11 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/ManglingUtils.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/ManglingMacros.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/Compiler.h"
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
@@ -1098,7 +1098,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
         break;
       case Node::Kind::DependentPseudogenericSignature:
         PseudoGeneric = "P";
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
       case Node::Kind::DependentGenericSignature:
         GenSig = Child.get();
         break;
@@ -1153,7 +1153,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
       }
       case Node::Kind::ImplErrorResult:
         Buffer << 'z';
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
       case Node::Kind::ImplResult: {
         char ConvCh = llvm::StringSwitch<char>(Child->getFirstChild()->getText())
                         .Case("@out", 'r')
