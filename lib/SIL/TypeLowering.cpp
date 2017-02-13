@@ -755,7 +755,7 @@ namespace {
                            SILValue value) const override {
       if (B.getFunction().hasQualifiedOwnership())
         return B.createCopyValue(loc, value);
-      B.createRetainValue(loc, value, Atomicity::Atomic);
+      B.createRetainValue(loc, value, getAtomicity(B));
       return value;
     }
 
@@ -888,7 +888,7 @@ namespace {
                            SILValue value) const override {
       if (B.getFunction().hasQualifiedOwnership())
         return B.createCopyValue(loc, value);
-      B.createRetainValue(loc, value, Atomicity::Atomic);
+      B.createRetainValue(loc, value, getAtomicity(B));
       return value;
     }
 
@@ -897,7 +897,7 @@ namespace {
                                   LoweringStyle style) const override {
       if (B.getFunction().hasQualifiedOwnership())
         return B.createCopyValue(loc, value);
-      B.createRetainValue(loc, value, Atomicity::Atomic);
+      B.createRetainValue(loc, value, getAtomicity(B));
       return value;
     }
 
@@ -957,7 +957,7 @@ namespace {
       if (B.getFunction().hasQualifiedOwnership())
         return B.createCopyValue(loc, value);
 
-      B.createStrongRetain(loc, value, Atomicity::Atomic);
+      B.createStrongRetain(loc, value, getAtomicity(B));
       return value;
     }
 
@@ -982,7 +982,7 @@ namespace {
       if (B.getFunction().hasQualifiedOwnership())
         return B.createCopyValue(loc, value);
 
-      B.createUnownedRetain(loc, value, Atomicity::Atomic);
+      B.createUnownedRetain(loc, value, getAtomicity(B));
       return value;
     }
 
@@ -992,7 +992,7 @@ namespace {
         B.createDestroyValue(loc, value);
         return;
       }
-      B.createUnownedRelease(loc, value, Atomicity::Atomic);
+      B.createUnownedRelease(loc, value, getAtomicity(B));
     }
   };
 

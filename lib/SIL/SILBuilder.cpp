@@ -13,6 +13,10 @@
 #include "swift/SIL/SILBuilder.h"
 using namespace swift;
 
+Atomicity swift::getAtomicity(SILBuilder &Builder) {
+  return isAtomic(Builder.getModule()) ? Atomicity::Atomic : Atomicity::NonAtomic;
+}
+
 //===----------------------------------------------------------------------===//
 // SILBuilder Implementation
 //===----------------------------------------------------------------------===//
@@ -245,7 +249,7 @@ SILBuilder::emitStrongRelease(SILLocation Loc, SILValue Operand) {
   }
 
   // If we didn't find a retain to fold this into, emit the release.
-  return createStrongRelease(Loc, Operand, Atomicity::Atomic);
+  return createStrongRelease(Loc, Operand, getAtomicity(*this));
 }
 
 /// Emit a release_value instruction at the current location, attempting to
@@ -272,7 +276,7 @@ SILBuilder::emitReleaseValue(SILLocation Loc, SILValue Operand) {
   }
 
   // If we didn't find a retain to fold this into, emit the release.
-  return createReleaseValue(Loc, Operand, Atomicity::Atomic);
+  return createReleaseValue(Loc, Operand, getAtomicity(*this));
 }
 
 PointerUnion<CopyValueInst *, DestroyValueInst *>

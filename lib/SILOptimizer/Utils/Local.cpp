@@ -44,10 +44,10 @@ swift::createIncrementBefore(SILValue Ptr, SILInstruction *InsertPt) {
   // If Ptr is refcounted itself, create the strong_retain and
   // return.
   if (Ptr->getType().isReferenceCounted(B.getModule()))
-    return B.createStrongRetain(Loc, Ptr, Atomicity::Atomic);
+    return B.createStrongRetain(Loc, Ptr, getAtomicity(B));
 
   // Otherwise, create the retain_value.
-  return B.createRetainValue(Loc, Ptr, Atomicity::Atomic);
+  return B.createRetainValue(Loc, Ptr, getAtomicity(B));
 }
 
 /// Creates a decrement on \p Ptr before insertion point \p InsertPt that
@@ -61,10 +61,10 @@ swift::createDecrementBefore(SILValue Ptr, SILInstruction *InsertPt) {
 
   // If Ptr has reference semantics itself, create a strong_release.
   if (Ptr->getType().isReferenceCounted(B.getModule()))
-    return B.createStrongRelease(Loc, Ptr, Atomicity::Atomic);
+    return B.createStrongRelease(Loc, Ptr, getAtomicity(B));
 
   // Otherwise create a release value.
-  return B.createReleaseValue(Loc, Ptr, Atomicity::Atomic);
+  return B.createReleaseValue(Loc, Ptr, getAtomicity(B));
 }
 
 /// \brief Perform a fast local check to see if the instruction is dead.
@@ -1502,7 +1502,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
          "Parameter should be @owned");
 
   // Emit a retain.
-  Builder.createRetainValue(Loc, SrcOp, Atomicity::Atomic);
+  Builder.createRetainValue(Loc, SrcOp, getAtomicity(Builder));
 
   Args.push_back(InOutOptionalParam);
   Args.push_back(SrcOp);
@@ -1515,18 +1515,18 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   if (auto *UCCAI = dyn_cast<UnconditionalCheckedCastAddrInst>(Inst)) {
     assert(UCCAI->getConsumptionKind() == CastConsumptionKind::TakeAlways);
     if (UCCAI->getConsumptionKind() == CastConsumptionKind::TakeAlways) {
-      Builder.createReleaseValue(Loc, SrcOp, Atomicity::Atomic);
+      Builder.createReleaseValue(Loc, SrcOp, getAtomicity(Builder));
     }
   }
 
   if (auto *CCABI = dyn_cast<CheckedCastAddrBranchInst>(Inst)) {
     if (CCABI->getConsumptionKind() == CastConsumptionKind::TakeAlways) {
-      Builder.createReleaseValue(Loc, SrcOp, Atomicity::Atomic);
+      Builder.createReleaseValue(Loc, SrcOp, getAtomicity(Builder));
     } else if (CCABI->getConsumptionKind() ==
                CastConsumptionKind::TakeOnSuccess) {
       // Insert a release in the success BB.
       Builder.setInsertionPoint(SuccessBB->begin());
-      Builder.createReleaseValue(Loc, SrcOp, Atomicity::Atomic);
+      Builder.createReleaseValue(Loc, SrcOp, getAtomicity(Builder));
     }
   }
 
@@ -1730,17 +1730,17 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   }
 
   if (needRetainBeforeCall)
-    Builder.createRetainValue(Loc, Src, Atomicity::Atomic);
+    Builder.createRetainValue(Loc, Src, getAtomicity(Builder));
 
   // Generate a code to invoke the bridging function.
   auto *NewAI = Builder.createApply(Loc, FnRef, SubstFnTy, ResultTy, Subs, Src,
                                     false);
 
   if (needReleaseAfterCall) {
-    Builder.createReleaseValue(Loc, Src, Atomicity::Atomic);
+    Builder.createReleaseValue(Loc, Src, getAtomicity(Builder));
   } else if (needReleaseInSucc) {
     SILBuilder SuccBuilder(SuccessBB->begin());
-    SuccBuilder.createReleaseValue(Loc, Src, Atomicity::Atomic);
+    SuccBuilder.createReleaseValue(Loc, Src, getAtomicity(SuccBuilder));
   }
   SILInstruction *NewI = NewAI;
 

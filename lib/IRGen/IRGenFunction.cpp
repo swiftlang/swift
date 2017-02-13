@@ -31,6 +31,10 @@
 using namespace swift;
 using namespace irgen;
 
+Atomicity swift::irgen::getAtomicity(IRGenFunction &IGF) {
+  return isAtomic(IGF.getSILModule()) ? Atomicity::Atomic : Atomicity::NonAtomic;
+}
+
 IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
                              const SILDebugScope *DbgScope,
                              Optional<SILLocation> DbgLoc)

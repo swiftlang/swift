@@ -121,7 +121,11 @@ public:
   bool AssumeUnqualifiedOwnershipWhenParsing = false;
 
   /// Assume that code will be executed in a single-threaded environment.
+#ifdef SWIFT_FORCE_ASSUME_SINGLE_THREADED
+  bool AssumeSingleThreaded = true;
+#else
   bool AssumeSingleThreaded = false;
+#endif
 };
 
 } // end namespace swift
