@@ -251,7 +251,7 @@ namespace {
       Address dataAddr = projectData(IGF, address);
       auto data = IGF.Builder.CreateLoad(dataAddr);
       if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRetain(data, getAtomicity(IGF));
+        IGF.emitNativeStrongRetain(data, IGF.getDefaultAtomicity());
       e.add(data);
     }
 
@@ -376,7 +376,7 @@ namespace {
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       auto data = IGF.Builder.CreateLoad(projectData(IGF, addr));
       if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRelease(data, getAtomicity(IGF));
+        IGF.emitNativeStrongRelease(data, IGF.getDefaultAtomicity());
     }
 
     void packIntoEnumPayload(IRGenFunction &IGF,
@@ -881,7 +881,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     switch (argConvention) {
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Direct_Owned:
-      if (!consumesContext) subIGF.emitNativeStrongRetain(rawData, getAtomicity(subIGF));
+      if (!consumesContext) subIGF.emitNativeStrongRetain(rawData, subIGF.getDefaultAtomicity());
       break;
 
     case ParameterConvention::Indirect_In_Guaranteed:
@@ -889,7 +889,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       dependsOnContextLifetime = true;
       if (outType->getCalleeConvention() ==
             ParameterConvention::Direct_Unowned) {
-        subIGF.emitNativeStrongRetain(rawData, getAtomicity(subIGF));
+        subIGF.emitNativeStrongRetain(rawData, subIGF.getDefaultAtomicity());
         consumesContext = true;
       }
       break;
@@ -1030,7 +1030,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // so we can tail call. The safety of this assumes that neither this release
     // nor any of the loads can throw.
     if (consumesContext && !dependsOnContextLifetime && rawData)
-      subIGF.emitNativeStrongRelease(rawData, getAtomicity(subIGF));
+      subIGF.emitNativeStrongRelease(rawData, subIGF.getDefaultAtomicity());
   }
 
   // Derive the callee function pointer.  If we found a function
@@ -1129,7 +1129,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   
   // If the parameters depended on the context, consume the context now.
   if (rawData && consumesContext && dependsOnContextLifetime)
-    subIGF.emitNativeStrongRelease(rawData, getAtomicity(subIGF));
+    subIGF.emitNativeStrongRelease(rawData, subIGF.getDefaultAtomicity());
   
   // FIXME: Reabstract the result value as substituted.
 

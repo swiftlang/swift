@@ -73,17 +73,19 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
 
   ++NumRefCountOpsSimplified;
 
+  auto *RCI = cast<RefCountingInst>(I);
+
   // If we have a retain value...
   if (isa<RetainValueInst>(I)) {
     // And our payload is refcounted, insert a strong_retain onto the
     // payload.
     if (UEDITy.isReferenceCounted(Mod)) {
-      Builder.createStrongRetain(I->getLoc(), UEDI, getAtomicity(I));
+      Builder.createStrongRetain(I->getLoc(), UEDI, RCI->getAtomicity());
       return;
     }
 
     // Otherwise, insert a retain_value on the payload.
-    Builder.createRetainValue(I->getLoc(), UEDI, getAtomicity(I));
+    Builder.createRetainValue(I->getLoc(), UEDI, RCI->getAtomicity());
     return;
   }
 
@@ -94,13 +96,13 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
 
   // If our payload has reference semantics, insert the strong release.
   if (UEDITy.isReferenceCounted(Mod)) {
-    Builder.createStrongRelease(I->getLoc(), UEDI, getAtomicity(I));
+    Builder.createStrongRelease(I->getLoc(), UEDI, RCI->getAtomicity());
     return;
   }
 
   // Otherwise if our payload is non-trivial but lacking reference semantics,
   // insert the release_value.
-  Builder.createReleaseValue(I->getLoc(), UEDI, getAtomicity(I));
+  Builder.createReleaseValue(I->getLoc(), UEDI, RCI->getAtomicity());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1547,7 +1549,7 @@ sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA,
     // delete list seems reasonable for now...
     SILBuilder Builder(getBB()->begin());
     Builder.createRetainValue(DeleteList[0]->getLoc(), EnumValue,
-                              getAtomicity(DeleteList[0]));
+                              cast<RefCountingInst>(DeleteList[0])->getAtomicity());
     for (auto *I : DeleteList)
       I->eraseFromParent();
     ++NumSunk;

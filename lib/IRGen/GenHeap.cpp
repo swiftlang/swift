@@ -972,7 +972,7 @@ void IRGenFunction::emitNativeStrongAssign(llvm::Value *newValue,
   Builder.CreateStore(newValue, address);
 
   // Release the old value.
-  emitNativeStrongRelease(oldValue, getAtomicity(*this));
+  emitNativeStrongRelease(oldValue, getDefaultAtomicity());
 }
 
 /// Emit an initialize of a live value to the given retaining variable.
@@ -1155,7 +1155,7 @@ void IRGenFunction::emitNativeUnownedInit(llvm::Value *value,
   value = Builder.CreateBitCast(value, IGM.RefCountedPtrTy);
   dest = Builder.CreateStructGEP(dest, 0, Size(0));
   Builder.CreateStore(value, dest);
-  emitNativeUnownedRetain(value, getAtomicity(*this));
+  emitNativeUnownedRetain(value, getDefaultAtomicity());
 }
 
 void IRGenFunction::emitNativeUnownedAssign(llvm::Value *value,
@@ -1164,8 +1164,8 @@ void IRGenFunction::emitNativeUnownedAssign(llvm::Value *value,
   dest = Builder.CreateStructGEP(dest, 0, Size(0));
   auto oldValue = Builder.CreateLoad(dest);
   Builder.CreateStore(value, dest);
-  emitNativeUnownedRetain(value, getAtomicity(*this));
-  emitNativeUnownedRelease(oldValue, getAtomicity(*this));
+  emitNativeUnownedRetain(value, getDefaultAtomicity());
+  emitNativeUnownedRelease(oldValue, getDefaultAtomicity());
 }
 
 llvm::Value *IRGenFunction::emitNativeUnownedLoadStrong(Address src,
@@ -1173,7 +1173,7 @@ llvm::Value *IRGenFunction::emitNativeUnownedLoadStrong(Address src,
   src = Builder.CreateStructGEP(src, 0, Size(0));
   llvm::Value *value = Builder.CreateLoad(src);
   value = Builder.CreateBitCast(value, type);
-  emitNativeStrongRetainUnowned(value, getAtomicity(*this));
+  emitNativeStrongRetainUnowned(value, getDefaultAtomicity());
   return value;
 }
 
@@ -1182,14 +1182,14 @@ llvm::Value *IRGenFunction::emitNativeUnownedTakeStrong(Address src,
   src = Builder.CreateStructGEP(src, 0, Size(0));
   llvm::Value *value = Builder.CreateLoad(src);
   value = Builder.CreateBitCast(value, type);
-  emitNativeStrongRetainAndUnownedRelease(value, getAtomicity(*this));
+  emitNativeStrongRetainAndUnownedRelease(value, getDefaultAtomicity());
   return value;
 }
 
 void IRGenFunction::emitNativeUnownedDestroy(Address ref) {
   ref = Builder.CreateStructGEP(ref, 0, Size(0));
   llvm::Value *value = Builder.CreateLoad(ref);
-  emitNativeUnownedRelease(value, getAtomicity(*this));
+  emitNativeUnownedRelease(value, getDefaultAtomicity());
 }
 
 void IRGenFunction::emitNativeUnownedCopyInit(Address dest, Address src) {
@@ -1197,7 +1197,7 @@ void IRGenFunction::emitNativeUnownedCopyInit(Address dest, Address src) {
   dest = Builder.CreateStructGEP(dest, 0, Size(0));
   llvm::Value *newValue = Builder.CreateLoad(src);
   Builder.CreateStore(newValue, dest);
-  emitNativeUnownedRetain(newValue, getAtomicity(*this));
+  emitNativeUnownedRetain(newValue, getDefaultAtomicity());
 }
 
 void IRGenFunction::emitNativeUnownedTakeInit(Address dest, Address src) {
@@ -1213,8 +1213,8 @@ void IRGenFunction::emitNativeUnownedCopyAssign(Address dest, Address src) {
   llvm::Value *newValue = Builder.CreateLoad(src);
   llvm::Value *oldValue = Builder.CreateLoad(dest);
   Builder.CreateStore(newValue, dest);
-  emitNativeUnownedRetain(newValue, getAtomicity(*this));
-  emitNativeUnownedRelease(oldValue, getAtomicity(*this));
+  emitNativeUnownedRetain(newValue, getDefaultAtomicity());
+  emitNativeUnownedRelease(oldValue, getDefaultAtomicity());
 }
 
 void IRGenFunction::emitNativeUnownedTakeAssign(Address dest, Address src) {
@@ -1223,7 +1223,7 @@ void IRGenFunction::emitNativeUnownedTakeAssign(Address dest, Address src) {
   llvm::Value *newValue = Builder.CreateLoad(src);
   llvm::Value *oldValue = Builder.CreateLoad(dest);
   Builder.CreateStore(newValue, dest);
-  emitNativeUnownedRelease(oldValue, getAtomicity(*this));
+  emitNativeUnownedRelease(oldValue, getDefaultAtomicity());
 }
 
 llvm::Constant *IRGenModule::getFixLifetimeFn() {

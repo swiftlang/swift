@@ -626,6 +626,11 @@ public:
 
   /// Returns true if the builtin or intrinsic is no-return.
   bool isNoReturnBuiltinOrIntrinsic(Identifier Name);
+
+  /// Returns true if the default atomicity of the module is Atomic.
+  bool isDefaultAtomic() const {
+    return ! getOptions().AssumeSingleThreaded;
+  }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
@@ -638,8 +643,6 @@ namespace Lowering {
   /// using the Objective-C runtime, i.e., +alloc and -dealloc.
   LLVM_LIBRARY_VISIBILITY bool usesObjCAllocator(ClassDecl *theClass);
 }
-
-bool isAtomic(SILModule &Module);
 
 } // end swift namespace
 

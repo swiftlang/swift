@@ -230,6 +230,9 @@ private:
 
 //--- Reference-counting methods -----------------------------------------------
 public:
+  // Returns the default atomicity of the module.
+  Atomicity getDefaultAtomicity();
+
   llvm::Value *emitUnmanagedAlloc(const HeapLayout &layout,
                                   const llvm::Twine &name,
                                   llvm::Constant *captureDescriptor,
@@ -581,8 +584,6 @@ private:
 };
 
 using ConditionalDominanceScope = IRGenFunction::ConditionalDominanceScope;
-
-Atomicity getAtomicity(IRGenFunction &IGF);
 
 } // end namespace irgen
 } // end namespace swift

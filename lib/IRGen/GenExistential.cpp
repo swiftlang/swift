@@ -750,7 +750,7 @@ public:
                   Explosion &out) const override {
     // Load the instance pointer, which is unknown-refcounted.
     llvm::Value *instance = asDerived().loadValue(IGF, address);
-    asDerived().emitValueRetain(IGF, instance, getAtomicity(IGF));
+    asDerived().emitValueRetain(IGF, instance, IGF.getDefaultAtomicity());
     out.add(instance);
 
     // Load the witness table pointers.
@@ -772,7 +772,7 @@ public:
     Address instanceAddr = asDerived().projectValue(IGF, address);
     llvm::Value *old = IGF.Builder.CreateLoad(instanceAddr);
     IGF.Builder.CreateStore(e.claimNext(), instanceAddr);
-    asDerived().emitValueRelease(IGF, old, getAtomicity(IGF));
+    asDerived().emitValueRelease(IGF, old, IGF.getDefaultAtomicity());
 
     // Store the witness table pointers.
     asDerived().emitStoreOfTables(IGF, e, address);
@@ -821,7 +821,7 @@ public:
 
   void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
     llvm::Value *value = asDerived().loadValue(IGF, addr);
-    asDerived().emitValueRelease(IGF, value, getAtomicity(IGF));
+    asDerived().emitValueRelease(IGF, value, IGF.getDefaultAtomicity());
   }
 
   void packIntoEnumPayload(IRGenFunction &IGF,

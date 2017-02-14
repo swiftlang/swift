@@ -652,7 +652,7 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
   case AddressorKind::NativePinning:
     // Emit the unpin immediately.
     SGF.B.createStrongUnpin(loc, addressorResult.second.forward(SGF),
-                            getAtomicity(SGF.B));
+                            SGF.B.getDefaultAtomicity());
     break;
   }
   
