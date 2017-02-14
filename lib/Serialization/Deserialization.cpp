@@ -2576,6 +2576,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     declOrOffset = assocType;
 
     assocType->computeType();
+
+    assert(!assocType->getDeclaredInterfaceType()->hasError() &&
+           "erroneous associated type");
+
     Accessibility parentAccess = cast<ProtocolDecl>(DC)->getFormalAccess();
     assocType->setAccessibility(std::max(parentAccess,Accessibility::Internal));
     if (isImplicit)
@@ -3031,8 +3035,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                           getIdentifier(nameID), None);
     declOrOffset = proto;
 
-    configureGenericEnvironment(proto, genericEnvID);
-
     proto->setRequiresClass(isClassBounded);
     
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
@@ -3041,6 +3043,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       error();
       return nullptr;
     }
+
+    auto genericParams = maybeReadGenericParams(DC);
+    assert(genericParams && "protocol with no generic parameters?");
+    proto->setGenericParams(genericParams);
 
     auto protocols = ctx.Allocate<ProtocolDecl *>(numProtocols);
     for_each(protocols, rawProtocolAndInheritedIDs.slice(0, numProtocols),
@@ -3051,9 +3057,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     handleInherited(proto, rawProtocolAndInheritedIDs.slice(numProtocols));
 
-    auto genericParams = maybeReadGenericParams(DC);
-    assert(genericParams && "protocol with no generic parameters?");
-    proto->setGenericParams(genericParams);
+    configureGenericEnvironment(proto, genericEnvID);
 
     SmallVector<Requirement, 4> requirements;
     readGenericRequirements(requirements, DeclTypeCursor);
