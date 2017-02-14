@@ -2965,16 +2965,18 @@ namespace {
       // it's not already there.  (Note that this potentially includes
       // conventions which pass indirectly without transferring
       // ownership, like Itanium C++.)
-      if (SGF.silConv.isSILIndirect(param)) {
-        if (specialDest) {
-          emitIndirectInto(std::move(arg), origParamType,
-                           loweredSubstParamType, *specialDest);
-          Args.push_back(ManagedValue::forInContext());
-        } else {
-          auto value = emitIndirect(std::move(arg), loweredSubstArgType,
-                                    origParamType, param);
-          Args.push_back(value);
-        }
+      if (specialDest) {
+        assert(param.isFormalIndirect() &&
+               "SpecialDest should imply indirect parameter");
+        // TODO: Change the way we initialize array storage in opaque mode
+        emitIndirectInto(std::move(arg), origParamType, loweredSubstParamType,
+                         *specialDest);
+        Args.push_back(ManagedValue::forInContext());
+        return;
+      } else if (SGF.silConv.isSILIndirect(param)) {
+        auto value = emitIndirect(std::move(arg), loweredSubstArgType,
+                                  origParamType, param);
+        Args.push_back(value);
         return;
       }
 
