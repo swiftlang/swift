@@ -343,9 +343,9 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
       // Emit the retain that matches the captured argument by the partial_apply
       // in the callee that is consumed by the partial_apply.
       Builder.setInsertionPoint(AI.getInstruction());
-      Builder.createRetainValue(Closure->getLoc(), Arg, getAtomicity(Builder));
+      Builder.createRetainValue(Closure->getLoc(), Arg, Builder.getDefaultAtomicity());
     } else {
-      Builder.createRetainValue(Closure->getLoc(), Arg, getAtomicity(Builder));
+      Builder.createRetainValue(Closure->getLoc(), Arg, Builder.getDefaultAtomicity());
     }
   }
 
@@ -364,9 +364,9 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     // argument to AI.
     if (CSDesc.isClosureConsumed() && CSDesc.closureHasRefSemanticContext()) {
       Builder.setInsertionPoint(TAI->getNormalBB()->begin());
-      Builder.createReleaseValue(Closure->getLoc(), Closure, getAtomicity(Builder));
+      Builder.createReleaseValue(Closure->getLoc(), Closure, Builder.getDefaultAtomicity());
       Builder.setInsertionPoint(TAI->getErrorBB()->begin());
-      Builder.createReleaseValue(Closure->getLoc(), Closure, getAtomicity(Builder));
+      Builder.createReleaseValue(Closure->getLoc(), Closure, Builder.getDefaultAtomicity());
       Builder.setInsertionPoint(AI.getInstruction());
     }
   } else {
@@ -377,7 +377,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     // right after NewAI. This is to balance the +1 from being an @owned
     // argument to AI.
     if (CSDesc.isClosureConsumed() && CSDesc.closureHasRefSemanticContext())
-      Builder.createReleaseValue(Closure->getLoc(), Closure, getAtomicity(Builder));
+      Builder.createReleaseValue(Closure->getLoc(), Closure, Builder.getDefaultAtomicity());
   }
 
   // Replace all uses of the old apply with the new apply.
@@ -425,10 +425,10 @@ void CallSiteDescriptor::extendArgumentLifetime(SILValue Arg) const {
 
   // Extend the lifetime of a captured argument to cover the callee.
   SILBuilderWithScope Builder(getClosure());
-  Builder.createRetainValue(getClosure()->getLoc(), Arg, getAtomicity(Builder));
+  Builder.createRetainValue(getClosure()->getLoc(), Arg, Builder.getDefaultAtomicity());
   for (auto *I : CInfo->LifetimeFrontier) {
     Builder.setInsertionPoint(I);
-    Builder.createReleaseValue(getClosure()->getLoc(), Arg, getAtomicity(Builder));
+    Builder.createReleaseValue(getClosure()->getLoc(), Arg, Builder.getDefaultAtomicity());
   }
 }
 
@@ -647,7 +647,7 @@ void ClosureSpecCloner::populateCloned() {
       if (isa<ReturnInst>(TI)) {
         Builder.setInsertionPoint(TI);
         Builder.createReleaseValue(Loc, SILValue(NewClosure),
-                                   getAtomicity(Builder));
+                                   Builder.getDefaultAtomicity());
         continue;
       }
 
@@ -663,7 +663,7 @@ void ClosureSpecCloner::populateCloned() {
       // value, we will retain the partial apply before we release it and
       // potentially eliminate it.
       Builder.setInsertionPoint(NoReturnApply.getInstruction());
-      Builder.createReleaseValue(Loc, SILValue(NewClosure), getAtomicity(Builder));
+      Builder.createReleaseValue(Loc, SILValue(NewClosure), Builder.getDefaultAtomicity());
     }
   }
 }

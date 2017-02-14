@@ -31,13 +31,6 @@
 using namespace swift;
 using namespace Lowering;
 
-Atomicity swift::getAtomicity(SILInstruction *Inst) {
-  if (auto *RCI = dyn_cast<RefCountingInst>(Inst)) {
-    return RCI->getAtomicity();
-  }
-  return Atomicity::Atomic;
-}
-
 //===----------------------------------------------------------------------===//
 // Instruction-specific properties on SILValue
 //===----------------------------------------------------------------------===//

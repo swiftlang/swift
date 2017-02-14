@@ -142,9 +142,9 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
       (next == Continue->end()) ? nullptr : dyn_cast<StrongReleaseInst>(next);
   if (Release && Release->getOperand() == CMI->getOperand()) {
     VirtBuilder.createStrongRelease(Release->getLoc(), CMI->getOperand(),
-                                    getAtomicity(Release));
+                                    Release->getAtomicity());
     IdenBuilder.createStrongRelease(Release->getLoc(), DownCastedClassInstance,
-                                    getAtomicity(Release));
+                                    Release->getAtomicity());
     Release->eraseFromParent();
   }
 

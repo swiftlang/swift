@@ -1512,6 +1512,11 @@ public:
   // Memory management helpers
   //===--------------------------------------------------------------------===//
 
+  /// Returns the default atomicity of the module.
+  Atomicity getDefaultAtomicity() {
+    return getModule().isDefaultAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
+  }
+
   /// Try to fold a destroy_addr operation into the previous instructions, or
   /// generate an explicit one if that fails.  If this inserts a new
   /// instruction, it returns it, otherwise it returns null.
@@ -1749,8 +1754,6 @@ public:
     inheritScopeFrom(InheritScopeFrom);
   }
 };
-
-Atomicity getAtomicity(SILBuilder &Builder);
 
 } // end swift namespace
 

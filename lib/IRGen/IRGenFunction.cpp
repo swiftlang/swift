@@ -31,10 +31,6 @@
 using namespace swift;
 using namespace irgen;
 
-Atomicity swift::irgen::getAtomicity(IRGenFunction &IGF) {
-  return isAtomic(IGF.getSILModule()) ? Atomicity::Atomic : Atomicity::NonAtomic;
-}
-
 IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
                              const SILDebugScope *DbgScope,
                              Optional<SILLocation> DbgLoc)
@@ -74,6 +70,11 @@ SILModule &IRGenFunction::getSILModule() const {
 
 Lowering::TypeConverter &IRGenFunction::getSILTypes() const {
   return IGM.getSILTypes();
+}
+
+// Returns the default atomicity of the module.
+Atomicity IRGenFunction::getDefaultAtomicity() {
+  return getSILModule().isDefaultAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
 }
 
 /// Call the llvm.memcpy intrinsic.  The arguments need not already

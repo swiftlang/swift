@@ -161,7 +161,8 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
 
   // Do what a release would do before calling the deallocator: set the object
   // in deallocating state, which means set the RC_DEALLOCATING_FLAG flag.
-  B.createSetDeallocating(ReleaseInst->getLoc(), object, getAtomicity(ReleaseInst));
+  B.createSetDeallocating(ReleaseInst->getLoc(), object,
+                          cast<RefCountingInst>(ReleaseInst)->getAtomicity());
 
   // Create the call to the destructor with the allocated object as self
   // argument.

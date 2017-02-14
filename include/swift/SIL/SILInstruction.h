@@ -5658,8 +5658,6 @@ SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
   }
 }
 
-RefCountingInst::Atomicity getAtomicity(SILInstruction *Inst);
-
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//

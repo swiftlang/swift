@@ -86,7 +86,7 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
     // is going away so we need to release the stored value now.
     Builder.setInsertionPoint(SingleStore);
     Builder.createReleaseValue(AEBI->getLoc(), SingleStore->getSrc(),
-                               getAtomicity(SingleRelease));
+                               SingleRelease->getAtomicity());
 
     // Erase the instruction that stores into the box and the release that
     // releases the box, and finally, release the box.
@@ -467,19 +467,19 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
     // reduced to a retain_value on the payload.
     if (EI->hasOperand()) {
       return Builder.createReleaseValue(RVI->getLoc(), EI->getOperand(),
-                                        getAtomicity(RVI));
+                                        RVI->getAtomicity());
     }
   }
 
   // ReleaseValueInst of an unowned type is an unowned_release.
   if (OperandTy.is<UnownedStorageType>())
     return Builder.createUnownedRelease(RVI->getLoc(), Operand,
-                                        getAtomicity(RVI));
+                                        RVI->getAtomicity());
 
   // ReleaseValueInst of a reference type is a strong_release.
   if (OperandTy.isReferenceCounted(RVI->getModule()))
     return Builder.createStrongRelease(RVI->getLoc(), Operand,
-                                       getAtomicity(RVI));
+                                       RVI->getAtomicity());
 
   // ReleaseValueInst of a trivial type is a no-op.
   if (OperandTy.isTrivial(RVI->getModule()))
@@ -505,19 +505,19 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
     // reduced to a retain_value on the payload.
     if (EI->hasOperand()) {
       return Builder.createRetainValue(RVI->getLoc(), EI->getOperand(),
-                                       getAtomicity(RVI));
+                                       RVI->getAtomicity());
     }
   }
 
   // RetainValueInst of an unowned type is an unowned_retain.
   if (OperandTy.is<UnownedStorageType>())
     return Builder.createUnownedRetain(RVI->getLoc(), Operand,
-                                       getAtomicity(RVI));
+                                       RVI->getAtomicity());
 
   // RetainValueInst of a reference type is a strong_release.
   if (OperandTy.isReferenceCounted(RVI->getModule())) {
     return Builder.createStrongRetain(RVI->getLoc(), Operand,
-                                      getAtomicity(RVI));
+                                      RVI->getAtomicity());
   }
 
   // RetainValueInst of a trivial type is a no-op + use propagation.
