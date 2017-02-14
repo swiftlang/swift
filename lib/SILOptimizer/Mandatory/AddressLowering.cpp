@@ -31,14 +31,6 @@ using namespace swift;
 using llvm::SmallSetVector;
 
 //===----------------------------------------------------------------------===//
-// Support for converting between value composition and address projection.
-//===----------------------------------------------------------------------===//
-
-/// TODO: List all operations that simply compose an aggregate from subobjects:
-/// tuple, struct, enum,
-bool isSubobjectCompsition(Operand &operand) { return false; }
-
-//===----------------------------------------------------------------------===//
 // ValueStorageMap: Map Opaque/Resilient SILValues to abstract storage units.
 //===----------------------------------------------------------------------===//
 
@@ -614,7 +606,7 @@ protected:
     assert(!pass.valueStorageMap.getStorage(tupleInst).storageAddress);
   }
 
-  void visitTupleExtractInst(TupleExtractInst *extractInst) {
+  void visitTupleExtractInst(TupleExtractInst *TEI) {
     // Tuple element instructions don't require rewrite. They are dead.
     llvm_unreachable("Untested.");
     return;

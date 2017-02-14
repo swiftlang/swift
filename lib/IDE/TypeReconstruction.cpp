@@ -389,11 +389,6 @@ struct VisitNodeResult {
 
   bool HasSingleType() { return _types.size() == 1 && _types.front(); }
 
-  Type GetFirstType() {
-    // Must ensure there is a type prior to calling this
-    return _types.front();
-  }
-
   void Clear() {
     _module.Clear();
     _decls.clear();
