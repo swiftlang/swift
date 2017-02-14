@@ -442,3 +442,10 @@ func sr3497() {
 let _: ((Any?) -> Void) = { (arg: Any!) in }
 // This example was rejected in 3.0 as well, but accepting it is correct.
 let _: ((Int?) -> Void) = { (arg: Int!) in }
+
+// rdar://30429709 - We should not attempt an implicit conversion from
+// () -> T to () -> Optional<()>.
+func returnsArray() -> [Int] { return [] }
+
+returnsArray().flatMap { $0 }.flatMap { }
+// expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}}

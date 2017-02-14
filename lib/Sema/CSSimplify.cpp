@@ -3833,7 +3833,9 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto generic2 = type2->castTo<BoundGenericType>();
     assert(generic2->getDecl()->classifyAsOptionalType());
     return matchTypes(type1, generic2->getGenericArgs()[0],
-                      matchKind, (subflags | TMF_UnwrappingOptional), locator);
+                      matchKind, subflags,
+                      locator.withPathElement(
+                        ConstraintLocator::OptionalPayload));
   }
 
   // for $< in { <, <c, <oc }:
