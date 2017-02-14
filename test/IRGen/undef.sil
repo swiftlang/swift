@@ -4,7 +4,7 @@
 
 import Builtin
 
-// CHECK: define{{( protected)?}} void @undefined() {{.*}} {
+// CHECK: define{{( protected)?}} swiftcc void @undefined() {{.*}} {
 // CHECK: entry:
 // CHECK:   store i64 undef, i64* undef, align 8
 // CHECK:   store i8 undef, i8* undef, align 8

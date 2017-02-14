@@ -650,7 +650,7 @@ bb0(%0 : $*T, %1 : $*S):
 
 // Check that a specialization for _Trivial(32) uses direct loads and stores
 // instead of value witness functions to load and store the value of a generic type.
-// CHECK-IRGEN-LABEL: define linkonce_odr hidden void @_T016eager_specialize18copyValueAndReturnxx_xz1stlFxxxRlze31_lItilr_Tp5(i32* noalias nocapture sret, i32* noalias nocapture dereferenceable(4), i32* nocapture dereferenceable(4), %swift.type* %"\CF\84_0_0")
+// CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @_T016eager_specialize18copyValueAndReturnxx_xz1stlFxxxRlze31_lItilr_Tp5(i32* noalias nocapture sret, i32* noalias nocapture dereferenceable(4), i32* nocapture dereferenceable(4), %swift.type* %"\CF\84_0_0")
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN-NEXT:  %3 = load i32, i32* %2
 // CHECK-IRGEN-NEXT:  store i32 %3, i32* %0
@@ -659,7 +659,7 @@ bb0(%0 : $*T, %1 : $*S):
 
 // Check that a specialization for _Trivial(64) uses direct loads and stores
 // instead of value witness functions to load and store the value of a generic type.
-// CHECK-IRGEN-LABEL: define linkonce_odr hidden void @_T016eager_specialize18copyValueAndReturnxx_xz1stlFxxxRlze63_lItilr_Tp5(i64* noalias nocapture sret, i64* noalias nocapture dereferenceable(8), i64* nocapture dereferenceable(8), %swift.type* %"\CF\84_0_0")
+// CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @_T016eager_specialize18copyValueAndReturnxx_xz1stlFxxxRlze63_lItilr_Tp5(i64* noalias nocapture sret, i64* noalias nocapture dereferenceable(8), i64* nocapture dereferenceable(8), %swift.type* %"\CF\84_0_0")
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN-NEXT:   %3 = load i64, i64* %2
 // CHECK-IRGEN-NEXT:   store i64 %3, i64* %0
@@ -668,7 +668,7 @@ bb0(%0 : $*T, %1 : $*S):
 
 // Check that a specialization for _Trivial does not call the 'destroy' value witness,
 // because it is known that the object is Trivial, i.e. contains no references.
-// CHECK-IRGEN-LABEL: define linkonce_odr hidden void @_T016eager_specialize19copyValueAndReturn2xx_xz1stlFxxxRlzTlItilr_Tp5(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.opaque* nocapture, %swift.type* %"\CF\84_0_0")
+// CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @_T016eager_specialize19copyValueAndReturn2xx_xz1stlFxxxRlzTlItilr_Tp5(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.opaque* nocapture, %swift.type* %"\CF\84_0_0")
 // CHECK-IRGEN-NEXT: entry:
 // CHECK-IRGEN-NEXT:   %3 = bitcast %swift.type* %"\CF\84_0_0" to i8***
 // CHECK-IRGEN-NEXT:   %4 = getelementptr inbounds i8**, i8*** %3, i{{.*}} -1

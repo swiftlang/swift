@@ -21,14 +21,17 @@ extern const NSDataDeallocator NSDataDeallocatorUnmap;
 extern const NSDataDeallocator NSDataDeallocatorFree;
 extern const NSDataDeallocator NSDataDeallocatorNone;
 
+SWIFT_CC(swift)
 void __NSDataInvokeDeallocatorVM(void *mem, NSUInteger length) {
   NSDataDeallocatorVM(mem, length);
 }
 
+SWIFT_CC(swift)
 void __NSDataInvokeDeallocatorUnmap(void *mem, NSUInteger length) {
   NSDataDeallocatorUnmap(mem, length);
 }
 
+SWIFT_CC(swift)
 void __NSDataInvokeDeallocatorFree(void *mem, NSUInteger length) {
   NSDataDeallocatorFree(mem, length);
 }

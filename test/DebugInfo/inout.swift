@@ -8,7 +8,7 @@
 func Close(_ fn: () -> Int64) { fn() }
 typealias MyFloat = Float
 
-// CHECK: define hidden void @_TF5inout13modifyFooHeap
+// CHECK: define hidden {{.*}}void @_TF5inout13modifyFooHeap
 // CHECK: %[[ALLOCA:.*]] = alloca %Vs5Int64*
 // CHECK: call void @llvm.dbg.declare(metadata
 // CHECK-SAME:                        %[[ALLOCA]], metadata ![[A:[0-9]+]]

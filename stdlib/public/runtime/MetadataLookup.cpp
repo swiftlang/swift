@@ -253,6 +253,7 @@ _classByName(const llvm::StringRef typeName) {
 
 /// \param typeName The name of a class in the form: <module>.<class>
 /// \return Returns the metadata of the type, if found.
+SWIFT_CC(swift)
 SWIFT_RUNTIME_EXPORT
 const Metadata *
 swift_getTypeByName(const char *typeName, size_t typeNameLength) {

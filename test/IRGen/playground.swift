@@ -15,7 +15,7 @@ anchor()
 
 // CHECK-LABEL: define{{( protected)?}} i32 @main
 // CHECK:         call void @runtime_registration
-// CHECK:         call void @_T010playground6anchoryyF
+// CHECK:         call swiftcc void @_T010playground6anchoryyF
 // CHECK:         ret void
 // CHECK:       }
 

@@ -11,7 +11,7 @@ func a(i i: Int) -> (Int) -> Int {
 }
 
 // -- Closure entry point
-// CHECK: define linkonce_odr hidden i64 @_T07closure1aSiSicSi1i_tFSiSicfU_(i64, i64)
+// CHECK: define linkonce_odr hidden swiftcc i64 @_T07closure1aSiSicSi1i_tFSiSicfU_(i64, i64)
 
 protocol Ordinable {
   func ord() -> Int
@@ -22,14 +22,14 @@ func b<T : Ordinable>(seq seq: T) -> (Int) -> Int {
 }
 
 // -- partial_apply stub
-// CHECK: define internal i64 @_T07closure1aSiSicSi1i_tFSiSicfU_TA(i64, %swift.refcounted*)
+// CHECK: define internal swiftcc i64 @_T07closure1aSiSicSi1i_tFSiSicfU_TA(i64, %swift.refcounted* swiftself)
 // CHECK: }
 
 // -- Closure entry point
-// CHECK: define linkonce_odr hidden i64 @_T07closure1bSiSicx3seq_tAA9OrdinableRzlFSiSicfU_(i64, %swift.refcounted*, %swift.type* %T, i8** %T.Ordinable) {{.*}} {
+// CHECK: define linkonce_odr hidden swiftcc i64 @_T07closure1bSiSicx3seq_tAA9OrdinableRzlFSiSicfU_(i64, %swift.refcounted*, %swift.type* %T, i8** %T.Ordinable) {{.*}} {
 
 // -- partial_apply stub
-// CHECK: define internal i64 @_T07closure1bSiSicx3seq_tAA9OrdinableRzlFSiSicfU_TA(i64, %swift.refcounted*) {{.*}} {
+// CHECK: define internal swiftcc i64 @_T07closure1bSiSicx3seq_tAA9OrdinableRzlFSiSicfU_TA(i64, %swift.refcounted* swiftself) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[CONTEXT:%.*]] = bitcast %swift.refcounted* %1 to <{ %swift.refcounted, [16 x i8], %swift.refcounted* }>*
 // CHECK:   [[BINDINGSADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [16 x i8], %swift.refcounted* }>, <{ %swift.refcounted, [16 x i8], %swift.refcounted* }>* [[CONTEXT]], i32 0, i32 1
@@ -42,12 +42,12 @@ func b<T : Ordinable>(seq seq: T) -> (Int) -> Int {
 // CHECK:   [[BOX:%.*]] = load %swift.refcounted*, %swift.refcounted** [[BOXADDR]], align 8
 // CHECK:   call void @swift_rt_swift_retain(%swift.refcounted* [[BOX]])
 // CHECK:   call void @swift_rt_swift_release(%swift.refcounted* %1)
-// CHECK:   [[RES:%.*]] = tail call i64 @_T07closure1bSiSicx3seq_tAA9OrdinableRzlFSiSicfU_(i64 %0, %swift.refcounted* [[BOX]], %swift.type* [[TYPE]], i8** [[WITNESS]])
+// CHECK:   [[RES:%.*]] = tail call swiftcc i64 @_T07closure1bSiSicx3seq_tAA9OrdinableRzlFSiSicfU_(i64 %0, %swift.refcounted* [[BOX]], %swift.type* [[TYPE]], i8** [[WITNESS]])
 // CHECK:   ret i64 [[RES]]
 // CHECK: }
 
 // -- <rdar://problem/14443343> Boxing of tuples with generic elements
-// CHECK: define hidden { i8*, %swift.refcounted* } @_T07closure14captures_tuplex_q_tycx_q_t1x_tr0_lF(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U)
+// CHECK: define hidden swiftcc { i8*, %swift.refcounted* } @_T07closure14captures_tuplex_q_tycx_q_t1x_tr0_lF(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U)
 func captures_tuple<T, U>(x x: (T, U)) -> () -> (T, U) {
   // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* %T, %swift.type* %U, i8* null, i8** null)
   // CHECK-NOT: @swift_getTupleTypeMetadata2

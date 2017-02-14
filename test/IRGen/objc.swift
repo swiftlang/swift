@@ -38,7 +38,7 @@ struct id {
 // Class and methods are [objc] by inheritance.
 class MyBlammo : Blammo {
   func foo() {}
-// CHECK:  define hidden void @_T04objc8MyBlammoC3fooyyF([[MYBLAMMO]]*) {{.*}} {
+// CHECK:  define hidden swiftcc void @_T04objc8MyBlammoC3fooyyF([[MYBLAMMO]]* swiftself) {{.*}} {
 // CHECK:    call {{.*}} @swift_rt_swift_release
 // CHECK:    ret void
 }
@@ -46,7 +46,7 @@ class MyBlammo : Blammo {
 // Class and methods are [objc] by inheritance.
 class Test2 : Gizmo {
   func foo() {}
-// CHECK:  define hidden void @_T04objc5Test2C3fooyyF([[TEST2]]*) {{.*}} {
+// CHECK:  define hidden swiftcc void @_T04objc5Test2C3fooyyF([[TEST2]]* swiftself) {{.*}} {
 // CHECK:    call {{.*}} @objc_release
 // CHECK:    ret void
 
@@ -71,7 +71,7 @@ class Octogenarian : Contrarian {
 @_silgen_name("unknown")
 func unknown(_ x: id) -> id
 
-// CHECK:    define hidden %objc_object* @_T04objc5test0{{[_0-9a-zA-Z]*}}F(%objc_object*)
+// CHECK:    define hidden swiftcc %objc_object* @_T04objc5test0{{[_0-9a-zA-Z]*}}F(%objc_object*)
 // CHECK-NOT:  call {{.*}} @swift_unknownRetain
 // CHECK:      call {{.*}} @swift_unknownRetain
 // CHECK-NOT:  call {{.*}} @swift_unknownRelease
@@ -86,7 +86,7 @@ func test0(_ arg: id) -> id {
 }
 
 func test1(_ cell: Blammo) {}
-// CHECK:  define hidden void @_T04objc5test1{{[_0-9a-zA-Z]*}}F([[BLAMMO]]*) {{.*}} {
+// CHECK:  define hidden swiftcc void @_T04objc5test1{{[_0-9a-zA-Z]*}}F([[BLAMMO]]*) {{.*}} {
 // CHECK:    call {{.*}} @swift_rt_swift_release
 // CHECK:    ret void
 
@@ -124,7 +124,7 @@ func test10(_ g: Gizmo, r: Rect) {
 // Force the emission of the Rect metadata.
 func test11_helper<T>(_ t: T) {}
 // NSRect's metadata needs to be uniqued at runtime using getForeignTypeMetadata.
-// CHECK-LABEL: define hidden void @_T04objc6test11ySC4RectVF
+// CHECK-LABEL: define hidden swiftcc void @_T04objc6test11ySC4RectVF
 // CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_T0SC4RectVN
 func test11(_ r: Rect) { test11_helper(r) }
 

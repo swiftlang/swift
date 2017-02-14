@@ -22,7 +22,7 @@ func call_me(_ code: @escaping () -> Void)
 }
 
 func main(_ x: Int64) -> Void
-// CHECK: define hidden void @_T09linetable4main{{[_0-9a-zA-Z]*}}F
+// CHECK: define hidden {{.*}} void @_T09linetable4main{{[_0-9a-zA-Z]*}}F
 {
     var my_class = MyClass(input: 10)
 // Linetable continuity. Don't go into the closure expression.

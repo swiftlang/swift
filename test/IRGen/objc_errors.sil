@@ -7,7 +7,7 @@
 import Swift
 import Foundation
 
-// CHECK-LABEL: define{{( protected)?}} %swift.error* @errortype_from_nserror(%CSo7NSError*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.error* @errortype_from_nserror(%CSo7NSError*)
 // CHECK:         %1 = bitcast %CSo7NSError* %0 to %swift.error*
 sil @errortype_from_nserror : $@convention(thin) (@owned NSError) -> @owned Error {
 entry(%0 : $NSError):

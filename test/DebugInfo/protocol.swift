@@ -19,7 +19,7 @@ class Point : PointUtils {
 
 }
 
-// CHECK: define hidden i64 @_T08protocol4mains5Int64VyF() {{.*}} {
+// CHECK: define hidden {{.*}}i64 @_T08protocol4mains5Int64VyF() {{.*}} {
 func main() -> Int64 {
     var pt = Point(_x: 2.5, _y: 4.25)
 // CHECK: [[LOC2D:%[a-zA-Z0-9]+]] = alloca %P8protocol10PointUtils_, align {{(4|8)}}

@@ -4116,11 +4116,13 @@ public:
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its getter selector.
-  ObjCSelector getObjCGetterSelector(LazyResolver *resolver = nullptr) const;
+  ObjCSelector getObjCGetterSelector(LazyResolver *resolver = nullptr,
+                                Identifier preferredName = Identifier()) const;
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its setter selector.
-  ObjCSelector getObjCSetterSelector(LazyResolver *resolver = nullptr) const;
+  ObjCSelector getObjCSetterSelector(LazyResolver *resolver = nullptr,
+                                Identifier preferredName = Identifier()) const;
 
   AbstractStorageDecl *getOverriddenDecl() const {
     return OverriddenDecl;
@@ -4844,7 +4846,8 @@ public:
   const CaptureInfo &getCaptureInfo() const { return Captures; }
 
   /// Retrieve the Objective-C selector that names this method.
-  ObjCSelector getObjCSelector(LazyResolver *resolver = nullptr) const;
+  ObjCSelector getObjCSelector(LazyResolver *resolver = nullptr,
+                               DeclName preferredName = DeclName()) const;
 
   /// Determine whether the given method would produce an Objective-C
   /// instance method.
