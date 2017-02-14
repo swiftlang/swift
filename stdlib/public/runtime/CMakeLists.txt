@@ -99,12 +99,12 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   add_custom_command_target(swift_static_binary_${sdk}_args
     COMMAND
       "${CMAKE_COMMAND}" -E copy
-      "${SWIFT_SOURCE_DIR}/utils/${lowercase}/static-executable-args.lnk"
+      "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk"
       "${SWIFTSTATICLIB_DIR}/${linkfile}"
     OUTPUT
       "${SWIFTSTATICLIB_DIR}/${linkfile}"
     DEPENDS
-      "${SWIFT_SOURCE_DIR}/utils/${lowercase}/static-executable-args.lnk")
+      "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk")
 
   list(APPEND static_binary_lnk_file_list ${swift_static_binary_${sdk}_args})
   swift_install_in_component(stdlib
