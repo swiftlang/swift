@@ -96,7 +96,7 @@
     {
       key.kind: source.lang.swift.decl.extension.class,
       key.name: "C2",
-      key.usr: "s:C11test_module2C2",
+      key.usr: "s:e:s:C11test_module2C2s:P11test_module5Prot3",
       key.related: [
         {
           key.kind: source.lang.swift.ref.protocol,
