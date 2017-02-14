@@ -39,7 +39,7 @@
 namespace swift {
 
 class GenericSignature;
-class CenericEnvironment;
+class GenericEnvironment;
 class SubstitutableType;
 
 template<class Type> class CanTypeWrapper;

@@ -385,7 +385,7 @@ func inoutAccessOfStaticProperty<T : Beverage>(_ t: T.Type) {
   increment(&t.abv)
 }
 
-// Test for materializeForSet vs overriden computed property of classes.
+// Test for materializeForSet vs overridden computed property of classes.
 class BaseForOverride {
   var valueStored: Int
   var valueComputed: Int { get { } set { } }
