@@ -26,11 +26,18 @@
 
 namespace swift {
 
-// For now, use malloc and free as our standard allocator for
-// metadata caches.  It might make sense in the future to take
-// advantage of the fact that we know that most allocations here
-// won't ever be deallocated.
-using MetadataAllocator = llvm::MallocAllocator;
+class MetadataAllocator : public llvm::AllocatorBase<MetadataAllocator> {
+public:
+  void Reset() {}
+
+  LLVM_ATTRIBUTE_RETURNS_NONNULL void *Allocate(size_t size, size_t alignment);
+  using AllocatorBase<MetadataAllocator>::Allocate;
+
+  void Deallocate(const void *Ptr, size_t size);
+  using AllocatorBase<MetadataAllocator>::Deallocate;
+
+  void PrintStats() const {}
+};
 
 /// A typedef for simple global caches.
 template <class EntryTy>

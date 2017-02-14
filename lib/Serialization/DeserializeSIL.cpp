@@ -1993,7 +1993,7 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
 /// This function is modeled after readSILFunction. But it does not
 /// create a SILFunction object.
 bool SILDeserializer::hasSILFunction(StringRef Name,
-                                     SILLinkage Linkage) {
+                                     Optional<SILLinkage> Linkage) {
   if (!FuncTable)
     return false;
   auto iter = FuncTable->find(Name);
@@ -2006,8 +2006,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   auto &cacheEntry = Funcs[FID-1];
   if (cacheEntry.isFullyDeserialized() ||
       (cacheEntry.isDeserialized()))
-    return cacheEntry.get()->getLinkage() == Linkage ||
-           Linkage == SILLinkage::Private;
+    return !Linkage || cacheEntry.get()->getLinkage() == *Linkage;
 
   BCOffsetRAII restoreOffset(SILCursor);
   SILCursor.JumpToBit(cacheEntry.getOffset());
@@ -2046,7 +2045,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   }
 
   // Bail if it is not a required linkage.
-  if (linkage.getValue() != Linkage && Linkage != SILLinkage::Private)
+  if (Linkage && linkage.getValue() != *Linkage)
     return false;
 
   DEBUG(llvm::dbgs() << "Found SIL Function: " << Name << "\n");
