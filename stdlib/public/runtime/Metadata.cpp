@@ -260,8 +260,8 @@ namespace {
       Data.Class = theClass;
     }
 
-    long getKeyIntValueForDump() {
-      return reinterpret_cast<long>(Data.Class);
+    intptr_t getKeyIntValueForDump() {
+      return reinterpret_cast<intptr_t>(Data.Class);
     }
 
     int compareWithKey(const ClassMetadata *theClass) const {
@@ -331,7 +331,7 @@ public:
 
   FunctionCacheEntry(Key key);
 
-  long getKeyIntValueForDump() {
+  intptr_t getKeyIntValueForDump() {
     return 0; // No single meaningful value here.
   }
 
@@ -486,7 +486,7 @@ public:
     return Data.NumElements;
   }
 
-  long getKeyIntValueForDump() {
+  intptr_t getKeyIntValueForDump() {
     return 0; // No single meaningful value
   }
 
@@ -1794,8 +1794,8 @@ namespace {
       Data.InstanceType = instanceType;
     }
 
-    long getKeyIntValueForDump() {
-      return reinterpret_cast<long>(Data.InstanceType);
+    intptr_t getKeyIntValueForDump() {
+      return reinterpret_cast<intptr_t>(Data.InstanceType);
     }
 
     int compareWithKey(const Metadata *instanceType) const {
@@ -1839,8 +1839,8 @@ public:
 
   ExistentialMetatypeValueWitnessTableCacheEntry(unsigned numWitnessTables);
 
-  long getKeyIntValueForDump() {
-    return static_cast<long>(getNumWitnessTables());
+  intptr_t getKeyIntValueForDump() {
+    return static_cast<intptr_t>(getNumWitnessTables());
   }
 
   int compareWithKey(unsigned key) const {
@@ -1861,8 +1861,8 @@ public:
 
   ExistentialMetatypeCacheEntry(const Metadata *instanceMetadata);
 
-  long getKeyIntValueForDump() {
-    return reinterpret_cast<long>(Data.InstanceType);
+  intptr_t getKeyIntValueForDump() {
+    return reinterpret_cast<intptr_t>(Data.InstanceType);
   }
 
   int compareWithKey(const Metadata *instanceType) const {
@@ -1980,7 +1980,7 @@ public:
 
   ExistentialCacheEntry(Key key);
 
-  long getKeyIntValueForDump() {
+  intptr_t getKeyIntValueForDump() {
     return 0;
   }
 
@@ -2016,7 +2016,7 @@ public:
               / sizeof(const WitnessTable *);
   }
 
-  long getKeyIntValueForDump() {
+  intptr_t getKeyIntValueForDump() {
     return getNumWitnessTables();
   }
 
@@ -2043,7 +2043,7 @@ public:
               / sizeof(const WitnessTable *);
   }
 
-  long getKeyIntValueForDump() {
+  intptr_t getKeyIntValueForDump() {
     return getNumWitnessTables();
   }
 
