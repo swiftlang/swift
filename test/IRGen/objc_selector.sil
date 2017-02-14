@@ -9,7 +9,7 @@ import Builtin
 // CHECK: @"\01L_selector_data(help:me:)" = private global [9 x i8] c"help:me:\00", section "__TEXT,__objc_methname,cstring_literals"
 // CHECK: @"\01L_selector(help:me:)" = private externally_initialized global i8* getelementptr inbounds ([9 x i8], [9 x i8]* @"\01L_selector_data(help:me:)", {{i(32|64)}} 0, {{i(32|64)}} 0), section "__DATA,__objc_selrefs,literal_pointers,no_dead_strip"
 
-// CHECK-LABEL: define{{( protected)?}} i8* @objc_selector_literal() #0 {
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @objc_selector_literal() #0 {
 sil @objc_selector_literal : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   // CHECK: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(help:me:)"

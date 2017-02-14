@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime --check-prefix=CHECK-%target-cpu
 // REQUIRES: executable_test
 
 sil_stage canonical
@@ -14,9 +14,14 @@ entry:
   unreachable
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @does_throw(%swift.refcounted*, %swift.error**) {{.*}} {
+// CHECK-LABEL-i386:   define{{( protected)?}} swiftcc void @does_throw(%swift.refcounted* swiftself, %swift.error**) {{.*}} {
+// CHECK-LABEL-x86_64: define{{( protected)?}} swiftcc void @does_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
+// CHECK-LABEL-armv7:  define{{( protected)?}} swiftcc void @does_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
+// CHECK-LABEL-armv7s: define{{( protected)?}} swiftcc void @does_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
+// CHECK-LABEL-armv7k: define{{( protected)?}} swiftcc void @does_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
+// CHECK-LABEL-arm64:  define{{( protected)?}} swiftcc void @does_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
 sil @does_throw : $@convention(thin) () -> @error Error {
-  // CHECK: [[T0:%.*]] = call %swift.error* @create_error()
+  // CHECK: [[T0:%.*]] = call swiftcc %swift.error* @create_error()
   %0 = function_ref @create_error : $@convention(thin) () -> @owned Error
   %1 = apply %0() : $@convention(thin) () -> @owned Error
 
@@ -27,11 +32,16 @@ sil @does_throw : $@convention(thin) () -> @error Error {
   throw %1 : $Error
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @doesnt_throw(%swift.refcounted*, %swift.error**) {{.*}} {
+// CHECK-LABEL-i386:   define{{( protected)?}} swiftcc void @doesnt_throw(%swift.refcounted* swiftself, %swift.error**) {{.*}} {
+// CHECK-LABEL-x86_64: define{{( protected)?}} swiftcc void @doesnt_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
+// CHECK-LABEL-armv7:  define{{( protected)?}} swiftcc void @doesnt_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
+// CHECK-LABEL-armv7s: define{{( protected)?}} swiftcc void @doesnt_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
+// CHECK-LABEL-armv7k: define{{( protected)?}} swiftcc void @doesnt_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
+// CHECK-LABEL-arm64:  define{{( protected)?}} swiftcc void @doesnt_throw(%swift.refcounted* swiftself, %swift.error** swifterror) {{.*}} {
 sil @doesnt_throw : $@convention(thin) () -> @error Error {
   //   We don't have to do anything here because the caller always
   //   zeroes the error slot before a call.
-  // CHECK-NEXT: entry:
+  // CHECK: entry:
   // CHECK-NEXT:   ret void
   %0 = tuple ()
   return %0 : $()
@@ -39,15 +49,20 @@ sil @doesnt_throw : $@convention(thin) () -> @error Error {
 
 sil @try_apply_helper : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error Error)
 
-// CHECK-objc-LABEL: define{{( protected)?}} void @try_apply(%objc_object*)
-// CHECK-native-LABEL: define{{( protected)?}} void @try_apply(%swift.refcounted*)
+// CHECK-objc-LABEL: define{{( protected)?}} swiftcc void @try_apply(%objc_object*)
+// CHECK-native-LABEL: define{{( protected)?}} swiftcc void @try_apply(%swift.refcounted*)
 sil @try_apply : $@convention(thin) (@owned AnyObject) -> () {
 entry(%0 : $AnyObject):
-  // CHECK:      [[ERRORSLOT:%.*]] = alloca %swift.error*, align
+  // CHECK-i386:        [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]]%swift.error*, align
+  // CHECK-x86_64:      [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
+  // CHECK-armv7:       [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
+  // CHECK-armv7s:      [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
+  // CHECK-armv7k:      [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
+  // CHECK-arm64:       [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
   // CHECK-NEXT: store %swift.error* null, %swift.error** [[ERRORSLOT]], align
 
-  // CHECK-objc-NEXT: [[RESULT:%.*]] = call %objc_object* @try_apply_helper(%objc_object* %0, %swift.refcounted* undef, %swift.error** nocapture [[ERRORSLOT]])
-  // CHECK-native-NEXT: [[RESULT:%.*]] = call %swift.refcounted* @try_apply_helper(%swift.refcounted* %0, %swift.refcounted* undef, %swift.error** nocapture [[ERRORSLOT]])
+  // CHECK-objc-NEXT: [[RESULT:%.*]] = call swiftcc %objc_object* @try_apply_helper(%objc_object* %0, %swift.refcounted* swiftself undef, %swift.error** nocapture [[SWIFTERROR]]{{( )?}}[[ERRORSLOT]])
+  // CHECK-native-NEXT: [[RESULT:%.*]] = call swiftcc %swift.refcounted* @try_apply_helper(%swift.refcounted* %0, %swift.refcounted* swiftself undef, %swift.error** nocapture [[SWIFTERROR]]{{( )?}}[[ERRORSLOT]])
   // CHECK-NEXT: [[ERR:%.*]] = load %swift.error*, %swift.error** [[ERRORSLOT]], align
   // CHECK-NEXT: [[T0:%.*]] = icmp ne %swift.error* [[ERR]], null
   // CHECK-NEXT: br i1 [[T0]],
@@ -93,11 +108,11 @@ bb0(%0 : $Error):
 
 // rdar://21084084 - Partial application of throwing functions.
 
-// CHECK-LABEL: define{{( protected)?}} { i8*, %swift.refcounted* } @partial_apply_single(%C6errors1A*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @partial_apply_single(%C6errors1A*)
 // CHECK:       insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*, %swift.error**)* @_TPA_partial_apply_single_helper to i8*), %swift.refcounted* undef },
-// CHECK-LABEL: define internal void @_TPA_partial_apply_single_helper(%swift.refcounted*, %swift.error**)
+// CHECK: define internal swiftcc void @_TPA_partial_apply_single_helper(%swift.refcounted* swiftself, %swift.error**{{( )?}}[[SWIFTERROR]])
 // CHECK:       [[T0:%.*]] = bitcast %swift.refcounted* {{%.*}} to %C6errors1A*
-// CHECK-NEXT:  tail call void @partial_apply_single_helper(%C6errors1A* [[T0]], %swift.refcounted* undef, %swift.error** {{%.*}})
+// CHECK-NEXT:  tail call swiftcc void @partial_apply_single_helper(%C6errors1A* [[T0]], %swift.refcounted* swiftself undef, %swift.error**{{( )?}}[[SWIFTERROR]]{{( )?}}{{%.*}})
 // CHECK-NEXT:  ret void
 sil @partial_apply_single : $@convention(thin) (@owned A) -> @callee_owned () -> @error Error {
 entry(%0 : $A):

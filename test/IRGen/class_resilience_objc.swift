@@ -13,7 +13,7 @@ public class FixedLayoutObjCSubclass : NSObject {
   public final var field: Int32 = 0
 };
 
-// CHECK-LABEL: define hidden void @_T021class_resilience_objc29testConstantDirectFieldAccessyAA23FixedLayoutObjCSubclassCF(%C21class_resilience_objc23FixedLayoutObjCSubclass*)
+// CHECK-LABEL: define hidden swiftcc void @_T021class_resilience_objc29testConstantDirectFieldAccessyAA23FixedLayoutObjCSubclassCF(%C21class_resilience_objc23FixedLayoutObjCSubclass*)
 // CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_T021class_resilience_objc23FixedLayoutObjCSubclassC5fields5Int32VvWvd
 // CHECK-NEXT: [[OBJECT:%.*]] = bitcast %C21class_resilience_objc23FixedLayoutObjCSubclass* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[OFFSET]]
@@ -31,7 +31,7 @@ public class NonFixedLayoutObjCSubclass : NSCoder {
   public final var field: Int32 = 0
 }
 
-// CHECK-LABEL: define hidden void @_T021class_resilience_objc32testNonConstantDirectFieldAccessyAA0E23FixedLayoutObjCSubclassCF(%C21class_resilience_objc26NonFixedLayoutObjCSubclass*)
+// CHECK-LABEL: define hidden swiftcc void @_T021class_resilience_objc32testNonConstantDirectFieldAccessyAA0E23FixedLayoutObjCSubclassCF(%C21class_resilience_objc26NonFixedLayoutObjCSubclass*)
 // CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_T021class_resilience_objc26NonFixedLayoutObjCSubclassC5fields5Int32VvWvd
 // CHECK-NEXT: [[OBJECT:%.*]] = bitcast %C21class_resilience_objc26NonFixedLayoutObjCSubclass* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[OFFSET]]
@@ -52,7 +52,7 @@ public class GenericObjCSubclass<T> : NSCoder {
   }
 }
 
-// CHECK-LABEL: define hidden void @_T021class_resilience_objc31testConstantIndirectFieldAccessyAA19GenericObjCSubclassCyxGlF(%C21class_resilience_objc19GenericObjCSubclass*)
+// CHECK-LABEL: define hidden swiftcc void @_T021class_resilience_objc31testConstantIndirectFieldAccessyAA19GenericObjCSubclassCyxGlF(%C21class_resilience_objc19GenericObjCSubclass*)
 
 // FIXME: we could eliminate the unnecessary isa load by lazily emitting
 // metadata sources in EmitPolymorphicParameters

@@ -19,7 +19,7 @@ bb0(%0 : $*Any, %1 : $T):
   return %3 : $()
 }
 
-// CHECK-DAG:   define{{( protected)?}} void @init_opaque_existential([[ANY:%Any]]* noalias nocapture sret, [[GIZMO:%.*]]*, [[TYPE:%.*]]* %T) {{.*}} {
+// CHECK-DAG:   define{{( protected)?}} swiftcc void @init_opaque_existential([[ANY:%Any]]* noalias nocapture sret, [[GIZMO:%.*]]*, [[TYPE:%.*]]* %T) {{.*}} {
 // CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 1
 // CHECK-NEXT:    store [[TYPE]]* %T, [[TYPE]]** [[T0]], align 8
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 0
@@ -34,7 +34,7 @@ bb0(%0 : $*Any, %1 : $*Any):
   return %3 : $()
 }
 
-// CHECK-DAG:   define{{( protected)?}} void @take_opaque_existential([[ANY:%Any]]* noalias nocapture sret, %Any* noalias nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-DAG:   define{{( protected)?}} swiftcc void @take_opaque_existential([[ANY:%Any]]* noalias nocapture sret, %Any* noalias nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[SRC:%1]], i32 0, i32 1
 // CHECK-NEXT:    [[TYPE:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[DEST:%0]], i32 0, i32 1
@@ -54,7 +54,7 @@ bb0(%0 : $*Any, %1 : $*Any):
 @objc protocol OP {}
 @objc protocol OP2: OP {}
 
-// CHECK-DAG: define{{( protected)?}} %objc_object* @init_existential_objc_to_objc(%objc_object*) {{.*}} {
+// CHECK-DAG: define{{( protected)?}} swiftcc %objc_object* @init_existential_objc_to_objc(%objc_object*) {{.*}} {
 // CHECK:       ret %objc_object* %0
 sil @init_existential_objc_to_objc : $@convention(thin) (@owned OP2) -> @owned OP {
 entry(%o : $OP2):
@@ -64,7 +64,7 @@ entry(%o : $OP2):
 
 protocol CP: class {}
 
-// CHECK-DAG: define{{( protected)?}} { %objc_object*, i8** } @class_existential_unowned(%objc_object*, i8**) {{.*}} {
+// CHECK-DAG: define{{( protected)?}} swiftcc { %objc_object*, i8** } @class_existential_unowned(%objc_object*, i8**) {{.*}} {
 sil @class_existential_unowned : $@convention(thin) (@owned CP) -> @owned CP {
 entry(%s : $CP):
   %u1 = alloc_stack $@sil_unowned CP
@@ -97,7 +97,7 @@ entry(%s : $CP):
   return %z : $CP
 }
 
-// CHECK-DAG: define{{( protected)?}} void @class_existential_weak({ %swift.weak, i8** }* noalias nocapture sret, i64, i64)
+// CHECK-DAG: define{{( protected)?}} swiftcc void @class_existential_weak({ %swift.weak, i8** }* noalias nocapture sret, i64, i64)
 sil @class_existential_weak : $@convention(thin) (@owned CP?) -> @out @sil_weak CP? {
 entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[V:%.*]] = alloca { %swift.weak, i8** }

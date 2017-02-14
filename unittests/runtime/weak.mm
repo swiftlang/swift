@@ -37,7 +37,7 @@ static HeapObject *make_objc_object() {
 
 // Make a Native Swift object by calling a Swift function.
 // make_swift_object is defined in TestHelpers.swift as part of StdlibUnittest.
-extern "C" HeapObject *make_swift_object();
+SWIFT_CC(swift) extern "C" HeapObject *make_swift_object();
 
 static unsigned getUnownedRetainCount(HeapObject *object) {
   return swift_unownedRetainCount(object) - 1;

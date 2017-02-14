@@ -196,7 +196,10 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
     llvm::Function::Create(IGM.DeallocatingDtorTy,
                            llvm::Function::PrivateLinkage,
                            "objectdestroy", &IGM.Module);
-  fn->setAttributes(IGM.constructInitialAttributes());
+  auto attrs = IGM.constructInitialAttributes();
+  IGM.addSwiftSelfAttributes(attrs, 0);
+  fn->setAttributes(attrs);
+  fn->setCallingConv(IGM.SwiftCC);
 
   IRGenFunction IGF(IGM, fn);
   if (IGM.DebugInfo)

@@ -16,7 +16,7 @@ entry(%b : $@convention(block) Foo -> Foo, %x : $Foo):
   %y = apply %b(%x) : $@convention(block) Foo -> Foo
   return %y : $Foo
 }
-// CHECK-LABEL: define{{( protected)?}} %C10objc_block3Foo* @call_block(%objc_block*, %C10objc_block3Foo*) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc %C10objc_block3Foo* @call_block(%objc_block*, %C10objc_block3Foo*) {{.*}} {
 // CHECK:       entry:
 // CHECK:         %2 = getelementptr inbounds %objc_block, %objc_block* %0, i32 0, i32 3
 // CHECK:         %3 = load i8*, i8** %2
@@ -36,7 +36,7 @@ entry(%b : $*@convention(block) () -> ()):
   return %z : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @generic_with_block(%objc_block** noalias nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @generic_with_block(%objc_block** noalias nocapture dereferenceable({{.*}}))
 // --                                                                               0x100_0001 = block convention, 1 arg
 // CHECK:         call %swift.type* @swift_getFunctionTypeMetadata1([[WORD:i(64|32)]] 16777217
 

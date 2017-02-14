@@ -3,7 +3,7 @@
 sil_stage canonical
 
 protocol P { func foo() }
-// CHECK-LABEL: define{{( protected)?}} void @phi_witness_method(%swift.type* %T, i8** %T.P) #0 {
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @phi_witness_method(%swift.type* %T, i8** %T.P) #0 {
 sil @phi_witness_method : $@convention(thin) <T: P> () -> () {
 entry:
   %1 = witness_method $T, #P.foo!1 : $@convention(witness_method) <T: P> (@in P) -> ()

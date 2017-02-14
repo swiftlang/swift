@@ -22,10 +22,10 @@ bb0(%0 : $*S):
   return %2 : $@callee_owned (@in O) -> ()
 }
 
-// CHECK-LABEL: define internal %GC23partial_apply_forwarder1DCS_1C_* @_TPA_unspecialized_uncurried(%swift.refcounted*
+// CHECK-LABEL: define internal swiftcc %GC23partial_apply_forwarder1DCS_1C_* @_TPA_unspecialized_uncurried(%swift.refcounted*
 // CHECK: [[TYPE:%.*]] = call %swift.type* @_TMaC23partial_apply_forwarder1C()
 // CHECK: [[CAST:%.*]] = bitcast %swift.refcounted* %0 to %C23partial_apply_forwarder1E*
-// CHECK: [[CALL:%.*]] = call %C23partial_apply_forwarder1D* @unspecialized_uncurried(%swift.type* [[TYPE]], i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @_TWPC23partial_apply_forwarder1CS_1PS_, i32 0, i32 0), %C23partial_apply_forwarder1E* [[CAST]])
+// CHECK: [[CALL:%.*]] = call swiftcc %C23partial_apply_forwarder1D* @unspecialized_uncurried(%swift.type* [[TYPE]], i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @_TWPC23partial_apply_forwarder1CS_1PS_, i32 0, i32 0), %C23partial_apply_forwarder1E* swiftself [[CAST]])
 
 sil hidden @specialized_curried : $@convention(thin) (@owned E) -> @owned @callee_owned () -> @owned D<C> {
 bb0(%0 : $E):
@@ -37,12 +37,12 @@ bb0(%0 : $E):
 sil hidden_external @unspecialized_uncurried : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed E) -> @owned D<τ_0_0>
 
 
-// CHECK-LABEL: define internal void @_TPA_takingP(%swift.refcounted*
+// CHECK-LABEL: define internal swiftcc void @_TPA_takingP(%swift.refcounted*
 // CHECK: [[CONTEXT:%.*]] = alloca %swift.refcounted*
 // CHECK: [[TYPE:%.*]]    = call %swift.type* @_TMaC23partial_apply_forwarder1C
 // CHECK: store %swift.refcounted* %0, %swift.refcounted** [[CONTEXT]]
 // CHECK: [[CAST:%.*]] = bitcast %swift.refcounted** [[CONTEXT]] to %swift.opaque*
-// CHECK:  call void @takingP(%swift.type* [[TYPE]], i8**{{.*}}_TWPC23partial_apply_forwarder1CS_1PS_{{.*}}, %swift.opaque* {{.*}} [[CAST]]
+// CHECK:  call swiftcc void @takingP(%swift.type* [[TYPE]], i8**{{.*}}_TWPC23partial_apply_forwarder1CS_1PS_{{.*}}, %swift.opaque* {{.*}} swiftself [[CAST]]
 // CHECK:  ret
 sil hidden_external @takingP : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
 

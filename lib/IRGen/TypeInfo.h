@@ -44,6 +44,7 @@ namespace irgen {
   class IRGenModule;
   class Explosion;
   class ExplosionSchema;
+  class NativeConventionSchema;
   enum OnHeap_t : unsigned char;
   class OwnedAddress;
   class RValue;
@@ -89,7 +90,8 @@ protected:
            IsBitwiseTakable_t bitwiseTakable,
            IsFixedSize_t alwaysFixedSize,
            SpecialTypeInfoKind stik)
-    : NextConverted(0), StorageType(Type), StorageAlignment(A),
+    : NextConverted(0), StorageType(Type), nativeReturnSchema(nullptr),
+      nativeParameterSchema(nullptr), StorageAlignment(A),
       POD(pod), BitwiseTakable(bitwiseTakable),
       AlwaysFixedSize(alwaysFixedSize), STIK(stik),
       SubclassKind(InvalidSubclassKind) {
@@ -102,7 +104,7 @@ protected:
   }
 
 public:
-  virtual ~TypeInfo() = default;
+  virtual ~TypeInfo();
 
   /// Unsafely cast this to the given subtype.
   template <class T> const T &as() const {
@@ -114,6 +116,9 @@ private:
   /// The LLVM representation of a stored value of this type.  For
   /// non-fixed types, this is really useful only for forming pointers to it.
   llvm::Type *StorageType;
+
+  mutable NativeConventionSchema *nativeReturnSchema;
+  mutable NativeConventionSchema *nativeParameterSchema;
 
   /// The storage alignment of this type in bytes.  This is never zero
   /// for a completely-converted type.
@@ -483,6 +488,12 @@ public:
   virtual void initializeArrayWithTakeBackToFront(IRGenFunction &IGF,
                                        Address dest, Address src,
                                        llvm::Value *count, SILType T) const;
+
+  /// Get the native (abi) convention for a return value of this type.
+  const NativeConventionSchema &nativeReturnValueSchema(IRGenModule &IGM) const;
+
+  /// Get the native (abi) convention for a parameter value of this type.
+  const NativeConventionSchema &nativeParameterValueSchema(IRGenModule &IGM) const;
 };
 
 } // end namespace irgen

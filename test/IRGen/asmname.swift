@@ -6,4 +6,4 @@
 
 atan2test(0.0, 0.0)
 
-// CHECK: call double @atan2(double {{.*}}, double {{.*}})
+// CHECK: call swiftcc double @atan2(double {{.*}}, double {{.*}})

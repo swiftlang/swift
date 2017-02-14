@@ -46,13 +46,13 @@ entry(%x : $float3):
   return %x : $float3
 }
 
-// x86_64-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
-// i386-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
-// arm64-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
-// armv6-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
-// armv7-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
-// armv7s-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
-// armv7k-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
+// x86_64-LABEL: define{{( protected)?}} swiftcc { i64, i64 } @simd_native_args(i64, i64)
+// i386-LABEL: define{{( protected)?}} swiftcc void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
+// arm64-LABEL: define{{( protected)?}} swiftcc { i64, i64 } @simd_native_args(i64, i64)
+// armv6-LABEL: define{{( protected)?}} swiftcc void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
+// armv7-LABEL: define{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float, float, float, float)
+// armv7s-LABEL: define{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float, float, float, float)
+// armv7k-LABEL: define{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float, float, float, float)
 // powerpc64-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
 // powerpc64le-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
 // s390x-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
@@ -63,16 +63,16 @@ entry(%x : $float4):
   return %y : $float4
 }
 
-// x86_64-LABEL: define{{( protected)?}} { float, float, float } @simd_native_args_float3(float, float, float)
-// i386-LABEL: define{{( protected)?}} { float, float, float } @simd_native_args_float3(float, float, float)
-// arm64-LABEL: define{{( protected)?}} { float, float, float } @simd_native_args_float3(float, float, float)
-// armv6-LABEL: define{{( protected)?}} { float, float, float } @simd_native_args_float3(float, float, float)
-// armv7-LABEL: define{{( protected)?}} { float, float, float } @simd_native_args_float3(float, float, float)
-// armv7s-LABEL: define{{( protected)?}} { float, float, float } @simd_native_args_float3(float, float, float)
-// armv7k-LABEL: define{{( protected)?}} { float, float, float } @simd_native_args_float3(float, float, float)
-// powerpc64-LABEL: define{{( protected)?}} { float, float, float } @simd_native_args_float3(float, float, float)
-// powerpc64le-LABEL: define{{( protected)?}} { float, float, float } @simd_native_args_float3(float, float, float)
-// s390x-LABEL: define{{( protected)?}} { float, float, float } @simd_native_args_float3(float, float, float)
+// x86_64-LABEL: define{{( protected)?}} swiftcc { i64, float }  @simd_native_args_float3(i64, float)
+// i386-LABEL: define{{( protected)?}} swiftcc { float, float, float } @simd_native_args_float3(float, float, float)
+// arm64-LABEL: define{{( protected)?}} swiftcc { i64, float } @simd_native_args_float3(i64, float)
+// armv6-LABEL: define{{( protected)?}} swiftcc { float, float, float } @simd_native_args_float3(float, float, float)
+// armv7-LABEL: define{{( protected)?}} swiftcc { float, float, float } @simd_native_args_float3(float, float, float)
+// armv7s-LABEL: define{{( protected)?}} swiftcc { float, float, float } @simd_native_args_float3(float, float, float)
+// armv7k-LABEL: define{{( protected)?}} swiftcc { float, float, float } @simd_native_args_float3(float, float, float)
+// powerpc64-LABEL: define{{( protected)?}} swiftcc { float, float, float } @simd_native_args_float3(float, float, float)
+// powerpc64le-LABEL: define{{( protected)?}} swiftcc { float, float, float } @simd_native_args_float3(float, float, float)
+// s390x-LABEL: define{{( protected)?}} swiftcc { float, float, float } @simd_native_args_float3(float, float, float)
 sil @simd_native_args_float3 : $@convention(thin) (float3) -> float3 {
 entry(%x : $float3):
   %f = function_ref @simd_c_args_float3 : $@convention(c) (float3) -> float3

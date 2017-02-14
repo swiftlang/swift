@@ -199,10 +199,11 @@ public:
 
   void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                         Size offset) const override {
-    LoadableTypeInfo::addScalarToAggLowering(IGM, lowering,
-                                             asDerived().getScalarType(),
-                                             offset,
-                                           asDerived().Derived::getFixedSize());
+    // Can't use getFixedSize because it returns the alloc size not the store
+    // size.
+    LoadableTypeInfo::addScalarToAggLowering(
+        IGM, lowering, asDerived().getScalarType(), offset,
+        Size(IGM.DataLayout.getTypeStoreSize(asDerived().getScalarType())));
   }
 };
 

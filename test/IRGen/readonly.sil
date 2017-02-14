@@ -15,7 +15,7 @@ sil @XXX_ctor : $@convention(method) (@owned XXX) -> @owned XXX
 // No @owned or @out parameters -- function is read only at LLVM level
 
 // CHECK: ; Function Attrs: readonly
-// CHECK-NEXT: define{{( protected)?}} void @function_foo(
+// CHECK-NEXT: define{{( protected)?}} swiftcc void @function_foo(
 sil [readonly] @function_foo : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = tuple ()
@@ -26,7 +26,7 @@ bb0(%0 : $Int):
 // -- function is not read only at LLVM level
 
 // CHECK-NOT: ; Function Attrs: readonly
-// CHECK: define{{( protected)?}} void @function_bar(
+// CHECK: define{{( protected)?}} swiftcc void @function_bar(
 sil [readonly] @function_bar : $@convention(thin) (@owned XXX) -> () {
 bb0(%0 : $XXX):
   strong_release %0 : $XXX
@@ -37,7 +37,7 @@ bb0(%0 : $XXX):
 // There's an @out parameter -- function is not read only at LLVM level
 
 // CHECK-NOT: ; Function Attrs: readonly
-// CHECK: define{{( protected)?}} void @function_baz(
+// CHECK: define{{( protected)?}} swiftcc void @function_baz(
 sil [readonly] @function_baz : $@convention(thin) () -> (@out Any) {
 bb0(%0 : $*Any):
   init_existential_addr %0 : $*Any, $()

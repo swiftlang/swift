@@ -9,7 +9,7 @@ import Foundation
 // cleanups/no cleanups, single / multiple return locations.
 
 // RUN: %FileCheck %s --check-prefix=CHECK_NONE < %t.ll
-// CHECK_NONE: define{{( protected)?}} void {{.*}}none
+// CHECK_NONE: define{{( protected)?}} {{.*}}void {{.*}}none
 public func none(_ a: inout Int64) {
   // CHECK_NONE: call void @llvm.dbg{{.*}}, !dbg
   // CHECK_NONE: !dbg ![[NONE_INIT:.*]]
