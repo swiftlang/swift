@@ -238,7 +238,11 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
   if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
     assert(fn->getLinkage() == linkage ||
-           stripExternalFromLinkage(fn->getLinkage()) == linkage);
+           stripExternalFromLinkage(fn->getLinkage()) == linkage ||
+           fn->getLinkage() == stripExternalFromLinkage(linkage));
+    if (isAvailableExternally(fn->getLinkage()) &&
+        !isAvailableExternally(linkage))
+      fn->setLinkage(linkage);
     return fn;
   }
 
