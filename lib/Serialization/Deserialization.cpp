@@ -4253,7 +4253,7 @@ Type ModuleFile::getType(TypeID TID) {
   }
 
 #ifndef NDEBUG
-  PrettyStackTraceType(ctx, "deserializing", typeOrOffset.get());
+  PrettyStackTraceType trace(ctx, "deserializing", typeOrOffset.get());
   assert(!typeOrOffset.get()->hasError());
 #endif
 
