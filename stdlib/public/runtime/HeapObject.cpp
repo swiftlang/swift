@@ -132,8 +132,8 @@ public:
                                   type}} {
   }
 
-  long getKeyIntValueForDump() {
-    return reinterpret_cast<long>(Data.BoxedType);
+  intptr_t getKeyIntValueForDump() {
+    return reinterpret_cast<intptr_t>(Data.BoxedType);
   }
 
   int compareWithKey(const Metadata *type) const {
