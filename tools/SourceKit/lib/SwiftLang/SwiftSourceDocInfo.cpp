@@ -896,28 +896,28 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
     NameTranslatingInfo Result;
     auto &Ctx = VD->getDeclContext()->getASTContext();
     auto ResultPair = getObjCNameForSwiftDecl(VD, getSwiftDeclName(Ctx, Info));
-    if (DeclName Name = ResultPair.first) {
+    Identifier Name = ResultPair.first;
+    if (!Name.empty()) {
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::ObjC);
-      Result.BaseName = Name.getBaseName().str();
-      Receiver(Result);
-      return false;
+      Result.BaseName = Name.str();
     } else if (ObjCSelector Selector = ResultPair.second) {
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::ObjC);
       SmallString<64> Buffer;
       StringRef Total = Selector.getString(Buffer);
       SmallVector<StringRef, 4> Pieces;
-      Total.split(Pieces, ":", -1, false);
+      Total.split(Pieces, ":");
       if (Selector.getNumArgs()) {
+        assert(Pieces.back().empty());
+        Pieces.pop_back();
         std::transform(Pieces.begin(), Pieces.end(), Pieces.begin(),
           [](StringRef P) { return StringRef(P.data(), P.size() + 1); });
       }
       Result.ArgNames = llvm::makeArrayRef(Pieces);
-      Receiver(Result);
-      return false;
     } else {
       Receiver(Result);
       return true;
     }
+    Receiver(Result);
     return false;
   }
   case NameKind::ObjC: {
