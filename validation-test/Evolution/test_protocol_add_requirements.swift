@@ -1,4 +1,4 @@
-// RUN: %target-resilience-test --no-backward-deployment
+// RUN: %target-resilience-test
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -23,22 +23,11 @@ struct AddMethods : AddMethodsProtocol {
   func importantOperation() -> Halogen {
     return Halogen(x: 0)
   }
-
-#if AFTER
-  func unimportantOperation() -> Halogen {
-    return Halogen(x: 10)
-  }
-#endif
 }
 
 ProtocolAddRequirementsTest.test("AddMethodRequirements") {
   let result = doSomething(AddMethods())
-
-#if BEFORE
   let expected = [0, 1, 2].map(Halogen.init)
-#else
-  let expected = [0, 10, 11].map(Halogen.init)
-#endif
 
   expectEqual(result, expected)
 }
