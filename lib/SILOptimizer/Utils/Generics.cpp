@@ -22,6 +22,18 @@
 
 using namespace swift;
 
+/// Set to true to enable the support for partial specialization.
+llvm::cl::opt<bool> EnablePartialSpecialization(
+    "sil-partial-specialization", llvm::cl::init(false),
+    llvm::cl::desc("Enable partial specialization of generics"));
+
+/// If set, then generic specialization tries to specialize using
+/// all substitutions, even if they the replacement types are generic.
+llvm::cl::opt<bool> SpecializeGenericSubstitutions(
+    "sil-partial-specialization-with-generic-substitutions",
+    llvm::cl::init(false),
+    llvm::cl::desc("Enable partial specialization with generic substitutions"));
+
 // Max depth of a bound generic which can be processed by the generic
 // specializer.
 // E.g. the depth of Array<Array<Array<T>>> is 3.
@@ -49,40 +61,54 @@ static unsigned getBoundGenericDepth(Type t) {
 // ReabstractionInfo
 // =============================================================================
 
-// Initialize SpecializedType iff the specialization is allowed.
-ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *OrigF,
-                                     SubstitutionList ParamSubs) {
-  if (!OrigF->shouldOptimize() ||
-      OrigF->hasSemanticsAttr("optimize.sil.specialize.generic.never")) {
-    DEBUG(llvm::dbgs() << "    Cannot specialize function " << OrigF->getName()
-                       << " marked to be excluded from optimizations.\n");
-    return;
+static bool shouldNotSpecializeCallee(SILFunction *Callee) {
+  if (!Callee->shouldOptimize()) {
+    DEBUG(llvm::dbgs() << "    Cannot specialize function " << Callee->getName()
+          << " marked to be excluded from optimizations.\n");
+    return true;
   }
 
-  OriginalF = OrigF;
-  OriginalParamSubs = ParamSubs;
-  ClonerParamSubs = ParamSubs;
-  CallerParamSubs = ParamSubs;
-  SpecializedGenericSig = nullptr;
+  if (Callee->hasSemanticsAttr("optimize.sil.specialize.generic.never"))
+    return true;
+
+  return false;
+}
+
+/// Prepares the ReabstractionInfo object for further processing and checks
+/// if the current function can be specialized at all.
+/// Returns false, if the current function cannot be specialized.
+/// Returns true otherwise.
+bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
+                                        SubstitutionList ParamSubs) {
+  if (shouldNotSpecializeCallee(Callee))
+    return false;
+
   SpecializedGenericEnv = nullptr;
+  SpecializedGenericSig = nullptr;
+  OriginalParamSubs = ParamSubs;
+  auto CalleeGenericSig = Callee->getLoweredFunctionType()->getGenericSignature();
+  auto CalleeGenericEnv = Callee->getGenericEnvironment();
+
+  OriginalF = Callee;
+  this->Apply = Apply;
 
   SubstitutionMap InterfaceSubs;
-  if (OrigF->getLoweredFunctionType()->getGenericSignature())
-    InterfaceSubs = OrigF->getLoweredFunctionType()->getGenericSignature()
-      ->getSubstitutionMap(ParamSubs);
+
+  // Get the original substitution map.
+  if (CalleeGenericSig)
+    InterfaceSubs = CalleeGenericSig->getSubstitutionMap(ParamSubs);
 
   // We do not support partial specialization.
-  if (InterfaceSubs.hasArchetypes()) {
-    DEBUG(llvm::dbgs() <<
-          "    Cannot specialize with unbound interface substitutions.\n");
-    DEBUG(for (auto Sub : ParamSubs) {
-            Sub.dump();
-          });
-    return;
+  if (!EnablePartialSpecialization && InterfaceSubs.hasArchetypes()) {
+    DEBUG(llvm::dbgs() << "    Partial specialization is not supported.\n");
+    DEBUG(for (auto Sub : ParamSubs) { Sub.dump(); });
+    return false;
   }
+
+  // Perform some checks to see if we need to bail.
   if (InterfaceSubs.hasDynamicSelf()) {
     DEBUG(llvm::dbgs() << "    Cannot specialize with dynamic self.\n");
-    return;
+    return false;
   }
 
   // Check if the substitution contains any generic types that are too deep.
@@ -93,46 +119,175 @@ ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *OrigF,
     if (Replacement.findIf([](Type ty) -> bool {
           return getBoundGenericDepth(ty) >= BoundGenericDepthThreshold;
         })) {
-      return;
+      DEBUG(llvm::dbgs()
+            << "    Cannot specialize because the generic type is too deep.\n");
+      return false;
     }
   }
 
-  SILModule &M = OrigF->getModule();
-  SubstitutedType = OrigF->getLoweredFunctionType()->substGenericArgs(
-    M, InterfaceSubs);
+  // Check if we have substitutions which replace generic type parameters with
+  // concrete types or unbound generic types.
+  bool HasConcreteGenericParams = false;
+  bool HasNonArchetypeGenericParams = false;
+  HasUnboundGenericParams = false;
+  for (auto DT : CalleeGenericSig->getGenericParams()) {
+    // Check only the substitutions for the generic parameters.
+    // Ignore any dependent types, etc.
+    auto Replacement = Type(DT).subst(InterfaceSubs);
+    if (!Replacement->is<ArchetypeType>())
+      HasNonArchetypeGenericParams = true;
 
-  NumFormalIndirectResults = SubstitutedType->getNumIndirectFormalResults();
-  Conversions.resize(NumFormalIndirectResults
-                     + SubstitutedType->getParameters().size());
-  if (SubstitutedType->getNumDirectFormalResults() == 0) {
-    // The original function has no direct result yet. Try to convert the first
-    // indirect result to a direct result.
-    // TODO: We could also convert multiple indirect results by returning a
-    // tuple type and created tuple_extract instructions at the call site.
-    SILFunctionConventions substConv(SubstitutedType, M);
-    unsigned IdxForResult = 0;
-    for (SILResultInfo RI : SubstitutedType->getIndirectFormalResults()) {
-      assert(RI.isFormalIndirect());
-      if (substConv.getSILType(RI).isLoadable(M) && !RI.getType()->isVoid()) {
-        Conversions.set(IdxForResult);
-        break;
+    if (Replacement->hasArchetype()) {
+      HasUnboundGenericParams = true;
+      // Check if the replacement is an archetype which is more specific
+      // than the corresponding archetype in the original generic signature.
+      // If this is the case, then specialization makes sense, because
+      // it would produce something more specific.
+      if (CalleeGenericEnv) {
+        if (auto Archetype = Replacement->getAs<ArchetypeType>()) {
+          auto OrigArchetype =
+              CalleeGenericEnv->mapTypeIntoContext(DT)->castTo<ArchetypeType>();
+          if (Archetype->requiresClass() && !OrigArchetype->requiresClass())
+            HasNonArchetypeGenericParams = true;
+          if (Archetype->getLayoutConstraint() &&
+              !OrigArchetype->getLayoutConstraint())
+            HasNonArchetypeGenericParams = true;
+        }
       }
-      ++IdxForResult;
+      continue;
+    }
+
+    HasConcreteGenericParams = true;
+  }
+
+  if (HasUnboundGenericParams) {
+    if (!HasNonArchetypeGenericParams && !HasConcreteGenericParams) {
+      DEBUG(llvm::dbgs() << "    Partial specialization is not supported if "
+                            "all substitutions are archetypes.\n");
+      DEBUG(for (auto Sub : ParamSubs) {
+          Sub.dump();
+        });
+      return false;
+    }
+
+    // We need a generic environment for the partial specialization.
+    if (!CalleeGenericEnv)
+      return false;
+  }
+
+  return true;
+}
+
+bool ReabstractionInfo::canBeSpecialized(ApplySite Apply, SILFunction *Callee,
+                                         SubstitutionList ParamSubs) {
+  ReabstractionInfo ReInfo;
+  return ReInfo.prepareAndCheck(Apply, Callee, ParamSubs);
+}
+
+ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
+                                     ArrayRef<Substitution> ParamSubs) {
+  if (!prepareAndCheck(Apply, Callee, ParamSubs))
+    return;
+
+  if (SpecializeGenericSubstitutions) {
+    specializeConcreteAndGenericSubstitutions(Apply, Callee, ParamSubs);
+  } else {
+    specializeConcreteSubstitutions(Apply, Callee, ParamSubs);
+  }
+
+  if (SpecializedGenericSig) {
+    DEBUG(llvm::dbgs() << "\n\nPartially specialized types for function: "
+                       << Callee->getName() << "\n\n";
+          llvm::dbgs() << "Original generic function type:\n"
+                       << Callee->getLoweredFunctionType() << "\n"
+                       << "Partially specialized generic function type:\n"
+                       << SpecializedType << "\n\n");
+  }
+
+  // Some sanity checks.
+  auto SpecializedFnTy = getSpecializedType();
+  auto SpecializedSubstFnTy = SpecializedFnTy;
+
+  if (SpecializedFnTy->isPolymorphic() &&
+      !getCallerParamSubstitutions().empty()) {
+    auto CalleeFnTy = Callee->getLoweredFunctionType();
+    assert(CalleeFnTy->isPolymorphic());
+    auto CalleeSubstFnTy = CalleeFnTy->substGenericArgs(
+        Callee->getModule(), getOriginalParamSubstitutions());
+    assert(!CalleeSubstFnTy->isPolymorphic() &&
+           "Substituted callee type should not be polymorphic");
+    assert(!CalleeSubstFnTy->hasTypeParameter() &&
+           "Substituted callee type should not have type parameters");
+
+    SpecializedSubstFnTy = SpecializedFnTy->substGenericArgs(
+        Callee->getModule(), getCallerParamSubstitutions());
+
+    assert(!SpecializedSubstFnTy->isPolymorphic() &&
+           "Substituted callee type should not be polymorphic");
+    assert(!SpecializedSubstFnTy->hasTypeParameter() &&
+           "Substituted callee type should not have type parameters");
+
+    auto SpecializedCalleeSubstFnTy =
+        createSpecializedType(CalleeSubstFnTy, Callee->getModule());
+
+    if (SpecializedSubstFnTy != SpecializedCalleeSubstFnTy) {
+      llvm::dbgs() << "SpecializedFnTy:\n" << SpecializedFnTy << "\n";
+      llvm::dbgs() << "SpecializedSubstFnTy:\n" << SpecializedSubstFnTy << "\n";
+      for (auto Sub : getCallerParamSubstitutions()) {
+        llvm::dbgs() << "Sub:\n";
+        Sub.dump();
+      }
+      llvm::dbgs() << "\n\n";
+
+      llvm::dbgs() << "CalleeFnTy:\n" << CalleeFnTy << "\n";
+      llvm::dbgs() << "SpecializedCalleeSubstFnTy:\n" << SpecializedCalleeSubstFnTy << "\n";
+      for (auto Sub : ParamSubs) {
+        llvm::dbgs() << "Sub:\n";
+        Sub.dump();
+      }
+      llvm::dbgs() << "\n\n";
+      assert(SpecializedSubstFnTy == SpecializedCalleeSubstFnTy &&
+             "Substituted function types should be the same");
     }
   }
-  // Try to convert indirect incoming parameters to direct parameters.
-  // The Conversions index domain is
-  // [0..<NumFormalIndirectResults + NumParameters]. This is *not* the same as
-  // a SubstitutedType's SIL argument index.
-  unsigned IdxForParam = NumFormalIndirectResults;
-  for (SILParameterInfo PI : SubstitutedType->getParameters()) {
-    if (PI.getSILStorageType().isLoadable(M)
-        && PI.getConvention() == ParameterConvention::Indirect_In) {
-      Conversions.set(IdxForParam);
-    }
-    ++IdxForParam;
+
+  // If the new type is the same, there is nothing to do and
+  // no specialization should be performed.
+  if (getSubstitutedType() == Callee->getLoweredFunctionType()) {
+    DEBUG(llvm::dbgs() << "The new specialized type is the same as "
+                          "the original "
+                          "type. Don't specialize!\n";
+          llvm::dbgs() << "The type is: " << getSubstitutedType() << "\n");
+    SpecializedType = CanSILFunctionType();
+    SubstitutedType = CanSILFunctionType();
+    SpecializedGenericSig = nullptr;
+    return;
   }
-  SpecializedType = createSpecializedType(SubstitutedType, M);
+
+  if (SpecializedGenericSig) {
+    // It is a partial specializaiton.
+    DEBUG(llvm::dbgs() << "Specializing the call:\n";
+          Apply.getInstruction()->dumpInContext();
+          llvm::dbgs() << "\n\nPartially specialized types for function: "
+                       << Callee->getName() << "\n\n";
+          llvm::dbgs() << "Original generic function type:\n"
+                       << Callee->getLoweredFunctionType() << "\n\n";
+          llvm::dbgs() << "\nOriginal call substitution:\n";
+          for (auto Sub : getOriginalParamSubstitutions()) {
+            llvm::dbgs() << "Sub:\n";
+            Sub.dump();
+            llvm::dbgs() << "\n";
+          }
+
+          llvm::dbgs() << "Partially specialized generic function type:\n"
+                       << getSpecializedType() << "\n\n";
+          llvm::dbgs() << "\nSpecialization call substitution:\n";
+          for (auto Sub : getCallerParamSubstitutions()) {
+            llvm::dbgs() << "Sub:\n";
+            Sub.dump();
+            llvm::dbgs() << "\n";
+          });
+  }
 }
 
 bool ReabstractionInfo::canBeSpecialized() const {
@@ -210,11 +365,6 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
                                          const SubstitutionMap &SubstMap,
                                          bool HasUnboundGenericParams) {
   auto &M = OrigF->getModule();
-  auto OrigFnTy = OrigF->getLoweredFunctionType();
-
-  // First substitute concrete types into the existing function type.
-  auto FnTy = OrigFnTy->substGenericArgs(M, SubstMap);
-
   if ((SpecializedGenericSig &&
        SpecializedGenericSig->areAllParamsConcrete()) ||
       !HasUnboundGenericParams) {
@@ -222,11 +372,24 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
     SpecializedGenericEnv = nullptr;
   }
 
+  CanGenericSignature CanSpecializedGenericSig;
+  if (SpecializedGenericSig)
+    CanSpecializedGenericSig = SpecializedGenericSig->getCanonicalSignature();
+
+  // First substitute concrete types into the existing function type.
+  CanSILFunctionType FnTy;
+  {
+    Lowering::GenericContextScope GenericScope(M.Types,
+                                               CanSpecializedGenericSig);
+    FnTy = OrigF->getLoweredFunctionType()->substGenericArgs(M, SubstMap);
+  }
+  assert(FnTy);
+
   // Use the new specialized generic signature.
   auto NewFnTy = SILFunctionType::get(
-      SpecializedGenericSig, FnTy->getExtInfo(), FnTy->getCalleeConvention(),
-      FnTy->getParameters(), FnTy->getResults(),
-      FnTy->getOptionalErrorResult(), M.getASTContext());
+      CanSpecializedGenericSig, FnTy->getExtInfo(), FnTy->getCalleeConvention(),
+      FnTy->getParameters(), FnTy->getResults(), FnTy->getOptionalErrorResult(),
+      M.getASTContext());
 
   // This is an interface type. It should not have any archetypes.
   assert(!NewFnTy->hasArchetype());
@@ -280,6 +443,25 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
                          M.getASTContext());
 }
 
+static std::pair<GenericEnvironment *, GenericSignature *>
+getGenericEnvironmentAndSignature(GenericSignatureBuilder &Builder,
+                                  SILModule &M) {
+  auto *GenericSig =
+      Builder.getGenericSignature()->getCanonicalSignature().getPointer();
+  auto *GenericEnv = GenericSig->createGenericEnvironment(*M.getSwiftModule());
+
+  // FIXME: This is a workaround for the signature minimization bug.
+  GenericSignatureBuilder TmpBuilder(
+      M.getASTContext(), LookUpConformanceInModule(M.getSwiftModule()));
+  TmpBuilder.addGenericSignature(GenericSig);
+  TmpBuilder.finalize(SourceLoc(), GenericSig->getGenericParams());
+  GenericSig =
+      TmpBuilder.getGenericSignature()->getCanonicalSignature().getPointer();
+  GenericEnv = GenericSig->createGenericEnvironment(*M.getSwiftModule());
+
+  return std::make_pair(GenericEnv, GenericSig);
+}
+
 std::pair<GenericEnvironment *, GenericSignature *>
 getSignatureWithRequirements(GenericSignature *OrigGenSig,
                              GenericEnvironment *OrigGenericEnv,
@@ -301,11 +483,7 @@ getSignatureWithRequirements(GenericSignature *OrigGenSig,
   }
 
   Builder.finalize(SourceLoc(), OrigGenSig->getGenericParams());
-  auto *GenericSig = Builder.getGenericSignature();
-  // Remember the new generic environment.
-  auto *GenericEnv = GenericSig->createGenericEnvironment(*M.getSwiftModule());
-
-  return std::make_pair(GenericEnv, GenericSig);
+  return getGenericEnvironmentAndSignature(Builder, M);
 }
 
 /// Perform some sanity checks for the requirements
@@ -340,11 +518,8 @@ checkSpecializationRequirements(ArrayRef<Requirement> Requirements) {
 
 ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
                                      ArrayRef<Requirement> Requirements) {
-  if (!OrigF->shouldOptimize()) {
-    DEBUG(llvm::dbgs() << "    Cannot specialize function " << OrigF->getName()
-                       << " marked to be excluded from optimizations.\n");
+  if (shouldNotSpecializeCallee(OrigF))
     return;
-  }
 
   // Perform some sanity checks for the requirements
   checkSpecializationRequirements(Requirements);
@@ -397,6 +572,138 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
 
   HasUnboundGenericParams = !SpecializedGenericSig->areAllParamsConcrete();
   createSubstitutedAndSpecializedTypes();
+}
+
+static void verifySubstitutionList(SubstitutionList Subs) {
+  for (auto Sub : Subs) {
+    assert(!Sub.getReplacement()->hasError() &&
+           "There should be no error types in substitutions");
+  }
+}
+
+// Builds a new signature based on the old one and adds same type
+// requirements for those generic type parameters that are concrete
+// according to the partial substitution. This way, the signature
+// has exactly the same generic parameter types, just with more
+// requirements.
+// Current issues:
+// - If Sig2 = GenericSignatureBuilder(Sig2 + Req), then GenericSignatureBuilder(Sig2) != Sig2
+// - The set of requirements is not really minimized.
+// - Some requirements are lost, when you add a same type parameter to the builder.
+
+// Initialize SpecializedType if and only if the specialization is allowed.
+void ReabstractionInfo::specializeConcreteSubstitutions(
+    ApplySite Apply, SILFunction *Callee, ArrayRef<Substitution> ParamSubs) {
+
+  SILModule &M = Callee->getModule();
+  auto &Ctx = M.getASTContext();
+
+  OriginalF = Callee;
+
+  auto OrigGenericSig = Callee->getLoweredFunctionType()->getGenericSignature();
+  auto OrigGenericEnv = Callee->getGenericEnvironment();
+
+  SubstitutionMap InterfaceSubs;
+  // Get the original substitution map.
+  if (Callee->getLoweredFunctionType()->getGenericSignature())
+    InterfaceSubs = Callee->getLoweredFunctionType()->getGenericSignature()
+      ->getSubstitutionMap(ParamSubs);
+
+  // This is a workaround for the rdar://30610428
+  if (!EnablePartialSpecialization) {
+    SubstitutedType =
+        Callee->getLoweredFunctionType()->substGenericArgs(M, InterfaceSubs);
+    ClonerParamSubs = OriginalParamSubs;
+    CallerParamSubs = {};
+    createSubstitutedAndSpecializedTypes();
+    return;
+  }
+
+  // Build a set of requirements.
+  SmallVector<Requirement, 4> Requirements;
+
+  for (auto DP : OrigGenericSig->getGenericParams()) {
+    auto Replacement = Type(DP).subst(InterfaceSubs);
+    if (Replacement->hasArchetype())
+      continue;
+    // Replacemengt is concrete. Add a same type requirement.
+    Requirement Req(RequirementKind::SameType, DP, Replacement);
+    Requirements.push_back(Req);
+  }
+
+  std::tie(SpecializedGenericEnv, SpecializedGenericSig) =
+      getSignatureWithRequirements(OrigGenericSig, OrigGenericEnv,
+                                   Requirements, M);
+  HasUnboundGenericParams = !SpecializedGenericSig->areAllParamsConcrete();
+
+  // No partial specializations!
+  //if (HasUnboundGenericParams)
+  //  return;
+
+  {
+    SmallVector<Substitution, 4> List;
+
+    OrigGenericSig->getSubstitutions(
+      [&](SubstitutableType *type) -> Type {
+        return SpecializedGenericEnv->mapTypeIntoContext(type);
+      },
+      LookUpConformanceInSignature(*SpecializedGenericSig),
+      List);
+    ClonerParamSubs = Ctx.AllocateCopy(List);
+    verifySubstitutionList(ClonerParamSubs);
+  }
+
+  {
+    SmallVector<Substitution, 4> List;
+    SpecializedGenericSig->getSubstitutions(InterfaceSubs, List);
+    CallerParamSubs = Ctx.AllocateCopy(List);
+    verifySubstitutionList(CallerParamSubs);
+  }
+
+  {
+    CallerInterfaceSubs = OrigGenericSig->getSubstitutionMap(
+      [&](SubstitutableType *type) -> Type {
+        return SpecializedGenericEnv->mapTypeOutOfContext(
+          SpecializedGenericEnv->mapTypeIntoContext(type));
+      },
+        //LookUpConformanceInSignature(*SpecializedGenericSig));
+      LookUpConformanceInSignature(*OrigGenericSig));
+  }
+
+  HasUnboundGenericParams = !SpecializedGenericSig->areAllParamsConcrete();
+  createSubstitutedAndSpecializedTypes();
+}
+
+// Builds a new generic and function signatures for a partial specialization.
+// Allows for partial specializations even if substitututions contain
+// type parameters.
+//
+// The new generic signature has the following generic parameters:
+// - For each substitution with a concrete type CT as a replacement for a generic
+// type T, it introduces a generic parameter T' and a requirement T' == CT
+// - For all other substitutions that are considered for partial specialization,
+// it collects first the archetypes used in the replacements. Then for each such
+// archetype A a new generic parameter T' introduced.
+// - If there is a substitution for type T and this substitution is execluded from
+// partial specialization (e.g. because it is impossible or would result in a less
+// efficient code), then a new generic parameter T' is introduced, which does not
+// get any additional, more specific requirements based on the substitutions.
+//
+// After all generic parameters are added accoriding to the rules above,
+// the requirements of the callee's signature are re-mapped by re-formulating them
+// in terms of the newly introduced generic parameters. In case a remapped
+// requirement does not contain any generic types, it can be omitted, because
+// it is fulfilled already.
+
+// Current issues:
+// - If Sig2 = GenericSignatureBuilder(Sig2 + Req), then
+// GenericSignatureBuilder(Sig2) != Sig2
+// - The set of requirements is not really minimized.
+// - Some requirements are lost, when you add a same type parameter to the
+// builder.
+void ReabstractionInfo::specializeConcreteAndGenericSubstitutions(
+    ApplySite Apply, SILFunction *Callee, ArrayRef<Substitution> ParamSubs) {
+  llvm_unreachable("Not implemented yet");
 }
 
 // =============================================================================
@@ -505,16 +812,13 @@ static void fixUsedVoidType(SILValue VoidVal, SILLocation Loc,
   VoidVal->replaceAllUsesWith(NewVoidVal);
 }
 
-// Create a new apply based on an old one, but with a different
-// function being applied.
-static ApplySite replaceWithSpecializedCallee(ApplySite AI,
-                                              SILValue Callee,
-                                              SILBuilder &Builder,
-                                              const ReabstractionInfo &ReInfo) {
-  SILLocation Loc = AI.getLoc();
-  SmallVector<SILValue, 4> Arguments;
-  SILValue StoreResultTo;
+// Prepare call arguments. Perform re-abstraction if required.
+static void prepareCallArguments(ApplySite AI, SILBuilder &Builder,
+                                 const ReabstractionInfo &ReInfo,
+                                 SmallVectorImpl<SILValue> &Arguments,
+                                 SILValue &StoreResultTo) {
   /// SIL function conventions for the original apply site with substitutions.
+  SILLocation Loc = AI.getLoc();
   auto substConv = AI.getSubstCalleeConv();
   unsigned ArgIdx = AI.getCalleeArgIndexOfFirstAppliedArg();
   for (auto &Op : AI.getArgumentOperands()) {
@@ -553,13 +857,58 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
 
     ++ArgIdx;
   }
+}
+
+/// Return a substituted callee function type.
+static CanSILFunctionType
+getCalleeSubstFunctionType(SILValue Callee, const ReabstractionInfo &ReInfo) {
+  // Create a substituted callee type.
+  auto CanFnTy =
+      dyn_cast<SILFunctionType>(Callee->getType().getSwiftRValueType());
+  auto CalleeSubstFnTy = CanFnTy;
+
+  if (ReInfo.getSpecializedType()->isPolymorphic() &&
+      !ReInfo.getCallerParamSubstitutions().empty()) {
+    CalleeSubstFnTy = CanFnTy->substGenericArgs(
+        ReInfo.getNonSpecializedFunction()->getModule(),
+        ReInfo.getCallerParamSubstitutions());
+    assert(!CalleeSubstFnTy->isPolymorphic() &&
+           "Substituted callee type should not be polymorphic");
+    assert(!CalleeSubstFnTy->hasTypeParameter() &&
+           "Substituted callee type should not have type parameters");
+  }
+
+  return CalleeSubstFnTy;
+}
+
+// Create a new apply based on an old one, but with a different
+// function being applied.
+static ApplySite replaceWithSpecializedCallee(ApplySite AI,
+                                              SILValue Callee,
+                                              SILBuilder &Builder,
+                                              const ReabstractionInfo &ReInfo) {
+  SILLocation Loc = AI.getLoc();
+  SmallVector<SILValue, 4> Arguments;
+  SILValue StoreResultTo;
+
+  prepareCallArguments(AI, Builder, ReInfo, Arguments, StoreResultTo);
+
+  // Create a substituted callee type.
+  ArrayRef<Substitution> Subs;
+  if (ReInfo.getSpecializedType()->isPolymorphic()) {
+    Subs = ReInfo.getCallerParamSubstitutions();
+  }
+
+  auto CalleeSubstFnTy = getCalleeSubstFunctionType(Callee, ReInfo);
+  auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
+  SILFunctionConventions substConv(CalleeSubstFnTy, Builder.getModule());
 
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
     SILBasicBlock *ResultBB = TAI->getNormalBB();
     assert(ResultBB->getSinglePredecessorBlock() == TAI->getParent());
     auto *NewTAI =
-      Builder.createTryApply(Loc, Callee, Callee->getType(), {},
-                             Arguments, ResultBB, TAI->getErrorBB());
+        Builder.createTryApply(Loc, Callee, CalleeSILSubstFnTy, Subs, Arguments,
+                               ResultBB, TAI->getErrorBB());
     if (StoreResultTo) {
       assert(substConv.useLoweredAddresses());
       // The original normal result of the try_apply is an empty tuple.
@@ -577,7 +926,9 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
     return NewTAI;
   }
   if (auto *A = dyn_cast<ApplyInst>(AI)) {
-    auto *NewAI = Builder.createApply(Loc, Callee, Arguments, A->isNonThrowing());
+    auto *NewAI = Builder.createApply(Loc, Callee, CalleeSILSubstFnTy,
+                                      substConv.getSILResultType(), Subs,
+                                      Arguments, A->isNonThrowing());
     if (StoreResultTo) {
       assert(substConv.useLoweredAddresses());
       // Store the direct result to the original result address.
@@ -589,12 +940,14 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
     return NewAI;
   }
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI)) {
-    CanSILFunctionType NewPAType =
-      ReInfo.createSpecializedType(PAI->getFunctionType(), Builder.getModule());
-    SILType PTy = SILType::getPrimitiveObjectType(ReInfo.getSpecializedType());
+    CanSILFunctionType NewPAType = ReInfo.createSpecializedType(
+        PAI->getFunctionType(), Builder.getModule());
+    // SILType PTy =
+    // SILType::getPrimitiveObjectType(ReInfo.getSpecializedType());
+    SILType PTy = CalleeSILSubstFnTy;
     auto *NewPAI =
-      Builder.createPartialApply(Loc, Callee, PTy, {}, Arguments,
-                                 SILType::getPrimitiveObjectType(NewPAType));
+        Builder.createPartialApply(Loc, Callee, PTy, Subs, Arguments,
+                                   SILType::getPrimitiveObjectType(NewPAType));
     PAI->replaceAllUsesWith(NewPAI);
     return NewPAI;
   }
@@ -835,6 +1188,9 @@ void swift::trySpecializeApplyOfGeneric(
   if (F->isFragile() && !RefF->hasValidLinkageForFragileInline())
       return;
 
+  if (shouldNotSpecializeCallee(RefF))
+    return;
+
   // If the caller and callee are both fragile, preserve the fragility when
   // cloning the callee. Otherwise, strip it off so that we can optimize
   // the body more.
@@ -851,6 +1207,12 @@ void swift::trySpecializeApplyOfGeneric(
   bool needAdaptUsers = false;
   bool replacePartialApplyWithoutReabstraction = false;
   auto *PAI = dyn_cast<PartialApplyInst>(Apply);
+
+  // TODO: Partial specializations of partial applies are
+  // not supported yet.
+  if (PAI && ReInfo.getSpecializedType()->isPolymorphic())
+    return;
+
   if (PAI && ReInfo.hasConversions()) {
     // If we have a partial_apply and we converted some results/parameters from
     // indirect to direct there are 3 cases:
