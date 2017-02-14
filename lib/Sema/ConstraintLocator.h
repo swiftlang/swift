@@ -75,6 +75,8 @@ public:
     TupleElement,
     /// \brief A tuple element referenced by name.
     NamedTupleElement,
+    /// \brief An optional payload.
+    OptionalPayload,
     /// \brief A generic argument.
     /// FIXME: Add support for named generic arguments?
     GenericArgument,
@@ -131,6 +133,7 @@ public:
     case AssociatedType:
     case FunctionArgument:
     case FunctionResult:
+    case OptionalPayload:
     case Member:
     case MemberRefBase:
     case UnresolvedMember:
@@ -188,6 +191,7 @@ public:
     case ConstructorMember:
     case InstanceType:
     case Load:
+    case OptionalPayload:
     case Member:
     case MemberRefBase:
     case UnresolvedMember:
