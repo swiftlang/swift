@@ -4889,7 +4889,7 @@ public:
 
     auto Operands = getTrueOperands();
     return Operands.front().getOperandNumber() <= OpIndex &&
-           Operands.back().getOperandNumber() <= OpIndex;
+           OpIndex <= Operands.back().getOperandNumber();
   }
 
   /// Is \p OpIndex an operand associated with the false case?
@@ -4901,7 +4901,7 @@ public:
 
     auto Operands = getFalseOperands();
     return Operands.front().getOperandNumber() <= OpIndex &&
-           Operands.back().getOperandNumber() <= OpIndex;
+           OpIndex <= Operands.back().getOperandNumber();
   }
 
   /// Returns the argument on the cond_br terminator that will be passed to
