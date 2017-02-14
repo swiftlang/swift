@@ -2651,7 +2651,7 @@ getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
     SmallString<64> Buffer;
     {
       llvm::raw_svector_ostream OS(Buffer);
-      OS << ED->getName().str();
+      OS << getNameForObjC(ED).str();
       SmallString<64> Scratch;
       OS << camel_case::toSentencecase(PreferredName.getBaseName().str(),
                                        Scratch);
