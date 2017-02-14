@@ -1778,7 +1778,7 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
                                                      ASTContext &context) {
   auto *DC = VD->getDeclContext();
   CanType resultTy =
-      DC->mapTypeOutOfContext(VD->getParentInitializer()->getType())
+      DC->mapTypeOutOfContext(VD->getParentPattern()->getType())
           ->getCanonicalType();
   GenericSignature *sig = DC->getGenericSignatureOfContext();
 
