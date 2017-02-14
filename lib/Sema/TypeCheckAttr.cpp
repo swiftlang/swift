@@ -715,7 +715,6 @@ public:
     IGNORED_ATTR(IBOutlet) // checked early.
     IGNORED_ATTR(Indirect)
     IGNORED_ATTR(Inline)
-    IGNORED_ATTR(Inlineable)
     IGNORED_ATTR(Lazy)      // checked early.
     IGNORED_ATTR(LLDBDebuggerFunction)
     IGNORED_ATTR(Mutating)
@@ -777,6 +776,7 @@ public:
 
   void visitFixedLayoutAttr(FixedLayoutAttr *attr);
   void visitVersionedAttr(VersionedAttr *attr);
+  void visitInlineableAttr(InlineableAttr *attr);
   
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
 };
@@ -1804,9 +1804,42 @@ void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
     return;
   }
 
+  // @_versioned can only be applied to internal declarations.
   if (VD->getFormalAccess() != Accessibility::Internal) {
     TC.diagnose(attr->getLocation(),
                 diag::versioned_attr_with_explicit_accessibility,
+                VD->getName(),
+                getAccessForDiagnostics(VD))
+        .fixItRemove(attr->getRangeWithAt());
+    attr->setInvalid();
+    return;
+  }
+}
+
+void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
+  // @_inlineable cannot be applied to stored properties.
+  //
+  // If the type is fixed-layout, the accessors are inlineable anyway;
+  // if the type is resilient, the accessors cannot be inlineable
+  // because clients cannot directly access storage.
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    if (VD->hasStorage() || VD->getAttrs().hasAttribute<LazyAttr>()) {
+      TC.diagnose(attr->getLocation(),
+                  diag::inlineable_stored_property)
+        .fixItRemove(attr->getRangeWithAt());
+      attr->setInvalid();
+    }
+  }
+
+  auto *VD = cast<ValueDecl>(D);
+
+  // @_inlineable can only be applied to public or @_versioned
+  // declarations.
+  if (VD->getFormalAccess() < Accessibility::Internal ||
+      (!VD->getAttrs().hasAttribute<VersionedAttr>() &&
+       VD->getFormalAccess() < Accessibility::Public)) {
+    TC.diagnose(attr->getLocation(),
+                diag::inlineable_decl_not_public,
                 VD->getName(),
                 getAccessForDiagnostics(VD))
         .fixItRemove(attr->getRangeWithAt());

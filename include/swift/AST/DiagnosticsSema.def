@@ -3374,6 +3374,14 @@ ERROR(designated_init_inlineable_resilient,none,
       "'%select{@_transparent|@inline(__always)|@_inlineable|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
 
+ERROR(inlineable_stored_property,
+      none, "'@_inlineable' attribute cannot be applied to stored properties", ())
+
+ERROR(inlineable_decl_not_public,
+      none, "'@_inlineable' attribute can only be applied to public declarations, "
+      "but %0 is %select{private|fileprivate|internal|%error|%error}1",
+      (Identifier, Accessibility))
+
 //------------------------------------------------------------------------------
 // @_specialize diagnostics
 //------------------------------------------------------------------------------
