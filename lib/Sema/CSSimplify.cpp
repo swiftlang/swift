@@ -2090,8 +2090,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
   // literals.
   if (auto elt = locator.last()) {
-    if (elt->getKind() == ConstraintLocator::ClosureResult &&
-        !(subflags & TMF_UnwrappingOptional)) {
+    if (elt->getKind() == ConstraintLocator::ClosureResult) {
       if (concrete && kind >= ConstraintKind::Subtype &&
           (type1->isUninhabited() || type2->isVoid())) {
         increaseScore(SK_FunctionConversion);
@@ -2231,10 +2230,6 @@ commit_to_conversions:
 
   // Handle restrictions.
   if (auto restriction = conversionsOrFixes[0].getRestriction()) {
-    if (flags.contains(TMF_UnwrappingOptional)) {
-      subflags |= TMF_UnwrappingOptional;
-    }
-    
     return simplifyRestrictedConstraint(*restriction, type1, type2,
                                         kind, subflags, locator);
   }
@@ -3873,7 +3868,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (auto generic2 = type2->getAs<BoundGenericType>()) {
       if (generic2->getDecl()->classifyAsOptionalType()) {
         return matchTypes(type1, generic2->getGenericArgs()[0],
-                          matchKind, (subflags | TMF_UnwrappingOptional),
+                          matchKind, subflags,
                           locator.withPathElement(
                             ConstraintLocator::OptionalPayload));
       }
