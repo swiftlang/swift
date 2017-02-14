@@ -48,7 +48,7 @@ bool ide::printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS) {
 bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
   using namespace Mangle;
 
-  if (!isa<FuncDecl>(D) && !D->hasName())
+  if (!D->hasName() && (!isa<FuncDecl>(D) || cast<FuncDecl>(D)->getAccessorKind() == AccessorKind::NotAccessor))
     return true; // Ignore.
   if (D->getModuleContext()->isBuiltinModule())
     return true; // Ignore.
