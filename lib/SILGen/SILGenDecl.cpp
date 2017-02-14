@@ -1624,11 +1624,33 @@ public:
       return;
     }
 
-    SILFunction *witnessFn =
-      SGM.emitProtocolWitness(Conformance, Linkage, requirementRef, witnessRef,
-                              isFree, witness);
+    SILFunction *witnessFn = nullptr;
+
+    auto *protocol = Conformance->getProtocol();
+    auto defaultWitness = protocol->getDefaultWitness(requirementRef.getDecl());
+
+    // FIXME: Really we should use the default witness always, even if the
+    // protocol is not in a resilient module, but we'd have to check for
+    // performance regressions first.
+    if (defaultWitness.getDecl() == witnessRef.getDecl() &&
+        !protocol->hasFixedLayout()) {
+      // FIXME: Should this be the linkage of the protocol containing the
+      // requirement instead?
+      SILLinkage defaultLinkage =
+        getSILLinkage(getDeclLinkage(protocol), NotForDefinition);
+      witnessFn =
+        SGM.emitProtocolWitness(nullptr, defaultLinkage, requirementRef,
+                                SILDeclRef(defaultWitness.getDecl()), isFree,
+                                defaultWitness, NotForDefinition);
+    } else {
+      witnessFn =
+        SGM.emitProtocolWitness(Conformance, Linkage, requirementRef,
+                                witnessRef, isFree,
+                                witness, ForDefinition);
+    }
+
     Entries.push_back(
-                    SILWitnessTable::MethodWitness{requirementRef, witnessFn});
+      SILWitnessTable::MethodWitness{requirementRef, witnessFn});
   }
 
   void addAssociatedType(AssociatedTypeDecl *td,
@@ -1773,7 +1795,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                   SILDeclRef requirement,
                                   SILDeclRef witnessRef,
                                   IsFreeFunctionWitness_t isFree,
-                                  Witness witness) {
+                                  Witness witness,
+                                  ForDefinition_t forDefinition) {
   auto requirementInfo = Types.getConstantInfo(requirement);
   unsigned witnessUncurryLevel = witnessRef.uncurryLevel;
 
@@ -1884,6 +1907,23 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     nameBuffer = NewMangling::selectMangling(Old, New);
   }
 
+  IsFragile_t isFragile = IsNotFragile;
+  if (makeModuleFragile)
+    isFragile = IsFragile;
+  if (witnessRef.isFragile())
+    isFragile = IsFragile;
+
+  auto *f = M.getOrCreateFunction(
+      SILLocation(witnessRef.getDecl()),
+      nameBuffer, linkage, witnessSILFnType,
+      IsNotBare, IsTransparent,
+      isFragile, IsThunk);
+
+  if (f->isDefinition() || !forDefinition)
+    return f;
+
+  f->setGenericEnvironment(genericEnv);
+
   // If the thunked-to function is set to be always inlined, do the
   // same with the witness, on the theory that the user wants all
   // calls removed if possible, e.g. when we're able to devirtualize
@@ -1894,18 +1934,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   if (witnessRef.isAlwaysInline())
     InlineStrategy = AlwaysInline;
 
-  IsFragile_t isFragile = IsNotFragile;
-  if (makeModuleFragile)
-    isFragile = IsFragile;
-  if (witnessRef.isFragile())
-    isFragile = IsFragile;
-
-  auto *f = M.createFunction(
-      linkage, nameBuffer, witnessSILFnType,
-      genericEnv, SILLocation(witnessRef.getDecl()),
-      IsNotBare, IsTransparent, isFragile, IsThunk,
-      SILFunction::NotRelevant, InlineStrategy);
-
+  f->setInlineStrategy(InlineStrategy);
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witnessRef.getDecl()), f));
 
@@ -1999,7 +2028,8 @@ public:
                  Witness witness) {
     SILFunction *witnessFn = SGM.emitProtocolWitness(nullptr, Linkage,
                                                      requirementRef, witnessRef,
-                                                     isFree, witness);
+                                                     isFree, witness,
+                                                     ForDefinition);
     auto entry = SILDefaultWitnessTable::Entry(requirementRef, witnessFn);
     DefaultWitnesses.push_back(entry);
   }

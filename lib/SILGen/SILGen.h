@@ -319,7 +319,8 @@ public:
                                    SILDeclRef requirement,
                                    SILDeclRef witnessRef,
                                    IsFreeFunctionWitness_t isFree,
-                                   Witness witness);
+                                   Witness witness,
+                                   ForDefinition_t forDefinition);
 
   /// Emit the default witness table for a resilient protocol.
   void emitDefaultWitnessTable(ProtocolDecl *protocol);
