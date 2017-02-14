@@ -16,18 +16,22 @@
 // Ranges
 //===----------------------------------------------------------------------===//
 
+extension Range where Bound == Int {
+  public init?(_ x: NSRange) {
+    guard x.location != NSNotFound else { return nil }
+    self.init(uncheckedBounds: (x.location, x.location + x.length))
+  }
+}
+
 extension NSRange {
   public init(_ x: Range<Int>) {
     location = x.lowerBound
     length = x.count
   }
 
-  // FIXME(ABI)#75 (Conditional Conformance): this API should be an extension on Range.
-  // Can't express it now because the compiler does not support conditional
-  // extensions with type equality constraints.
+  @available(*, deprecated, message: "Use Range(_: NSRange) initializer instead")
   public func toRange() -> Range<Int>? {
-    if location == NSNotFound { return nil }
-    return location..<(location+length)
+    return Range(self)
   }
 }
 

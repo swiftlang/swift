@@ -91,8 +91,8 @@ extension String {
   /// `NSRange`. To convert an `NSRange` instance to a range of
   /// `String.UTF16View.Index`, follow these steps:
   ///
-  /// 1. Use the `NSRange` type's `toRange` method to convert the instance to
-  ///    an optional range of `Int` values.
+  /// 1. Use the `Range` type's failable initializer to convert the `NSRange` to
+  ///    a range of `Int` values.
   /// 2. Use your string's `utf16` view's index manipulation methods to convert
   ///    the integer bounds to `String.UTF16View.Index` values.
   /// 3. Create a new `Range` instance from the new index values.
@@ -103,7 +103,7 @@ extension String {
   ///
   ///     let snowy = "❄️ Let it snow! ☃️"
   ///     let nsrange = NSRange(location: 3, length: 12)
-  ///     if let r = nsrange.toRange() {
+  ///     if let r = Range(nsrange) {
   ///         let start = snowy.utf16.index(snowy.utf16.startIndex, offsetBy: r.lowerBound)
   ///         let end = snowy.utf16.index(snowy.utf16.startIndex, offsetBy: r.upperBound)
   ///         let substringRange = start..<end

@@ -11,7 +11,7 @@ print(hello)
 
 // CHECK: ello,
 var helloStr: String = hello as String
-print(String(helloStr._core[NSRange(location: 1, length: 5).toRange()!]))
+print(String(helloStr._core[Range(NSRange(location: 1, length: 5))!]))
 
 var upperHello = hello.uppercased
 // CHECK: HELLO, WORLD!
