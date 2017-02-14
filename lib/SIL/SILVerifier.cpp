@@ -3451,10 +3451,6 @@ public:
   }
 
   void verifyBranches(SILFunction *F) {
-    // If we are not in canonical SIL return early.
-    if (F->getModule().getStage() != SILStage::Canonical)
-      return;
-
     // Verify that there is no non_condbr critical edge.
     auto isCriticalEdgePred = [](const TermInst *T, unsigned EdgeIdx) {
       assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
@@ -3474,15 +3470,44 @@ public:
       return true;
     };
 
-    // Check for non-cond_br critical edges.
+    SILModule &M = F->getModule();
     for (auto &BB : *F) {
       TermInst *TI = BB.getTerminator();
-      if (isa<CondBranchInst>(TI))
+
+      // Check for non-cond_br critical edges in canonical SIL.
+      if (!isa<CondBranchInst>(TI) && M.getStage() == SILStage::Canonical) {
+        for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
+          require(!isCriticalEdgePred(TI, Idx),
+                  "non cond_br critical edges not allowed");
+        }
+        continue;
+      }
+
+      // In ownership qualified SIL, ban critical edges from CondBranchInst that
+      // have non-trivial arguments.
+      if (!F->hasQualifiedOwnership())
         continue;
 
-      for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
-        require(!isCriticalEdgePred(TI, Idx),
-                "non cond_br critical edges not allowed");
+      auto *CBI = dyn_cast<CondBranchInst>(TI);
+      if (!CBI)
+        continue;
+      if (isCriticalEdgePred(CBI, CondBranchInst::TrueIdx)) {
+        require(
+            llvm::all_of(CBI->getTrueArgs(),
+                         [](SILValue V) -> bool {
+                           return V.getOwnershipKind() ==
+                                  ValueOwnershipKind::Trivial;
+                         }),
+            "cond_br with critical edges must not have a non-trivial value");
+      }
+      if (isCriticalEdgePred(CBI, CondBranchInst::FalseIdx)) {
+        require(
+            llvm::all_of(CBI->getFalseArgs(),
+                         [](SILValue V) -> bool {
+                           return V.getOwnershipKind() ==
+                                  ValueOwnershipKind::Trivial;
+                         }),
+            "cond_br with critical edges must not have a non-trivial value");
       }
     }
   }
