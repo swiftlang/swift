@@ -42,6 +42,8 @@ PASS(AADumper, "aa-dump",
      "Dump AA result for all pairs of ValueKinds in all functions")
 PASS(ABCOpt, "abcopts",
      "Optimization of array bounds checks")
+PASS(AddressLowering, "address-lowering",
+     "SIL AddressOnly lowering.")
 PASS(AllocBoxToStack, "allocbox-to-stack",
      "Promote heap allocations to stack allocations")
 IRGEN_PASS(AllocStackHoisting, "alloc-stack-hoisting",

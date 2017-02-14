@@ -28,12 +28,15 @@
 namespace swift {
 
 class DominanceInfo;
+class PostOrderFunctionInfo;
+class ReversePostOrderInfo;
 class Operand;
 class SILBasicBlock;
 class SILFunction;
 class SILInstruction;
 class SILLocation;
 class SILModule;
+class TransitivelyUnreachableBlocksInfo;
 class ValueBaseUseIterator;
 class ValueUseIterator;
 
@@ -278,7 +281,8 @@ public:
   ValueOwnershipKind getOwnershipKind() const;
 
   /// Verify that this SILValue and its uses respects ownership invariants.
-  void verifyOwnership(SILModule &Mod) const;
+  void verifyOwnership(SILModule &Mod,
+                       TransitivelyUnreachableBlocksInfo *TUB = nullptr) const;
 };
 
 /// A formal SIL reference to a value, suitable for use as a stored

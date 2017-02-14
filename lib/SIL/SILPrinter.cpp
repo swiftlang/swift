@@ -2136,6 +2136,9 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   case SILStage::Canonical:
     OS << "canonical";
     break;
+  case SILStage::Lowered:
+    OS << "lowered";
+    break;
   }
   
   OS << "\n\nimport Builtin\nimport " << STDLIB_NAME

@@ -1370,15 +1370,6 @@ void Remangler::mangleConstrainedType(Node *node) {
   }
 }
 
-void Remangler::mangleArchetype(Node *node) {
-  if (node->hasChildren()) {
-    assert(node->getNumChildren() == 1);
-    mangleProtocolListWithoutPrefix(node->begin()->get());
-  } else {
-    Out << '_';
-  }
-}
-
 void Remangler::mangleAssociatedType(Node *node) {
   if (node->hasChildren()) {
     assert(node->getNumChildren() == 1);

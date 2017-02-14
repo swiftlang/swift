@@ -701,8 +701,8 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
   if (Context.hadError())
     return true;
 
-  // Cleanup instructions/builtin calls not suitable for IRGen.
-  performSILCleanup(SM.get());
+  // Convert SIL to a lowered form suitable for IRGen.
+  runSILLoweringPasses(*SM.get());
 
   // TODO: remove once the frontend understands what action it should perform
   IRGenOpts.OutputKind = getOutputKind(Action);

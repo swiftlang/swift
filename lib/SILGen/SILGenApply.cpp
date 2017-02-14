@@ -2464,8 +2464,10 @@ RValue SILGenFunction::emitApply(
         SILValue v = elt.copyUnmanaged(*this, loc).forward(*this);
         // We assume that unowned inner pointers, autoreleased values, and
         // indirect values are never returned in tuples.
-        assert(directResult.getConvention() == ResultConvention::Owned ||
-               directResult.getConvention() == ResultConvention::Unowned);
+        // FIXME: can this assertion be removed without lowered addresses?
+        assert(directResult.getConvention() == ResultConvention::Owned
+               || directResult.getConvention() == ResultConvention::Unowned
+               || !substFnConv.useLoweredAddresses());
         copiedResults.push_back({v, directResult});
         ++Index;
       }
