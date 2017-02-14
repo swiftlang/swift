@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 309; // Last change: static/non-static values
+const uint16_t VERSION_MINOR = 310; // Last change: uniquely identify extensions
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -1467,6 +1467,12 @@ namespace index_block {
   using GroupNamesLayout = BCGenericRecordLayout<
     RecordIDField, // record ID
     BCBlob       // actual names
+  >;
+
+  using ExtensionTableLayout = BCRecordLayout<
+    EXTENSIONS, // record ID
+    BCVBR<16>,  // table offset within the blob (see below)
+    BCBlob  // map from identifier strings to decl kinds / decl IDs
   >;
 
   using ObjCMethodTableLayout = BCRecordLayout<

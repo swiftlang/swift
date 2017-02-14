@@ -128,12 +128,16 @@ public:
 
   // In-memory representation of what will eventually be an on-disk
   // hash table of all defined Objective-C methods.
-  using ObjCMethodTable = llvm::DenseMap<ObjCSelector, ObjCMethodTableData>;
+  using ObjCMethodTable = llvm::MapVector<ObjCSelector, ObjCMethodTableData>;
 
   using NestedTypeDeclsData = SmallVector<std::pair<DeclID, DeclID>, 4>;
   // In-memory representation of what will eventually be an on-disk
   // hash table of all defined Objective-C methods.
-  using NestedTypeDeclsTable = llvm::DenseMap<Identifier, NestedTypeDeclsData>;
+  using NestedTypeDeclsTable = llvm::MapVector<Identifier, NestedTypeDeclsData>;
+
+  using ExtensionTableData =
+      SmallVector<std::pair<const NominalTypeDecl *, DeclID>, 4>;
+  using ExtensionTable = llvm::MapVector<Identifier, ExtensionTableData>;
 
 private:
   /// A map from identifiers to methods and properties with the given name.
