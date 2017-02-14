@@ -8,6 +8,24 @@ protocol P {
   var x : Int { get }
 }
 
+func hasVarArg(_ args: Any...) {}
+
+// Test that we still use addresses when dealing with array initialization
+// ---
+// CHECK-LABEL: sil @_TF20opaque_values_silgen10callVarArgFT_T_ : $@convention(thin) () -> () {
+// CHECK: %[[APY:.*]] = apply %{{.*}}<Any>(%{{.*}}) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: %[[BRW:.*]] = begin_borrow %[[APY]]
+// CHECK: %[[TPL:.*]] = tuple_extract %[[BRW]] : $(Array<Any>, Builtin.RawPointer), 1
+// CHECK: end_borrow %[[BRW]] from %[[APY]] : $(Array<Any>, Builtin.RawPointer), $(Array<Any>, Builtin.RawPointer)
+// CHECK: destroy_value %[[APY]]
+// CHECK: %[[PTR:.*]] = pointer_to_address %[[TPL]] : $Builtin.RawPointer to [strict] $*Any
+// CHECK: init_existential_addr %[[PTR]] : $*Any, $Int
+// CHECK: return %{{.*}} : $()
+// CHECK: } // end sil function '_TF20opaque_values_silgen10callVarArgFT_T_'
+public func callVarArg() {
+  hasVarArg(3)
+}
+
 // Test emitSemanticStore.
 // ---
 // CHECK-LABEL: sil hidden @_TF20opaque_values_silgen11assigninouturFTRxx_T_ : $@convention(thin) <T> (@inout T, @in T) -> () {
