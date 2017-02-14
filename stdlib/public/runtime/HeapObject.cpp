@@ -709,6 +709,18 @@ bool swift::isNativeSwiftWeakReference(WeakReference *ref) {
   return (ref->Value & WR_NATIVEMASK) == WR_NATIVE;
 }
 
+static HeapObject *decodeWeaklyReferencedObject(uintptr_t ptr) {
+  return reinterpret_cast<HeapObject *>(ptr & ~WR_NATIVEMASK);
+}
+
+static HeapObject *extractWeaklyReferencedObject(WeakReference *ref) {
+  return decodeWeaklyReferencedObject(ref->Value);
+}
+
+static bool isClearedWeakReference(WeakReference *ref) {
+  return extractWeaklyReferencedObject(ref) == nullptr;
+}
+
 void swift::swift_weakInit(WeakReference *ref, HeapObject *value) {
   ref->Value = (uintptr_t)value | WR_NATIVE;
   SWIFT_RT_ENTRY_CALL(swift_unownedRetain)(value);
@@ -716,15 +728,14 @@ void swift::swift_weakInit(WeakReference *ref, HeapObject *value) {
 
 void swift::swift_weakAssign(WeakReference *ref, HeapObject *newValue) {
   SWIFT_RT_ENTRY_CALL(swift_unownedRetain)(newValue);
-  auto oldValue = (HeapObject*) (ref->Value & ~WR_NATIVE);
+  auto oldValue = extractWeaklyReferencedObject(ref);
   ref->Value = (uintptr_t)newValue | WR_NATIVE;
   SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(oldValue);
 }
 
 HeapObject *swift::swift_weakLoadStrong(WeakReference *ref) {
-  if (ref->Value == (uintptr_t)nullptr) {
+  if (isClearedWeakReference(ref))
     return nullptr;
-  }
 
   // ref might be visible to other threads
   auto ptr = __atomic_fetch_or(&ref->Value, WR_READING, __ATOMIC_RELAXED);
@@ -739,13 +750,19 @@ HeapObject *swift::swift_weakLoadStrong(WeakReference *ref) {
     ptr = __atomic_fetch_or(&ref->Value, WR_READING, __ATOMIC_RELAXED);
   }
 
-  auto object = (HeapObject*)(ptr & ~WR_NATIVE);
+  auto object = decodeWeaklyReferencedObject(ptr);
   if (object == nullptr) {
-    __atomic_store_n(&ref->Value, (uintptr_t)nullptr, __ATOMIC_RELAXED);
+    // Weak variable is already cleared.
+    // Put back the existing value so as to preserve any WR_NATIVE bit.
+    __atomic_store_n(&ref->Value, ptr, __ATOMIC_RELAXED);
     return nullptr;
   }
   if (object->refCount.isDeallocating()) {
-    __atomic_store_n(&ref->Value, (uintptr_t)nullptr, __ATOMIC_RELAXED);
+    // Weakly-referenced object is dead but the variable is not cleared.
+    // Clear it. Preserve the WR_NATIVE bit to avoid a race
+    // versus swift_unknownWeakLoadStrong.
+    __atomic_store_n(&ref->Value, (uintptr_t)nullptr | WR_NATIVE,
+                     __ATOMIC_RELAXED);
     SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(object);
     return nullptr;
   }
@@ -755,8 +772,9 @@ HeapObject *swift::swift_weakLoadStrong(WeakReference *ref) {
 }
 
 HeapObject *swift::swift_weakTakeStrong(WeakReference *ref) {
-  auto object = (HeapObject*) (ref->Value & ~WR_NATIVE);
-  if (object == nullptr) return nullptr;
+  auto object = extractWeaklyReferencedObject(ref);
+  if (object == nullptr)
+    return nullptr;
   auto result = swift_tryRetain(object);
   ref->Value = (uintptr_t)nullptr;
   swift_unownedRelease(object);
@@ -764,13 +782,13 @@ HeapObject *swift::swift_weakTakeStrong(WeakReference *ref) {
 }
 
 void swift::swift_weakDestroy(WeakReference *ref) {
-  auto tmp = (HeapObject*) (ref->Value & ~WR_NATIVE);
+  auto tmp = extractWeaklyReferencedObject(ref);
   ref->Value = (uintptr_t)nullptr;
   SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(tmp);
 }
 
 void swift::swift_weakCopyInit(WeakReference *dest, WeakReference *src) {
-  if (src->Value == (uintptr_t)nullptr) {
+  if (isClearedWeakReference(src)) {
     dest->Value = (uintptr_t)nullptr;
     return;
   }
@@ -788,12 +806,18 @@ void swift::swift_weakCopyInit(WeakReference *dest, WeakReference *src) {
     ptr = __atomic_fetch_or(&src->Value, WR_READING, __ATOMIC_RELAXED);
   }
 
-  auto object = (HeapObject*)(ptr & ~WR_NATIVE);
+  auto object = decodeWeaklyReferencedObject(ptr);
   if (object == nullptr) {
-    __atomic_store_n(&src->Value, (uintptr_t)nullptr, __ATOMIC_RELAXED);
+    // Weak variable is already cleared.
+    // Put back the existing value so as to preserve any WR_NATIVE bit.
+    __atomic_store_n(&src->Value, ptr, __ATOMIC_RELAXED);
     dest->Value = (uintptr_t)nullptr;
   } else if (object->refCount.isDeallocating()) {
-    __atomic_store_n(&src->Value, (uintptr_t)nullptr, __ATOMIC_RELAXED);
+    // Weakly-referenced object is dead but the variable is not cleared.
+    // Clear it. Preserve the WR_NATIVE bit to avoid a race
+    // versus swift_unknownWeakLoadStrong.
+    __atomic_store_n(&src->Value, (uintptr_t)nullptr | WR_NATIVE,
+                     __ATOMIC_RELAXED);
     SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(object);
     dest->Value = (uintptr_t)nullptr;
   } else {
@@ -804,7 +828,7 @@ void swift::swift_weakCopyInit(WeakReference *dest, WeakReference *src) {
 }
 
 void swift::swift_weakTakeInit(WeakReference *dest, WeakReference *src) {
-  auto object = (HeapObject*) (src->Value & ~WR_NATIVE);
+  auto object = extractWeaklyReferencedObject(src);
   if (object == nullptr) {
     dest->Value = (uintptr_t)nullptr;
   } else if (object->refCount.isDeallocating()) {
@@ -817,18 +841,16 @@ void swift::swift_weakTakeInit(WeakReference *dest, WeakReference *src) {
 }
 
 void swift::swift_weakCopyAssign(WeakReference *dest, WeakReference *src) {
-  if (dest->Value) {
-    auto object = (HeapObject*) (dest->Value & ~WR_NATIVE);
+  auto object = extractWeaklyReferencedObject(dest);
+  if (object)
     SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(object);
-  }
   swift_weakCopyInit(dest, src);
 }
 
 void swift::swift_weakTakeAssign(WeakReference *dest, WeakReference *src) {
-  if (dest->Value) {
-    auto object = (HeapObject*) (dest->Value & ~WR_NATIVE);
+  auto object = extractWeaklyReferencedObject(dest);
+  if (object)
     SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(object);
-  }
   swift_weakTakeInit(dest, src);
 }
 
