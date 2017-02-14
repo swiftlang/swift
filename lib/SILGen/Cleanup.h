@@ -73,8 +73,8 @@ public:
   bool isActive() const { return state >= CleanupState::Active; }
   bool isDead() const { return state == CleanupState::Dead; }
 
-  virtual void emit(SILGenFunction &Gen, CleanupLocation L) = 0;
-  virtual void dump() const = 0;
+  virtual void emit(SILGenFunction &gen, CleanupLocation L) = 0;
+  virtual void dump(SILGenFunction &gen) const = 0;
 };
 
 /// A cleanup depth is generally used to denote the set of cleanups

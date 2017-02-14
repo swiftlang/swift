@@ -460,7 +460,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
 
       auto nativeError = F(SGFContext());
 
-      WritebackScope writebackScope(*this);
+      FormalEvaluationScope writebackScope(*this);
       auto nsError =
         emitRValueForPropertyLoad(loc, nativeError, concreteFormalType,
                                   /*super*/ false, nsErrorVar,
