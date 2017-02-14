@@ -461,10 +461,6 @@ void Remangler::mangleAllocator(Node *node) {
   Buffer << "fC";
 }
 
-void Remangler::mangleArchetype(Node *node) {
-  unreachable("unsupported node");
-}
-
 void Remangler::mangleArgumentTuple(Node *node) {
   Node *Child = skipType(getSingleChild(node));
   if (Child->getKind() == Node::Kind::NonVariadicTuple &&

@@ -719,42 +719,6 @@ static void VisitNodeAddressor(
   result._types.push_back(swift_can_func_type.getPointer());
 }
 
-static void VisitNodeArchetype(
-    ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
-    Demangle::NodePointer &cur_node, VisitNodeResult &result,
-    const VisitNodeResult &generic_context) { // set by GenericType case
-  const StringRef &archetype_name(cur_node->getText());
-  VisitNodeResult protocol_list;
-  for (Demangle::Node::iterator pos = cur_node->begin(), end = cur_node->end();
-       pos != end; ++pos) {
-    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
-    switch (child_node_kind) {
-    case Demangle::Node::Kind::ProtocolList:
-      nodes.push_back(*pos);
-      VisitNode(ast, nodes, protocol_list, generic_context);
-      break;
-    default:
-      result._error =
-          stringWithFormat("%s encountered in generics children",
-                           SwiftDemangleNodeKindToCString(child_node_kind));
-      break;
-    }
-  }
-
-  SmallVector<ProtocolDecl *, 1> conforms_to;
-  if (protocol_list.HasSingleType()) {
-    (void)protocol_list.GetFirstType()->isExistentialType(conforms_to);
-  }
-
-  if (ast) {
-    result._types.push_back(ArchetypeType::getNew(
-        *ast, nullptr, ast->getIdentifier(archetype_name), conforms_to,
-        Type(), LayoutConstraint()));
-  } else {
-    result._error = "invalid ASTContext";
-  }
-}
-
 static void VisitNodeAssociatedTypeRef(
     ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
     Demangle::NodePointer &cur_node, VisitNodeResult &result,
@@ -2015,10 +1979,6 @@ static void visitNodeImpl(
   case Demangle::Node::Kind::UnsafeAddressor:
   case Demangle::Node::Kind::UnsafeMutableAddressor:
     VisitNodeAddressor(ast, nodes, node, result, genericContext);
-    break;
-
-  case Demangle::Node::Kind::Archetype:
-    VisitNodeArchetype(ast, nodes, node, result, genericContext);
     break;
 
   case Demangle::Node::Kind::ArgumentTuple:
