@@ -11,10 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "ArgumentSource.h"
+#include "FormalEvaluation.h"
+#include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
 #include "Scope.h"
-#include "Initialization.h"
 #include "SpecializedEmitter.h"
 #include "Varargs.h"
 #include "swift/AST/ASTContext.h"
@@ -23,8 +24,8 @@
 #include "swift/AST/Module.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Unicode.h"
-#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "swift/SIL/SILArgument.h"
 #include "llvm/Support/Compiler.h"
 
 using namespace swift;
@@ -2380,7 +2381,7 @@ RValue SILGenFunction::emitApply(
   }
 
   // If there's a foreign error parameter, fill it in.
-  Optional<WritebackScope> errorTempWriteback;
+  Optional<FormalEvaluationScope> errorTempWriteback;
   ManagedValue errorTemp;
   if (foreignError) {
     // Error-temporary emission may need writeback.
@@ -4177,7 +4178,7 @@ namespace {
     std::vector<CallSite> uncurriedSites;
     std::vector<CallSite> extraSites;
     Callee callee;
-    WritebackScope InitialWritebackScope;
+    FormalEvaluationScope InitialWritebackScope;
     unsigned uncurries;
     bool applied;
     bool AssumedPlusZeroSelf;
@@ -4185,15 +4186,12 @@ namespace {
   public:
     /// Create an emission for a call of the given callee.
     CallEmission(SILGenFunction &gen, Callee &&callee,
-                 WritebackScope &&writebackScope,
+                 FormalEvaluationScope &&writebackScope,
                  bool assumedPlusZeroSelf = false)
-      : gen(gen),
-        callee(std::move(callee)),
-        InitialWritebackScope(std::move(writebackScope)),
-        uncurries(callee.getNaturalUncurryLevel() + 1),
-        applied(false),
-        AssumedPlusZeroSelf(assumedPlusZeroSelf)
-    {
+        : gen(gen), callee(std::move(callee)),
+          InitialWritebackScope(std::move(writebackScope)),
+          uncurries(callee.getNaturalUncurryLevel() + 1), applied(false),
+          AssumedPlusZeroSelf(assumedPlusZeroSelf) {
       // Subtract an uncurry level for captures, if any.
       // TODO: Encapsulate this better in Callee.
       if (this->callee.hasCaptures()) {
@@ -4544,7 +4542,7 @@ namespace {
       // If there are remaining call sites, apply them to the result function.
       // Each chained call gets its own writeback scope.
       for (unsigned i = 0, size = extraSites.size(); i < size; ++i) {
-        WritebackScope writebackScope(gen);
+        FormalEvaluationScope writebackScope(gen);
 
         SILLocation loc = extraSites[i].Loc;
 
@@ -4607,7 +4605,7 @@ namespace {
 
 static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   // Set up writebacks for the call(s).
-  WritebackScope writebacks(gen);
+  FormalEvaluationScope writebacks(gen);
 
   SILGenApply apply(gen);
 
@@ -4711,7 +4709,7 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
   SILConstantInfo initConstant = SGF.getConstantInfo(initRef);
 
   // Scope any further writeback just within this operation.
-  WritebackScope writebackScope(SGF);
+  FormalEvaluationScope writebackScope(SGF);
 
   // Determine the formal and substituted types.
   CanFunctionType substFormalType;
@@ -5279,7 +5277,7 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
                 bool isSuper, bool isDirectUse,
                 RValue &&subscripts, SGFContext c) {
   // Scope any further writeback just within this operation.
-  WritebackScope writebackScope(*this);
+  FormalEvaluationScope writebackScope(*this);
 
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
                                                      substitutions, selfValue,
@@ -5322,7 +5320,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
                                      bool isSuper, bool isDirectUse,
                                      RValue &&subscripts, RValue &&setValue) {
   // Scope any further writeback just within this operation.
-  WritebackScope writebackScope(*this);
+  FormalEvaluationScope writebackScope(*this);
 
   Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
                                                      substitutions, selfValue,
@@ -5376,7 +5374,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                               RValue &&subscripts, SILValue buffer,
                               SILValue callbackStorage) {
   // Scope any further writeback just within this operation.
-  WritebackScope writebackScope(*this);
+  FormalEvaluationScope writebackScope(*this);
 
   Callee callee = emitSpecializedAccessorFunctionRef(*this, loc,
                                                      materializeForSet,
@@ -5462,7 +5460,7 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                       bool isSuper, bool isDirectUse,
                       RValue &&subscripts, SILType addressType) {
   // Scope any further writeback just within this operation.
-  WritebackScope writebackScope(*this);
+  FormalEvaluationScope writebackScope(*this);
 
   Callee callee =
     emitSpecializedAccessorFunctionRef(*this, loc, addressor,

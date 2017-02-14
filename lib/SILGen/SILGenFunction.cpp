@@ -51,8 +51,6 @@ SILGenFunction::~SILGenFunction() {
   // If we didn't clean up the rethrow destination, we screwed up somewhere.
   assert(!ThrowDest.isValid() &&
          "SILGenFunction did not emit throw destination");
-
-  freeWritebackStack();
 }
 
 //===----------------------------------------------------------------------===//
