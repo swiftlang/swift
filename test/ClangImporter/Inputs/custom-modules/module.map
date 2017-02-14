@@ -108,6 +108,11 @@ module PredefinedMacros {
   export *
 }
 
+module ProtoRenaming {
+  header "ProtoRenaming.h"
+  export *
+}
+
 module ProtoWithInitializer {
   header "ProtoWithInitializer.h"
   export *
