@@ -115,6 +115,14 @@ class ReabstractionInfo {
                                            bool HasUnboundGenericParams);
 
   void createSubstitutedAndSpecializedTypes();
+  bool prepareAndCheck(ApplySite Apply, SILFunction *Callee,
+                       SubstitutionList ParamSubs);
+  void specializeConcreteAndGenericSubstitutions(ApplySite Apply,
+                                                 SILFunction *Callee,
+                                                 SubstitutionList ParamSubs);
+  void specializeConcreteSubstitutions(ApplySite Apply, SILFunction *Callee,
+                                       SubstitutionList ParamSubs);
+
 public:
   /// Constructs the ReabstractionInfo for generic function \p Orig with
   /// substitutions \p ParamSubs.
