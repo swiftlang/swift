@@ -835,10 +835,14 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
 static StringRef copyAndStripUnderscores(ASTContext &C, StringRef orig) {
   char *start = static_cast<char*>(C.Allocate(orig.size(), 1));
   char *p = start;
-  
-  for (char c : orig)
-    if (c != '_')
-      *p++ = c;
+
+  if (p) {
+    for (char c : orig) {
+      if (c != '_') {
+        *p++ = c;
+      }
+    }
+  }
   
   return StringRef(start, p - start);
 }
