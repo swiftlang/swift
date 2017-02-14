@@ -3018,7 +3018,7 @@ void ProtocolDecl::computeRequirementSignature() {
                   genericSig->getRequirements().size() == 1;
   if (!validSig) {
     // This doesn't look like a protocol we can handle, so some other error must
-    // have occured (usually a protocol nested within another declaration)
+    // have occurred (usually a protocol nested within another declaration)
     return;
   }
 

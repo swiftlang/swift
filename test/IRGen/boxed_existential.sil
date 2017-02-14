@@ -61,8 +61,8 @@ entry(%b : $Error):
 
 struct Str : Error { }
 
-// CHECK-LABEL: define{{( protected)?}} void @alloc_deallc_box_with_concrete_type
-sil @alloc_deallc_box_with_concrete_type : $@convention(thin) () -> () {
+// CHECK-LABEL: define{{( protected)?}} void @alloc_dealloc_box_with_concrete_type
+sil @alloc_dealloc_box_with_concrete_type : $@convention(thin) () -> () {
 bb0:
   // CHECK: call {{.*}} @swift_allocError
   %b = alloc_existential_box $Error, $Str

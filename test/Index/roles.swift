@@ -159,7 +159,7 @@ class ASubClass : AClass, AProtocol {
 // RelationExtendedBy
 // FIXME give extensions their own USR like ObjC?
 extension AClass {
-  // CHECK: [[@LINE-1]]:11 | extension/ext-class/Swift | AClass | s:C14swift_ide_test6AClass | Def | rel: 0
+  // CHECK: [[@LINE-1]]:11 | extension/ext-class/Swift | AClass | s:e:s:FC14swift_ide_test6AClass3barFT_Si | Def | rel: 0
   // CHECK: [[@LINE-2]]:11 | class/Swift | AClass | s:C14swift_ide_test6AClass | Ref,RelExt | rel: 1
   // CHECK-NEXT: RelExt | AClass | s:C14swift_ide_test6AClass
 

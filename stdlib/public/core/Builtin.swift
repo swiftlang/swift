@@ -677,7 +677,7 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 ///     // Smile! 😀
 ///
 /// In this example, accessing the `text` property of the `smileyType` metatype
-/// retrieves the overriden value from the `EmojiSmiley` subclass, instead of
+/// retrieves the overridden value from the `EmojiSmiley` subclass, instead of
 /// the `Smiley` class's original definition.
 ///
 /// Normally, you don't need to be aware of the difference between concrete and
