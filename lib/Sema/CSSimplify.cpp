@@ -3874,7 +3874,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       if (generic2->getDecl()->classifyAsOptionalType()) {
         return matchTypes(type1, generic2->getGenericArgs()[0],
                           matchKind, (subflags | TMF_UnwrappingOptional),
-                          locator);
+                          locator.withPathElement(
+                            ConstraintLocator::OptionalPayload));
       }
     }
 
