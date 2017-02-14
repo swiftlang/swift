@@ -2635,7 +2635,7 @@ bool swift::printAsObjC(llvm::raw_ostream &os, ModuleDecl *M,
 }
 
 std::pair<DeclName, ObjCSelector> swift::
-getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName) {
+getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
   ASTContext &Ctx = VD->getASTContext();
   LazyResolver *Resolver = Ctx.getLazyResolver();
   if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD)) {
@@ -2647,9 +2647,9 @@ getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName) {
   } else if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
     return getObjCNameForSwiftDecl(SD->getGetter(), PreferredName);
   } else {
-    if (auto Name = getNameForObjC(VD, CustomNamesOnly) {
+    auto Name = getNameForObjC(VD, CustomNamesOnly);
+    if (!Name.empty())
       return {DeclName(Ctx.getIdentifier(Name)), ObjCSelector()};
-    }
     return {PreferredName, ObjCSelector()};
   }
 }

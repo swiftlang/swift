@@ -27,6 +27,7 @@
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/XMLUtils.h"
+#include "swift/PrintAsObjC/PrintAsObjC.h"
 #include "swift/Sema/IDETypeChecking.h"
 
 #include "clang/AST/ASTContext.h"
@@ -882,7 +883,7 @@ getSwiftDeclName(ASTContext &Ctx, NameTranslatingInfo &Info) {
   assert(SwiftLangSupport::getNameKindForUID(Info.NameKind) == NameKind::Swift);
   std::vector<Identifier> Args(Info.ArgNames.size(), Identifier());
   std::transform(Info.ArgNames.begin(), Info.ArgNames.end(), Args.begin(),
-                 [](StringRef T) { return Ctx.getIdentifier(T)});
+                 [&](StringRef T) { return Ctx.getIdentifier(T); });
   return DeclName(Ctx, Ctx.getIdentifier(Info.BaseName),
                   llvm::makeArrayRef(Args));
 }
@@ -893,18 +894,26 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
   switch (SwiftLangSupport::getNameKindForUID(Info.NameKind)) {
   case NameKind::Swift: {
     NameTranslatingInfo Result;
-    auto Ctx = VD->getDeclContext()->getASTContext();
+    auto &Ctx = VD->getDeclContext()->getASTContext();
     auto ResultPair = getObjCNameForSwiftDecl(VD, getSwiftDeclName(Ctx, Info));
-    if (DeclName Name = ResultPair.getFirst()) {
+    if (DeclName Name = ResultPair.first) {
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::ObjC);
       Result.BaseName = Name.getBaseName().str();
       Receiver(Result);
       return false;
-    } else if (ObjCSelector Selector = ResultPair.getSecond()) {
+    } else if (ObjCSelector Selector = ResultPair.second) {
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::ObjC);
-      unsigned N = Selector.getSelectorPieces();
-      std::vector<StringRef> Pieces(N, StringRef());
-      
+      SmallString<64> Buffer;
+      StringRef Total = Selector.getString(Buffer);
+      SmallVector<StringRef, 4> Pieces;
+      Total.split(Pieces, ":", -1, false);
+      if (Selector.getNumArgs()) {
+        std::transform(Pieces.begin(), Pieces.end(), Pieces.begin(),
+          [](StringRef P) { return StringRef(P.data(), P.size() + 1); });
+      }
+      Result.ArgNames = llvm::makeArrayRef(Pieces);
+      Receiver(Result);
+      return false;
     } else {
       Receiver(Result);
       return true;

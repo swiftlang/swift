@@ -437,7 +437,7 @@ public:
   ObjCSelector() : Storage() {};
 
   /// Convert to true if the decl name is valid.
-  operator bool() const { return Storage; }
+  explicit operator bool() const { return (bool)Storage; }
 
   /// Determine the number of arguments in the selector.
   ///

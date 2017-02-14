@@ -3433,7 +3433,7 @@ ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
   auto name = var->getObjCPropertyName();
 
   // Use preferred name is specified.
-  if (preferredName)
+  if (!preferredName.empty())
     name = preferredName;
   return VarDecl::getDefaultObjCGetterSelector(ctx, name);
 }
@@ -3470,7 +3470,7 @@ ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
   // property name capitalized and preceded by 'set'.
   auto var = cast<VarDecl>(this);
   Identifier Name = var->getObjCPropertyName();
-  if (preferredName)
+  if (!preferredName.empty())
     Name = preferredName;
   auto result = VarDecl::getDefaultObjCSetterSelector(ctx, Name);
 
@@ -4339,7 +4339,7 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
   auto argNames = getFullName().getArgumentNames();
 
   // Use the preferred name if specified
-  if (preferrredName) {
+  if (preferredName) {
     // Return invalid selector if argument count doesn't match.
     if (argNames.size() != preferredName.getArgumentNames().size()) {
       return ObjCSelector();
