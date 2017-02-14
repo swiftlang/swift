@@ -52,10 +52,13 @@ bb0(%0 : @owned $Builtin.NativeObject):
   br bb1(%0 : $Builtin.NativeObject)
 
 bb1(%1 : @owned $Builtin.NativeObject):
-  cond_br undef, bb2, bb1(%1 : $Builtin.NativeObject)
+  cond_br undef, bb2, bb3
 
 bb2:
   unreachable
+
+bb3:
+  br bb1(%1 : $Builtin.NativeObject)
 }
 
 // Make sure that we properly handle loop parameters that are leaked in the body
