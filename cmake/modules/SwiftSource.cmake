@@ -494,6 +494,8 @@ function(_compile_swift_files
     add_custom_command_target(
         module_dependency_target
         COMMAND
+          "${CMAKE_COMMAND}" "-E" "remove" "-f" "${module_file}"
+        COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}" ${swift_flags}
           "@${file_path}"
