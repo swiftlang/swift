@@ -912,7 +912,7 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
         std::transform(Pieces.begin(), Pieces.end(), Pieces.begin(),
           [](StringRef P) { return StringRef(P.data(), P.size() + 1); });
       }
-      Result.ArgNames = llvm::makeArrayRef(Pieces);
+      Result.ArgNames.insert(Result.ArgNames.begin(), Pieces.begin(), Pieces.end());
     } else {
       Receiver(Result);
       return true;

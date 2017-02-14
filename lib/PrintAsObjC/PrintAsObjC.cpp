@@ -119,6 +119,25 @@ static StringRef getNameForObjC(const ValueDecl *VD,
   return VD->getName().str();
 }
 
+static Optional<StringRef>
+printSwiftEnumElemNameInObjC(const EnumElementDecl *EL, llvm::raw_ostream &OS,
+                             Identifier PreferredName = Identifier()) {
+  OS << getNameForObjC(EL->getDeclContext()->getAsEnumOrEnumExtensionContext());
+  StringRef ElemName = getNameForObjC(EL, CustomNamesOnly);
+  Optional<StringRef> Result = None;
+  if (ElemName.empty()) {
+    if (PreferredName.empty())
+      ElemName = EL->getName().str();
+    else
+      ElemName = PreferredName.str();
+  } else {
+    Result = ElemName;
+  }
+  SmallString<64> Scratch;
+  OS << camel_case::toSentencecase(ElemName, Scratch);
+  return Result;
+}
+
 /// Returns true if the given selector might be classified as an init method
 /// by Objective-C ARC.
 static bool looksLikeInitMethod(ObjCSelector selector) {
@@ -403,18 +422,8 @@ private:
       // Print the cases as the concatenation of the enum name with the case
       // name.
       os << "  ";
-      StringRef customEltName = getNameForObjC(Elt, CustomNamesOnly);
-      if (customEltName.empty()) {
-        if (customName.empty()) {
-          os << ED->getName();
-        } else {
-          os << customName;
-        }
-
-        SmallString<16> scratch;
-        os << camel_case::toSentencecase(Elt->getName().str(), scratch);
-      } else {
-        os << customEltName
+      if (auto customEltName = printSwiftEnumElemNameInObjC(Elt, os)) {
+        os << customEltName.getValue()
            << " SWIFT_COMPILE_NAME(\"" << Elt->getName() << "\")";
       }
       
@@ -2647,20 +2656,15 @@ getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
   } else if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
     return getObjCNameForSwiftDecl(SD->getGetter(), PreferredName);
   } else if (auto *EL = dyn_cast<EnumElementDecl>(VD)) {
-    EnumDecl* ED = EL->getDeclContext()->getAsEnumOrEnumExtensionContext();
     SmallString<64> Buffer;
     {
       llvm::raw_svector_ostream OS(Buffer);
-      OS << getNameForObjC(ED).str();
-      SmallString<64> Scratch;
-      OS << camel_case::toSentencecase(PreferredName.getBaseName().str(),
-                                       Scratch);
+      printSwiftEnumElemNameInObjC(EL, OS, PreferredName.getBaseName());
     }
     return {Ctx.getIdentifier(Buffer.str()), ObjCSelector()};
   } else {
-    auto Name = getNameForObjC(VD, CustomNamesOnly);
-    if (!Name.empty())
-      return {Ctx.getIdentifier(Name), ObjCSelector()};
-    return {PreferredName.getBaseName(), ObjCSelector()};
+    if (PreferredName)
+      return {PreferredName.getBaseName(), ObjCSelector()};
+    return {Ctx.getIdentifier(getNameForObjC(VD)), ObjCSelector()};
   }
 }
