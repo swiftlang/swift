@@ -122,23 +122,23 @@ protocol AProtocol {
 }
 
 // Extension
-extension AnEnumeration {}
-// CHECK: [[@LINE-1]]:11 | extension/ext-enum/Swift | AnEnumeration | s:14swift_ide_test13AnEnumerationO | Def | rel: 0
+extension AnEnumeration { func extFn() {} }
+// CHECK: [[@LINE-1]]:11 | extension/ext-enum/Swift | AnEnumeration | s:e:s:14swift_ide_test13AnEnumerationO5extFnyyF | Def | rel: 0
 // CHECK: [[@LINE-2]]:11 | enum/Swift | AnEnumeration | s:14swift_ide_test13AnEnumerationO | Ref,RelExt | rel: 1
 // CHECK-NEXT: RelExt | AnEnumeration | s:14swift_ide_test13AnEnumerationO
 
-extension AStruct {}
-// CHECK: [[@LINE-1]]:11 | extension/ext-struct/Swift | AStruct | s:14swift_ide_test7AStructV | Def | rel: 0
+extension AStruct { func extFn() {} }
+// CHECK: [[@LINE-1]]:11 | extension/ext-struct/Swift | AStruct | s:e:s:14swift_ide_test7AStructV5extFnyyF | Def | rel: 0
 // CHECK: [[@LINE-2]]:11 | struct/Swift | AStruct | s:14swift_ide_test7AStructV | Ref,RelExt | rel: 1
 // CHECK-NEXT: RelExt | AStruct | s:14swift_ide_test7AStructV
 
-extension AClass {}
-// CHECK: [[@LINE-1]]:11 | extension/ext-class/Swift | AClass | s:14swift_ide_test6AClassC | Def | rel: 0
+extension AClass { func extFn() {} }
+// CHECK: [[@LINE-1]]:11 | extension/ext-class/Swift | AClass | s:e:s:14swift_ide_test6AClassC5extFnyyF | Def | rel: 0
 // CHECK: [[@LINE-2]]:11 | class/Swift | AClass | s:14swift_ide_test6AClassC | Ref,RelExt | rel: 1
 // CHECK-NEXT: RelExt | AClass | s:14swift_ide_test6AClassC
 
-extension AProtocol {}
-// CHECK: [[@LINE-1]]:11 | extension/ext-protocol/Swift | AProtocol | s:14swift_ide_test9AProtocolP | Def | rel: 0
+extension AProtocol { func extFn() }
+// CHECK: [[@LINE-1]]:11 | extension/ext-protocol/Swift | AProtocol | s:e:s:14swift_ide_test9AProtocolPAAE5extFnyyF | Def | rel: 0
 // CHECK: [[@LINE-2]]:11 | protocol/Swift | AProtocol | s:14swift_ide_test9AProtocolP | Ref,RelExt | rel: 1
 // CHECK-NEXT: RelExt | AProtocol | s:14swift_ide_test9AProtocolP
 

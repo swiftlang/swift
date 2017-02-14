@@ -132,14 +132,20 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
   llvm::DenseMap<DeclAccessorPair, NameAndUSR> accessorNameAndUSRCache;
   StringScratchSpace stringStorage;
 
-  bool getNameAndUSR(ValueDecl *D, StringRef &name, StringRef &USR) {
-    auto &result = nameAndUSRCache[D];
+  bool getNameAndUSR(ValueDecl *D, ExtensionDecl *ExtD,
+                     StringRef &name, StringRef &USR) {
+    auto &result = nameAndUSRCache[ExtD ? (Decl*)ExtD : D];
     if (result.USR.empty()) {
       SmallString<128> storage;
       {
         llvm::raw_svector_ostream OS(storage);
-        if (ide::printDeclUSR(D, OS))
-          return true;
+        if (ExtD) {
+          if (ide::printExtensionUSR(ExtD, OS))
+            return true;
+        } else {
+          if (ide::printDeclUSR(D, OS))
+            return true;
+        }
         result.USR = stringStorage.copyString(OS.str());
       }
 
@@ -190,7 +196,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
 
     if (SymInfo.Kind == SymbolKind::Unknown)
       return true;
-    if (getNameAndUSR(D, Name, USR))
+    if (getNameAndUSR(D, /*ExtD=*/nullptr, Name, USR))
       return true;
 
     Info.Relations.push_back(IndexRelation(RelationRoles, D, SymInfo, Name, USR));
@@ -360,6 +366,8 @@ private:
   }
 
   bool initIndexSymbol(ValueDecl *D, SourceLoc Loc, bool IsRef,
+                       IndexSymbol &Info);
+  bool initIndexSymbol(ExtensionDecl *D, ValueDecl *ExtendedD, SourceLoc Loc,
                        IndexSymbol &Info);
   bool initFuncDeclIndexSymbol(FuncDecl *D, IndexSymbol &Info);
   bool initFuncRefIndexSymbol(Expr *CurrentE, Expr *ParentE, ValueDecl *D,
@@ -720,10 +728,8 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
     return true;
 
   IndexSymbol Info;
-  if (initIndexSymbol(NTD, Loc, /*IsRef=*/false, Info))
+  if (initIndexSymbol(D, NTD, Loc, Info))
     return true;
-
-  Info.symInfo = getSymbolInfoForDecl(D);
 
   if (!startEntity(D, Info))
     return false;
@@ -857,7 +863,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
   else
     Info.roles |= (unsigned)SymbolRole::Definition;
 
-  if (getNameAndUSR(D, Info.name, Info.USR))
+  if (getNameAndUSR(D, /*ExtD=*/nullptr, Info.name, Info.USR))
     return true;
 
   std::tie(Info.line, Info.column) = getLineCol(Loc);
@@ -865,6 +871,25 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
     if (auto Group = D->getGroupName())
       Info.group = Group.getValue();
   }
+  return false;
+}
+
+bool IndexSwiftASTWalker::initIndexSymbol(ExtensionDecl *ExtD, ValueDecl *ExtendedD,
+                                          SourceLoc Loc, IndexSymbol &Info) {
+  assert(ExtD && ExtendedD);
+  Info.decl = ExtendedD;
+  Info.symInfo = getSymbolInfoForDecl(ExtD);
+  if (Info.symInfo.Kind == SymbolKind::Unknown)
+    return true;
+
+  Info.roles |= (unsigned)SymbolRole::Definition;
+
+  if (getNameAndUSR(ExtendedD, ExtD, Info.name, Info.USR))
+    return true;
+
+  std::tie(Info.line, Info.column) = getLineCol(Loc);
+  if (auto Group = ExtD->getGroupName())
+    Info.group = Group.getValue();
   return false;
 }
 
