@@ -2206,10 +2206,6 @@ commit_to_conversions:
 
   // Handle restrictions.
   if (auto restriction = conversionsOrFixes[0].getRestriction()) {
-    if (flags.contains(TMF_UnwrappingOptional)) {
-      subflags |= TMF_UnwrappingOptional;
-    }
-    
     return simplifyRestrictedConstraint(*restriction, type1, type2,
                                         kind, subflags, locator);
   }
