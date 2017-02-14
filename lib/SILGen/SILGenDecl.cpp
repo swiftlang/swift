@@ -120,7 +120,7 @@ namespace {
     void emit(SILGenFunction &gen, CleanupLocation l) override {
       gen.B.emitDestroyValueOperation(l, closure);
     }
-    void dump() const override {
+    void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
       llvm::errs() << "CleanupClosureConstant\n"
                    << "State:" << getState() << "\n"
@@ -222,7 +222,7 @@ public:
     gen.B.createEndBorrow(l, borrowed, original);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "EndBorrowCleanup "
                  << "State:" << getState() << "\n"
@@ -246,7 +246,7 @@ public:
       gen.B.emitDestroyValueOperation(l, v);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "ReleaseValueCleanup\n"
                  << "State:" << getState() << "\n"
@@ -267,7 +267,7 @@ public:
     gen.B.createDeallocStack(l, Addr);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "DeallocStackCleanup\n"
                  << "State:" << getState() << "\n"
@@ -288,7 +288,7 @@ public:
     gen.destroyLocalVariable(l, Var);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "DestroyLocalVariable\n"
                  << "State:" << getState() << "\n";
@@ -310,7 +310,7 @@ public:
     gen.deallocateUninitializedLocalVariable(l, Var);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "DeallocateUninitializedLocalVariable\n"
                  << "State:" << getState() << "\n";
@@ -1247,7 +1247,7 @@ namespace {
       }
     }
 
-    void dump() const override {
+    void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
       llvm::errs() << "DeinitExistentialCleanup\n"
                    << "State:" << getState() << "\n"

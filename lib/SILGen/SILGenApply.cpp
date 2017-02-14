@@ -3831,7 +3831,7 @@ public:
     gen.B.createDeallocBox(l, box);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &gen) const override {
 #ifndef NDEBUG
     llvm::errs() << "DeallocateUninitializedBox "
                  << "State:" << getState() << " "
@@ -4958,7 +4958,7 @@ namespace {
       gen.emitUninitializedArrayDeallocation(l, Array);
     }
 
-    void dump() const override {
+    void dump(SILGenFunction &gen) const override {
 #ifndef NDEBUG
       llvm::errs() << "DeallocateUninitializedArray "
                    << "State:" << getState() << " "
