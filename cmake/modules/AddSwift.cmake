@@ -1216,6 +1216,13 @@ function(add_swift_library name)
 
   llvm_add_library(${name} ${ARGN})
 
+  # Override the output directories setup by llvm_add_library. This is required
+  # because swift deviates from the LLVM convention of using the LLVM_*_INTDIR
+  # variables.
+  set_output_directory(${name}
+      BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
+      LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
+
   swift_install_in_component(dev
       TARGETS ${name}
       ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
