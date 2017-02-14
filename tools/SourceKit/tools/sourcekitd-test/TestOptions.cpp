@@ -131,6 +131,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("extract-comment", SourceKitRequest::ExtractComment)
         .Case("module-groups", SourceKitRequest::ModuleGroups)
         .Case("range", SourceKitRequest::RangeInfo)
+        .Case("translate", SourceKitRequest::NameTranslation)
         .Default(SourceKitRequest::None);
       if (Request == SourceKitRequest::None) {
         llvm::errs() << "error: invalid request, expected one of "
@@ -260,6 +261,18 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 
     case OPT_cursor_action:
       CollectActionables = true;
+      break;
+
+    case OPT_swift_name:
+      SwiftName = InputArg->getValue();
+      break;
+
+    case OPT_objc_name:
+      ObjCName = InputArg->getValue();
+      break;
+
+    case OPT_objc_selector:
+      ObjCSelector = InputArg->getValue();
       break;
 
     case OPT_UNKNOWN:

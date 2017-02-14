@@ -187,3 +187,29 @@ extension RangeReplaceableCollection where
 {
 	func f() { }
 }
+
+// rdar://problem/30478915
+protocol P11 {
+  associatedtype A
+}
+
+protocol P12 {
+	associatedtype B: P11
+}
+
+struct X6 { }
+
+struct X7 : P11 {
+	typealias A = X6
+}
+
+struct X8 : P12 {
+	typealias B = X7
+}
+
+struct X9<T: P12, U: P12> where T.B == U.B {
+  // CHECK-LABEL: X9.upperSameTypeConstraint
+	// CHECK: Generic signature: <T, U, V where T == X8, U : P12, U.B == X8.B>
+	// CHECK: Canonical generic signature: <τ_0_0, τ_0_1, τ_1_0 where τ_0_0 == X8, τ_0_1 : P12, τ_0_1.B == X7>
+	func upperSameTypeConstraint<V>(_: V) where T == X8 { }
+}

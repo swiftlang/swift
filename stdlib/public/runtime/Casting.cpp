@@ -16,7 +16,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Demangle.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Enum.h"
@@ -26,6 +25,7 @@
 #include "swift/Runtime/Unreachable.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/Support/Compiler.h"
 #include "swift/Runtime/Debug.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
@@ -908,7 +908,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
         maybeDeallocateSource(result);
         return result;
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case MetadataKind::Enum:
     case MetadataKind::Optional:
@@ -926,7 +926,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
         return success;
       }
 #endif
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case MetadataKind::Function:
     case MetadataKind::HeapLocalVariable:
@@ -1175,7 +1175,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
     // Get the actual class object.
     targetType = static_cast<const ObjCClassWrapperMetadata*>(targetType)
       ->Class;
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case MetadataKind::Class:
     // The source value must also be a class; otherwise the cast fails.
     switch (sourceType->getKind()) {
@@ -1183,7 +1183,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
       // Get the actual class object.
       sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
         ->Class;
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case MetadataKind::Class: {
       // Check if the source is a subclass of the target.
 #if SWIFT_OBJC_INTEROP
@@ -1230,7 +1230,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
       // Get the actual class object.
       sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
         ->Class;
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case MetadataKind::Class:
     case MetadataKind::ForeignClass:
       // Check if the source is a subclass of the target.
@@ -1287,7 +1287,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     // Get the actual class object.
     targetType = static_cast<const ObjCClassWrapperMetadata*>(targetType)
       ->Class;
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case MetadataKind::Class:
     // The source value must also be a class; otherwise the cast fails.
     switch (sourceType->getKind()) {
@@ -1295,7 +1295,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
       // Get the actual class object.
       sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
         ->Class;
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case MetadataKind::Class: {
       // Check if the source is a subclass of the target.
 #if SWIFT_OBJC_INTEROP
@@ -1343,7 +1343,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
       // Get the actual class object.
       sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
         ->Class;
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case MetadataKind::Class:
     case MetadataKind::ForeignClass:
       // Check if the source is a subclass of the target.
@@ -2491,7 +2491,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
         return true;
       }
     }
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 #endif
 
   case MetadataKind::ForeignClass:
@@ -2518,7 +2518,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
         return _dynamicCastFromAnyHashable(dest, src, srcType,
                                            targetType, flags);
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case MetadataKind::Enum:
     case MetadataKind::Optional: {
@@ -2628,7 +2628,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
       break;
     }
 
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   // The non-polymorphic types.
   case MetadataKind::HeapLocalVariable:

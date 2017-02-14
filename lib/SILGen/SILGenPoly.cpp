@@ -80,7 +80,6 @@
 
 #include "SILGen.h"
 #include "Scope.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
@@ -93,6 +92,7 @@
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -742,17 +742,17 @@ static ManagedValue manageParam(SILGenFunction &gen,
         return gen.emitManagedBufferWithCleanup(copy);
       }
     }
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case ParameterConvention::Direct_Guaranteed:
     if (allowPlusZero)
       return gen.emitManagedBeginBorrow(loc, paramValue);
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   // Unowned parameters are only guaranteed at the instant of the call, so we
   // must retain them even if we're in a context that can accept a +0 value.
   case ParameterConvention::Direct_Unowned:
     paramValue = gen.getTypeLowering(paramValue->getType())
         .emitCopyValue(gen.B, loc, paramValue);
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case ParameterConvention::Direct_Owned:
     return gen.emitManagedRValueWithCleanup(paramValue);
 
@@ -2203,7 +2203,7 @@ SILValue ResultPlanner::execute(SILValue innerResult) {
     {
       Scope S(Gen.Cleanups, CleanupLocation::get(Loc));
 
-      // First create a rvalue cleanup for our direct result.
+      // First create an rvalue cleanup for our direct result.
       assert(innerResult.getOwnershipKind() == ValueOwnershipKind::Owned ||
              innerResult.getOwnershipKind() == ValueOwnershipKind::Trivial);
       ManagedValue ownedInnerResult = Gen.emitManagedRValueWithCleanup(innerResult);
@@ -2245,7 +2245,7 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
     case ResultConvention::Indirect:
       assert(!Gen.silConv.isSILIndirect(result)
              && "claiming indirect result as direct!");
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
       return Gen.emitManagedRValueWithCleanup(resultValue, resultTL);
@@ -2255,7 +2255,7 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
       // originally 'self'.
       Gen.SGM.diagnose(Loc.getSourceLoc(), diag::not_implemented,
                        "reabstraction of returns_inner_pointer function");
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case ResultConvention::Unowned:
       return Gen.emitManagedRetain(Loc, resultValue, resultTL);
     }

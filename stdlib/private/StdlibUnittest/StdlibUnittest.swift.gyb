@@ -1324,7 +1324,7 @@ public final class TestSuite {
       case .single:
         return [nil]
       case .parameterized(code: _, count: let count):
-        return (0..<count).map { $0 }
+        return Array(0..<count)
       }
     }
   }

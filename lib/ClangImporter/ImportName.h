@@ -212,7 +212,7 @@ public:
     case ImportedAccessorKind::SubscriptSetter:
       return true;
     }
-    
+
     llvm_unreachable("Invalid ImportedAccessorKind.");
   }
 };
@@ -250,7 +250,9 @@ public:
 
   /// Determine the Swift name for a Clang decl
   ImportedName importName(const clang::NamedDecl *decl,
-                          ImportNameVersion version);
+                          ImportNameVersion version,
+                          clang::DeclarationName preferredName =
+                            clang::DeclarationName());
 
   /// Imports the name of the given Clang macro into Swift.
   Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
@@ -313,7 +315,8 @@ private:
                                                   ImportNameVersion version);
 
   ImportedName importNameImpl(const clang::NamedDecl *,
-                              ImportNameVersion version);
+                              ImportNameVersion version,
+                              clang::DeclarationName);
 };
 
 }

@@ -14,7 +14,6 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/Version.h"
@@ -31,6 +30,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Chrono.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -387,7 +387,7 @@ int Compilation::performJobsImpl() {
         InitialOutOfDateCommands.push_back(Cmd);
         DepGraph.markIntransitive(Cmd);
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case Job::Condition::RunWithoutCascading:
       noteBuilding(Cmd, "(initial)");
       scheduleCommandIfNecessaryAndPossible(Cmd);
@@ -547,7 +547,7 @@ int Compilation::performJobsImpl() {
           case DependencyGraphImpl::LoadResult::UpToDate:
             if (!wasCascading)
               break;
-            SWIFT_FALLTHROUGH;
+            LLVM_FALLTHROUGH;
           case DependencyGraphImpl::LoadResult::AffectsDownstream:
             DepGraph.markTransitive(Dependents, FinishedCmd);
             break;

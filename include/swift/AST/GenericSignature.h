@@ -77,6 +77,8 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
   /// Retrieve the generic signature builder for the given generic signature.
   GenericSignatureBuilder *getGenericSignatureBuilder(ModuleDecl &mod);
 
+  void populateParentMap(SubstitutionMap &subMap) const;
+
   friend class ArchetypeType;
 
 public:
@@ -142,6 +144,12 @@ public:
   SubstitutionMap
   getSubstitutionMap(TypeSubstitutionFn subs,
                      LookupConformanceFn lookupConformance) const;
+
+  /// Look up a stored conformance in the generic signature. These are formed
+  /// from same-type constraints placed on associated types of generic
+  /// parameters which have conformance constraints on them.
+  Optional<ProtocolConformanceRef>
+  lookupConformance(CanType depTy, ProtocolDecl *proto) const;
 
   using GenericFunction = auto(CanType canType, Type conformingReplacementType,
     ProtocolType *conformedProtocol)

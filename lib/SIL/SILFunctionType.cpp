@@ -24,11 +24,11 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/Basic/Fallthrough.h"
 #include "clang/Analysis/DomainSpecific/CocoaConventions.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -1864,7 +1864,7 @@ namespace {
       case ParameterConvention::Direct_Owned:
       case ParameterConvention::Direct_Guaranteed:
         if (isTrivial) return ParameterConvention::Direct_Unowned;
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
@@ -1883,7 +1883,7 @@ namespace {
       case ResultConvention::Owned:
       case ResultConvention::Autoreleased:
         if (isTrivial) return ResultConvention::Unowned;
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
       case ResultConvention::Indirect:
       case ResultConvention::Unowned:
       case ResultConvention::UnownedInnerPointer:

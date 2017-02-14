@@ -25,9 +25,9 @@
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/IR/CallSite.h"
+#include "llvm/Support/Compiler.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
@@ -807,7 +807,7 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
       assert((signExt || paramTys[i]->hasUnsignedIntegerRepresentation()) &&
              "Invalid attempt to add extension attribute to argument!");
       addExtendAttribute(IGM, Attrs, getCurParamIndex()+1, signExt);
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     }
     case clang::CodeGen::ABIArgInfo::Direct: {
       switch (FI.getExtParameterInfo(i).getABI()) {
@@ -1654,7 +1654,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       assert((signExt || clangParamTy->hasUnsignedIntegerRepresentation()) &&
              "Invalid attempt to add extension attribute to argument!");
       (void) signExt;
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     }
     case clang::CodeGen::ABIArgInfo::Direct: {
       auto toTy = AI.getCoerceToType();
@@ -1884,7 +1884,7 @@ void CallEmission::setArgs(Explosion &arg, WitnessMetadata *witnessMetadata) {
            IGF.IGM.WitnessTablePtrTy);
     Args.rbegin()[1] = witnessMetadata->SelfMetadata;
     Args.rbegin()[0] = witnessMetadata->SelfWitnessTable;
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::Method:

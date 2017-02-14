@@ -32,7 +32,6 @@
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/Compiler.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h" // bad dependency
@@ -40,10 +39,11 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
-#include "llvm/Support/Allocator.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/Allocator.h"
+#include "llvm/Support/Compiler.h"
 #include <algorithm>
 #include <memory>
 
@@ -1246,7 +1246,7 @@ void ASTContext::getVisibleTopLevelClangModules(
 GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
                                                       CanGenericSignature sig,
                                                       ModuleDecl *mod) {
-  // Check whether we already have an generic signature builder for this
+  // Check whether we already have a generic signature builder for this
   // signature and module.
   auto known = Impl.GenericSignatureBuilders.find({sig, mod});
   if (known != Impl.GenericSignatureBuilders.end())
@@ -3751,7 +3751,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
     if (entry.getKind() == ForeignRepresentableKind::BridgedError)
       return ForeignRepresentationInfo::forNone();
 
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case ForeignLanguage::ObjectiveC:
     return entry;

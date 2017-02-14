@@ -13,10 +13,10 @@
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 
 #include "swift/AST/Decl.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "llvm/Support/Compiler.h"
 
 #include <algorithm>
 
@@ -202,7 +202,7 @@ CalleeList CalleeCache::getCalleeListForCalleeKind(SILValue Callee) const {
 
   case ValueKind::ThinToThickFunctionInst:
     Callee = cast<ThinToThickFunctionInst>(Callee)->getOperand();
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case ValueKind::FunctionRefInst:
     return CalleeList(cast<FunctionRefInst>(Callee)->getReferencedFunction());

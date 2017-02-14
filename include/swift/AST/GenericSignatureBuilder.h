@@ -1,4 +1,4 @@
-//===--- GenericSignatureBuilder.h - Generic generic signature builder ---------*- C++ -*-===//
+//===--- GenericSignatureBuilder.h - Generic signature builder --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -172,7 +172,6 @@ private:
   /// requirement mismatch.
   bool addSameTypeRequirement(
                         Type T1, Type T2, RequirementSource Source,
-                        PotentialArchetype *basePA,
                         llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
   /// Add the requirements placed on the given abstract type parameter
@@ -258,7 +257,6 @@ public:
   bool addRequirement(const Requirement &req, RequirementSource source);
 
   bool addRequirement(const Requirement &req, RequirementSource source,
-                      PotentialArchetype *basePA,
                       llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
 
   bool addLayoutRequirement(PotentialArchetype *PAT,
@@ -323,12 +321,7 @@ public:
   /// signature are fully resolved).
   ///
   /// For any type that cannot refer to an archetype, this routine returns null.
-  ///
-  /// A non-null \c basePA is used in place of the "true" potential archetype
-  /// for a GenericTypeParamType, effectively performing a substitution like,
-  /// e.g., Self = <some PA>.
-  PotentialArchetype *resolveArchetype(Type type,
-                                       PotentialArchetype *basePA = nullptr);
+  PotentialArchetype *resolveArchetype(Type type);
 
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(

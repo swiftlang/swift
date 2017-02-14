@@ -138,6 +138,11 @@ UIdent sourcekitd::KeyTypeUsr("key.typeusr");
 UIdent sourcekitd::KeyContainerTypeUsr("key.containertypeusr");
 UIdent sourcekitd::KeyModuleGroups("key.modulegroups");
 
+UIdent sourcekitd::KeyBaseName("key.basename");
+UIdent sourcekitd::KeyArgNames("key.argnames");
+UIdent sourcekitd::KeySelectorPieces("key.selectorpieces");
+UIdent sourcekitd::KeyNameKind("key.namekind");
+
 /// \brief Order for the keys to use when emitting the debug description of
 /// dictionaries.
 static UIdent *OrderedKeys[] = {
@@ -231,6 +236,12 @@ static UIdent *OrderedKeys[] = {
   &KeyTypeUsr,
   &KeyContainerTypeUsr,
   &KeyModuleGroups,
+
+  &KeyBaseName,
+  &KeyArgNames,
+  &KeySelectorPieces,
+  &KeyNameKind,
+
 };
 
 static unsigned findPrintOrderForDictKey(UIdent Key) {
@@ -309,7 +320,7 @@ public:
   }
 };
 
-class VariantPrinter : public VariantVisitor<VariantPrinter>,   
+class VariantPrinter : public VariantVisitor<VariantPrinter>,
                        public RequestResponsePrinterBase<VariantPrinter,
                                                          sourcekitd_variant_t> {
 public:

@@ -23,11 +23,14 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Basic/Defer.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 
 #define DEBUG_TYPE "Serialization"
 
+STATISTIC(NumDeclsLoaded, "# of decls deserialized");
 STATISTIC(NumMemberListsLoaded,
           "# of nominals/extensions whose members were loaded");
 STATISTIC(NumNestedTypeShortcuts,
@@ -1504,7 +1507,7 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
           pathTrace.removeLast();
         }
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     }
     case XREF_VALUE_PATH_PIECE:
     case XREF_INITIALIZER_PATH_PIECE: {
@@ -2162,6 +2165,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (declOrOffset.isComplete())
     return declOrOffset;
 
+  ++NumDeclsLoaded;
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(declOrOffset);
   auto entry = DeclTypeCursor.advance();
@@ -4362,8 +4366,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     GenericEnvironment *syntheticEnv = nullptr;
 
     // Requirement -> synthetic map.
-    SubstitutionMap reqToSyntheticMap;
-    bool hasReqToSyntheticMap = false;
+    SmallVector<Substitution, 4> reqToSyntheticSubs;
     if (unsigned numGenericParams = *rawIDIter++) {
       // Generic parameters of the synthetic environment.
       SmallVector<GenericTypeParamType *, 2> genericParams;
@@ -4383,21 +4386,11 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       syntheticEnv =
         syntheticSig->createGenericEnvironment(*getAssociatedModule());
 
-      // Requirement -> synthetic map.
-      hasReqToSyntheticMap = true;
-      auto reqSignature =
-        req->getInnermostDeclContext()->getGenericSignatureOfContext();
-      for (auto reqGP : reqSignature->getGenericParams()) {
-        auto canonicalGP =
-          cast<GenericTypeParamType>(reqGP->getCanonicalType());
-        auto concreteTy = getType(*rawIDIter++);
-        reqToSyntheticMap.addSubstitution(canonicalGP, concreteTy);
-
-        if (unsigned numConformances = *rawIDIter++) {
-          while (numConformances--) {
-            reqToSyntheticMap.addConformance(
-                canonicalGP, readConformance(DeclTypeCursor));
-          }
+      // Requirement -> synthetic substitutions.
+      if (unsigned numReqSubstitutions = *rawIDIter++) {
+        while (numReqSubstitutions--) {
+          auto sub = maybeReadSubstitution(DeclTypeCursor, nullptr);
+          reqToSyntheticSubs.push_back(*sub);
         }
       }
     }
@@ -4413,14 +4406,14 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
     // Handle simple witnesses.
     if (witnessSubstitutions.empty() && !syntheticSig && !syntheticEnv &&
-        !hasReqToSyntheticMap) {
+        reqToSyntheticSubs.empty()) {
       conformance->setWitness(req, Witness(witness));
       continue;
     }
 
     // Set the witness.
     conformance->setWitness(req, Witness(witness, witnessSubstitutions,
-                                         syntheticEnv, reqToSyntheticMap));
+                                         syntheticEnv, reqToSyntheticSubs));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 

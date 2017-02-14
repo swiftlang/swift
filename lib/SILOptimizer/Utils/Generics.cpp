@@ -345,119 +345,49 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
   // Perform some sanity checks for the requirements
   checkSpecializationRequirements(Requirements);
 
-  SpecializedGenericEnv = nullptr;
-
   OriginalF = OrigF;
   SILModule &M = OrigF->getModule();
-  ModuleDecl *SM = M.getSwiftModule();
   auto &Ctx = M.getASTContext();
 
   auto OrigGenericSig = OrigF->getLoweredFunctionType()->getGenericSignature();
   auto OrigGenericEnv = OrigF->getGenericEnvironment();
-  SpecializedGenericSig = OrigGenericSig;
-  auto ForwardingSubs = OrigGenericEnv->getForwardingSubstitutions();
-  auto ForwardingInterfaceSubsMap =
-      OrigGenericSig->getSubstitutionMap(ForwardingSubs);
-  // Map archetypes of the original function to the contextual types
-  // of the specialized function.
-  SubstitutionMap ClonerArchetypeToConcreteMap;
-  SubstitutionMap CallerArchetypeToConcreteMap;
-  SubstitutionMap CallerArchetypeToInterfaceMap;
-
-  for (auto &Req : Requirements) {
-    if (Req.getKind() == RequirementKind::SameType) {
-      auto CallerArchetype = cast<SubstitutableType>(
-          OrigGenericEnv->mapTypeIntoContext(Req.getFirstType())
-              ->getCanonicalType());
-      // Remember that a given generic parameter is mapped
-      // to a concrete type.
-      CallerArchetypeToInterfaceMap.addSubstitution(
-          CallerArchetype, Req.getSecondType()->getCanonicalType());
-
-      // Remember how the original interace type is mapped to a concrete type.
-      ClonerArchetypeToConcreteMap.addSubstitution(
-          CallerArchetype, Req.getSecondType()->getCanonicalType());
-
-      // Remember how the original interace type is mapped to a concrete type.
-      CallerArchetypeToConcreteMap.addSubstitution(
-          CallerArchetype, Req.getSecondType()->getCanonicalType());
-    }
-  }
 
   std::tie(SpecializedGenericEnv, SpecializedGenericSig) =
       getSignatureWithRequirements(OrigGenericSig, OrigGenericEnv,
                                    Requirements, M);
 
-  for (auto Req : SpecializedGenericSig->getRequirements()) {
-    // Remember how the original contextual type is represented in
-    // the specialized function.
-    if (Req.getKind() == RequirementKind::Layout) {
-      auto CallerArchetype = cast<SubstitutableType>(
-          OrigGenericEnv->mapTypeIntoContext(Req.getFirstType())
-              ->getCanonicalType());
+  {
+    SmallVector<Substitution, 4> List;
 
-      ClonerArchetypeToConcreteMap.addSubstitution(
-          CallerArchetype,
-          SpecializedGenericEnv->mapTypeIntoContext(Req.getFirstType()));
-
-      CallerArchetypeToInterfaceMap.addSubstitution(
-          CallerArchetype,
-          SpecializedGenericEnv->mapTypeOutOfContext(Req.getFirstType()));
-    }
+    OrigGenericSig->getSubstitutions(
+      [&](SubstitutableType *type) -> Type {
+        return SpecializedGenericEnv->mapTypeIntoContext(type);
+      },
+      LookUpConformanceInSignature(*SpecializedGenericSig),
+      List);
+    ClonerParamSubs = Ctx.AllocateCopy(List);
   }
 
-  // If this is a partial specialization, some of the generic type parameters
-  // are not substituted, so add the missing substitutions which basically map
-  // the caller archetypes to their interface types or the corresponding
-  // archetypes in the specialized function.
-  for (auto GP : SpecializedGenericSig->getGenericParams()) {
-    auto CallerArchetype = cast<SubstitutableType>(
-        OrigGenericEnv->mapTypeIntoContext(GP)->getCanonicalType());
-    if (CallerArchetypeToInterfaceMap.lookupSubstitution(CallerArchetype))
-      continue;
-    CallerArchetypeToInterfaceMap.addSubstitution(CallerArchetype,
-                                                  GP->getCanonicalType());
-    if (ClonerArchetypeToConcreteMap.lookupSubstitution(CallerArchetype))
-      continue;
-    auto SpecializedArchetype =
-        SpecializedGenericEnv->mapTypeIntoContext(GP);
-    ClonerArchetypeToConcreteMap.addSubstitution(CallerArchetype,
-                                                 SpecializedArchetype);
+  {
+    SmallVector<Substitution, 4> List;
+
+    SpecializedGenericSig->getSubstitutions(
+      [&](SubstitutableType *type) -> Type {
+        return OrigGenericEnv->mapTypeIntoContext(type);
+      },
+      LookUpConformanceInSignature(*SpecializedGenericSig),
+      List);
+    CallerParamSubs = Ctx.AllocateCopy(List);
   }
 
-  // Substitute into forwarding substitutions to get the cloner substitutions
-  // and substitutions to be used by the caller for calling the specialized
-  // function.
-  SmallVector<Substitution, 4> ClonerSubsList;
-  SmallVector<Substitution, 4> CallerSubsList;
-  SmallVector<Substitution, 4> InterfaceCallerSubsList;
-  // FIXME: Clean up the module conformance lookup currently used by subst()
-  // calls. They should not directly use module conformance lookup here.
-  for (auto Sub : ForwardingSubs) {
-    auto ClonerSub = Sub.subst(
-        SM, QuerySubstitutionMap{ClonerArchetypeToConcreteMap},
-        LookUpConformanceInModule(SM));
-    ClonerSubsList.push_back(ClonerSub);
-
-    auto CallerSub = Sub.subst(
-        SM, QuerySubstitutionMap{CallerArchetypeToConcreteMap},
-        LookUpConformanceInModule(SM));
-    CallerSubsList.push_back(CallerSub);
-
-    auto InterfaceCallerSub = Sub.subst(
-        SM, QuerySubstitutionMap{CallerArchetypeToInterfaceMap},
-        LookUpConformanceInModule(SM));
-    InterfaceCallerSubsList.push_back(InterfaceCallerSub);
+  {
+    CallerInterfaceSubs = OrigGenericSig->getSubstitutionMap(
+      [&](SubstitutableType *type) -> Type {
+        return SpecializedGenericEnv->mapTypeOutOfContext(
+          SpecializedGenericEnv->mapTypeIntoContext(type));
+      },
+      LookUpConformanceInSignature(*SpecializedGenericSig));
   }
-
-  ClonerParamSubs = Ctx.AllocateCopy(ClonerSubsList);
-
-  CallerInterfaceSubs = OrigGenericSig->getSubstitutionMap(InterfaceCallerSubsList);
-
-  auto CallerParamSubsMap = OrigGenericSig->getSubstitutionMap(CallerSubsList);
-  CallerSubsList.clear();
-  SpecializedGenericSig->getSubstitutions(CallerParamSubsMap, CallerSubsList);
-  CallerParamSubs = Ctx.AllocateCopy(CallerSubsList);
 
   OriginalParamSubs = CallerParamSubs;
 

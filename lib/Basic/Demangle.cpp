@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Demangle.h"
-#include "swift/Basic/Fallthrough.h"
 #ifndef NO_NEW_DEMANGLING
 #include "swift/Basic/Demangler.h"
 #include "swift/Basic/ManglingMacros.h"
@@ -25,6 +24,7 @@
 #include "swift/Basic/Punycode.h"
 #include "swift/Basic/UUID.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Compiler.h"
 #include <functional>
 #include <vector>
 #include <cstdio>
@@ -3756,7 +3756,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::ImplErrorResult:
     Printer << "@error ";
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case Node::Kind::ImplParameter:
   case Node::Kind::ImplResult:
     printChildren(pointer, " ");

@@ -53,8 +53,10 @@ Substitution Substitution::subst(ModuleDecl *module,
                                  TypeSubstitutionFn subs,
                                  LookupConformanceFn conformances) const {
   // Substitute the replacement.
-  Type substReplacement = Replacement.subst(subs, conformances, None);
-  assert(substReplacement && "substitution replacement failed");
+  Type substReplacement = Replacement.subst(subs, conformances,
+                                            SubstFlags::UseErrorType);
+  assert(!substReplacement->hasError() &&
+         "substitution replacement failed");
 
   if (substReplacement->isEqual(Replacement))
     return *this;

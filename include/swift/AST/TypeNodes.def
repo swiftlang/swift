@@ -83,7 +83,7 @@
 #define TYPE_RANGE(Id, First, Last)
 #endif
 
-UNCHECKED_TYPE(Error, Type)
+TYPE(Error, Type)
 UNCHECKED_TYPE(Unresolved, Type)
 ABSTRACT_TYPE(Builtin, Type)
   BUILTIN_TYPE(BuiltinInteger, BuiltinType)

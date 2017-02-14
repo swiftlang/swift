@@ -363,8 +363,14 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "")
 endif()
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   set(SWIFT_BUILD_SOURCEKIT_default TRUE)
+elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+  if(EXISTS ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
+    set(SWIFT_BUILD_SOURCEKIT_default TRUE)
+  else()
+    set(SWIFT_BUILD_SOURCEKIT_default FALSE)
+  endif()
 else()
-  set(SWIFT_BUILD_SOURCEKIT_default FALSE)
+    set(SWIFT_BUILD_SOURCEKIT_default FALSE)
 endif()
 option(SWIFT_BUILD_SOURCEKIT
     "Build SourceKit"
@@ -883,6 +889,8 @@ message(STATUS "")
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND "${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "")
   find_package(ICU REQUIRED COMPONENTS uc i18n)
 endif()
+
+find_package(PythonInterp REQUIRED)
 
 #
 # Find optional dependencies.

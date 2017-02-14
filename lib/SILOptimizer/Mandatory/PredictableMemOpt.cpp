@@ -11,15 +11,17 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "predictable-memopt"
-#include "swift/Basic/Fallthrough.h"
+
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "DIMemoryUseCollector.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Compiler.h"
+#include "llvm/Support/Debug.h"
+
 using namespace swift;
 
 STATISTIC(NumLoadPromoted, "Number of loads promoted");
@@ -888,7 +890,7 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
            cast<CopyAddrInst>(U.Inst)->isTakeOfSrc()))
         break;
       // FALL THROUGH.
-     SWIFT_FALLTHROUGH;
+     LLVM_FALLTHROUGH;
     case DIUseKind::Load:
     case DIUseKind::IndirectIn:
     case DIUseKind::InOutUse:

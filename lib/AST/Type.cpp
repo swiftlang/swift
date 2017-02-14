@@ -22,12 +22,13 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeLoc.h"
-#include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <functional>
@@ -1313,6 +1314,7 @@ TypeBase *TypeBase::getDesugaredType() {
 #define UNCHECKED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
   case TypeKind::Tuple:
   case TypeKind::Function:
   case TypeKind::GenericFunction:
@@ -1476,6 +1478,7 @@ bool TypeBase::isSpelledLike(Type other) {
 #define UNCHECKED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
   case TypeKind::Enum:
   case TypeKind::Struct:
   case TypeKind::Class:
@@ -2181,7 +2184,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       // Imported classes and protocols are not representable in C.
       if (isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal))
         return failure();
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case ForeignLanguage::ObjectiveC:
       if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
@@ -2989,15 +2992,10 @@ Optional<ProtocolConformanceRef>
 LookUpConformanceInSignature::operator()(CanType dependentType,
                                          Type conformingReplacementType,
                                          ProtocolType *conformedProtocol) const {
-  // FIXME: Actually implement this properly.
-  auto *M = conformedProtocol->getDecl()->getParentModule();
-
-  if (conformingReplacementType->isTypeParameter())
-    return ProtocolConformanceRef(conformedProtocol->getDecl());
-
-  return M->lookupConformance(conformingReplacementType,
-                              conformedProtocol->getDecl(),
-                              M->getASTContext().getLazyResolver());
+  // FIXME: Should pass dependentType instead, once
+  // GenericSignature::lookupConformance() does the right thing
+  return Sig.lookupConformance(conformingReplacementType->getCanonicalType(),
+                               conformedProtocol->getDecl());
 }
 
 Type DependentMemberType::substBaseType(ModuleDecl *module,
@@ -3087,6 +3085,12 @@ static Type substType(Type derivedType,
     }
 
     auto archetype = cast<ArchetypeType>(substOrig);
+
+    // Opened existentials cannot be substituted in this manner,
+    // but if they appear in the original type this is not an
+    // error.
+    if (archetype->isOpenedExistential())
+      return Type(type);
 
     // For archetypes, we can substitute the parent (if present).
     auto parent = archetype->getParent();
