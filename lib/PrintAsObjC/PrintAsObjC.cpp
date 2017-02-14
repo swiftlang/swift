@@ -2633,3 +2633,34 @@ bool swift::printAsObjC(llvm::raw_ostream &os, ModuleDecl *M,
   llvm::PrettyStackTraceString trace("While generating Objective-C header");
   return ModuleWriter(*M, bridgingHeader, minRequiredAccess).writeToStream(os);
 }
+
+std::pair<Identifier, ObjCSelector> swift::
+getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
+  ASTContext &Ctx = VD->getASTContext();
+  LazyResolver *Resolver = Ctx.getLazyResolver();
+  if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD)) {
+    return {Identifier(), FD->getObjCSelector(Resolver, PreferredName)};
+  } else if (auto *VAD = dyn_cast<VarDecl>(VD)) {
+    if (PreferredName)
+      return {PreferredName.getBaseName(), ObjCSelector()};
+    return {VAD->getObjCPropertyName(), ObjCSelector()};
+  } else if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
+    return getObjCNameForSwiftDecl(SD->getGetter(), PreferredName);
+  } else if (auto *EL = dyn_cast<EnumElementDecl>(VD)) {
+    EnumDecl* ED = EL->getDeclContext()->getAsEnumOrEnumExtensionContext();
+    SmallString<64> Buffer;
+    {
+      llvm::raw_svector_ostream OS(Buffer);
+      OS << getNameForObjC(ED).str();
+      SmallString<64> Scratch;
+      OS << camel_case::toSentencecase(PreferredName.getBaseName().str(),
+                                       Scratch);
+    }
+    return {Ctx.getIdentifier(Buffer.str()), ObjCSelector()};
+  } else {
+    auto Name = getNameForObjC(VD, CustomNamesOnly);
+    if (!Name.empty())
+      return {Ctx.getIdentifier(Name), ObjCSelector()};
+    return {PreferredName.getBaseName(), ObjCSelector()};
+  }
+}

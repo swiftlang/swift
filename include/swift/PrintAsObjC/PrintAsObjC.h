@@ -15,9 +15,11 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/Identifier.h"
 
 namespace swift {
   class ModuleDecl;
+  class ValueDecl;
 
   /// Print the Objective-C-compatible declarations in a module as a Clang
   /// header.
@@ -25,6 +27,14 @@ namespace swift {
   /// Returns true on error.
   bool printAsObjC(raw_ostream &out, ModuleDecl *M, StringRef bridgingHeader,
                    Accessibility minRequiredAccess);
+
+  /// Get the name for a value decl D if D is exported to ObjC, PreferredName is
+  /// specified to perform what-if analysis, shadowing D's original name during
+  /// computation.
+  ///
+  /// Returns a pair of Identifier and ObjCSelector, only one of which is valid.
+  std::pair<Identifier, ObjCSelector> getObjCNameForSwiftDecl(const ValueDecl *VD,
+    DeclName PreferredName);
 }
 
 #endif
