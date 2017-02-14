@@ -23,11 +23,13 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Basic/Defer.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
 
 #define DEBUG_TYPE "Serialization"
 
+STATISTIC(NumDeclsLoaded, "# of decls deserialized");
 STATISTIC(NumMemberListsLoaded,
           "# of nominals/extensions whose members were loaded");
 STATISTIC(NumNestedTypeShortcuts,
@@ -2133,6 +2135,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (declOrOffset.isComplete())
     return declOrOffset;
 
+  ++NumDeclsLoaded;
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(declOrOffset);
   auto entry = DeclTypeCursor.advance();
