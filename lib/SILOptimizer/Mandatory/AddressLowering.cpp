@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -487,7 +487,7 @@ void OpaqueStorageAllocation::allocateForResults(SILInstruction *origInst) {
     args[firstResultIdx] = addr;
   }
   // Allocate storage for any unused or concrete results. One for each missing
-  // entry in the the SIL arguments list.
+  // entry in the SIL arguments list.
   unsigned argIdx = firstResultIdx;
   for (SILType resultTy : loweredFnConv.getIndirectSILResultTypes()) {
     if (!args[argIdx]) {
@@ -529,7 +529,7 @@ void OpaqueStorageAllocation::allocateForResults(SILInstruction *origInst) {
   }
   origInst->replaceAllUsesWith(callInst);
   pass.instsToDelete.insert(origInst);
-  // Load an concrete args, and mark the extract for deletion.
+  // Load a concrete args, and mark the extract for deletion.
   for (TupleExtractInst *extract : concreteResults) {
     unsigned argIdx = firstResultIdx + extract->getFieldNo();
     SILValue arg = args[argIdx];

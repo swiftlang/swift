@@ -811,8 +811,8 @@ OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitNonTrivialEnum(
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitApplyArgument(ValueOwnershipKind Kind,
                                                      bool ShouldCheck) {
-  // Check if we have an enum. If not, then we just check against the passed inc
-  // onvention.
+  // Check if we have an enum. If not, then we just check against the passed in
+  // convention.
   EnumDecl *E = getType().getEnumOrBoundGenericEnum();
   if (!E) {
     return {compatibleWithOwnership(Kind), ShouldCheck};

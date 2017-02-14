@@ -639,7 +639,7 @@ takesAnArrayOfSubstring(arrayOfString.map { $0[] })
 
 As we have seen, all three options above have downsides, but it's possible
 these downsides could be eliminated/mitigated by the compiler. We are proposing
-one such mitigation--implicit conversion--as part of the the "different type,
+one such mitigation--implicit conversion--as part of the "different type,
 shared storage" option, to help avoid the cognitive load on developers of
 having to deal with a separate `Substring` type.
 

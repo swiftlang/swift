@@ -200,7 +200,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
 
   // Produce a specialized type, which is the substituted type with
   // the parameters/results passing conventions adjusted according
-  // to the converions selected above.
+  // to the conversions selected above.
   SpecializedType = createSpecializedType(SubstitutedType, M);
 }
 
@@ -748,7 +748,7 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
 
   assert(specConv.useLoweredAddresses());
 
-  // ReInfo.NumIndirectResults correponds to SubstTy's formal indirect
+  // ReInfo.NumIndirectResults corresponds to SubstTy's formal indirect
   // results. SpecTy may have fewer formal indirect results.
   assert(SubstType->getNumIndirectFormalResults()
          >= SpecType->getNumIndirectFormalResults());
@@ -763,7 +763,7 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
         EntryBB->createFunctionArgument(SpecArg->getType(), SpecArg->getDecl());
     Arguments.push_back(NewArg);
   };
-  // ReInfo.NumIndirectResults correponds to SubstTy's formal indirect
+  // ReInfo.NumIndirectResults corresponds to SubstTy's formal indirect
   // results. SpecTy may have fewer formal indirect results.
   assert(SubstType->getNumIndirectFormalResults()
          >= SpecType->getNumIndirectFormalResults());

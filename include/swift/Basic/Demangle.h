@@ -232,7 +232,7 @@ class Demangler;
 /// It owns the allocated nodes which are created during demangling.
 /// It is always preferable to use the demangling via this context class as it
 /// ensures efficient memory management. Especially if demangling is done for
-/// multiple symbols. Typecial usage:
+/// multiple symbols. Typical usage:
 /// \code
 ///   Context Ctx;
 ///   for (...) {

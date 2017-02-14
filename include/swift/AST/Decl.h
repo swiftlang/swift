@@ -326,7 +326,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// the enum type.
     unsigned Recursiveness : 2;
 
-    /// \brief Whther or not this element has an associated value.
+    /// \brief Whether or not this element has an associated value.
     unsigned HasArgumentType : 1;
   };
   enum { NumEnumElementDeclBits = NumValueDeclBits + 3 };

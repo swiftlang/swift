@@ -2225,14 +2225,14 @@ static void sameTypeDFS(PotentialArchetype *pa,
 /// spanning tree among the connected components formed by only the implied
 /// same-type requirements within the equivalence class of \c rep.
 ///
-/// The equivalance class of the given representative potential archetype
+/// The equivalence class of the given representative potential archetype
 /// (\c rep) contains all potential archetypes that are made equivalent by
 /// the known set of same-type constraints, which includes both directly-
 /// stated same-type constraints (e.g., \c T.A == T.B) as well as same-type
 /// constraints that are implied either because the names coincide (e.g.,
 /// \c T[.P1].A == T[.P2].A) or due to a requirement in a protocol.
 ///
-/// The equivalance class of the given representative potential archetype
+/// The equivalence class of the given representative potential archetype
 /// (\c rep) is formed from a graph whose vertices are the potential archetypes
 /// and whose edges are the same-type constraints. These edges include both
 /// directly-stated same-type constraints (e.g., \c T.A == T.B) as well as
@@ -2318,7 +2318,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
                        compareDependentTypes);
 
   // Track the anchors for each of the implied connected components within the
-  // equivalance class of each representative.
+  // equivalence class of each representative.
   llvm::DenseMap<PotentialArchetype *, SmallVector<PotentialArchetype *, 2>>
     sameTypeComponentAnchors;
   auto getSameTypeComponentAnchors =
@@ -2346,7 +2346,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
     std::function<void()> deferredSameTypeRequirement;
 
     if (knownAnchor != componentAnchors.end()) {
-      // If this equivalance class is bound to a concrete type, equate the
+      // If this equivalence class is bound to a concrete type, equate the
       // anchor with a concrete type.
       if (auto concreteType = rep->getConcreteType()) {
         f(RequirementKind::SameType, archetype, concreteType,

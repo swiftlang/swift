@@ -3904,7 +3904,7 @@ class OpenExistentialAddrInst
                           SILType SelfTy);
 };
 
-/// Given an opaque value refering to an existential, "opens" the
+/// Given an opaque value referring to an existential, "opens" the
 /// existential by returning a pointer to a fresh archetype T, which also
 /// captures the (dynamic) conformances.
 class OpenExistentialOpaqueInst

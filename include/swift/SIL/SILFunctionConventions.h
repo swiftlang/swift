@@ -19,7 +19,7 @@
 // The primary purpose of this API is mapping the formal SIL parameter and
 // result conventions onto the SIL argument types. The "formal" conventions are
 // immutably associated with a SILFunctionType--a SIL function's type
-// information never changes. The SIL convenentions determine how those formal
+// information never changes. The SIL conventions determine how those formal
 // conventions will be represented in the body of SIL functions and at call
 // sites.
 //
