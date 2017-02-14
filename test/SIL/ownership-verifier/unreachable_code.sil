@@ -1,0 +1,127 @@
+// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all=0 -module-name Swift -o /dev/null %s 2>&1
+// REQUIRES: asserts
+
+// Make sure that we properly handle unreachable code the likes of which come
+// from SILGen. This file should never crash.
+
+sil_stage raw
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+enum Never {}
+
+sil @no_return_function : $@convention(thin) () -> Never
+sil @create_object : $@convention(thin) () -> @owned Builtin.NativeObject
+sil @use_object : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+
+///////////
+// Tests //
+///////////
+
+// Make sure that we properly handle owned parameters in one function block that
+// are leaked and those that are not leaked.
+sil @test1 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  destroy_value %1 : $Builtin.NativeObject
+  unreachable
+}
+
+// Make sure that we properly handle owned parameters that are leaked along one
+// block and are consumed along a different one.
+sil @test2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we properly handle loop parameters that are leaked along the
+// exit edge of a loop.
+sil @test3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject)
+
+bb1(%1 : @owned $Builtin.NativeObject):
+  cond_br undef, bb2, bb1(%1 : $Builtin.NativeObject)
+
+bb2:
+  unreachable
+}
+
+// Make sure that we properly handle loop parameters that are leaked in the body
+// of a loop.
+sil @test4 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject)
+
+bb1(%1 : @owned $Builtin.NativeObject):
+  %2 = copy_value %1 : $Builtin.NativeObject
+  cond_br undef, bb2, bb3
+
+bb2:
+  unreachable
+
+bb3:
+  destroy_value %1 : $Builtin.NativeObject
+  cond_br undef, bb4, bb5
+
+bb4:
+  br bb1(%2 : $Builtin.NativeObject)
+
+bb5:
+  destroy_value %2 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Check that we handle diamonds correctly.
+sil @test5 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb4
+
+bb2:
+  br bb4
+
+bb3:
+  unreachable
+
+bb4:
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that even if we have a destroy value in our unreachable path, we do
+// not really care.
+sil @test6 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb4
+
+bb2:
+  br bb4
+
+bb3:
+  destroy_value %0 : $Builtin.NativeObject
+  unreachable
+
+bb4:
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

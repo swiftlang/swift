@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-ownership-verifier"
 
+#include "TransitivelyUnreachableBlocks.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
@@ -38,6 +39,7 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include <algorithm>
 
 using namespace swift;
 
@@ -1043,6 +1045,10 @@ class SILValueOwnershipChecker {
   /// The module that we are in.
   SILModule &Mod;
 
+  /// A cache of unreachable function blocks that we use to determine if we can
+  /// ignore "leaks".
+  const TransitivelyUnreachableBlocksInfo &TUB;
+
   /// The value whose ownership we will check.
   SILValue Value;
 
@@ -1065,7 +1071,10 @@ class SILValueOwnershipChecker {
   llvm::SmallPtrSet<SILBasicBlock *, 8> SuccessorBlocksThatMustBeVisited;
 
 public:
-  SILValueOwnershipChecker(SILModule &M, SILValue V) : Mod(M), Value(V) {}
+  SILValueOwnershipChecker(SILModule &M,
+                           const TransitivelyUnreachableBlocksInfo &TUB,
+                           SILValue V)
+      : Mod(M), TUB(TUB), Value(V) {}
 
   ~SILValueOwnershipChecker() = default;
   SILValueOwnershipChecker(SILValueOwnershipChecker &) = delete;
@@ -1084,6 +1093,7 @@ public:
 private:
   bool checkUses();
   void checkDataflow();
+  void checkDataflowEndConditions();
   void
   gatherUsers(llvm::SmallVectorImpl<SILInstruction *> &LifetimeEndingUsers,
               llvm::SmallVectorImpl<SILInstruction *> &NonLifetimeEndingUsers);
@@ -1106,6 +1116,8 @@ private:
                                     SILBasicBlock *UserBlock);
 
   bool checkValueWithoutLifetimeEndingUses();
+
+  bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *Arg);
 };
 
 } // end anonymous namespace
@@ -1248,8 +1260,8 @@ void SILValueOwnershipChecker::uniqueNonLifetimeEndingUsers(
   }
 }
 
-static bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *Arg,
-                                                      SILModule &Mod) {
+bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
+    SILFunctionArgument *Arg) {
   switch (Arg->getOwnershipKind()) {
   case ValueOwnershipKind::Guaranteed:
   case ValueOwnershipKind::Unowned:
@@ -1261,6 +1273,9 @@ static bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *Arg,
   case ValueOwnershipKind::Owned:
     break;
   }
+
+  if (TUB.isUnreachable(Arg->getParent()))
+    return true;
 
   llvm::errs() << "Function: '" << Arg->getFunction()->getName() << "'\n"
                << "    Owned function parameter without life "
@@ -1274,7 +1289,7 @@ static bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *Arg,
 bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
   DEBUG(llvm::dbgs() << "    No lifetime ending users?! Bailing early.\n");
   if (auto *Arg = dyn_cast<SILFunctionArgument>(Value)) {
-    if (checkFunctionArgWithoutLifetimeEndingUses(Arg, Mod)) {
+    if (checkFunctionArgWithoutLifetimeEndingUses(Arg)) {
       return true;
     }
   }
@@ -1289,6 +1304,17 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
   // If we have an unowned value, then again there is nothing left to do.
   if (Value.getOwnershipKind() == ValueOwnershipKind::Unowned)
     return true;
+
+  if (auto *ParentBlock = Value->getParentBlock()) {
+    if (TUB.isUnreachable(ParentBlock)) {
+      DEBUG(llvm::dbgs() << "    Ignoring transitively unreachable value "
+                         << "without users!\n"
+                         << "    Function: '" << Value->getFunction()->getName()
+                         << "'\n"
+                         << "    Value: " << *Value << '\n');
+      return true;
+    }
+  }
 
   if (!isValueAddressOrTrivial(Value, Mod)) {
     llvm::errs() << "Function: '" << Value->getFunction()->getName() << "'\n"
@@ -1425,6 +1451,12 @@ bool SILValueOwnershipChecker::checkUses() {
       llvm_unreachable("triggering standard assertion failure routine");
     }
 
+    // If this user is in the same block as the value, do not visit
+    // predecessors. We must be extra tolerant here since we allow for
+    // unreachable code.
+    if (UserBlock == Value->getParentBlock())
+      continue;
+
     // Then for each predecessor of this block...
     for (auto *Pred : UserBlock->getPredecessorBlocks()) {
       // If this block is not a block that we have already put on the list, add
@@ -1491,13 +1523,21 @@ void SILValueOwnershipChecker::checkDataflow() {
     // users.
     BlocksWithNonLifetimeEndingUses.erase(BB);
 
-    // Ok, now we know that we do not have an overconsume. So now we need to
-    // update our state for our successors to make sure by the end of the
-    // traversal we visit them.
+    // Ok, now we know that we do not have an overconsume. If this block does
+    // not end in a no return function, we need to update our state for our
+    // successors to make sure by the end of the traversal we visit them.
+    //
+    // We must consider such no-return blocks since we may be running during
+    // SILGen before NoReturn folding has run.
     for (SILBasicBlock *SuccBlock : BB->getSuccessorBlocks()) {
       // If we already visited the successor, there is nothing to do since we
       // already visited the successor.
       if (VisitedBlocks.count(SuccBlock))
+        continue;
+
+      // Then check if the successor is a transitively unreachable block. In
+      // such a case, we ignore it since we are going to leak along that path.
+      if (TUB.isUnreachable(SuccBlock))
         continue;
 
       // Otherwise, add the successor to our SuccessorBlocksThatMustBeVisited
@@ -1530,6 +1570,7 @@ void SILValueOwnershipChecker::checkDataflow() {
       if (VisitedBlocks.count(PredBlock)) {
         continue;
       }
+
       VisitedBlocks.insert(PredBlock);
       Worklist.push_back(PredBlock);
     }
@@ -1601,8 +1642,15 @@ void SILInstruction::verifyOperandOwnership() const {
 #endif
 }
 
-void SILValue::verifyOwnership(SILModule &Mod) const {
+void SILValue::verifyOwnership(SILModule &Mod,
+                               TransitivelyUnreachableBlocksInfo *TUB) const {
 #ifndef NDEBUG
-  SILValueOwnershipChecker(Mod, *this).check();
+  if (TUB) {
+    SILValueOwnershipChecker(Mod, *TUB, *this).check();
+  } else {
+    PostOrderFunctionInfo NewPOFI((*this)->getFunction());
+    TransitivelyUnreachableBlocksInfo TUB(NewPOFI);
+    SILValueOwnershipChecker(Mod, TUB, *this).check();
+  }
 #endif
 }
