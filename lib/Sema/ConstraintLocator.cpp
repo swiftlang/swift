@@ -53,6 +53,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case ApplyFunction:
     case FunctionArgument:
     case FunctionResult:
+    case OptionalPayload:
     case Member:
     case MemberRefBase:
     case UnresolvedMember:
@@ -128,6 +129,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case ApplyFunction:
       out << "apply function";
+      break;
+
+    case OptionalPayload:
+      out << "optional payload";
       break;
 
     case ApplyArgToParam:

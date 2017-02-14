@@ -2206,10 +2206,6 @@ commit_to_conversions:
 
   // Handle restrictions.
   if (auto restriction = conversionsOrFixes[0].getRestriction()) {
-    if (flags.contains(TMF_UnwrappingOptional)) {
-      subflags |= TMF_UnwrappingOptional;
-    }
-    
     return simplifyRestrictedConstraint(*restriction, type1, type2,
                                         kind, subflags, locator);
   }
@@ -3833,7 +3829,9 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto generic2 = type2->castTo<BoundGenericType>();
     assert(generic2->getDecl()->classifyAsOptionalType());
     return matchTypes(type1, generic2->getGenericArgs()[0],
-                      matchKind, (subflags | TMF_UnwrappingOptional), locator);
+                      matchKind, subflags,
+                      locator.withPathElement(
+                        ConstraintLocator::OptionalPayload));
   }
 
   // for $< in { <, <c, <oc }:
