@@ -1551,9 +1551,9 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       diagnose(initExpr->getLoc(), diag::delegation_here);
       ctor->setInitKind(CtorInitializerKind::Convenience);
     }
-  } else {
-    diagnoseResilientValueConstructor(ctor);
   }
+
+  diagnoseResilientConstructor(ctor);
 
   // If we want a super.init call...
   if (wantSuperInitCall) {
