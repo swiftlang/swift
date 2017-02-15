@@ -148,9 +148,8 @@ def F : JoinedOrSeparate<["-"], "F">, Flags<[FrontendOption]>,
   HelpText<"Add directory to framework search path">;
 def F_EQ : Joined<["-"], "F=">, Flags<[FrontendOption]>, Alias<F>;
 
-def Fsystem : JoinedOrSeparate<["-"], "Fsystem">, Flags<[FrontendOption]>,
+def Fsystem : Separate<["-"], "Fsystem">, Flags<[FrontendOption]>,
   HelpText<"Add directory to system framework search path">;
-def Fsystem_EQ : Joined<["-"], "Fsystem=">, Flags<[FrontendOption]>, Alias<Fsystem>;
 
 def I : JoinedOrSeparate<["-"], "I">, Flags<[FrontendOption]>,
   HelpText<"Add directory to the import search path">;

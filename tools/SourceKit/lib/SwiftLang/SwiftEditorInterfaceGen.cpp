@@ -891,7 +891,7 @@ void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
   addArgPair("-sdk", SPOpts.SDKPath);
   for (auto &FramePath : SPOpts.FrameworkSearchPaths) {
     if (FramePath.IsSystem)
-      addArgPair("-iframework", FramePath.Path);
+      addArgPair("-Fsystem", FramePath.Path);
     else
       addArgPair("-F", FramePath.Path);
   }
