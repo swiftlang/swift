@@ -1716,6 +1716,7 @@ class GenericSignatureBuilder::InferRequirementsWalker : public TypeWalker {
   bool isOuterArchetype(PotentialArchetype *PA) {
     unsigned ParamDepth = PA->getRootGenericParamKey().Depth;
     assert(ParamDepth <= MaxDepth);
+    (void) MaxDepth;
     return ParamDepth < MinDepth;
   }
 

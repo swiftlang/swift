@@ -631,6 +631,7 @@ TypeBase::gatherAllSubstitutions(ModuleDecl *module,
                       {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
                        genericEnv->mapTypeIntoContext(gp)});
       assert(result.second);
+      (void) result;
     }
   }
 

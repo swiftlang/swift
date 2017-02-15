@@ -4351,7 +4351,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   while (inheritedCount--)
     (void)readConformance(DeclTypeCursor);
 
-  ASTContext &ctx = getContext();
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
 
   while (valueCount--) {
@@ -4359,7 +4358,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto witness = cast_or_null<ValueDecl>(getDecl(*rawIDIter++));
     assert(witness ||
            req->getAttrs().hasAttribute<OptionalAttr>() ||
-           req->getAttrs().isUnavailable(ctx));
+           req->getAttrs().isUnavailable(getContext()));
     if (!witness) {
       conformance->setWitness(req, Witness());
       continue;

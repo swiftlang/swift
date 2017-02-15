@@ -3082,8 +3082,6 @@ namespace {
         return nullptr;
 
       DeclName name = owningStorage ? DeclName() : importedName.getDeclName();
-      bool hasCustomName = importedName.hasCustomName();
-
       if (importedName.importAsMember()) {
         assert(!correctSwiftName && "Swift 2 didn't support import-as-member!");
 
@@ -3114,7 +3112,8 @@ namespace {
       auto loc = Impl.importSourceLoc(decl->getLocation());
 
       if (name && name.isSimpleName()) {
-        assert(hasCustomName && "imported function with simple name?");
+        assert(importedName.hasCustomName() &&
+               "imported function with simple name?");
         // Just fill in empty argument labels.
         name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
       }

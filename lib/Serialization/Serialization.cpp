@@ -1202,8 +1202,8 @@ void Serializer::writeSILLayout(SILLayout *layout) {
   using namespace decls_block;
   auto foundLayoutID = SILLayouts.find(layout);
   assert(foundLayoutID != SILLayouts.end() && "layout not referenced properly");
-  auto layoutID = foundLayoutID->second;
-  assert(layoutID - 1 == SILLayoutOffsets.size());
+  assert(foundLayoutID->second - 1 == SILLayoutOffsets.size());
+  (void) foundLayoutID;
   SILLayoutOffsets.push_back(Out.GetCurrentBitNo());
   
   SmallVector<unsigned, 16> data;

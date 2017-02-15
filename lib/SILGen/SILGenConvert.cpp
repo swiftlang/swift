@@ -121,8 +121,7 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
   SILType optType = optTL.getLoweredType();
   CanType formalOptType = optType.getSwiftRValueType();
 
-  auto formalObjectType = formalOptType.getAnyOptionalObjectType();
-  assert(formalObjectType);
+  assert(formalOptType.getAnyOptionalObjectType());
   auto someDecl = getASTContext().getOptionalSomeDecl();
   
   SILValue result =

@@ -6,6 +6,25 @@
 // REQUIRES: tsan_runtime
 // XFAIL: linux
 
+// Make sure we can handle swifterror and don't bail during the LLVM
+// threadsanitizer pass.
+
+enum MyError : Error {
+    case A
+}
+
+public func foobar(_ x: Int) throws {
+  if x == 0 {
+    throw MyError.A
+  }
+}
+
+public func call_foobar() {
+  do {
+    try foobar(1)
+  } catch(_) { }
+}
+
 // Test ThreadSanitizer execution end-to-end.
 
 import Darwin
