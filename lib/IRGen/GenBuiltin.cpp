@@ -215,9 +215,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
 
       if (FuncNamePtr) {
         llvm::SmallVector<llvm::Value *, 2> Indices(2, NameGEP->getOperand(1));
-        NameGEP = llvm::GetElementPtrInst::CreateInBounds(
-            FuncNamePtr, makeArrayRef(Indices), "",
-            IGF.Builder.GetInsertBlock());
+        NameGEP = llvm::ConstantExpr::getGetElementPtr(
+            ((llvm::PointerType *)FuncNamePtr->getType())->getElementType(),
+            FuncNamePtr, makeArrayRef(Indices));
       }
     }
 

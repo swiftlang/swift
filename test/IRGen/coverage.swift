@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -profile-generate -profile-coverage-mapping -emit-sil -o - | %FileCheck %s --check-prefix=SIL
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -profile-generate -profile-coverage-mapping -emit-ir -o - | %FileCheck %s --check-prefix=IR
 
+// IR-NOT: __llvm_coverage_names
+
 // SIL-DAG: sil hidden @_TF8coverage2f1FT_T_
 // SIL-DAG: string_literal utf8 "{{.*}}coverage.swift:{{.*}}_TF8coverage2f1FT_T_"
 // IR-DAG: @"__profn_{{.*}}coverage.swift:_TF8coverage2f1FT_T_" {{.*}} c"{{.*}}coverage.swift:_TF8coverage2f1FT_T_"
