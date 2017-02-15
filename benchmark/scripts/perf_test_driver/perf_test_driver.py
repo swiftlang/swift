@@ -126,8 +126,8 @@ class BenchmarkDriver(object):
             self.run_for_opt_level(binary, opt_level, test_filter)
             for binary, opt_level in self.targets]
         max_test_len = functools.reduce(max,
-                                        [d['max_test_len']for d in self.data])
+                                        [d['max_test_len'] for d in self.data])
         has_failure = functools.reduce(max,
-                                       [d['has_failure']for d in self.data])
+                                       [d['has_failure'] for d in self.data])
         self.print_data(self.data, max_test_len)
         return not has_failure
