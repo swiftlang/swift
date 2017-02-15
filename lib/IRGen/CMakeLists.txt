@@ -41,7 +41,7 @@ add_swift_library(swiftIRGen STATIC
   StructLayout.cpp
   SwiftTargetInfo.cpp
   TypeLayoutVerifier.cpp
-  LINK_LIBRARIES
+  LINK_LIBS
     swiftAST
     swiftLLVMPasses
     swiftSIL

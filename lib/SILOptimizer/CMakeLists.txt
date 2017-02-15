@@ -19,4 +19,4 @@ add_swift_library(swiftSILOptimizer STATIC
   ${MANDATORY_SOURCES}
   ${TRANSFORMS_SOURCES}
   ${IPO_SOURCES}
-  LINK_LIBRARIES swiftSIL)
+  LINK_LIBS swiftSIL)
