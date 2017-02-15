@@ -49,5 +49,5 @@ class HasComputedProperty: ProtocolWithProperty {
     set {}
   }
 }
-// CHECK-LABEL: sil hidden @_T010multi_file19HasComputedPropertyC3fooSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasComputedProperty) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T010multi_file19HasComputedPropertyC3fooSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasComputedProperty) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_T010multi_file19HasComputedPropertyCAA012ProtocolWithE0AaaDP3fooSifmTW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasComputedProperty) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {

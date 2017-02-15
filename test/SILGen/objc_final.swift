@@ -9,8 +9,8 @@ final class Foo {
   // CHECK-LABEL: sil hidden [thunk] @_T010objc_final3FooC3foo{{[_0-9a-zA-Z]*}}FTo
 
   @objc var prop: Int = 0
-  // CHECK-LABEL: sil hidden [thunk] @_T010objc_final3FooC4propSifgTo
-  // CHECK-LABEL: sil hidden [thunk] @_T010objc_final3FooC4propSifsTo
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T010objc_final3FooC4propSifgTo
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T010objc_final3FooC4propSifsTo
 }
 
 // CHECK-LABEL: sil hidden @_T010objc_final7callFooyAA0D0CF

@@ -320,7 +320,7 @@ class C: Fooable, Barrable {
     self.bas()
   }
 
-  // CHECK-LABEL: sil hidden [thunk] @_T015guaranteed_self1CC5prop1SifgTo : $@convention(objc_method) (C) -> Int
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T015guaranteed_self1CC5prop1SifgTo : $@convention(objc_method) (C) -> Int
   // CHECK:       bb0([[SELF:%.*]] : $C):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         apply {{.*}}([[SELF_COPY]])
@@ -328,7 +328,7 @@ class C: Fooable, Barrable {
   // CHECK-NOT:     destroy_value [[SELF]]
   // CHECK-NOT:     destroy_value [[SELF_COPY]]
 
-  // CHECK-LABEL: sil hidden [thunk] @_T015guaranteed_self1CC5prop1SifsTo : $@convention(objc_method) (Int, C) -> ()
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T015guaranteed_self1CC5prop1SifsTo : $@convention(objc_method) (Int, C) -> ()
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         apply {{.*}} [[SELF_COPY]]
