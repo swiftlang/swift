@@ -702,7 +702,7 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
     return true;
 
   // Convert SIL to a lowered form suitable for IRGen.
-  runSILLoweringPasses(*SM.get());
+  runSILLoweringPasses(*SM);
 
   // TODO: remove once the frontend understands what action it should perform
   IRGenOpts.OutputKind = getOutputKind(Action);
