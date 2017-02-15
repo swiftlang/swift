@@ -119,23 +119,23 @@ static StringRef getNameForObjC(const ValueDecl *VD,
   return VD->getName().str();
 }
 
-static Optional<StringRef>
+static bool
 printSwiftEnumElemNameInObjC(const EnumElementDecl *EL, llvm::raw_ostream &OS,
                              Identifier PreferredName = Identifier()) {
   OS << getNameForObjC(EL->getDeclContext()->getAsEnumOrEnumExtensionContext());
   StringRef ElemName = getNameForObjC(EL, CustomNamesOnly);
-  Optional<StringRef> Result = None;
   if (ElemName.empty()) {
     if (PreferredName.empty())
       ElemName = EL->getName().str();
     else
       ElemName = PreferredName.str();
   } else {
-    Result = ElemName;
+    OS << ElemName;
+    return true;
   }
   SmallString<64> Scratch;
   OS << camel_case::toSentencecase(ElemName, Scratch);
-  return Result;
+  return false;
 }
 
 /// Returns true if the given selector might be classified as an init method
@@ -422,9 +422,8 @@ private:
       // Print the cases as the concatenation of the enum name with the case
       // name.
       os << "  ";
-      if (auto customEltName = printSwiftEnumElemNameInObjC(Elt, os)) {
-        os << customEltName.getValue()
-           << " SWIFT_COMPILE_NAME(\"" << Elt->getName() << "\")";
+      if (printSwiftEnumElemNameInObjC(Elt, os)) {
+        os << " SWIFT_COMPILE_NAME(\"" << Elt->getName() << "\")";
       }
       
       if (auto ILE = cast_or_null<IntegerLiteralExpr>(Elt->getRawValueExpr())) {
