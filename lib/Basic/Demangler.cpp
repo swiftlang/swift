@@ -465,8 +465,9 @@ NodePointer Demangler::demangleIdentifier() {
         WordIdx = c - 'A';
         hasWordSubsts = false;
       }
-      if (WordIdx >= (int)Words.size())
+      if (WordIdx >= NumWords)
         return nullptr;
+      assert(WordIdx < MaxNumWords);
       StringRef Slice = Words[WordIdx];
       Identifier.append(Slice.data(), Slice.size());
     }
@@ -489,9 +490,9 @@ NodePointer Demangler::demangleIdentifier() {
       for (int Idx = 0, End = (int)Slice.size(); Idx <= End; ++Idx) {
         char c = (Idx < End ? Slice[Idx] : 0);
         if (wordStartPos >= 0 && isWordEnd(c, Slice[Idx - 1])) {
-          if (Idx - wordStartPos >= 2) {
+          if (Idx - wordStartPos >= 2 && NumWords < MaxNumWords) {
             StringRef word(Slice.begin() + wordStartPos, Idx - wordStartPos);
-            Words.push_back(word);
+            Words[NumWords++] = word;
           }
           wordStartPos = -1;
         }

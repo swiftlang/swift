@@ -224,7 +224,7 @@ std::string NewMangling::selectMangling(const std::string &Old,
       assert(false);
     }
     if (StringRef(New).startswith(MANGLING_PREFIX_STR)) {
-      std::string Remangled = mangleNodeNew(NewNode);
+      std::string Remangled = mangleNode(NewNode);
       if (New != Remangled) {
         bool isEqual = false;
         if (treeContains(NewNode,

@@ -28,6 +28,7 @@
 #include <condition_variable>
 #include <new>
 #include <cctype>
+#include <iostream>
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 // Avoid defining macro max(), min() which conflict with std::max(), std::min()
@@ -1454,9 +1455,10 @@ static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
   auto globalNode
     = Demangle::NodeFactory::create(Demangle::Node::Kind::Global);
   globalNode->addChild(typeNode);
-  
+
+
   auto string = Demangle::mangleNode(globalNode);
-  
+
   auto fullNameBuf = (char*)swift_slowAlloc(string.size() + 1, 0);
   memcpy(fullNameBuf, string.c_str(), string.size() + 1);
 
