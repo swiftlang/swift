@@ -13,7 +13,15 @@
 #ifndef SWIFT_STDLIB_SHIMS_SWIFT_STDDEF_H
 #define SWIFT_STDLIB_SHIMS_SWIFT_STDDEF_H
 
+// stddef.h is provided by Clang, but it dispatches to libc's stddef.h.  As a
+// result, using stddef.h here would pull in Darwin module (which includes
+// libc). This creates a dependency cycle, so we can't use stddef.h in
+// SwiftShims.
+#if !defined(__APPLE__)
+#include <stddef.h>
+typedef size_t __swift_size_t;
+#else
 typedef __SIZE_TYPE__ __swift_size_t;
+#endif
 
 #endif // SWIFT_STDLIB_SHIMS_SWIFT_STDDEF_H
-
