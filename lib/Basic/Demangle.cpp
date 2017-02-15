@@ -15,8 +15,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Demangle.h"
+#ifndef NO_NEW_DEMANGLING
 #include "swift/Basic/Demangler.h"
 #include "swift/Basic/ManglingMacros.h"
+#endif
 #include "swift/Strings.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Punycode.h"
@@ -323,10 +325,12 @@ public:
   ///
   /// \return true if the mangling succeeded
   NodePointer demangleTopLevel() {
+#ifndef NO_NEW_DEMANGLING
     if (Mangled.str().startswith(MANGLING_PREFIX_STR)) {
       NewMangling::Demangler D(Mangled.str());
       return D.demangleTopLevel();
     }
+#endif
     if (!Mangled.nextIf("_T"))
       return nullptr;
 
@@ -2338,18 +2342,23 @@ swift::Demangle::isSwiftSymbol(const char *mangledName) {
   if (mangledName[0] == '_' && mangledName[1] == 'T')
     return true;
 
+#ifndef NO_NEW_DEMANGLING
   // The new mangling.
   for (unsigned i = 0; i < sizeof(MANGLING_PREFIX_STR) - 1; i++) {
     if (mangledName[i] != MANGLING_PREFIX_STR[i])
       return false;
   }
   return true;
+#else // !NO_NEW_DEMANGLING
+  return false;
+#endif // !NO_NEW_DEMANGLING
 }
 
 bool
 swift::Demangle::isThunkSymbol(const char *mangledName,
                                size_t mangledNameLength) {
   StringRef Name(mangledName, mangledNameLength);
+#ifndef NO_NEW_DEMANGLING
   if (Name.startswith(MANGLING_PREFIX_STR)) {
     // First do a quick check
     if (Name.endswith("TA") ||  // partial application forwarder
@@ -2375,6 +2384,7 @@ swift::Demangle::isThunkSymbol(const char *mangledName,
     }
     return false;
   }
+#endif // !NO_NEW_DEMANGLING
 
   if (Name.startswith("_T")) {
     // Old mangling.
@@ -2400,8 +2410,8 @@ NodePointer
 swift::Demangle::demangleTypeAsNode(const char *MangledName,
                                     size_t MangledNameLength,
                                     const DemangleOptions &Options) {
-  NewMangling::Demangler D(StringRef(MangledName, MangledNameLength));
-  return D.demangleType();
+  OldDemangler demangler(StringRef(MangledName, MangledNameLength));
+  return demangler.demangleTypeName();
 }
 
 namespace {

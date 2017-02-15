@@ -334,47 +334,47 @@ protocol ProtocolA {}
 protocol ProtocolB {}
 
 Runtime.test("Generic class ObjC runtime names") {
-  expectEqual("_T01a12GenericClassCySiGD",
+  expectEqual("_TtGC1a12GenericClassSi_",
               NSStringFromClass(GenericClass<Int>.self))
-  expectEqual("_T01a12GenericClassCyAA11PlainStructVGD",
+  expectEqual("_TtGC1a12GenericClassVS_11PlainStruct_",
               NSStringFromClass(GenericClass<PlainStruct>.self))
-  expectEqual("_T01a12GenericClassCyAA9PlainEnumOGD",
+  expectEqual("_TtGC1a12GenericClassOS_9PlainEnum_",
               NSStringFromClass(GenericClass<PlainEnum>.self))
-  expectEqual("_T01a12GenericClassCyAA11PlainStructV_AA0C4EnumOAEtGD",
+  expectEqual("_TtGC1a12GenericClassTVS_11PlainStructOS_9PlainEnumS1___",
               NSStringFromClass(GenericClass<(PlainStruct, PlainEnum, PlainStruct)>.self))
-  expectEqual("_T01a12GenericClassCyAA11PlainStructVmGD",
+  expectEqual("_TtGC1a12GenericClassMVS_11PlainStruct_",
               NSStringFromClass(GenericClass<PlainStruct.Type>.self))
-  expectEqual("_T01a12GenericClassCyAA11PlainStructVAEmcGD",
+  expectEqual("_TtGC1a12GenericClassFMVS_11PlainStructS1__",
               NSStringFromClass(GenericClass<(PlainStruct.Type) -> PlainStruct>.self))
 
-  expectEqual("_T01a12GenericClassCyAA11PlainStructVAEmKcGD",
+  expectEqual("_TtGC1a12GenericClassFzMVS_11PlainStructS1__",
               NSStringFromClass(GenericClass<(PlainStruct.Type) throws -> PlainStruct>.self))
-  expectEqual("_T01a12GenericClassCySiAA11PlainStructV_AA0C4EnumOztcGD",
+  expectEqual("_TtGC1a12GenericClassFTVS_11PlainStructROS_9PlainEnum_Si_",
               NSStringFromClass(GenericClass<(PlainStruct, inout PlainEnum) -> Int>.self))
 
-  expectEqual("_T01a12GenericClassCyAA9ProtocolA_pGD",
+  expectEqual("_TtGC1a12GenericClassPS_9ProtocolA__",
               NSStringFromClass(GenericClass<ProtocolA>.self))
-  expectEqual("_T01a12GenericClassCyAA9ProtocolA_AA0C1BpGD",
+  expectEqual("_TtGC1a12GenericClassPS_9ProtocolAS_9ProtocolB__",
               NSStringFromClass(GenericClass<ProtocolA & ProtocolB>.self))
-  expectEqual("_T01a12GenericClassCyAA9ProtocolA_AA0C1BpXpGD",
+  expectEqual("_TtGC1a12GenericClassPMPS_9ProtocolAS_9ProtocolB__",
               NSStringFromClass(GenericClass<(ProtocolA & ProtocolB).Type>.self))
-  expectEqual("_T01a12GenericClassCyAA9ProtocolA_AA0C1BpmGD",
+  expectEqual("_TtGC1a12GenericClassMPS_9ProtocolAS_9ProtocolB__",
               NSStringFromClass(GenericClass<(ProtocolB & ProtocolA).Protocol>.self))
 
-  expectEqual("_T01a12GenericClassCySo7CFArrayCGD",
+  expectEqual("_TtGC1a12GenericClassCSo7CFArray_",
               NSStringFromClass(GenericClass<CFArray>.self))
-  expectEqual("_T01a12GenericClassCySC7DecimalVGD",
+  expectEqual("_TtGC1a12GenericClassVSC7Decimal_",
               NSStringFromClass(GenericClass<Decimal>.self))
-  expectEqual("_T01a12GenericClassCySo8NSObjectCGD",
+  expectEqual("_TtGC1a12GenericClassCSo8NSObject_",
               NSStringFromClass(GenericClass<NSObject>.self))
-  expectEqual("_T01a12GenericClassCySo8NSObjectCGD",
+  expectEqual("_TtGC1a12GenericClassCSo8NSObject_",
               NSStringFromClass(GenericClass<NSObject>.self))
-  expectEqual("_T01a12GenericClassCySo9NSCopying_pGD",
+  expectEqual("_TtGC1a12GenericClassPSo9NSCopying__",
               NSStringFromClass(GenericClass<NSCopying>.self))
-  expectEqual("_T01a12GenericClassCySo9NSCopying_AA9ProtocolAAA0D1BpGD",
+  expectEqual("_TtGC1a12GenericClassPSo9NSCopyingS_9ProtocolAS_9ProtocolB__",
               NSStringFromClass(GenericClass<ProtocolB & NSCopying & ProtocolA>.self))
 
-  expectEqual("_T01a17MultiGenericClassCyAA0B6StructVySiGAA0B4EnumOyAGySiGGGD",
+  expectEqual("_TtGC1a17MultiGenericClassGVS_13GenericStructSi_GOS_11GenericEnumGS2_Si___",
               NSStringFromClass(MultiGenericClass<GenericStruct<Int>,
                                                   GenericEnum<GenericEnum<Int>>>.self))
 }

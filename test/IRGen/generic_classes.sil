@@ -9,7 +9,7 @@ import Swift
 
 // -- offset of RootGeneric<T>.x
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[ROOTGENERIC_NAME:@.*]] = private constant [32 x i8] c"15generic_classes11RootGenericC\00"
+// CHECK: [[ROOTGENERIC_NAME:@.*]] = private constant [32 x i8] c"C15generic_classes11RootGeneric\00"
 // CHECK: [[ROOTGENERIC_FIELDS:@.*]] = private constant [7 x i8] c"x\00y\00z\00\00"
 // CHECK: @_TMnC15generic_classes11RootGeneric = hidden constant <{ {{.*}} i32 }> <{
 // --       name
@@ -48,7 +48,7 @@ import Swift
 
 // -- fixed-layout nongeneric descriptor
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private constant [35 x i8] c"15generic_classes14RootNonGenericC\00"
+// CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private constant [35 x i8] c"C15generic_classes14RootNonGeneric\00"
 // CHECK: @_TMnC15generic_classes14RootNonGeneric = hidden constant <{ {{.*}} i32 }> <{
 // --       name
 // CHECK:   [35 x i8]* [[ROOTNONGENERIC_NAME]]

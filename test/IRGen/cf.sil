@@ -7,7 +7,7 @@
 // CHECK: [[REFRIGERATOR:%CSo14CCRefrigerator]] = type
 // CHECK: [[OBJC:%objc_object]] = type
 
-// CHECK: [[REFRIGERATOR_NAME:@.*]] = private unnamed_addr constant [20 x i8] c"So14CCRefrigeratorC\00"
+// CHECK: [[REFRIGERATOR_NAME:@.*]] = private unnamed_addr constant [20 x i8] c"CSo14CCRefrigerator\00"
 
 // CHECK-32: @_TMCSo14CCRefrigerator = linkonce_odr hidden global <{ {{.*}} }> <{ i8* getelementptr inbounds ([20 x i8], [20 x i8]* [[REFRIGERATOR_NAME]], i32 0, i32 0), [[TYPE]]* null, i32 0, i8** @_TWVBO, i32 16, [[TYPE]]* null, i8* null, i8* null, i8* null }>
 
