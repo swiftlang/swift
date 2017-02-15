@@ -358,6 +358,16 @@ function(_add_variant_link_flags)
   if(NOT "${SWIFT_${LFLAGS_SDK}_ICU_I18N}" STREQUAL "")
     list(APPEND library_search_directories "${SWIFT_${sdk}_ICU_I18N}")
   endif()
+  
+  if(SWIFT_ENABLE_GOLD_LINKER AND
+     "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
+    list(APPEND result "-fuse-ld=gold")
+  endif()
+  if(SWIFT_ENABLE_LLD_LINKER OR
+     ("${LFLAGS_SDK}" STREQUAL "WINDOWS" AND
+      NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
+    list(APPEND result "-fuse-ld=lld")
+  endif()
 
   set("${LFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
   set("${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}" "${library_search_directories}" PARENT_SCOPE)
@@ -1065,16 +1075,6 @@ function(_add_swift_library_single target name)
     RESULT_VAR_NAME link_flags
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
       )
-
-  if(SWIFT_ENABLE_GOLD_LINKER AND
-     "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-    list(APPEND link_flags "-fuse-ld=gold")
-  endif()
-  if(SWIFT_ENABLE_LLD_LINKER OR
-     ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS" AND
-      NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
-    list(APPEND link_flags "-fuse-ld=lld")
-  endif()
 
   # Configure plist creation for OS X.
   set(PLIST_INFO_PLIST "Info.plist" CACHE STRING "Plist name")
@@ -1823,16 +1823,6 @@ function(_add_swift_executable_single name)
     list(APPEND link_flags
         "-Xlinker" "-rpath"
         "-Xlinker" "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
-  endif()
-
-  if(SWIFT_ENABLE_GOLD_LINKER AND
-     "${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-    list(APPEND link_flags "-fuse-ld=gold")
-  endif()
-  if(SWIFT_ENABLE_LLD_LINKER OR
-     ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS" AND
-      NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
-    list(APPEND link_flags "-fuse-ld=lld")
   endif()
 
   # Find the names of dependency library targets.
