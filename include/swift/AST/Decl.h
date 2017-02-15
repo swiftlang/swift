@@ -511,8 +511,11 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// it is implicit. This bit is used during parsing and type-checking to
     /// control inserting the implicit destructor.
     unsigned HasDestructorDecl : 1;
+
+    /// Whether the class has @objc ancestry.
+    unsigned ObjCClassKind : 3;
   };
-  enum { NumClassDeclBits = NumNominalTypeDeclBits + 8 };
+  enum { NumClassDeclBits = NumNominalTypeDeclBits + 11 };
   static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
 
   class StructDeclBitfields {
