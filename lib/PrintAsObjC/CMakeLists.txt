@@ -1,7 +1,7 @@
 add_swift_library(swiftPrintAsObjC STATIC
   PrintAsObjC.cpp
 
-  LINK_LIBRARIES
+  LINK_LIBS
     swiftIDE
     swiftFrontend
     swiftClangImporter
