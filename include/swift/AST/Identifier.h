@@ -434,7 +434,7 @@ public:
   ObjCSelector(ASTContext &ctx, unsigned numArgs, ArrayRef<Identifier> pieces);
 
   /// Construct an invalid ObjCSelector.
-  ObjCSelector() : Storage() {};
+  ObjCSelector() : Storage() {}
 
   /// Convert to true if the decl name is valid.
   explicit operator bool() const { return (bool)Storage; }

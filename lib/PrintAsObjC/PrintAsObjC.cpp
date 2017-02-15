@@ -119,6 +119,29 @@ static StringRef getNameForObjC(const ValueDecl *VD,
   return VD->getName().str();
 }
 
+/// Print the ObjC name of an enum element decl to OS, also allowing the client
+/// to specify a preferred name other than the decl's original name.
+///
+/// Returns true if the decl has a custom ObjC name (@objc); false otherwise.
+static bool
+printSwiftEnumElemNameInObjC(const EnumElementDecl *EL, llvm::raw_ostream &OS,
+                             Identifier PreferredName = Identifier()) {
+  StringRef ElemName = getNameForObjC(EL, CustomNamesOnly);
+  if (!ElemName.empty()) {
+    OS << ElemName;
+    return true;
+  }
+  OS << getNameForObjC(EL->getDeclContext()->getAsEnumOrEnumExtensionContext());
+  if (PreferredName.empty())
+    ElemName = EL->getName().str();
+  else
+    ElemName = PreferredName.str();
+
+  SmallString<64> Scratch;
+  OS << camel_case::toSentencecase(ElemName, Scratch);
+  return false;
+}
+
 /// Returns true if the given selector might be classified as an init method
 /// by Objective-C ARC.
 static bool looksLikeInitMethod(ObjCSelector selector) {
@@ -403,19 +426,8 @@ private:
       // Print the cases as the concatenation of the enum name with the case
       // name.
       os << "  ";
-      StringRef customEltName = getNameForObjC(Elt, CustomNamesOnly);
-      if (customEltName.empty()) {
-        if (customName.empty()) {
-          os << ED->getName();
-        } else {
-          os << customName;
-        }
-
-        SmallString<16> scratch;
-        os << camel_case::toSentencecase(Elt->getName().str(), scratch);
-      } else {
-        os << customEltName
-           << " SWIFT_COMPILE_NAME(\"" << Elt->getName() << "\")";
+      if (printSwiftEnumElemNameInObjC(Elt, os)) {
+        os << " SWIFT_COMPILE_NAME(\"" << Elt->getName() << "\")";
       }
       
       if (auto ILE = cast_or_null<IntegerLiteralExpr>(Elt->getRawValueExpr())) {
@@ -2647,20 +2659,19 @@ getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
   } else if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
     return getObjCNameForSwiftDecl(SD->getGetter(), PreferredName);
   } else if (auto *EL = dyn_cast<EnumElementDecl>(VD)) {
-    EnumDecl* ED = EL->getDeclContext()->getAsEnumOrEnumExtensionContext();
     SmallString<64> Buffer;
     {
       llvm::raw_svector_ostream OS(Buffer);
-      OS << getNameForObjC(ED).str();
-      SmallString<64> Scratch;
-      OS << camel_case::toSentencecase(PreferredName.getBaseName().str(),
-                                       Scratch);
+      printSwiftEnumElemNameInObjC(EL, OS, PreferredName.getBaseName());
     }
     return {Ctx.getIdentifier(Buffer.str()), ObjCSelector()};
   } else {
-    auto Name = getNameForObjC(VD, CustomNamesOnly);
+    // @objc(ExplicitName) > PreferredName > Swift name.
+    StringRef Name = getNameForObjC(VD, CustomNamesOnly);
     if (!Name.empty())
       return {Ctx.getIdentifier(Name), ObjCSelector()};
-    return {PreferredName.getBaseName(), ObjCSelector()};
+    if (!PreferredName.getBaseName().empty())
+      return {PreferredName.getBaseName(), ObjCSelector()};
+    return {Ctx.getIdentifier(getNameForObjC(VD)), ObjCSelector()};
   }
 }

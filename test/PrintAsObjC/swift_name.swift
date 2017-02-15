@@ -31,3 +31,13 @@ class Test : NSObject {
   func useAlignment(_: ZZAlignment) {}
   func useObjects(_: ZZClass) -> [ZZProto] { return [] }
 }
+
+@objc
+public enum TestE : Int{
+	@objc(A2)
+	case A1
+	case B1
+}
+// CHECK: typedef SWIFT_ENUM(NSInteger, TestE)
+// CHECK-NEXT: {{^}} A2 SWIFT_COMPILE_NAME("A1") = 0,
+// CHECK-NEXT: {{^}} TestEB1 = 1,
