@@ -425,3 +425,15 @@ bb0:
   %result = tuple ()
   return %result : $()
 }
+
+// Crash on partial apply of witness_method without generic signature
+
+sil hidden_external @concrete_witness_method : $@convention(witness_method) (Int, Int) -> ()
+
+sil hidden @partial_apply_witness_method : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %fn = function_ref @concrete_witness_method : $@convention(witness_method) (Int, Int) -> ()
+  %pa = partial_apply %fn (%0) : $@convention(witness_method) (Int, Int) -> ()
+  %result = tuple ()
+  return %result : $()
+}
