@@ -1,12 +1,12 @@
-//===--- NativeConventionSchema.h - R-Value Schema for SwiftCC  -*- C++ -*-===//
+//===--- NativeConventionSchema.h - R-Value Schema for SwiftCC --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -58,7 +58,7 @@ public:
                           Explosion &fromNonNative, SILType type) const;
 
   /// Map form a native explosion that follows the native calling convention's
-  /// schema to an non-native explosion whose schema is described by
+  /// schema to a non-native explosion whose schema is described by
   /// type.getSchema().
   Explosion mapFromNative(IRGenModule &IGM, IRGenFunction &IGF,
                           Explosion &native, SILType type) const;
