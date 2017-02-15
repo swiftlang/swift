@@ -319,10 +319,15 @@ checkSpecializationRequirements(ArrayRef<Requirement> Requirements) {
       assert(FirstType && SecondType);
       assert(!FirstType->hasArchetype());
       assert(!SecondType->hasArchetype());
+
       // Only one of the types should be concrete.
       assert(FirstType->hasTypeParameter() != SecondType->hasTypeParameter() &&
              "Only concrete type same-type requirements are supported by "
              "generic specialization");
+
+      (void) FirstType;
+      (void) SecondType;
+
       continue;
     }
 

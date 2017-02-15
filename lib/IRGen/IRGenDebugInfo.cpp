@@ -86,11 +86,15 @@ static unsigned getSizeInBits(llvm::DIType *Ty) {
   return Ty->getSizeInBits();
 }
 
+#ifndef NDEBUG
+
 /// Return the size reported by the variable's type.
 static unsigned getSizeInBits(const llvm::DILocalVariable *Var) {
   llvm::DIType *Ty = Var->getType().resolve();
   return getSizeInBits(Ty);
 }
+
+#endif
 
 IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
                                ClangImporter &CI,
