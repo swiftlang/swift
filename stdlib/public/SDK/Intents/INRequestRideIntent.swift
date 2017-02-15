@@ -33,11 +33,15 @@ extension INRequestRideIntent {
         paymentMethod: paymentMethod,
         scheduledPickupTime: scheduledPickupTime)
     } else {
+#if os(iOS)
       self.init(__pickupLocation: pickupLocation,
         dropOffLocation: dropOffLocation,
         rideOptionName: rideOptionName,
         partySize: partySize.map { NSNumber(value: $0) },
         paymentMethod: paymentMethod)
+#else
+      fatalError("The initializer is not available")
+#endif
     }
   }
 
