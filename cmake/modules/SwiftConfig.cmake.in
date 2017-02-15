@@ -1,0 +1,23 @@
+# This file provides information and services to the final user.
+
+@SWIFT_CONFIG_CODE@
+
+set(SWIFT_VERSION @SWIFT_VERSION@)
+set(SWIFT_MAIN_SRC_DIR @SWIFT_MAIN_SRC_DIR@)
+
+set(SWIFT_INCLUDE_DIRS "@SWIFT_INCLUDE_DIR@")
+set(SWIFT_LIBRARY_DIRS "@SWIFT_CONFIG_LIBRARY_DIRS@")
+
+# These variables are duplicated, but they must match the LLVM variables of the
+# same name. The variables ending in "S" could some day become lists, and are
+# preserved for convention and compatibility.
+set(SWIFT_INCLUDE_DIR "@SWIFT_INCLUDE_DIR@")
+set(SWIFT_LIBRARY_DIR "@SWIFT_CONFIG_LIBRARY_DIRS@")
+
+set(SWIFT_CMAKE_DIR "@SWIFT_CMAKE_DIR@")
+set(SWIFT_BINARY_DIR "@SWIFT_BINARY_DIR@")
+
+if(NOT TARGET swift)
+  set(SWIFT_EXPORTED_TARGETS "@SWIFT_CONFIG_EXPORTS@")
+  include("@SWIFT_EXPORTS_FILE@")
+endif()

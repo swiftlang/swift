@@ -1228,6 +1228,13 @@ function(add_swift_library name)
       ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
       LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
       RUNTIME DESTINATION bin)
+  swift_is_installing_component(dev is_installing)
+  
+  if(NOT is_installing)
+    set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
+  else()
+    set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
+  endif()
 endfunction()
 
 # Add a new Swift library.
@@ -2079,5 +2086,14 @@ function(add_swift_host_tool executable)
     swift_install_in_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
       TARGETS ${executable}
       RUNTIME DESTINATION bin)
+
+    swift_is_installing_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
+      is_installing)
+  
+    if(NOT is_installing)
+      set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${executable})
+    else()
+      set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${executable})
+    endif()
   endif()
 endfunction()
