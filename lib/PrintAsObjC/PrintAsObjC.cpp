@@ -119,12 +119,16 @@ static StringRef getNameForObjC(const ValueDecl *VD,
   return VD->getName().str();
 }
 
+/// Print the ObjC name of an enum element decl to OS, also allowing the client
+/// to specify a preferred name other than the decl's original name.
+///
+/// Returns true if the decl has a custom ObjC name (@objc); false otherwise.
 static bool
 printSwiftEnumElemNameInObjC(const EnumElementDecl *EL, llvm::raw_ostream &OS,
                              Identifier PreferredName = Identifier()) {
-  OS << getNameForObjC(EL->getDeclContext()->getAsEnumOrEnumExtensionContext());
   StringRef ElemName = getNameForObjC(EL, CustomNamesOnly);
   if (ElemName.empty()) {
+    OS << getNameForObjC(EL->getDeclContext()->getAsEnumOrEnumExtensionContext());
     if (PreferredName.empty())
       ElemName = EL->getName().str();
     else
