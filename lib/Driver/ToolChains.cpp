@@ -124,6 +124,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
 
   inputArgs.AddAllArgs(arguments, options::OPT_I);
   inputArgs.AddAllArgs(arguments, options::OPT_F);
+  inputArgs.AddAllArgs(arguments, options::OPT_Fsystem);
 
   inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
   inputArgs.AddLastArg(arguments, options::OPT_autolink_force_load);
@@ -930,6 +931,7 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
                                      runtimeLibraryPath);
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_FRAMEWORK_PATH",
                                      ":", options::OPT_F, context.Args);
+  // FIXME: Add options::OPT_Fsystem paths to DYLD_FRAMEWORK_PATH as well.
   return II;
 }
 
@@ -1119,6 +1121,7 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   context.Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
   context.Args.AddAllArgs(Arguments, options::OPT_F);
+  context.Args.AddAllArgs(Arguments, options::OPT_Fsystem);
 
   if (context.Args.hasArg(options::OPT_enable_app_extension)) {
     // Keep this string fixed in case the option used by the
@@ -1441,6 +1444,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
   context.Args.AddAllArgs(Arguments, options::OPT_F);
+  context.Args.AddAllArgs(Arguments, options::OPT_Fsystem);
 
   if (!context.OI.SDKPath.empty()) {
     Arguments.push_back("--sysroot");

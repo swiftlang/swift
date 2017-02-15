@@ -996,8 +996,10 @@ ModuleFile::ModuleFile(
         }
         case input_block::SEARCH_PATH: {
           bool isFramework;
-          input_block::SearchPathLayout::readRecord(scratch, isFramework);
-          SearchPaths.push_back({blobData, isFramework});
+          bool isSystem;
+          input_block::SearchPathLayout::readRecord(scratch, isFramework,
+                                                    isSystem);
+          SearchPaths.push_back({blobData, isFramework, isSystem});
           break;
         }
         default:
@@ -1187,8 +1189,9 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
     return error(Status::TargetTooNew);
   }
 
-  for (const auto &searchPathPair : SearchPaths)
-    ctx.addSearchPath(searchPathPair.first, searchPathPair.second);
+  for (const auto &searchPath : SearchPaths)
+    ctx.addSearchPath(searchPath.Path, searchPath.IsFramework,
+                      searchPath.IsSystem);
 
   auto clangImporter = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
 

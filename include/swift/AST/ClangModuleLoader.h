@@ -44,7 +44,8 @@ public:
   /// -I or -F.
   ///
   /// \returns true if there was an error adding the search path.
-  virtual bool addSearchPath(StringRef newSearchPath, bool isFramework) = 0;
+  virtual bool addSearchPath(StringRef newSearchPath, bool isFramework,
+                             bool isSystem) = 0;
 };
 
 } // namespace swift

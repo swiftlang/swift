@@ -537,7 +537,7 @@ public:
   /// Adds a search path to SearchPathOpts, unless it is already present.
   ///
   /// Does any proper bookkeeping to keep all module loaders up to date as well.
-  void addSearchPath(StringRef searchPath, bool isFramework);
+  void addSearchPath(StringRef searchPath, bool isFramework, bool isSystem);
 
   /// \brief Adds a module loader to this AST context.
   ///
