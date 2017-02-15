@@ -15,7 +15,7 @@ extension Sub {
 
     // Make sure that we are generating the @objc thunk and are calling the actual method.
     //
-    // CHECK-LABEL: sil hidden [transparent] [thunk] @_T015objc_extensions3SubC4propSQySSGfgTo : $@convention(objc_method) (Sub) -> @autoreleased Optional<NSString> {
+    // CHECK-LABEL: sil hidden [thunk] @_T015objc_extensions3SubC4propSQySSGfgTo : $@convention(objc_method) (Sub) -> @autoreleased Optional<NSString> {
     // CHECK: bb0([[SELF:%.*]] : $Sub):
     // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK: [[GETTER_FUNC:%.*]] = function_ref @_T015objc_extensions3SubC4propSQySSGfg : $@convention(method) (@guaranteed Sub) -> @owned Optional<String>
@@ -24,7 +24,7 @@ extension Sub {
     // CHECK: } // end sil function '_T015objc_extensions3SubC4propSQySSGfgTo'
 
     // Then check the body of the getter calls the super_method.
-    // CHECK-LABEL: sil hidden [transparent] @_T015objc_extensions3SubC4propSQySSGfg : $@convention(method) (@guaranteed Sub) -> @owned Optional<String> {
+    // CHECK-LABEL: sil hidden @_T015objc_extensions3SubC4propSQySSGfg : $@convention(method) (@guaranteed Sub) -> @owned Optional<String> {
     // CHECK: bb0([[SELF:%.*]] : $Sub):
     // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK: [[SELF_COPY_CAST:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base

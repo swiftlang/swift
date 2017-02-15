@@ -68,8 +68,8 @@ protocol Proto {
 
 // CHECK-LABEL: sil hidden [thunk] @_T07dynamic3{{[_0-9a-zA-Z]*}}fcTo
 // CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC10objcMethod{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC8objcPropSifgTo
-// CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC8objcPropSifsTo
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooC8objcPropSifgTo
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooC8objcPropSifsTo
 // CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfgTo
 // CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfsTo
 
@@ -81,8 +81,8 @@ protocol Proto {
 
 // CHECK-LABEL: sil hidden [thunk] @_T07dynamic3{{[_0-9a-zA-Z]*}}fcTo
 // CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC0A6Method{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC0A4PropSifgTo
-// CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC0A4PropSifsTo
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooC0A4PropSifgTo
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooC0A4PropSifsTo
 // CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC9subscriptSiSiAA_tcfgTo
 // CHECK-LABEL: sil hidden [thunk] @_T07dynamic3FooC9subscriptSiSiAA_tcfsTo
 

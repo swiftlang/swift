@@ -6,7 +6,7 @@ class Base {
 // The ordering here is unfortunate: we generate the property
 // getters and setters after we've processed the decl.
 
-// CHECK-LABEL: sil hidden @_T017materializeForSet4BaseC8computedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet4BaseC8computedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $Base):
 // CHECK:   [[ADDR:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:   [[T0:%.*]] = function_ref @_T017materializeForSet4BaseC8computedSifg
@@ -20,7 +20,7 @@ class Base {
 // CHECK:   return [[T4]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
 // CHECK: }
 
-// CHECK-LABEL: sil hidden @_T017materializeForSet4BaseC8computedSifmytfU_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Base, @thick Base.Type) -> () {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet4BaseC8computedSifmytfU_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Base, @thick Base.Type) -> () {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*Base, [[SELFTYPE:%.*]] : $@thick Base.Type):
 // CHECK:   [[T0:%.*]] = load_borrow [[SELF]]
 // CHECK:   [[T1:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
@@ -28,7 +28,7 @@ class Base {
 // CHECK:   [[SETTER:%.*]] = function_ref @_T017materializeForSet4BaseC8computedSifs
 // CHECK:   apply [[SETTER]]([[T2]], [[T0]])
 
-// CHECK-LABEL: sil hidden @_T017materializeForSet4BaseC6storedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet4BaseC6storedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $Base):
 // CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.stored
 // CHECK:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
@@ -205,7 +205,7 @@ class HasDidSet : Base {
     didSet {}
   }
 
-// CHECK-LABEL: sil hidden @_T017materializeForSet06HasDidC0C6storedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet06HasDidC0C6storedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasDidSet):
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:   [[T0:%.*]] = function_ref @_T017materializeForSet06HasDidC0C6storedSifg
@@ -224,7 +224,7 @@ class HasDidSet : Base {
     set(value) {}
   }
 
-// CHECK-LABEL: sil hidden @_T017materializeForSet06HasDidC0C8computedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet06HasDidC0C8computedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasDidSet):
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:   [[T0:%.*]] = function_ref @_T017materializeForSet06HasDidC0C8computedSifg
@@ -244,7 +244,7 @@ class HasStoredDidSet {
     didSet {}
   }
 
-// CHECK-LABEL: sil hidden @_T017materializeForSet012HasStoredDidC0C6storedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasStoredDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet012HasStoredDidC0C6storedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasStoredDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasStoredDidSet):
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:   [[T0:%.*]] = function_ref @_T017materializeForSet012HasStoredDidC0C6storedSifg
@@ -259,7 +259,7 @@ class HasStoredDidSet {
 // CHECK: }
 }
 
-// CHECK-LABEL: sil hidden @_T017materializeForSet012HasStoredDidC0C6storedSifmytfU_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasStoredDidSet, @thick HasStoredDidSet.Type) -> () {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet012HasStoredDidC0C6storedSifmytfU_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasStoredDidSet, @thick HasStoredDidSet.Type) -> () {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*HasStoredDidSet, [[METATYPE:%.*]] : $@thick HasStoredDidSet.Type):
 // CHECK:   [[SELF_VALUE:%.*]] = load_borrow [[SELF]] : $*HasStoredDidSet
 // CHECK:   [[BUFFER_ADDR:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
@@ -272,7 +272,7 @@ class HasStoredDidSet {
 class HasWeak {
   weak var weakvar: HasWeak?
 }
-// CHECK-LABEL: sil hidden @_T017materializeForSet7HasWeakC7weakvarACSgXwfm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasWeak) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet7HasWeakC7weakvarACSgXwfm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasWeak) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasWeak):
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Optional<HasWeak>
 // CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $HasWeak, #HasWeak.weakvar
@@ -486,7 +486,7 @@ func inoutAccessOfLazyStructProperty(l: inout LazyStructProperty) {
 
 // Test for materializeForSet vs lazy properties of classes.
 
-// CHECK-LABEL: sil hidden @_T017materializeForSet17LazyClassPropertyC3catSifm
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet17LazyClassPropertyC3catSifm
 
 class LazyClassProperty {
   lazy var cat: Int = 5
