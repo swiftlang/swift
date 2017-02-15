@@ -192,20 +192,19 @@ should be case-sensitive by default.  We propose a standard "language" of
 defaulted parameters to be used for these purposes, with usage roughly like this:
 
 ```swift
-  x.compared(to: y, case: .sensitive, in: swissGerman)
-  
-  x.lowercased(in: .currentLocale)
-  
-  x.allMatches(
-    somePattern, case: .insensitive, diacritic: .insensitive)
+x.compared(to: y, case: .sensitive, in: swissGerman)
+
+x.lowercased(in: .currentLocale)
+
+x.allMatches(somePattern, case: .insensitive, diacritic: .insensitive)
 ```
 
 This usage might be supported by code like this:
 
 ```swift
 enum StringSensitivity {
-case sensitive
-case insensitive
+  case sensitive
+  case insensitive
 }
 
 extension Locale {
@@ -301,8 +300,8 @@ an operator `<=>`:
 enum SortOrder { case before, same, after }
 
 protocol Comparable : Equatable {
- func compared(to: Self) -> SortOrder
- ...
+  func compared(to: Self) -> SortOrder
+  ...
 }
 ```
 
@@ -312,8 +311,9 @@ across the library.
 
 ```swift
 extension String {
- func compared(to: Self) -> SortOrder
-
+  func compared(to: Self) -> SortOrder {
+    ...
+  }
 }
 ```
 
@@ -405,7 +405,7 @@ The benefits of restoring `Collection` conformance are substantial:
     "correct" this limitation by declaring a trivial conformance:
     
     ```swift
-  extension String : BidirectionalCollection {}
+    extension String : BidirectionalCollection {}
     ```
     
     Even if we removed indexing-by-element from `String`, users could still do
@@ -464,6 +464,7 @@ their naming:
 
   * Slicing from an index to the end, or from the start to an index, is done
     with a method and does not support in-place mutation:
+    
     ```swift
     s.prefix(upTo: i).readOnly()
     ```
@@ -684,9 +685,9 @@ the overall algorithm quadratic:
 
 ```swift
 extension String {
-    func containsChar(_ x: Character) -> Bool {
-        return !isEmpty && (first == x || dropFirst().containsChar(x))
-    }
+  func containsChar(_ x: Character) -> Bool {
+    return !isEmpty && (first == x || dropFirst().containsChar(x))
+  }
 }
 ```
 
@@ -696,12 +697,12 @@ efficient (assuming they remember):
 
 ```swift
 extension String {
-    // add optional argument tracking progress through the string
-    func containsCharacter(_ x: Character, atOrAfter idx: Index? = nil) -> Bool {
-        let idx = idx ?? startIndex
-        return idx != endIndex
-            && (self[idx] == x || containsCharacter(x, atOrAfter: index(after: idx)))
-    }
+  // add optional argument tracking progress through the string
+  func containsCharacter(_ x: Character, atOrAfter idx: Index? = nil) -> Bool {
+    let idx = idx ?? startIndex
+    return idx != endIndex
+      && (self[idx] == x || containsCharacter(x, atOrAfter: index(after: idx)))
+  }
 }
 ```
 
@@ -787,9 +788,9 @@ extension Unicode {
 
 extension Unicode : RangeReplaceableCollection where CodeUnits :
   RangeReplaceableCollection {
-    // Satisfy protocol requirement
-    mutating func replaceSubrange<C : Collection>(_: Range<Index>, with: C) 
-      where C.Element == Element
+  // Satisfy protocol requirement
+  mutating func replaceSubrange<C : Collection>(_: Range<Index>, with: C) 
+    where C.Element == Element
   
   // ... define high-level mutating string operations, e.g. replace ...
 }
@@ -824,7 +825,7 @@ if let firstLetter = input.dropPrefix(alphabeticCharacter) {
 }
 
 if let (number, restOfInput) = input.parsingPrefix(Int.self) {
-   ...
+  ...
 }
 ```
 
@@ -871,7 +872,7 @@ the string being searched, if needed, can easily be recovered as the
 Note also that matching operations are useful for collections in general, and
 would fall out of this proposal:
 
-```
+```swift
 // replace subsequences of contiguous NaNs with zero
 forces.replace(oneOrMore([Float.nan]), [0.0])
 ```
