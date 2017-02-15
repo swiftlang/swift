@@ -10,26 +10,26 @@ protocol Unicode {
   associatedtype Encoding: UnicodeEncoding
   associatedtype CodeUnits: RandomAccessCollection
   /* where CodeUnits.Iterator.Element == Encoding.CodeUnit */
-  var codeUnits: CodeUnits {get}
+  var codeUnits: CodeUnits { get }
 
   associatedtype ValidUTF8View : BidirectionalCollection
   // where ValidUTF8View.Iterator.Element == UTF8.CodeUnit */
   // = TranscodedView<CodeUnits, Encoding, UTF8>
-  var utf8: ValidUTF8View {get}
+  var utf8: ValidUTF8View { get }
 
   associatedtype ValidUTF16View : BidirectionalCollection
   // where ValidUTF16View.Iterator.Element == UTF16.CodeUnit
   // = TranscodedView<CodeUnits, Encoding, UTF16>
-  var utf16: ValidUTF16View {get}
+  var utf16: ValidUTF16View { get }
 
   associatedtype ValidUTF32View : BidirectionalCollection
   // where ValidUTF32View.Iterator.Element == UTF32.CodeUnit
   // = TranscodedView<CodeUnits, Encoding, UTF32>
-  var utf32: ValidUTF32View {get}
+  var utf32: ValidUTF32View { get }
 
   associatedtype ExtendedASCII : BidirectionalCollection // FIXME: Can this be Random Access?
   /* where ExtendedASCII.Iterator.Element == UInt32 */
-  var extendedASCII: ExtendedASCII {get}
+  var extendedASCII: ExtendedASCII { get }
 
   associatedtype Characters : BidirectionalCollection
   /* where Characters.Iterator.Element == Character */
@@ -101,6 +101,8 @@ final class _StringStorage<Element: UnsignedInteger>
   }
 /*
 }
+
+// TODO: JIRA for error: @objc is not supported within extensions of generic classes
 
 extension _StringStorage : _NSStringCore {
 */
@@ -321,8 +323,6 @@ struct SwiftCanonicalString {
 }
 
 extension SwiftCanonicalString {
-  // TODO: the below didn't work :-(
-#if false
   init<
     OtherCodeUnits: RandomAccessCollection,
     OtherEncoding: UnicodeEncoding
@@ -331,7 +331,7 @@ extension SwiftCanonicalString {
     codeUnits: OtherCodeUnits, encodedWith otherEncoding: OtherEncoding.Type
   )
   where
-    OtherEncoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
+    OtherEncoding.EncodedScalar.Iterator.Element == OtherCodeUnits.Iterator.Element,
     OtherCodeUnits.SubSequence : RandomAccessCollection,
     OtherCodeUnits.SubSequence.Index == OtherCodeUnits.Index,
     OtherCodeUnits.SubSequence.SubSequence == OtherCodeUnits.SubSequence,
@@ -339,22 +339,6 @@ extension SwiftCanonicalString {
   {
     self.init(UnicodeStorage(codeUnits, otherEncoding))
   }
-#endif // false
-
-  // Quick hack to be easier to test
-  init<
-    OtherCU : UnsignedInteger,
-    OtherEncoding : UnicodeEncoding
-  >
-  (
-    codeUnits: [OtherCU], encodedWith otherEncoding: OtherEncoding.Type
-  )
-  where
-    OtherEncoding.EncodedScalar.Iterator.Element == OtherCU
-  {
-    self.init(UnicodeStorage(codeUnits, otherEncoding))
-  }
-
 }
 
 extension SwiftCanonicalString : Unicode {
