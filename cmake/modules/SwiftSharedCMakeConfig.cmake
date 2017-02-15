@@ -198,6 +198,7 @@ macro(swift_common_standalone_build_config_cmark product)
                       "${CMARK_BUILD_INCLUDE_DIR}")
 
   include(${${product}_PATH_TO_CMARK_BUILD}/src/CMarkExports.cmake)
+  add_definitions(-DCMARK_STATIC_DEFINE)
 endmacro()
 
 # Common cmake project config for standalone builds.
