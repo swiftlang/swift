@@ -64,6 +64,9 @@ class CachedProperty(object):
 class Object(object):
 
     def __init__(self, obj):
+        import sys
+        if sys.version_info > (3,):
+            long = int
         if isinstance(obj, Object):
             self._obj = conf.lib.sourcekitd_request_retain(obj)
         elif isinstance(obj, (int, long, bool)):
