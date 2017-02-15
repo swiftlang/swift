@@ -1525,9 +1525,7 @@ function calculate_targets_for_host() {
 }
 
 
-if [ -z "${COMMON_C_FLAGS}" ]; then
-    COMMON_C_FLAGS=""
-fi
+COMMON_C_FLAGS=""
 
 # Convert to an array.
 eval COMMON_CMAKE_OPTIONS=(${COMMON_CMAKE_OPTIONS})
