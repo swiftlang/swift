@@ -160,7 +160,7 @@ func verifyParameters${TestType}${FuncName}(
 % else:
    let res = clobber${FuncName}(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
 % end
-													2, 3, 5, 7, 11, 13, 17, 19, 23, 29)
+                          2, 3, 5, 7, 11, 13, 17, 19, 23, 29)
    precondition(res.0 == 5.5)
    precondition(res.1 == 129)
 % for Num in range(0, 10):
@@ -211,7 +211,7 @@ func verifyReturnAndParameters${TestType}${FuncName}(
 % else:
    let res = clobber${FuncName}(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
 % end
-													2, 3, 5, 7, 11, 13, 17, 19, 23, 29)
+                          2, 3, 5, 7, 11, 13, 17, 19, 23, 29)
    precondition(res.0 == 5.5)
    precondition(res.1 == 129)
 % for Num in range(0, 10):
@@ -323,7 +323,7 @@ public class A${TestType} : Proto${TestType} {
 % else:
      let res = clobber${FuncName}(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
 % end
-  													2, 3, 5, 7, 11, 13, 17, 19, 23, 29)
+                            2, 3, 5, 7, 11, 13, 17, 19, 23, 29)
      precondition(res.0 == 5.5)
      precondition(res.1 == 129)
 % for Num in range(0, 10):
@@ -345,7 +345,7 @@ tests.test("${TestType}/Fun${FuncName}") {
   // Test a regular function call.
 % if MayThrow:
   do {
-	  try verifyParameters${TestType}${FuncName}(
+    try verifyParameters${TestType}${FuncName}(
 %for Num in range(0, 9):
       value${TestType}${Num}(),
 %end
@@ -361,7 +361,7 @@ tests.test("${TestType}/Fun${FuncName}") {
      preconditionFailure("Should not get there")
   }
 % else:
-	verifyParameters${TestType}${FuncName}(
+  verifyParameters${TestType}${FuncName}(
 %for Num in range(0, 9):
     value${TestType}${Num}(),
 %end
@@ -374,7 +374,7 @@ tests.test("${TestType}/RetFun${FuncName}") {
   // Test a regular function call.
 % if MayThrow:
   do {
-	  let res = try verifyReturn${TestType}${FuncName}()
+    let res = try verifyReturn${TestType}${FuncName}()
 % for Num in range(0, 10):
     expectEqual(value${TestType}${Num}(), res.${Num})
 % end
@@ -399,7 +399,7 @@ tests.test("${TestType}/RetAndParamFun${FuncName}") {
   // Test a regular function call.
 % if MayThrow:
   do {
-	  let res = try verifyReturnAndParameters${TestType}${FuncName}(
+    let res = try verifyReturnAndParameters${TestType}${FuncName}(
 %for Num in range(0, 9):
       value${TestType}${Num}(),
 %end
@@ -418,7 +418,7 @@ tests.test("${TestType}/RetAndParamFun${FuncName}") {
      preconditionFailure("Should not get there")
   }
 % else:
-	let res = verifyReturnAndParameters${TestType}${FuncName}(
+  let res = verifyReturnAndParameters${TestType}${FuncName}(
 %for Num in range(0, 9):
     value${TestType}${Num}(),
 %end
@@ -438,7 +438,7 @@ tests.test("${TestType}/Method${FuncName}") {
   // Test a method call.
 % if MayThrow:
   do {
-	  try klazz.verifyParameters${FuncName}(
+    try klazz.verifyParameters${FuncName}(
 %for Num in range(0, 9):
       value${TestType}${Num}(),
 %end
@@ -454,7 +454,7 @@ tests.test("${TestType}/Method${FuncName}") {
      preconditionFailure("Should not get there")
   }
 % else:
-	klazz.verifyParameters${FuncName}(
+  klazz.verifyParameters${FuncName}(
 %for Num in range(0, 9):
       value${TestType}${Num}(),
 %end
@@ -471,7 +471,7 @@ tests.test("${TestType}/RetMethod${FuncName}") {
   // Test a method call.
 % if MayThrow:
   do {
-	  let res = try klazz.verifyReturn${FuncName}()
+    let res = try klazz.verifyReturn${FuncName}()
 % for Num in range(0, 10):
     expectEqual(value${TestType}${Num}(), res.${Num})
 % end
@@ -500,7 +500,7 @@ tests.test("${TestType}/RetAndParamMethod${FuncName}") {
   // Test a method call.
 % if MayThrow:
   do {
-	  let res = try klazz.verifyReturnAndParameters${FuncName}(
+    let res = try klazz.verifyReturnAndParameters${FuncName}(
 %for Num in range(0, 9):
       value${TestType}${Num}(),
 %end
@@ -519,7 +519,7 @@ tests.test("${TestType}/RetAndParamMethod${FuncName}") {
      preconditionFailure("Should not get there")
   }
 % else:
-	let res = klazz.verifyReturnAndParameters${FuncName}(
+  let res = klazz.verifyReturnAndParameters${FuncName}(
 %for Num in range(0, 9):
       value${TestType}${Num}(),
 %end
@@ -538,7 +538,7 @@ tests.test("${TestType}/WitnessMethod${FuncName}") {
   // Test a witness method call.
 % if MayThrow:
   do {
-	  try p.verifyParameters${FuncName}(
+    try p.verifyParameters${FuncName}(
 %for Num in range(0, 9):
       value${TestType}${Num}(),
 %end
@@ -554,7 +554,7 @@ tests.test("${TestType}/WitnessMethod${FuncName}") {
      preconditionFailure("Should not get there")
   }
 % else:
-	p.verifyParameters${FuncName}(
+  p.verifyParameters${FuncName}(
 %for Num in range(0, 9):
       value${TestType}${Num}(),
 %end
@@ -570,7 +570,7 @@ tests.test("${TestType}/RetWitnessMethod${FuncName}") {
   // Test a witness method call.
 % if MayThrow:
   do {
-	  let res = try p.verifyReturn${FuncName}()
+    let res = try p.verifyReturn${FuncName}()
 % for Num in range(0, 10):
     expectEqual(value${TestType}${Num}(), res.${Num})
 % end
@@ -598,7 +598,7 @@ tests.test("${TestType}/RetAndParamWitnessMethod${FuncName}") {
   // Test a method call.
 % if MayThrow:
   do {
-	  let res = try p.verifyReturnAndParameters${FuncName}(
+    let res = try p.verifyReturnAndParameters${FuncName}(
 %for Num in range(0, 9):
       value${TestType}${Num}(),
 %end
@@ -617,7 +617,7 @@ tests.test("${TestType}/RetAndParamWitnessMethod${FuncName}") {
      preconditionFailure("Should not get there")
   }
 % else:
-	let res = p.verifyReturnAndParameters${FuncName}(
+  let res = p.verifyReturnAndParameters${FuncName}(
 %for Num in range(0, 9):
       value${TestType}${Num}(),
 %end
