@@ -710,40 +710,42 @@ bool swift::isNativeSwiftWeakReference(WeakReference *ref) {
 }
 
 void swift::swift_weakInit(WeakReference *ref, HeapObject *value) {
-  ref->Value = (uintptr_t)value | WR_NATIVE;
+  ref->Value = (uintptr_t)value | (value ? WR_NATIVE : 0);
   SWIFT_RT_ENTRY_CALL(swift_unownedRetain)(value);
 }
 
 void swift::swift_weakAssign(WeakReference *ref, HeapObject *newValue) {
   SWIFT_RT_ENTRY_CALL(swift_unownedRetain)(newValue);
   auto oldValue = (HeapObject*) (ref->Value & ~WR_NATIVE);
-  ref->Value = (uintptr_t)newValue | WR_NATIVE;
+  ref->Value = (uintptr_t)newValue | (newValue ? WR_NATIVE : 0);
   SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(oldValue);
 }
 
 HeapObject *swift::swift_weakLoadStrong(WeakReference *ref) {
-  if (ref->Value == (uintptr_t)nullptr) {
-    return nullptr;
-  }
-
   // ref might be visible to other threads
-  auto ptr = __atomic_fetch_or(&ref->Value, WR_READING, __ATOMIC_RELAXED);
-  while (ptr & WR_READING) {
-    short c = 0;
-    while (__atomic_load_n(&ref->Value, __ATOMIC_RELAXED) & WR_READING) {
-      if (++c == WR_SPINLIMIT) {
-        std::this_thread::yield();
-        c -= 1;
-      }
+  auto ptr = ref->Value;
+  short c = 0;
+  while (true) {
+    // Never write WR_READING into a null pointer.
+    // This would cause a race against swift_unknownWeakLoadStrong.
+    if (ptr == (uintptr_t)nullptr)
+      return nullptr;
+    // Set WR_READING if it is not set already.
+    if (!(ptr & WR_READING)) {
+      if (__atomic_compare_exchange_n(&ref->Value, &ptr, ptr|WR_READING, false,
+                                      __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+        break;
+      // Failed to set WR_READING. atomic_compare_exchange loaded ptr again.
     }
-    ptr = __atomic_fetch_or(&ref->Value, WR_READING, __ATOMIC_RELAXED);
+    // Failed to set WR_READING or WR_READING is already set. Retry.
+    if (++c == WR_SPINLIMIT) {
+      std::this_thread::yield();
+      c -= 1;
+      ptr = ref->Value;
+    }
   }
-
+  assert(ptr & WR_NATIVE);
   auto object = (HeapObject*)(ptr & ~WR_NATIVE);
-  if (object == nullptr) {
-    __atomic_store_n(&ref->Value, (uintptr_t)nullptr, __ATOMIC_RELAXED);
-    return nullptr;
-  }
   if (object->refCount.isDeallocating()) {
     __atomic_store_n(&ref->Value, (uintptr_t)nullptr, __ATOMIC_RELAXED);
     SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(object);
@@ -770,29 +772,33 @@ void swift::swift_weakDestroy(WeakReference *ref) {
 }
 
 void swift::swift_weakCopyInit(WeakReference *dest, WeakReference *src) {
-  if (src->Value == (uintptr_t)nullptr) {
-    dest->Value = (uintptr_t)nullptr;
-    return;
-  }
-
   // src might be visible to other threads
-  auto ptr = __atomic_fetch_or(&src->Value, WR_READING, __ATOMIC_RELAXED);
-  while (ptr & WR_READING) {
-    short c = 0;
-    while (__atomic_load_n(&src->Value, __ATOMIC_RELAXED) & WR_READING) {
-      if (++c == WR_SPINLIMIT) {
-        std::this_thread::yield();
-        c -= 1;
-      }
+  auto ptr = src->Value;
+  short c = 0;
+  while (true) {
+    // Never write WR_READING into a null pointer.
+    // This would cause a race against swift_unknownWeakLoadStrong.
+    if (ptr == (uintptr_t)nullptr) {
+      dest->Value = (uintptr_t)nullptr;
+      return;
     }
-    ptr = __atomic_fetch_or(&src->Value, WR_READING, __ATOMIC_RELAXED);
+    // Set WR_READING if it is not set already.
+    if (!(ptr & WR_READING)) {
+      if (__atomic_compare_exchange_n(&src->Value, &ptr, ptr|WR_READING, false,
+                                      __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+        break;
+      // Failed to set WR_READING. atomic_compare_exchange loaded ptr again.
+    }
+    // Failed to set WR_READING or WR_READING is already set. Retry.
+    if (++c == WR_SPINLIMIT) {
+      std::this_thread::yield();
+      c -= 1;
+      ptr = src->Value;
+    }
   }
-
+  assert(ptr & WR_NATIVE);
   auto object = (HeapObject*)(ptr & ~WR_NATIVE);
-  if (object == nullptr) {
-    __atomic_store_n(&src->Value, (uintptr_t)nullptr, __ATOMIC_RELAXED);
-    dest->Value = (uintptr_t)nullptr;
-  } else if (object->refCount.isDeallocating()) {
+  if (object->refCount.isDeallocating()) {
     __atomic_store_n(&src->Value, (uintptr_t)nullptr, __ATOMIC_RELAXED);
     SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(object);
     dest->Value = (uintptr_t)nullptr;
