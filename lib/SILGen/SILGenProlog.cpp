@@ -169,7 +169,7 @@ public:
       elements.push_back(elt);
     }
 
-    if (tl.isLoadable()) {
+    if (tl.isLoadable() || !gen.silConv.useLoweredAddresses()) {
       SmallVector<SILValue, 4> elementValues;
       if (canBeGuaranteed) {
         // If all of the elements were guaranteed, we can form a guaranteed tuple.
