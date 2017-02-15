@@ -872,7 +872,7 @@ the string being searched, if needed, can easily be recovered as the
 Note also that matching operations are useful for collections in general, and
 would fall out of this proposal:
 
-```
+```swift
 // replace subsequences of contiguous NaNs with zero
 forces.replace(oneOrMore([Float.nan]), [0.0])
 ```
