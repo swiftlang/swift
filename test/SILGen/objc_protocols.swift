@@ -216,8 +216,7 @@ class StoredPropertyCount {
 }
 
 extension StoredPropertyCount: NSCounting {}
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols19StoredPropertyCountg5countSi
-
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC14objc_protocols19StoredPropertyCountg5countSi
 class ComputedPropertyCount {
   @objc var count: Int { return 0 }
 }
