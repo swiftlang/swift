@@ -3,7 +3,7 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck %s < %t.simple.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s -sdk %S/../Inputs/clang-importer-sdk -Xfrontend -foo -Xfrontend -bar -Xllvm -baz -Xcc -garply -F /path/to/frameworks -F /path/to/more/frameworks -I /path/to/headers -I path/to/more/headers -module-cache-path /tmp/modules -incremental 2>&1 > %t.complex.txt
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s -sdk %S/../Inputs/clang-importer-sdk -Xfrontend -foo -Xfrontend -bar -Xllvm -baz -Xcc -garply -F /path/to/frameworks -F /path/to/more/frameworks -Fsystem /path/to/systemframeworks -I /path/to/headers -I path/to/more/headers -module-cache-path /tmp/modules -incremental 2>&1 > %t.complex.txt
 // RUN: %FileCheck %s < %t.complex.txt
 // RUN: %FileCheck -check-prefix COMPLEX %s < %t.complex.txt
 
@@ -70,7 +70,7 @@
 // COMPLEX-DAG: -foo -bar
 // COMPLEX-DAG: -Xllvm -baz
 // COMPLEX-DAG: -Xcc -garply
-// COMPLEX-DAG: -F /path/to/frameworks -F /path/to/more/frameworks
+// COMPLEX-DAG: -F /path/to/frameworks -F /path/to/more/frameworks -Fsystem /path/to/systemframeworks
 // COMPLEX-DAG: -I /path/to/headers -I path/to/more/headers
 // COMPLEX-DAG: -module-cache-path /tmp/modules
 // COMPLEX-DAG: -emit-reference-dependencies-path {{(.*/)?driver-compile[^ /]+}}.swiftdeps

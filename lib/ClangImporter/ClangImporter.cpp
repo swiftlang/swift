@@ -181,10 +181,11 @@ namespace {
       // so that (a) we use the same code as search paths for imported modules,
       // and (b) search paths are always added after -Xcc options.
       SearchPathOptions &searchPathOpts = Ctx.SearchPathOpts;
-      for (auto path : searchPathOpts.FrameworkSearchPaths)
-        Importer.addSearchPath(path, /*isFramework*/true);
+      for (const auto &framepath : searchPathOpts.FrameworkSearchPaths)
+        Importer.addSearchPath(framepath.Path, /*isFramework*/true,
+                               framepath.IsSystem);
       for (auto path : searchPathOpts.ImportSearchPaths)
-        Importer.addSearchPath(path, /*isFramework*/false);
+        Importer.addSearchPath(path, /*isFramework*/false, /*isSystem=*/false);
       return true;
     }
   };
@@ -842,20 +843,23 @@ ClangImporter::create(ASTContext &ctx,
   return importer;
 }
 
-bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework) {
+bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
+                                  bool isSystem) {
   clang::FileManager &fileMgr = Impl.Instance->getFileManager();
   const clang::DirectoryEntry *entry = fileMgr.getDirectory(newSearchPath);
   if (!entry)
     return true;
 
   auto &headerSearchInfo = Impl.getClangPreprocessor().getHeaderSearchInfo();
-  headerSearchInfo.AddSearchPath({entry, clang::SrcMgr::C_User, isFramework},
+  headerSearchInfo.AddSearchPath({entry, isSystem ?
+                                           clang::SrcMgr::C_System :
+                                           clang::SrcMgr::C_User, isFramework},
                                  /*isAngled=*/true);
 
   // In addition to changing the current preprocessor directly, we still need
   // to change the options structure for future module-building.
   Impl.Instance->getHeaderSearchOpts().AddPath(newSearchPath,
-                                               clang::frontend::Angled,
+                   isSystem ? clang::frontend::System : clang::frontend::Angled,
                                                isFramework,
                                                /*IgnoreSysRoot=*/true);
   return false;
