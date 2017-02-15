@@ -39,5 +39,5 @@ public enum TestE : Int{
 	case B1
 }
 // CHECK: typedef SWIFT_ENUM(NSInteger, TestE)
-// CHECK-NEXT:  A2 SWIFT_COMPILE_NAME("A1") = 0,
-// CHECK-NEXT:  TestEB1 = 1,
+// CHECK-NEXT: {{^}} A2 SWIFT_COMPILE_NAME("A1") = 0,
+// CHECK-NEXT: {{^}} TestEB1 = 1,

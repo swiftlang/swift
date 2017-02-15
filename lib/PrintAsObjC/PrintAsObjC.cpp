@@ -127,16 +127,16 @@ static bool
 printSwiftEnumElemNameInObjC(const EnumElementDecl *EL, llvm::raw_ostream &OS,
                              Identifier PreferredName = Identifier()) {
   StringRef ElemName = getNameForObjC(EL, CustomNamesOnly);
-  if (ElemName.empty()) {
-    OS << getNameForObjC(EL->getDeclContext()->getAsEnumOrEnumExtensionContext());
-    if (PreferredName.empty())
-      ElemName = EL->getName().str();
-    else
-      ElemName = PreferredName.str();
-  } else {
+  if (!ElemName.empty()) {
     OS << ElemName;
     return true;
   }
+  OS << getNameForObjC(EL->getDeclContext()->getAsEnumOrEnumExtensionContext());
+  if (PreferredName.empty())
+    ElemName = EL->getName().str();
+  else
+    ElemName = PreferredName.str();
+
   SmallString<64> Scratch;
   OS << camel_case::toSentencecase(ElemName, Scratch);
   return false;
