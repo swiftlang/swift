@@ -864,6 +864,10 @@ bool SILInstruction::mayRelease() const {
   case ValueKind::ReleaseValueInst:
     return true;
 
+  case ValueKind::DestroyValueInst:
+    assert(!SILModuleConventions(getModule()).useLoweredAddresses());
+    return true;
+
   case ValueKind::UnconditionalCheckedCastAddrInst: {
     // Failing casts with take_always can release.
     auto *Cast = cast<UnconditionalCheckedCastAddrInst>(this);
