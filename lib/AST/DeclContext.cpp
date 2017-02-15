@@ -107,8 +107,7 @@ ProtocolDecl *DeclContext::getAsProtocolExtensionContext() const {
 }
 
 GenericTypeParamType *DeclContext::getProtocolSelfType() const {
-  auto *proto = getAsProtocolOrProtocolExtensionContext();
-  assert(proto && "not a protocol");
+  assert(getAsProtocolOrProtocolExtensionContext() && "not a protocol");
 
   // FIXME: This comes up when the extension didn't resolve,
   // and we have a protocol nested inside that extension

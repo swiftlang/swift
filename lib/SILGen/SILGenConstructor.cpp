@@ -129,10 +129,12 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
       // initializer - it doesn't come from an argument.
       if (!field->isStatic() && field->isLet() &&
           field->getParentInitializer()) {
+#ifndef NDEBUG
         auto fieldTy = decl->getDeclContext()->mapTypeIntoContext(
             field->getInterfaceType());
         assert(fieldTy->isEqual(field->getParentInitializer()->getType())
                && "Checked by sema");
+#endif
 
         // Cleanup after this initialization.
         FullExpr scope(gen.Cleanups, field->getParentPatternBinding());

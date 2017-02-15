@@ -226,7 +226,10 @@ SubstitutionMap
 SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
                                           Type selfType,
                                           ProtocolConformanceRef conformance) {
+#ifndef NDEBUG
   auto protocolSelfType = protocol->getSelfInterfaceType();
+#endif
+
   return protocol->getGenericSignature()->getSubstitutionMap(
     [&](SubstitutableType *type) -> Type {
       assert(type->isEqual(protocolSelfType));

@@ -2464,10 +2464,12 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M,
   // Computed properties of non-optional reference type that were imported from
   // Objective-C.
   if (auto var = dyn_cast<VarDecl>(decl)) {
+#ifndef NDEBUG
     auto type = var->getInterfaceType();
     assert((type->hasTypeParameter()
             || isVerbatimNullableTypeInC(M, type->getReferenceStorageReferent()))
            && "property's result type is not nullable?!");
+#endif
     return var->hasClangNode();
   }
 

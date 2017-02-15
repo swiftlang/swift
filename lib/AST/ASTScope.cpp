@@ -207,7 +207,6 @@ static bool isRealTopLevelCodeDecl(Decl *decl) {
 void ASTScope::expand() const {
   assert(!isExpanded() && "Already expanded the children of this node");
   ASTContext &ctx = getASTContext();
-  SourceManager &sourceMgr = ctx.SourceMgr;
 
 #ifndef NDEBUG
   auto verificationError = [&]() -> llvm::raw_ostream& {
@@ -235,6 +234,7 @@ void ASTScope::expand() const {
 
 #ifndef NDEBUG
     // Check invariants in asserting builds.
+    SourceManager &sourceMgr = ctx.SourceMgr;
 
     // Check for containment of the child within the parent.
     if (!sourceMgr.rangeContains(getSourceRange(), child->getSourceRange())) {
