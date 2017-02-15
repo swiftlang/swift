@@ -2583,14 +2583,19 @@ class AssociatedTypeDecl : public AbstractTypeParamDecl {
   /// The default definition.
   TypeLoc DefaultDefinition;
 
+  /// The where clause attached to the associated type.
+  TrailingWhereClause *TrailingWhere;
+
   LazyMemberLoader *Resolver = nullptr;
   uint64_t ResolverContextData;
 
 public:
   AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
-                     SourceLoc nameLoc, TypeLoc defaultDefinition);
+                     SourceLoc nameLoc, TypeLoc defaultDefinition,
+                     TrailingWhereClause *trailingWhere);
   AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
-                     SourceLoc nameLoc, LazyMemberLoader *definitionResolver,
+                     SourceLoc nameLoc, TrailingWhereClause *trailingWhere,
+                     LazyMemberLoader *definitionResolver,
                      uint64_t resolverData);
 
   /// Get the protocol in which this associated type is declared.
@@ -2606,6 +2611,14 @@ public:
   TypeLoc &getDefaultDefinitionLoc();
   const TypeLoc &getDefaultDefinitionLoc() const {
     return const_cast<AssociatedTypeDecl *>(this)->getDefaultDefinitionLoc();
+  }
+
+  /// Retrieve the trailing where clause for this associated type, if any.
+  TrailingWhereClause *getTrailingWhereClause() const { return TrailingWhere; }
+
+  /// Set the trailing where clause for this associated type.
+  void setTrailingWhereClause(TrailingWhereClause *trailingWhereClause) {
+    TrailingWhere = trailingWhereClause;
   }
 
   /// computeType - Compute the type (and declared type) of this associated

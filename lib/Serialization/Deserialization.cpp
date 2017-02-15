@@ -2551,10 +2551,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto assocType = createDecl<AssociatedTypeDecl>(DC, SourceLoc(),
-                                                    getIdentifier(nameID),
-                                                    SourceLoc(), this,
-                                                    defaultDefinitionID);
+    // The where-clause information is pushed up into the protocol
+    // (specifically, into its requirement signature) and
+    // serialized/deserialized there, so the actual Decl doesn't need to store
+    // it.
+    TrailingWhereClause *trailingWhere = nullptr;
+    auto assocType = createDecl<AssociatedTypeDecl>(
+        DC, SourceLoc(), getIdentifier(nameID), SourceLoc(), trailingWhere,
+        this, defaultDefinitionID);
     declOrOffset = assocType;
 
     assocType->computeType();

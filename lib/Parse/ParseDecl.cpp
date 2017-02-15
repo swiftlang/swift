@@ -3185,7 +3185,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
 ///
 /// \verbatim
 ///   decl-associatedtype:
-///     'associatedtype' identifier inheritance? ('=' type)?
+///     'associatedtype' identifier inheritance? ('=' type)? where-clause?
 /// \endverbatim
 
 ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions Flags,
@@ -3239,15 +3239,32 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
     if (UnderlyingTy.isNull())
       return Status;
   }
-  
-  // Parse a 'where' clause if present. These are not supported, but we will
-  // get better QoI this way.
+
+  TrailingWhereClause *TrailingWhere = nullptr;
+  // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
-    GenericParamList *unused = nullptr;
-    auto whereStatus = parseFreestandingGenericWhereClause(
-        unused, WhereClauseKind::AssociatedType);
-    if (whereStatus.shouldStopParsing())
-      return whereStatus;
+    SourceLoc whereLoc;
+    SmallVector<RequirementRepr, 4> requirements;
+    bool firstTypeInComplete;
+    auto whereStatus =
+        parseGenericWhereClause(whereLoc, requirements, firstTypeInComplete);
+    if (whereStatus.isSuccess()) {
+      TrailingWhere =
+          TrailingWhereClause::create(Context, whereLoc, requirements);
+    } else if (whereStatus.hasCodeCompletion()) {
+      // FIXME: this is completely (hah) cargo culted.
+      if (CodeCompletion && firstTypeInComplete) {
+        CodeCompletion->completeGenericParams(nullptr);
+      } else {
+        return makeParserCodeCompletionResult<AssociatedTypeDecl>();
+      }
+    }
+
+    if (Context.isSwiftVersion3()) {
+      diagnose(whereLoc, diag::associatedtype_where_swift_3);
+      // There's nothing to see here, move along.
+      TrailingWhere = nullptr;
+    }
   }
 
   if (!Flags.contains(PD_InProtocol)) {
@@ -3256,10 +3273,10 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
     Status.setIsParseError();
     return Status;
   }
-  
-  auto assocType = new (Context) AssociatedTypeDecl(CurDeclContext,
-                                                    AssociatedTypeLoc, Id, IdLoc,
-                                                    UnderlyingTy.getPtrOrNull());
+
+  auto assocType = new (Context)
+      AssociatedTypeDecl(CurDeclContext, AssociatedTypeLoc, Id, IdLoc,
+                         UnderlyingTy.getPtrOrNull(), TrailingWhere);
   assocType->getAttrs() = Attributes;
   if (!Inherited.empty())
     assocType->setInherited(Context.AllocateCopy(Inherited));

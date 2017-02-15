@@ -2342,19 +2342,20 @@ SourceRange GenericTypeParamDecl::getSourceRange() const {
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
-                                       TypeLoc defaultDefinition)
-  : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
-    KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition)
-{ }
+                                       TypeLoc defaultDefinition,
+                                       TrailingWhereClause *trailingWhere)
+    : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
+      KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition),
+      TrailingWhere(trailingWhere) {}
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
+                                       TrailingWhereClause *trailingWhere,
                                        LazyMemberLoader *definitionResolver,
                                        uint64_t resolverData)
-  : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
-    KeywordLoc(keywordLoc), Resolver(definitionResolver),
-    ResolverContextData(resolverData)
-{
+    : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
+      KeywordLoc(keywordLoc), TrailingWhere(trailingWhere),
+      Resolver(definitionResolver), ResolverContextData(resolverData) {
   assert(Resolver && "missing resolver");
 }
 
