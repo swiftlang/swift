@@ -3497,6 +3497,8 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
                                              convertTypePurpose, TCEOptions,
                                              listener, CS);
 
+  CS->cacheExprTypes(subExpr);
+
   // This is a terrible hack to get around the fact that typeCheckExpression()
   // might change subExpr to point to a new OpenExistentialExpr. In that case,
   // since the caller passed subExpr by value here, they would be left
