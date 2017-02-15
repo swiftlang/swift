@@ -17,6 +17,10 @@ set(SWIFT_LIBRARY_DIR "@SWIFT_CONFIG_LIBRARY_DIRS@")
 set(SWIFT_CMAKE_DIR "@SWIFT_CMAKE_DIR@")
 set(SWIFT_BINARY_DIR "@SWIFT_BINARY_DIR@")
 
+if(NOT TARGET libcmark_static AND ${product}_PATH_TO_CMARK_BUILD)
+  include(${${product}_PATH_TO_CMARK_BUILD}/src/CMarkExports.cmake)
+endif()
+
 if(NOT TARGET swift)
   set(SWIFT_EXPORTED_TARGETS "@SWIFT_CONFIG_EXPORTS@")
   include("@SWIFT_EXPORTS_FILE@")
