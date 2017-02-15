@@ -264,19 +264,19 @@ const bool RetainableBoxBase<Impl,T>::isAtomic = ! std::getenv("SWIFT_ASSUME_SIN
 struct SwiftRetainableBox :
     RetainableBoxBase<SwiftRetainableBox, HeapObject*> {
   static HeapObject *retain(HeapObject *obj) {
-    if (!isAtomic) {
-      swift_nonatomic_retain(obj);
-    } else {
+    if (isAtomic) {
       swift_retain(obj);
+    } else {
+      swift_nonatomic_retain(obj);
     }
     return obj;
   }
 
   static void release(HeapObject *obj) {
-    if (!isAtomic) {
-      swift_nonatomic_release(obj);
-    } else {
+    if (isAtomic) {
       swift_release(obj);
+    } else {
+      swift_nonatomic_release(obj);
     }
   }
 };
@@ -285,19 +285,19 @@ struct SwiftRetainableBox :
 struct SwiftUnownedRetainableBox :
     RetainableBoxBase<SwiftUnownedRetainableBox, HeapObject*> {
   static HeapObject *retain(HeapObject *obj) {
-    if (!isAtomic) {
-      swift_nonatomic_unownedRetain(obj);
-    } else {
+    if (isAtomic) {
       swift_unownedRetain(obj);
+    } else {
+      swift_nonatomic_unownedRetain(obj);
     }
     return obj;
   }
 
   static void release(HeapObject *obj) {
-    if (!isAtomic) {
-      swift_nonatomic_unownedRelease(obj);
-    } else {
+    if (isAtomic) {
       swift_unownedRelease(obj);
+    } else {
+      swift_nonatomic_unownedRelease(obj);
     }
   }
 
@@ -486,10 +486,10 @@ struct UnknownRetainableBox : RetainableBoxBase<UnknownRetainableBox, void*> {
     swift_unknownRetain(obj);
     return obj;
 #else
-    if (!isAtomic) {
-      swift_nonatomic_retain(static_cast<HeapObject *>(obj));
-    } else {
+    if (isAtomic) {
       swift_retain(static_cast<HeapObject *>(obj));
+    } else {
+      swift_nonatomic_retain(static_cast<HeapObject *>(obj));
     }
     return static_cast<HeapObject *>(obj);
 #endif
@@ -499,10 +499,10 @@ struct UnknownRetainableBox : RetainableBoxBase<UnknownRetainableBox, void*> {
 #if SWIFT_OBJC_INTEROP
     swift_unknownRelease(obj);
 #else
-    if (!isAtomic) {
-      swift_nonatomic_release(static_cast<HeapObject *>(obj));
-    } else {
+    if (isAtomic) {
       swift_release(static_cast<HeapObject *>(obj));
+    } else {
+      swift_nonatomic_release(static_cast<HeapObject *>(obj));
     }
 #endif
   }
