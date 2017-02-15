@@ -21,6 +21,7 @@
 #include "llvm/ADT/StringRef.h"
 #include <string>
 #include <climits>
+#include <cstdlib>
 
 namespace swift {
 
@@ -121,11 +122,9 @@ public:
   bool AssumeUnqualifiedOwnershipWhenParsing = false;
 
   /// Assume that code will be executed in a single-threaded environment.
-#ifdef SWIFT_FORCE_ASSUME_SINGLE_THREADED
-  bool AssumeSingleThreaded = true;
-#else
-  bool AssumeSingleThreaded = false;
-#endif
+  /// TODO: return to false when we can pass "-Xfrontend -assume-single-threaded"
+  ///       to swift compiler while building standard library.
+  bool AssumeSingleThreaded = std::getenv("SWIFT_ASSUME_SINGLE_THREADED");
 };
 
 } // end namespace swift
