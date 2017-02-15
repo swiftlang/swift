@@ -1036,7 +1036,13 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
 
   for (const Arg *A : make_range(Args.filtered_begin(OPT_F),
                                  Args.filtered_end())) {
-    Opts.FrameworkSearchPaths.push_back(resolveSearchPath(A->getValue()));
+    Opts.FrameworkSearchPaths.push_back({resolveSearchPath(A->getValue()),
+                                         /*isSystem=*/false});
+  }
+  for (const Arg *A : make_range(Args.filtered_begin(OPT_Fsystem),
+                                 Args.filtered_end())) {
+    Opts.FrameworkSearchPaths.push_back({resolveSearchPath(A->getValue()),
+                                         /*isSystem=*/true});
   }
 
   for (const Arg *A : make_range(Args.filtered_begin(OPT_L),

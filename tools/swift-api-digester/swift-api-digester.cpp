@@ -3511,12 +3511,15 @@ static int prepareForDump(const char *Main,
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }
-  InitInvok.setFrameworkSearchPaths(options::FrameworkPaths);
-  InitInvok.setImportSearchPaths(options::ModuleInputPaths);
-  for (auto CCFrameworkPath : options::CCSystemFrameworkPaths) {
-    InitInvok.getClangImporterOptions().ExtraArgs.push_back("-iframework");
-    InitInvok.getClangImporterOptions().ExtraArgs.push_back(CCFrameworkPath);
+  std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
+  for (const auto &path : options::FrameworkPaths) {
+    FramePaths.push_back({path, /*isSystem=*/false});
   }
+  for (const auto &path : options::CCSystemFrameworkPaths) {
+    FramePaths.push_back({path, /*isSystem=*/true});
+  }
+  InitInvok.setFrameworkSearchPaths(FramePaths);
+  InitInvok.setImportSearchPaths(options::ModuleInputPaths);
 
   if (!options::ModuleList.empty()) {
     if (readFileLineByLine(options::ModuleList, Modules))

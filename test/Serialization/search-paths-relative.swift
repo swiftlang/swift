@@ -24,8 +24,8 @@ numeric(42)
 // CHECK: </OPTIONS_BLOCK>
 
 // CHECK-LABEL: <INPUT_BLOCK
-// CHECK: <SEARCH_PATH abbrevid={{[0-9]+}} op0=1/> blob data = '{{.+}}/secret/../Frameworks'
-// CHECK: <SEARCH_PATH abbrevid={{[0-9]+}} op0=0/> blob data = '{{.+}}/secret/.'
+// CHECK: <SEARCH_PATH abbrevid={{[0-9]+}} op0=1 op1=0/> blob data = '{{.+}}/secret/../Frameworks'
+// CHECK: <SEARCH_PATH abbrevid={{[0-9]+}} op0=0 op1=0/> blob data = '{{.+}}/secret/.'
 // CHECK: </INPUT_BLOCK>
 
 // NEGATIVE-NOT: '.'
