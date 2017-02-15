@@ -723,7 +723,7 @@ void swift::swift_weakAssign(WeakReference *ref, HeapObject *newValue) {
 
 HeapObject *swift::swift_weakLoadStrong(WeakReference *ref) {
   // ref might be visible to other threads
-  auto ptr = ref->Value;
+  auto ptr = __atomic_load_n(&ref->Value, __ATOMIC_RELAXED);
   short c = 0;
   while (true) {
     // Never write WR_READING into a null pointer.
@@ -741,7 +741,7 @@ HeapObject *swift::swift_weakLoadStrong(WeakReference *ref) {
     if (++c == WR_SPINLIMIT) {
       std::this_thread::yield();
       c -= 1;
-      ptr = ref->Value;
+      ptr = __atomic_load_n(&ref->Value, __ATOMIC_RELAXED);
     }
   }
   assert(ptr & WR_NATIVE);
@@ -773,7 +773,7 @@ void swift::swift_weakDestroy(WeakReference *ref) {
 
 void swift::swift_weakCopyInit(WeakReference *dest, WeakReference *src) {
   // src might be visible to other threads
-  auto ptr = src->Value;
+  auto ptr = __atomic_load_n(&src->Value, __ATOMIC_RELAXED);
   short c = 0;
   while (true) {
     // Never write WR_READING into a null pointer.
@@ -793,7 +793,7 @@ void swift::swift_weakCopyInit(WeakReference *dest, WeakReference *src) {
     if (++c == WR_SPINLIMIT) {
       std::this_thread::yield();
       c -= 1;
-      ptr = src->Value;
+      ptr = __atomic_load_n(&src->Value, __ATOMIC_RELAXED);
     }
   }
   assert(ptr & WR_NATIVE);
