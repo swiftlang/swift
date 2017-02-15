@@ -268,13 +268,17 @@ public func posixWaitpid(_ pid: pid_t) -> ProcessTerminationStatus {
   withUnsafeMutablePointer(to: &status) {
     statusPtr in
     let statusPtrWrapper = __wait_status_ptr_t(__int_ptr: statusPtr)
-    if waitpid(pid, statusPtrWrapper, 0) < 0 {
-      preconditionFailure("waitpid() failed")
+    while waitpid(pid, statusPtrWrapper, 0) < 0 {
+      if errno != EINTR {
+        preconditionFailure("waitpid() failed")
+      }
     }
   }
 #else
-  if waitpid(pid, &status, 0) < 0 {
-    preconditionFailure("waitpid() failed")
+  while waitpid(pid, &status, 0) < 0 {
+    if errno != EINTR {
+      preconditionFailure("waitpid() failed")
+    }
   }
 #endif
   if WIFEXITED(status) {
