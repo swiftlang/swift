@@ -725,6 +725,113 @@ testSuite.test("basic") {
 }
 
 ///
+/// UnicodeEncoding.swift
+///
+
+// TODO: put these on protocol decl, and have impls provide functionality
+// instead
+extension UnicodeEncoding
+where
+  EncodedScalar.Iterator.Element : UnsignedInteger
+{
+  // The below establishes the concept of a *trivially-decodable* code unit.A
+  // trivially-decodable code unit can be decoded into its unicode scalar merely
+  // by zero-extending the value. It represents an entire unicode scalar all on
+  // its own. Trivially decodable code units can be more efficiently compared.
+
+  // The trivial-decodable encodings: An encoding is trivially-decodable if
+  // all possible code units expressed in that encoding are trivially-
+  // decodable
+  static var isTriviallyDecodableEncoding: Bool {
+    if (Self.self == Latin1.self) {
+      return true
+    }
+    if (Self.self == UTF32.self) {
+      // TODO: valid only? what about surrogate scalars (which are invalid)?
+      return true
+    }
+
+    // TODO: others? valid variants?
+
+    return false
+  }
+
+  // Whether the provided code unit is trivially decodable in this encoding.
+  static func isTriviallyDecodable(_ codeUnit: CodeUnit) -> Bool {
+    if isTriviallyDecodableEncoding {
+      return true
+    }
+
+    // The encodings with thresholds: All code units below a certain threshold
+    // are trivial
+    if (Self.self == UTF8.self) {
+      // Only ASCII
+      return codeUnit < 0x80
+    }
+    if (Self.self == UTF16.self) {
+      // All BMP scalars, that is anything not in a surrogate range.
+      //
+      // For efficiency and simplicity, currently implemented as a threshold.
+      // But in theory, we could include scalars above surrogate ranges. But
+      // that might be murkey for private use areas and might be more likely to
+      // be affected by churn in future Unicode versions.
+      //
+      // TODO: cost/benefit investigation of more complex check here...
+      return codeUnit < 0xD800
+    }
+
+    fatalError("unimplemented")
+  }
+}
+
+// Test that all trivially-decodable code units are in fact trivially-
+// decodable.
+testSuite.test("trivially-decodable") {
+  let aceOfSpacesScalarValue: UInt32 = 0x1F0A1 // "🂡"
+  let aceOfSpacesScalar = UnicodeScalar(aceOfSpacesScalarValue)!
+
+  //
+  // UTF16
+  //
+  for i in 0..<0xD800 {
+    expectTrue(UTF16.isTriviallyDecodable(UInt16(i)))
+    let utf16CUs = UTF16.EncodedScalar(UnicodeScalar(i)!)
+    expectEqual(utf16CUs.count, 1)
+    expectEqual(UInt32(utf16CUs[0]), UInt32(i))
+  }
+
+  // Test 🂡
+  let utf16CUs = UTF16.EncodedScalar(aceOfSpacesScalar)
+  expectEqual(utf16CUs.count, 2)
+  expectFalse(UTF16.isTriviallyDecodable(utf16CUs[0]))
+  expectFalse(UTF16.isTriviallyDecodable(utf16CUs[1]))
+  expectEqual(utf16CUs[0], 0xD83C)
+  expectEqual(utf16CUs[1], 0xDCA1)
+
+  //
+  // UTF8
+  //
+  for i in 0..<0x80 {
+    expectTrue(UTF8.isTriviallyDecodable(UInt8(i)))
+    let utf8CUs = UTF8.EncodedScalar(UnicodeScalar(i)!)
+    expectEqual(utf8CUs.count, 1)
+    expectEqual(UInt32(utf8CUs[0]), UInt32(i))
+  }
+
+  // Test 🂡
+  let utf8CUs = UTF8.EncodedScalar(aceOfSpacesScalar)
+  expectEqual(utf8CUs.count, 4)
+  expectFalse(UTF8.isTriviallyDecodable(utf8CUs[0]))
+  expectFalse(UTF8.isTriviallyDecodable(utf8CUs[1]))
+  expectFalse(UTF8.isTriviallyDecodable(utf8CUs[2]))
+  expectFalse(UTF8.isTriviallyDecodable(utf8CUs[3]))
+  expectEqual(utf8CUs[0], 0xF0)
+  expectEqual(utf8CUs[1], 0x9F)
+  expectEqual(utf8CUs[2], 0x82)
+  expectEqual(utf8CUs[3], 0xA1)
+}
+
+///
 /// String comparison
 ///
 
