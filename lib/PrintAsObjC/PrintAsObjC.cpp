@@ -2663,7 +2663,11 @@ getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
     }
     return {Ctx.getIdentifier(Buffer.str()), ObjCSelector()};
   } else {
-    if (PreferredName)
+    // @objc(ExplicitName) > PreferredName > Swift name.
+    StringRef Name = getNameForObjC(VD, CustomNamesOnly);
+    if (!Name.empty())
+      return {Ctx.getIdentifier(Name), ObjCSelector()};
+    if (!PreferredName.getBaseName().empty())
       return {PreferredName.getBaseName(), ObjCSelector()};
     return {Ctx.getIdentifier(getNameForObjC(VD)), ObjCSelector()};
   }
