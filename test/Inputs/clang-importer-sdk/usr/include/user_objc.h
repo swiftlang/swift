@@ -23,6 +23,12 @@ typedef NS_ENUM(NSInteger, SomeRandomEnum) {
   SomeRandomB
 };
 
+typedef NS_ENUM(NSInteger, EnumWithAwkwardDeprecations) {
+  EnumWithAwkwardNormalCase1,
+  EnumWithAwkwardNormalCase2,
+  EnumWithAwkward2BitProblems __attribute__((deprecated)) = EnumWithAwkwardNormalCase1,
+};
+
 // From <AudioUnit/AudioComponent.h>
 // The interesting feature of this enum is that the common prefix before
 // taking the enum name itself into account extends past the underscore.
