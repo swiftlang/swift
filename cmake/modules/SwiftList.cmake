@@ -91,3 +91,7 @@ function(precondition_list_is_disjoint first)
     list_union(RESULT "${${l}}" "${RESULT}")
   endforeach()
 endfunction()
+
+function(precondition_list_empty l message)
+  precondition(l NEGATE MESSAGE "${message}")
+endfunction()
