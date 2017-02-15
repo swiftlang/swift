@@ -194,11 +194,8 @@ int doFullParseRoundTrip(const StringRef InputFilename) {
     if (NewNode.hasValue()) {
       NewNode.getValue().print(llvm::outs());
       auto Symbol = Sema.getNodeForSyntax(NewNode.getValue());
-      assert(Symbol.hasValue());
     }
   }
-
-  Sema.dumpSyntaxMap();
 
   if (Tokens.back().first->getTokenKind() == tok::eof) {
     Tokens.back().first->print(llvm::outs());

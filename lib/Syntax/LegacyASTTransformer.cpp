@@ -284,6 +284,9 @@ RC<SyntaxData>
 LegacyASTTransformer::visitStructDecl(StructDecl *D,
                                       const SyntaxData *Parent,
                                       const CursorIndex IndexInParent) {
+  return getUnknownDecl(D);
+
+/* TODO
   StructDeclSyntaxBuilder StructBuilder;
   if (D->getStartLoc().isValid()) {
     auto StructKeyword = findTokenSyntax(tok::kw_struct, "struct", SourceMgr,
@@ -329,6 +332,7 @@ LegacyASTTransformer::visitStructDecl(StructDecl *D,
   StructBuilder.useMembers(MemberBuilder.build());
 
   return StructBuilder.build().Root;
+*/
 }
 
 RC<SyntaxData>
