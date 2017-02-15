@@ -27,12 +27,6 @@ function(add_dependencies_multiple_targets)
   endif()
 endfunction()
 
-function(_require_empty_list the_list the_message)
-  if(the_list)
-    message(FATAL_ERROR "${the_message}")
-  endif()
-endfunction()
-
 # Compute the library subdirectory to use for the given sdk and
 # architecture, placing the result in 'result_var_name'.
 function(compute_library_subdir result_var_name sdk arch)
@@ -976,7 +970,7 @@ function(_add_swift_library_single target name)
   if("${libkind}" STREQUAL "SHARED")
     target_link_libraries("${target}" PRIVATE ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
   elseif("${libkind}" STREQUAL "OBJECT")
-    _require_empty_list(
+    precondition_list_empty(
         "${SWIFTLIB_SINGLE_LINK_LIBRARIES}"
         "OBJECT_LIBRARY may not link to anything")
   else()
@@ -1153,7 +1147,7 @@ function(_add_swift_library_single target name)
   endif()
 
   if("${libkind}" STREQUAL "OBJECT")
-    _require_empty_list(
+    precondition_list_empty(
         "${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES}"
         "OBJECT_LIBRARY may not link to anything")
   else()
@@ -1161,7 +1155,7 @@ function(_add_swift_library_single target name)
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
   endif()
   if("${libkind}" STREQUAL "OBJECT")
-    _require_empty_list(
+    precondition_list_empty(
         "${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES}"
         "OBJECT_LIBRARY may not link to anything")
   else()
