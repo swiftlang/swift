@@ -27,4 +27,7 @@ pthread_create(&user_interactive_thread2, nil, { _ in
     return nil
 }, nil)
 
+pthread_join(user_interactive_thread!, nil)
+pthread_join(user_interactive_thread2!, nil)
+
 // CHECK: ThreadSanitizer: data race
