@@ -65,6 +65,8 @@ ERROR(incomplete_conditional_compilation_directive,none,
       "incomplete condition in conditional compilation directive", ())
 ERROR(extra_tokens_conditional_compilation_directive,none,
       "extra tokens following conditional compilation directive", ())
+ERROR(unexpected_rbrace_in_conditional_compilation_block,none,
+      "unexpected '}' in conditional compilation block", ())
 
 ERROR(sourceLocation_expected,none,
       "expected '%0' in #sourceLocation directive", (StringRef))
