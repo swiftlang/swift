@@ -2562,7 +2562,11 @@ namespace {
               ImportedName importedName =
                   Impl.importFullName(constant, getActiveSwiftVersion());
               Identifier name = importedName.getDeclName().getBaseName();
-              if (!name.empty()) {
+              if (name.empty()) {
+                // Clear the existing declaration so we don't try to process it
+                // twice later.
+                enumeratorDecl = nullptr;
+              } else {
                 auto original = cast<ValueDecl>(enumeratorDecl);
                 enumeratorDecl = importEnumCaseAlias(name, constant, original,
                                                      decl, enumeratorContext);
