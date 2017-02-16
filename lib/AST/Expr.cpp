@@ -1789,6 +1789,12 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
       continue;
     }
 
+    // Look through covariant return expressions.
+    if (auto covariantExpr
+          = dyn_cast<CovariantReturnConversionExpr>(candidate)) {
+      candidate = covariantExpr->getSubExpr();
+      continue;
+    }
     break;
   }
 
