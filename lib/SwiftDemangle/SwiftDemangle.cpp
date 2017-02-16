@@ -15,15 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/DemangleWrappers.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Basic/Demangle.h"
 #include "swift/SwiftDemangle/SwiftDemangle.h"
-
-/// \returns true if \p MangledName starts with Swift prefix, "_T".
-static bool isSwiftPrefixed(const char *MangledName) {
-  return MangledName[0] == '_' &&
-         (MangledName[1] == 'T' || MangledName[1] == MANGLING_PREFIX_STR[1]);
-}
 
 static size_t swift_demangle_getDemangledName_Options(const char *MangledName,
     char *OutputBuffer, size_t Length,
@@ -31,11 +24,11 @@ static size_t swift_demangle_getDemangledName_Options(const char *MangledName,
   assert(MangledName != nullptr && "null input");
   assert(OutputBuffer != nullptr || Length == 0);
 
-  if (!isSwiftPrefixed(MangledName))
+  if (!swift::Demangle::isSwiftSymbol(MangledName))
     return 0; // Not a mangled name
 
-  std::string Result = swift::demangle_wrappers::demangleSymbolAsString(
-      MangledName, DemangleOptions);
+  std::string Result = swift::Demangle::demangleSymbolAsString(
+      llvm::StringRef(MangledName), DemangleOptions);
 
   if (Result == MangledName)
     return 0; // Not a mangled name
