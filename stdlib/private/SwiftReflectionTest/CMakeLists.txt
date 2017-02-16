@@ -1,6 +1,6 @@
 
 if (SWIFT_INCLUDE_TESTS)
-  add_swift_target_library(swiftSwiftReflectionTest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+  add_swift_library(swiftSwiftReflectionTest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
     SwiftReflectionTest.swift
     SWIFT_MODULE_DEPENDS Darwin
     TARGET_SDKS ALL_APPLE_PLATFORMS

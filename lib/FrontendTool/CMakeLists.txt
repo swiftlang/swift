@@ -2,7 +2,7 @@ add_swift_library(swiftFrontendTool STATIC
   FrontendTool.cpp
   ReferenceDependencies.cpp
   DEPENDS SwiftOptions
-  LINK_LIBS
+  LINK_LIBRARIES
     swiftIDE
     swiftIRGen swiftSIL swiftSILGen swiftSILOptimizer
     swiftImmediate

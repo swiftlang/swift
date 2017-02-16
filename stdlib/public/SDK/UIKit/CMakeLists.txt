@@ -1,4 +1,4 @@
-add_swift_target_library(swiftUIKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+add_swift_library(swiftUIKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   DesignatedInitializers.mm
   UIKit.swift
   UIKit_FoundationExtensions.swift.gyb

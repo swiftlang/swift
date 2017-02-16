@@ -17,7 +17,7 @@ set(swiftDriver_targetDefines)
 add_swift_library(swiftDriver STATIC
   ${swiftDriver_sources}
   DEPENDS SwiftOptions
-  LINK_LIBS swiftAST swiftBasic swiftFrontend swiftOption)
+  LINK_LIBRARIES swiftAST swiftBasic swiftFrontend swiftOption)
 
 # Generate the static-stdlib-args.lnk file used by -static-stdlib option
 # for 'GenericUnix' (eg linux)

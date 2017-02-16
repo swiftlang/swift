@@ -9,7 +9,7 @@ add_swift_library(swiftIDE STATIC
   SwiftSourceDocInfo.cpp
   SyntaxModel.cpp
   Utils.cpp
-  LINK_LIBS
+  LINK_LIBRARIES
     swiftFrontend
     swiftClangImporter
     swiftParse

@@ -112,14 +112,14 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
     DESTINATION "lib/swift_static/${lowercase_sdk}")
   add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
 
-  add_swift_target_library(swiftImageInspectionShared OBJECT_LIBRARY TARGET_LIBRARY
+  add_swift_library(swiftImageInspectionShared OBJECT_LIBRARY TARGET_LIBRARY
     ImageInspectionELF.cpp
     C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
     LINK_FLAGS ${swift_runtime_linker_flags}
     INSTALL_IN_COMPONENT never_install)
 endif()
 
-add_swift_target_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
+add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
   ${swift_runtime_sources}
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
@@ -134,19 +134,19 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
   endif()
 endforeach()
 
-add_swift_target_library(section_magic_loader OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
+add_swift_library(section_magic_loader OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
     ImageInspectionInit.cpp
     C_COMPILE_FLAGS ${section_magic_compile_flags}
     TARGET_SDKS "${ELFISH_SDKS}"
     LINK_FLAGS ${swift_runtime_linker_flags}
     INSTALL_IN_COMPONENT never_install)
-add_swift_target_library(section_magic_begin OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
+add_swift_library(section_magic_begin OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
     swift_sections.S
     C_COMPILE_FLAGS ${section_magic_compile_flags} "-DSWIFT_BEGIN"
     TARGET_SDKS "${ELFISH_SDKS}"
     LINK_FLAGS ${swift_runtime_linker_flags}
     INSTALL_IN_COMPONENT never_install)
-add_swift_target_library(section_magic_end OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
+add_swift_library(section_magic_end OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
     swift_sections.S
     C_COMPILE_FLAGS ${section_magic_compile_flags} "-DSWIFT_END"
     LINK_FLAGS ${swift_runtime_linker_flags}

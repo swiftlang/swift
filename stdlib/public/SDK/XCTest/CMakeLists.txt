@@ -1,6 +1,6 @@
 set(DISABLE_APPLICATION_EXTENSION ON)
 
-add_swift_target_library(swiftXCTest ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+add_swift_library(swiftXCTest ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   XCTestCaseAdditions.mm
   XCTest.swift
 
