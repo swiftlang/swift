@@ -1771,7 +1771,6 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
 ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
   StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                   StructureMarkerKind::IfConfig);
-  llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
   SmallVector<IfConfigStmtClause, 4> Clauses;
 
   bool foundActive = false;
@@ -1785,6 +1784,7 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
       ConfigState.setConditionActive(!foundActive);
     } else {
       // Evaluate the condition.
+      llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
                                                     /*basic*/true,
                                                     /*isForDirective*/true);
