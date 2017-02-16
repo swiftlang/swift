@@ -1897,6 +1897,18 @@ ConstraintSystem::solve(Expr *&expr,
                         ExprTypeCheckListener *listener,
                         SmallVectorImpl<Solution> &solutions,
                         FreeTypeVariableBinding allowFreeTypeVariables) {
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = getASTContext().TypeCheckerDebug->getStream();
+    log << "---Constraint solving for the expression at ";
+    auto R = expr->getSourceRange();
+    if (R.isValid()) {
+      R.print(log, TC.Context.SourceMgr, /*PrintText=*/ false);
+    } else {
+      log << "<invalid range>";
+    }
+    log << "---\n";
+  }
+
   assert(!solverState && "use solveRec for recursive calls");
 
   // Try to shrink the system by reducing disjunction domains. This
