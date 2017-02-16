@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -address-lowering -enable-sil-opaque-values -emit-sorted-sil -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -address-lowering -enable-sil-opaque-values -emit-sorted-sil -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
 
 import Builtin
 
@@ -13,4 +13,48 @@ sil_stage canonical
 sil hidden @addrlower_identity : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $T):
   return %0 : $T
+}
+
+
+sil hidden [noinline] @f020_multiResult : $@convention(thin) <T> (@in T) -> (@out T, @out T, @out T) {
+bb0(%0 : $T):
+  %2 = copy_value %0 : $T
+  %3 = copy_value %0 : $T
+  %4 = copy_value %0 : $T
+  destroy_value %0 : $T
+  %6 = tuple (%2 : $T, %3 : $T, %4 : $T)
+  return %6 : $(T, T, T)
+}
+
+// Test returning an opaque tuple of tuples as a concrete tuple.
+// The multiResult call is specialized, but the SIL result convention does not change.
+// ---
+// CHECK-LABEL: sil @f030_callMultiResult : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) {
+// CHECK: bb0(%0 : $Builtin.Int64):
+// CHECK:  %[[FN:.*]] = function_ref @f020_multiResult : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @out τ_0_0, @out τ_0_0)
+// CHECK:  %[[IN:.*]] = alloc_stack $Builtin.Int64
+// CHECK:  store %0 to %[[IN]] : $*Builtin.Int64
+// CHECK:  %[[OUT1:.*]] = alloc_stack $Builtin.Int64
+// CHECK:  %[[OUT2:.*]] = alloc_stack $Builtin.Int64
+// CHECK:  %[[OUT3:.*]] = alloc_stack $Builtin.Int64
+// CHECK:  %{{.*}} = apply %[[FN]]<Builtin.Int64>(%[[OUT1]], %[[OUT2]], %[[OUT3]], %[[IN]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @out τ_0_0, @out τ_0_0)
+// CHECK:  %[[R3:.*]] = load %[[OUT3]] : $*Builtin.Int64
+// CHECK:  %[[R2:.*]] = load %[[OUT2]] : $*Builtin.Int64
+// CHECK:  %[[R1:.*]] = load %[[OUT1]] : $*Builtin.Int64
+// CHECK:  dealloc_stack %[[OUT3]] : $*Builtin.Int64
+// CHECK:  dealloc_stack %[[OUT2]] : $*Builtin.Int64
+// CHECK:  dealloc_stack %[[OUT1]] : $*Builtin.Int64
+// CHECK:  dealloc_stack %[[IN]] : $*Builtin.Int64
+// CHECK:  %[[R:.*]] = tuple (%[[R1]] : $Builtin.Int64, %[[R2]] : $Builtin.Int64, %[[R3]] : $Builtin.Int64)
+// CHECK:  return %[[R]] : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
+// CHECK-LABEL: } // end sil function 'f30_callMultiResult'
+sil @f030_callMultiResult : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @f020_multiResult : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @out τ_0_0, @out τ_0_0)
+  %2 = apply %1<Builtin.Int64>(%0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @out τ_0_0, @out τ_0_0)
+  %3 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64), 0
+  %4 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64), 1
+  %5 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64), 2
+  %6 = tuple (%3 : $Builtin.Int64, %4 : $Builtin.Int64, %5 : $Builtin.Int64)
+  return %6 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
 }
