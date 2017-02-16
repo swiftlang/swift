@@ -52,6 +52,36 @@ extern "C" void printMetadataType(const Metadata *typeMetadata) {
   }
 }
 
+// FIXME: swiftcall
+/// func printDynamicType(_: AnyObject)
+LLVM_ATTRIBUTE_USED
+extern "C" void printHeapMetadataType(void *object) {
+  assert(Context && "context was not set");
+
+  std::shared_ptr<MemoryReader> reader(new InProcessMemoryReader());
+  RemoteASTContext remoteAST(*Context, std::move(reader));
+
+  auto &out = llvm::outs();
+
+  auto metadataResult =
+    remoteAST.getHeapMetadataForObject(RemoteAddress(object));
+  if (!metadataResult) {
+    out << metadataResult.getFailure().render() << '\n';
+    return;
+  }
+  auto metadata = metadataResult.getValue();
+
+  auto result =
+    remoteAST.getTypeForRemoteTypeMetadata(metadata, /*skipArtificial*/ true);
+  if (result) {
+    out << "found type: ";
+    result.getValue().print(out);
+    out << '\n';
+  } else {
+    out << result.getFailure().render() << '\n';
+  }
+}
+
 static void printMemberOffset(const Metadata *typeMetadata,
                               StringRef memberName, bool passMetadata) {
   assert(Context && "context was not set");
