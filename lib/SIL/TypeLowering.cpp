@@ -1129,11 +1129,6 @@ namespace {
       llvm_unreachable("store copy");
     }
 
-    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
-                   SILValue addr, StoreOwnershipQualifier qual) const override {
-      llvm_unreachable("store");
-    }
-
     SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
                       LoadOwnershipQualifier qual) const override {
       llvm_unreachable("store");
