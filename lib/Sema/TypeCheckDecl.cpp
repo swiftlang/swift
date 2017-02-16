@@ -867,12 +867,12 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     isCascading = (current->getFormalAccess() > Accessibility::FilePrivate);
 
   // Find other potential definitions.
-  SmallVector<ValueDecl *, 4> otherDefinitionsVec;
-  ArrayRef<ValueDecl *> otherDefinitions;
+  SmallVector<ValueDecl *, 4> otherDefinitions;
   if (currentDC->isTypeContext()) {
     // Look within a type context.
     if (auto nominal = currentDC->getAsNominalTypeOrNominalTypeExtensionContext()) {
-      otherDefinitions = nominal->lookupDirect(current->getBaseName());
+      auto found = nominal->lookupDirect(current->getBaseName());
+      otherDefinitions.append(found.begin(), found.end());
       if (tracker)
         tracker->addUsedMember({nominal, current->getName()}, isCascading);
     }
@@ -880,8 +880,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     // Look within a module context.
     currentFile->getParentModule()->lookupValue({ }, current->getBaseName(),
                                                 NLKind::QualifiedLookup,
-                                                otherDefinitionsVec);
-    otherDefinitions = otherDefinitionsVec;
+                                                otherDefinitions);
     if (tracker)
       tracker->addTopLevelName(current->getName(), isCascading);
   }
