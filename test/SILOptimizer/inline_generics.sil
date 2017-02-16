@@ -10,6 +10,15 @@ public func genericFoo<T>(_ t: T) -> T
 
 public func testInliningOfGenerics<T>(_ t: T) -> T
 
+public protocol P : class {
+  func getSelf() -> Self
+}
+
+extension P {
+  func combine<T>(first: T) -> (T) -> Bool
+}
+
+public func callClosure<T>(arg: P) -> (T) -> Bool where T : P
 
 sil @genericFoo : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
@@ -36,3 +45,73 @@ bb0(%0 : $*T, %1 : $*T):
   return %9 : $()
 } // end sil function 'testInliningOfGenerics'
 
+sil hidden @P_combine : $@convention(method) <Self where Self : P><T> (@in T, @guaranteed Self) -> @owned @callee_owned (@in T) -> Bool {
+bb0(%0 : $*T, %1 : $Self):
+  // function_ref P.(combine<A> (first : A1) -> (A1) -> Bool).(closure #1)
+  %4 = function_ref @_TFFE50generic_inlining_partial_apply_opened_existentialsPS_1P7combineurFT5firstqd___Fqd__SbU_Fqd__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : P><τ_1_0> (@in τ_1_0) -> Bool
+  %5 = partial_apply %4<Self, T>() : $@convention(thin) <τ_0_0 where τ_0_0 : P><τ_1_0> (@in τ_1_0) -> Bool
+  destroy_addr %0 : $*T
+  return %5 : $@callee_owned (@in T) -> Bool
+} // end sil function 'P_combine'
+
+// P.(combine<A> (first : A1) -> (A1) -> Bool).(closure #1)
+sil shared @_TFFE50generic_inlining_partial_apply_opened_existentialsPS_1P7combineurFT5firstqd___Fqd__SbU_Fqd__Sb : $@convention(thin) <Self where Self : P><T> (@in T) -> Bool {
+bb0(%0 : $*T):
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = struct $Bool (%2 : $Builtin.Int1)
+  destroy_addr %0 : $*T
+  return %3 : $Bool
+} // end sil function '_TFFE50generic_inlining_partial_apply_opened_existentialsPS_1P7combineurFT5firstqd___Fqd__SbU_Fqd__Sb'
+
+
+// Check that P_combine is not inlined into the generic function, because
+// doing so would result in a partial_apply instruction, with an opened existential
+// in the substitution list. And this cannot be handled by the IRGen yet.
+// CHECK-LABEL: sil @dont_inline_callee_with_opened_existential_in_partial_apply_substitution_list
+// CHECK: [[FUN_REF:%[0-9]+]] = function_ref @P_combine
+// CHECK: apply [[FUN_REF]]
+// CHECK: end sil function 'dont_inline_callee_with_opened_existential_in_partial_apply_substitution_list'
+sil @dont_inline_callee_with_opened_existential_in_partial_apply_substitution_list : $@convention(thin) <T where T : P> (@owned P) -> @owned @callee_owned (@owned T) -> Bool {
+bb0(%0 : $P):
+  %2 = open_existential_ref %0 : $P to $@opened("41B148C8-F49C-11E6-BE69-A45E60E99281") P
+  // function_ref P.combine<A> (first : A1) -> (A1) -> Bool
+  %3 = function_ref @P_combine : $@convention(method) <τ_0_0 where τ_0_0 : P><τ_1_0> (@in τ_1_0, @guaranteed τ_0_0) -> @owned @callee_owned (@in τ_1_0) -> Bool
+  %4 = open_existential_ref %0 : $P to $@opened("41B14A4E-F49C-11E6-BE69-A45E60E99281") P
+  %5 = witness_method $@opened("41B14A4E-F49C-11E6-BE69-A45E60E99281") P, #P.getSelf!1 : <Self where Self : P> (Self) -> () -> @dynamic_self Self, %4 : $@opened("41B14A4E-F49C-11E6-BE69-A45E60E99281") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
+  %6 = apply %5<@opened("41B14A4E-F49C-11E6-BE69-A45E60E99281") P>(%4) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
+  %7 = init_existential_ref %6 : $@opened("41B14A4E-F49C-11E6-BE69-A45E60E99281") P : $@opened("41B14A4E-F49C-11E6-BE69-A45E60E99281") P, $P
+  %8 = alloc_stack $P
+  store %7 to %8 : $*P
+  %10 = apply %3<@opened("41B148C8-F49C-11E6-BE69-A45E60E99281") P, P>(%8, %2) : $@convention(method) <τ_0_0 where τ_0_0 : P><τ_1_0> (@in τ_1_0, @guaranteed τ_0_0) -> @owned @callee_owned (@in τ_1_0) -> Bool
+  // function_ref thunk
+  %11 = function_ref @thunk1 : $@convention(thin) (@owned P, @owned @callee_owned (@in P) -> Bool) -> Bool
+  %12 = partial_apply %11(%10) : $@convention(thin) (@owned P, @owned @callee_owned (@in P) -> Bool) -> Bool
+  // function_ref thunk
+  %13 = function_ref @thunk2 : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned τ_0_0, @owned @callee_owned (@owned P) -> Bool) -> Bool
+  %14 = partial_apply %13<T>(%12) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned τ_0_0, @owned @callee_owned (@owned P) -> Bool) -> Bool
+  dealloc_stack %8 : $*P
+  strong_release %0 : $P
+  return %14 : $@callee_owned (@owned T) -> Bool
+} // end sil function 'dont_inline_callee_with_opened_existential_in_partial_apply_substitution_list'
+
+// thunk
+sil shared [transparent] [reabstraction_thunk] @thunk1 : $@convention(thin) (@owned P, @owned @callee_owned (@in P) -> Bool) -> Bool {
+bb0(%0 : $P, %1 : $@callee_owned (@in P) -> Bool):
+  %2 = alloc_stack $P
+  store %0 to %2 : $*P
+  %4 = apply %1(%2) : $@callee_owned (@in P) -> Bool
+  dealloc_stack %2 : $*P
+  return %4 : $Bool
+} // end sil function 'thunk1'
+
+// thunk
+sil shared [transparent] [reabstraction_thunk] @thunk2 : $@convention(thin) <T where T : P> (@owned T, @owned @callee_owned (@owned P) -> Bool) -> Bool {
+bb0(%0 : $T, %1 : $@callee_owned (@owned P) -> Bool):
+  %2 = init_existential_ref %0 : $T : $T, $P
+  %3 = apply %1(%2) : $@callee_owned (@owned P) -> Bool
+  return %3 : $Bool
+} // end sil function 'thunk2'
+
+sil_default_witness_table P {
+  no_default
+}
