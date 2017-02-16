@@ -1,0 +1,38 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-inline-generics=true | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public func genericFoo<T>(_ t: T) -> T
+
+public func testInliningOfGenerics<T>(_ t: T) -> T
+
+
+sil @genericFoo : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  copy_addr [take] %1 to [initialization] %0 : $*T
+  %4 = tuple ()
+  return %4 : $()
+} // end sil function 'genericFoo'
+
+
+// Check that the generic call was inlined.
+// CHECK-LABEL: sil @testInliningOfGenerics
+// CHECK-NOT: apply
+// CHECK: end sil function 'testInliningOfGenerics'
+sil @testInliningOfGenerics : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  // function_ref genericFoo<A> (A) -> A
+  %3 = function_ref @genericFoo : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  %4 = alloc_stack $T
+  copy_addr %1 to [initialization] %4 : $*T
+  %6 = apply %3<T>(%0, %4) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  dealloc_stack %4 : $*T
+  destroy_addr %1 : $*T
+  %9 = tuple ()
+  return %9 : $()
+} // end sil function 'testInliningOfGenerics'
+
