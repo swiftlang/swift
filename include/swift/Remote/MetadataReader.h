@@ -626,7 +626,8 @@ public:
   }
 
   /// Given a remote pointer to metadata, attempt to turn it into a type.
-  BuiltType readTypeFromMetadata(StoredPointer MetadataAddress) {
+  BuiltType readTypeFromMetadata(StoredPointer MetadataAddress,
+                                 bool skipArtificialSubclasses = false) {
     auto Cached = TypeCache.find(MetadataAddress);
     if (Cached != TypeCache.end())
       return Cached->second;
@@ -643,7 +644,7 @@ public:
 
     switch (Meta->getKind()) {
     case MetadataKind::Class:
-      return readNominalTypeFromMetadata(Meta);
+      return readNominalTypeFromMetadata(Meta, skipArtificialSubclasses);
     case MetadataKind::Struct:
       return readNominalTypeFromMetadata(Meta);
     case MetadataKind::Enum:
@@ -997,6 +998,20 @@ protected:
     return targetAddress + signext;
   }
 
+  template<typename Offset>
+  llvm::Optional<StoredPointer>
+  resolveNullableRelativeOffset(StoredPointer targetAddress) {
+    Offset relative;
+    if (!Reader->readInteger(RemoteAddress(targetAddress), &relative))
+      return llvm::None;
+    if (relative == 0)
+      return 0;
+    using SignedOffset = typename std::make_signed<Offset>::type;
+    using SignedPointer = typename std::make_signed<StoredPointer>::type;
+    auto signext = (SignedPointer)(SignedOffset)relative;
+    return targetAddress + signext;
+  }
+
   /// Given a pointer to an Objective-C class, try to read its class name.
   bool readObjCClassName(StoredPointer classAddress, std::string &className) {
     // The following algorithm only works on the non-fragile Apple runtime.
@@ -1118,12 +1133,39 @@ private:
     return MetadataRef(address, metadata);
   }
 
-  StoredPointer readAddressOfNominalTypeDescriptor(MetadataRef metadata) {
+  StoredPointer readAddressOfNominalTypeDescriptor(MetadataRef &metadata,
+                                        bool skipArtificialSubclasses = false) {
     switch (metadata->getKind()) {
     case MetadataKind::Class: {
       auto classMeta = cast<TargetClassMetadata<Runtime>>(metadata);
-      return resolveRelativeOffset<StoredPointer>(metadata.getAddress() +
-                                       classMeta->offsetToDescriptorOffset());
+      while (true) {
+        auto descriptorAddress =
+          resolveNullableRelativeOffset<StoredPointer>(metadata.getAddress() +
+                                         classMeta->offsetToDescriptorOffset());
+
+        // Propagate errors reading the offset.
+        if (!descriptorAddress) return 0;
+
+        // If this class has a null descriptor, it's artificial,
+        // and we need to skip it upon request.  Otherwise, we're done.
+        if (*descriptorAddress || !skipArtificialSubclasses)
+          return *descriptorAddress;
+
+        auto superclassMetadataAddress = classMeta->SuperClass;
+        if (!superclassMetadataAddress)
+          return 0;
+
+        auto superMeta = readMetadata(superclassMetadataAddress);
+        if (!superMeta)
+          return 0;
+        auto superclassMeta =
+          dyn_cast<TargetClassMetadata<Runtime>>(superMeta);
+        if (!superclassMeta)
+          return 0;
+
+        classMeta = superclassMeta;
+        metadata = superMeta;
+      }
     }
 
     case MetadataKind::Struct:
@@ -1241,10 +1283,23 @@ private:
     return substitutions;
   }
 
-  BuiltType readNominalTypeFromMetadata(MetadataRef metadata) {
-    auto descriptorAddress = readAddressOfNominalTypeDescriptor(metadata);
+  BuiltType readNominalTypeFromMetadata(MetadataRef origMetadata,
+                                        bool skipArtificialSubclasses = false) {
+    auto metadata = origMetadata;
+    auto descriptorAddress =
+      readAddressOfNominalTypeDescriptor(metadata,
+                                         skipArtificialSubclasses);
     if (!descriptorAddress)
       return BuiltType();
+
+    // If we've skipped an artificial subclasses, check the cache at
+    // the superclass.  (This also protects against recursion.)
+    if (skipArtificialSubclasses &&
+        metadata.getAddress() != origMetadata.getAddress()) {
+      auto it = TypeCache.find(metadata.getAddress());
+      if (it != TypeCache.end())
+        return it->second;
+    }
 
     // Read the nominal type descriptor.
     auto descriptor = readNominalTypeDescriptor(descriptorAddress);
@@ -1277,6 +1332,14 @@ private:
     if (!nominal) return BuiltType();
 
     TypeCache[metadata.getAddress()] = nominal;
+
+    // If we've skipped an artificial subclass, remove the
+    // recursion-protection entry we made for it.
+    if (skipArtificialSubclasses &&
+        metadata.getAddress() != origMetadata.getAddress()) {
+      TypeCache.erase(origMetadata.getAddress());
+    }
+
     return nominal;
   }
 
