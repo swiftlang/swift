@@ -1224,13 +1224,13 @@ bb0(%0 : $*Airplane):
 // p2.trytofly (p2.Flyable) -> ()
 sil hidden @_TF2p28trytoflyFPS_7Flyable_T_ : $@convention(thin) (@in Flyable) -> () {
 bb0(%0 : $*Flyable):
-  %2 = open_existential_addr %0 : $*Flyable to $*@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A") Flyable // users: %3, %4
+  %2 = open_existential_addr immutable_access %0 : $*Flyable to $*@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A") Flyable // users: %3, %4
   %3 = witness_method $@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A") Flyable, #Flyable.fly!1, %2 : $*@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A") Flyable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> () // user: %4
   %4 = apply %3<@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A") Flyable>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
-  %5 = open_existential_addr %0 : $*Flyable to $*@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A") Flyable // users: %6, %7
+  %5 = open_existential_addr immutable_access %0 : $*Flyable to $*@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A") Flyable // users: %6, %7
   %6 = witness_method $@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A") Flyable, #Flyable.fly!1, %5 : $*@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A") Flyable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> () // user: %7
   %7 = apply %6<@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A") Flyable>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
-  %8 = open_existential_addr %0 : $*Flyable to $*@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable // users: %9, %10
+  %8 = open_existential_addr immutable_access %0 : $*Flyable to $*@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable // users: %9, %10
   %9 = witness_method $@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable, #Flyable.fly!1, %8 : $*@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> () // user: %10
   %10 = apply %9<@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable>(%8) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
   %11 = witness_method $@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable, #Flyable.fly!1, %8 : $*@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A") Flyable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> () // user: %12
@@ -1248,20 +1248,20 @@ sil_witness_table hidden Airplane: Flyable module p2 {
 protocol Pingable { func ping() }
 
 // CHECK-LABEL: CSE_Existential_Simple
-// CHECK: open_existential_addr %0 : $*Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073")
+// CHECK: open_existential_addr immutable_access %0 : $*Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073")
 // CHECK: witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable, #Pingable.ping!1 : {{.*}}, %2
 // CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable>(%2)
-// CHECK: open_existential_addr
+// CHECK: open_existential_addr immutable_access 
 // CHECK: witness_method
 // CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable>(%2)
 // CHECK: return
 sil hidden @CSE_Existential_Simple : $@convention(thin) (@in Pingable) -> () {
 bb0(%0 : $*Pingable):
   debug_value_addr %0 : $*Pingable  // let x      // id: %1
-  %2 = open_existential_addr %0 : $*Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable // users: %3, %4
+  %2 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable // users: %3, %4
   %3 = witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable, #Pingable.ping!1, %2 : $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %4
   %4 = apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073") Pingable>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
-  %5 = open_existential_addr %0 : $*Pingable to $*@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073") Pingable // users: %6, %7
+  %5 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073") Pingable // users: %6, %7
   %6 = witness_method $@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073") Pingable, #Pingable.ping!1, %5 : $*@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073") Pingable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %7
   %7 = apply %6<@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073") Pingable>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*Pingable                    // id: %8
@@ -1274,7 +1274,7 @@ sil hidden @CSE_Existential_Calls_With_Control_Flow : $@convention(thin) (@in Pi
 bb0(%0 : $*Pingable, %1 : $Int):
   debug_value_addr %0 : $*Pingable  // let x      // id: %2
   debug_value %1 : $Int  // let y                 // id: %3
-  %4 = open_existential_addr %0 : $*Pingable to $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable // users: %5, %6
+  %4 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable // users: %5, %6
   %5 = witness_method $@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable, #Pingable.ping!1, %4 : $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %6
 
   // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable>(%4)
@@ -1285,7 +1285,7 @@ bb0(%0 : $*Pingable, %1 : $Int):
   cond_br %9, bb1, bb2                            // id: %10
 
 bb1:                                              // Preds: bb0
-  %11 = open_existential_addr %0 : $*Pingable to $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073") Pingable // users: %12, %13
+  %11 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073") Pingable // users: %12, %13
   %12 = witness_method $@opened("75F1F3AC-D6CB-11E5-9470-A82066121073") Pingable, #Pingable.ping!1, %11 : $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073") Pingable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %13
 
   // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable>(%4)
@@ -1293,7 +1293,7 @@ bb1:                                              // Preds: bb0
   br bb2                                          // id: %14
 
 bb2:                                              // Preds: bb0 bb1
-  %15 = open_existential_addr %0 : $*Pingable to $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073") Pingable // users: %16, %17
+  %15 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073") Pingable // users: %16, %17
   %16 = witness_method $@opened("75F1F5C8-D6CB-11E5-9470-A82066121073") Pingable, #Pingable.ping!1, %15 : $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073") Pingable : $@convention(witness_method) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %17
 
   // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073") Pingable>(%4)

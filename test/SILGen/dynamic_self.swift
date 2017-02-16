@@ -76,7 +76,7 @@ func testArchetypeDispatch<T: P>(t: T) {
 // CHECK-LABEL: sil hidden @_T012dynamic_self23testExistentialDispatch{{[_0-9a-zA-Z]*}}F
 func testExistentialDispatch(p: P) {
 // CHECK: bb0([[P:%[0-9]+]] : $*P):
-// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr [[P]] : $*P to $*@opened([[N:".*"]]) P
+// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P to $*@opened([[N:".*"]]) P
 // CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $P
 // CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*P, $@opened([[N]]) P
 // CHECK:   [[P_F_METHOD:%[0-9]+]] = witness_method $@opened([[N]]) P, #P.f!1 : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0

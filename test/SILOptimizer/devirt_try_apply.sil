@@ -669,7 +669,7 @@ bb0:
   %7 = integer_literal $Builtin.Int32, 0
   %8 = struct $Int32 (%7 : $Builtin.Int32)
   store %8 to %0 : $*Int32
-  %10 = open_existential_addr %1 : $*P to $*@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P
+  %10 = open_existential_addr immutable_access %1 : $*P to $*@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P
   %11 = witness_method $@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P, #P.foo!1, %10 : $*@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (Int32, @error Error)
   try_apply %11<@opened("3F4928FC-364E-11E5-9488-B8E856428C60") P>(%10) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> (Int32, @error Error), normal bb1, error bb4
 

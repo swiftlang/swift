@@ -214,7 +214,7 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[TEMP:%.*]] = alloc_stack $SomeProtocol
   // CHECK: copy_addr [[PADDR]] to [initialization] [[TEMP]]
-  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr [[TEMP]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
+  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[TEMP]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
   // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])
@@ -223,7 +223,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: dealloc_stack [[TEMP]]
   p.method(i)
 
-  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr [[PADDR:%.*]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
+  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[PADDR:%.*]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
   // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])

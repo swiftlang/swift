@@ -958,7 +958,7 @@ bb0(%0 : $Pointer):
   %1 = alloc_stack $P
   %2 = init_existential_addr %1 : $*P, $Pointer
   store %0 to %2 : $*Pointer
-  %4 = open_existential_addr %1 : $*P to $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P
+  %4 = open_existential_addr immutable_access %1 : $*P to $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P
   %5 = witness_method $@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P, #P.foo!1, %4 : $*@opened("C62B1408-97C8-11E5-8D7C-685B35C48C83") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   dealloc_stack %1 : $*P
   %7 = tuple ()

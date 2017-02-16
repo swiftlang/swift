@@ -200,8 +200,8 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
     // Unwrap zero or more metatype levels
     openedArchetype = getOpenedArchetype(openedType);
 
-    state = SGF.emitOpenExistential(loc, input,
-                                    openedArchetype, loweredOpenedType);
+    state = SGF.emitOpenExistential(loc, input, openedArchetype,
+                                    loweredOpenedType, AccessKind::Read);
     inputType = openedType;
   }
 

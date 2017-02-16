@@ -54,8 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 317; // Last change: search path options record
-                                    // if it is system or not.
+const uint16_t VERSION_MINOR = 318; // Last change: SIL open_exist. access kind
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
