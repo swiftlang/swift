@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-sil -emit-ir -disable-llvm-optzns -Ounchecked %s | %FileCheck --check-prefix=CHECK-%target-runtime %s
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-sil -emit-ir -disable-llvm-optzns -Onone %s | %FileCheck --check-prefix=ONONE %s
 
-// REQUIRES: CPU=i386_or_x86_64
+// REQUIRES: CPU=i386 || CPU=x86_64
 
 // At -Onone we don't run the LLVM ARC optimizer, so the fixLifetime call is
 // unnecessary.
