@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -Xllvm -sil-disable-pass="External Defs To Decls" %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
-// REQUIRES: CPU=i386_or_x86_64
+// REQUIRES: CPU=i386 || CPU=x86_64
 // XFAIL: linux
 
 sil_stage canonical
