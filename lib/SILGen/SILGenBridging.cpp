@@ -498,9 +498,10 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
   // some work by opening it.
   if (loweredNativeTy->isExistentialType()) {
     auto openedTy = ArchetypeType::getOpened(loweredNativeTy);
-    
-    auto openedExistential = gen.emitOpenExistential(loc, v, openedTy,
-                                                 gen.getLoweredType(openedTy));
+
+    auto openedExistential = gen.emitOpenExistential(
+        loc, v, openedTy, gen.getLoweredType(openedTy), AccessKind::Read);
+
     v = gen.manageOpaqueValue(openedExistential, loc, SGFContext());
     loweredNativeTy = openedTy;
   }

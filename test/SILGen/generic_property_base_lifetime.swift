@@ -65,7 +65,7 @@ func setIntPropGeneric<T: ProtocolA>(_ a: T) {
 }
 
 // CHECK-LABEL: sil hidden @_T030generic_property_base_lifetime21getIntPropExistentialSiAA9ProtocolB_pF
-// CHECK:         [[PROJECTION:%.*]] = open_existential_addr %0
+// CHECK:         [[PROJECTION:%.*]] = open_existential_addr immutable_access %0
 // CHECK:         [[STACK:%[0-9]+]] = alloc_stack $@opened({{".*"}}) ProtocolB
 // CHECK:         copy_addr [[PROJECTION]] to [initialization] [[STACK]]
 // CHECK:         apply {{%.*}}([[STACK]])

@@ -118,7 +118,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
   // CHECK:   [[COPY:%.*]] = alloc_stack $P
   // CHECK:   copy_addr [[EXISTENTIAL]] to [initialization] [[COPY]]
-  // CHECK:   [[OPENED_COPY:%.*]] = open_existential_addr [[COPY]] : $*P to $*[[OPENED_TYPE:@opened.*P]],
+  // CHECK:   [[OPENED_COPY:%.*]] = open_existential_addr immutable_access [[COPY]] : $*P to $*[[OPENED_TYPE:@opened.*P]],
   // CHECK:   // function_ref _bridgeAnythingToObjectiveC
   // CHECK:   [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK:   [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[OPENED_COPY]])
@@ -150,7 +150,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
   // CHECK:   [[COPY:%.*]] = alloc_stack $Any
   // CHECK:   copy_addr [[ANY]] to [initialization] [[COPY]]
-  // CHECK:   [[OPENED_COPY:%.*]] = open_existential_addr [[COPY]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
+  // CHECK:   [[OPENED_COPY:%.*]] = open_existential_addr immutable_access [[COPY]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
   // CHECK:   // function_ref _bridgeAnythingToObjectiveC
   // CHECK:   [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK:   [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[OPENED_COPY]])
@@ -356,7 +356,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $P
   // CHECK-NEXT: copy_addr [[EXISTENTIAL]] to [initialization] [[COPY]]
-  // CHECK-NEXT: [[OPENED_COPY:%.*]] = open_existential_addr [[COPY]] : $*P to $*[[OPENED_TYPE:@opened.*P]],
+  // CHECK-NEXT: [[OPENED_COPY:%.*]] = open_existential_addr immutable_access [[COPY]] : $*P to $*[[OPENED_TYPE:@opened.*P]],
   // CHECK-NEXT: // function_ref _bridgeAnythingToObjectiveC
   // CHECK-NEXT: [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[OPENED_COPY]])
@@ -390,7 +390,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]] : $NSIdLover,
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $Any
   // CHECK-NEXT: copy_addr [[ANY]] to [initialization] [[COPY]]
-  // CHECK-NEXT: [[OPENED_COPY:%.*]] = open_existential_addr [[COPY]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
+  // CHECK-NEXT: [[OPENED_COPY:%.*]] = open_existential_addr immutable_access [[COPY]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
   // CHECK-NEXT: // function_ref _bridgeAnythingToObjectiveC
   // CHECK-NEXT: [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[OPENED_COPY]])
@@ -490,7 +490,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK:   [[NATIVE_IMP:%.*]] = function_ref @_TFC17objc_bridging_any12SwiftIdLover18methodReturningAny
   // CHECK:   apply [[NATIVE_IMP]]([[NATIVE_RESULT]], [[SELF_COPY]])
   // CHECK:   destroy_value [[SELF_COPY]]
-  // CHECK:   [[OPEN_RESULT:%.*]] = open_existential_addr [[NATIVE_RESULT]]
+  // CHECK:   [[OPEN_RESULT:%.*]] = open_existential_addr immutable_access [[NATIVE_RESULT]]
   // CHECK:   [[BRIDGE_ANYTHING:%.*]] = function_ref @_TFs27_bridgeAnythingToObjectiveC
   // CHECK:   [[OBJC_RESULT:%.*]] = apply [[BRIDGE_ANYTHING]]<{{.*}}>([[OPEN_RESULT]])
   // CHECK:   return [[OBJC_RESULT]]
@@ -539,7 +539,7 @@ class SwiftIdLover : NSObject, Anyable {
 
   // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFdCb_dPs9AnyObject___XFo_iP___
   // CHECK:     bb0([[ANY:%.*]] : $*Any, [[BLOCK:%.*]] : $@convention(block) (AnyObject) -> ()):
-  // CHECK-NEXT:  [[OPENED_ANY:%.*]] = open_existential_addr [[ANY]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
+  // CHECK-NEXT:  [[OPENED_ANY:%.*]] = open_existential_addr immutable_access [[ANY]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
   // CHECK-NEXT:  // function_ref _bridgeAnythingToObjectiveC
   // CHECK-NEXT:  [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK-NEXT:  [[BRIDGED:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[OPENED_ANY]])
@@ -646,7 +646,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  [[FUNCTION:%.*]] = load [copy] [[BLOCK_STORAGE_ADDR]]
   // CHECK-NEXT:  [[RESULT:%.*]] = alloc_stack $Any
   // CHECK-NEXT:  apply [[FUNCTION]]([[RESULT]])
-  // CHECK-NEXT:  [[OPENED:%.*]] = open_existential_addr [[RESULT]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
+  // CHECK-NEXT:  [[OPENED:%.*]] = open_existential_addr immutable_access [[RESULT]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
   // CHECK-NEXT:  // function_ref _bridgeAnythingToObjectiveC
   // CHECK-NEXT:  [[BRIDGE_ANYTHING:%.*]] = function_ref
   // CHECK-NEXT:  [[BRIDGED:%.*]] = apply [[BRIDGE_ANYTHING]]<[[OPENED_TYPE]]>([[OPENED]])

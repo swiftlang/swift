@@ -18,6 +18,7 @@
 #define SWIFT_SIL_INSTRUCTION_H
 
 #include "swift/AST/Builtins.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/SIL/Consumption.h"
@@ -3892,6 +3893,13 @@ class DynamicMethodInst final
          SILOpenedArchetypesState &OpenedArchetypes);
 };
 
+/// Access allowed to the opened value by the open_existential_addr instruction.
+/// Allowing mutable access to the opened existential requires a boxed
+/// existential value's box to be unique.
+enum class OpenedExistentialAccess { Immutable, Mutable };
+
+OpenedExistentialAccess getOpenedExistentialAccessFor(AccessKind access);
+
 /// Given the address of an existential, "opens" the
 /// existential by returning a pointer to a fresh archetype T, which also
 /// captures the (dynamic) conformances.
@@ -3899,9 +3907,13 @@ class OpenExistentialAddrInst
   : public UnaryInstructionBase<ValueKind::OpenExistentialAddrInst>
 {
   friend SILBuilder;
+  OpenedExistentialAccess ForAccess;
 
   OpenExistentialAddrInst(SILDebugLocation DebugLoc, SILValue Operand,
-                          SILType SelfTy);
+                          SILType SelfTy, OpenedExistentialAccess AccessKind);
+
+public:
+  OpenedExistentialAccess getAccessKind() const { return ForAccess; }
 };
 
 /// Given an opaque value referring to an existential, "opens" the

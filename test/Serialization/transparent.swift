@@ -67,7 +67,7 @@ func test_wrapper() {
 
 // SIL-LABEL: sil public_external [transparent] [fragile] @_T015def_transparent17open_existentialsyAA1P_p1p_AA2CP_p2cptF
 func test_open_existentials(p: P, cp: CP) {
-  // SIL: open_existential_addr [[EXIST:%[0-9]+]] : $*P to $*@opened([[N:".*"]]) P
+  // SIL: open_existential_addr immutable_access [[EXIST:%[0-9]+]] : $*P to $*@opened([[N:".*"]]) P
   // SIL: open_existential_ref [[EXIST:%[0-9]+]] : $CP to $@opened([[M:".*"]]) CP
   open_existentials(p: p, cp: cp)
 }

@@ -1479,7 +1479,8 @@ SILCloner<ImplClass>::visitOpenExistentialAddrInst(OpenExistentialAddrInst *Inst
   doPostProcess(Inst,
     getBuilder().createOpenExistentialAddr(getOpLocation(Inst->getLoc()),
                                        getOpValue(Inst->getOperand()),
-                                       getOpType(Inst->getType())));
+                                       getOpType(Inst->getType()),
+                                       Inst->getAccessKind()));
 }
 
 template <typename ImplClass>

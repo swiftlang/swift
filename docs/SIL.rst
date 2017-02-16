@@ -3835,9 +3835,11 @@ open_existential_addr
 `````````````````````
 ::
 
-  sil-instruction ::= 'open_existential_addr' sil-operand 'to' sil-type
+  sil-instruction ::= 'open_existential_addr' sil-allowed-access sil-operand 'to' sil-type
+  sil-allowed-access ::= 'immutable_access'
+  sil-allowed-access ::= 'mutable_access'
 
-  %1 = open_existential_addr %0 : $*P to $*@opened P
+  %1 = open_existential_addr immutable_access %0 : $*P to $*@opened P
   // %0 must be of a $*P type for non-class protocol or protocol composition
   //   type P
   // $*@opened P must be a unique archetype that refers to an opened
@@ -3848,7 +3850,11 @@ Obtains the address of the concrete value inside the existential
 container referenced by ``%0``. The protocol conformances associated
 with this existential container are associated directly with the
 archetype ``$*@opened P``. This pointer can be used with any operation
-on archetypes, such as ``witness_method``.
+on archetypes, such as ``witness_method`` assuming this operation obeys the
+access contraint: The returned address can either allow ``mutable_access`` or
+``immutable_access``. Users of the returned address may only consume
+(e.g ``destroy_addr`` or ``copy_addr [take]``) or mutate the value at the
+address if they have ``mutable_access``.
 
 open_existential_opaque
 ```````````````````````
