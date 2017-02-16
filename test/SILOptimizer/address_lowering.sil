@@ -47,7 +47,7 @@ bb0(%0 : $T):
 // CHECK:  dealloc_stack %[[IN]] : $*Builtin.Int64
 // CHECK:  %[[R:.*]] = tuple (%[[R1]] : $Builtin.Int64, %[[R2]] : $Builtin.Int64, %[[R3]] : $Builtin.Int64)
 // CHECK:  return %[[R]] : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
-// CHECK-LABEL: } // end sil function 'f30_callMultiResult'
+// CHECK-LABEL: } // end sil function 'f030_callMultiResult'
 sil @f030_callMultiResult : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) {
 bb0(%0 : $Builtin.Int64):
   %1 = function_ref @f020_multiResult : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @out τ_0_0, @out τ_0_0)
