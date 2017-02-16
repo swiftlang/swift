@@ -290,8 +290,9 @@ macro(swift_common_cxx_warnings)
 
   # Disable C4068: unknown pragma. This means that MSVC doesn't report hundreds of warnings across
   # the repository for IDE features such as #pragma mark "Title".
-  check_cxx_compiler_flag("/wd4068" CXX_SUPPORTS_UNKNOWN_PRAGMA_FLAG)
-  append_if(CXX_SUPPORTS_UNKNOWN_PRAGMA_FLAG "/wd4068" CMAKE_CXX_FLAGS)
+  if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4068")
+  endif()
 endmacro()
 
 # Like 'llvm_config()', but uses libraries from the selected build
