@@ -98,523 +98,116 @@ extension ExpressibleByIntegerLiteral
 
 %{
 
-def operationComment(operator):
+# documentation for binary operators: +, -, <<, &, etc
+def operatorComment(operator, fixedWidth):
     comments = {
         '+': """\
-  /// Returns the sum of this value and the given value.
+  /// Adds two values and produces their sum.
   ///
-  /// This method serves as the basis for the addition operator (`+`). For
+  /// The addition operator (`+`) calculates the sum of its two arguments. For
   /// example:
   ///
-  ///     let x = 15
-  ///     print(x.adding(7))
-  ///     // Prints "22"
-  ///     print(x + 7)
-  ///     // Prints "22"
+  ///     1 + 2                   // 3
+  ///     -10 + 15                // 5
+  ///     -15 + -5                // -20
+  ///     21.5 + 3.25             // 24.75
   ///
-  /// - Parameter rhs: The value to add to this value.
-  /// - Returns: The sum of this value and `rhs`.
+  /// You cannot use `+` with arguments of different types. To add values of
+  /// different types, convert one of the values to the other value's type.
   ///
-  /// - SeeAlso: `add(_:)`
-""",
-        '-': """\
-  /// Returns the difference of this value and the given value.
+  ///     let x: Int8 = 21
+  ///     let y: Int = 1000000
+  ///     Int(x) + y              // 1000021
   ///
-  /// This method serves as the basis for the subtraction operator (`-`). For
-  /// example:
+""" + ("""\
+  /// The sum of the two arguments must be representable in the arguments'
+  /// type. In the following example, the result of `21 + 120` is greater than
+  /// the maximum representable `Int8` value:
   ///
-  ///     let x = 15
-  ///     print(x.subtracting(7))
-  ///     // Prints "8"
-  ///     print(x - 7)
-  ///     // Prints "8"
+  ///     x + 120                 // Overflow error
   ///
-  /// - Parameter rhs: The value to subtract from this value.
-  /// - Returns: The difference of this value and `rhs`.
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
   ///
-  /// - SeeAlso: `subtract(_:)`
-""",
-        '*': """\
-  /// Returns the product of this value and the given value.
+  /// If you want to opt out of overflow checking and ignore any overflow, use
+  /// the overflow addition operator (`&+`).
   ///
-  /// This method serves as the basis for the multiplication operator (`*`).
-  /// For example:
+  ///     x &+ 120                // -115
   ///
-  ///     let x = 15
-  ///     print(x.multiplied(by: 7))
-  ///     // Prints "105"
-  ///     print(x * 7)
-  ///     // Prints "105"
-  ///
-  /// - Parameter rhs: The value to multiply by this value.
-  /// - Returns: The product of this value and `rhs`.
-  ///
-  /// - SeeAlso: `multiply(by:)`
-""",
-        '/': """\
-  /// Returns the quotient of dividing this value by the given value.
-  ///
-  /// This method serves as the basis for the division operator (`/`). For
-  /// example:
-  ///
-  ///     let x = 15
-  ///     print(x.divided(by: 7))
-  ///     // Prints "2"
-  ///     print(x / 7)
-  ///     // Prints "2"
-  ///
-  /// - Parameter rhs: The value to divide this value by. `rhs` must not be
-  ///   zero.
-  /// - Returns: The quotient of dividing this value by `rhs`.
-  ///
-  /// - SeeAlso: `divide(by:)`
-""",
-        '%': """\
-  /// Returns the remainder of dividing this value by the given value.
-  ///
-  /// This method serves as the basis for the remainder operator (`%`). For
-  /// example:
-  ///
-  ///     let x = 15
-  ///     print(x.remainder(dividingBy: 7))
-  ///     // Prints "1"
-  ///     print(x % 7)
-  ///     // Prints "1"
-  ///
-  /// - Parameter rhs: The value to divide this value by. `rhs` must not be
-  ///   zero.
-  /// - Returns: The remainder of dividing this value by `rhs`.
-  ///
-  /// - SeeAlso: `formRemainder(dividingBy:)`
-""",
-
-        '&': """\
-  /// Returns the result of performing a bitwise AND operation on this value
-  /// and the given value.
-  ///
-  /// A bitwise AND operation results in a value that has each bit set to `1`
-  /// where *both* of its arguments have that bit set to `1`. For example:
-  ///
-  ///     let x: UInt8 = 5          // 0b00000101
-  ///     let y: UInt8 = 14         // 0b00001110
-  ///     let z = x.bitwiseAnd(y)   // 0b00000100
-  ///
-  /// This method serves as the basis for the bitwise AND operator (`&`).
-  ///
-  /// - Parameter rhs: The value to perform the bitwise AND with this value.
-  /// - Returns: A new value with each bit set to `1` where this value and
-  ///   `rhs` both have bits set to `1`.
-""",
-        '|': """\
-  /// Returns the result of performing a bitwise OR operation on this value and
-  /// the given value.
-  ///
-  /// A bitwise OR operation results in a value that has each bit set to `1`
-  /// where *one or both* of its arguments have that bit set to `1`. For
-  /// example:
-  ///
-  ///     let x: UInt8 = 5          // 0b00000101
-  ///     let y: UInt8 = 14         // 0b00001110
-  ///     let z = x.bitwiseOr(y)    // 0b00001111
-  ///
-  /// This method serves as the basis for the bitwise OR operator (`|`).
-  ///
-  /// - Parameter rhs: The value to perform the bitwise OR with this value.
-  /// - Returns: A new value with each bit set to `1` where this value, `rhs`,
-  ///   or both have bits set to `1`.
-""",
-        '^': """\
-  /// Returns the result of performing a bitwise XOR operation on this value
-  /// and the given value.
-  ///
-  /// A bitwise XOR operation, also known as an exclusive OR operation, results
-  /// in a value that has each bit set to `1` where *one or the other but not
-  /// both* of its arguments had that bit set to `1`. For example:
-  ///
-  ///     let x: UInt8 = 5          // 0b00000101
-  ///     let y: UInt8 = 14         // 0b00001110
-  ///     let z = x.bitwiseXor(y)   // 0b00001011
-  ///
-  /// This method serves as the basis for the bitwise XOR operator (`^`).
-  ///
-  /// - Parameter rhs: The value to perform the bitwise XOR with this value.
-  /// - Returns: A new value with each bit set to `1` where either this value
-  ///   or `rhs`, but not both, have bits set to `1`.
-""",
-
-        '&>>': """\
-  /// Returns the result of shifting this value's binary representation the
-  /// specified number of digits to the right.
-  ///
-  /// In a *masking shift*, the bit pattern of the value passed as `rhs` is
-  /// masked to produce a value between zero and the bit width of `lhs`. The
-  /// shift is performed using this masked value. Masking shifts require more
-  /// care to use correctly than a traditional bit shift, but are likely to be
-  /// more efficient when used with shift amounts that are not compile-time
-  /// constants. On most architectures, a masking shift compiles down to a
-  /// single instruction.
-  ///
-  /// For example, if you pass `2` to the `maskingShiftRight(_:)` method on an
-  /// 8-bit, unsigned integer, the shift amount requires no masking.
-  ///
-  ///     let x: UInt8 = 30                 // 0b00011110
-  ///     let y = x.maskingShiftRight(2)
-  ///     // y == 7                         // 0b00000111
-  ///
-  /// However, if you pass `11` as `rhs`, the method first bitmasks `rhs` to
-  /// `3`, and then uses that masked value as the number of bits to shift `x`.
-  ///
-  ///     let z = x.maskingShiftRight(11)
-  ///     // z == 3                         // 0b00000011
-  ///
-  /// This method serves as the basis for the masking right shift operator
-  /// (`&>>`).
-  ///
-  ///     let y3 = x &>> 11
-  ///     // y3 == 3
-  ///
-  /// Relationship to the Right Shift Operator
-  /// ----------------------------------------
-  ///
-  /// The `maskingShiftRight(_:)` method handles attempted overshifts and
-  /// undershifts differently from the right shift operator (`>>`). When the
-  /// value passed as `rhs` in a masking shift is within the range
-  /// `0...<bitWidth`, the operation is equivalent to using the right shift
-  /// operator.
-  ///
-  ///     let x: UInt8 = 30                 // 0b00011110
-  ///     let y1 = x.maskingShiftRight(2)
-  ///     // y1 == 7                        // 0b00000111
-  ///     let y2 = x >> 2
-  ///     // y2 == 7                        // 0b00000111
-  ///
-  /// The right shift operator does not mask its right-hand-side argument, so
-  /// passing `11` as `rhs` shifts all the bits of `x` to zero.
-  ///
-  ///     let z1 = x.maskingShiftRight(11)
-  ///     // z1 == 240                      // 0b00000011
-  ///     let z2 = x >> 11
-  ///     // z2 == 0                        // 0b00000000
-  ///
-  /// - Parameter rhs: The number of bits to shift this value to the right. If
-  ///   `rhs` is outside the range `0..<bitWidth`, it is masked to produce a
-  ///   value within that range.
-  /// - Returns: The result of shifting this value by the masked `rhs` to the
-  ///   right.
-  ///
-  /// - SeeAlso: `&>>`, `>>`, `maskingShiftLeft(_:)`
-""",
-        '&<<': """\
-  /// Returns the result of shifting this value's binary representation the
-  /// specified number of digits to the left.
-  ///
-  /// In a *masking shift*, the bit pattern of the value passed as `rhs` is
-  /// masked to produce a value between zero and the bit width of `lhs`. The
-  /// shift is performed using this masked value. Masking shifts require more
-  /// care to use correctly than a traditional bit shift, but are likely to be
-  /// more efficient when used with shift amounts that are not compile-time
-  /// constants. On most architectures, a masking shift compiles down to a
-  /// single instruction.
-  ///
-  /// For example, if you pass `2` to the `maskingShiftLeft(_:)` method on an
-  /// 8-bit, unsigned integer, the shift amount requires no masking.
-  ///
-  ///     let x: UInt8 = 30                 // 0b00011110
-  ///     let y = x.maskingShiftLeft(2)
-  ///     // y == 120                       // 0b01111000
-  ///
-  /// However, if you pass `11` as `rhs`, the method first bitmasks `rhs` to
-  /// `3`, and then uses that masked value as the number of bits to shift `x`.
-  ///
-  ///     let z = x.maskingShiftLeft(11)
-  ///     // z == 240                       // 0b11110000
-  ///
-  /// This method serves as the basis for the masking left shift operator
-  /// (`&<<`).
-  ///
-  ///     let y3 = x &<< 11
-  ///     // y3 == 240
-  ///
-  /// Relationship to the Left Shift Operator
-  /// ---------------------------------------
-  ///
-  /// The `maskingShiftLeft(_:)` method handles attempted overshifts and
-  /// undershifts differently from the left shift operator (`<<`). When the
-  /// value passed as `rhs` in a masking shift is within the range
-  /// `0...<bitWidth`, the operation is equivalent to using the left shift
-  /// operator.
-  ///
-  ///     let x: UInt8 = 30                 // 0b00011110
-  ///     let y1 = x.maskingShiftLeft(2)
-  ///     // y1 == 120                      // 0b01111000
-  ///     let y2 = x << 2
-  ///     // y2 == 120                      // 0b01111000
-  ///
-  /// The left shift operator does not mask its right-hand-side argument, so
-  /// passing `11` as `rhs` shifts all the bits of `x` to zero.
-  ///
-  ///     let z1 = x.maskingShiftLeft(11)
-  ///     // z1 == 240                      // 0b11110000
-  ///     let z2 = x << 11
-  ///     // z2 == 0                        // 0b00000000
-  ///
-  /// - Parameter rhs: The number of bits to shift this value to the left. If
-  ///   `rhs` is outside the range `0..<bitWidth`, it is masked to produce a
-  ///   value within that range.
-  /// - Returns: The result of shifting this value by the masked `rhs` to the
-  ///   left.
-  ///
-  /// - SeeAlso: `&<<`, `<<`, `maskingShiftRight(_:)`
-""",
-    }
-    return comments[operator]
-
-def mutatingOperationComment(operator):
-    comments = {
-        '+': """\
-  /// Adds the given value to this value in place.
-  ///
-  /// This method serves as the basis for the in-place addition operator
-  /// (`+=`). For example:
-  ///
-  ///     var (x, y) = (15, 15)
-  ///     x.add(7)
-  ///     // x == 22
-  ///     y += 7
-  ///     // y == 22
-  ///
-  /// - Parameter rhs: The value to add to this value.
-  ///
-  /// - SeeAlso: `adding(_:)`
-""",
-        '-': """\
-  /// Subtracts the given value from this value in place.
-  ///
-  /// This method serves as the basis for the in-place subtraction operator
-  /// (`-=`). For example:
-  ///
-  ///     var (x, y) = (15, 15)
-  ///     x.subtract(7)
-  ///     // x == 8
-  ///     y -= 7
-  ///     // y == 8
-  ///
-  /// - Parameter rhs: The value to subtract from this value.
-  ///
-  /// - SeeAlso: `subtracting(_:)`
-""",
-        '*': """\
-  /// Multiples this value by the given value in place.
-  ///
-  /// This method serves as the basis for the in-place multiplication operator
-  /// (`*=`). For example:
-  ///
-  ///     var (x, y) = (15, 15)
-  ///     x.multiply(by: 7)
-  ///     // x == 105
-  ///     y *= 7
-  ///     // y == 105
-  ///
-  /// - Parameter rhs: The value to multiply by this value.
-  ///
-  /// - SeeAlso: `multiplying(by:)`
-""",
-        '/': """\
-  /// Divides this value by the given value in place.
-  ///
-  /// This method serves as the basis for the in-place division operator
-  /// (`/=`). For example:
-  ///
-  ///     var (x, y) = (15, 15)
-  ///     x.divide(by: 7)
-  ///     // x == 2
-  ///     y /= 7
-  ///     // y == 2
-  ///
-  /// - Parameter rhs: The value to divide this value by. `rhs` must not be
-  ///   zero.
-  ///
-  /// - SeeAlso: `dividing(by:)`
-""",
-        '%': """\
-  /// Replaces this value with the remainder of itself divided by the given
-  /// value.
-  ///
-  /// This method serves as the basis for the in-place remainder operator
-  /// (`%=`). For example:
-  ///
-  ///     var (x, y) = (15, 15)
-  ///     x.formRemainder(dividingBy: 7)
-  ///     // x == 1
-  ///     y %= 7
-  ///     // y == 1
-  ///
-  /// - Parameter rhs: The value to divide this value by. `rhs` must not be
-  ///   zero.
-  ///
-  /// - SeeAlso: `remainder(dividingBy:)`
-""",
-    }
-    return comments[operator]
-
-def overflowOperationComment(operator):
-    comments = {
-        '+': """\
-  /// Returns the sum of this value and the given value along with a flag
-  /// indicating whether overflow occurred in the operation.
-  ///
-  /// - Parameter rhs: The value to add to this value.
-  /// - Returns: A tuple containing the result of the addition along with a
-  ///   flag indicating whether overflow occurred. If the `overflow` component
-  ///   is `.none`, the `partialValue` component contains the entire sum. If
-  ///   the `overflow` component is `.overflow`, an overflow occurred and the
-  ///   `partialValue` component contains the truncated sum of this value and
-  ///   `rhs`.
-  ///
-  /// - SeeAlso: `adding(_:)`
-""",
-        '-': """\
-  /// Returns the difference of this value and the given value along with a
-  /// flag indicating whether overflow occurred in the operation.
-  ///
-  /// - Parameter rhs: The value to subtract from this value.
-  /// - Returns: A tuple containing the result of the subtraction along with a
-  ///   flag indicating whether overflow occurred. If the `overflow` component
-  ///   is `.none`, the `partialValue` component contains the entire
-  ///   difference. If the `overflow` component is `.overflow`, an overflow
-  ///   occurred and the `partialValue` component contains the truncated
-  ///   result of `rhs` subtracted from this value.
-  ///
-  /// - SeeAlso: `subtracting(_:)`
-""",
-        '*': """\
-  /// Returns the product of this value and the given value along with a flag
-  /// indicating whether overflow occurred in the operation.
-  ///
-  /// - Parameter rhs: The value to multiply by this value.
-  /// - Returns: A tuple containing the result of the multiplication along with
-  ///   a flag indicating whether overflow occurred. If the `overflow`
-  ///   component is `.none`, the `partialValue` component contains the entire
-  ///   product. If the `overflow` component is `.overflow`, an overflow
-  ///   occurred and the `partialValue` component contains the truncated
-  ///   product of this value and `rhs`.
-  ///
-  /// - SeeAlso: `multiplied(by:)`, `doubleWidthMultiply(_:_:)`
-""",
-        '/': """\
-  /// Returns the quotient of dividing this value by the given value along with
-  /// a flag indicating whether overflow occurred in the operation.
-  ///
-  /// For a value `x`, if zero is passed as `rhs`, the result is
-  /// `(x, .overflow)`.
-  ///
-  /// - Parameter rhs: The value to divide this value by.
-  /// - Returns: A tuple containing the result of the division along with a
-  ///   flag indicating whether overflow occurred. If the `overflow` component
-  ///   is `.none`, the `partialValue` component contains the entire quotient.
-  ///   If the `overflow` component is `.overflow`, an overflow occurred and
-  ///   the `partialValue` component contains the truncated quotient.
-  ///
-  /// - SeeAlso: `divided(by:)`, `doubleWidthDivide(_:_:)`
-""",
-    }
-    return comments[operator]
-
-def unsafeOperationComment(operator):
-    comments = {
-        '+': """\
-  /// Returns the sum of this value and the given value without checking for
-  /// arithmetic overflow.
-  ///
-  /// If an arithmetic overflow occurs, the behavior is undefined. Use this
-  /// function only to avoid the cost of overflow checking when you are sure
-  /// that the operation won't overflow.
-  ///
-  /// - Parameter rhs: The value to add to this value.
-  /// - Returns: The sum of this value and `rhs`.
-""",
-        '-': """\
-  /// Returns the difference of this value and the given value without checking
-  /// for arithmetic overflow.
-  ///
-  /// If an arithmetic overflow occurs, the behavior is undefined. Use this
-  /// function only to avoid the cost of overflow checking when you are sure
-  /// that the operation won't overflow.
-  ///
-  /// - Parameter rhs: The value to subtract from this value.
-  /// - Returns: The difference of this value and `rhs`.
-""",
-        '*': """\
-  /// Returns the product of this value and the given value without checking
-  /// for arithmetic overflow.
-  ///
-  /// If an arithmetic overflow occurs, the behavior is undefined. Use this
-  /// function only to avoid the cost of overflow checking when you are sure
-  /// that the operation won't overflow.
-  ///
-  /// - Parameter rhs: The value to multiply by this value.
-  /// - Returns: The difference of this value and `rhs`.
-""",
-        '/': """\
-  /// Returns the quotient of dividing this value by the given value without
-  /// checking for arithmetic overflow.
-  ///
-  /// If an arithmetic overflow occurs, the behavior is undefined. Use this
-  /// function only to avoid the cost of overflow checking when you are sure
-  /// that the operation won't overflow.
-  ///
-  /// - Parameter rhs: The value to divide this value by.
-  /// - Returns: The quotient of dividing this value by `rhs`.
-""",
-    }
-    return comments[operator]
-
-def operatorComment(operator):
-    comments = {
-        '+': """\
-  /// Returns the sum of the two given values.
-  ///
-  /// The sum of `lhs` and `rhs` must be representable in the same type. In the
-  /// following example, the result of `100 + 200` is greater than the maximum
-  /// representable `Int8` value:
-  ///
-  ///     let x: Int8 = 10 + 21
-  ///     // x == 31
-  ///     let y: Int8 = 100 + 121
-  ///     // Overflow error
-  ///
+""" if fixedWidth else '') + """\
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
 """,
         '-': """\
-  /// Returns the difference of the two given values.
+  /// Subtracts one value from another and produces their difference.
   ///
-  /// The difference of `lhs` and `rhs` must be representable in the same type.
-  /// In the following example, the result of `10 - 21` is less than zero, the
-  /// minimum representable `UInt` value:
+  /// The subtraction operator (`-`) calculates the difference of its two
+  /// arguments. For example:
   ///
-  ///     let x: UInt = 21 - 10
-  ///     // x == 11
-  ///     let y: UInt = 10 - 21
-  ///     // Overflow error
+  ///     8 - 3                   // 5
+  ///     -10 - 5                 // -15
+  ///     100 - -5                // 105
+  ///     10.5 - 100.0            // -89.5
   ///
+  /// You cannot use `-` with arguments of different types. To subtract values
+  /// of different types, convert one of the values to the other value's type.
+  ///
+  ///     let x: UInt8 = 21
+  ///     let y: UInt = 1000000
+  ///     y - UInt(x)             // 999979
+  ///
+""" + ("""\
+  /// The difference of the two arguments must be representable in the
+  /// arguments' type. In the following example, the result of `21 - 50` is
+  /// less than zero, the minimum representable `UInt8` value:
+  ///
+  ///     x - 50                  // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
+  ///
+  /// If you want to opt out of overflow checking and ignore any overflow, use
+  /// the overflow subtraction operator (`&-`).
+  ///
+  ///     x &- 50                // 227
+  ///
+""" if fixedWidth else '') + """\
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
 """,
         '*': """\
-  /// Returns the product of the two given values.
+  /// Multiplies two values and produces their product.
   ///
-  /// The product of `lhs` and `rhs` must be representable in the same type. In
-  /// the following example, the result of `10 * 50` is greater than the
-  /// maximum representable `Int8` value.
+  /// The multiplication operator (`*`) calculates the product of its two
+  /// arguments. For example:
   ///
-  ///     let x: Int8 = 10 * 5
-  ///     // x == 50
-  ///     let y: Int8 = 10 * 50
-  ///     // Overflow error
+  ///     2 * 3                   // 6
+  ///     100 * 21                // 2100
+  ///     -10 * 15                // -150
+  ///     3.5 * 2.25              // 7.875
   ///
+  /// You cannot use `*` with arguments of different types. To multiply values
+  /// of different types, convert one of the values to the other value's type.
+  ///
+  ///     let x: Int8 = 21
+  ///     let y: Int = 1000000
+  ///     Int(x) * y              // 21000000
+  ///
+""" + ("""\
+  /// The product of the two arguments must be representable in the arguments'
+  /// type. In the following example, the result of `21 * 21` is greater than
+  /// the maximum representable `Int8` value:
+  ///
+  ///     x * 21                  // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
+  ///
+  /// If you want to opt out of overflow checking and ignore any overflow, use
+  /// the overflow multiplication operator (`&*`).
+  ///
+  ///     x &* 21                // -115
+  ///
+""" if fixedWidth else '') + """\
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
@@ -634,7 +227,8 @@ def operatorComment(operator):
         '%': """\
   /// Returns the remainder of dividing the first value by the second.
   ///
-  /// The result has the same sign as `lhs` and is less than `rhs.magnitude`.
+  /// The result of the modulo operator (`%`) has the same sign as `lhs` and is
+  /// less than `rhs.magnitude`.
   ///
   ///     let x = 22 % 5
   ///     // x == 2
@@ -642,6 +236,9 @@ def operatorComment(operator):
   ///     // y == 2
   ///     let z = -22 % -5
   ///     // z == -2
+  ///
+  /// For any two integers `a` and `b`, their quotient `q`, and their remainder
+  /// `r`, `a == b * q + r`.
   ///
   /// - Parameters:
   ///   - lhs: The value to divide.
@@ -669,9 +266,10 @@ def operatorComment(operator):
         '&-': """\
   /// Returns the difference of the two given values, discarding any overflow.
   ///
-  /// In the following example, the difference of `10` and `21` is less than
-  /// zero, the minimum representable `UInt` value, so the result is the
-  /// overflowed value:
+  /// The masking subtraction operator (`&-`) silently discards any overflow
+  /// that occurs during the operation. In the following example, the
+  /// difference of `10` and `21` is less than zero, the minimum representable
+  /// `UInt` value, so the result is the overflowed value:
   ///
   ///     let x: UInt8 = 21 &- 10
   ///     // x == 11
@@ -687,9 +285,10 @@ def operatorComment(operator):
         '&*': """\
   /// Returns the product of the two given values, discarding any overflow.
   ///
-  /// In
-  /// the following example, the product of `10` and `50` is greater than the
-/// maximum representable `Int8` value, so the result is the overflowed value:
+  /// The masking multiplication operator (`&*`) silently discards any overflow
+  /// that occurs during the operation. In the following example, the product
+  /// of `10` and `50` is greater than the maximum representable `Int8` value,
+  /// so the result is the overflowed value:
   ///
   ///     let x: Int8 = 10 &* 5
   ///     // x == 50
@@ -741,7 +340,7 @@ def operatorComment(operator):
   ///
   ///     let x: UInt8 = 5          // 0b00000101
   ///     let y: UInt8 = 14         // 0b00001110
-  ///     let z = x.bitwiseXor(y)   // 0b00001011
+  ///     let z = x ^ y             // 0b00001011
   ///
   /// - Parameters:
   ///   - lhs: An integer value.
@@ -752,9 +351,10 @@ def operatorComment(operator):
   /// specified number of digits to the right, masking the shift amount to the
   /// type's bit width.
   ///
-  /// The `&>>` operator performs a *masking shift*, where the value passed as
-  /// `rhs` is masked to produce a value in the range `0..<lhs.bitWidth`. The
-  /// shift is performed using this masked value.
+  /// The masking right shift operator (`&>>`) performs a *masking shift*,
+  /// where the value passed as `rhs` is masked to produce a value in the
+  /// range `0..<lhs.bitWidth`. The shift is performed using this masked
+  /// value.
   ///
   /// The following example defines `x` as an instance of `UInt8`, an 8-bit,
   /// unsigned integer type. If you use `2` as the right-hand-side value in an
@@ -764,10 +364,10 @@ def operatorComment(operator):
   ///     let y = x &>> 2
   ///     // y == 7                         // 0b00000111
   ///
-  /// However, if you use `11` as `rhs`, the operation first bitmasks `rhs` to
-  /// `3`, and then uses that masked value as the number of bits to shift `x`.
+  /// However, if you use `19` as `rhs`, the operation first bitmasks `rhs` to
+  /// `3`, and then uses that masked value as the number of bits to shift `lhs`.
   ///
-  ///     let z = x &>> 11
+  ///     let z = x &>> 19
   ///     // z == 3                         // 0b00000011
   ///
   /// - Parameters:
@@ -783,9 +383,9 @@ def operatorComment(operator):
   /// specified number of digits to the left, masking the shift amount to the
   /// type's bit width.
   ///
-  /// The `&<<` operator performs a *masking shift*, where the value used as
-  /// `rhs` is masked to produce a value in the range `0..<lhs.bitWidth`. The
-  /// shift is performed using this masked value.
+  /// The masking left shift operator (`&<<`) performs a *masking shift*, where
+  /// the value used as `rhs` is masked to produce a value in the range
+  /// `0..<lhs.bitWidth`. The shift is performed using this masked value.
   ///
   /// The following example defines `x` as an instance of `UInt8`, an 8-bit,
   /// unsigned integer type. If you use `2` as the right-hand-side value in an
@@ -795,10 +395,10 @@ def operatorComment(operator):
   ///     let y = x &<< 2
   ///     // y == 120                       // 0b01111000
   ///
-  /// However, if you pass `11` as `rhs`, the method first bitmasks `rhs` to
-  /// `3`, and then uses that masked value as the number of bits to shift `x`.
+  /// However, if you pass `19` as `rhs`, the method first bitmasks `rhs` to
+  /// `3`, and then uses that masked value as the number of bits to shift `lhs`.
   ///
-  ///     let z = x &<< 11
+  ///     let z = x &<< 19
   ///     // z == 240                       // 0b11110000
   ///
   /// - Parameters:
@@ -907,6 +507,459 @@ def operatorComment(operator):
   }
     return comments[operator]
 
+# documentation for assignment operators: +=, -=, <<=, etc
+def assignmentOperatorComment(operator, fixedWidth):
+    comments = {
+        '+': """\
+  /// Adds two values and stores the result in the left-hand-side variable.
+  ///
+""" + ("""\
+  /// The sum of the two arguments must be representable in the arguments'
+  /// type. In the following example, the result of `21 + 120` is greater than
+  /// the maximum representable `Int8` value:
+  ///
+  ///     var x: Int8 = 21
+  ///     x += 120
+  ///     // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
+  ///
+""" if fixedWidth else '') + """\
+  /// - Parameters:
+  ///   - lhs: The first value to add.
+  ///   - rhs: The second value to add.
+""",
+        '-': """\
+  /// Subtracts the second value from the first and stores the difference in the
+  /// left-hand-side variable.
+  ///
+""" + ("""\
+  /// The difference of the two arguments must be representable in the
+  /// arguments' type. In the following example, the result of `21 - 50` is
+  /// less than zero, the minimum representable `UInt8` value:
+  ///
+  ///     var x: UInt8 = 21
+  ///     x - 50                  
+  ///     // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
+  ///
+""" if fixedWidth else '') + """\
+  /// - Parameters:
+  ///   - lhs: A numeric value.
+  ///   - rhs: The value to subtract from `lhs`.
+""",
+        '*': """\
+  /// Multiplies two values and stores the result in the left-hand-side 
+  /// variable.
+  ///
+""" + ("""\
+  /// The product of the two arguments must be representable in the arguments'
+  /// type. In the following example, the result of `21 * 21` is greater than
+  /// the maximum representable `Int8` value:
+  ///
+  ///     var x: Int8 = 21
+  ///     x * 21                  
+  ///     // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
+  ///
+""" if fixedWidth else '') + """\
+  /// - Parameters:
+  ///   - lhs: The first value to multiply.
+  ///   - rhs: The second value to multiply.
+""",
+        '/': """\
+  /// Divides the first value by the second and stores the quotient in the
+  /// left-hand-side variable.
+  ///
+  /// For integer types, any remainder of the division is discarded.
+  ///
+  ///     var x = 21
+  ///     x /= 5
+  ///     // x == 4
+  ///
+  /// - Parameters:
+  ///   - lhs: The value to divide.
+  ///   - rhs: The value to divide `lhs` by. `rhs` must not be zero.
+""",
+        '%': """\
+  /// Divides the first value by the second and stores the remainder in the
+  /// left-hand-side variable.
+  ///
+  /// The result has the same sign as `lhs` and is less than `rhs.magnitude`.
+  ///
+  ///     var x = 22
+  ///     x %= 5
+  ///     // x == 2
+  ///
+  ///     var y = 22
+  ///     y %= -5
+  ///     // y == 2
+  ///
+  ///     var z = -22 
+  ///     z %= -5
+  ///     // z == -2
+  ///
+  /// - Parameters:
+  ///   - lhs: The value to divide.
+  ///   - rhs: The value to divide `lhs` by. `rhs` must not be zero.
+""",
+        '&': """\
+  /// Stores the result of performing a bitwise AND operation on the two given
+  /// values in the left-hand-side variable.
+  ///
+  /// A bitwise AND operation results in a value that has each bit set to `1`
+  /// where *both* of its arguments have that bit set to `1`. For example:
+  ///
+  ///     var x: UInt8 = 5          // 0b00000101
+  ///     let y: UInt8 = 14         // 0b00001110
+  ///     x &= y                    // 0b00000100
+  ///
+  /// - Parameters:
+  ///   - lhs: An integer value.
+  ///   - rhs: Another integer value.
+""",
+        '|': """\
+  /// Stores the result of performing a bitwise OR operation on the two given
+  /// values in the left-hand-side variable.
+  ///
+  /// A bitwise OR operation results in a value that has each bit set to `1`
+  /// where *one or both* of its arguments have that bit set to `1`. For
+  /// example:
+  ///
+  ///     var x: UInt8 = 5          // 0b00000101
+  ///     let y: UInt8 = 14         // 0b00001110
+  ///     x |= y                    // 0b00001111
+  ///
+  /// - Parameters:
+  ///   - lhs: An integer value.
+  ///   - rhs: Another integer value.
+""",
+        '^': """\
+  /// Stores the result of performing a bitwise XOR operation on the two given
+  /// values in the left-hand-side variable.
+  ///
+  /// A bitwise XOR operation, also known as an exclusive OR operation, results
+  /// in a value that has each bit set to `1` where *one or the other but not
+  /// both* of its arguments had that bit set to `1`. For example:
+  ///
+  ///     var x: UInt8 = 5          // 0b00000101
+  ///     let y: UInt8 = 14         // 0b00001110
+  ///     x ^= y                    // 0b00001011
+  ///
+  /// - Parameters:
+  ///   - lhs: An integer value.
+  ///   - rhs: Another integer value.
+""",
+        '&>>': """\
+  /// Calculates the result of shifting a value's binary representation the
+  /// specified number of digits to the right, masking the shift amount to the
+  /// type's bit width, and stores the result in the left-hand-side variable.
+  ///
+  /// The `&>>=` operator performs a *masking shift*, where the value passed as
+  /// `rhs` is masked to produce a value in the range `0..<lhs.bitWidth`. The
+  /// shift is performed using this masked value.
+  ///
+  /// The following example defines `x` as an instance of `UInt8`, an 8-bit,
+  /// unsigned integer type. If you use `2` as the right-hand-side value in an
+  /// operation on `x`, the shift amount requires no masking.
+  ///
+  ///     var x: UInt8 = 30                 // 0b00011110
+  ///     x &>>= 2
+  ///     // x == 7                         // 0b00000111
+  ///
+  /// However, if you use `19` as `rhs`, the operation first bitmasks `rhs` to
+  /// `3`, and then uses that masked value as the number of bits to shift `lhs`.
+  ///
+  ///     var y: UInt8 = 30                 // 0b00011110
+  ///     y &>>= 19
+  ///     // y == 3                         // 0b00000011
+  ///
+  /// - Parameters:
+  ///   - lhs: The value to shift.
+  ///   - rhs: The number of bits to shift `lhs` to the right. If `rhs` is
+  ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
+  ///     value within that range.
+  ///
+  /// - SeeAlso: `>>=`, `&<<=`
+""",
+        '&<<': """\
+  /// Returns the result of shifting a value's binary representation the
+  /// specified number of digits to the left, masking the shift amount to the
+  /// type's bit width, and stores the result in the left-hand-side variable.
+  ///
+  /// The `&<<=` operator performs a *masking shift*, where the value used as
+  /// `rhs` is masked to produce a value in the range `0..<lhs.bitWidth`. The
+  /// shift is performed using this masked value.
+  ///
+  /// The following example defines `x` as an instance of `UInt8`, an 8-bit,
+  /// unsigned integer type. If you use `2` as the right-hand-side value in an
+  /// operation on `x`, the shift amount requires no masking.
+  ///
+  ///     var x: UInt8 = 30                 // 0b00011110
+  ///     x &<<= 2
+  ///     // x == 120                       // 0b01111000
+  ///
+  /// However, if you pass `19` as `rhs`, the method first bitmasks `rhs` to
+  /// `3`, and then uses that masked value as the number of bits to shift `lhs`.
+  ///
+  ///     var y: UInt8 = 30                 // 0b00011110
+  ///     y &<<= 19
+  ///     // y == 240                       // 0b11110000
+  ///
+  /// - Parameters:
+  ///   - lhs: The value to shift.
+  ///   - rhs: The number of bits to shift `lhs` to the left. If `rhs` is
+  ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
+  ///     value within that range.
+  ///
+  /// - SeeAlso: `<<=`, `&>>=`
+""",
+        '>>': """\
+  /// Stores the result of shifting a value's binary representation the
+  /// specified number of digits to the right in the left-hand-side variable.
+  ///
+  /// The `>>=` operator performs a *smart shift*, which defines a result for a
+  /// shift of any value.
+  ///
+  /// - Using a negative value for `rhs` performs a left shift using
+  ///   `abs(rhs)`.
+  /// - Using a value for `rhs` that is greater than or equal to the bit width
+  ///   of `lhs` is an *overshift*. An overshift results in `-1` for a
+  ///   negative value of `lhs` or `0` for a nonnegative value.
+  /// - Using any other value for `rhs` performs a right shift on `lhs` by that
+  ///   amount.
+  ///
+  /// The following example defines `x` as an instance of `UInt8`, an 8-bit,
+  /// unsigned integer type. If you use `2` as the right-hand-side value in an
+  /// operation on `x`, the value is shifted right by two bits.
+  ///
+  ///     var x: UInt8 = 30                 // 0b00011110
+  ///     x >>= 2
+  ///     // x == 7                         // 0b00000111
+  ///
+  /// If you use `11` as `rhs`, `x` is overshifted such that all of its bits
+  /// are set to zero.
+  ///
+  ///     var y: UInt8 = 30                 // 0b00011110
+  ///     y >>= 11
+  ///     // y == 0                         // 0b00000000
+  ///
+  /// Using a negative value as `rhs` is the same as performing a left shift
+  /// using `abs(rhs)`.
+  ///
+  ///     var a: UInt8 = 30                 // 0b00011110
+  ///     a >>= -3
+  ///     // a == 240                       // 0b11110000
+  ///
+  ///     var b: UInt8 = 30                 // 0b00011110
+  ///     b <<= 3
+  ///     // b == 240                       // 0b11110000
+  ///
+  /// Right shift operations on negative values "fill in" the high bits with
+  /// ones instead of zeros.
+  ///
+  ///     var q: Int8 = -30                 // 0b11100010
+  ///     q >>= 2
+  ///     // q == -8                        // 0b11111000
+  ///
+  ///     var r: Int8 = -30                 // 0b11100010
+  ///     r >>= 11
+  ///     // r == -1                        // 0b11111111
+  ///
+  /// - Parameters:
+  ///   - lhs: The value to shift.
+  ///   - rhs: The number of bits to shift `lhs` to the right.
+  ///
+  /// - SeeAlso: `<<=`
+""",
+        '<<': """\
+  /// Stores the result of shifting a value's binary representation the
+  /// specified number of digits to the left in the left-hand-side variable.
+  ///
+  /// The `<<` operator performs a *smart shift*, which defines a result for a
+  /// shift of any value.
+  ///
+  /// - Using a negative value for `rhs` performs a right shift using
+  ///   `abs(rhs)`.
+  /// - Using a value for `rhs` that is greater than or equal to the bit width
+  ///   of `lhs` is an *overshift*, resulting in zero.
+  /// - Using any other value for `rhs` performs a left shift on `lhs` by that
+  ///   amount.
+  ///
+  /// The following example defines `x` as an instance of `UInt8`, an 8-bit,
+  /// unsigned integer type. If you use `2` as the right-hand-side value in an
+  /// operation on `x`, the value is shifted left by two bits.
+  ///
+  ///     var x: UInt8 = 30                 // 0b00011110
+  ///     x <<= 2
+  ///     // x == 120                       // 0b01111000
+  ///
+  /// If you use `11` as `rhs`, `x` is overshifted such that all of its bits
+  /// are set to zero.
+  ///
+  ///     var y: UInt8 = 30                 // 0b00011110
+  ///     y <<= 11
+  ///     // y == 0                         // 0b00000000
+  ///
+  /// Using a negative value as `rhs` is the same as performing a right shift
+  /// with `abs(rhs)`.
+  ///
+  ///     var a: UInt8 = 30                 // 0b00011110
+  ///     a <<= -3
+  ///     // a == 3                         // 0b00000011
+  ///
+  ///     var b: UInt8 = 30                 // 0b00011110
+  ///     b >>= 3
+  ///     // b == 3                         // 0b00000011
+  ///
+  /// - Parameters:
+  ///   - lhs: The value to shift.
+  ///   - rhs: The number of bits to shift `lhs` to the left.
+  ///
+  /// - SeeAlso: `>>=`
+""",
+  }
+    return comments[operator]
+
+# documentation for overflow-calculating arithmetic methods, indexed
+# by the related operator:
+#     +   addingWithOverflow(_:)
+#     -   subtractingWithOverflow(_:)
+#     *   multiplyingWithOverflow(_:)
+#     /   dividingWithOverflow(by:)
+#     %   remainderWithOverflow(dividingBy:)
+def overflowOperationComment(operator):
+    comments = {
+        '+': """\
+  /// Returns the sum of this value and the given value along with a flag
+  /// indicating whether overflow occurred in the operation.
+  ///
+  /// - Parameter rhs: The value to add to this value.
+  /// - Returns: A tuple containing the result of the addition along with a
+  ///   flag indicating whether overflow occurred. If the `overflow` component
+  ///   is `.none`, the `partialValue` component contains the entire sum. If
+  ///   the `overflow` component is `.overflow`, an overflow occurred and the
+  ///   `partialValue` component contains the truncated sum of this value and
+  ///   `rhs`.
+""",
+        '-': """\
+  /// Returns the difference of this value and the given value along with a
+  /// flag indicating whether overflow occurred in the operation.
+  ///
+  /// - Parameter rhs: The value to subtract from this value.
+  /// - Returns: A tuple containing the result of the subtraction along with a
+  ///   flag indicating whether overflow occurred. If the `overflow` component
+  ///   is `.none`, the `partialValue` component contains the entire
+  ///   difference. If the `overflow` component is `.overflow`, an overflow
+  ///   occurred and the `partialValue` component contains the truncated
+  ///   result of `rhs` subtracted from this value.
+""",
+        '*': """\
+  /// Returns the product of this value and the given value along with a flag
+  /// indicating whether overflow occurred in the operation.
+  ///
+  /// - Parameter rhs: The value to multiply by this value.
+  /// - Returns: A tuple containing the result of the multiplication along with
+  ///   a flag indicating whether overflow occurred. If the `overflow`
+  ///   component is `.none`, the `partialValue` component contains the entire
+  ///   product. If the `overflow` component is `.overflow`, an overflow
+  ///   occurred and the `partialValue` component contains the truncated
+  ///   product of this value and `rhs`.
+  ///
+  /// - SeeAlso: `doubleWidthMultiply(_:_:)`
+""",
+        '/': """\
+  /// Returns the quotient of dividing this value by the given value along with
+  /// a flag indicating whether overflow occurred in the operation.
+  ///
+  /// Dividing by zero is not an error when using this method. For a value `x`,
+  /// the result of `x.dividingWithOverflow(by: 0)` is `(x, .overflow)`.
+  ///
+  /// - Parameter rhs: The value to divide this value by.
+  /// - Returns: A tuple containing the result of the division along with a
+  ///   flag indicating whether overflow occurred. If the `overflow` component
+  ///   is `.none`, the `partialValue` component contains the entire quotient.
+  ///   If the `overflow` component is `.overflow`, an overflow occurred and
+  ///   the `partialValue` component contains the truncated quotient.
+  ///
+  /// - SeeAlso: `doubleWidthDivide(_:_:)`
+""",
+        '/': """\
+  /// Returns the remainder of dividing this value by the given value along with
+  /// a flag indicating whether overflow occurred in the operation.
+  ///
+  /// Dividing by zero is not an error when using this method. For a value `x`,
+  /// the result of `x.dividingWithOverflow(by: 0)` is `(x, .overflow)`.
+  ///
+  /// - Parameter rhs: The value to divide this value by.
+  /// - Returns: A tuple containing the result of the division along with a
+  ///   flag indicating whether overflow occurred. If the `overflow` component
+  ///   is `.none`, the `partialValue` component contains the entire quotient.
+  ///   If the `overflow` component is `.overflow`, an overflow occurred and
+  ///   the `partialValue` component contains the truncated quotient.
+  ///
+  /// - SeeAlso: `doubleWidthDivide(_:_:)`
+""",
+    }
+    return comments[operator]
+
+# documentation for "unsafe" arithmetic methods, indexed by the related
+# operator:
+#     +   unsafeAdding(_:)
+#     -   unsafeSubtracting(_:)
+#     *   unsafeMultiplying(_:)
+#     /   unsafeDividing(by:)
+def unsafeOperationComment(operator):
+    comments = {
+        '+': """\
+  /// Returns the sum of this value and the given value without checking for
+  /// arithmetic overflow.
+  ///
+  /// If an arithmetic overflow occurs, the behavior is undefined. Use this
+  /// function only to avoid the cost of overflow checking when you are sure
+  /// that the operation won't overflow.
+  ///
+  /// - Parameter rhs: The value to add to this value.
+  /// - Returns: The sum of this value and `rhs`.
+""",
+        '-': """\
+  /// Returns the difference of this value and the given value without checking
+  /// for arithmetic overflow.
+  ///
+  /// If an arithmetic overflow occurs, the behavior is undefined. Use this
+  /// function only to avoid the cost of overflow checking when you are sure
+  /// that the operation won't overflow.
+  ///
+  /// - Parameter rhs: The value to subtract from this value.
+  /// - Returns: The difference of this value and `rhs`.
+""",
+        '*': """\
+  /// Returns the product of this value and the given value without checking
+  /// for arithmetic overflow.
+  ///
+  /// If an arithmetic overflow occurs, the behavior is undefined. Use this
+  /// function only to avoid the cost of overflow checking when you are sure
+  /// that the operation won't overflow.
+  ///
+  /// - Parameter rhs: The value to multiply by this value.
+  /// - Returns: The difference of this value and `rhs`.
+""",
+        '/': """\
+  /// Returns the quotient of dividing this value by the given value without
+  /// checking for arithmetic overflow.
+  ///
+  /// If an arithmetic overflow occurs, the behavior is undefined. Use this
+  /// function only to avoid the cost of overflow checking when you are sure
+  /// that the operation won't overflow.
+  ///
+  /// - Parameter rhs: The value to divide this value by.
+  /// - Returns: The quotient of dividing this value by `rhs`.
+""",
+    }
+    return comments[operator]
+
 }%
 
 //===----------------------------------------------------------------------===//
@@ -992,13 +1045,11 @@ public protocol Arithmetic : Equatable, ExpressibleByIntegerLiteral {
 % for x in binaryArithmetic['Arithmetic']:
   // defaulted using an in-place counterpart, but can be used as an
   // optimization hook
-${operatorComment(x.operator)}
-  // FIXME(integers): revisit the doc comment
+${operatorComment(x.operator, False)}
   static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self
 
   // implementation hook
-${mutatingOperationComment(x.operator)}
-  // FIXME(integers): revisit the doc comment
+${assignmentOperatorComment(x.operator, False)}
   static func ${x.operator}=(_ lhs: inout Self, rhs: Self)
 % end
 }
@@ -1017,8 +1068,7 @@ extension ${Protocol} {
 %       ops = binaryArithmetic['Arithmetic'] + binaryArithmetic['BinaryInteger']
 %   for x in ops:
 %     callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
-${operationComment(x.operator)}
-  // FIXME(integers): revisit the doc comment
+${operatorComment(x.operator, False)}
   @_transparent
   public static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self {
     var lhs = lhs
@@ -1043,11 +1093,21 @@ ${operationComment(x.operator)}
 /// type support negation. To customize your type's implementation, provide
 /// your own mutating `negate()` method.
 public protocol SignedArithmetic : Arithmetic {
-  /// Returns the additive inverse of this value.
+  /// Returns the additive inverse of the specified value.
+  ///
+  /// The negation operator (prefix `-`) returns the additive inverse of its
+  /// argument.
   ///
   ///     let x = 21
   ///     let y = -x
   ///     // y == -21
+  ///
+  /// The resulting value must be representable in the same type as the
+  /// argument. In particular, negating a signed, fixed-width integer type's
+  /// minimum results in a value that cannot be represented.
+  ///
+  ///     let z = -Int8.min
+  ///     // Overflow error
   ///
   /// - Returns: The additive inverse of this value.
   ///
@@ -1437,13 +1497,11 @@ public protocol BinaryInteger :
 % for x in chain(*binaryArithmetic.values()):
   // defaulted using an in-place counterpart, but can be used as an
   // optimization hook
-${operatorComment(x.operator)}
-  // FIXME(integers): revisit the doc comment
+${operatorComment(x.operator, False)}
   static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self
 
   // implementation hook
-${mutatingOperationComment(x.operator)}
-  // FIXME(integers): revisit the doc commenl
+${assignmentOperatorComment(x.operator, False)}
   static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
 % end
 
@@ -1467,9 +1525,10 @@ ${mutatingOperationComment(x.operator)}
   static prefix func ~ (_ x: Self) -> Self
 
 % for x in binaryBitwise + maskingShifts:
-${operationComment(x.operator)}
-  // FIXME(integers): revisit the doc comment
+${operatorComment(x.operator, False)}
   static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self
+
+${assignmentOperatorComment(x.operator, False)}
   static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
 % end
 
@@ -1533,6 +1592,7 @@ extension BinaryInteger {
 
   % for x in binaryBitwise + maskingShifts:
 
+${operatorComment(x.operator, False)}
   @_transparent
   public static func ${x.operator} (lhs: Self, rhs: Self) -> Self {
     var lhs = lhs
@@ -1544,13 +1604,14 @@ extension BinaryInteger {
 
   % for x in maskingShifts:
 
-${operatorComment(x.operator)}
+${operatorComment(x.operator, False)}
   public static func ${x.operator} <
     Other : BinaryInteger
   >(lhs: Self, rhs: Other) -> Self {
     return lhs ${x.operator} Self(extendingOrTruncating: rhs)
   }
 
+${assignmentOperatorComment(x.operator, False)}
   @_transparent
   public static func ${x.operator}= <
     Other : BinaryInteger
@@ -1950,7 +2011,7 @@ public protocol FixedWidthInteger : BinaryInteger, BitwiseOperations {
   /// An unsigned, fixed-width integer type can represent values from 0 through
   /// `(2 ** bitWidth) - 1`, where `**` is exponentiation. A signed,
   /// fixed-width integer type can represent values from
-  /// `-(2 ** bitWidth - 1)` through `(2 ** bitWidth - 1) - 1`. For example,
+  /// `-(2 ** (bitWidth - 1))` through `(2 ** (bitWidth - 1)) - 1`. For example,
   /// the `Int8` type has a `bitWidth` value of 8 and can store any integer in
   /// the range `-128...127`.
   static var bitWidth : Int { get }
@@ -1959,13 +2020,13 @@ public protocol FixedWidthInteger : BinaryInteger, BitwiseOperations {
   ///
   /// For unsigned integer types, this value is `(2 ** bitWidth) - 1`, where
   /// `**` is exponentiation. For signed integer types, this value is
-  /// `(2 ** bitWidth - 1) - 1`.
+  /// `(2 ** (bitWidth - 1)) - 1`.
   static var max: Self { get }
 
-  /// The minimum representable value.
+  /// The minimum representable integer in this type.
   ///
   /// For unsigned integer types, this value is always `0`. For signed integer
-  /// types, this value is `-(2 ** bitWidth - 1)`, where `**` is
+  /// types, this value is `-(2 ** (bitWidth - 1))`, where `**` is
   /// exponentiation.
   static var min: Self { get }
 
@@ -2051,11 +2112,18 @@ ${overflowOperationComment(x.operator)}
   ///     // x.leadingZeroBits == 3
   var leadingZeroBits: Int { get }
 
-  /// Creates an integer from its big-endian representation, changing the
-  /// byte order if necessary.
+  /// Creates an integer from its big-endian representation, changing the byte
+  /// order if necessary.
+  ///
+  /// - Parameter value: A value to use as the big-endian representation of the
+  ///   new integer.
   init(bigEndian value: Self)
+
   /// Creates an integer from its little-endian representation, changing the
   /// byte order if necessary.
+  ///
+  /// - Parameter value: A value to use as the little-endian representation of
+  ///   the new integer.
   init(littleEndian value: Self)
 
   /// The big-endian representation of this integer.
@@ -2066,6 +2134,7 @@ ${overflowOperationComment(x.operator)}
   ///
   /// - SeeAlso: `littleEndian`
   var bigEndian: Self { get }
+
   /// The little-endian representation of this integer.
   ///
   /// If necessary, the byte order of this value is reversed from the typical
@@ -2074,11 +2143,29 @@ ${overflowOperationComment(x.operator)}
   ///
   /// - SeeAlso: `bigEndian`
   var littleEndian: Self { get }
+
   /// A representation of this integer with the byte order swapped.
   var byteSwapped: Self { get }
 }
 
 extension FixedWidthInteger {
+  /// The empty bitset.
+  ///
+  /// The `allZeros` static property is the [identity element][] for bitwise OR
+  /// and XOR operations and the [fixed point][] for bitwise AND operations.
+  /// For example:
+  ///
+  ///     let x: UInt8 = 5        // 0b00000101
+  ///
+  ///     // Identity
+  ///     x | .allZeros           // 0b00000101
+  ///     x ^ .allZeros           // 0b00000101
+  ///
+  ///     // Fixed point
+  ///     x & .allZeros           // 0b00000000
+  ///
+  /// [identity element]:http://en.wikipedia.org/wiki/Identity_element
+  /// [fixed point]:http://en.wikipedia.org/wiki/Fixed_point_(mathematics)
   @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0")
   public static var allZeros: Self { return 0 }
 }
@@ -2099,7 +2186,7 @@ extension FixedWidthInteger {
 //=== "Smart ${x.description}", supporting overshifts and negative shifts -===//
 //===----------------------------------------------------------------------===//
 
-${operatorComment(x.nonMaskingOperator)}
+${operatorComment(x.nonMaskingOperator, True)}
   @_transparent
   public static func ${x.nonMaskingOperator} <
     Other : BinaryInteger
@@ -2174,6 +2261,7 @@ extension FixedWidthInteger {
 // Uncomment this block and remove the corresponding one from the concrete
 // types once the optimizer is ready.
 #if false
+${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self) {
     let (result, overflow) = lhs.${x.name}WithOverflow(${callLabel}rhs)
@@ -2231,7 +2319,7 @@ ${unsafeOperationComment(x.operator)}
 % for x in chain(*binaryArithmetic.values()):
 %   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
 %   if x.kind != '/':
-${operatorComment('&' + x.operator)}
+${operatorComment('&' + x.operator, True)}
   @_transparent
   public static func &${x.operator} (lhs: Self, rhs: Self) -> Self {
     return lhs.${x.name}WithOverflow(${callLabel}rhs).partialValue
@@ -2246,6 +2334,8 @@ ${operatorComment('&' + x.operator)}
 
 /// An integer type that can represent only nonnegative values.
 public protocol UnsignedInteger : BinaryInteger {
+  /// A type that can represent the absolute value of any possible value of the
+  /// conforming type.
   associatedtype Magnitude : BinaryInteger
 }
 
@@ -2264,9 +2354,13 @@ extension UnsignedInteger {
   @_transparent
   public var magnitude: Self { return self }
 
+  /// A Boolean value indicating whether this type is a signed integer type.
+  ///
+  /// This property is always `false` for unsigned integer types.
   @_transparent
   public static var isSigned: Bool { return false }
 
+  /// A textual representation of this value.
   public var description: String {
     if self.bitWidth <= ${word_bits} {
       return _uint64ToString(UInt64(extendingOrTruncating: self))
@@ -2325,11 +2419,18 @@ extension UnsignedInteger where Self : FixedWidthInteger {
     self.init(extendingOrTruncating: source)
   }
 
+  /// The maximum representable integer in this type.
+  ///
+  /// For unsigned integer types, this value is `(2 ** bitWidth) - 1`, where
+  /// `**` is exponentiation.
   @_transparent
   public static var max: Self {
     return ~0
   }
 
+  /// The minimum representable integer in this type.
+  ///
+  /// For unsigned integer types, this value is always `0`.
   @_transparent
   public static var min: Self {
     return 0
@@ -2343,10 +2444,13 @@ extension UnsignedInteger where Self : FixedWidthInteger {
 
 /// An integer type that can represent both positive and negative values.
 public protocol SignedInteger : BinaryInteger, SignedArithmetic {
+  /// A type that can represent the absolute value of any possible value of the
+  /// conforming type.
   associatedtype Magnitude : BinaryInteger
 }
 
 extension SignedInteger {
+  /// A textual representation of this value.
   public var description: String {
     if self.bitWidth <= ${word_bits} {
       return _int64ToString(Int64(extendingOrTruncating: self))
@@ -2356,6 +2460,9 @@ extension SignedInteger {
     return self < (0 as Self) ? "-" + base : base
   }
 
+  /// A Boolean value indicating whether this type is a signed integer type.
+  ///
+  /// This property is always `true` for signed integer types.
   @_transparent
   public static var isSigned: Bool { return true }
 }
@@ -2392,11 +2499,19 @@ extension SignedInteger where Self : FixedWidthInteger {
     self.init(extendingOrTruncating: source)
   }
 
+  /// The maximum representable integer in this type.
+  ///
+  /// For signed integer types, this value is `(2 ** (bitWidth - 1)) - 1`,
+  /// where `**` is exponentiation.
   @_transparent
   public static var max: Self {
     return ~min
   }
 
+  /// The minimum representable integer in this type.
+  ///
+  /// For signed integer types, this value is `-(2 ** (bitWidth - 1))`, where
+  /// `**` is exponentiation.
   @_transparent
   public static var min: Self {
     return -1 &<< Self._highBitIndex
@@ -2572,7 +2687,7 @@ public struct ${Self}
   }
 %       end
 
-// FIXME(integers): penging optimizer work on handling the case where the
+// FIXME(integers): pending optimizer work on handling the case where the
 // boolean value is wrapped into a two-case enum and then immediately
 // unwrapped. <rdar://problem/29004429>
 // See corresponding definitions in the FixedWidthInteger extension.
@@ -2672,6 +2787,7 @@ public struct ${Self}
 % end
 
 % for x in maskingShifts:
+${assignmentOperatorComment(x.operator, True)}
   @_transparent
   public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
     let rhs_ = rhs & ${bits - 1}
@@ -2679,6 +2795,7 @@ public struct ${Self}
       Builtin.${x.llvmName(signed)}_Int${bits}(lhs._value, rhs_._value))
   }
 
+${operatorComment(x.operator, True)}
   // FIXME(integers): this overload is not necessary, as there is one in the
   // protocol extension. But omitting it makes a lot of expressions too complex
   // to typecheck.
@@ -2814,8 +2931,14 @@ public struct ${Self}
 %   end
   }
 
-  /// Creates an integer from its big-endian representation, changing the
-  /// byte order if necessary.
+  /// Creates an integer using the specified big-endian representation,
+  /// changing the byte order if necessary.
+  ///
+  /// On a big-endian platform, for any integer `x`,
+  /// `x == ${Self}(bigEndian: x)`.
+  ///
+  /// - Parameter value: A value to use as the big-endian representation of the
+  ///   new integer.
   @_transparent
   public init(bigEndian value: ${Self}) {
 %   if bits <= 8:
@@ -2829,8 +2952,14 @@ public struct ${Self}
 %   end
   }
 
-  /// Creates an integer from its little-endian representation, changing the
-  /// byte order if necessary.
+  /// Creates an integer using the specified little-endian representation,
+  /// changing the byte order if necessary.
+  ///
+  /// On a little-endian platform, for any integer `x`,
+  /// `x == ${Self}(littleEndian: x)`.
+  ///
+  /// - Parameter value: A value to use as the little-endian representation of
+  ///   the new integer.
   @_transparent
   public init(littleEndian value: ${Self}) {
 %   if bits <= 8:
