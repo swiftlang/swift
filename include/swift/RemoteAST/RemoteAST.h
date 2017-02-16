@@ -168,7 +168,16 @@ public:
 
   /// Given an address which is supposedly of type metadata, try to
   /// resolve it to a specific type in the local AST.
-  Result<Type> getTypeForRemoteTypeMetadata(remote::RemoteAddress address);
+  ///
+  /// \param skipArtificial If true, the address may be an artificial type
+  ///   wrapper that should be ignored.  For example, it could be a
+  ///   dynamic subclass created by (e.g.) CoreData or KVO; if so, and this
+  ///   flag is set, this method will implicitly ignore the subclass
+  ///   and instead attempt to resolve a type for the first non-artificial
+  ///   superclass.
+  Result<Type>
+  getTypeForRemoteTypeMetadata(remote::RemoteAddress address,
+                               bool skipArtificial = false);
 
   /// Given an address which is supposedly of type metadata, try to
   /// resolve it to a specific MetadataKind value for its backing type.
@@ -198,6 +207,10 @@ public:
   Result<uint64_t> getOffsetOfMember(Type type,
                                      remote::RemoteAddress optMetadataAddress,
                                      StringRef memberName);
+
+  /// Given a heap object, resolve its heap metadata.
+  Result<remote::RemoteAddress>
+  getHeapMetadataForObject(remote::RemoteAddress address);
 };
 
 } // end namespace remoteAST
