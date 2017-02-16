@@ -1,4 +1,4 @@
-add_swift_target_library(swiftos ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+add_swift_library(swiftos ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   os_log.swift
   os_log.m
   os_trace_blob.c

@@ -41,6 +41,25 @@ func assigninout<T>(_ a: inout T, _ b: T) {
   a = b
 }
 
+// Test that we no longer use copy_addr or tuple_element_addr when copy by value is possible
+// ---
+// CHECK-LABEL: sil hidden @_TF20opaque_values_silgen14tupleReturnInturFTSix_Si : $@convention(thin) <T> (Int, @in T) -> Int {
+// CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $T):
+// CHECK:   [[TPL:%.*]] = tuple ([[ARG0]] : $Int, [[ARG1]] : $T)
+// CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[TPL]] : $(Int, T)
+// CHECK:   [[CPY:%.*]] = copy_value [[BORROWED_ARG1]] : $(Int, T)
+// CHECK:   [[INT:%.*]] = tuple_extract [[CPY]] : $(Int, T), 0
+// CHECK:   [[GEN:%.*]] = tuple_extract [[CPY]] : $(Int, T), 1
+// CHECK:   destroy_value [[GEN]] : $T
+// CHECK:   end_borrow [[BORROWED_ARG1]] from [[TPL]] : $(Int, T), $(Int, T)
+// CHECK:   destroy_value [[TPL]] : $(Int, T)
+// CHECK:   return [[INT]]
+// CHECK: } // end sil function '_TF20opaque_values_silgen14tupleReturnInturFTSix_Si'
+func tupleReturnInt<T>(_ x: (Int, T)) -> Int {
+  let y = x.0
+  return y
+}
+
 // SILGen, prepareArchetypeCallee. Materialize a
 // non-class-constrainted self from a class-constrained archetype.
 // ---

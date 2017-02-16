@@ -1,4 +1,4 @@
-add_swift_target_library(swiftDispatch ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+add_swift_library(swiftDispatch ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   Dispatch.swift
   Dispatch.mm
   Block.swift

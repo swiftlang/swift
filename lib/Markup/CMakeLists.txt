@@ -3,6 +3,6 @@ add_swift_library(swiftMarkup STATIC
   LineList.cpp
   Markup.cpp
   
-  LINK_LIBS
+  LINK_LIBRARIES
     libcmark_static)
 

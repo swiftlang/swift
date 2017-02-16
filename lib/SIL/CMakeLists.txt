@@ -33,7 +33,7 @@ add_swift_library(swiftSIL STATIC
   SILVTable.cpp
   SILWitnessTable.cpp
   TypeLowering.cpp
-  LINK_LIBS
+  LINK_LIBRARIES
     swiftSerialization
     swiftSema
 )
