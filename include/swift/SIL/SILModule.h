@@ -130,6 +130,9 @@ private:
   llvm::StringMap<SILFunction *> FunctionTable;
   llvm::StringMap<SILFunction *> ZombieFunctionTable;
 
+  /// The last function which was handled in linkTransparentFunctions().
+  SILFunction *LastFunctionChecked = nullptr;
+
   /// The list of SILFunctions in the module.
   FunctionListType functions;
 
@@ -242,6 +245,12 @@ public:
 
   /// Invalidate cached entries in SIL Loader.
   void invalidateSILLoaderCaches();
+
+  /// De-serializes all transparent functions for which there is only a
+  /// declaration yet (meaning: the body was not de-serialized yet).
+  ///
+  /// See also: SILFunction::Transparent.
+  void linkTransparentFunctions();
 
   /// Erase a function from the module.
   void eraseFunction(SILFunction *F);

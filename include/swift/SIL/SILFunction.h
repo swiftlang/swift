@@ -147,6 +147,19 @@ private:
   unsigned Bare : 1;
 
   /// The function's transparent attribute.
+  ///
+  /// Transparent functions and linkage: In most cases, transparent functions
+  /// are inlined. Therefore it's better for code-size that the module, which
+  /// defines a transparent function does not generate code for it.
+  /// The only exception is in case a transparent is referenced but cannot be
+  /// inlined, e.g. if it is passed as a closure or it is referenced from a
+  /// vtable/witness-table.
+  ///
+  /// In this case the module which _references_ the transparent function must
+  /// generate code for it, regardless in which module the function is defined.
+  /// This means that transparent functions must always have a body, i.e. must
+  /// not be declarations. Regardless if they are defined in the current module
+  /// or de-serialized from another module.
   unsigned Transparent : 1; // FIXME: pack this somewhere
 
   /// The function's fragile attribute.
