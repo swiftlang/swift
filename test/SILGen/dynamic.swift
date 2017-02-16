@@ -333,10 +333,13 @@ extension Gizmo {
 }
 
 // CHECK-LABEL: sil hidden @_T07dynamic24foreignExtensionDispatchySo5GizmoCF
+// CHECK: bb0([[ARG:%.*]] : $Gizmo):
 func foreignExtensionDispatch(_ g: Gizmo) {
-  // CHECK: class_method [volatile] %0 : $Gizmo, #Gizmo.foreignObjCExtension!1.foreign : (Gizmo)
+  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK: class_method [volatile] [[BORROWED_ARG]] : $Gizmo, #Gizmo.foreignObjCExtension!1.foreign : (Gizmo)
   g.foreignObjCExtension()
-  // CHECK: class_method [volatile] %0 : $Gizmo, #Gizmo.foreignDynamicExtension!1.foreign
+  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK: class_method [volatile] [[BORROWED_ARG]] : $Gizmo, #Gizmo.foreignDynamicExtension!1.foreign
   g.foreignDynamicExtension()
 }
 
@@ -433,11 +436,13 @@ public class Sub : Base {
 
   // CHECK-LABEL: sil shared [transparent] @_T07dynamic3SubC1xSbfgSbyKXKfu_ : $@convention(thin) (@owned Sub) -> (Bool, @error Error) {
   // CHECK: bb0([[VALUE:%.*]] : $Sub):
-  // CHECK:     [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
+  // CHECK:     [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
+  // CHECK:     [[VALUE_COPY:%.*]] = copy_value [[BORROWED_VALUE]]
   // CHECK:     [[CASTED_VALUE_COPY:%.*]] = upcast [[VALUE_COPY]]
   // CHECK:     [[SUPER:%.*]] = super_method [volatile] [[VALUE_COPY]] : $Sub, #Base.x!getter.1.foreign : (Base) -> () -> Bool, $@convention(objc_method) (Base) -> ObjCBool
   // CHECK:     = apply [[SUPER]]([[CASTED_VALUE_COPY]])
   // CHECK:     destroy_value [[VALUE_COPY]]
+  // CHECK:     end_borrow [[BORROWED_VALUE]] from [[VALUE]]
   // CHECK:     destroy_value [[VALUE]]
   // CHECK: } // end sil function '_T07dynamic3SubC1xSbfgSbyKXKfu_'
   override var x: Bool { return false || super.x }

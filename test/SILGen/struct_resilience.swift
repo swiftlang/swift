@@ -147,7 +147,8 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 // CHECK:         [[RESULT:%.*]] = load_borrow [[RESULT_ADDR]] : $*Int
   _ = s.h
 
-// CHECK:         [[CLOSURE_COPY:%.*]] = copy_value %2
+// CHECK:         [[BORROWED_CLOSURE:%.*]] = begin_borrow %2
+// CHECK:         [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
 // CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*MySize
 // CHECK:         apply [[CLOSURE_COPY]](%0, [[SIZE_BOX]])
 // CHECK:         return

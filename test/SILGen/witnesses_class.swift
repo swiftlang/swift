@@ -28,7 +28,10 @@ class Foo: Fooable {
 // CHECK:         bb0([[SELF:%.*]] : $T)
 // CHECK:         [[METHOD:%.*]] = witness_method $T
 // CHECK-NOT:     copy_value [[SELF]]
-// CHECK:         apply [[METHOD]]<T>([[SELF]])
+// CHECK:         [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+// CHECK-NOT:     copy_value [[SELF]]
+// CHECK:         apply [[METHOD]]<T>([[BORROWED_SELF]])
+// CHECK:         end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK:         destroy_value [[SELF]]
 // CHECK-NOT:         destroy_value [[SELF]]
 // CHECK:         return
@@ -38,10 +41,12 @@ func gen<T: Fooable>(_ foo: T) {
 
 // CHECK-LABEL: sil hidden @_T015witnesses_class2exyAA7Fooable_pF
 // CHECK: bb0([[SELF:%[0-0]+]] : $Fooable):
-// CHECK:         [[SELF_PROJ:%.*]] = open_existential_ref [[SELF]]
+// CHECK:         [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+// CHECK:         [[SELF_PROJ:%.*]] = open_existential_ref [[BORROWED_SELF]]
 // CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened(.*) Fooable]],
 // CHECK-NOT:     copy_value [[SELF_PROJ]] : $
 // CHECK:         apply [[METHOD]]<[[OPENED]]>([[SELF_PROJ]])
+// CHECK:         end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK:         destroy_value [[SELF]]
 // CHECK-NOT:     destroy_value [[SELF]]
 // CHECK:         return

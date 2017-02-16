@@ -183,18 +183,22 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
   assert(gen.InWritebackScope &&
          "materializing l-value for modification without writeback scope");
 
-  // Otherwise, we need to emit a get and set.  Borrow the base for
-  // the getter.
-  BorrowedManagedValue borrowedBase(gen, base, loc);
-
   // Clone anything else about the component that we might need in the
   // writeback.
   auto clonedComponent = clone(gen, loc);
 
-  // Emit a 'get' into a temporary and then pop the borrow of base.
-  ManagedValue temporary =
-      emitGetIntoTemporary(gen, loc, borrowedBase, std::move(*this));
-  std::move(borrowedBase).cleanup();
+  ManagedValue temporary;
+  {
+    FormalEvaluationScope Scope(gen);
+
+    // Otherwise, we need to emit a get and set.  Borrow the base for
+    // the getter.
+    ManagedValue getterBase =
+        base ? base.formalEvaluationBorrow(gen, loc) : ManagedValue();
+
+    // Emit a 'get' into a temporary and then pop the borrow of base.
+    temporary = emitGetIntoTemporary(gen, loc, getterBase, std::move(*this));
+  }
 
   // Push a writeback for the temporary.
   pushWriteback(gen, loc, std::move(clonedComponent), base,
@@ -757,10 +761,6 @@ namespace {
       SILValue buffer =
         gen.emitTemporaryAllocation(loc, getTypeOfRValue());
 
-      // If the base is a +1 r-value, just borrow it for materializeForSet.
-      // prepareAccessorArgs will copy it if necessary.
-      BorrowedManagedValue borrowedBase(gen, base, loc);
-
       // Clone the component without cloning the indices.  We don't actually
       // consume them in writeback().
       std::unique_ptr<LogicalPathComponent> clonedComponent(
@@ -788,28 +788,31 @@ namespace {
       SILDeclRef materializeForSet =
         gen.getMaterializeForSetDeclRef(decl, IsDirectAccessorUse);
 
-      auto args = std::move(*this).prepareAccessorArgs(gen, loc, borrowedBase,
-                                                       materializeForSet);
-      MaterializedLValue materialized =
-        gen.emitMaterializeForSetAccessor(loc, materializeForSet, substitutions,
-                                          std::move(args.base), IsSuper,
-                                          IsDirectAccessorUse,
-                                          std::move(args.subscripts),
-                                          buffer, callbackStorage);
+      MaterializedLValue materialized;
+      {
+        FormalEvaluationScope Scope(gen);
 
-      // Mark a value-dependence on the base.  We do this regardless
-      // of whether the base is trivial because even a trivial base
-      // may be value-dependent on something non-trivial.
-      if (base) {
-        SILValue temporary = materialized.temporary.getValue();
-        materialized.temporary = ManagedValue::forUnmanaged(
-            gen.B.createMarkDependence(loc, temporary, base.getValue()));
+        // If the base is a +1 r-value, just borrow it for materializeForSet.
+        // prepareAccessorArgs will copy it if necessary.
+        ManagedValue borrowedBase =
+            base ? base.formalEvaluationBorrow(gen, loc) : ManagedValue();
+
+        auto args = std::move(*this).prepareAccessorArgs(gen, loc, borrowedBase,
+                                                         materializeForSet);
+        materialized = gen.emitMaterializeForSetAccessor(
+            loc, materializeForSet, substitutions, std::move(args.base),
+            IsSuper, IsDirectAccessorUse, std::move(args.subscripts), buffer,
+            callbackStorage);
+
+        // Mark a value-dependence on the base.  We do this regardless
+        // of whether the base is trivial because even a trivial base
+        // may be value-dependent on something non-trivial.
+        if (base) {
+          SILValue temporary = materialized.temporary.getValue();
+          materialized.temporary = ManagedValue::forUnmanaged(
+              gen.B.createMarkDependence(loc, temporary, base.getValue()));
+        }
       }
-
-      // Now that we have emitted the materializeForSet and created a dependence
-      // on the base from the temporary value, we can end the shared borrow of
-      // the base scope if we performed one.
-      std::move(borrowedBase).cleanup();
 
       // TODO: maybe needsWriteback should be a thin function pointer
       // to which we pass the base?  That would let us use direct

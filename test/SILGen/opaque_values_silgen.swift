@@ -29,12 +29,14 @@ public func callVarArg() {
 // Test emitSemanticStore.
 // ---
 // CHECK-LABEL: sil hidden @_TF20opaque_values_silgen11assigninouturFTRxx_T_ : $@convention(thin) <T> (@inout T, @in T) -> () {
-// CHECK: bb0(%0 : $*T, %1 : $T):
-// CHECK: %[[CPY:.*]] = copy_value %1 : $T
-// CHECK: assign %[[CPY]] to %0 : $*T
-// CHECK: destroy_value %1 : $T
-// CHECK: return %{{.*}} : $()
-// CHECK-LABEL: } // end sil function '_TF20opaque_values_silgen11assigninouturFTRxx_T_'
+// CHECK: bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $T):
+// CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
+// CHECK:   [[CPY:%.*]] = copy_value [[BORROWED_ARG1]] : $T
+// CHECK:   assign [[CPY]] to [[ARG0]] : $*T
+// CHECK:   end_borrow [[BORROWED_ARG1]] from [[ARG1]]
+// CHECK:   destroy_value [[ARG1]] : $T
+// CHECK:   return %{{.*}} : $()
+// CHECK: } // end sil function '_TF20opaque_values_silgen11assigninouturFTRxx_T_'
 func assigninout<T>(_ a: inout T, _ b: T) {
   a = b
 }
@@ -43,10 +45,12 @@ func assigninout<T>(_ a: inout T, _ b: T) {
 // non-class-constrainted self from a class-constrained archetype.
 // ---
 // CHECK-LABEL: sil hidden @_TF20opaque_values_silgen15materializeSelfuRxs9AnyObjectxS_3FoorFT1tx_T_ : $@convention(thin) <T where T : AnyObject, T : Foo> (@owned T) -> () {
-// CHECK: bb0(%0 : $T):
-// CHECK: witness_method $T, #Foo.foo!1 : <Self where Self : Foo> (Self) -> () -> () : $@convention(witness_method) <τ_0_0 where τ_0_0 : Foo> (@in_guaranteed τ_0_0) -> ()
-// CHECK: apply %{{[0-9]+}}<T>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Foo> (@in_guaranteed τ_0_0) -> ()
-// CHECK: destroy_value %0 : $T
+// CHECK: bb0([[ARG:%.*]] : $T):
+// CHECK: [[WITNESS_METHOD:%.*]] = witness_method $T, #Foo.foo!1 : <Self where Self : Foo> (Self) -> () -> () : $@convention(witness_method) <τ_0_0 where τ_0_0 : Foo> (@in_guaranteed τ_0_0) -> ()
+// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK: apply [[WITNESS_METHOD]]<T>([[BORROWED_ARG]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Foo> (@in_guaranteed τ_0_0) -> ()
+// CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK: destroy_value [[ARG]] : $T
 // CHECK: return %{{[0-9]+}} : $()
 // CHECK: } // end sil function '_TF20opaque_values_silgen15materializeSelfuRxs9AnyObjectxS_3FoorFT1tx_T_'
 func materializeSelf<T: Foo>(t: T) where T: AnyObject {
@@ -56,12 +60,14 @@ func materializeSelf<T: Foo>(t: T) where T: AnyObject {
 // Test open existential with opaque values
 // ---
 // CHECK-LABEL: sil hidden @_TF20opaque_values_silgen3barFT1pPS_1P__Si : $@convention(thin) (@in P) -> Int {
-// CHECK: bb0(%0 : $P):
-// CHECK: %[[OPEN:[0-9]+]] = open_existential_opaque %0 : $P to $@opened
-// CHECK: witness_method $@opened
-// CHECK: %{{.*}} = apply %{{.*}}(%[[OPEN]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int
-// CHECK: destroy_value %0 : $P
-// CHECK: return %{{.*}} : $Int
+// CHECK: bb0([[ARG:%.*]] : $P):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[OPENED_ARG:%.*]] = open_existential_opaque [[BORROWED_ARG]] : $P to $@opened
+// CHECK:   [[WITNESS_FUNC:%.*]] = witness_method $@opened
+// CHECK:   [[RESULT:%.*]] = apply [[WITNESS_FUNC]]<{{.*}}>([[OPENED_ARG]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK:   destroy_value [[ARG]] : $P
+// CHECK:   return [[RESULT]] : $Int
 func bar(p: P) -> Int {
   return p.x
 }
@@ -69,12 +75,14 @@ func bar(p: P) -> Int {
 // Test OpaqueTypeLowering copyValue and destroyValue.
 // ---
 // CHECK-LABEL: sil hidden @_TF20opaque_values_silgen6callerurFxx : $@convention(thin) <T> (@in T) -> @out T {
-// CHECK: bb0(%0 : $T):
-// CHECK: %[[COPY:[0-9]+]] = copy_value %0 : $T
-// CHECK: %{{.*}} = apply %{{.*}}<T>(%[[COPY]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
-// CHECK: destroy_value %0 : $T
-// CHECK: return %{{.*}} : $T
-// CHECK-LABEL: } // end sil function '_TF20opaque_values_silgen6callerurFxx'
+// CHECK: bb0([[ARG:%.*]] : $T):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY:%.*]] = copy_value [[BORROWED_ARG]] : $T
+// CHECK:   [[RESULT:%.*]] = apply {{%.*}}<T>([[COPY]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+// CHECK:   end_borrow [[BORROWED_ARG:%.*]] from [[ARG]]
+// CHECK:   destroy_value [[ARG]] : $T
+// CHECK:   return %{{.*}} : $T
+// CHECK: } // end sil function '_TF20opaque_values_silgen6callerurFxx'
 func caller<T>(_ t: T) -> T {
   return caller(t)
 }
@@ -82,11 +90,13 @@ func caller<T>(_ t: T) -> T {
 // Test a simple opaque parameter and return value.
 // ---
 // CHECK-LABEL: sil hidden @_TF20opaque_values_silgen8identityurFT1tx_x : $@convention(thin) <T> (@in T) -> @out T {
-// CHECK: bb0(%0 : $T):
-// CHECK: %[[CPY:.*]] = copy_value %0 : $T
-// CHECK: destroy_value %0 : $T
-// CHECK: return %[[CPY]] : $T
-// CHECK-LABEL: } // end sil function '_TF20opaque_values_silgen8identityurFT1tx_x'
+// CHECK: bb0([[ARG:%.*]] : $T):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]] : $T
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK:   destroy_value [[ARG]] : $T
+// CHECK:   return [[COPY_ARG]] : $T
+// CHECK: } // end sil function '_TF20opaque_values_silgen8identityurFT1tx_x'
 func identity<T>(t: T) -> T {
   return t
 }
@@ -95,10 +105,10 @@ func identity<T>(t: T) -> T {
 // ---
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV20opaque_values_silgen17HasGuaranteedSelfS_3FooS_FS1_3foofT_T_ : $@convention(witness_method) (@in_guaranteed HasGuaranteedSelf) -> () {
 // CHECK: bb0(%0 : $HasGuaranteedSelf):
-// CHECK: %[[F:.*]] = function_ref @_TFV20opaque_values_silgen17HasGuaranteedSelf3foofT_T_ : $@convention(method) (HasGuaranteedSelf) -> ()
-// CHECK: apply %[[F]](%0) : $@convention(method) (HasGuaranteedSelf) -> ()
-// CHECK: return
-// CHECK-LABEL: } // end sil function '_TTWV20opaque_values_silgen17HasGuaranteedSelfS_3FooS_FS1_3foofT_T_'
+// CHECK:   %[[F:.*]] = function_ref @_TFV20opaque_values_silgen17HasGuaranteedSelf3foofT_T_ : $@convention(method) (HasGuaranteedSelf) -> ()
+// CHECK:   apply %[[F]](%0) : $@convention(method) (HasGuaranteedSelf) -> ()
+// CHECK:   return
+// CHECK: } // end sil function '_TTWV20opaque_values_silgen17HasGuaranteedSelfS_3FooS_FS1_3foofT_T_'
 struct HasGuaranteedSelf : Foo {
   func foo() {}
 }

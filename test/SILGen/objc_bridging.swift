@@ -51,8 +51,9 @@ func setFoo(_ f: Foo, s: String) {
   f.setFoo(s)
 }
 // CHECK-LABEL: sil hidden @_TF13objc_bridging6setFoo
-// CHECK: bb0({{%.*}} : $Foo, {{%.*}} : $String):
-// CHECK:   [[SET_FOO:%.*]] = class_method [volatile] [[F:%.*]] : {{.*}}, #Foo.setFoo!1.foreign
+// CHECK: bb0([[ARG0:%.*]] : $Foo, {{%.*}} : $String):
+// CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
+// CHECK:   [[SET_FOO:%.*]] = class_method [volatile] [[BORROWED_ARG0]] : {{.*}}, #Foo.setFoo!1.foreign
 // CHECK:   [[NV:%.*]] = load
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[NV]]
 
@@ -64,7 +65,7 @@ func setFoo(_ f: Foo, s: String) {
 // CHECK:    = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   end_borrow [[BORROWED_NATIVE]] from [[NATIVE]]
 // CHECK:   bb3([[OPT_BRIDGED:%.*]] : $Optional<NSString>):
-// CHECK:   apply [[SET_FOO]]([[OPT_BRIDGED]], %0)
+// CHECK:   apply [[SET_FOO]]([[OPT_BRIDGED]], [[BORROWED_ARG0]])
 // CHECK:   destroy_value [[OPT_BRIDGED]]
 // CHECK: }
 
@@ -138,7 +139,9 @@ func getZang(_ f: Foo) -> Bool {
   return f.zang()
 }
 // CHECK-LABEL: sil hidden @_TF13objc_bridging7getZangFCSo3FooSb
-// CHECK:   [[BOOL:%.*]] = apply {{%.*}}(%0) : $@convention(objc_method) (Foo) -> Bool
+// CHECK: bb0([[ARG:%.*]] : $Foo)
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[BOOL:%.*]] = apply {{%.*}}([[BORROWED_ARG]]) : $@convention(objc_method) (Foo) -> Bool
 // CHECK:   return [[BOOL]]
 
 // @interface Foo -(void) setZang: (_Bool)b; @end
@@ -146,7 +149,9 @@ func setZang(_ f: Foo, _ b: Bool) {
   f.setZang(b)
 }
 // CHECK-LABEL: sil hidden @_TF13objc_bridging7setZangFTCSo3FooSb_T_
-// CHECK:   apply {{%.*}}(%1, %0) : $@convention(objc_method) (Bool, Foo) -> ()
+// CHECK: bb0([[ARG0:%.*]] : $Foo, [[ARG1:%.*]] : $Bool):
+// CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
+// CHECK:   apply {{%.*}}([[ARG1]], [[BORROWED_ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
 
 // NSString *bar(void);
 func callBar() -> String {
@@ -391,8 +396,10 @@ class Bas : NSObject {
 func applyStringBlock(_ f: @convention(block) (String) -> String, x: String) -> String {
   // CHECK: bb0([[BLOCK:%.*]] : $@convention(block) (NSString) -> @autoreleased NSString, [[STRING:%.*]] : $String):
   // CHECK:   [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
-  // CHECK:   [[BLOCK_COPY_COPY:%.*]] = copy_value [[BLOCK_COPY]]
-  // CHECK:   [[STRING_COPY:%.*]] = copy_value [[STRING]]
+  // CHECK:   [[BORROWED_BLOCK_COPY:%.*]] = begin_borrow [[BLOCK_COPY]]
+  // CHECK:   [[BLOCK_COPY_COPY:%.*]] = copy_value [[BORROWED_BLOCK_COPY]]
+  // CHECK:   [[BORROWED_STRING:%.*]] = begin_borrow [[STRING]]
+  // CHECK:   [[STRING_COPY:%.*]] = copy_value [[BORROWED_STRING]]
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
   // CHECK:   [[BORROWED_STRING_COPY:%.*]] = begin_borrow [[STRING_COPY]]
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_STRING_COPY]]) : $@convention(method) (@guaranteed String)
@@ -482,11 +489,13 @@ func bools(_ x: Bool) -> (Bool, Bool) {
 // CHECK-LABEL: sil hidden @_TF13objc_bridging9getFridge
 // CHECK: bb0([[HOME:%[0-9]+]] : $APPHouse):
 func getFridge(_ home: APPHouse) -> Refrigerator {
-  // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[HOME]] : $APPHouse, #APPHouse.fridge!getter.1.foreign
-  // CHECK: [[OBJC_RESULT:%[0-9]+]] = apply [[GETTER]]([[HOME]])
+  // CHECK: [[BORROWED_HOME:%.*]] = begin_borrow [[HOME]]
+  // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[BORROWED_HOME]] : $APPHouse, #APPHouse.fridge!getter.1.foreign
+  // CHECK: [[OBJC_RESULT:%[0-9]+]] = apply [[GETTER]]([[BORROWED_HOME]])
   // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TZFV10Appliances12Refrigerator36_unconditionallyBridgeFromObjectiveC
   // CHECK: [[REFRIGERATOR_META:%[0-9]+]] = metatype $@thin Refrigerator.Type
   // CHECK: [[RESULT:%[0-9]+]] = apply [[BRIDGE_FN]]([[OBJC_RESULT]], [[REFRIGERATOR_META]])
+  // CHECK: end_borrow [[BORROWED_HOME]] from [[HOME]]
   // CHECK: destroy_value [[HOME]] : $APPHouse
   // CHECK: return [[RESULT]] : $Refrigerator
   return home.fridge
@@ -511,20 +520,18 @@ func updateFridgeTemp(_ home: APPHouse, delta: Double) {
   // CHECK: [[REFRIGERATOR_META:%[0-9]+]] = metatype $@thin Refrigerator.Type
   // CHECK: [[FRIDGE:%[0-9]+]] = apply [[BRIDGE_FROM_FN]]([[OBJC_FRIDGE]], [[REFRIGERATOR_META]])
 
-  // End the borrow from the get operation.
-  // CHECK: end_borrow [[BORROWED_HOME]] from [[HOME]]
-
   // Addition
   // CHECK: [[TEMP:%[0-9]+]] = struct_element_addr [[TEMP_FRIDGE]] : $*Refrigerator, #Refrigerator.temperature
   // CHECK: apply [[PLUS_EQ]]([[TEMP]], [[DELTA]])
 
   // Setter
   // CHECK: [[FRIDGE:%[0-9]+]] = load [trivial] [[TEMP_FRIDGE]] : $*Refrigerator
-  // CHECK: [[SETTER:%[0-9]+]] = class_method [volatile] [[HOME]] : $APPHouse, #APPHouse.fridge!setter.1.foreign
+  // CHECK: [[SETTER:%[0-9]+]] = class_method [volatile] [[BORROWED_HOME]] : $APPHouse, #APPHouse.fridge!setter.1.foreign
   // CHECK: [[BRIDGE_TO_FN:%[0-9]+]] = function_ref @_TFV10Appliances12Refrigerator19_bridgeToObjectiveCfT_CSo15APPRefrigerator
   // CHECK: [[OBJC_ARG:%[0-9]+]] = apply [[BRIDGE_TO_FN]]([[FRIDGE]])
-  // CHECK: apply [[SETTER]]([[OBJC_ARG]], [[HOME]]) : $@convention(objc_method) (APPRefrigerator, APPHouse) -> ()
+  // CHECK: apply [[SETTER]]([[OBJC_ARG]], [[BORROWED_HOME]]) : $@convention(objc_method) (APPRefrigerator, APPHouse) -> ()
   // CHECK: destroy_value [[OBJC_ARG]]
+  // CHECK: end_borrow [[BORROWED_HOME]] from [[HOME]]
   // CHECK: destroy_value [[HOME]]
   home.fridge.temperature += delta
 }

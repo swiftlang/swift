@@ -5,10 +5,12 @@ struct S { var x, y: Int }
 // CHECK-LABEL: sil hidden @_TF27collection_subtype_downcast14array_downcastFT5arrayGSaP___GSqGSaVS_1S__ :
 // CHECK:    bb0([[ARG:%.*]] : $Array<Any>):
 // CHECK-NEXT: debug_value [[ARG]]
-// CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[FN:%.*]] = function_ref @_TFs21_arrayConditionalCastu0_rFGSax_GSqGSaq___
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Any, S>([[ARG_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@owned Array<τ_0_0>) -> @owned Optional<Array<τ_0_1>>
+// CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK-NEXT: destroy_value [[ARG]]
 // CHECK-NEXT: return [[RESULT]]
 func array_downcast(array: [Any]) -> [S]? {
@@ -28,10 +30,12 @@ func ==(lhs: S, rhs: S) -> Bool {
 // CHECK-LABEL:      sil hidden @_TF27collection_subtype_downcast13dict_downcastFT4dictGVs10DictionaryVS_1SP___GSqGS0_S1_Si__ :
 // CHECK:    bb0([[ARG:%.*]] : $Dictionary<S, Any>):
 // CHECK-NEXT: debug_value [[ARG]]
-// CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[FN:%.*]] = function_ref @_TFs30_dictionaryDownCastConditionalu2_Rxs8Hashable0_S_rFGVs10Dictionaryxq__GSqGS0_q0_q1___
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<S, Any, S, Int>([[ARG_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
+// CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK-NEXT: destroy_value [[ARG]]
 // CHECK-NEXT: return [[RESULT]]
 func dict_downcast(dict: [S: Any]) -> [S: Int]? {

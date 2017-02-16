@@ -25,8 +25,10 @@ func cToBlock(_ arg: @escaping @convention(c) (Int) -> Int) -> @convention(block
 
 // CHECK-LABEL: sil hidden @_T019function_conversion12funcToThrowsyyKcyycF : $@convention(thin) (@owned @callee_owned () -> ()) -> @owned @callee_owned () -> @error Error
 // CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> ()):
-// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:   [[FUNC:%.*]] = convert_function [[ARG_COPY]] : $@callee_owned () -> () to $@callee_owned () -> @error Error
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return [[FUNC]]
 // CHECK: } // end sil function '_T019function_conversion12funcToThrowsyyKcyycF'
@@ -57,8 +59,10 @@ class Domesticated : Feral {}
 
 // CHECK-LABEL: sil hidden @_T019function_conversion12funcToUpcastAA5FeralCycAA12DomesticatedCycF : $@convention(thin) (@owned @callee_owned () -> @owned Domesticated) -> @owned @callee_owned () -> @owned Feral {
 // CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> @owned Domesticated):
-// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:   [[FUNC:%.*]] = convert_function [[ARG_COPY]] : $@callee_owned () -> @owned Domesticated to $@callee_owned () -> @owned Feral
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return [[FUNC]]
 // CHECK: } // end sil function '_T019function_conversion12funcToUpcastAA5FeralCycAA12DomesticatedCycF'
@@ -68,8 +72,10 @@ func funcToUpcast(_ x: @escaping () -> Domesticated) -> () -> Feral {
 
 // CHECK-LABEL: sil hidden @_T019function_conversion12funcToUpcastyAA12DomesticatedCcyAA5FeralCcF : $@convention(thin) (@owned @callee_owned (@owned Feral) -> ()) -> @owned @callee_owned (@owned Domesticated) -> ()
 // CHECK: bb0([[ARG:%.*]] :
-// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:   [[FUNC:%.*]] = convert_function [[ARG_COPY]] : $@callee_owned (@owned Feral) -> () to $@callee_owned (@owned Domesticated) -> (){{.*}}
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return [[FUNC]]
 func funcToUpcast(_ x: @escaping (Feral) -> ()) -> (Domesticated) -> () {
@@ -336,10 +342,12 @@ func convUpcastMetatype(_ c4: @escaping (Parent.Type, Trivial?) -> Child.Type,
 
 // CHECK-LABEL: sil hidden @_T019function_conversion19convFuncExistentialySiSicypcF : $@convention(thin) (@owned @callee_owned (@in Any) -> @owned @callee_owned (Int) -> Int) -> ()
 // CHECK: bb0([[ARG:%.*]] :
-// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:   [[REABSTRACT_THUNK:%.*]] = function_ref @_T0ypSiSiIxyd_Ixio_SiSiIxyd_ypIxxr_TR
 // CHECK:   [[PA:%.*]] = partial_apply [[REABSTRACT_THUNK]]([[ARG_COPY]])
 // CHECK:   destroy_value [[PA]]
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]]
 // CHECK: } // end sil function '_T019function_conversion19convFuncExistentialySiSicypcF'
 func convFuncExistential(_ f1: @escaping (Any) -> (Int) -> Int) {
@@ -430,11 +438,13 @@ func convTupleScalarOpaque<T>(_ f: @escaping (T...) -> ()) -> ((_ args: T...) ->
 }
 
 // CHECK-LABEL: sil hidden @_T019function_conversion25convTupleToOptionalDirectSi_SitSgSicSi_SitSicF : $@convention(thin) (@owned @callee_owned (Int) -> (Int, Int)) -> @owned @callee_owned (Int) -> Optional<(Int, Int)>
-// CHECK:         bb0(%0 : $@callee_owned (Int) -> (Int, Int)):
-// CHECK:           [[FN:%.*]] = copy_value %0
+// CHECK:         bb0([[ARG:%.*]] : $@callee_owned (Int) -> (Int, Int)):
+// CHECK:           [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:           [[FN:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:           [[THUNK_FN:%.*]] = function_ref @_T0SiSiSiIxydd_SiSi_SitSgIxyd_TR
 // CHECK-NEXT:      [[THUNK:%.*]] = partial_apply [[THUNK_FN]]([[FN]])
-// CHECK-NEXT:      destroy_value %0
+// CHECK-NEXT:      end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK-NEXT:      destroy_value [[ARG]]
 // CHECK-NEXT:      return [[THUNK]]
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0SiSiSiIxydd_SiSi_SitSgIxyd_TR : $@convention(thin) (Int, @owned @callee_owned (Int) -> (Int, Int)) -> Optional<(Int, Int)>
@@ -451,12 +461,14 @@ func convTupleToOptionalDirect(_ f: @escaping (Int) -> (Int, Int)) -> (Int) -> (
 }
 
 // CHECK-LABEL: sil hidden @_T019function_conversion27convTupleToOptionalIndirectx_xtSgxcx_xtxclF : $@convention(thin) <T> (@owned @callee_owned (@in T) -> (@out T, @out T)) -> @owned @callee_owned (@in T) -> @out Optional<(T, T)>
-// CHECK:       bb0(%0 : $@callee_owned (@in T) -> (@out T, @out T)):
-// CHECK:         [[FN:%.*]] = copy_value %0
-// CHECK:         [[THUNK_FN:%.*]] = function_ref @_T0xxxIxirr_xx_xtSgIxir_lTR
-// CHECK-NEXT:    [[THUNK:%.*]] = partial_apply [[THUNK_FN]]<T>([[FN]])
-// CHECK-NEXT:    destroy_value %0
-// CHECK-NEXT:    return [[THUNK]]
+// CHECK:       bb0([[ARG:%.*]] : $@callee_owned (@in T) -> (@out T, @out T)):
+// CHECK:          [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:          [[FN:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK:          [[THUNK_FN:%.*]] = function_ref @_T0xxxIxirr_xx_xtSgIxir_lTR
+// CHECK-NEXT:     [[THUNK:%.*]] = partial_apply [[THUNK_FN]]<T>([[FN]])
+// CHECK-NEXT:     end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK-NEXT:     destroy_value [[ARG]]
+// CHECK-NEXT:     return [[THUNK]]
 
 // CHECK:       sil shared [transparent] [reabstraction_thunk] @_T0xxxIxirr_xx_xtSgIxir_lTR : $@convention(thin) <T> (@in T, @owned @callee_owned (@in T) -> (@out T, @out T)) -> @out Optional<(T, T)>
 // CHECK:       bb0(%0 : $*Optional<(T, T)>, %1 : $*T, %2 : $@callee_owned (@in T) -> (@out T, @out T)):

@@ -1210,12 +1210,6 @@ CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
   return Cleanups.getTopCleanup();
 }
 
-CleanupHandle SILGenFunction::enterEndBorrowCleanup(SILValue original,
-                                                    SILValue borrowed) {
-  Cleanups.pushCleanup<EndBorrowCleanup>(original, borrowed);
-  return Cleanups.getTopCleanup();
-}
-
 namespace {
   /// A cleanup that deinitializes an opaque existential container
   /// before a value has been stored into it, or after its value was taken.
