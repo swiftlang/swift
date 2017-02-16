@@ -103,8 +103,9 @@ class B : A {
 // Test the @NSCopying attribute.
 class TestNSCopying {
   // CHECK-LABEL: sil hidden [transparent] @_T015objc_properties13TestNSCopyingC8propertySo8NSStringCfs : $@convention(method) (@owned NSString, @guaranteed TestNSCopying) -> ()
-  // CHECK: bb0(%0 : $NSString, %1 : $TestNSCopying):
-  // CHECK:  class_method [volatile] %0 : $NSString, #NSString.copy!1.foreign
+  // CHECK: bb0([[ARG0:%.*]] : $NSString, [[ARG1:%.*]] : $TestNSCopying):
+  // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
+  // CHECK:   class_method [volatile] [[BORROWED_ARG0]] : $NSString, #NSString.copy!1.foreign
   @NSCopying var property : NSString
 
   @NSCopying var optionalProperty : NSString?

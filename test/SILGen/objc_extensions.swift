@@ -73,7 +73,9 @@ extension Sub {
     // CHECK:    destroy_value [[BRIDGED_NEW_STRING]]
     // CHECK:    destroy_value [[SELF_COPY]]
     // CHECK:    [[DIDSET_NOTIFIER:%.*]] = function_ref @_T015objc_extensions3SubC4propSQySSGfW : $@convention(method) (@owned Optional<String>, @guaranteed Sub) -> ()
-    // CHECK:    [[COPIED_OLD_NSSTRING_BRIDGED:%.*]] = copy_value [[OLD_NSSTRING_BRIDGED]]
+    // CHECK:    [[BORROWED_OLD_NSSTRING_BRIDGED:%.*]] = begin_borrow [[OLD_NSSTRING_BRIDGED]]
+    // CHECK:    [[COPIED_OLD_NSSTRING_BRIDGED:%.*]] = copy_value [[BORROWED_OLD_NSSTRING_BRIDGED]]
+    // CHECK:    end_borrow [[BORROWED_OLD_NSSTRING_BRIDGED]] from [[OLD_NSSTRING_BRIDGED]]
     // This is an identity cast that should be eliminated by SILGen peepholes.
     // CHECK:    apply [[DIDSET_NOTIFIER]]([[COPIED_OLD_NSSTRING_BRIDGED]], [[SELF]])
     // CHECK:    destroy_value [[OLD_NSSTRING_BRIDGED]]
@@ -90,9 +92,11 @@ extension Sub {
 
 // CHECK-LABEL: sil hidden @_T015objc_extensions20testOverridePropertyyAA3SubCF
 func testOverrideProperty(_ obj: Sub) {
-  // CHECK: = class_method [volatile] %0 : $Sub, #Sub.prop!setter.1.foreign : (Sub) -> (String!) -> ()
+  // CHECK: bb0([[ARG:%.*]] : $Sub):
+  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK: = class_method [volatile] [[BORROWED_ARG]] : $Sub, #Sub.prop!setter.1.foreign : (Sub) -> (String!) -> ()
   obj.prop = "abc"
-} // CHECK: }
+} // CHECK: } // end sil function '_T015objc_extensions20testOverridePropertyyAA3SubCF'
 
 testOverrideProperty(Sub())
 

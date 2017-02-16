@@ -12,9 +12,11 @@ func curry_pod(_ x: CurryTest) -> (Int) -> Int {
 }
 // CHECK-LABEL: sil hidden @_T013objc_currying9curry_podSiSicSo9CurryTestCF : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
 // CHECK:      bb0([[ARG1:%.*]] : $CurryTest):
+// CHECK:         [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
 // CHECK:         [[THUNK:%.*]] = function_ref @[[THUNK_FOO_1:_T0So9CurryTestC3podSiSiFTcTO]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
-// CHECK:         [[COPIED_ARG1:%.*]] = copy_value [[ARG1]]
+// CHECK:         [[COPIED_ARG1:%.*]] = copy_value [[BORROWED_ARG1]]
 // CHECK:         [[FN:%.*]] = apply [[THUNK]]([[COPIED_ARG1]])
+// CHECK:         end_borrow [[BORROWED_ARG1]] from [[ARG1]]
 // CHECK:         destroy_value [[ARG1]]
 // CHECK:         return [[FN]]
 // CHECK: } // end sil function '_T013objc_currying9curry_podSiSicSo9CurryTestCF'
@@ -39,9 +41,11 @@ func curry_bridged(_ x: CurryTest) -> (String!) -> String! {
 }
 // CHECK-LABEL: sil hidden @_T013objc_currying13curry_bridgedSQySSGSQySSGcSo9CurryTestCF : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (@owned Optional<String>) -> @owned Optional<String>
 // CHECK: bb0([[ARG1:%.*]] : $CurryTest):
+// CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
 // CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_BAR_1:_T0So9CurryTestC7bridgedSQySSGSQySSGFTcTO]]
-// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
 // CHECK:   [[FN:%.*]] = apply [[THUNK]]([[ARG1_COPY]])
+// CHECK:   end_borrow [[BORROWED_ARG1]] from [[ARG1]]
 // CHECK:   destroy_value [[ARG1]]
 // CHECK:   return [[FN]]
 // CHECK: } // end sil function '_T013objc_currying13curry_bridgedSQySSGSQySSGcSo9CurryTestCF'
@@ -100,9 +104,11 @@ func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutableRawPointer!
 }
 // CHECK-LABEL: sil hidden @_T013objc_currying25curry_returnsInnerPointerSQySvGycSo9CurryTestCF : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned () -> Optional<UnsafeMutableRawPointer> {
 // CHECK: bb0([[SELF:%.*]] : $CurryTest):
+// CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_RETURNSINNERPOINTER:_T0So9CurryTestC19returnsInnerPointerSQySvGyFTcTO]]
-// CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
+// CHECK:   [[SELF_COPY:%.*]] = copy_value [[BORROWED_SELF]]
 // CHECK:   [[FN:%.*]] = apply [[THUNK]]([[SELF_COPY]])
+// CHECK:   end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK:   destroy_value [[SELF]]
 // CHECK:   return [[FN]]
 // CHECK: } // end sil function '_T013objc_currying25curry_returnsInnerPointerSQySvGycSo9CurryTestCF'
@@ -124,7 +130,8 @@ func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutableRawPointer!
 
 // CHECK-LABEL: sil hidden @_T013objc_currying19curry_pod_AnyObjectSiSics0eF0_pF : $@convention(thin) (@owned AnyObject) -> @owned @callee_owned (Int) -> Int
 // CHECK: bb0([[ANY:%.*]] : $AnyObject):
-// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
+// CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
+// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened({{.*}}) AnyObject, #CurryTest.pod!1.foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK:   [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
@@ -138,7 +145,8 @@ func curry_pod_AnyObject(_ x: AnyObject) -> (Int) -> Int {
 // normalOwnership requires a thunk to bring the method to Swift conventions
 // CHECK-LABEL: sil hidden @_T013objc_currying31curry_normalOwnership_AnyObjectSQySo9CurryTestCGSQyADGcs0fG0_pF : $@convention(thin) (@owned AnyObject) -> @owned @callee_owned (@owned Optional<CurryTest>) -> @owned Optional<CurryTest> {
 // CHECK: bb0([[ANY:%.*]] : $AnyObject):
-// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
+// CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
+// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened({{.*}}) AnyObject, #CurryTest.normalOwnership!1.foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK: [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (Optional<CurryTest>, @opened({{.*}}) AnyObject) -> @autoreleased Optional<CurryTest>):
@@ -155,7 +163,8 @@ func curry_normalOwnership_AnyObject(_ x: AnyObject) -> (CurryTest!) -> CurryTes
 // follows Swift conventions
 // CHECK-LABEL: sil hidden @_T013objc_currying30curry_weirdOwnership_AnyObjectSQySo9CurryTestCGSQyADGcs0fG0_pF : $@convention(thin) (@owned AnyObject) -> @owned @callee_owned (@owned Optional<CurryTest>) -> @owned Optional<CurryTest>
 // CHECK: bb0([[ANY:%.*]] : $AnyObject):
-// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
+// CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
+// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[SELF:%.*]] : $@opened({{.*}}) AnyObject, #CurryTest.weirdOwnership!1.foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK: bb1([[METHOD:%.*]] : $@convention(objc_method) (@owned Optional<CurryTest>, @owned @opened({{.*}}) AnyObject) -> @owned Optional<CurryTest>):
@@ -169,7 +178,8 @@ func curry_weirdOwnership_AnyObject(_ x: AnyObject) -> (CurryTest!) -> CurryTest
 // bridged requires a thunk to handle bridging conversions
 // CHECK-LABEL: sil hidden @_T013objc_currying23curry_bridged_AnyObjectSQySSGSQySSGcs0eF0_pF : $@convention(thin) (@owned AnyObject) -> @owned @callee_owned (@owned Optional<String>) -> @owned Optional<String>
 // CHECK: bb0([[ANY:%.*]] : $AnyObject):
-// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
+// CHECK:    [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
+// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened({{.*}}) AnyObject, #CurryTest.bridged!1.foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK: [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (Optional<NSString>, @opened({{.*}}) AnyObject) -> @autoreleased Optional<NSString>):
@@ -186,7 +196,8 @@ func curry_bridged_AnyObject(_ x: AnyObject) -> (String!) -> String! {
 // methods
 // CHECK-LABEL: sil hidden @_T013objc_currying27curry_returnsSelf_AnyObjectSQys0fG0_pGycsAC_pF : $@convention(thin) (@owned AnyObject) -> @owned @callee_owned () -> @owned Optional<AnyObject> {
 // CHECK: bb0([[ANY:%.*]] : $AnyObject):
-// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
+// CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
+// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened({{.*}}) AnyObject, #CurryTest.returnsSelf!1.foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK: [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased Optional<AnyObject>):
@@ -199,7 +210,8 @@ func curry_returnsSelf_AnyObject(_ x: AnyObject) -> () -> AnyObject! {
 
 // CHECK-LABEL: sil hidden @_T013objc_currying35curry_returnsInnerPointer_AnyObjectSQySvGycs0gH0_pF : $@convention(thin) (@owned AnyObject) -> @owned @callee_owned () -> Optional<UnsafeMutableRawPointer> {
 // CHECK: bb0([[ANY:%.*]] : $AnyObject):
-// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
+// CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
+// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened({{.*}}) AnyObject, #CurryTest.returnsInnerPointer!1.foreign, [[HAS_METHOD:bb[0-9]+]]
 // CHECK: [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @unowned_inner_pointer Optional<UnsafeMutableRawPointer>):

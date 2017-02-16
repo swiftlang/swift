@@ -6,8 +6,10 @@ var false_ = Bool()
 // CHECK-LABEL: sil hidden @_T013auto_closures05call_A8_closureAA4BoolVADyXKF : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
 func call_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
   // CHECK: bb0([[CLOSURE:%.*]] : $@callee_owned () -> Bool):
-  // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[CLOSURE]]
+  // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [[CLOSURE]]
+  // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
   // CHECK: [[RET:%.*]] = apply [[CLOSURE_COPY]]()
+  // CHECK: end_borrow [[BORROWED_CLOSURE]] from [[CLOSURE]]
   // CHECK: destroy_value [[CLOSURE]]
   // CHECK: return [[RET]]
   return x()
