@@ -2854,8 +2854,8 @@ public:
   ///
   /// \param ignoreNewExtensions Whether to avoid loading any new extension.
   /// Used by the module loader to break recursion.
-  ArrayRef<ValueDecl *> lookupDirect(DeclName name,
-                                     bool ignoreNewExtensions = false);
+  TinyPtrVector<ValueDecl *> lookupDirect(DeclName name,
+                                          bool ignoreNewExtensions = false);
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
