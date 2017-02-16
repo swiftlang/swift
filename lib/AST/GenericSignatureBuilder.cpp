@@ -554,7 +554,16 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
   SmallVector<std::pair<ProtocolDecl *, RequirementSource>, 4>
     conformsTo(rep->ConformsTo.begin(), rep->ConformsTo.end());
   for (auto &conforms : conformsTo) {
-    for (auto member : conforms.first->lookupDirect(nestedName)) {
+    // Make sure we don't trigger deserialization of extensions,
+    // since they can refer back to a protocol we're currently
+    // type checking.
+    //
+    // Note that typealiases in extensions won't matter here,
+    // because a typealias is never going to be a representative
+    // PA.
+    auto members = conforms.first->lookupDirect(nestedName,
+                                                /*ignoreNewExtensions=*/true);
+    for (auto member : members) {
       PotentialArchetype *pa;
       
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
