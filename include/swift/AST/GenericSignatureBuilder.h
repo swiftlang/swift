@@ -296,6 +296,11 @@ public:
   /// path.
   bool isDerivedRequirement() const;
 
+  /// Whether the requirement is derived via some concrete conformance, e.g.,
+  /// a concrete type's conformance to a protocol or a superclass's conformance
+  /// to a protocol.
+  bool isDerivedViaConcreteConformance() const;
+
   /// Retrieve a source location that corresponds to the requirement.
   SourceLoc getLoc() const;
 
@@ -712,7 +717,8 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// constrained.
   Type ConcreteType;
 
-  /// The source of the concrete type requirement.
+  /// The source of the concrete type requirement, if one was written
+  /// on this potential archetype.
   const RequirementSource *ConcreteTypeSource = nullptr;
 
   /// Whether this is an unresolved nested type.
@@ -936,14 +942,15 @@ public:
                             SameTypeConstraints.end());
   }
 
-  /// Retrieve the source of the same-type constraint that maps this potential
-  /// archetype to a concrete type.
-  const RequirementSource *getConcreteTypeSource() const {
-    if (Representative != this)
-      return Representative->getConcreteTypeSource();
-
+  /// Retrieve the concrete type source as written on this potential archetype.
+  const RequirementSource *getConcreteTypeSourceAsWritten() const {
     return ConcreteTypeSource;
   }
+
+  /// Find a source of the same-type constraint that maps this potential
+  /// archetype to a concrete type somewhere in the equivalence class of this
+  /// type.
+  const RequirementSource *findAnyConcreteTypeSourceAsWritten() const;
 
   /// \brief Retrieve (or create) a nested type with the given name.
   PotentialArchetype *getNestedType(Identifier Name,
