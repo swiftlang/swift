@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "address-lowering"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
@@ -107,11 +108,18 @@ struct AddressLoweringState {
   SmallVector<Operand *, 16> indirectOperands;
   // All call instruction's with formally indirect result conventions.
   SmallVector<SILInstruction *, 16> indirectResults;
+  // All function-exiting terminators (return or throw instructions).
+  SmallVector<TermInst *, 8> returnInsts;
   // Delete these instructions after performing transformations.
   // They must not have any remaining users.
   SmallSetVector<SILInstruction *, 16> instsToDelete;
 
   AddressLoweringState(SILFunction *F) : F(F) {}
+
+  void markDeadInst(SILInstruction *inst) {
+    assert(onlyHaveDebugUses(inst));
+    instsToDelete.insert(inst);
+  }
 };
 } // end anonymous namespace
 
@@ -148,6 +156,9 @@ protected:
 /// to valueStorageMap in RPO.
 void OpaqueValueVisitor::mapValueStorage() {
   for (auto *BB : postorderInfo.getReversePostOrder()) {
+    if (BB->getTerminator()->isFunctionExiting())
+      pass.returnInsts.push_back(BB->getTerminator());
+
     // Opaque function arguments have already been replaced.
     if (BB != pass.F->getEntryBlock()) {
       for (auto argI = BB->args_begin(), argEnd = BB->args_end();
@@ -220,11 +231,8 @@ namespace {
 class OpaqueStorageAllocation {
   AddressLoweringState &pass;
 
-  SILBuilder allocBuilder;
-
 public:
-  explicit OpaqueStorageAllocation(AddressLoweringState &pass)
-      : pass(pass), allocBuilder(*pass.F) {}
+  explicit OpaqueStorageAllocation(AddressLoweringState &pass) : pass(pass) {}
 
   void allocateOpaqueStorage();
 
@@ -265,13 +273,6 @@ void OpaqueStorageAllocation::allocateOpaqueStorage() {
   // Populate valueStorageMap.
   OpaqueValueVisitor(pass).mapValueStorage();
 
-  // Find an insertion point for new AllocStack instructions.
-  SILBasicBlock::iterator insertionPoint = pass.F->begin()->begin();
-  while (isa<AllocStackInst>(*insertionPoint))
-    ++insertionPoint;
-
-  allocBuilder.setInsertionPoint(insertionPoint);
-
   // Create an AllocStack for every opaque value defined in the function.
   for (auto &valueStorageI : pass.valueStorageMap)
     allocateForValue(valueStorageI.first, valueStorageI.second);
@@ -289,7 +290,7 @@ void OpaqueStorageAllocation::allocateOpaqueStorage() {
 /// inserting a temprorary load instruction.
 void OpaqueStorageAllocation::replaceFunctionArgs() {
   // Insert temporary argument loads at the top of the function.
-  allocBuilder.setInsertionPoint(pass.F->getEntryBlock()->begin());
+  SILBuilder argBuilder(pass.F->getEntryBlock()->begin());
 
   auto fnConv = pass.F->getConventions();
   unsigned argIdx = fnConv.getSILArgIndexOfFirstParam();
@@ -300,7 +301,7 @@ void OpaqueStorageAllocation::replaceFunctionArgs() {
       SILArgument *arg = pass.F->getArgument(argIdx);
       SILType addrType = arg->getType().getAddressType();
 
-      LoadInst *loadArg = allocBuilder.createLoad(
+      LoadInst *loadArg = argBuilder.createLoad(
           RegularLocation(const_cast<ValueDecl *>(arg->getDecl())),
           SILUndef::get(addrType, pass.F->getModule()),
           LoadOwnershipQualifier::Unqualified);
@@ -374,14 +375,6 @@ static SILLocation getLocForValue(SILValue value) {
   return value->getFunction()->getLocation();
 }
 
-/// Create a dealloc_stack instruction.
-static DeallocStackInst *
-createDeallocStackAfterBlock(SILBasicBlock *deallocBlock,
-                             AllocStackInst *allocInstr) {
-  SILBuilder deallocBuilder(deallocBlock->getTerminator());
-  return deallocBuilder.createDeallocStack(allocInstr->getLoc(), allocInstr);
-}
-
 /// Allocate storage for a single opaque/resilient value.
 void OpaqueStorageAllocation::allocateForValue(SILValue value,
                                                ValueStorage &storage) {
@@ -397,18 +390,17 @@ void OpaqueStorageAllocation::allocateForValue(SILValue value,
     return;
   }
 
+  SILBuilder allocBuilder(pass.F->begin()->begin());
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(getLocForValue(value), value->getType());
 
   storage.storageAddress = allocInstr;
 
-  // TODO: insert deallocation at reasonable points.
-  auto blockI = pass.F->findReturnBB();
-  if (blockI != pass.F->end())
-    createDeallocStackAfterBlock(&*blockI, allocInstr);
-
-  if (pass.F->findThrowBB() != pass.F->end())
-    createDeallocStackAfterBlock(&*blockI, allocInstr);
+  // Insert stack deallocations.
+  for (TermInst *termInst : pass.returnInsts) {
+    SILBuilder deallocBuilder(termInst);
+    deallocBuilder.createDeallocStack(allocInstr->getLoc(), allocInstr);
+  }
 }
 
 /// Deallocate temporary call-site stack storage.
@@ -416,7 +408,7 @@ static void insertStackDeallocationAtCall(AllocStackInst *allocInst,
                                           SILInstruction *applyInst) {
   switch (applyInst->getKind()) {
   case ValueKind::ApplyInst: {
-    SILBuilder deallocBuilder(applyInst);
+    SILBuilder deallocBuilder(&*std::next(applyInst->getIterator()));
     deallocBuilder.createDeallocStack(allocInst->getLoc(), allocInst);
     break;
   }
@@ -509,8 +501,8 @@ void OpaqueStorageAllocation::allocateForResults(SILInstruction *origInst) {
   switch (origInst->getKind()) {
   case ValueKind::ApplyInst:
     callInst = callBuilder.createApply(
-        loc, apply.getCallee(), apply.getSubstCalleeSILType(), apply.getType(),
-        apply.getSubstitutions(), args,
+        loc, apply.getCallee(), apply.getSubstCalleeSILType(),
+        loweredFnConv.getSILResultType(), apply.getSubstitutions(), args,
         cast<ApplyInst>(origInst)->isNonThrowing());
     break;
   case ValueKind::TryApplyInst:
@@ -528,15 +520,15 @@ void OpaqueStorageAllocation::allocateForResults(SILInstruction *origInst) {
     // origInst remains in the map but has no users.
   }
   origInst->replaceAllUsesWith(callInst);
-  pass.instsToDelete.insert(origInst);
-  // Load a concrete args, and mark the extract for deletion.
+  pass.markDeadInst(origInst);
+  // Load concrete args, and mark the extract for deletion.
   for (TupleExtractInst *extract : concreteResults) {
     unsigned argIdx = firstResultIdx + extract->getFieldNo();
     SILValue arg = args[argIdx];
     LoadInst *loadArg = callBuilder.createLoad(
         extract->getLoc(), arg, LoadOwnershipQualifier::Unqualified);
     extract->replaceAllUsesWith(loadArg);
-    pass.instsToDelete.insert(extract);
+    pass.markDeadInst(extract);
   }
 }
 
@@ -600,16 +592,12 @@ protected:
     B.createCopyAddr(copyInst->getLoc(), srcAddr, destAddr, IsNotTake,
                      IsInitialization);
   }
-
-  void visitTupleInst(TupleInst *tupleInst) {
-    // Tuple elements have their own storage. Tuple instructions are dead.
-    assert(!pass.valueStorageMap.getStorage(tupleInst).storageAddress);
-  }
-
-  void visitTupleExtractInst(TupleExtractInst *TEI) {
-    // Tuple element instructions don't require rewrite. They are dead.
-    llvm_unreachable("Untested.");
-    return;
+  
+  void visitDestroyValueInst(DestroyValueInst *destroyInst) {
+    SILValue src = destroyInst->getOperand();
+    SILValue addr = pass.valueStorageMap.getStorage(src).storageAddress;
+    B.createDestroyAddr(destroyInst->getLoc(), addr);
+    pass.markDeadInst(destroyInst);
   }
 
   void visitReturnInst(ReturnInst *returnInst) {
@@ -640,6 +628,17 @@ protected:
     auto *tupleInst = B.createTuple(returnInst->getLoc(), emptyTy, {});
     returnInst->setOperand(tupleInst);
   }
+
+  void visitTupleInst(TupleInst *tupleInst) {
+    // Tuple elements have their own storage. Tuple instructions are dead.
+    assert(!pass.valueStorageMap.getStorage(tupleInst).storageAddress);
+  }
+
+  void visitTupleExtractInst(TupleExtractInst *extractInst) {
+    // Tuple element instructions don't require rewrite. They are dead.
+    llvm_unreachable("Untested.");
+    return;
+  }
 };
 } // end anonymous namespace
 
@@ -659,6 +658,8 @@ class AddressLowering : public SILModuleTransform {
 } // end anonymous namespace
 
 void AddressLowering::runOnFunction(SILFunction *F) {
+  DEBUG(llvm::dbgs() << "LOWER "; F->dump());
+
   AddressLoweringState pass(F);
 
   // Rewrite function args and insert alloc_stack/dealloc_stack.

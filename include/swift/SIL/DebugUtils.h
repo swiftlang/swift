@@ -36,7 +36,8 @@
 #ifndef SWIFT_SIL_DEBUGUTILS_H
 #define SWIFT_SIL_DEBUGUTILS_H
 
-#include "swift/SIL/SILValue.h"
+#include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILInstruction.h"
 
 namespace swift {
 
