@@ -1,7 +1,7 @@
 add_swift_library(swiftDemangle SHARED
   SwiftDemangle.cpp
   MangleHack.cpp
-  LINK_LIBS swiftBasic)
+  LINK_LIBRARIES swiftBasic)
 
 swift_install_in_component(compiler
     TARGETS swiftDemangle

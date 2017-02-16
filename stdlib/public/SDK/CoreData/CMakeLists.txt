@@ -1,4 +1,4 @@
-add_swift_target_library(swiftCoreData ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+add_swift_library(swiftCoreData ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   CocoaError.swift
   NSManagedObjectContext.swift
   CoreData.mm

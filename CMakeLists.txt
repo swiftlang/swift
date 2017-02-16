@@ -459,9 +459,6 @@ endif()
 
 set(SWIFT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(SWIFT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
-set(SWIFT_CMAKE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
-set(SWIFT_MAIN_INCLUDE_DIR "${SWIFT_SOURCE_DIR}/include")
-set(SWIFT_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
 
 set(SWIFT_RUNTIME_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin")
 set(SWIFT_LIBRARY_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
@@ -482,8 +479,8 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 # We'll need this once we have generated headers
 include_directories(BEFORE
-  ${SWIFT_MAIN_INCLUDE_DIR}
-  ${SWIFT_INCLUDE_DIR}
+  ${CMAKE_CURRENT_BINARY_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
   )
 
 # A convenience pattern to match Darwin platforms. Example:
@@ -956,8 +953,6 @@ endif()
 if(SWIFT_INCLUDE_DOCS)
   add_subdirectory(docs)
 endif()
-
-add_subdirectory(cmake/modules)
 
 swift_install_in_component(license
   FILES "LICENSE.txt"
