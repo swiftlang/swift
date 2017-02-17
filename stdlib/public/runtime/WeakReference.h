@@ -66,23 +66,46 @@ namespace swift {
 //  * concurrent writes other than zeroing
 
 class WeakReferenceBits {
-#if SWIFT_OBJC_INTEROP
-  // NativeMarker: ObjC low bits all zero, next bit 1
+  // On ObjC platforms, a weak variable may be controlled by the ObjC
+  // runtime or by the Swift runtime. NativeMarkerMask and NativeMarkerValue
+  // are used to distinguish them.
+  //   if ((ptr & NativeMarkerMask) == NativeMarkerValue) it's Swift
+  //   else it's ObjC
+  // NativeMarkerMask incorporates the ObjC tagged pointer bits
+  // plus one more bit that is set in Swift-controlled weak pointer values.
+  // Non-ObjC platforms don't use any markers.
   enum : uintptr_t {
-    NativeMarkerValue =
-      uintptr_t(1) << swift::heap_object_abi::ObjCReservedLowBits,
-    NativeMarkerMask =
-      NativeMarkerValue | (NativeMarkerValue - 1)
-  };
+#if !SWIFT_OBJC_INTEROP
+    NativeMarkerMask  = 0,
+    NativeMarkerValue = 0
+#elif __x86_64__
+    NativeMarkerMask  = SWIFT_ABI_X86_64_OBJC_WEAK_REFERENCE_MARKER_MASK,
+    NativeMarkerValue = SWIFT_ABI_X86_64_OBJC_WEAK_REFERENCE_MARKER_VALUE
+#elif __i386__
+    NativeMarkerMask  = SWIFT_ABI_I386_OBJC_WEAK_REFERENCE_MARKER_MASK,
+    NativeMarkerValue = SWIFT_ABI_I386_OBJC_WEAK_REFERENCE_MARKER_VALUE
+#elif __arm__
+    NativeMarkerMask  = SWIFT_ABI_ARM_OBJC_WEAK_REFERENCE_MARKER_MASK,
+    NativeMarkerValue = SWIFT_ABI_ARM_OBJC_WEAK_REFERENCE_MARKER_VALUE
+#elif __arm64__
+    NativeMarkerMask  = SWIFT_ABI_ARM64_OBJC_WEAK_REFERENCE_MARKER_MASK,
+    NativeMarkerValue = SWIFT_ABI_ARM64_OBJC_WEAK_REFERENCE_MARKER_VALUE
 #else
-  // No NativeMarkerValue needed.
-  enum : uintptr_t {
-    NativeMarkerValue = 0, NativeMarkerMask = 0
-  };
+    #error unknown architecture
 #endif
+  };
 
-  static_assert(NativeMarkerMask < alignof(void*),
-                "native marker bit must not interfere with pointer bits");
+  static_assert((NativeMarkerMask & NativeMarkerValue) == NativeMarkerValue,
+                "native marker value must fall within native marker mask");
+  static_assert((NativeMarkerMask & heap_object_abi::SwiftSpareBitsMask)
+                == NativeMarkerMask,
+                "native marker mask must fall within Swift spare bits");
+  static_assert((NativeMarkerMask & heap_object_abi::ObjCReservedBitsMask)
+                == heap_object_abi::ObjCReservedBitsMask,
+                "native marker mask must contain all ObjC tagged pointer bits");
+  static_assert((NativeMarkerValue & heap_object_abi::ObjCReservedBitsMask)
+                == 0,
+                "native marker value must not interfere with ObjC bits");
   
   uintptr_t bits;
 
