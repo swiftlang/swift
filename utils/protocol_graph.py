@@ -71,6 +71,7 @@ def body_lines(body_text):
             body_text, re_flags)
     ]
 
+
 # Mapping from protocol to associated type / operator requirements
 body = {}
 
@@ -129,6 +130,7 @@ def parse_protocol(m):
             if re.match(r'_Builtin.*Convertible', parent):
                 return
             graph.setdefault(parent.strip(), set()).add(child)
+
 
 protocols_and_operators = interpolate(r'''
 \bprotocol \s+ (%(identifier)s) \s*

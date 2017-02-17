@@ -34,5 +34,6 @@ class ListFunctionSizesTestCase(unittest.TestCase):
             '     100 baz',
         ])
 
+
 if __name__ == '__main__':
     unittest.main()
