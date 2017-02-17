@@ -303,8 +303,8 @@ class DelayedStringRetriever : public raw_ostream {
     unsigned CurrentStart;
 
 public:
-    explicit DelayedStringRetriever(SmallVectorImpl<char> &OS) : OS(OS), Underlying(OS) {}
-    ~DelayedStringRetriever() override {}
+    explicit DelayedStringRetriever(SmallVectorImpl<char> &OS) : OS(OS),
+                                                              Underlying(OS) {}
     void startPiece() {
       CurrentStart = OS.size();
     }
