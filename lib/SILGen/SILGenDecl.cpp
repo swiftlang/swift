@@ -447,7 +447,8 @@ public:
     } else {
       // If this is a let with an initializer or bound value, we only need a
       // buffer if the type is address only.
-      needsTemporaryBuffer = lowering.isAddressOnly();
+      needsTemporaryBuffer =
+          lowering.isAddressOnly() && gen.silConv.useLoweredAddresses();
     }
    
     if (needsTemporaryBuffer) {
