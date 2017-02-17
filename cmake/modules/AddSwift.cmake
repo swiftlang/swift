@@ -435,14 +435,7 @@ function(_add_swift_lipo_target)
   # Gather the source binaries.
   set(source_binaries)
   foreach(source_target ${source_targets})
-    if(SWIFT_CMAKE_HAS_GENERATOR_EXPRESSIONS)
-      list(APPEND source_binaries $<TARGET_FILE:${source_target}>)
-    else()
-      get_property(source_binary
-          TARGET ${source_target}
-          PROPERTY LOCATION)
-      list(APPEND source_binaries "${source_binary}")
-    endif()
+    list(APPEND source_binaries $<TARGET_FILE:${source_target}>)
   endforeach()
 
   is_darwin_based_sdk("${LIPO_SDK}" IS_DARWIN)
