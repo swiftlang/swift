@@ -25,7 +25,7 @@ bb0(%0 : $T):
 // CHECK: bb0(%0 : $*T, %1 : $T):
 // CHECK: %[[CPY:.*]] = copy_value %1 : $T
 // CHECK: %[[LD:.*]] = load %0 : $*T
-// CHECK: store %1 to %0 : $*T
+// CHECK: store %2 to %0 : $*T
 // CHECK: destroy_value %[[LD]] : $T
 // CHECK: destroy_value %1 : $T
 // CHECK: return %{{.*}} : $()
@@ -68,7 +68,7 @@ bb0(%0 : $Int):
 // CHECK: bb0(%0 : $T):
 // CHECK:   %1 = copy_value %0 : $T
 // CHECK:   %2 = copy_value %0 : $T
-// CHECK:   %3 = tuple (%0 : $T, %0 : $T, %0 : $T)
+// CHECK:   %3 = tuple (%1 : $T, %2 : $T, %0 : $T)
 // CHECK:   return %3 : $(T, T, T)
 // CHECK-LABEL: } // end sil function 'f040_multiResult'
 sil hidden [noinline] @f040_multiResult : $@convention(thin) <T> (@in T) -> (@out T, @out T, @out T) {
