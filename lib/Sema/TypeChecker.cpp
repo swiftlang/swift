@@ -161,7 +161,7 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Protocol)\
     case ObjectLiteralExpr::Name:\
       return getProtocol(expr->getLoc(), KnownProtocolKind::Protocol);
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
     }
   }
 
