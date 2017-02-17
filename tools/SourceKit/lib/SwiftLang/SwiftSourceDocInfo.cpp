@@ -715,36 +715,30 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   }
   unsigned GroupEnd = SS.size();
 
-  SmallVector<std::pair<unsigned, unsigned>, 4> OverUSROffs;
-
+  DelayedStringRetriever OverUSRsStream(SS);
   ide::walkOverriddenDecls(VD,
     [&](llvm::PointerUnion<const ValueDecl*, const clang::NamedDecl*> D) {
-      unsigned OverUSRBegin = SS.size();
-      {
-        llvm::raw_svector_ostream OS(SS);
-        if (auto VD = D.dyn_cast<const ValueDecl*>()) {
-          if (SwiftLangSupport::printUSR(VD, OS))
-            return;
-        } else {
-          llvm::SmallString<128> Buf;
-          if (clang::index::generateUSRForDecl(
-              D.get<const clang::NamedDecl*>(), Buf))
-            return;
-          OS << Buf.str();
-        }
+      OverUSRsStream.startPiece();
+      if (auto VD = D.dyn_cast<const ValueDecl*>()) {
+        if (SwiftLangSupport::printUSR(VD, OverUSRsStream))
+          return;
+      } else {
+        llvm::SmallString<128> Buf;
+        if (clang::index::generateUSRForDecl(
+            D.get<const clang::NamedDecl*>(), Buf))
+          return;
+        OverUSRsStream << Buf.str();
       }
-      unsigned OverUSREnd = SS.size();
-      OverUSROffs.push_back(std::make_pair(OverUSRBegin, OverUSREnd));
+      OverUSRsStream.endPiece();
   });
 
-  SmallVector<std::pair<unsigned, unsigned>, 4> RelDeclOffs;
+  DelayedStringRetriever RelDeclsStream(SS);
   walkRelatedDecls(VD, [&](const ValueDecl *RelatedDecl, bool DuplicateName) {
-    unsigned RelatedDeclBegin = SS.size();
+    RelDeclsStream.startPiece();
     {
-      llvm::raw_svector_ostream OS(SS);
-      OS<<"<RelatedName usr=\"";
-      SwiftLangSupport::printUSR(RelatedDecl, OS);
-      OS<<"\">";
+      RelDeclsStream<<"<RelatedName usr=\"";
+      SwiftLangSupport::printUSR(RelatedDecl, RelDeclsStream);
+      RelDeclsStream<<"\">";
       if (isa<AbstractFunctionDecl>(RelatedDecl) && DuplicateName) {
         // Related decls are generally overloads, so print parameter types to
         // differentiate them.
@@ -752,7 +746,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
         PO.SkipAttributes = true;
         PO.SkipIntroducerKeywords = true;
         PO.ArgAndParamPrinting = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
-        XMLEscapingPrinter Printer(OS);
+        XMLEscapingPrinter Printer(RelDeclsStream);
         if (BaseType) {
           PO.setBaseType(BaseType);
           PO.PrintAsMember = true;
@@ -764,12 +758,11 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
           llvm::raw_svector_ostream OSBuf(Buf);
           SwiftLangSupport::printDisplayName(RelatedDecl, OSBuf);
         }
-        swift::markup::appendWithXMLEscaping(OS, Buf);
+        swift::markup::appendWithXMLEscaping(RelDeclsStream, Buf);
       }
-      OS<<"</RelatedName>";
+      RelDeclsStream<<"</RelatedName>";
     }
-    unsigned RelatedDeclEnd = SS.size();
-    RelDeclOffs.push_back(std::make_pair(RelatedDeclBegin, RelatedDeclEnd));
+    RelDeclsStream.endPiece();
   });
 
   ASTContext &Ctx = VD->getASTContext();
@@ -819,16 +812,10 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   }
 
   SmallVector<StringRef, 4> OverUSRs;
-  for (auto Offs : OverUSROffs) {
-    OverUSRs.push_back(StringRef(SS.begin()+Offs.first,
-                                 Offs.second-Offs.first));
-  }
+  OverUSRsStream.retrieve([&](StringRef S) { OverUSRs.push_back(S); });
 
   SmallVector<StringRef, 4> AnnotatedRelatedDecls;
-  for (auto Offs : RelDeclOffs) {
-    AnnotatedRelatedDecls.push_back(StringRef(SS.begin() + Offs.first,
-                                              Offs.second - Offs.first));
-  }
+  RelDeclsStream.retrieve([&](StringRef S) { AnnotatedRelatedDecls.push_back(S); });
 
   bool IsSystem = VD->getModuleContext()->isSystemModule();
   std::string TypeInterface;

@@ -293,6 +293,42 @@ public:
   unsigned partsCount() const { return 1 + Labels.size(); }
   unsigned commonPartsCount(DeclNameViewer &Other) const;
 };
+
+/// This provide a utility for writing to a underlying string buffer mulitiple
+/// string pieces and retrieve them later when the underlying buffer is stable.
+class DelayedStringRetriever : public raw_ostream {
+    SmallVectorImpl<char> &OS;
+    std::unique_ptr<llvm::raw_svector_ostream> Underlying;
+    SmallVector<std::pair<unsigned, unsigned>, 4> StartEnds;
+    unsigned Pos;
+    unsigned CurrentStart;
+public:
+    explicit DelayedStringRetriever(SmallVectorImpl<char> &OS) : OS(OS) {}
+    ~DelayedStringRetriever() override { assert(!Underlying); }
+    void startPiece() {
+      CurrentStart = OS.size();
+      Underlying.reset(new llvm::raw_svector_ostream(OS));
+    }
+    void endPiece() {
+      Underlying.reset();
+      StartEnds.emplace_back(CurrentStart, OS.size());
+    }
+    void write_impl(const char *ptr, size_t size) override {
+      Underlying->write(ptr, size);
+      Pos += size;
+    }
+    uint64_t current_pos() const override {
+      return Pos;
+    }
+    size_t preferred_buffer_size() const override {
+      return 0;
+    }
+    void retrieve(std::function<void(StringRef)> F) {
+      for (auto P : StartEnds) {
+        F(StringRef(OS.begin() + P.first, P.second - P.first));
+      }
+    }
+  };
 } // namespace ide
 } // namespace swift
 
