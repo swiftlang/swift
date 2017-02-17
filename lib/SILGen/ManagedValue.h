@@ -257,6 +257,10 @@ public:
   /// will not be forwarded until the borrowed value is fully used.
   ManagedValue borrow(SILGenFunction &gen, SILLocation loc) const;
 
+  /// Return a formally evaluated "borrowed" version of this value.
+  ManagedValue formalEvaluationBorrow(SILGenFunction &gen,
+                                      SILLocation loc) const;
+
   ManagedValue unmanagedBorrow() const {
     return isLValue() ? *this : ManagedValue::forUnmanaged(getValue());
   }
@@ -360,36 +364,6 @@ public:
   ConsumableManagedValue asBorrowedOperand() const {
     return { asUnmanagedValue(), CastConsumptionKind::CopyOnSuccess };
   }
-};
-
-/// An RAII object that allows a user to borrow a value without a specific scope
-/// that ensures that the object is cleaned up before other scoped cleanups
-/// occur. The way cleanup is triggered is by calling:
-///
-///   std::move(value).cleanup();
-class BorrowedManagedValue {
-  SILGenFunction &gen;
-  ManagedValue borrowedValue;
-  Optional<CleanupHandle> handle;
-  SILLocation loc;
-
-public:
-  BorrowedManagedValue(SILGenFunction &gen, ManagedValue originalValue,
-                       SILLocation loc);
-  ~BorrowedManagedValue() {
-    assert(!borrowedValue &&
-           "Did not manually cleanup borrowed managed value?!");
-  }
-  BorrowedManagedValue(const BorrowedManagedValue &) = delete;
-  BorrowedManagedValue(BorrowedManagedValue &&) = delete;
-  BorrowedManagedValue &operator=(const BorrowedManagedValue &) = delete;
-  BorrowedManagedValue &operator=(BorrowedManagedValue &&) = delete;
-
-  void cleanup() && { cleanupImpl(); }
-  operator ManagedValue() const { return borrowedValue; }
-
-private:
-  void cleanupImpl();
 };
 
 } // namespace Lowering

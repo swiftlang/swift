@@ -15,16 +15,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Demangle.h"
-#include "swift/Basic/Fallthrough.h"
-#ifndef NO_NEW_DEMANGLING
 #include "swift/Basic/Demangler.h"
 #include "swift/Basic/ManglingMacros.h"
-#endif
 #include "swift/Strings.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Punycode.h"
 #include "swift/Basic/UUID.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Compiler.h"
 #include <functional>
 #include <vector>
 #include <cstdio>
@@ -295,11 +293,11 @@ static StringRef toString(ValueWitnessKind k) {
 }
 
 /// The main class for parsing a demangling tree out of a mangled string.
-class Demangler {
+class OldDemangler {
   std::vector<NodePointer> Substitutions;
   NameSource Mangled;
 public:  
-  Demangler(llvm::StringRef mangled) : Mangled(mangled) {}
+  OldDemangler(llvm::StringRef mangled) : Mangled(mangled) {}
 
 /// Try to demangle a child node of the given kind.  If that fails,
 /// return; otherwise add it to the parent.
@@ -325,12 +323,10 @@ public:
   ///
   /// \return true if the mangling succeeded
   NodePointer demangleTopLevel() {
-#ifndef NO_NEW_DEMANGLING
     if (Mangled.str().startswith(MANGLING_PREFIX_STR)) {
       NewMangling::Demangler D(Mangled.str());
       return D.demangleTopLevel();
     }
-#endif
     if (!Mangled.nextIf("_T"))
       return nullptr;
 
@@ -2337,26 +2333,23 @@ private:
 
 
 bool
-swift::Demangle::isSwiftSymbol(const char *mangledName,
-                               size_t mangledNameLength) {
-  StringRef Name(mangledName, mangledNameLength);
+swift::Demangle::isSwiftSymbol(const char *mangledName) {
   // The old mangling.
-  if (Name.startswith("_T"))
+  if (mangledName[0] == '_' && mangledName[1] == 'T')
     return true;
 
-#ifndef NO_NEW_DEMANGLING
   // The new mangling.
-  if (Name.startswith(MANGLING_PREFIX_STR))
-    return true;
-#endif // !NO_NEW_DEMANGLING
-  return false;
+  for (unsigned i = 0; i < sizeof(MANGLING_PREFIX_STR) - 1; i++) {
+    if (mangledName[i] != MANGLING_PREFIX_STR[i])
+      return false;
+  }
+  return true;
 }
 
 bool
 swift::Demangle::isThunkSymbol(const char *mangledName,
                                size_t mangledNameLength) {
   StringRef Name(mangledName, mangledNameLength);
-#ifndef NO_NEW_DEMANGLING
   if (Name.startswith(MANGLING_PREFIX_STR)) {
     // First do a quick check
     if (Name.endswith("TA") ||  // partial application forwarder
@@ -2382,7 +2375,6 @@ swift::Demangle::isThunkSymbol(const char *mangledName,
     }
     return false;
   }
-#endif // !NO_NEW_DEMANGLING
 
   if (Name.startswith("_T")) {
     // Old mangling.
@@ -2400,7 +2392,7 @@ NodePointer
 swift::Demangle::demangleSymbolAsNode(const char *MangledName,
                                       size_t MangledNameLength,
                                       const DemangleOptions &Options) {
-  Demangler demangler(StringRef(MangledName, MangledNameLength));
+  OldDemangler demangler(StringRef(MangledName, MangledNameLength));
   return demangler.demangleTopLevel();
 }
 
@@ -2408,8 +2400,8 @@ NodePointer
 swift::Demangle::demangleTypeAsNode(const char *MangledName,
                                     size_t MangledNameLength,
                                     const DemangleOptions &Options) {
-  Demangler demangler(StringRef(MangledName, MangledNameLength));
-  return demangler.demangleTypeName();
+  NewMangling::Demangler D(StringRef(MangledName, MangledNameLength));
+  return D.demangleType();
 }
 
 namespace {
@@ -2492,7 +2484,6 @@ private:
   /// production.
   bool isSimpleType(NodePointer pointer) {
     switch (pointer->getKind()) {
-    case Node::Kind::Archetype:
     case Node::Kind::AssociatedType:
     case Node::Kind::AssociatedTypeRef:
     case Node::Kind::BoundGenericClass:
@@ -3631,14 +3622,6 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       printChildren(type_list, " & ");
     return;
   }
-  case Node::Kind::Archetype: {
-    Printer << pointer->getText();
-    if (pointer->hasChildren()) {
-      Printer << " : ";
-      print(pointer->getChild(0));
-    }
-    return;
-  }
   case Node::Kind::AssociatedType:
     // Don't print for now.
     return;
@@ -3754,7 +3737,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::ImplErrorResult:
     Printer << "@error ";
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case Node::Kind::ImplParameter:
   case Node::Kind::ImplResult:
     printChildren(pointer, " ");
@@ -3921,7 +3904,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       signature = pointer->getChild(1);
       assert(signature->getKind() == Node::Kind::DependentGenericSignature);
       genericArgs = pointer->getChild(2);
-      assert(signature->getKind() == Node::Kind::TypeList);
+      assert(genericArgs->getKind() == Node::Kind::TypeList);
       
       print(signature);
       Printer << ' ';

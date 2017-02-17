@@ -2,6 +2,9 @@
 
 // REQUIRES: CPU=x86_64
 
+// rdar://30579970
+// REQUIRES: optimized_stdlib
+
 // FIXME: https://bugs.swift.org/browse/SR-2808
 // XFAIL: resilient_stdlib
 

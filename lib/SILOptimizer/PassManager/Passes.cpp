@@ -46,7 +46,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
 
   // If we parsed a .sil file that is already in canonical form, don't rerun
   // the diagnostic passes.
-  if (Module.getStage() == SILStage::Canonical)
+  if (Module.getStage() != SILStage::Raw)
     return false;
 
   auto &Ctx = Module.getASTContext();
@@ -161,4 +161,18 @@ StringRef swift::PassKindID(PassKind Kind) {
   }
 
   llvm_unreachable("Unhandled PassKind in switch.");
+}
+
+// During SIL Lowering, passes may see partially lowered SIL, which is
+// inconsistent with the current (canonical) stage. We don't change the SIL
+// stage until lowering is complete. Consequently, any pass added to this
+// PassManager needs to be able to handle the output of the previous pass. If
+// the function pass needs to read SIL from other functions, it may be best to
+// convert it to a module pass to ensure that the SIL input is always at the
+// same stage of lowering.
+void swift::runSILLoweringPasses(SILModule &Module) {
+  SILPassManager PM(&Module, "LoweringPasses");
+  PM.executePassPipelinePlan(SILPassPipelinePlan::getLoweringPassPipeline());
+
+  assert(Module.getStage() == SILStage::Lowered);
 }

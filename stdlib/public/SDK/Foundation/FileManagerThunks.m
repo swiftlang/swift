@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #import <Foundation/Foundation.h>
+#include "swift/Runtime/Config.h"
 
+SWIFT_CC(swift)
 extern /*"C"*/ NS_RETURNS_RETAINED id
 NS_Swift_NSFileManager_replaceItemAtURL_withItemAtURL_backupItemName_options(
     NSFileManager *NS_RELEASES_ARGUMENT _Nonnull self_,

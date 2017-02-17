@@ -245,6 +245,8 @@ llvm::raw_ostream &Lowering::operator<<(llvm::raw_ostream &os,
   case CleanupState::PersistentlyActive:
     return os << "PersistentlyActive";
   }
+
+  llvm_unreachable("Unhandled CleanupState in switch.");
 }
 
 void CleanupManager::dump() const {
@@ -255,7 +257,7 @@ void CleanupManager::dump() const {
     auto iter = Stack.find(begin);
     const Cleanup &stackCleanup = *iter;
     llvm::errs() << "CLEANUP DEPTH: " << begin.getDepth() << "\n";
-    stackCleanup.dump();
+    stackCleanup.dump(Gen);
     begin = Stack.stabilize(++iter);
     Stack.checkIterator(begin);
   }

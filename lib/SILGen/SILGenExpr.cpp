@@ -20,7 +20,6 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/SILArgument.h"
@@ -35,9 +34,10 @@
 #include "SILGenDynamicCast.h"
 #include "Varargs.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 #include "swift/AST/DiagnosticsSIL.h"
@@ -137,6 +137,116 @@ SILGenFunction::emitManagedBeginBorrow(SILLocation loc, SILValue v,
   return emitManagedBorrowedRValueWithCleanup(v, bbi, lowering);
 }
 
+namespace {
+
+struct EndBorrowCleanup : Cleanup {
+  SILValue originalValue;
+  SILValue borrowedValue;
+
+  EndBorrowCleanup(SILValue originalValue, SILValue borrowedValue)
+      : originalValue(originalValue), borrowedValue(borrowedValue) {}
+
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    gen.B.createEndBorrow(l, borrowedValue, originalValue);
+  }
+
+  void dump(SILGenFunction &gen) const override {
+#ifndef NDEBUG
+    llvm::errs() << "EndBorrowCleanup "
+                 << "State:" << getState() << "\n"
+                 << "original:" << originalValue << "\n"
+                 << "borrowed:" << borrowedValue << "\n";
+#endif
+  }
+};
+
+struct FormalEvaluationEndBorrowCleanup : Cleanup {
+  FormalEvaluationContext::stable_iterator Depth;
+
+  FormalEvaluationEndBorrowCleanup() : Depth() {}
+
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    getEvaluation(gen).finish(gen);
+  }
+
+  void dump(SILGenFunction &gen) const override {
+#ifndef NDEBUG
+    llvm::errs() << "FormalEvaluationEndBorrowCleanup "
+                 << "State:" << getState() << "\n"
+                 << "original:" << getOriginalValue(gen) << "\n"
+                 << "borrowed:" << getBorrowedValue(gen) << "\n";
+#endif
+  }
+
+  SharedBorrowFormalEvaluation &getEvaluation(SILGenFunction &gen) const {
+    auto &evaluation = *gen.FormalEvalContext.find(Depth);
+    assert(evaluation.getKind() == FormalEvaluation::Shared);
+    return static_cast<SharedBorrowFormalEvaluation &>(evaluation);
+  }
+
+  SILValue getOriginalValue(SILGenFunction &gen) const {
+    return getEvaluation(gen).getOriginalValue();
+  }
+
+  SILValue getBorrowedValue(SILGenFunction &gen) const {
+    return getEvaluation(gen).getBorrowedValue();
+  }
+};
+
+} // end anonymous namespace
+
+ManagedValue
+SILGenFunction::emitFormalEvaluationManagedBeginBorrow(SILLocation loc,
+                                                       SILValue v) {
+  if (v.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+    return ManagedValue::forUnmanaged(v);
+  auto &lowering = F.getTypeLowering(v->getType());
+  return emitFormalEvaluationManagedBeginBorrow(loc, v, lowering);
+}
+
+ManagedValue SILGenFunction::emitFormalEvaluationManagedBeginBorrow(
+    SILLocation loc, SILValue v, const TypeLowering &lowering) {
+  assert(lowering.getLoweredType().getObjectType() ==
+         v->getType().getObjectType());
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(v);
+  if (v.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+    return ManagedValue::forUnmanaged(v);
+  auto *bbi = B.createBeginBorrow(loc, v);
+  return emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc, v, bbi,
+                                                              lowering);
+}
+
+ManagedValue
+SILGenFunction::emitFormalEvaluationManagedBorrowedRValueWithCleanup(
+    SILLocation loc, SILValue original, SILValue borrowed) {
+  auto &lowering = F.getTypeLowering(original->getType());
+  return emitFormalEvaluationManagedBorrowedRValueWithCleanup(
+      loc, original, borrowed, lowering);
+}
+
+ManagedValue
+SILGenFunction::emitFormalEvaluationManagedBorrowedRValueWithCleanup(
+    SILLocation loc, SILValue original, SILValue borrowed,
+    const TypeLowering &lowering) {
+  assert(lowering.getLoweredType().getObjectType() ==
+         original->getType().getObjectType());
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(borrowed);
+
+  if (!borrowed->getType().isObject()) {
+    return ManagedValue(borrowed, CleanupHandle::invalid());
+  }
+
+  assert(InWritebackScope && "Must be in formal evaluation scope");
+  Cleanups.pushCleanup<FormalEvaluationEndBorrowCleanup>();
+  CleanupHandle handle = Cleanups.getTopCleanup();
+  FormalEvalContext.push<SharedBorrowFormalEvaluation>(loc, handle, original,
+                                                       borrowed);
+
+  return ManagedValue(borrowed, CleanupHandle::invalid());
+}
+
 ManagedValue
 SILGenFunction::emitManagedBorrowedRValueWithCleanup(SILValue original,
                                                      SILValue borrowed) {
@@ -153,8 +263,9 @@ ManagedValue SILGenFunction::emitManagedBorrowedRValueWithCleanup(
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(borrowed);
 
-  if (borrowed->getType().isObject())
-    enterEndBorrowCleanup(original, borrowed);
+  if (borrowed->getType().isObject()) {
+    Cleanups.pushCleanup<EndBorrowCleanup>(original, borrowed);
+  }
   return ManagedValue(borrowed, CleanupHandle::invalid());
 }
 
@@ -189,7 +300,7 @@ ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v,
 void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
   // Handle the special case of copying an lvalue.
   if (auto load = dyn_cast<LoadExpr>(E)) {
-    WritebackScope writeback(*this);
+    FormalEvaluationScope writeback(*this);
     auto lv = emitLValue(load->getSubExpr(), AccessKind::Read);
     emitCopyLValueInto(E, std::move(lv), I);
     return;
@@ -394,10 +505,10 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
                   AccessSemantics semantics, SGFContext C) {
   assert(!ncRefType->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
-  
+
   // Any writebacks for this access are tightly scoped.
-  WritebackScope scope(*this);
-  
+  FormalEvaluationScope scope(*this);
+
   // If this is a decl that we have an lvalue for, produce and return it.
   ValueDecl *decl = declRef.getDecl();
   
@@ -494,7 +605,8 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
                       refType, emitManagedRValueWithCleanup(Scalar));
       }
 
-      auto Result = ManagedValue::forUnmanaged(Scalar);
+      // This is a let, so we can make guarantees, so begin the borrow scope.
+      ManagedValue Result = emitManagedBeginBorrow(loc, Scalar);
 
       // If the client can't handle a +0 result, retain it to get a +1.
       // This is a 'let', so we can make guarantees.
@@ -845,7 +957,7 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   // Any writebacks here are tightly scoped.
-  WritebackScope writeback(SGF);
+  FormalEvaluationScope writeback(SGF);
   LValue lv = SGF.emitLValue(E->getSubExpr(), AccessKind::Read);
   return SGF.emitLoadOfLValue(E, std::move(lv), C);
 }
@@ -1261,7 +1373,7 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
         SILType::getPrimitiveObjectType(
          adjustFunctionType(resultFTy, SILFunctionType::Representation::Thick)));
       result = ManagedValue(v, result.getCleanup());
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     }
     case SILFunctionType::Representation::Thick:
     case SILFunctionType::Representation::CFunctionPointer:
@@ -1780,7 +1892,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
   // Everything else should use the l-value logic.
 
   // Any writebacks for this access are tightly scoped.
-  WritebackScope scope(SGF);
+  FormalEvaluationScope scope(SGF);
 
   LValue lv = SGF.emitLValue(E, AccessKind::Read);
   return SGF.emitLoadOfLValue(E, std::move(lv), C);
@@ -1799,7 +1911,7 @@ visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   // Any writebacks for this access are tightly scoped.
-  WritebackScope scope(SGF);
+  FormalEvaluationScope scope(SGF);
 
   LValue lv = SGF.emitLValue(E, AccessKind::Read);
   return SGF.emitLoadOfLValue(E, std::move(lv), C);
@@ -2464,10 +2576,12 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M,
   // Computed properties of non-optional reference type that were imported from
   // Objective-C.
   if (auto var = dyn_cast<VarDecl>(decl)) {
+#ifndef NDEBUG
     auto type = var->getInterfaceType();
     assert((type->hasTypeParameter()
             || isVerbatimNullableTypeInC(M, type->getReferenceStorageReferent()))
            && "property's result type is not nullable?!");
+#endif
     return var->hasClangNode();
   }
 
@@ -2850,7 +2964,7 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
     // also prevents us from getting into that case.
     if (dest->getType()->isEqual(srcLoad->getSubExpr()->getType())) {
       assert(!dest->getType()->is<TupleType>());
-      WritebackScope writeback(SGF);
+      FormalEvaluationScope writeback(SGF);
       auto destLV = SGF.emitLValue(dest, AccessKind::Write);
       auto srcLV = SGF.emitLValue(srcLoad->getSubExpr(), AccessKind::Read);
       SGF.emitAssignLValueToLValue(loc, std::move(srcLV), std::move(destLV));
@@ -2871,14 +2985,14 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
       return;
     }
 
-    WritebackScope writeback(SGF);
+    FormalEvaluationScope writeback(SGF);
     LValue destLV = SGF.emitLValue(dest, AccessKind::Write);
     RValue srcRV = SGF.emitRValue(src);
     SGF.emitAssignToLValue(loc, std::move(srcRV), std::move(destLV));
     return;
   }
 
-  WritebackScope writeback(SGF);
+  FormalEvaluationScope writeback(SGF);
 
   // Produce a flattened queue of LValues.
   SmallVector<Optional<LValue>, 4> destLVs;
@@ -3243,31 +3357,32 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
 void SILGenFunction::emitOpenExistentialExprImpl(
        OpenExistentialExpr *E,
        llvm::function_ref<void(Expr *)> emitSubExpr) {
-  Optional<WritebackScope> writebackScope;
+  Optional<FormalEvaluationScope> writebackScope;
 
   // Emit the existential value.
   ManagedValue existentialValue;
+  AccessKind accessKind;
   if (E->getExistentialValue()->getType()->is<LValueType>()) {
     // Create a writeback scope for the access to the existential lvalue.
     writebackScope.emplace(*this);
 
-    AccessKind accessKind = E->getExistentialValue()->getLValueAccessKind();
+    accessKind = E->getExistentialValue()->getLValueAccessKind();
     existentialValue = emitAddressOfLValue(
                          E->getExistentialValue(),
                          emitLValue(E->getExistentialValue(), accessKind),
                          accessKind);
   } else {
+    accessKind = AccessKind::Read;
     existentialValue = emitRValueAsSingleValue(
                          E->getExistentialValue(),
                          SGFContext::AllowGuaranteedPlusZero);
   }
   
   Type opaqueValueType = E->getOpaqueValue()->getType()->getRValueType();
-  SILGenFunction::OpaqueValueState state =
-      emitOpenExistential(E, existentialValue,
-                          CanArchetypeType(E->getOpenedArchetype()),
-                          getLoweredType(opaqueValueType));
-  
+  SILGenFunction::OpaqueValueState state = emitOpenExistential(
+      E, existentialValue, CanArchetypeType(E->getOpenedArchetype()),
+      getLoweredType(opaqueValueType), accessKind);
+
   // Register the opaque value for the projected existential.
   SILGenFunction::OpaqueValueRAII opaqueValueRAII(
                                     *this, E->getOpaqueValue(), state);
@@ -3493,7 +3608,7 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc,
 }
 RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
                                               SGFContext C) {
-  WritebackScope writeback(SGF);
+  FormalEvaluationScope writeback(SGF);
 
   auto &Ctx = SGF.getASTContext();
   FuncDecl *converter;
@@ -3606,7 +3721,7 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   FullExpr scope(Cleanups, CleanupLocation(E));
   if (!E->getType()->isMaterializable()) {
     // Emit the l-value, but don't perform an access.
-    WritebackScope scope(*this);
+    FormalEvaluationScope scope(*this);
     emitLValue(E, AccessKind::Read);
     return;
   }
@@ -3614,7 +3729,7 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   // If this is a load expression, we try hard not to actually do the load
   // (which could materialize a potentially expensive value with cleanups).
   if (auto *LE = dyn_cast<LoadExpr>(E)) {
-    WritebackScope scope(*this);
+    FormalEvaluationScope scope(*this);
     LValue lv = emitLValue(LE->getSubExpr(), AccessKind::Read);
     // If the lvalue is purely physical, then it won't have any side effects,
     // and we don't need to drill into it.

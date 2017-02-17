@@ -1,0 +1,44 @@
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %build-irgen-test-overlays
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+
+// REQUIRES: CPU=i386 || CPU=x86_64
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import gizmo
+
+// CHECK-LABEL: define {{.*}} @test
+// CHECK:  [[ALLOC1:%.*]] = call %objc_object* @objc_allocWithZone
+// CHECK:  [[CAST1:%.*]] = bitcast %objc_object* [[ALLOC1]] to [[KLASS:%.*]]*
+// CHECK:  br
+
+// CHECK:  [[ALLOC2:%.*]] = call %objc_object* @objc_allocWithZone
+// CHECK:  [[CAST2:%.*]] = bitcast %objc_object* [[ALLOC2]] to [[KLASS]]*
+// CHECK:  br
+
+// CHECK:  phi [[KLASS]]* [ [[CAST2]], %{{.*}} ], [ [[CAST1]], %{{.*}} ]
+// CHECK:  ret
+
+sil @test : $@convention(thin) (@owned Optional<Int>) -> () {
+bb0(%0 : $Optional<Int>):
+  switch_enum %0 : $Optional<Int>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
+
+bb1:
+  %1 = alloc_ref [objc] $Gizmo
+  br bb3(%1 : $Gizmo)
+
+bb2:
+  %2 = alloc_ref [objc] $Gizmo
+  br bb3(%2 : $Gizmo)
+
+bb3(%3 : $Gizmo):
+  %4 = class_method [volatile] %3 : $Gizmo, #Gizmo.frob!1.foreign : (Gizmo) -> () -> (), $@convention(objc_method) (Gizmo) -> ()
+  %5 = apply %4(%3) : $@convention(objc_method) (Gizmo) -> ()
+  %6 = tuple ()
+  return %6 : $()
+}
+

@@ -43,6 +43,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                            TestOptions *InitOpts);
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef Filename,
                             llvm::raw_ostream &OS);
+static void printNameTranslationInfo(sourcekitd_variant_t Info, llvm::raw_ostream &OS);
 static void printRangeInfo(sourcekitd_variant_t Info, StringRef Filename,
                            llvm::raw_ostream &OS);
 static void printDocInfo(sourcekitd_variant_t Info, StringRef Filename);
@@ -132,6 +133,10 @@ static sourcekitd_uid_t KeyContainerTypeUsr;
 static sourcekitd_uid_t KeyModuleGroups;
 static sourcekitd_uid_t KeySimplified;
 static sourcekitd_uid_t KeyRangeContent;
+static sourcekitd_uid_t KeyBaseName;
+static sourcekitd_uid_t KeyArgNames;
+static sourcekitd_uid_t KeySelectorPieces;
+static sourcekitd_uid_t KeyNameKind;
 
 static sourcekitd_uid_t RequestProtocolVersion;
 static sourcekitd_uid_t RequestDemangle;
@@ -159,10 +164,14 @@ static sourcekitd_uid_t RequestEditorFindUSR;
 static sourcekitd_uid_t RequestEditorFindInterfaceDoc;
 static sourcekitd_uid_t RequestDocInfo;
 static sourcekitd_uid_t RequestModuleGroups;
+static sourcekitd_uid_t RequestNameTranslation;
 
 static sourcekitd_uid_t SemaDiagnosticStage;
 
 static sourcekitd_uid_t NoteDocUpdate;
+
+static sourcekitd_uid_t KindNameObjc;
+static sourcekitd_uid_t KindNameSwift;
 
 static SourceKit::Semaphore semaSemaphore(0);
 static sourcekitd_response_t semaResponse;
@@ -250,6 +259,11 @@ static int skt_main(int argc, const char **argv) {
   KeySimplified = sourcekitd_uid_get_from_cstr("key.simplified");
   KeyRangeContent = sourcekitd_uid_get_from_cstr("key.rangecontent");
 
+  KeyBaseName = sourcekitd_uid_get_from_cstr("key.basename");
+  KeyArgNames = sourcekitd_uid_get_from_cstr("key.argnames");
+  KeySelectorPieces = sourcekitd_uid_get_from_cstr("key.selectorpieces");
+  KeyNameKind = sourcekitd_uid_get_from_cstr("key.namekind");
+
   SemaDiagnosticStage = sourcekitd_uid_get_from_cstr("source.diagnostic.stage.swift.sema");
 
   NoteDocUpdate = sourcekitd_uid_get_from_cstr("source.notification.editor.documentupdate");
@@ -280,6 +294,9 @@ static int skt_main(int argc, const char **argv) {
   RequestEditorFindInterfaceDoc = sourcekitd_uid_get_from_cstr("source.request.editor.find_interface_doc");
   RequestDocInfo = sourcekitd_uid_get_from_cstr("source.request.docinfo");
   RequestModuleGroups = sourcekitd_uid_get_from_cstr("source.request.module.groups");
+  RequestNameTranslation = sourcekitd_uid_get_from_cstr("source.request.name.translation");
+  KindNameObjc = sourcekitd_uid_get_from_cstr("source.lang.name.kind.objc");
+  KindNameSwift = sourcekitd_uid_get_from_cstr("source.lang.name.kind.swift");
 
   // A test invocation may initialize the options to be used for subsequent
   // invocations.
@@ -559,6 +576,75 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     sourcekitd_request_dictionary_set_int64(Req, KeyLength, Length);
     break;
   }
+
+  case SourceKitRequest::NameTranslation: {
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestNameTranslation);
+    sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    StringRef BaseName;
+    llvm::SmallVector<StringRef, 4> ArgPices;
+    sourcekitd_uid_t ArgName;
+    if (!Opts.SwiftName.empty()) {
+      sourcekitd_request_dictionary_set_uid(Req, KeyNameKind, KindNameSwift);
+      ArgName = KeyArgNames;
+      StringRef Text(Opts.SwiftName);
+      auto ArgStart = Text.find_first_of('(');
+      if (ArgStart == StringRef::npos) {
+        BaseName = Text;
+      } else {
+        BaseName = Text.substr(0, ArgStart);
+        auto ArgEnd = Text.find_last_of(')');
+        if (ArgEnd == StringRef::npos) {
+          llvm::errs() << "Swift name is malformed.\n";
+          return 1;
+        }
+        StringRef AllArgs = Text.substr(ArgStart + 1, ArgEnd - ArgStart - 1);
+        AllArgs.split(ArgPices, ':');
+        if (!Args.empty()) {
+          if (!ArgPices.back().empty()) {
+            llvm::errs() << "Swift name is malformed.\n";
+            return 1;
+          }
+          ArgPices.pop_back();
+        }
+      }
+    } else if (!Opts.ObjCName.empty()) {
+      sourcekitd_request_dictionary_set_uid(Req, KeyNameKind, KindNameObjc);
+      BaseName = Opts.ObjCName;
+      ArgName = KeySelectorPieces;
+    } else if (!Opts.ObjCSelector.empty()) {
+      sourcekitd_request_dictionary_set_uid(Req, KeyNameKind, KindNameObjc);
+      StringRef Name(Opts.ObjCSelector);
+      Name.split(ArgPices, ':', -1, /*keep empty*/false);
+      ArgName = KeySelectorPieces;
+      std::transform(ArgPices.begin(), ArgPices.end(), ArgPices.begin(),
+        [Name] (StringRef T) {
+        if (T.data() + T.size() < Name.data() + Name.size() &&
+            *(T.data() + T.size()) == ':') {
+          // Include the colon belonging to the piece.
+          return StringRef(T.data(), T.size() + 1);
+        }
+        return T;
+      });
+    } else {
+      llvm::errs() << "must specify either -swift-name or -objc-name or -objc-selector\n";
+      return 1;
+    }
+    if (!BaseName.empty()) {
+      std::string S = BaseName;
+      sourcekitd_request_dictionary_set_string(Req, KeyBaseName, S.c_str());
+    }
+    if (!ArgPices.empty()) {
+      sourcekitd_object_t Arr = sourcekitd_request_array_create(nullptr, 0);
+      for (StringRef A: ArgPices) {
+        std::string S = A;
+        sourcekitd_request_array_set_string(Arr, SOURCEKITD_ARRAY_APPEND,
+                                            S.c_str());
+      }
+      sourcekitd_request_dictionary_set_value(Req, ArgName, Arr);
+    }
+    break;
+  }
+
   case SourceKitRequest::RelatedIdents:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestRelatedIdents);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
@@ -587,7 +673,7 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSubStructure, false);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
-      
+
   case SourceKitRequest::ExpandPlaceholder:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
     sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
@@ -822,6 +908,10 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       printCursorInfo(Info, SourceFile, llvm::outs());
       break;
 
+    case SourceKitRequest::NameTranslation:
+      printNameTranslationInfo(Info, llvm::outs());
+      break;
+
     case SourceKitRequest::RangeInfo:
       printRangeInfo(Info, SourceFile, llvm::outs());
       break;
@@ -918,7 +1008,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
           sourcekitd_request_dictionary_set_value(Fmt, KeyFormatOptions, FO);
           sourcekitd_request_release(FO);
         }
-        
+
         sourcekitd_response_t FmtResp = sourcekitd_send_request_sync(Fmt);
         sourcekitd_response_description_dump_filedesc(FmtResp, STDOUT_FILENO);
         sourcekitd_response_dispose(FmtResp);
@@ -1022,6 +1112,56 @@ static void notification_receiver(sourcekitd_response_t resp) {
     sourcekitd_request_release(edReq);
     semaSemaphore.signal();
   }
+}
+
+static void printNameTranslationInfo(sourcekitd_variant_t Info,
+                                     llvm::raw_ostream &OS) {
+  sourcekitd_uid_t KindUID = sourcekitd_variant_dictionary_get_uid(Info,
+                                                                   KeyNameKind);
+  if (KindUID == nullptr) {
+    OS << "<empty name translation info>\n";
+    return;
+  }
+  const char *Kind = sourcekitd_uid_get_string_ptr(KindUID);
+  const char *BaseName = sourcekitd_variant_dictionary_get_string(Info,
+                                                                  KeyBaseName);
+  std::vector<const char *> Selectors;
+  sourcekitd_variant_t SelectorsObj =
+    sourcekitd_variant_dictionary_get_value(Info, KeySelectorPieces);
+  for (unsigned i = 0, e = sourcekitd_variant_array_get_count(SelectorsObj);
+         i != e; ++i) {
+    sourcekitd_variant_t Entry =
+      sourcekitd_variant_array_get_value(SelectorsObj, i);
+    Selectors.push_back(sourcekitd_variant_dictionary_get_string(Entry, KeyName));
+  }
+
+  std::vector<const char *> Args;
+  sourcekitd_variant_t ArgsObj =
+    sourcekitd_variant_dictionary_get_value(Info, KeyArgNames);
+  for (unsigned i = 0, e = sourcekitd_variant_array_get_count(ArgsObj);
+       i != e; ++i) {
+    sourcekitd_variant_t Entry =
+      sourcekitd_variant_array_get_value(ArgsObj, i);
+    Args.push_back(sourcekitd_variant_dictionary_get_string(Entry, KeyName));
+  }
+
+  OS << Kind << "\n";
+  OS << StringRef(BaseName);
+  if (!Args.empty()) {
+    OS << "(";
+    for (auto A : Args) {
+      StringRef Text(A);
+      if (Text.empty())
+        OS << "_" << ":";
+      else
+        OS << Text << ":";
+    }
+    OS << ")";
+  }
+  for (auto S : Selectors) {
+    OS << S;
+  }
+  OS << '\n';
 }
 
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,

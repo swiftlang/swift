@@ -117,7 +117,7 @@ namespace swift {
     /// \brief Enable the iterative type checker.
     bool IterativeTypeChecker = false;
 
-    /// Debug the generic signatures computed by the archetype builder.
+    /// Debug the generic signatures computed by the generic signature builder.
     bool DebugGenericSignatures = false;
 
     /// Triggers llvm fatal_error if typechecker tries to typecheck a decl or an

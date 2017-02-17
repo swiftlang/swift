@@ -25,7 +25,7 @@
 #include "IRGenModule.h"
 
 namespace swift {
-  class ArchetypeBuilder;
+  class GenericSignatureBuilder;
   class ArchetypeType;
   class CanType;
   class ClassDecl;

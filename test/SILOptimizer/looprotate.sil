@@ -122,7 +122,7 @@ bb0(%0 : $Int32, %25: $*P):
   %2 = integer_literal $Builtin.Int32, 0
   %30 = alloc_box $<τ_0_0> { var τ_0_0 } <Bool>
   %30a = project_box %30 : $<τ_0_0> { var τ_0_0 } <Bool>, 0
-  %40 = open_existential_addr %25 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P
+  %40 = open_existential_addr immutable_access %25 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $*P, %30 : $<τ_0_0> { var τ_0_0 } <Bool>, %30a : $*Bool)
 
 bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $*P, %31 : $<τ_0_0> { var τ_0_0 } <Bool>, %32 : $*Bool):

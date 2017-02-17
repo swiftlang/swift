@@ -326,7 +326,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// the enum type.
     unsigned Recursiveness : 2;
 
-    /// \brief Whther or not this element has an associated value.
+    /// \brief Whether or not this element has an associated value.
     unsigned HasArgumentType : 1;
   };
   enum { NumEnumElementDeclBits = NumValueDeclBits + 3 };
@@ -511,8 +511,11 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// it is implicit. This bit is used during parsing and type-checking to
     /// control inserting the implicit destructor.
     unsigned HasDestructorDecl : 1;
+
+    /// Whether the class has @objc ancestry.
+    unsigned ObjCClassKind : 3;
   };
-  enum { NumClassDeclBits = NumNominalTypeDeclBits + 8 };
+  enum { NumClassDeclBits = NumNominalTypeDeclBits + 11 };
   static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
 
   class StructDeclBitfields {
@@ -2851,8 +2854,8 @@ public:
   ///
   /// \param ignoreNewExtensions Whether to avoid loading any new extension.
   /// Used by the module loader to break recursion.
-  ArrayRef<ValueDecl *> lookupDirect(DeclName name,
-                                     bool ignoreNewExtensions = false);
+  TinyPtrVector<ValueDecl *> lookupDirect(DeclName name,
+                                          bool ignoreNewExtensions = false);
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
@@ -3392,6 +3395,10 @@ class ProtocolDecl : public NominalTypeDecl {
 
   llvm::DenseMap<ValueDecl *, Witness> DefaultWitnesses;
 
+  /// The generic signature representing exactly the new requirements introduced
+  /// by this protocol.
+  GenericSignature *RequirementSignature = nullptr;
+
   /// True if the protocol has requirements that cannot be satisfied (e.g.
   /// because they could not be imported from Objective-C).
   unsigned HasMissingRequirements : 1;
@@ -3585,7 +3592,22 @@ public:
   /// for associated types that are mentioned literally in this
   /// decl. Requirements implied via inheritance are not mentioned, nor is the
   /// conformance of Self to this protocol.
-  GenericSignature *getRequirementSignature();
+  GenericSignature *getRequirementSignature() const {
+    assert(RequirementSignature &&
+           "getting requirement signature before computing it");
+    return RequirementSignature;
+  }
+
+  /// Has the requirement signature been computed yet?
+  bool isRequirementSignatureComputed() const {
+    return RequirementSignature != nullptr;
+  }
+
+  void computeRequirementSignature();
+
+  void setRequirementSignature(GenericSignature *sig) {
+    RequirementSignature = sig;
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -4097,11 +4119,13 @@ public:
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its getter selector.
-  ObjCSelector getObjCGetterSelector(LazyResolver *resolver = nullptr) const;
+  ObjCSelector getObjCGetterSelector(LazyResolver *resolver = nullptr,
+                                Identifier preferredName = Identifier()) const;
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its setter selector.
-  ObjCSelector getObjCSetterSelector(LazyResolver *resolver = nullptr) const;
+  ObjCSelector getObjCSetterSelector(LazyResolver *resolver = nullptr,
+                                Identifier preferredName = Identifier()) const;
 
   AbstractStorageDecl *getOverriddenDecl() const {
     return OverriddenDecl;
@@ -4825,7 +4849,8 @@ public:
   const CaptureInfo &getCaptureInfo() const { return Captures; }
 
   /// Retrieve the Objective-C selector that names this method.
-  ObjCSelector getObjCSelector(LazyResolver *resolver = nullptr) const;
+  ObjCSelector getObjCSelector(LazyResolver *resolver = nullptr,
+                               DeclName preferredName = DeclName()) const;
 
   /// Determine whether the given method would produce an Objective-C
   /// instance method.

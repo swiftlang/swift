@@ -17,7 +17,6 @@
 #ifndef SWIFT_AST_SUBSTITUTION_H
 #define SWIFT_AST_SUBSTITUTION_H
 
-#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
@@ -28,6 +27,7 @@ namespace llvm {
 
 namespace swift {
   class GenericEnvironment;
+  class SubstitutionMap;
 
 /// Substitution - A substitution into a generic specialization.
 class Substitution {

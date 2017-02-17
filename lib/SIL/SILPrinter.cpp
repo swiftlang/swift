@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Strings.h"
-#include "swift/Basic/DemangleWrappers.h"
+#include "swift/Basic/Demangle.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/SIL/SILPrintContext.h"
 #include "swift/SIL/CFG.h"
@@ -49,7 +49,6 @@
 
 
 using namespace swift;
-using namespace demangle_wrappers;
 
 llvm::cl::opt<bool>
 SILPrintNoColor("sil-print-no-color", llvm::cl::init(""),
@@ -61,8 +60,8 @@ SILFullDemangle("sil-full-demangle", llvm::cl::init(false),
 
 static std::string demangleSymbol(StringRef Name) {
   if (SILFullDemangle)
-    return demangleSymbolAsString(Name);
-  return demangleSymbolAsString(Name,
+    return Demangle::demangleSymbolAsString(Name);
+  return Demangle::demangleSymbolAsString(Name,
                     Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
 }
 
@@ -1478,6 +1477,10 @@ public:
     *this << DMI->getType();
   }
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *OI) {
+    if (OI->getAccessKind() == OpenedExistentialAccess::Immutable)
+      *this << "immutable_access ";
+    else
+      *this << "mutable_access ";
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
   void visitOpenExistentialRefInst(OpenExistentialRefInst *OI) {
@@ -1487,6 +1490,9 @@ public:
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
   void visitOpenExistentialBoxInst(OpenExistentialBoxInst *OI) {
+    *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
+  }
+  void visitOpenExistentialOpaqueInst(OpenExistentialOpaqueInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
   void visitInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
@@ -2134,6 +2140,9 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   case SILStage::Canonical:
     OS << "canonical";
     break;
+  case SILStage::Lowered:
+    OS << "lowered";
+    break;
   }
   
   OS << "\n\nimport Builtin\nimport " << STDLIB_NAME
@@ -2339,7 +2348,7 @@ void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     OS << " : ";
     witness.getWitness()->printName(OS);
     OS << "\t// "
-       << demangleSymbolAsString(witness.getWitness()->getName());
+       << Demangle::demangleSymbolAsString(witness.getWitness()->getName());
     OS << '\n';
   }
   

@@ -33,7 +33,6 @@
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Edit.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Basic/SourceManager.h"
@@ -702,8 +701,8 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
   if (Context.hadError())
     return true;
 
-  // Cleanup instructions/builtin calls not suitable for IRGen.
-  performSILCleanup(SM.get());
+  // Convert SIL to a lowered form suitable for IRGen.
+  runSILLoweringPasses(*SM);
 
   // TODO: remove once the frontend understands what action it should perform
   IRGenOpts.OutputKind = getOutputKind(Action);

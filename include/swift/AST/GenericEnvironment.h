@@ -28,7 +28,7 @@
 
 namespace swift {
 
-class ArchetypeBuilder;
+class GenericSignatureBuilder;
 class ASTContext;
 class GenericTypeParamType;
 class SILModule;
@@ -41,7 +41,7 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
                                         std::pair<ArchetypeType *,
                                                   GenericTypeParamType *>> {
   GenericSignature *Signature = nullptr;
-  ArchetypeBuilder *Builder = nullptr;
+  GenericSignatureBuilder *Builder = nullptr;
   DeclContext *OwningDC = nullptr;
 
   // The number of generic type parameter -> context type mappings we have
@@ -109,12 +109,12 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   }
 
   GenericEnvironment(GenericSignature *signature,
-                     ArchetypeBuilder *builder);
+                     GenericSignatureBuilder *builder);
 
   friend class ArchetypeType;
-  friend class ArchetypeBuilder;
+  friend class GenericSignatureBuilder;
   
-  ArchetypeBuilder *getArchetypeBuilder() const { return Builder; }
+  GenericSignatureBuilder *getGenericSignatureBuilder() const { return Builder; }
 
   /// Query function suitable for use as a \c TypeSubstitutionFn that queries
   /// the mapping of interface types to archetypes.
@@ -161,7 +161,7 @@ public:
   /// by calls to \c addMapping().
   static
   GenericEnvironment *getIncomplete(GenericSignature *signature,
-                                    ArchetypeBuilder *builder);
+                                    GenericSignatureBuilder *builder);
 
   /// Set the owning declaration context for this generic environment.
   void setOwningDeclContext(DeclContext *owningDC);

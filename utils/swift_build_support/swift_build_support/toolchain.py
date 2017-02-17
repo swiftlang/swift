@@ -43,6 +43,8 @@ def _register(name, *tool):
         return self.find_tool(*tool)
     _getter.__name__ = name
     setattr(Toolchain, name, cache_util.reify(_getter))
+
+
 _register("cc", "clang")
 _register("cxx", "clang++")
 _register("ninja", "ninja", "ninja-build")

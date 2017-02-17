@@ -17,7 +17,7 @@ bb0(%x : $*T):
   %0 = tuple ()
   return %0 : $()
 }
-// CHECK:    define{{( protected)?}} void @generic([[OPAQUE]]* noalias nocapture, [[TYPE]]* %T) {{.*}} {
+// CHECK:    define{{( protected)?}} swiftcc void @generic([[OPAQUE]]* noalias nocapture, [[TYPE]]* %T) {{.*}} {
 //   Allocate it.
 // CHECK: [[TYPE_ADDR:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK-NEXT: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_ADDR]], {{(i32|i64)}} -1
@@ -56,7 +56,7 @@ bb0(%x : $*T):
   %0 = tuple ()
   return %0 : $()
 }
-// CHECK:    define{{( protected)?}} void @generic_with_reuse([[OPAQUE]]* noalias nocapture, [[TYPE]]* %T) {{.*}} {
+// CHECK:    define{{( protected)?}} swiftcc void @generic_with_reuse([[OPAQUE]]* noalias nocapture, [[TYPE]]* %T) {{.*}} {
 //   Allocate it.
 // CHECK: [[TYPE_ADDR:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK-NEXT: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_ADDR]], {{(i32|i64)}} -1
@@ -99,7 +99,7 @@ bb0(%x : $*Builtin.Int64):
   %0 = tuple ()
   return %0 : $()
 }
-// CHECK-LABEL: define{{( protected)?}} void @fixed_size(i64* noalias nocapture dereferenceable(8))
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @fixed_size(i64* noalias nocapture dereferenceable(8))
 // CHECK:         [[XBUF:%.*]] = alloca i64
 // CHECK-NEXT:    [[XBUFLIFE:%.*]] = bitcast i64* [[XBUF]] to i8*
 // CHECK-NEXT:    call void @llvm.lifetime.start({{(i32|i64)}} 8, i8* [[XBUFLIFE]])

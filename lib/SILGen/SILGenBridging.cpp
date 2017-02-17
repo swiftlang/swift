@@ -19,7 +19,6 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -499,9 +498,10 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
   // some work by opening it.
   if (loweredNativeTy->isExistentialType()) {
     auto openedTy = ArchetypeType::getOpened(loweredNativeTy);
-    
-    auto openedExistential = gen.emitOpenExistential(loc, v, openedTy,
-                                                 gen.getLoweredType(openedTy));
+
+    auto openedExistential = gen.emitOpenExistential(
+        loc, v, openedTy, gen.getLoweredType(openedTy), AccessKind::Read);
+
     v = gen.manageOpaqueValue(openedExistential, loc, SGFContext());
     loweredNativeTy = openedTy;
   }

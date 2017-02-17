@@ -16,11 +16,11 @@
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
 
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletionCache.h"
 
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 using namespace SourceKit;
@@ -865,7 +865,7 @@ static bool canonicalizeFilterName(const char *origName,
         if (next == ':' || next == ')')
           continue;
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     default:
       Result.push_back(curr);
       continue;

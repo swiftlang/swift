@@ -25,6 +25,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -207,7 +208,7 @@ void constraints::simplifyLocator(Expr *&anchor,
         path = path.slice(1);
         continue;
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case ConstraintLocator::Member:
     case ConstraintLocator::MemberRefBase:
@@ -1186,11 +1187,13 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
     GenericVisitor(DeclContext *dc, TypeSubstitutionMap &archetypesMap)
       : dc(dc), archetypesMap(archetypesMap) {}
     
-    bool mismatch(TypeBase *paramType, TypeBase *argType) {
+    bool mismatch(TypeBase *paramType, TypeBase *argType,
+                  Type sugaredFirstType) {
       return paramType->isEqual(argType);
     }
     
-    bool mismatch(SubstitutableType *paramType, TypeBase *argType) {
+    bool mismatch(SubstitutableType *paramType, TypeBase *argType,
+                  Type sugaredFirstType) {
       Type type = paramType;
       if (type->is<GenericTypeParamType>()) {
         assert(dc);
@@ -3506,6 +3509,8 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
                                              TypeLoc::withoutLoc(convertType),
                                              convertTypePurpose, TCEOptions,
                                              listener, CS);
+
+  CS->cacheExprTypes(subExpr);
 
   // This is a terrible hack to get around the fact that typeCheckExpression()
   // might change subExpr to point to a new OpenExistentialExpr. In that case,

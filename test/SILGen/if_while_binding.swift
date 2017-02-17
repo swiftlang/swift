@@ -20,8 +20,10 @@ func if_no_else() {
   if let x = foo() {
   // CHECK: [[YES]]([[VAL:%[0-9]+]] : $String):
   // CHECK:   [[A:%.*]] = function_ref @_T016if_while_binding1a
-  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
   // CHECK:   apply [[A]]([[VAL_COPY]])
+  // CHECK:   end_borrow [[BORROWED_VAL]] from [[VAL]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]
     a(x)
@@ -40,8 +42,10 @@ func if_else_chain() {
   // CHECK: [[YESX]]([[VAL:%[0-9]+]] : $String):
   // CHECK:   debug_value [[VAL]] : $String, let, name "x"
   // CHECK:   [[A:%.*]] = function_ref @_T016if_while_binding1a
-  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
   // CHECK:   apply [[A]]([[VAL_COPY]])
+  // CHECK:   end_borrow [[BORROWED_VAL]] from [[VAL]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT_X:bb[0-9]+]]
     a(x)
@@ -137,10 +141,13 @@ func while_loop_multi() {
   // CHECK: [[LOOP_BODY]]([[B:%[0-9]+]] : $String):
   while let a = foo(), let b = bar() {
     // CHECK:   debug_value [[B]] : $String, let, name "b"
-    // CHECK:   [[A_COPY:%.*]] = copy_value [[A]]
+    // CHECK:   [[BORROWED_A:%.*]] = begin_borrow [[A]]
+    // CHECK:   [[A_COPY:%.*]] = copy_value [[BORROWED_A]]
     // CHECK:   debug_value [[A_COPY]] : $String, let, name "c"
+    // CHECK:   end_borrow [[BORROWED_A]] from [[A]]
     // CHECK:   destroy_value [[A_COPY]]
     // CHECK:   destroy_value [[B]]
+    // CHECK:   destroy_value [[A]]
     // CHECK:   br [[LOOP_ENTRY]]
     let c = a
   }
@@ -263,8 +270,10 @@ func if_leading_boolean(_ a : Int) {
 
 // CHECK: [[SUCCESS]]([[B:%[0-9]+]] : $String):
   // CHECK:   debug_value [[B]] : $String, let, name "b"
-  // CHECK:   [[B_COPY:%.*]] = copy_value [[B]]
+  // CHECK:   [[BORROWED_B:%.*]] = begin_borrow [[B]]
+  // CHECK:   [[B_COPY:%.*]] = copy_value [[BORROWED_B]]
   // CHECK:   debug_value [[B_COPY]] : $String, let, name "c"
+  // CHECK:   end_borrow [[BORROWED_B]] from [[B]]
   // CHECK:   destroy_value [[B_COPY]]
   // CHECK:   destroy_value [[B]]
   // CHECK:   br [[IFDONE]]
@@ -285,8 +294,13 @@ class DerivedClass : BaseClass {}
 func testAsPatternInIfLet(_ a : BaseClass?) {
   // CHECK: bb0([[ARG:%.*]] : $Optional<BaseClass>):
   // CHECK:   debug_value [[ARG]] : $Optional<BaseClass>, let, name "a"
-  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]] : $Optional<BaseClass>
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]] : $Optional<BaseClass>
   // CHECK:   switch_enum [[ARG_COPY]] : $Optional<BaseClass>, case #Optional.some!enumelt.1: [[OPTPRESENTBB:bb[0-9]+]], default [[NILBB:bb[0-9]+]]
+
+  // CHECK: [[NILBB]]:
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK:   br [[EXITBB:bb[0-9]+]]
 
   // CHECK: [[OPTPRESENTBB]]([[CLS:%.*]] : $BaseClass):
   // CHECK:   checked_cast_br [[CLS]] : $BaseClass to $DerivedClass, [[ISDERIVEDBB:bb[0-9]+]], [[ISBASEBB:bb[0-9]+]]
@@ -305,10 +319,12 @@ func testAsPatternInIfLet(_ a : BaseClass?) {
 
   // CHECK: [[ISDERIVEDBB]]([[DERIVEDVAL:%[0-9]+]] : $DerivedClass):
   // CHECK:   debug_value [[DERIVEDVAL]] : $DerivedClass
+  // => SEMANTIC SIL TODO: This is benign, but scoping wise, this end borrow should be after derived val.
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK:   destroy_value [[DERIVEDVAL]] : $DerivedClass
-  // CHECK:   br [[NILBB]]
+  // CHECK:   br [[EXITBB]]
   
-  // CHECK: [[NILBB]]:
+  // CHECK: [[EXITBB]]:
   // CHECK:   destroy_value [[ARG]] : $Optional<BaseClass>
   // CHECK:   tuple ()
   // CHECK:   return

@@ -13,6 +13,7 @@ def execute_cmd(cmd):
     print(cmd)
     os.system(cmd)
 
+
 # The regular expression we use to match compiler-crasher lines.
 regex = re.compile(
     '.*Swift(.*) :: '

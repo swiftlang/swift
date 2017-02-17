@@ -13,19 +13,18 @@
 #include "Serialization.h"
 #include "SILFormat.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LinkLibrary.h"
-#include "swift/AST/Mangle.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Dwarf.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -46,6 +45,7 @@
 #include "llvm/Bitcode/RecordLayout.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -108,6 +108,74 @@ namespace {
       for (auto entry : data) {
         writer.write<uint8_t>(entry.first);
         writer.write<uint32_t>(entry.second);
+      }
+    }
+  };
+
+  class ExtensionTableInfo {
+    serialization::Serializer &Serializer;
+    llvm::SmallDenseMap<const NominalTypeDecl *,std::string,4> MangledNameCache;
+
+  public:
+    explicit ExtensionTableInfo(serialization::Serializer &serializer)
+        : Serializer(serializer) {}
+
+    using key_type = Identifier;
+    using key_type_ref = key_type;
+    using data_type = Serializer::ExtensionTableData;
+    using data_type_ref = const data_type &;
+    using hash_value_type = uint32_t;
+    using offset_type = unsigned;
+
+    hash_value_type ComputeHash(key_type_ref key) {
+      assert(!key.empty());
+      return llvm::HashString(key.str());
+    }
+
+    int32_t getNameDataForBase(const NominalTypeDecl *nominal,
+                               StringRef *dataToWrite = nullptr) {
+      if (nominal->getDeclContext()->isModuleScopeContext())
+        return -Serializer.addModuleRef(nominal->getParentModule());
+
+      auto &mangledName = MangledNameCache[nominal];
+      if (mangledName.empty())
+        mangledName = NewMangling::ASTMangler().mangleNominalType(nominal);
+
+      assert(llvm::isUInt<31>(mangledName.size()));
+      if (dataToWrite)
+        *dataToWrite = mangledName;
+      return mangledName.size();
+    }
+
+    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
+                                                    key_type_ref key,
+                                                    data_type_ref data) {
+      uint32_t keyLength = key.str().size();
+      uint32_t dataLength = (sizeof(uint32_t) * 2) * data.size();
+      for (auto dataPair : data) {
+        int32_t nameData = getNameDataForBase(dataPair.first);
+        if (nameData > 0)
+          dataLength += nameData;
+      }
+      endian::Writer<little> writer(out);
+      writer.write<uint16_t>(keyLength);
+      writer.write<uint16_t>(dataLength);
+      return { keyLength, dataLength };
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      out << key.str();
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      static_assert(declIDFitsIn32Bits(), "DeclID too large");
+      endian::Writer<little> writer(out);
+      for (auto entry : data) {
+        StringRef dataToWrite;
+        writer.write<uint32_t>(entry.second);
+        writer.write<int32_t>(getNameDataForBase(entry.first, &dataToWrite));
+        out << dataToWrite;
       }
     }
   };
@@ -397,7 +465,10 @@ TypeID Serializer::addTypeRef(Type ty) {
   if (!ty)
     return 0;
 
+#ifndef NDEBUG
+  PrettyStackTraceType trace(M->getASTContext(), "serializing", ty);
   assert(!ty->hasError() && "Serializing error type");
+#endif
 
   auto &id = DeclAndTypeIDs[ty];
   if (id.first != 0)
@@ -776,10 +847,11 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
     // Put the framework search paths first so that they'll be preferred upon
     // deserialization.
-    for (auto &path : searchPathOpts.FrameworkSearchPaths)
-      SearchPath.emit(ScratchRecord, /*framework=*/true, path);
+    for (auto &framepath : searchPathOpts.FrameworkSearchPaths)
+      SearchPath.emit(ScratchRecord, /*framework=*/true, framepath.IsSystem,
+                      framepath.Path);
     for (auto &path : searchPathOpts.ImportSearchPaths)
-      SearchPath.emit(ScratchRecord, /*framework=*/false, path);
+      SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false, path);
   }
 
   // FIXME: Having to deal with private imports as a superset of public imports
@@ -1110,7 +1182,6 @@ void Serializer::writeGenericEnvironment(const GenericEnvironment *env) {
     }
 
     rawParamIDs.push_back(addTypeRef(paramTy));
-    rawParamIDs.push_back(addTypeRef(env->mapTypeIntoContext(paramTy)));
   }
 
   if (SILMode) {
@@ -1131,8 +1202,8 @@ void Serializer::writeSILLayout(SILLayout *layout) {
   using namespace decls_block;
   auto foundLayoutID = SILLayouts.find(layout);
   assert(foundLayoutID != SILLayouts.end() && "layout not referenced properly");
-  auto layoutID = foundLayoutID->second;
-  assert(layoutID - 1 == SILLayoutOffsets.size());
+  assert(foundLayoutID->second - 1 == SILLayoutOffsets.size());
+  (void) foundLayoutID;
   SILLayoutOffsets.push_back(Out.GetCurrentBitNo());
   
   SmallVector<unsigned, 16> data;
@@ -1213,20 +1284,8 @@ void Serializer::writeNormalConformance(
         for (auto gp : genericSig->getGenericParams())
           data.push_back(addTypeRef(gp));
 
-        // Mapping from the requirement's interface types to the interface
-        // types of the synthetic environment.
-        auto reqSignature =
-          req->getInnermostDeclContext()->getGenericSignatureOfContext();
-        const auto &reqToSyntheticMap = witness.getRequirementToSyntheticMap();
-        for (auto reqGP : reqSignature->getGenericParams()) {
-          auto canonicalGP =
-            cast<GenericTypeParamType>(reqGP->getCanonicalType());
-          data.push_back(
-            addTypeRef(Type(canonicalGP).subst(reqToSyntheticMap)));
-          auto conformances = reqToSyntheticMap.getConformances(canonicalGP);
-          data.push_back(conformances.size());
-          // Conformances come at the end.
-        }
+        auto reqToSyntheticSubs = witness.getRequirementToSyntheticSubs();
+        data.push_back(reqToSyntheticSubs.size());
 
         // Requirements come at the end.
       } else {
@@ -1279,18 +1338,10 @@ void Serializer::writeNormalConformance(
      writeGenericRequirements(genericSig->getRequirements(),
                               DeclTypeAbbrCodes);
 
-     // Write conformances for the requirement-to-synthetic environment map.
-     auto reqSignature =
-       req->getInnermostDeclContext()->getGenericSignatureOfContext();
-     const auto &reqToSyntheticMap = witness.getRequirementToSyntheticMap();
-     for (auto reqGP : reqSignature->getGenericParams()) {
-       auto canonicalGP =
-         cast<GenericTypeParamType>(reqGP->getCanonicalType());
-       auto conformances = reqToSyntheticMap.getConformances(canonicalGP);
-       for (auto conformance : conformances) {
-         writeConformance(conformance, DeclTypeAbbrCodes);
-       }
-     }
+     // Write requirement-to-synthetic substitutions.
+     writeSubstitutions(witness.getRequirementToSyntheticSubs(),
+                        DeclTypeAbbrCodes,
+                        nullptr);
    }
 
    // Write the witness substitutions.
@@ -1581,7 +1632,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
 
   case DeclContextKind::FileUnit:
     DC = cast<FileUnit>(DC)->getParentModule();
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case DeclContextKind::Module:
     abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
@@ -2661,6 +2712,8 @@ void Serializer::writeDecl(const Decl *D) {
                                protocolsAndInherited);
 
     writeGenericParams(proto->getGenericParams());
+    writeGenericRequirements(
+        proto->getRequirementSignature()->getRequirements(), DeclTypeAbbrCodes);
     writeMembers(proto->getMembers(), true);
     writeDefaultWitnessTable(proto, DeclTypeAbbrCodes);
     break;
@@ -2717,6 +2770,12 @@ void Serializer::writeDecl(const Decl *D) {
                             contextID,
                             param->isLet(),
                             addTypeRef(interfaceType));
+
+    if (interfaceType->hasError()) {
+      param->getDeclContext()->dumpContext();
+      interfaceType->dump();
+      llvm_unreachable("error in interface type of parameter");
+    }
     break;
   }
 
@@ -3137,44 +3196,15 @@ void Serializer::writeType(Type ty) {
       break;
     }
 
-    SmallVector<DeclID, 4> conformances;
-    for (auto proto : archetypeTy->getConformsTo())
-      conformances.push_back(addDeclRef(proto));
+    auto env = archetypeTy->getGenericEnvironment();
+    assert(env && "Primary archetype without generic environment?");
 
-    TypeID parentOrGenericEnv;
-    DeclID assocTypeOrNameID;
-    if (archetypeTy->getParent()) {
-      parentOrGenericEnv = addTypeRef(archetypeTy->getParent());
-      assocTypeOrNameID = addDeclRef(archetypeTy->getAssocType());
-    } else {
-      parentOrGenericEnv =
-        addGenericEnvironmentRef(archetypeTy->getGenericEnvironment());
-      assocTypeOrNameID = addIdentifierRef(archetypeTy->getName());
-    }
+    GenericEnvironmentID envID = addGenericEnvironmentRef(env);
+    Type interfaceType = env->mapTypeOutOfContext(archetypeTy);
 
     unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
     ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    archetypeTy->isPrimary(),
-                                    parentOrGenericEnv,
-                                    assocTypeOrNameID,
-                                    addTypeRef(archetypeTy->getSuperclass()),
-                                    conformances);
-
-    SmallVector<IdentifierID, 4> nestedTypeNames;
-    SmallVector<TypeID, 4> nestedTypes;
-    for (auto next : archetypeTy->getAllNestedTypes()) {
-      nestedTypeNames.push_back(addIdentifierRef(next.first));
-      nestedTypes.push_back(addTypeRef(next.second));
-    }
-
-    abbrCode = DeclTypeAbbrCodes[ArchetypeNestedTypeNamesLayout::Code];
-    ArchetypeNestedTypeNamesLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                               nestedTypeNames);
-
-    abbrCode = DeclTypeAbbrCodes[ArchetypeNestedTypesLayout::Code];
-    ArchetypeNestedTypesLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                           nestedTypes);
-
+                                    envID, addTypeRef(interfaceType));
     break;
   }
 
@@ -3183,7 +3213,9 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[GenericTypeParamTypeLayout::Code];
     DeclID declIDOrDepth;
     unsigned indexPlusOne;
-    if (genericParam->getDecl()) {
+    if (genericParam->getDecl() &&
+        !(genericParam->getDecl()->getDeclContext()->isModuleScopeContext() &&
+          isDeclXRef(genericParam->getDecl()))) {
       declIDOrDepth = addDeclRef(genericParam->getDecl());
       indexPlusOne = 0;
     } else {
@@ -3448,8 +3480,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<LValueTypeLayout>();
   registerDeclTypeAbbr<InOutTypeLayout>();
   registerDeclTypeAbbr<ArchetypeTypeLayout>();
-  registerDeclTypeAbbr<ArchetypeNestedTypeNamesLayout>();
-  registerDeclTypeAbbr<ArchetypeNestedTypesLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
   registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
@@ -3632,6 +3662,32 @@ static void writeDeclTable(const index_block::DeclListLayout &DeclList,
   }
 
   DeclList.emit(scratch, kind, tableOffset, hashTableBlob);
+}
+
+static void
+writeExtensionTable(const index_block::ExtensionTableLayout &ExtensionTable,
+                    const Serializer::ExtensionTable &table,
+                    Serializer &serializer) {
+  if (table.empty())
+    return;
+
+  SmallVector<uint64_t, 8> scratch;
+  llvm::SmallString<4096> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::OnDiskChainedHashTableGenerator<ExtensionTableInfo> generator;
+    ExtensionTableInfo info{serializer};
+    for (auto &entry : table) {
+      generator.insert(entry.first, entry.second, info);
+    }
+
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    endian::Writer<little>(blobStream).write<uint32_t>(0);
+    tableOffset = generator.Emit(blobStream, info);
+  }
+
+  ExtensionTable.emit(scratch, tableOffset, hashTableBlob);
 }
 
 static void writeLocalDeclTable(const index_block::DeclListLayout &DeclList,
@@ -4200,11 +4256,12 @@ static void collectInterestingNestedDeclarations(
 
 void Serializer::writeAST(ModuleOrSourceFile DC,
                           bool enableNestedTypeLookupTable) {
-  DeclTable topLevelDecls, extensionDecls, operatorDecls, operatorMethodDecls;
+  DeclTable topLevelDecls, operatorDecls, operatorMethodDecls;
   DeclTable precedenceGroupDecls;
   ObjCMethodTable objcMethods;
   NestedTypeDeclsTable nestedTypeDecls;
   LocalTypeHashTableGenerator localTypeGenerator;
+  ExtensionTable extensionDecls;
   bool hasLocalTypes = false;
 
   Optional<DeclID> entryPointClassID;
@@ -4238,7 +4295,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
         Type extendedTy = ED->getExtendedType();
         const NominalTypeDecl *extendedNominal = extendedTy->getAnyNominal();
         extensionDecls[extendedNominal->getName()]
-          .push_back({ getKindForTable(extendedNominal), addDeclRef(D) });
+          .push_back({ extendedNominal, addDeclRef(D) });
       } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
         operatorDecls[OD->getName()]
           .push_back({ getStableFixity(OD->getKind()), addDeclRef(D) });
@@ -4306,12 +4363,16 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
     writeDeclTable(DeclList, index_block::TOP_LEVEL_DECLS, topLevelDecls);
     writeDeclTable(DeclList, index_block::OPERATORS, operatorDecls);
     writeDeclTable(DeclList, index_block::PRECEDENCE_GROUPS, precedenceGroupDecls);
-    writeDeclTable(DeclList, index_block::EXTENSIONS, extensionDecls);
     writeDeclTable(DeclList, index_block::CLASS_MEMBERS, ClassMembersByName);
     writeDeclTable(DeclList, index_block::OPERATOR_METHODS, operatorMethodDecls);
     if (hasLocalTypes)
       writeLocalDeclTable(DeclList, index_block::LOCAL_TYPE_DECLS,
                           localTypeGenerator);
+
+    if (!extensionDecls.empty()) {
+      index_block::ExtensionTableLayout ExtensionTable(Out);
+      writeExtensionTable(ExtensionTable, extensionDecls, *this);
+    }
 
     index_block::ObjCMethodTableLayout ObjCMethodTable(Out);
     writeObjCMethodTable(ObjCMethodTable, objcMethods);

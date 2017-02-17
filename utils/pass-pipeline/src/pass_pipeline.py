@@ -6,6 +6,7 @@ class Pass(object):
     def __repr__(self):
         return "<pass name=%s>" % self.name
 
+
 PassListId = 0
 
 

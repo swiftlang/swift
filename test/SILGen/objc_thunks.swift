@@ -97,9 +97,11 @@ class Hoozit : Gizmo {
 
   // CHECK-LABEL: sil hidden @_TFC11objc_thunks6Hoozits15typicalPropertyCSo5Gizmo
   // CHECK: bb0([[ARG0:%.*]] : $Gizmo, [[ARG1:%.*]] : $Hoozit):
-  // CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
+  // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
+  // CHECK:   [[ARG0_COPY:%.*]] = copy_value [[BORROWED_ARG0]]
   // CHECK:   [[ADDR:%.*]] = ref_element_addr [[ARG1]] : {{.*}}, #Hoozit.typicalProperty
   // CHECK:   assign [[ARG0_COPY]] to [[ADDR]] : $*Gizmo
+  // CHECK:   end_borrow [[BORROWED_ARG0]] from [[ARG0]]
   // CHECK:   destroy_value [[ARG0]]
   // CHECK: } // end sil function '_TFC11objc_thunks6Hoozits15typicalPropertyCSo5Gizmo'
 
@@ -135,9 +137,11 @@ class Hoozit : Gizmo {
 
   // CHECK-LABEL: sil hidden @_TFC11objc_thunks6Hoozits12copyPropertyCSo5Gizmo
   // CHECK: bb0([[ARG1:%.*]] : $Gizmo, [[SELF:%.*]] : $Hoozit):
-  // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+  // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
+  // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
   // CHECK:   [[ADDR:%.*]] = ref_element_addr [[SELF]] : {{.*}}, #Hoozit.copyProperty
   // CHECK:   assign [[ARG1_COPY]] to [[ADDR]]
+  // CHECK:   end_borrow [[BORROWED_ARG1]] from [[ARG1]]
   // CHECK:   destroy_value [[ARG1]]
   // CHECK: } // end sil function '_TFC11objc_thunks6Hoozits12copyPropertyCSo5Gizmo'
 
@@ -427,15 +431,20 @@ class X { }
 
 // CHECK-LABEL: sil hidden @_TF11objc_thunks8property
 func property(_ g: Gizmo) -> Int {
-  // CHECK: class_method [volatile] %0 : $Gizmo, #Gizmo.count!getter.1.foreign
+  // CHECK: bb0([[ARG:%.*]] : $Gizmo):
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   class_method [volatile] [[BORROWED_ARG]] : $Gizmo, #Gizmo.count!getter.1.foreign
   return g.count
 }
 
 // CHECK-LABEL: sil hidden @_TF11objc_thunks13blockProperty
 func blockProperty(_ g: Gizmo) {
-  // CHECK: class_method [volatile] %0 : $Gizmo, #Gizmo.block!setter.1.foreign
+  // CHECK: bb0([[ARG:%.*]] : $Gizmo):
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   class_method [volatile] [[BORROWED_ARG]] : $Gizmo, #Gizmo.block!setter.1.foreign
   g.block = { }
-  // CHECK: class_method [volatile] %0 : $Gizmo, #Gizmo.block!getter.1.foreign
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   class_method [volatile] [[BORROWED_ARG]] : $Gizmo, #Gizmo.block!getter.1.foreign
   g.block()
 }
 

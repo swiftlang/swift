@@ -25,15 +25,15 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
+#include "llvm/Support/Compiler.h"
+
 using namespace swift;
 using namespace Lowering;
-
 
 /// Shallow-dump a pattern node one level deep for debug purposes.
 static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
@@ -258,7 +258,7 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
     if ((isa<OptionalSomePattern>(p) && isa<EnumElementPattern>(first)) ||
         (isa<OptionalSomePattern>(first) && isa<EnumElementPattern>(p)))
       return p;
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   }
   case PatternKind::Tuple:
   case PatternKind::Named:

@@ -60,7 +60,7 @@ public:
 
   /// Process Name, try to check if there is a declaration of a function
   /// with this Name.
-  bool hasFunction(StringRef Name, SILLinkage Linkage);
+  bool hasFunction(StringRef Name, Optional<SILLinkage> Linkage = None);
 
   /// Deserialize the VTable mapped to C if it exists and all SIL the VTable
   /// transitively references.

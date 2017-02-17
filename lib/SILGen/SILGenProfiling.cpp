@@ -15,7 +15,6 @@
 #include "SILGenFunction.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "llvm/IR/Intrinsics.h"

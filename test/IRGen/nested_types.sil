@@ -16,7 +16,7 @@ bb0(%0 : $@thick Outer.Inner.Type):
   %1 = metatype $@thick Outer.Type
   return %1 : $@thick Outer.Type
 }
-// CHECK-LABEL: define{{ | protected }}%swift.type* @test0(%swift.type*)
+// CHECK-LABEL: define{{ | protected }}swiftcc %swift.type* @test0(%swift.type*)
 //   TODO: it would be more efficient to get this type from the parent metadata field
 // CHECK:      [[T0:%.*]] = call %swift.type* @_T012nested_types5OuterCMa()
 // CHECK-NEXT: ret %swift.type* [[T0]]

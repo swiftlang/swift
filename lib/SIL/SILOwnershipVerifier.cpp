@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-ownership-verifier"
 
+#include "TransitivelyUnreachableBlocks.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
@@ -38,6 +39,7 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include <algorithm>
 
 using namespace swift;
 
@@ -60,6 +62,110 @@ llvm::cl::opt<bool> IsSILOwnershipVerifierTestingEnabled(
     llvm::cl::desc("Put the sil ownership verifier in testing mode. See "
                    "comment in SILOwnershipVerifier.cpp above option for more "
                    "information."));
+
+//===----------------------------------------------------------------------===//
+//                              Generalized User
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// This is a class that models normal users and also cond_br users that are
+/// associated with the block in the target block. This is safe to do since in
+/// Semantic SIL, cond_br with non-trivial arguments are not allowed to have
+/// critical edges.
+class GeneralizedUser {
+  using InnerTy = llvm::PointerIntPair<SILInstruction *, 1>;
+  InnerTy User;
+
+public:
+  GeneralizedUser(SILInstruction *I) : User(I) {
+    assert(!isa<CondBranchInst>(I));
+  }
+
+  GeneralizedUser(CondBranchInst *I) : User(I) {}
+
+  GeneralizedUser(CondBranchInst *I, unsigned SuccessorIndex)
+      : User(I, SuccessorIndex) {
+    assert(SuccessorIndex == CondBranchInst::TrueIdx ||
+           SuccessorIndex == CondBranchInst::FalseIdx);
+  }
+
+  GeneralizedUser(const GeneralizedUser &Other) : User(Other.User) {}
+  GeneralizedUser &operator=(const GeneralizedUser &Other) {
+    User = Other.User;
+    return *this;
+  }
+
+  operator SILInstruction *() { return User.getPointer(); }
+  operator const SILInstruction *() const { return User.getPointer(); }
+
+  SILInstruction *getInst() const { return User.getPointer(); }
+
+  SILBasicBlock *getParent() const;
+
+  bool isCondBranchUser() const {
+    return isa<CondBranchInst>(User.getPointer());
+  }
+
+  unsigned getCondBranchSuccessorID() const {
+    assert(isCondBranchUser());
+    return User.getInt();
+  }
+
+  SILBasicBlock::iterator getIterator() const {
+    return User.getPointer()->getIterator();
+  }
+
+  void *getAsOpaqueValue() const {
+    return llvm::PointerLikeTypeTraits<InnerTy>::getAsVoidPointer(User);
+  }
+
+  static GeneralizedUser getFromOpaqueValue(void *p) {
+    InnerTy TmpUser =
+        llvm::PointerLikeTypeTraits<InnerTy>::getFromVoidPointer(p);
+    if (auto *CBI = dyn_cast<CondBranchInst>(TmpUser.getPointer())) {
+      return GeneralizedUser(CBI, TmpUser.getInt());
+    }
+    return GeneralizedUser(TmpUser.getPointer());
+  }
+
+  enum {
+    NumLowBitsAvailable =
+        llvm::PointerLikeTypeTraits<InnerTy>::NumLowBitsAvailable
+  };
+};
+
+} // end anonymous namespace
+
+SILBasicBlock *GeneralizedUser::getParent() const {
+  if (!isCondBranchUser()) {
+    return getInst()->getParent();
+  }
+
+  auto *CBI = cast<CondBranchInst>(getInst());
+  unsigned Number = getCondBranchSuccessorID();
+  if (Number == CondBranchInst::TrueIdx)
+    return CBI->getTrueBB();
+  return CBI->getFalseBB();
+}
+
+namespace llvm {
+
+template <> class PointerLikeTypeTraits<GeneralizedUser> {
+
+public:
+  static void *getAsVoidPointer(GeneralizedUser v) {
+    return v.getAsOpaqueValue();
+  }
+
+  static GeneralizedUser getFromVoidPointer(void *p) {
+    return GeneralizedUser::getFromOpaqueValue(p);
+  }
+
+  enum { NumLowBitsAvailable = GeneralizedUser::NumLowBitsAvailable };
+};
+
+} // namespace llvm
 
 //===----------------------------------------------------------------------===//
 //                                  Utility
@@ -304,6 +410,7 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, ObjCExistentialMetatypeToObject)
 CONSTANT_OWNERSHIP_INST(Trivial, false, ObjCMetatypeToObject)
 CONSTANT_OWNERSHIP_INST(Trivial, false, ObjCToThickMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, false, OpenExistentialAddr)
+CONSTANT_OWNERSHIP_INST(Trivial, false, OpenExistentialOpaque)
 CONSTANT_OWNERSHIP_INST(Trivial, false, OpenExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, false, PointerToAddress)
 CONSTANT_OWNERSHIP_INST(Trivial, false, PointerToThinFunction)
@@ -704,8 +811,8 @@ OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitNonTrivialEnum(
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitApplyArgument(ValueOwnershipKind Kind,
                                                      bool ShouldCheck) {
-  // Check if we have an enum. If not, then we just check against the passed inc
-  // onvention.
+  // Check if we have an enum. If not, then we just check against the passed in
+  // convention.
   EnumDecl *E = getType().getEnumOrBoundGenericEnum();
   if (!E) {
     return {compatibleWithOwnership(Kind), ShouldCheck};
@@ -1042,6 +1149,10 @@ class SILValueOwnershipChecker {
   /// The module that we are in.
   SILModule &Mod;
 
+  /// A cache of unreachable function blocks that we use to determine if we can
+  /// ignore "leaks".
+  const TransitivelyUnreachableBlocksInfo &TUB;
+
   /// The value whose ownership we will check.
   SILValue Value;
 
@@ -1053,7 +1164,7 @@ class SILValueOwnershipChecker {
 
   // The set of blocks with non-lifetime ending uses and the associated
   // non-lifetime ending use SILInstruction.
-  llvm::SmallDenseMap<SILBasicBlock *, SILInstruction *, 8>
+  llvm::SmallDenseMap<SILBasicBlock *, GeneralizedUser, 8>
       BlocksWithNonLifetimeEndingUses;
 
   // The blocks that we have already visited.
@@ -1064,7 +1175,10 @@ class SILValueOwnershipChecker {
   llvm::SmallPtrSet<SILBasicBlock *, 8> SuccessorBlocksThatMustBeVisited;
 
 public:
-  SILValueOwnershipChecker(SILModule &M, SILValue V) : Mod(M), Value(V) {}
+  SILValueOwnershipChecker(SILModule &M,
+                           const TransitivelyUnreachableBlocksInfo &TUB,
+                           SILValue V)
+      : Mod(M), TUB(TUB), Value(V) {}
 
   ~SILValueOwnershipChecker() = default;
   SILValueOwnershipChecker(SILValueOwnershipChecker &) = delete;
@@ -1083,42 +1197,72 @@ public:
 private:
   bool checkUses();
   void checkDataflow();
+  void checkDataflowEndConditions();
   void
-  gatherUsers(llvm::SmallVectorImpl<SILInstruction *> &LifetimeEndingUsers,
-              llvm::SmallVectorImpl<SILInstruction *> &NonLifetimeEndingUsers);
+  gatherUsers(llvm::SmallVectorImpl<GeneralizedUser> &LifetimeEndingUsers,
+              llvm::SmallVectorImpl<GeneralizedUser> &NonLifetimeEndingUsers);
   void uniqueNonLifetimeEndingUsers(
-      ArrayRef<SILInstruction *> NonLifetimeEndingUsers);
+      ArrayRef<GeneralizedUser> NonLifetimeEndingUsers);
 
   /// Returns true if the given block is in the BlocksWithLifetimeEndingUses
   /// set. This is a helper to extract out large logging messages so that the
   /// main logic is easy to read.
-  bool doesBlockDoubleConsume(SILBasicBlock *UserBlock,
-                              SILInstruction *LifetimeEndingUser = nullptr,
-                              bool ShouldInsert = false);
+  bool doesBlockDoubleConsume(
+      SILBasicBlock *UserBlock,
+      llvm::Optional<GeneralizedUser> LifetimeEndingUser = None,
+      bool ShouldInsert = false);
 
   /// Returns true if the given block contains a non-lifetime ending use that is
   /// strictly later in the block than a lifetime ending use. If all
   /// non-lifetime ending uses are before the lifetime ending use, the block is
   /// removed from the BlocksWithNonLifetimeEndingUses map to show that the uses
   /// were found to properly be post-dominated by a lifetime ending use.
-  bool doesBlockContainUseAfterFree(SILInstruction *LifetimeEndingUser,
+  bool doesBlockContainUseAfterFree(GeneralizedUser LifetimeEndingUser,
                                     SILBasicBlock *UserBlock);
 
   bool checkValueWithoutLifetimeEndingUses();
+
+  bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *Arg);
 };
 
 } // end anonymous namespace
 
 bool SILValueOwnershipChecker::doesBlockContainUseAfterFree(
-    SILInstruction *LifetimeEndingUser, SILBasicBlock *UserBlock) {
+    GeneralizedUser LifetimeEndingUser, SILBasicBlock *UserBlock) {
   auto Iter = BlocksWithNonLifetimeEndingUses.find(UserBlock);
   if (Iter == BlocksWithNonLifetimeEndingUses.end())
     return false;
 
-  SILInstruction *NonLifetimeEndingUser = Iter->second;
-  // Make sure that the non-lifetime ending use is before the lifetime
-  // ending use. Otherwise, we have a use after free.
-  if (std::find_if(LifetimeEndingUser->getIterator(), UserBlock->end(),
+  GeneralizedUser NonLifetimeEndingUser = Iter->second;
+
+  // Make sure that the non-lifetime ending use is before the lifetime ending
+  // use. Otherwise, we have a use after free.
+
+  // First check if our lifetime ending user is a cond_br. In such a case, we
+  // always consider the non-lifetime ending use to be a use after free.
+  if (LifetimeEndingUser.isCondBranchUser()) {
+    llvm::errs() << "Function: '" << Value->getFunction()->getName() << "'\n"
+                 << "Found use after free?!\n"
+                 << "Value: " << *Value
+                 << "Consuming User: " << *LifetimeEndingUser
+                 << "Non Consuming User: " << *Iter->second << "Block: bb"
+                 << UserBlock->getDebugID() << "\n\n";
+    return true;
+  }
+
+  // Ok. At this point, we know that our lifetime ending user is not a cond
+  // branch user. Check if our non-lifetime ending use is. In such a case, we
+  // know that our non lifetime ending user is properly post-dominated so we can
+  // erase the non lifetime ending use and continue.
+  if (NonLifetimeEndingUser.isCondBranchUser()) {
+    BlocksWithNonLifetimeEndingUses.erase(Iter);
+    return false;
+  }
+
+  // Otherwise, we know that both of our users are non-cond branch users and
+  // thus must be instructions in the given block. Make sure that the non
+  // lifetime ending user is strictly before the lifetime ending user.
+  if (std::find_if(LifetimeEndingUser.getIterator(), UserBlock->end(),
                    [&NonLifetimeEndingUser](const SILInstruction &I) -> bool {
                      return NonLifetimeEndingUser == &I;
                    }) != UserBlock->end()) {
@@ -1137,8 +1281,8 @@ bool SILValueOwnershipChecker::doesBlockContainUseAfterFree(
 }
 
 bool SILValueOwnershipChecker::doesBlockDoubleConsume(
-    SILBasicBlock *UserBlock, SILInstruction *LifetimeEndingUser,
-    bool ShouldInsert) {
+    SILBasicBlock *UserBlock,
+    llvm::Optional<GeneralizedUser> LifetimeEndingUser, bool ShouldInsert) {
   if ((ShouldInsert && BlocksWithLifetimeEndingUses.insert(UserBlock).second) ||
       !BlocksWithLifetimeEndingUses.count(UserBlock))
     return false;
@@ -1146,16 +1290,16 @@ bool SILValueOwnershipChecker::doesBlockDoubleConsume(
   llvm::errs() << "Function: '" << Value->getFunction()->getName() << "'\n"
                << "Found over consume?!\n"
                << "Value: " << *Value;
-  if (LifetimeEndingUser)
-    llvm::errs() << "User: " << *LifetimeEndingUser;
+  if (LifetimeEndingUser.hasValue())
+    llvm::errs() << "User: " << *LifetimeEndingUser.getValue();
   llvm::errs() << "Block: bb" << UserBlock->getDebugID() << "\n\n";
 
   return true;
 }
 
 void SILValueOwnershipChecker::gatherUsers(
-    llvm::SmallVectorImpl<SILInstruction *> &LifetimeEndingUsers,
-    llvm::SmallVectorImpl<SILInstruction *> &NonLifetimeEndingUsers) {
+    llvm::SmallVectorImpl<GeneralizedUser> &LifetimeEndingUsers,
+    llvm::SmallVectorImpl<GeneralizedUser> &NonLifetimeEndingUsers) {
 
   // See if Value is guaranteed. If we are guaranteed and not forwarding, then
   // we need to look through subobject uses for more uses. Otherwise, if we are
@@ -1171,6 +1315,18 @@ void SILValueOwnershipChecker::gatherUsers(
   llvm::SmallVector<Operand *, 8> Users;
   std::copy(Value->use_begin(), Value->use_end(), std::back_inserter(Users));
 
+  auto addCondBranchToList = [](llvm::SmallVectorImpl<GeneralizedUser> &List,
+                                CondBranchInst *CBI, unsigned OperandIndex) {
+    if (CBI->isConditionOperandIndex(OperandIndex)) {
+      List.emplace_back(CBI);
+      return;
+    }
+
+    bool isTrueOperand = CBI->isTrueOperandIndex(OperandIndex);
+    List.emplace_back(CBI, isTrueOperand ? CondBranchInst::TrueIdx
+                                         : CondBranchInst::FalseIdx);
+  };
+
   while (!Users.empty()) {
     Operand *Op = Users.pop_back_val();
     auto *User = Op->getUser();
@@ -1182,10 +1338,19 @@ void SILValueOwnershipChecker::gatherUsers(
 
     if (OwnershipCompatibilityUseChecker(Mod, *Op, Value).check(User)) {
       DEBUG(llvm::dbgs() << "        Lifetime Ending User: " << *User);
-      LifetimeEndingUsers.push_back(User);
+      if (auto *CBI = dyn_cast<CondBranchInst>(User)) {
+        addCondBranchToList(LifetimeEndingUsers, CBI, Op->getOperandNumber());
+      } else {
+        LifetimeEndingUsers.emplace_back(User);
+      }
     } else {
       DEBUG(llvm::dbgs() << "        Regular User: " << *User);
-      NonLifetimeEndingUsers.push_back(User);
+      if (auto *CBI = dyn_cast<CondBranchInst>(User)) {
+        addCondBranchToList(NonLifetimeEndingUsers, CBI,
+                            Op->getOperandNumber());
+      } else {
+        NonLifetimeEndingUsers.emplace_back(User);
+      }
     }
 
     // If our base value is not guaranteed or our intermediate value is not an
@@ -1216,9 +1381,9 @@ void SILValueOwnershipChecker::gatherUsers(
 // Unique our non lifetime ending user list by only selecting the last user in
 // each block.
 void SILValueOwnershipChecker::uniqueNonLifetimeEndingUsers(
-    ArrayRef<SILInstruction *> NonLifetimeEndingUsers) {
-  for (SILInstruction *User : NonLifetimeEndingUsers) {
-    auto *UserBlock = User->getParent();
+    ArrayRef<GeneralizedUser> NonLifetimeEndingUsers) {
+  for (GeneralizedUser User : NonLifetimeEndingUsers) {
+    auto *UserBlock = User.getParent();
     // First try to associate User with User->getParent().
     auto Result =
         BlocksWithNonLifetimeEndingUses.insert(std::make_pair(UserBlock, User));
@@ -1231,24 +1396,33 @@ void SILValueOwnershipChecker::uniqueNonLifetimeEndingUsers(
     // If the insertion fails, then we have at least two non-lifetime ending
     // uses in the same block. Since we are performing a liveness type of
     // dataflow, we only need the last non-lifetime ending use to show that all
-    // lifetime ending uses post dominate both. Thus, see if Use is after
-    // Result.first->second in the use list. If Use is not later, then we wish
-    // to keep the already mapped value, not use, so continue.
-    if (std::find_if(Result.first->second->getIterator(), UserBlock->end(),
+    // lifetime ending uses post dominate both.
+    //
+    // We begin by checking if the first use is a cond_br use from the previous
+    // block. In such a case, we always use the already stored value and
+    // continue.
+    if (User.isCondBranchUser()) {
+      continue;
+    }
+
+    // Then, we check if Use is after Result.first->second in the use list. If
+    // Use is not later, then we wish to keep the already mapped value, not use,
+    // so continue.
+    if (std::find_if(Result.first->second.getIterator(), UserBlock->end(),
                      [&User](const SILInstruction &I) -> bool {
                        return User == &I;
                      }) == UserBlock->end()) {
       continue;
     }
 
-    // At this point, we know that Use is later in the Block than
+    // At this point, we know that User is later in the Block than
     // Result.first->second, so store Use instead.
     Result.first->second = User;
   }
 }
 
-static bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *Arg,
-                                                      SILModule &Mod) {
+bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
+    SILFunctionArgument *Arg) {
   switch (Arg->getOwnershipKind()) {
   case ValueOwnershipKind::Guaranteed:
   case ValueOwnershipKind::Unowned:
@@ -1260,6 +1434,9 @@ static bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *Arg,
   case ValueOwnershipKind::Owned:
     break;
   }
+
+  if (TUB.isUnreachable(Arg->getParent()))
+    return true;
 
   llvm::errs() << "Function: '" << Arg->getFunction()->getName() << "'\n"
                << "    Owned function parameter without life "
@@ -1273,7 +1450,7 @@ static bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *Arg,
 bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
   DEBUG(llvm::dbgs() << "    No lifetime ending users?! Bailing early.\n");
   if (auto *Arg = dyn_cast<SILFunctionArgument>(Value)) {
-    if (checkFunctionArgWithoutLifetimeEndingUses(Arg, Mod)) {
+    if (checkFunctionArgWithoutLifetimeEndingUses(Arg)) {
       return true;
     }
   }
@@ -1288,6 +1465,17 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
   // If we have an unowned value, then again there is nothing left to do.
   if (Value.getOwnershipKind() == ValueOwnershipKind::Unowned)
     return true;
+
+  if (auto *ParentBlock = Value->getParentBlock()) {
+    if (TUB.isUnreachable(ParentBlock)) {
+      DEBUG(llvm::dbgs() << "    Ignoring transitively unreachable value "
+                         << "without users!\n"
+                         << "    Function: '" << Value->getFunction()->getName()
+                         << "'\n"
+                         << "    Value: " << *Value << '\n');
+      return true;
+    }
+  }
 
   if (!isValueAddressOrTrivial(Value, Mod)) {
     llvm::errs() << "Function: '" << Value->getFunction()->getName() << "'\n"
@@ -1305,14 +1493,14 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
 
 static bool isGuaranteedFunctionArgWithLifetimeEndingUses(
     SILFunctionArgument *Arg,
-    const llvm::SmallVectorImpl<SILInstruction *> &LifetimeEndingUsers) {
+    const llvm::SmallVectorImpl<GeneralizedUser> &LifetimeEndingUsers) {
   if (Arg->getOwnershipKind() != ValueOwnershipKind::Guaranteed)
     return true;
 
   llvm::errs() << "    Function: '" << Arg->getFunction()->getName() << "'\n"
                << "    Guaranteed function parameter with life ending uses!\n"
                << "    Value: " << *Arg;
-  for (auto *U : LifetimeEndingUsers) {
+  for (const auto &U : LifetimeEndingUsers) {
     llvm::errs() << "    Lifetime Ending User: " << *U;
   }
   llvm::errs() << '\n';
@@ -1323,11 +1511,11 @@ static bool isGuaranteedFunctionArgWithLifetimeEndingUses(
 
 static bool isSubobjectProjectionWithLifetimeEndingUses(
     SILValue Value,
-    const llvm::SmallVectorImpl<SILInstruction *> &LifetimeEndingUsers) {
+    const llvm::SmallVectorImpl<GeneralizedUser> &LifetimeEndingUsers) {
   llvm::errs() << "    Function: '" << Value->getFunction()->getName() << "'\n"
                << "    Subobject projection with life ending uses!\n"
                << "    Value: " << *Value;
-  for (auto *U : LifetimeEndingUsers) {
+  for (const auto &U : LifetimeEndingUsers) {
     llvm::errs() << "    Lifetime Ending User: " << *U;
   }
   llvm::errs() << '\n';
@@ -1344,8 +1532,8 @@ bool SILValueOwnershipChecker::checkUses() {
   // 1. Verify that none of the uses are in the same block. This would be an
   // overconsume so in this case we assert.
   // 2. Verify that the uses are compatible with our ownership convention.
-  llvm::SmallVector<SILInstruction *, 16> LifetimeEndingUsers;
-  llvm::SmallVector<SILInstruction *, 16> NonLifetimeEndingUsers;
+  llvm::SmallVector<GeneralizedUser, 16> LifetimeEndingUsers;
+  llvm::SmallVector<GeneralizedUser, 16> NonLifetimeEndingUsers;
   gatherUsers(LifetimeEndingUsers, NonLifetimeEndingUsers);
 
   // We can only have no lifetime ending uses if we have:
@@ -1405,10 +1593,10 @@ bool SILValueOwnershipChecker::checkUses() {
   // reason why this is necessary is because we wish to not add elements to the
   // worklist twice. Thus we want to check if we have already visited a
   // predecessor.
-  llvm::SmallVector<std::pair<SILInstruction *, SILBasicBlock *>, 32>
+  llvm::SmallVector<std::pair<GeneralizedUser, SILBasicBlock *>, 32>
       PredsToAddToWorklist;
-  for (SILInstruction *User : LifetimeEndingUsers) {
-    SILBasicBlock *UserBlock = User->getParent();
+  for (GeneralizedUser User : LifetimeEndingUsers) {
+    SILBasicBlock *UserBlock = User.getParent();
     // If the block does over consume, we either assert or return false. We only
     // return false when debugging.
     if (doesBlockDoubleConsume(UserBlock, User, true)) {
@@ -1424,6 +1612,12 @@ bool SILValueOwnershipChecker::checkUses() {
       llvm_unreachable("triggering standard assertion failure routine");
     }
 
+    // If this user is in the same block as the value, do not visit
+    // predecessors. We must be extra tolerant here since we allow for
+    // unreachable code.
+    if (UserBlock == Value->getParentBlock())
+      continue;
+
     // Then for each predecessor of this block...
     for (auto *Pred : UserBlock->getPredecessorBlocks()) {
       // If this block is not a block that we have already put on the list, add
@@ -1432,16 +1626,16 @@ bool SILValueOwnershipChecker::checkUses() {
     }
   }
 
-  for (auto *I : LifetimeEndingUsers) {
+  for (const auto &I : LifetimeEndingUsers) {
     // Finally add the user block to the visited list so we do not try to add it
     // to our must visit successor list.
-    VisitedBlocks.insert(I->getParent());
+    VisitedBlocks.insert(I.getParent());
   }
 
   // Make sure not to add predecessors to our worklist if we only have 1
   // lifetime ending user and it is in the same block as our def.
   if (LifetimeEndingUsers.size() == 1 &&
-      LifetimeEndingUsers[0]->getParent() == Value->getParentBlock()) {
+      LifetimeEndingUsers[0].getParent() == Value->getParentBlock()) {
     return true;
   }
 
@@ -1449,9 +1643,8 @@ bool SILValueOwnershipChecker::checkUses() {
   // PredsToAddToWorklist list and add our preds, making sure that none of these
   // preds are in BlocksWithLifetimeEndingUses.
   for (auto Pair : PredsToAddToWorklist) {
-    SILBasicBlock *PredBlock;
-    SILInstruction *User;
-    std::tie(User, PredBlock) = Pair;
+    GeneralizedUser User = Pair.first;
+    SILBasicBlock *PredBlock = Pair.second;
 
     // Make sure that the predecessor is not in our
     // BlocksWithLifetimeEndingUses list.
@@ -1490,13 +1683,21 @@ void SILValueOwnershipChecker::checkDataflow() {
     // users.
     BlocksWithNonLifetimeEndingUses.erase(BB);
 
-    // Ok, now we know that we do not have an overconsume. So now we need to
-    // update our state for our successors to make sure by the end of the
-    // traversal we visit them.
+    // Ok, now we know that we do not have an overconsume. If this block does
+    // not end in a no return function, we need to update our state for our
+    // successors to make sure by the end of the traversal we visit them.
+    //
+    // We must consider such no-return blocks since we may be running during
+    // SILGen before NoReturn folding has run.
     for (SILBasicBlock *SuccBlock : BB->getSuccessorBlocks()) {
       // If we already visited the successor, there is nothing to do since we
       // already visited the successor.
       if (VisitedBlocks.count(SuccBlock))
+        continue;
+
+      // Then check if the successor is a transitively unreachable block. In
+      // such a case, we ignore it since we are going to leak along that path.
+      if (TUB.isUnreachable(SuccBlock))
         continue;
 
       // Otherwise, add the successor to our SuccessorBlocksThatMustBeVisited
@@ -1529,6 +1730,7 @@ void SILValueOwnershipChecker::checkDataflow() {
       if (VisitedBlocks.count(PredBlock)) {
         continue;
       }
+
       VisitedBlocks.insert(PredBlock);
       Worklist.push_back(PredBlock);
     }
@@ -1600,8 +1802,15 @@ void SILInstruction::verifyOperandOwnership() const {
 #endif
 }
 
-void SILValue::verifyOwnership(SILModule &Mod) const {
+void SILValue::verifyOwnership(SILModule &Mod,
+                               TransitivelyUnreachableBlocksInfo *TUB) const {
 #ifndef NDEBUG
-  SILValueOwnershipChecker(Mod, *this).check();
+  if (TUB) {
+    SILValueOwnershipChecker(Mod, *TUB, *this).check();
+  } else {
+    PostOrderFunctionInfo NewPOFI((*this)->getFunction());
+    TransitivelyUnreachableBlocksInfo TUB(NewPOFI);
+    SILValueOwnershipChecker(Mod, TUB, *this).check();
+  }
 #endif
 }

@@ -63,6 +63,7 @@ function write_linkfile {
 -lpthread
 -latomic
 -lswiftCore
+-latomic
 -lswiftImageInspectionShared
 $ICU_LIBS
 -Xlinker

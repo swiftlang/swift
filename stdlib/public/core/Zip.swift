@@ -112,12 +112,15 @@ public struct Zip2Iterator<
 public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence>
   : Sequence {
 
+    
+  @available(*, deprecated, renamed: "Sequence1.Iterator")
   public typealias Stream1 = Sequence1.Iterator
+  @available(*, deprecated, renamed: "Sequence2.Iterator")
   public typealias Stream2 = Sequence2.Iterator
 
   /// A type whose instances can produce the elements of this
   /// sequence, in order.
-  public typealias Iterator = Zip2Iterator<Stream1, Stream2>
+  public typealias Iterator = Zip2Iterator<Sequence1.Iterator, Sequence2.Iterator>
 
   @available(*, unavailable, renamed: "Iterator")
   public typealias Generator = Iterator

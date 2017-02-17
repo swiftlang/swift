@@ -22,11 +22,11 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/ManglingUtils.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/ManglingMacros.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/Compiler.h"
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
@@ -143,6 +143,8 @@ class Remangler {
 
   std::vector<SubstitutionWord> Words;
   std::vector<WordReplacement> SubstWordsInIdent;
+
+  static const size_t MaxNumWords = 26;
 
   std::unordered_map<SubstitutionEntry, unsigned,
                      SubstitutionEntry::Hasher> Substitutions;
@@ -459,10 +461,6 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator) {
 void Remangler::mangleAllocator(Node *node) {
   mangleChildNodes(node);
   Buffer << "fC";
-}
-
-void Remangler::mangleArchetype(Node *node) {
-  unreachable("unsupported node");
 }
 
 void Remangler::mangleArgumentTuple(Node *node) {
@@ -1098,7 +1096,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
         break;
       case Node::Kind::DependentPseudogenericSignature:
         PseudoGeneric = "P";
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
       case Node::Kind::DependentGenericSignature:
         GenSig = Child.get();
         break;
@@ -1153,7 +1151,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
       }
       case Node::Kind::ImplErrorResult:
         Buffer << 'z';
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
       case Node::Kind::ImplResult: {
         char ConvCh = llvm::StringSwitch<char>(Child->getFirstChild()->getText())
                         .Case("@out", 'r')
@@ -1687,11 +1685,126 @@ void Remangler::mangleSILBoxImmutableField(Node *node) {
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
-std::string Demangle::mangleNodeNew(const NodePointer &node) {
+std::string Demangle::mangleNode(const NodePointer &node) {
   if (!node) return "";
 
   DemanglerPrinter printer;
   Remangler(printer).mangle(node.get());
 
   return std::move(printer).str();
+}
+
+static bool isInSwiftModule(Node *node) {
+  auto context = node->begin()->get();
+  return (context->getKind() == Node::Kind::Module &&
+          context->getText() == STDLIB_NAME);
+};
+
+bool Demangle::mangleStandardSubstitution(Node *node, DemanglerPrinter &Out) {
+  // Look for known substitutions.
+  switch (node->getKind()) {
+#define SUCCESS_IF_IS(VALUE, EXPECTED, SUBSTITUTION)            \
+do {                                                        \
+if ((VALUE) == (EXPECTED)) {                              \
+Out << SUBSTITUTION;                                    \
+return true;                                            \
+}                                                         \
+} while (0)
+#define SUCCESS_IF_TEXT_IS(EXPECTED, SUBSTITUTION)              \
+SUCCESS_IF_IS(node->getText(), EXPECTED, SUBSTITUTION)
+#define SUCCESS_IF_DECLNAME_IS(EXPECTED, SUBSTITUTION)          \
+SUCCESS_IF_IS(node->getChild(1)->getText(), EXPECTED, SUBSTITUTION)
+
+    case Node::Kind::Module:
+      SUCCESS_IF_TEXT_IS(STDLIB_NAME, "s");
+      SUCCESS_IF_TEXT_IS(MANGLING_MODULE_OBJC, "So");
+      SUCCESS_IF_TEXT_IS(MANGLING_MODULE_C, "SC");
+      break;
+    case Node::Kind::Structure:
+      if (isInSwiftModule(node)) {
+        SUCCESS_IF_DECLNAME_IS("Array", "Sa");
+        SUCCESS_IF_DECLNAME_IS("Bool", "Sb");
+        SUCCESS_IF_DECLNAME_IS("UnicodeScalar", "Sc");
+        SUCCESS_IF_DECLNAME_IS("Double", "Sd");
+        SUCCESS_IF_DECLNAME_IS("Float", "Sf");
+        SUCCESS_IF_DECLNAME_IS("Int", "Si");
+        SUCCESS_IF_DECLNAME_IS("UnsafeRawPointer", "SV");
+        SUCCESS_IF_DECLNAME_IS("UnsafeMutableRawPointer", "Sv");
+        SUCCESS_IF_DECLNAME_IS("UnsafePointer", "SP");
+        SUCCESS_IF_DECLNAME_IS("UnsafeMutablePointer", "Sp");
+        SUCCESS_IF_DECLNAME_IS("UnsafeBufferPointer", "SR");
+        SUCCESS_IF_DECLNAME_IS("UnsafeMutableBufferPointer", "Sr");
+        SUCCESS_IF_DECLNAME_IS("String", "SS");
+        SUCCESS_IF_DECLNAME_IS("UInt", "Su");
+      }
+      break;
+    case Node::Kind::Enum:
+      if (isInSwiftModule(node)) {
+        SUCCESS_IF_DECLNAME_IS("Optional", "Sq");
+        SUCCESS_IF_DECLNAME_IS("ImplicitlyUnwrappedOptional", "SQ");
+      }
+      break;
+
+    default:
+      break;
+
+#undef SUCCESS_IF_DECLNAME_IS
+#undef SUCCESS_IF_TEXT_IS
+#undef SUCCESS_IF_IS
+  }
+  return false;
+}
+
+bool Demangle::isSpecialized(Node *node) {
+  switch (node->getKind()) {
+    case Node::Kind::BoundGenericStructure:
+    case Node::Kind::BoundGenericEnum:
+    case Node::Kind::BoundGenericClass:
+      return true;
+
+    case Node::Kind::Structure:
+    case Node::Kind::Enum:
+    case Node::Kind::Class: {
+      Node *parentOrModule = node->getChild(0).get();
+      if (isSpecialized(parentOrModule))
+        return true;
+
+      return false;
+    }
+
+    default:
+      return false;
+  }
+}
+
+NodePointer Demangle::getUnspecialized(Node *node) {
+  switch (node->getKind()) {
+    case Node::Kind::Structure:
+    case Node::Kind::Enum:
+    case Node::Kind::Class: {
+      NodePointer result = NodeFactory::create(node->getKind());
+      NodePointer parentOrModule = node->getChild(0);
+      if (isSpecialized(parentOrModule.get()))
+        result->addChild(getUnspecialized(parentOrModule.get()));
+      else
+        result->addChild(parentOrModule);
+      result->addChild(node->getChild(1));
+      return result;
+    }
+
+    case Node::Kind::BoundGenericStructure:
+    case Node::Kind::BoundGenericEnum:
+    case Node::Kind::BoundGenericClass: {
+      NodePointer unboundType = node->getChild(0);
+      assert(unboundType->getKind() == Node::Kind::Type);
+      NodePointer nominalType = unboundType->getChild(0);
+      if (isSpecialized(nominalType.get()))
+        return getUnspecialized(nominalType.get());
+      else
+        return nominalType;
+    }
+      
+    default:
+      unreachable("bad nominal type kind");
+  }
 }

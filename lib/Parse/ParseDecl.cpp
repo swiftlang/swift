@@ -25,8 +25,8 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/StringExtras.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -1047,7 +1047,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           PlatformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
           break;
         }
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
 
       case IsIntroduced:
       case IsObsoleted: {
@@ -2183,14 +2183,14 @@ Parser::parseDecl(ParseDeclOptions Flags,
       }
 
       // Otherwise this is not a context-sensitive keyword.
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case tok::pound_if:
     case tok::pound_sourceLocation:
     case tok::pound_line:
       // We see some attributes right before these pounds.
       // TODO: Emit dedicated errors for them.
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     // Obvious nonsense.
     default:
@@ -3016,6 +3016,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
       ConfigState.setConditionActive(!foundActive);
     } else {
       // Evaluate the condition.
+      llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
                                                     /*isBasic*/true,
                                                     /*isForDirective*/true);
@@ -3045,19 +3046,18 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
     if (ConfigState.shouldParse()) {
       ParserStatus Status;
       bool PreviousHadSemi = true;
-      while (Tok.isNot(tok::pound_else, tok::pound_endif, tok::pound_elseif)) {
-        SourceLoc StartLoc = Tok.getLoc();
-        Status |= parseDeclItem(*this, PreviousHadSemi, Flags,
-                                [&](Decl *D) {Decls.push_back(D);});
-        if (StartLoc == Tok.getLoc()) {
-          assert(Status.isError() && "no progress without error?");
+      while (Tok.isNot(tok::pound_else, tok::pound_endif, tok::pound_elseif,
+                       tok::eof)) {
+        if (Tok.is(tok::r_brace)) {
+          diagnose(Tok.getLoc(),
+                   diag::unexpected_rbrace_in_conditional_compilation_block);
+          // If we see '}', following declarations don't look like belong to
+          // the current decl context; skip them.
           skipUntilConditionalBlockClose();
           break;
         }
-        if (Tok.isAny(tok::eof)) {
-          diagnose(Tok, diag::expected_close_to_if_directive);
-          break;
-        }
+        Status |= parseDeclItem(*this, PreviousHadSemi, Flags,
+                                [&](Decl *D) {Decls.push_back(D);});
       }
     } else {
       DiagnosticTransaction DT(Diags);
@@ -3413,7 +3413,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, ParameterList *param,
 
     case AccessorKind::IsMutableAddressor:
       D->setAddressorKind(addressorKind);
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case AccessorKind::IsSetter:
     case AccessorKind::IsWillSet:

@@ -14,7 +14,6 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/Version.h"
@@ -31,6 +30,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Chrono.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -387,7 +387,7 @@ int Compilation::performJobsImpl() {
         InitialOutOfDateCommands.push_back(Cmd);
         DepGraph.markIntransitive(Cmd);
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case Job::Condition::RunWithoutCascading:
       noteBuilding(Cmd, "(initial)");
       scheduleCommandIfNecessaryAndPossible(Cmd);
@@ -547,7 +547,7 @@ int Compilation::performJobsImpl() {
           case DependencyGraphImpl::LoadResult::UpToDate:
             if (!wasCascading)
               break;
-            SWIFT_FALLTHROUGH;
+            LLVM_FALLTHROUGH;
           case DependencyGraphImpl::LoadResult::AffectsDownstream:
             DepGraph.markTransitive(Dependents, FinishedCmd);
             break;
@@ -747,13 +747,16 @@ int Compilation::performSingleCommand(const Job *Cmd) {
 
   for (auto &envPair : Cmd->getExtraEnvironment()) {
 #if defined(_MSC_VER)
-    llvm::SmallString<256> envStr = StringRef(envPair.first);
-    envStr.append(StringRef("="));
-    envStr.append(StringRef(envPair.second));
-    _putenv(envStr.c_str());
+    int envResult =_putenv_s(envPair.first, envPair.second);
 #else
-    setenv(envPair.first, envPair.second, /*replacing=*/true);
+    int envResult = setenv(envPair.first, envPair.second, /*replacing=*/true);
 #endif
+    assert(envResult == 0 &&
+          "expected environment variable to be set successfully");
+    // Bail out early in release builds.
+    if (envResult != 0) {
+      return envResult;
+    }
   }
 
   return ExecuteInPlace(ExecPath, argv);

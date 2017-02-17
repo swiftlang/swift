@@ -11,7 +11,7 @@ sil_vtable C {}
 
 @objc protocol ObjC {}
 
-// CHECK-LABEL: define{{( protected)?}} void @retain_release_bridge_object
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @retain_release_bridge_object
 // CHECK:         call [[BRIDGE:%swift.bridge\*]] @swift_bridgeObjectRetain
 // CHECK:         call void @swift_bridgeObjectRelease
 sil @retain_release_bridge_object : $(Builtin.BridgeObject) -> () {
@@ -21,7 +21,7 @@ entry(%b : $Builtin.BridgeObject):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} %swift.bridge* @convert_to_bridge_object
+// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.bridge* @convert_to_bridge_object
 // CHECK:         [[REFBITS:%.*]] = ptrtoint [[C:%C13bridge_object1C\*]] %0 to i64
 // CHECK:         [[OR:%.*]] = or i64 [[REFBITS]], %1
 // CHECK:         inttoptr i64 [[OR]] to [[BRIDGE]]
@@ -31,7 +31,7 @@ entry(%c : $C, %w : $Builtin.Word):
   return %b : $Builtin.BridgeObject
 }
 
-// CHECK-LABEL: define{{( protected)?}} { %objc_object*, i64 } @convert_from_bridge_object
+// CHECK-LABEL: define{{( protected)?}} swiftcc { %objc_object*, i64 } @convert_from_bridge_object
 // CHECK:         [[BOBITS:%.*]] = ptrtoint [[BRIDGE]] %0 to i64
 // --                                                     0x8000_0000_0000_0001
 // CHECK:         [[TAGBITS:%.*]] = and i64 [[BOBITS]], -9223372036854775807
@@ -56,7 +56,7 @@ entry(%b : $Builtin.BridgeObject):
   return %t : $(ObjC, Builtin.Word)
 }
 
-// CHECK-LABEL: define{{( protected)?}} %C13bridge_object1C* @convert_from_native_bridge_object
+// CHECK-LABEL: define{{( protected)?}} swiftcc %C13bridge_object1C* @convert_from_native_bridge_object
 // CHECK:         [[BOBITS:%.*]] = ptrtoint %swift.bridge* %0 to i64
 // CHECK:         [[MASKED_BITS:%.*]] = and i64 [[BOBITS]], 72057594037927928
 // CHECK:         [[RESULT:%.*]] = inttoptr i64 [[MASKED_BITS]] to [[C:%C13bridge_object1C\*]]

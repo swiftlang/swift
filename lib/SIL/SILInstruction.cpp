@@ -864,6 +864,10 @@ bool SILInstruction::mayRelease() const {
   case ValueKind::ReleaseValueInst:
     return true;
 
+  case ValueKind::DestroyValueInst:
+    assert(!SILModuleConventions(getModule()).useLoweredAddresses());
+    return true;
+
   case ValueKind::UnconditionalCheckedCastAddrInst: {
     // Failing casts with take_always can release.
     auto *Cast = cast<UnconditionalCheckedCastAddrInst>(this);
@@ -997,9 +1001,9 @@ bool SILInstruction::isTriviallyDuplicatable() const {
       return false;
   }
 
-  if (isa<OpenExistentialAddrInst>(this) ||
-      isa<OpenExistentialRefInst>(this) ||
-      isa<OpenExistentialMetatypeInst>(this)) {
+  if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
+      isa<OpenExistentialMetatypeInst>(this) ||
+      isa<OpenExistentialOpaqueInst>(this)) {
     // Don't know how to duplicate these properly yet. Inst.clone() per
     // instruction does not work. Because the follow-up instructions need to
     // reuse the same archetype uuid which would only work if we used a

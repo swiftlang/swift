@@ -41,6 +41,7 @@ def syntax_annotate_text(text):
     resp = request_sync(req)
     return resp.get_payload().to_python_object()
 
+
 __all__ = [
     'request_sync',
     'syntax_annotate_text',

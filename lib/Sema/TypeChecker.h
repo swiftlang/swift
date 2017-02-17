@@ -27,7 +27,6 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
@@ -36,7 +35,7 @@
 
 namespace swift {
 
-class ArchetypeBuilder;
+class GenericSignatureBuilder;
 class GenericTypeResolver;
 class NominalTypeDecl;
 class NormalProtocolConformance;
@@ -1140,7 +1139,7 @@ public:
                         DeclContext *dc,
                         GenericSignature *outerSignature,
                         bool allowConcreteGenericParams,
-                        llvm::function_ref<void(ArchetypeBuilder &)>
+                        llvm::function_ref<void(GenericSignatureBuilder &)>
                           inferRequirements);
 
   /// Construct a new generic environment for the given declaration context.
@@ -1160,7 +1159,7 @@ public:
                         bool allowConcreteGenericParams) {
     return checkGenericEnvironment(genericParams, dc, outerSignature,
                                    allowConcreteGenericParams,
-                                   [&](ArchetypeBuilder &) { });
+                                   [&](GenericSignatureBuilder &) { });
   }
 
   /// Validate the signature of a generic type.
@@ -1170,7 +1169,7 @@ public:
 
   /// Check the generic parameters in the given generic parameter list (and its
   /// parent generic parameter lists) according to the given resolver.
-  void checkGenericParamList(ArchetypeBuilder *builder,
+  void checkGenericParamList(GenericSignatureBuilder *builder,
                              GenericParamList *genericParams,
                              GenericSignature *parentSig,
                              GenericTypeResolver *resolver);
@@ -1935,7 +1934,7 @@ public:
   bool diagnoseInlineableDeclRef(SourceLoc loc, const ValueDecl *D,
                                  const DeclContext *DC);
 
-  void diagnoseResilientValueConstructor(ConstructorDecl *ctor);
+  void diagnoseResilientConstructor(ConstructorDecl *ctor);
 
   /// \name Availability checking
   ///

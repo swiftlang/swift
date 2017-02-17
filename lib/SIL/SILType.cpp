@@ -73,9 +73,7 @@ bool SILType::isReferenceCounted(SILModule &M) const {
 
 bool SILType::isNoReturnFunction() const {
   if (auto funcTy = dyn_cast<SILFunctionType>(getSwiftRValueType()))
-    return funcTy->getDirectFormalResultsType()
-        .getSwiftRValueType()
-        ->isUninhabited();
+    return funcTy->isNoReturnFunction();
 
   return false;
 }
@@ -611,7 +609,8 @@ SILResultInfo::getOwnershipKind(SILModule &M,
 }
 
 SILModuleConventions::SILModuleConventions(const SILModule &M)
-    : loweredAddresses(!M.getASTContext().LangOpts.EnableSILOpaqueValues) {}
+    : loweredAddresses(!M.getASTContext().LangOpts.EnableSILOpaqueValues
+                       || M.getStage() == SILStage::Lowered) {}
 
 bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
                                                      SILModule &M) {
@@ -626,4 +625,8 @@ bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
     return type.isAddressOnly(M);
 
   return false;
+}
+
+bool SILFunctionType::isNoReturnFunction() {
+  return getDirectFormalResultsType().getSwiftRValueType()->isUninhabited();
 }

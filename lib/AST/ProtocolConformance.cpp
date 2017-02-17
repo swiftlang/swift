@@ -13,8 +13,8 @@
 // This file implements the protocol conformance data structures.
 //
 //===----------------------------------------------------------------------===//
+
 #include "ConformanceLookupTable.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/LazyResolver.h"
@@ -32,13 +32,14 @@ using namespace swift;
 
 Witness::Witness(ValueDecl *decl, SubstitutionList substitutions,
                  GenericEnvironment *syntheticEnv,
-                 SubstitutionMap reqToSynthesizedEnvMap) {
+                 SubstitutionList reqToSynthesizedEnvSubs) {
   auto &ctx = decl->getASTContext();
 
   auto declRef = ConcreteDeclRef(ctx, decl, substitutions);
   auto storedMem = ctx.Allocate(sizeof(StoredWitness), alignof(StoredWitness));
   auto stored = new (storedMem)
-      StoredWitness{declRef, syntheticEnv, std::move(reqToSynthesizedEnvMap)};
+      StoredWitness{declRef, syntheticEnv,
+                    ctx.AllocateCopy(reqToSynthesizedEnvSubs)};
   ctx.addDestructorCleanup(*stored);
 
   storage = stored;
@@ -394,7 +395,7 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
 
   // Apply the substitution we computed above
   auto specializedType
-    = genericWitness.getReplacement().subst(substitutionMap, None);
+    = genericWitness.getReplacement().subst(substitutionMap);
   if (!specializedType)
     specializedType = ErrorType::get(genericWitness.getReplacement());
 
@@ -628,14 +629,10 @@ void NominalTypeDecl::prepareConformanceTable() const {
     if (resolver)
       resolver->resolveRawType(theEnum);
     if (theEnum->hasRawType()) {
-      if (auto rawRepresentable = ctx.getProtocol(KnownProtocolKind::RawRepresentable)) {
-
-        // The presence of a raw type is an explicit declaration that
-        // the compiler should derive a RawRepresentable conformance.
-        auto conformance = ctx.getConformance(mutableThis->getDeclaredTypeInContext(), rawRepresentable,
-                                              mutableThis->getNameLoc(), mutableThis->getInnermostDeclContext(),
-                                              ProtocolConformanceState::Incomplete);
-        ConformanceTable->registerProtocolConformance(conformance);
+      if (auto rawRepresentable =
+            ctx.getProtocol(KnownProtocolKind::RawRepresentable)) {
+        ConformanceTable->addSynthesizedConformance(mutableThis,
+                                                    rawRepresentable);
       }
     }
   }

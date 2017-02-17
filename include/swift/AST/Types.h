@@ -2828,7 +2828,7 @@ public:
   /// storage. Therefore they will be passed using an indirect formal
   /// convention, and this method will return an address type. However, in
   /// canonical SIL the opaque arguments might not have an address type.
-  SILType getSILStorageType() const; // in SILFunctioConventions.h
+  SILType getSILStorageType() const; // in SILFunctionConventions.h
 
   /// Return a version of this parameter info with the type replaced.
   SILParameterInfo getWithType(CanType type) const {
@@ -2925,7 +2925,7 @@ public:
   /// storage. Therefore they will be returned using an indirect formal
   /// convention, and this method will return an address type. However, in
   /// canonical SIL the opaque results might not have an address type.
-  SILType getSILStorageType() const; // in SILFunctioConventions.h
+  SILType getSILStorageType() const; // in SILFunctionConventions.h
 
   /// Return a version of this result info with the type replaced.
   SILResultInfo getWithType(CanType type) const {
@@ -3239,7 +3239,7 @@ public:
   // substituted SIL types match, a formal direct argument may not be passed
   // to a formal indirect parameter and vice-versa. Hence, the formally
   // indirect property, not the SIL indirect property, should be consulted to
-  // determine whether function reabstraction is necesary.
+  // determine whether function reabstraction is necessary.
   unsigned getNumIndirectFormalResults() const {
     return NumIndirectFormalResults;
   }
@@ -3354,6 +3354,8 @@ public:
   bool isPseudogeneric() const {
     return getExtInfo().isPseudogeneric();
   }
+
+  bool isNoReturnFunction(); // Defined in SILType.cpp
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       SubstitutionList subs);
@@ -3956,7 +3958,7 @@ public:
   /// \brief Retrieve the nested type with the given name, if it's already
   /// known.
   ///
-  /// This is an implementation detail used by the archetype builder.
+  /// This is an implementation detail used by the generic signature builder.
   Optional<Type> getNestedTypeIfKnown(Identifier Name) const;
 
   /// \brief Check if the archetype contains a nested type with the given name.

@@ -23,13 +23,13 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "clang/AST/Type.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -229,6 +229,9 @@ namespace {
     }
     RetTy visitInOutType(CanInOutType type) {
       llvm_unreachable("shouldn't get an inout type here");
+    }
+    RetTy visitErrorType(CanErrorType type) {
+      llvm_unreachable("shouldn't get an error type here");
     }
 
     // Dependent types should be contextualized before visiting.
@@ -1126,11 +1129,6 @@ namespace {
       llvm_unreachable("store copy");
     }
 
-    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
-                   SILValue addr, StoreOwnershipQualifier qual) const override {
-      llvm_unreachable("store");
-    }
-
     SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
                       LoadOwnershipQualifier qual) const override {
       llvm_unreachable("store");
@@ -1775,7 +1773,7 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
                                                      ASTContext &context) {
   auto *DC = VD->getDeclContext();
   CanType resultTy =
-      DC->mapTypeOutOfContext(VD->getParentInitializer()->getType())
+      DC->mapTypeOutOfContext(VD->getParentPattern()->getType())
           ->getCanonicalType();
   GenericSignature *sig = DC->getGenericSignatureOfContext();
 
@@ -2273,7 +2271,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
             goto capture_value;
 
           // Otherwise, transitively capture the accessors.
-          SWIFT_FALLTHROUGH;
+          LLVM_FALLTHROUGH;
 
         case VarDecl::Computed: {
           collectFunctionCaptures(capturedVar->getGetter());

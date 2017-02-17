@@ -526,8 +526,12 @@ public:
 
 private:
   SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
-  SourceLoc getEndLocImpl() const { return QuestionLoc; }
-  SourceLoc getLocImpl() const { return QuestionLoc; }
+  SourceLoc getEndLocImpl() const {
+    return QuestionLoc.isValid() ? QuestionLoc : Base->getEndLoc();
+  }
+  SourceLoc getLocImpl() const {
+    return QuestionLoc.isValid() ? QuestionLoc : Base->getLoc();
+  }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };

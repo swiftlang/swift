@@ -1,13 +1,13 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs %s -emit-ir -import-cf-types | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %s
 
-// REQUIRES: CPU=i386_or_x86_64
+// REQUIRES: CPU=i386 || CPU=x86_64
 // REQUIRES: objc_interop
 
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[REFRIGERATOR:%CSo14CCRefrigerator]] = type
 // CHECK: [[OBJC:%objc_object]] = type
 
-// CHECK: [[REFRIGERATOR_NAME:@.*]] = private unnamed_addr constant [20 x i8] c"CSo14CCRefrigerator\00"
+// CHECK: [[REFRIGERATOR_NAME:@.*]] = private unnamed_addr constant [20 x i8] c"So14CCRefrigeratorC\00"
 
 // CHECK-32: @_TMCSo14CCRefrigerator = linkonce_odr hidden global <{ {{.*}} }> <{ i8* getelementptr inbounds ([20 x i8], [20 x i8]* [[REFRIGERATOR_NAME]], i32 0, i32 0), [[TYPE]]* null, i32 0, i8** @_TWVBO, i32 16, [[TYPE]]* null, i8* null, i8* null, i8* null }>
 
@@ -28,10 +28,10 @@ bb0(%0 : $CCRefrigerator):
   return %3 : $()
 }
 
-// CHECK:    define{{( protected)?}} void @call_generic([[REFRIGERATOR]]*) {{.*}} {
+// CHECK:    define{{( protected)?}} swiftcc void @call_generic([[REFRIGERATOR]]*) {{.*}} {
 // CHECK:      [[T0:%.*]] = bitcast [[REFRIGERATOR]]* %0 to [[OBJC]]*
 // CHECK-NEXT: [[T1:%.*]] = call [[TYPE]]* @_TMaCSo14CCRefrigerator()
-// CHECK-NEXT: call void @generic_function([[OBJC]]* [[T0]], [[TYPE]]* [[T1]])
+// CHECK-NEXT: call swiftcc void @generic_function([[OBJC]]* [[T0]], [[TYPE]]* [[T1]])
 // CHECK-NEXT: ret void
 
 // CHECK:    define linkonce_odr hidden [[TYPE]]* @_TMaCSo14CCRefrigerator()

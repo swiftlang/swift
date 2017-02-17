@@ -19,7 +19,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Mangle.h"
-#include "swift/AST/Substitution.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILModule.h"
@@ -51,6 +51,7 @@
 #include "StructMetadataLayout.h"
 #include "StructLayout.h"
 #include "EnumMetadataLayout.h"
+#include "IRGenMangler.h"
 
 #include "GenMeta.h"
 
@@ -122,10 +123,9 @@ static Address createPointerSizedGEP(IRGenFunction &IGF,
 // It should be removed when fixed. rdar://problem/22674524
 static llvm::Constant *getMangledTypeName(IRGenModule &IGM, CanType type,
                                       bool willBeRelativelyAddressed = false) {
-  auto name = LinkEntity::forTypeMangling(type);
-  llvm::SmallString<32> mangling;
-  name.mangle(mangling);
-  return IGM.getAddrOfGlobalString(mangling, willBeRelativelyAddressed);
+  IRGenMangler Mangler;
+  std::string Name = Mangler.mangleTypeForMetadata(type);
+  return IGM.getAddrOfGlobalString(Name, willBeRelativelyAddressed);
 }
 
 llvm::Value *irgen::emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
@@ -1005,7 +1005,10 @@ namespace {
     llvm::Value *visitInOutType(CanInOutType type) {
       llvm_unreachable("inout type should have been lowered by SILGen");
     }
-      
+    llvm::Value *visitErrorType(CanErrorType type) {
+      llvm_unreachable("error type should not appear in IRGen");
+    }
+
     llvm::Value *visitSILBlockStorageType(CanSILBlockStorageType type) {
       llvm_unreachable("cannot ask for metadata of block storage");
     }

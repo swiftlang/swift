@@ -9,9 +9,9 @@
 // CHECK: [[HOOZIT:%C17objc_class_export6Hoozit]] = type <{ [[REF:%swift.refcounted]] }>
 // CHECK: [[FOO:%C17objc_class_export3Foo]] = type <{ [[REF]], %Si }>
 // CHECK: [[INT:%Si]] = type <{ i64 }>
+// CHECK: [[DOUBLE:%Sd]] = type <{ double }>
 // CHECK: [[NSRECT:%VSC6NSRect]] = type <{ %VSC7NSPoint, %VSC6NSSize }>
 // CHECK: [[NSPOINT:%VSC7NSPoint]] = type <{ %Sd, %Sd }>
-// CHECK: [[DOUBLE:%Sd]] = type <{ double }>
 // CHECK: [[NSSIZE:%VSC6NSSize]] = type <{ %Sd, %Sd }>
 // CHECK: [[OBJC:%objc_object]] = type opaque
 
@@ -58,7 +58,7 @@
 // CHECK:   %swift.opaque* null,
 // CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC17objc_class_export3Foo to i64), i64 1),
 // CHECK:   [[FOO]]* (%swift.type*)* @_TZFC17objc_class_export3Foo6createfT_S0_,
-// CHECK:   void (%VSC6NSRect*, [[FOO]]*)* @_TFC17objc_class_export3Foo10drawInRectfT5dirtyVSC6NSRect_T_
+// CHECK:   void (double, double, double, double, [[FOO]]*)* @_TFC17objc_class_export3Foo10drawInRectfT5dirtyVSC6NSRect_T_
 // CHECK: }>, section "__DATA,__objc_data, regular"
 // -- TODO: The OBJC_CLASS symbol should reflect the qualified runtime name of
 //    Foo.
@@ -84,7 +84,7 @@ struct BigStructWithNativeObjects {
   }
   // CHECK: define internal void @_TToFC17objc_class_export3Foo10drawInRectfT5dirtyVSC6NSRect_T_([[OPAQUE:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE]]* %0 to [[FOO]]*
-  // CHECK:   call void @_TFC17objc_class_export3Foo10drawInRectfT5dirtyVSC6NSRect_T_(%VSC6NSRect* {{.*}}, [[FOO]]* [[CAST]])
+  // CHECK:   call swiftcc void @_TFC17objc_class_export3Foo10drawInRectfT5dirtyVSC6NSRect_T_(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* swiftself [[CAST]])
   // CHECK: }
 
   func bounds() -> NSRect {
@@ -93,14 +93,14 @@ struct BigStructWithNativeObjects {
   }
   // CHECK: define internal void @_TToFC17objc_class_export3Foo6boundsfT_VSC6NSRect([[NSRECT]]* noalias nocapture sret, [[OPAQUE4:%.*]]*, i8*) unnamed_addr {{.*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE4]]* %1 to [[FOO]]*
-  // CHECK:   call void @_TFC17objc_class_export3Foo6boundsfT_VSC6NSRect([[NSRECT]]* noalias nocapture sret {{.*}}, [[FOO]]* [[CAST]])
+  // CHECK:   call swiftcc { double, double, double, double } @_TFC17objc_class_export3Foo6boundsfT_VSC6NSRect([[FOO]]* swiftself [[CAST]])
 
   func convertRectToBacking(r r: NSRect) -> NSRect {
     return r
   }
   // CHECK: define internal void @_TToFC17objc_class_export3Foo20convertRectToBackingfT1rVSC6NSRect_S1_([[NSRECT]]* noalias nocapture sret, [[OPAQUE5:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE5]]* %1 to [[FOO]]*
-  // CHECK:   call void @_TFC17objc_class_export3Foo20convertRectToBackingfT1rVSC6NSRect_S1_([[NSRECT]]* noalias nocapture sret {{.*}}, %VSC6NSRect* {{.*}}, [[FOO]]* [[CAST]])
+  // CHECK:   call swiftcc { double, double, double, double } @_TFC17objc_class_export3Foo20convertRectToBackingfT1rVSC6NSRect_S1_(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* swiftself [[CAST]])
 
   func doStuffToSwiftSlice(f f: [Int]) {
   }

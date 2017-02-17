@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// REQUIRES: CPU=i386 || CPU=x86_64
+
 sil_stage canonical
 
 import Builtin
@@ -9,10 +11,19 @@ enum ManyEmptyCases {
     case C(Builtin.Int32)
 }
 
-// CHECK-LABEL: define{{( protected)?}} i1 @select_enum_A(i32, i1)
-// CHECK:         [[PAYLOAD:%.*]] = icmp eq i32 %0, 0
-// CHECK:         [[EXTRA:%.*]] = and i1 %1, [[PAYLOAD]]
-// CHECK:         ret i1 [[EXTRA]]
+// CHECK-LABEL-64: define{{( protected)?}} swiftcc i1 @select_enum_A(i64)
+// CHECK-64:  %5 = load i32, i32* %4
+// CHECK-64:  %8 = load i1, i1* %7
+// CHECK-64:  [[PAYLOAD:%.*]] = icmp eq i32 %5, 0
+// CHECK-64:  [[EXTRA:%.*]] = and i1 %8, [[PAYLOAD]]
+// CHECK-64:  ret i1 [[EXTRA]]
+
+// CHECK-LABEL-32: define{{( protected)?}} swiftcc i1 @select_enum_A(i32, i8) {{.*}}{
+// CHECK-32: entry:
+// CHECK-32:   %2 = trunc i8 %1 to i1
+// CHECK-32:   %3 = icmp eq i32 %0, 0
+// CHECK-32:   %4 = and i1 %2, %3
+// CHECK-32:   ret i1 %4
 sil @select_enum_A : $@convention(thin) (ManyEmptyCases) -> Builtin.Int1 {
 entry(%0 : $ManyEmptyCases):
   %4 = integer_literal $Builtin.Int1, -1          // user: %6
@@ -21,10 +32,19 @@ entry(%0 : $ManyEmptyCases):
   return %6 : $Builtin.Int1
 }
 
-// CHECK-LABEL: define{{( protected)?}} i1 @select_enum_B(i32, i1)
-// CHECK:         [[PAYLOAD:%.*]] = icmp eq i32 %0, 1
-// CHECK:         [[EXTRA:%.*]] = and i1 %1, [[PAYLOAD]]
-// CHECK:         ret i1 [[EXTRA]]
+// CHECK-LABEL-64: define{{( protected)?}} swiftcc i1 @select_enum_B(i64)
+// CHECK-64:  %5 = load i32, i32* %4
+// CHECK-64:  %8 = load i1, i1* %7
+// CHECK-64:  [[PAYLOAD:%.*]] = icmp eq i32 %5, 1
+// CHECK-64:  [[EXTRA:%.*]] = and i1 %8, [[PAYLOAD]]
+// CHECK-64:  ret i1 [[EXTRA]]
+
+// CHECK-LABEL-32: define{{( protected)?}} swiftcc i1 @select_enum_A(i32, i8) {{.*}}{
+// CHECK-32: entry:
+// CHECK-32:   %2 = trunc i8 %1 to i1
+// CHECK-32:   %3 = icmp eq i32 %0, 1
+// CHECK-32:   %4 = and i1 %2, %3
+// CHECK-32:   ret i1 %4
 sil @select_enum_B : $@convention(thin) (ManyEmptyCases) -> Builtin.Int1 {
 entry(%0 : $ManyEmptyCases):
   %4 = integer_literal $Builtin.Int1, -1          // user: %6

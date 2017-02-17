@@ -179,8 +179,10 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
   // *NOTE* In practice, wtable will be deserializedTable, but I do not want to rely
   // on that behavior for now.
   if (deserializeLazily)
-    if (auto deserialized = getSILLoader()->lookupWitnessTable(wtable))
+    if (auto deserialized = getSILLoader()->lookupWitnessTable(wtable)) {
+      linkTransparentFunctions();
       return deserialized;
+    }
 
   // If we fail, just return the declaration.
   return wtable;
@@ -499,7 +501,7 @@ bool SILModule::linkFunction(StringRef Name, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Name);
 }
 
-SILFunction *SILModule::hasFunction(StringRef Name, SILLinkage Linkage) {
+SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
   assert((Linkage == SILLinkage::Public ||
           Linkage == SILLinkage::PublicExternal) &&
          "Only a lookup of public functions is supported currently");
@@ -562,6 +564,14 @@ SILFunction *SILModule::hasFunction(StringRef Name, SILLinkage Linkage) {
   return F;
 }
 
+bool SILModule::hasFunction(StringRef Name) {
+  if (lookUpFunction(Name))
+    return true;
+  SILLinkerVisitor Visitor(*this, getSILLoader(),
+                           SILModule::LinkingMode::LinkNormal);
+  return Visitor.hasFunction(Name);
+}
+
 void SILModule::linkAllWitnessTables() {
   getSILLoader()->getAllWitnessTables();
 }
@@ -581,8 +591,25 @@ void SILModule::removeFromZombieList(StringRef Name) {
   }
 }
 
+void SILModule::linkTransparentFunctions() {
+  FunctionListType::iterator Iter = functions.begin();
+  if (LastFunctionChecked) {
+    Iter = LastFunctionChecked->getIterator();
+    Iter++;
+  }
+  while (Iter != functions.end()) {
+    SILFunction *F = &*Iter;
+    Iter++;
+    LastFunctionChecked = F;
+    if (F->isTransparent() && F->isExternalDeclaration())
+      linkFunction(F, LinkingMode::LinkNormal);
+  }
+}
+
 /// Erase a function from the module.
 void SILModule::eraseFunction(SILFunction *F) {
+  if (F == LastFunctionChecked)
+    LastFunctionChecked = nullptr;
 
   assert(! F->isZombie() && "zombie function is in list of alive functions");
   if (F->isInlined() || F->isExternallyUsedSymbol()) {
@@ -776,5 +803,24 @@ removeDeleteNotificationHandler(DeleteNotificationHandler* Handler) {
 void SILModule::notifyDeleteHandlers(ValueBase *V) {
   for (auto *Handler : NotificationHandlers) {
     Handler->handleDeleteNotification(V);
+  }
+}
+
+// TODO: We should have an "isNoReturn" bit on Swift's BuiltinInfo, but for
+// now, let's recognize noreturn intrinsics and builtins specially here.
+bool SILModule::isNoReturnBuiltinOrIntrinsic(Identifier Name) {
+  const auto &IntrinsicInfo = getIntrinsicInfo(Name);
+  if (IntrinsicInfo.ID != llvm::Intrinsic::not_intrinsic) {
+    return IntrinsicInfo.hasAttribute(llvm::Attribute::NoReturn);
+  }
+  const auto &BuiltinInfo = getBuiltinInfo(Name);
+  switch (BuiltinInfo.ID) {
+  default:
+    return false;
+  case BuiltinValueKind::Unreachable:
+  case BuiltinValueKind::CondUnreachable:
+  case BuiltinValueKind::UnexpectedError:
+  case BuiltinValueKind::ErrorInMain:
+    return true;
   }
 }

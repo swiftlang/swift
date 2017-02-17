@@ -21,13 +21,13 @@
 #include "GenericTypeResolver.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ReferencedNameTracker.h"
@@ -45,6 +45,8 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/Compiler.h"
+
 using namespace swift;
 
 #define DEBUG_TYPE "TypeCheckDecl"
@@ -865,12 +867,12 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     isCascading = (current->getFormalAccess() > Accessibility::FilePrivate);
 
   // Find other potential definitions.
-  SmallVector<ValueDecl *, 4> otherDefinitionsVec;
-  ArrayRef<ValueDecl *> otherDefinitions;
+  SmallVector<ValueDecl *, 4> otherDefinitions;
   if (currentDC->isTypeContext()) {
     // Look within a type context.
     if (auto nominal = currentDC->getAsNominalTypeOrNominalTypeExtensionContext()) {
-      otherDefinitions = nominal->lookupDirect(current->getBaseName());
+      auto found = nominal->lookupDirect(current->getBaseName());
+      otherDefinitions.append(found.begin(), found.end());
       if (tracker)
         tracker->addUsedMember({nominal, current->getName()}, isCascading);
     }
@@ -878,8 +880,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     // Look within a module context.
     currentFile->getParentModule()->lookupValue({ }, current->getBaseName(),
                                                 NLKind::QualifiedLookup,
-                                                otherDefinitionsVec);
-    otherDefinitions = otherDefinitionsVec;
+                                                otherDefinitions);
     if (tracker)
       tracker->addTopLevelName(current->getName(), isCascading);
   }
@@ -2106,7 +2107,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   case DeclKind::Func:
     if (cast<FuncDecl>(D)->isAccessor())
       return;
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case DeclKind::Constructor: {
     auto fn = cast<AbstractFunctionDecl>(D);
     bool isTypeContext = fn->getDeclContext()->isTypeContext();
@@ -2784,6 +2785,10 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
   llvm::SmallDenseMap<RawValueKey, RawValueSource, 8> uniqueRawValues;
 
   for (auto elt : ED->getAllElements()) {
+    // Skip if the raw value expr has already been checked.
+    if (elt->getTypeCheckedRawValueExpr())
+      continue;
+
     // Make sure the element is checked out before we poke at it.
     TC.validateDecl(elt);
     
@@ -3264,8 +3269,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   // declared property type in context.
   auto sig = behaviorProto->getGenericSignatureOfContext();
   auto map = sig->getSubstitutionMap(interfaceSubs);
-  auto substValueTy = behavior->ValueDecl->getInterfaceType()
-    .subst(map, SubstOptions());
+  auto substValueTy = behavior->ValueDecl->getInterfaceType().subst(map);
   
   if (!substValueTy->isEqual(decl->getInterfaceType())) {
     TC.diagnose(behavior->getLoc(),
@@ -4792,6 +4796,7 @@ public:
           auto *newValueParam = firstParamPattern->get(0);
           newValueParam->setType(valueTy);
           newValueParam->setInterfaceType(valueIfaceTy);
+          newValueParam->getTypeLoc().setType(valueTy);
         } else if (FD->isGetter() && FD->isImplicit()) {
           FD->getBodyResultTypeLoc().setType(valueIfaceTy, true);
         }
@@ -4808,8 +4813,8 @@ public:
 
       auto *sig = TC.validateGenericFuncSignature(FD);
 
-      // Create a fresh archetype builder.
-      ArchetypeBuilder builder(
+      // Create a fresh generic signature builder.
+      GenericSignatureBuilder builder(
                              FD->getASTContext(),
                              LookUpConformanceInModule(FD->getModuleContext()));
       auto *parentSig = FD->getDeclContext()->getGenericSignatureOfContext();
@@ -6310,6 +6315,12 @@ public:
       if (auto extendedTy = ED->getExtendedType()) {
         if (auto nominal = extendedTy->getAnyNominal()) {
           TC.validateDecl(nominal);
+          // Check the raw values of an enum, since we might synthesize
+          // RawRepresentable while checking conformances on this extension.
+          if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
+            if (enumDecl->hasRawType())
+              checkEnumRawValues(TC, enumDecl);
+          }
         }
       }
 
@@ -6328,7 +6339,7 @@ public:
           assert((ED->isInvalid() ||
                   ED->getDeclContext()->isModuleScopeContext()) &&
                  "non-top-level extensions make 'private' != 'fileprivate'");
-          SWIFT_FALLTHROUGH;
+          LLVM_FALLTHROUGH;
         case Accessibility::FilePrivate: {
           const DeclContext *DC = ED->getModuleScopeContext();
           bool isPrivate = access == Accessibility::Private;
@@ -6448,7 +6459,7 @@ public:
 
       auto *sig = TC.validateGenericFuncSignature(CD);
 
-      ArchetypeBuilder builder(
+      GenericSignatureBuilder builder(
                              CD->getASTContext(),
                              LookUpConformanceInModule(CD->getModuleContext()));
       auto *parentSig = CD->getDeclContext()->getGenericSignatureOfContext();
@@ -7083,6 +7094,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       markAsObjC(*this, proto, isObjC);
     }
 
+    proto->computeRequirementSignature();
+
     ValidatedTypes.insert(proto);
     break;
   }
@@ -7385,7 +7398,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   });
 
   // Local function used to infer requirements from the extended type.
-  auto inferExtendedTypeReqs = [&](ArchetypeBuilder &builder) {
+  auto inferExtendedTypeReqs = [&](GenericSignatureBuilder &builder) {
     builder.inferRequirements(TypeLoc::withoutLoc(extInterfaceType),
                               /*minDepth=*/0,
                               /*maxDepth=*/genericParams->getDepth());
@@ -7469,7 +7482,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     ext->setGenericEnvironment(env);
     return;
   }
-
+  
   // If we're extending a protocol, check the generic parameters.
   //
   // Canonicalize the type to work around the fact that getAs<> cannot

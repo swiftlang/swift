@@ -71,7 +71,7 @@ enum os_log_int_types_t {
 
 typedef struct {
     os_log_fmt_cmd_flags_t cmd_flags : 4;
-    os_log_fmt_cmd_type_t  cmd_type : 4;
+    os_log_fmt_cmd_type_t cmd_type : 4;
     uint8_t cmd_size;
     uint8_t cmd_data[];
 } os_log_fmt_cmd_s, *os_log_fmt_cmd_t;

@@ -72,6 +72,18 @@ enum class SILStage {
   /// dataflow errors, and some instructions must be canonicalized to simpler
   /// forms.
   Canonical,
+
+  /// \brief Lowered SIL, which has been prepared for IRGen and will no longer
+  /// be passed to canonical SIL transform passes.
+  ///
+  /// In lowered SIL, the SILType of all SILValues is its SIL storage
+  /// type. Explicit storage is required for all address-only and resilient
+  /// types.
+  ///
+  /// Generating the initial Raw SIL is typically referred to as lowering (from
+  /// the AST). To disambiguate, refer to the process of generating the lowered
+  /// stage of SIL as "address lowering".
+  Lowered,
 };
 
 /// \brief A SIL module. The SIL module owns all of the SILFunctions generated
@@ -117,6 +129,9 @@ private:
   /// functions so that the destructor of \p functions is called first.
   llvm::StringMap<SILFunction *> FunctionTable;
   llvm::StringMap<SILFunction *> ZombieFunctionTable;
+
+  /// The last function which was handled in linkTransparentFunctions().
+  SILFunction *LastFunctionChecked = nullptr;
 
   /// The list of SILFunctions in the module.
   FunctionListType functions;
@@ -230,6 +245,12 @@ public:
 
   /// Invalidate cached entries in SIL Loader.
   void invalidateSILLoaderCaches();
+
+  /// De-serializes all transparent functions for which there is only a
+  /// declaration yet (meaning: the body was not de-serialized yet).
+  ///
+  /// See also: SILFunction::Transparent.
+  void linkTransparentFunctions();
 
   /// Erase a function from the module.
   void eraseFunction(SILFunction *F);
@@ -430,12 +451,16 @@ public:
   bool linkFunction(StringRef Name,
                     LinkingMode LinkAll = LinkingMode::LinkNormal);
 
-  /// Check if a given function exists in the module,
-  /// i.e. it can be linked by linkFunction.
+  /// Check if a given function exists in any of the modules with a
+  /// required linkage, i.e. it can be linked by linkFunction.
   ///
   /// \return null if this module has no such function. Otherwise
   /// the declaration of a function.
-  SILFunction *hasFunction(StringRef Name, SILLinkage Linkage);
+  SILFunction *findFunction(StringRef Name, SILLinkage Linkage);
+
+  /// Check if a given function exists in any of the modules.
+  /// i.e. it can be linked by linkFunction.
+  bool hasFunction(StringRef Name);
 
   /// Link in all Witness Tables in the module.
   void linkAllWitnessTables();
@@ -623,6 +648,9 @@ public:
   /// \returns Returns builtin info of BuiltinValueKind::None kind if the
   /// declaration is not a builtin.
   const BuiltinInfo &getBuiltinInfo(Identifier ID);
+
+  /// Returns true if the builtin or intrinsic is no-return.
+  bool isNoReturnBuiltinOrIntrinsic(Identifier Name);
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){

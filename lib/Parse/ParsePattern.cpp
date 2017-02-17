@@ -948,7 +948,7 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result,
   // In an if-let, the actual type of the expression is Optional of whatever
   // was written.
   if (isOptional)
-    repr = new (Context) OptionalTypeRepr(repr, Tok.isNot(tok::eof) ? Tok.getLoc() : PreviousLoc);
+    repr = new (Context) OptionalTypeRepr(repr, SourceLoc());
 
   return makeParserResult(new (Context) TypedPattern(P, repr));
 }

@@ -18,7 +18,7 @@
 #include "ImporterImpl.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
@@ -33,7 +33,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Config.h"
@@ -2566,7 +2565,11 @@ namespace {
               ImportedName importedName =
                   Impl.importFullName(constant, getActiveSwiftVersion());
               Identifier name = importedName.getDeclName().getBaseName();
-              if (!name.empty()) {
+              if (name.empty()) {
+                // Clear the existing declaration so we don't try to process it
+                // twice later.
+                enumeratorDecl = nullptr;
+              } else {
                 auto original = cast<ValueDecl>(enumeratorDecl);
                 enumeratorDecl = importEnumCaseAlias(name, constant, original,
                                                      decl, enumeratorContext);
@@ -2724,9 +2727,12 @@ namespace {
 
         auto member = Impl.importDecl(nd, getActiveSwiftVersion());
         if (!member) {
-          // We don't know what this field is. Assume it may be important in C.
-          hasUnreferenceableStorage = true;
-          hasMemberwiseInitializer = false;
+          if (!isa<clang::TypeDecl>(nd)) {
+            // We don't know what this field is.
+            // Assume it may be important in C.
+            hasUnreferenceableStorage = true;
+            hasMemberwiseInitializer = false;
+          }
           continue;
         }
 
@@ -3079,8 +3085,6 @@ namespace {
         return nullptr;
 
       DeclName name = owningStorage ? DeclName() : importedName.getDeclName();
-      bool hasCustomName = importedName.hasCustomName();
-
       if (importedName.importAsMember()) {
         assert(!correctSwiftName && "Swift 2 didn't support import-as-member!");
 
@@ -3111,7 +3115,8 @@ namespace {
       auto loc = Impl.importSourceLoc(decl->getLocation());
 
       if (name && name.isSimpleName()) {
-        assert(hasCustomName && "imported function with simple name?");
+        assert(importedName.hasCustomName() &&
+               "imported function with simple name?");
         // Just fill in empty argument labels.
         name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
       }
@@ -4001,6 +4006,10 @@ namespace {
 
       auto *env = Impl.buildGenericEnvironment(result->getGenericParams(), dc);
       result->setGenericEnvironment(env);
+
+      // Compute the requirement signature.
+      if (!result->isRequirementSignatureComputed())
+        result->computeRequirementSignature();
 
       result->setMemberLoader(&Impl, 0);
 
@@ -7075,10 +7084,9 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
   return nullptr;
 }
 
-// Calculate the generic environment from an imported generic param list.
-GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
+GenericSignature *ClangImporter::Implementation::buildGenericSignature(
     GenericParamList *genericParams, DeclContext *dc) {
-  ArchetypeBuilder builder(SwiftContext,
+  GenericSignatureBuilder builder(SwiftContext,
                            LookUpConformanceInModule(dc->getParentModule()));
   SmallVector<GenericTypeParamType *, 4> allGenericParams;
   for (auto param : *genericParams) {
@@ -7094,7 +7102,13 @@ GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
   // TODO: any need to infer requirements?
   builder.finalize(genericParams->getSourceRange().Start, allGenericParams);
 
-  return builder.getGenericSignature()->createGenericEnvironment(
+  return builder.getGenericSignature();
+}
+
+// Calculate the generic environment from an imported generic param list.
+GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
+    GenericParamList *genericParams, DeclContext *dc) {
+  return buildGenericSignature(genericParams, dc)->createGenericEnvironment(
                                                        *dc->getParentModule());
 }
 

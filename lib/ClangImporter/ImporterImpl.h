@@ -607,8 +607,10 @@ public:
   ///
   /// \param D The Clang declaration whose name should be imported.
   importer::ImportedName importFullName(const clang::NamedDecl *D,
-                                        Version version) {
-    return getNameImporter().importName(D, version);
+                                        Version version,
+                                        clang::DeclarationName givenName =
+                                          clang::DeclarationName()) {
+    return getNameImporter().importName(D, version, givenName);
   }
 
   /// Print an imported name as a string suitable for the swift_name attribute,
@@ -704,6 +706,10 @@ public:
   /// be represented in Swift.
   Decl *importMirroredDecl(const clang::NamedDecl *decl, DeclContext *dc,
                            Version version, ProtocolDecl *proto);
+
+  /// \brief Utility function for building simple generic signatures.
+  GenericSignature *buildGenericSignature(GenericParamList *genericParams,
+                                          DeclContext *dc);
 
   /// \brief Utility function for building simple generic environments.
   GenericEnvironment *buildGenericEnvironment(GenericParamList *genericParams,

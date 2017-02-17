@@ -1579,6 +1579,9 @@ ERROR(requires_same_type_conflict,none,
 ERROR(requires_generic_param_same_type_does_not_conform,none,
       "same-type constraint type %0 does not conform to required protocol %1",
       (Type, Identifier))
+ERROR(requires_same_concrete_type,none,
+      "generic signature requires types %0 and %1 to be the same", (Type, Type))
+
 ERROR(mutiple_layout_constraints,none,
       "multiple layout constraints cannot be used at the same time: %0 and %1",
       (LayoutConstraint, LayoutConstraint))
@@ -3367,9 +3370,22 @@ ERROR(designated_init_in_extension_resilient,none,
       "non-'@_fixed_layout' type %0 must delegate to another initializer", (Type))
 
 ERROR(designated_init_inlineable_resilient,none,
-      "initializer of non-'@_fixed_layout' type %0 is "
+      "initializer for non-'@_fixed_layout' type %0 is "
       "'%select{@_transparent|@inline(__always)|@_inlineable|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
+
+ERROR(class_designated_init_inlineable_resilient,none,
+      "initializer for class %0 is "
+      "'%select{@_transparent|@inline(__always)|@_inlineable|%error}1' and must "
+      "delegate to another initializer", (Type, unsigned))
+
+ERROR(inlineable_stored_property,
+      none, "'@_inlineable' attribute cannot be applied to stored properties", ())
+
+ERROR(inlineable_decl_not_public,
+      none, "'@_inlineable' attribute can only be applied to public declarations, "
+      "but %0 is %select{private|fileprivate|internal|%error|%error}1",
+      (Identifier, Accessibility))
 
 //------------------------------------------------------------------------------
 // @_specialize diagnostics

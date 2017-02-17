@@ -16,8 +16,8 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-speculative-devirtualizer"
+
 #include "swift/Basic/DemangleWrappers.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -38,6 +38,7 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
+
 using namespace swift;
 
 // This is the limit for the number of subclasses (jump targets) that the

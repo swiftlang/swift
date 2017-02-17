@@ -1,4 +1,4 @@
-//===--- SubstitutionList.h - Compact SubstitutionMap -----------*- C++ -*-===//
+//===--- SubstitutionList.cpp - Compact SubstitutionMap -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -24,6 +24,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -566,7 +567,7 @@ bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
     if (!Context.isSwiftVersion3())
       break;
     // Swift3 accepts 'throws' and 'rethrows'
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case tok::kw_self:
   case tok::kw_Self:
   case tok::identifier:

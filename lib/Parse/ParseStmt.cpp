@@ -18,13 +18,13 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -505,7 +505,7 @@ ParserResult<Stmt> Parser::parseStmt() {
     assert((LabelInfo || tryLoc.isValid()) &&
            "unlabeled directives should be handled earlier");
     // Bailout, and let parseBraceItems() parse them.
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   default:
     diagnose(Tok, tryLoc.isValid() ? diag::expected_expr : diag::expected_stmt);
     return nullptr;
@@ -1771,7 +1771,6 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
 ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
   StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                   StructureMarkerKind::IfConfig);
-  llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
   SmallVector<IfConfigStmtClause, 4> Clauses;
 
   bool foundActive = false;
@@ -1785,6 +1784,7 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
       ConfigState.setConditionActive(!foundActive);
     } else {
       // Evaluate the condition.
+      llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
                                                     /*basic*/true,
                                                     /*isForDirective*/true);

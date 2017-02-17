@@ -59,11 +59,16 @@ func funcToBlock(_ x: @escaping () -> ()) -> @convention(block) () -> () {
 }
 
 // CHECK-LABEL: sil hidden @_T024function_conversion_objc11blockToFuncyycyyXBF : $@convention(thin) (@owned @convention(block) () -> ()) -> @owned @callee_owned () -> ()
-// CHECK:         [[COPIED:%.*]] = copy_block %0
-// CHECK:         [[COPIED_2:%.*]] = copy_value [[COPIED]]
-// CHECK:         [[THUNK:%.*]] = function_ref @_T0IyB_Ix_TR
-// CHECK:         [[FUNC:%.*]] = partial_apply [[THUNK]]([[COPIED_2]])
-// CHECK:         return [[FUNC]]
+// CHECK: bb0([[ARG:%.*]] : $@convention(block) () -> ()):
+// CHECK:   [[COPIED:%.*]] = copy_block [[ARG]]
+// CHECK:   [[BORROWED_COPIED:%.*]] = begin_borrow [[COPIED]]
+// CHECK:   [[COPIED_2:%.*]] = copy_value [[BORROWED_COPIED]]
+// CHECK:   [[THUNK:%.*]] = function_ref @_T0IyB_Ix_TR
+// CHECK:   [[FUNC:%.*]] = partial_apply [[THUNK]]([[COPIED_2]])
+// CHECK:   end_borrow [[BORROWED_COPIED]] from [[COPIED]]
+// CHECK:   destroy_value [[COPIED]]
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return [[FUNC]]
 func blockToFunc(_ x: @escaping @convention(block) () -> ()) -> () -> () {
   return x
 }

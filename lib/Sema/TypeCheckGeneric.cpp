@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Types.h"
@@ -25,8 +25,7 @@ using namespace swift;
 
 Type DependentGenericTypeResolver::resolveGenericTypeParamType(
                                      GenericTypeParamType *gp) {
-  auto gpDecl = gp->getDecl();
-  assert(gpDecl && "Missing generic parameter declaration");
+  assert(gp->getDecl() && "Missing generic parameter declaration");
 
   // Don't resolve generic parameters.
   return gp;
@@ -177,7 +176,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   SourceLoc nameLoc = ref->getIdLoc();
 
   // Check whether the name can be found in the superclass.
-  // FIXME: The archetype builder should be doing this and mapping down to a
+  // FIXME: The generic signature builder should be doing this and mapping down to a
   // concrete type.
   if (auto superclassTy = basePA->getSuperclass()) {
     if (auto lookup = TC.lookupMemberType(DC, superclassTy, name)) {
@@ -233,7 +232,7 @@ CompleteGenericTypeResolver::recordParamType(ParamDecl *decl, Type type) {
 
 /// Check the generic parameters in the given generic parameter list (and its
 /// parent generic parameter lists) according to the given resolver.
-void TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
+void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
                                         GenericParamList *genericParams,
                                         GenericSignature *parentSig,
                                         GenericTypeResolver *resolver) {
@@ -259,7 +258,7 @@ void TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
     options = TR_GenericSignature;
   }    
 
-  // First, add the generic parameters to the archetype builder.
+  // First, add the generic parameters to the generic signature builder.
   // Do this before checking the inheritance clause, since it may
   // itself be dependent on one of these parameters.
   if (builder) {
@@ -351,14 +350,14 @@ void TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
       break;
     }
     
-    if (builder && builder->addRequirement(req))
+    if (builder && builder->addRequirement(&req))
       req.setInvalid();
   }
 }
 
 /// Check the signature of a generic function.
 static bool checkGenericFuncSignature(TypeChecker &tc,
-                                      ArchetypeBuilder *builder,
+                                      GenericSignatureBuilder *builder,
                                       AbstractFunctionDecl *func,
                                       GenericTypeResolver &resolver) {
   bool badType = false;
@@ -474,8 +473,8 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
                             parentSig->getGenericParams().end());
   addGenericParamTypes(gp, allGenericParams);
 
-  // Create the archetype builder.
-  ArchetypeBuilder builder(Context,
+  // Create the generic signature builder.
+  GenericSignatureBuilder builder(Context,
                            LookUpConformanceInModule(func->getParentModule()));
 
   // Type check the function declaration, treating all generic type
@@ -487,7 +486,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   // Finalize the generic requirements.
   (void)builder.finalize(func->getLoc(), allGenericParams);
 
-  // The archetype builder now has all of the requirements, although there might
+  // The generic signature builder now has all of the requirements, although there might
   // still be errors that have not yet been diagnosed. Revert the generic
   // function signature and type-check it again, completely.
   revertGenericFuncSignature(func);
@@ -538,7 +537,7 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     }
   }
 
-  // Debugging of the archetype builder and generic signature generation.
+  // Debugging of the generic signature builder and generic signature generation.
   if (Context.LangOpts.DebugGenericSignatures) {
     func->dumpRef(llvm::errs());
     llvm::errs() << "\n";
@@ -713,7 +712,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
                       DeclContext *dc,
                       GenericSignature *parentSig,
                       bool allowConcreteGenericParams,
-                      llvm::function_ref<void(ArchetypeBuilder &)>
+                      llvm::function_ref<void(GenericSignatureBuilder &)>
                         inferRequirements) {
   assert(genericParams && "Missing generic parameters?");
   bool recursivelyVisitGenericParams =
@@ -735,9 +734,9 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
     addGenericParamTypes(genericParams, allGenericParams);
   }
 
-  // Create the archetype builder.
+  // Create the generic signature builder.
   ModuleDecl *module = dc->getParentModule();
-  ArchetypeBuilder builder(Context, LookUpConformanceInModule(module));
+  GenericSignatureBuilder builder(Context, LookUpConformanceInModule(module));
 
   // Type check the generic parameters, treating all generic type
   // parameters as dependent, unresolved.
@@ -760,7 +759,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
                          allGenericParams,
                          allowConcreteGenericParams);
 
-  // The archetype builder now has all of the requirements, although there might
+  // The generic signature builder now has all of the requirements, although there might
   // still be errors that have not yet been diagnosed. Revert the signature
   // and type-check it again, completely.
   if (recursivelyVisitGenericParams) {
@@ -791,7 +790,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
   // Record the generic type parameter types and the requirements.
   auto sig = builder.getGenericSignature();
 
-  // Debugging of the archetype builder and generic signature generation.
+  // Debugging of the generic signature builder and generic signature generation.
   if (Context.LangOpts.DebugGenericSignatures) {
     dc->printContext(llvm::errs());
     llvm::errs() << "\n";

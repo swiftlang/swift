@@ -80,6 +80,7 @@ static id __swift_leaks_allocWithZone(id self, SEL _cmd, id zone) {
   return result;
 }
 
+SWIFT_CC(swift)
 extern "C" void swift_leaks_startTrackingObjects(const char *name) {
   pthread_mutex_lock(&LeaksMutex);
 
@@ -159,6 +160,7 @@ static void dumpObjCHeapObjects() {
   }
 }
 
+SWIFT_CC(swift)
 extern "C" int swift_leaks_stopTrackingObjects(const char *name) {
   pthread_mutex_lock(&LeaksMutex);
   unsigned Result = TrackedSwiftObjects->size() + TrackedObjCObjects->size();

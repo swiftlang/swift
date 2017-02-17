@@ -319,67 +319,6 @@ void Remangler::resetSubstitutions() {
   Substitutions.clear();
 }
 
-static bool isInSwiftModule(Node *node) {
-  auto context = node->begin()->get();
-  return (context->getKind() == Node::Kind::Module &&
-          context->getText() == STDLIB_NAME);
-};
-
-bool Demangle::mangleStandardSubstitution(Node *node, DemanglerPrinter &Out) {
-  // Look for known substitutions.
-  switch (node->getKind()) {
-#define SUCCESS_IF_IS(VALUE, EXPECTED, SUBSTITUTION)            \
-    do {                                                        \
-      if ((VALUE) == (EXPECTED)) {                              \
-        Out << SUBSTITUTION;                                    \
-        return true;                                            \
-      }                                                         \
-    } while (0)
-#define SUCCESS_IF_TEXT_IS(EXPECTED, SUBSTITUTION)              \
-  SUCCESS_IF_IS(node->getText(), EXPECTED, SUBSTITUTION)
-#define SUCCESS_IF_DECLNAME_IS(EXPECTED, SUBSTITUTION)          \
-  SUCCESS_IF_IS(node->getChild(1)->getText(), EXPECTED, SUBSTITUTION)
-
-  case Node::Kind::Module:
-    SUCCESS_IF_TEXT_IS(STDLIB_NAME, "s");
-    SUCCESS_IF_TEXT_IS(MANGLING_MODULE_OBJC, "So");
-    SUCCESS_IF_TEXT_IS(MANGLING_MODULE_C, "SC");
-    break;
-  case Node::Kind::Structure:
-    if (isInSwiftModule(node)) {
-      SUCCESS_IF_DECLNAME_IS("Array", "Sa");
-      SUCCESS_IF_DECLNAME_IS("Bool", "Sb");
-      SUCCESS_IF_DECLNAME_IS("UnicodeScalar", "Sc");
-      SUCCESS_IF_DECLNAME_IS("Double", "Sd");
-      SUCCESS_IF_DECLNAME_IS("Float", "Sf");
-      SUCCESS_IF_DECLNAME_IS("Int", "Si");
-      SUCCESS_IF_DECLNAME_IS("UnsafeRawPointer", "SV");
-      SUCCESS_IF_DECLNAME_IS("UnsafeMutableRawPointer", "Sv");
-      SUCCESS_IF_DECLNAME_IS("UnsafePointer", "SP");
-      SUCCESS_IF_DECLNAME_IS("UnsafeMutablePointer", "Sp");
-      SUCCESS_IF_DECLNAME_IS("UnsafeBufferPointer", "SR");
-      SUCCESS_IF_DECLNAME_IS("UnsafeMutableBufferPointer", "Sr");
-      SUCCESS_IF_DECLNAME_IS("String", "SS");
-      SUCCESS_IF_DECLNAME_IS("UInt", "Su");
-    }
-    break;
-  case Node::Kind::Enum:
-    if (isInSwiftModule(node)) {
-      SUCCESS_IF_DECLNAME_IS("Optional", "Sq");
-      SUCCESS_IF_DECLNAME_IS("ImplicitlyUnwrappedOptional", "SQ");
-    }
-    break;
-
-  default:
-    break;
-
-#undef SUCCESS_IF_DECLNAME_IS
-#undef SUCCESS_IF_TEXT_IS
-#undef SUCCESS_IF_IS
-  }
-  return false;
-}
-
 bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
   if (Demangle::mangleStandardSubstitution(node, Out))
     return true;
@@ -1370,15 +1309,6 @@ void Remangler::mangleConstrainedType(Node *node) {
   }
 }
 
-void Remangler::mangleArchetype(Node *node) {
-  if (node->hasChildren()) {
-    assert(node->getNumChildren() == 1);
-    mangleProtocolListWithoutPrefix(node->begin()->get());
-  } else {
-    Out << '_';
-  }
-}
-
 void Remangler::mangleAssociatedType(Node *node) {
   if (node->hasChildren()) {
     assert(node->getNumChildren() == 1);
@@ -1516,60 +1446,6 @@ void Remangler::mangleProtocolWithoutPrefix(Node *node) {
   assert(node->getKind() == Node::Kind::Protocol);
   EntityContext ctx;
   mangleNominalType(node, '\0', ctx);
-}
-
-bool Demangle::isSpecialized(Node *node) {
-  switch (node->getKind()) {
-  case Node::Kind::BoundGenericStructure:
-  case Node::Kind::BoundGenericEnum:
-  case Node::Kind::BoundGenericClass:
-    return true;
-
-  case Node::Kind::Structure:
-  case Node::Kind::Enum:
-  case Node::Kind::Class: {
-    Node *parentOrModule = node->getChild(0).get();
-    if (isSpecialized(parentOrModule))
-      return true;
-
-    return false;
-  }
-
-  default:
-    return false;
-  }
-}
-
-NodePointer Demangle::getUnspecialized(Node *node) {
-  switch (node->getKind()) {
-  case Node::Kind::Structure:
-  case Node::Kind::Enum:
-  case Node::Kind::Class: {
-    NodePointer result = NodeFactory::create(node->getKind());
-    NodePointer parentOrModule = node->getChild(0);
-    if (isSpecialized(parentOrModule.get()))
-      result->addChild(getUnspecialized(parentOrModule.get()));
-    else
-      result->addChild(parentOrModule);
-    result->addChild(node->getChild(1));
-    return result;
-  }
-
-  case Node::Kind::BoundGenericStructure:
-  case Node::Kind::BoundGenericEnum:
-  case Node::Kind::BoundGenericClass: {
-    NodePointer unboundType = node->getChild(0);
-    assert(unboundType->getKind() == Node::Kind::Type);
-    NodePointer nominalType = unboundType->getChild(0);
-    if (isSpecialized(nominalType.get()))
-      return getUnspecialized(nominalType.get());
-    else
-      return nominalType;
-  }
-
-  default:
-    unreachable("bad nominal type kind");
-  }
 }
 
 void Remangler::mangleGenericArgs(Node *node, EntityContext &ctx) {
@@ -1769,7 +1645,7 @@ void Remangler::mangleSILBoxImmutableField(Node *node) {
 }
 
 /// The top-level interface to the remangler.
-std::string Demangle::mangleNode(const NodePointer &node) {
+std::string Demangle::mangleNodeOld(const NodePointer &node) {
   if (!node) return "";
 
   DemanglerPrinter printer;

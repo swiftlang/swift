@@ -631,6 +631,7 @@ TypeBase::gatherAllSubstitutions(ModuleDecl *module,
                       {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
                        genericEnv->mapTypeIntoContext(gp)});
       assert(result.second);
+      (void) result;
     }
   }
 
@@ -668,7 +669,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
   // constraint and the superclass conforms to the protocol.
   if (auto archetype = type->getAs<ArchetypeType>()) {
 
-    // The archetype builder drops conformance requirements that are made
+    // The generic signature builder drops conformance requirements that are made
     // redundant by a superclass requirement, so check for a concrete
     // conformance first, since an abstract conformance might not be
     // able to be resolved by a substitution that makes the archetype

@@ -14,10 +14,10 @@
 // relationships among the type variables within a constraint system.
 //
 //===----------------------------------------------------------------------===//
+
 #include "ConstraintGraph.h"
 #include "ConstraintGraphScope.h"
 #include "ConstraintSystem.h"
-#include "swift/Basic/Fallthrough.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>

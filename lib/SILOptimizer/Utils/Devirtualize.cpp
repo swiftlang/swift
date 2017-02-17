@@ -15,6 +15,7 @@
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
@@ -617,7 +618,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   }
 
   auto ParamArgIter = AI.getArgumentsWithoutIndirectResults().begin();
-  // Skip the last paramater, which is `self`. Add it below.
+  // Skip the last parameter, which is `self`. Add it below.
   for (auto param : substConv.getParameters().drop_back()) {
     auto paramType = substConv.getSILType(param);
     NewArgs.push_back(

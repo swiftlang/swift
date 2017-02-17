@@ -16,13 +16,13 @@
 
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ProtocolConformance.h"
 
 using namespace swift;
 
 GenericEnvironment::GenericEnvironment(GenericSignature *signature,
-                                       ArchetypeBuilder *builder)
+                                       GenericSignatureBuilder *builder)
   : Signature(signature), Builder(builder)
 {
   NumMappingsRecorded = 0;
@@ -186,7 +186,7 @@ Type GenericEnvironment::mapTypeOutOfContext(Type type) const {
 
 Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
                                                 SubstitutableType *type) const {
-  if (auto gp = type->getCanonicalType()->getAs<GenericTypeParamType>()) {
+  if (auto gp = type->getAs<GenericTypeParamType>()) {
     // Find the index into the parallel arrays of generic parameters and
     // context types.
     auto genericParams = self->Signature->getGenericParams();
@@ -200,7 +200,7 @@ Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
     // If the context type isn't already known, lazily create it.
     Type contextType = self->getContextTypes()[index];
     if (!contextType) {
-      assert(self->Builder && "Missing archetype builder for lazy query");
+      assert(self->Builder && "Missing generic signature builder for lazy query");
       auto potentialArchetype = self->Builder->resolveArchetype(type);
 
       auto mutableSelf = const_cast<GenericEnvironment *>(self);
@@ -286,6 +286,9 @@ Type GenericEnvironment::QueryArchetypeToInterfaceSubstitutions::operator()(
 Type GenericEnvironment::mapTypeIntoContext(
                                 Type type,
                                 LookupConformanceFn lookupConformance) const {
+  assert(!type->hasOpenedExistential() &&
+         "Opened existentials are special and so are you");
+
   Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
                            lookupConformance,
                            (SubstFlags::AllowLoweredTypes|

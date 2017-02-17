@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
-// REQUIRES: CPU=i386_or_x86_64
+// REQUIRES: CPU=i386 || CPU=x86_64
 // XFAIL: linux
 
 import Swift
 
-// CHECK-LABEL: define{{( protected)?}} void @archetype_metatype_cast
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @archetype_metatype_cast
 // CHECK:         %0 = call %swift.type* @swift_dynamicCastMetatype(%swift.type* %T, %swift.type* %U)
 // CHECK:         %1 = icmp ne %swift.type* %0, null
 sil @archetype_metatype_cast : $@convention(thin) <T, U> () -> () {
@@ -24,7 +24,7 @@ end:
 
 protocol P {}
 
-// CHECK-LABEL: define{{( protected)?}} void @existential_archetype_metatype_cast(%swift.type*, i8**, %swift.type* %T)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @existential_archetype_metatype_cast(%swift.type*, i8**, %swift.type* %T)
 // CHECK:         [[T0:%.*]] = call %swift.type* @swift_dynamicCastMetatype(%swift.type* %0, %swift.type* %T)
 // CHECK:         [[T1:%.*]] = icmp ne %swift.type* [[T0]], null
 sil @existential_archetype_metatype_cast : $@convention(thin) <T> (@thick P.Type) -> () {
@@ -43,7 +43,7 @@ end:
 class SomeClass {}
 sil_vtable SomeClass {}
 
-// CHECK-LABEL: define{{( protected)?}} %objc_object* @metatype_object_conversion(%objc_class*) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc %objc_object* @metatype_object_conversion(%objc_class*) {{.*}} {
 // CHECK:         %1 = bitcast %objc_class* %0 to %objc_object*
 // CHECK:         ret %objc_object* %1
 // CHECK:       }
@@ -55,7 +55,7 @@ entry(%m : $@objc_metatype SomeClass.Type):
 
 protocol SomeClassProtocol : class {}
 
-// CHECK-LABEL: define{{( protected)?}} %objc_object* @existential_metatype_object_conversion(%objc_class*, i8**) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc %objc_object* @existential_metatype_object_conversion(%objc_class*, i8**) {{.*}} {
 // CHECK:         [[T0:%.*]] = bitcast %objc_class* %0 to %objc_object*
 // CHECK:         ret %objc_object* [[T0]]
 // CHECK:       }
@@ -68,7 +68,7 @@ entry(%m : $@objc_metatype SomeClassProtocol.Type):
 class OtherClass : SomeClass {}
 sil_vtable OtherClass {}
 
-// CHECK-LABEL: define{{( protected)?}} void @value_metatype_cast(%C14metatype_casts9SomeClass*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @value_metatype_cast(%C14metatype_casts9SomeClass*)
 // CHECK:         [[T0:%.*]] = bitcast %C14metatype_casts9SomeClass* %0 to %swift.type**
 // CHECK:         [[T1:%.*]] = load %swift.type*, %swift.type** [[T0]]
 // CHECK:         [[T2:%.*]] = icmp eq %swift.type* [[T1]], {{.*}} @_T014metatype_casts10OtherClassCMf
@@ -87,7 +87,7 @@ end:
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @checked_cast_to_anyobject_type
+// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @checked_cast_to_anyobject_type
 // CHECK:         [[METATYPE:%.*]] = call %swift.type* @_T014metatype_casts9SomeClassCMa()
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* [[METATYPE]] to i8*
 // CHECK:         [[CAST:%.*]] = call { i8* } @dynamic_cast_existential_0_class_unconditional(i8* [[T0]], %swift.type* [[METATYPE]])

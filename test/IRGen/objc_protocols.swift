@@ -115,14 +115,14 @@ extension Zang : Frungible {
 // CHECK: }, section "__DATA, __objc_const", align 8
 
 // -- Force generation of witness for Zim.
-// CHECK: define hidden { %objc_object*, i8** } @_T014objc_protocols22mixed_heritage_erasure{{[_0-9a-zA-Z]*}}F
+// CHECK: define hidden swiftcc { %objc_object*, i8** } @_T014objc_protocols22mixed_heritage_erasure{{[_0-9a-zA-Z]*}}F
 func mixed_heritage_erasure(_ x: Zim) -> Frungible {
   return x
   // CHECK: [[T0:%.*]] = insertvalue { %objc_object*, i8** } undef, %objc_object* {{%.*}}, 0
   // CHECK: insertvalue { %objc_object*, i8** } [[T0]], i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* [[ZIM_FRUNGIBLE_WITNESS]], i32 0, i32 0), 1
 }
 
-// CHECK-LABEL: define hidden void @_T014objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F(%objc_object*, %swift.type* %T) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc void @_T014objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F(%objc_object*, %swift.type* %T) {{.*}} {
 func objc_generic<T : NSRuncing>(_ x: T) {
   x.runce()
   // CHECK: [[SELECTOR:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
@@ -130,13 +130,13 @@ func objc_generic<T : NSRuncing>(_ x: T) {
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[SELECTOR]])
 }
 
-// CHECK-LABEL: define hidden void @_T014objc_protocols05call_A8_generic{{[_0-9a-zA-Z]*}}F(%objc_object*, %swift.type* %T) {{.*}} {
-// CHECK:         call void @_T014objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F(%objc_object* %0, %swift.type* %T)
+// CHECK-LABEL: define hidden swiftcc void @_T014objc_protocols05call_A8_generic{{[_0-9a-zA-Z]*}}F(%objc_object*, %swift.type* %T) {{.*}} {
+// CHECK:         call swiftcc void @_T014objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F(%objc_object* %0, %swift.type* %T)
 func call_objc_generic<T : NSRuncing>(_ x: T) {
   objc_generic(x)
 }
 
-// CHECK-LABEL: define hidden void @_T014objc_protocols0A9_protocol{{[_0-9a-zA-Z]*}}F(%objc_object*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc void @_T014objc_protocols0A9_protocol{{[_0-9a-zA-Z]*}}F(%objc_object*) {{.*}} {
 func objc_protocol(_ x: NSRuncing) {
   x.runce()
   // CHECK: [[SELECTOR:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
@@ -144,14 +144,14 @@ func objc_protocol(_ x: NSRuncing) {
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[SELECTOR]])
 }
 
-// CHECK: define hidden %objc_object* @_T014objc_protocols0A8_erasure{{[_0-9a-zA-Z]*}}F(%CSo7NSSpoon*) {{.*}} {
+// CHECK: define hidden swiftcc %objc_object* @_T014objc_protocols0A8_erasure{{[_0-9a-zA-Z]*}}F(%CSo7NSSpoon*) {{.*}} {
 func objc_erasure(_ x: NSSpoon) -> NSRuncing {
   return x
   // CHECK: [[RES:%.*]] = bitcast %CSo7NSSpoon* {{%.*}} to %objc_object*
   // CHECK: ret %objc_object* [[RES]]
 }
 
-// CHECK: define hidden void @_T014objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F(%objc_object*)
+// CHECK: define hidden swiftcc void @_T014objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F(%objc_object*)
 func objc_protocol_composition(_ x: NSRuncing & NSFunging) {
   x.runce()
   // CHECK: [[RUNCE:%.*]] = load i8*, i8** @"\01L_selector(runce)", align 8
@@ -162,7 +162,7 @@ func objc_protocol_composition(_ x: NSRuncing & NSFunging) {
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[FUNGE]])
 }
 
-// CHECK: define hidden void @_T014objc_protocols0A27_swift_protocol_composition{{[_0-9a-zA-Z]*}}F(%objc_object*, i8**)
+// CHECK: define hidden swiftcc void @_T014objc_protocols0A27_swift_protocol_composition{{[_0-9a-zA-Z]*}}F(%objc_object*, i8**)
 func objc_swift_protocol_composition
 (_ x: NSRuncing & Ansible & NSFunging) {
   x.runce()

@@ -22,12 +22,12 @@
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
-#include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Compiler.h"
 #include <deque>
 
 using namespace swift;
@@ -1597,10 +1597,26 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   // Generate code to invoke _bridgeToObjectiveC
   SILBuilderWithScope Builder(Inst);
 
-  auto Members = Source.getNominalOrBoundGenericNominal()->lookupDirect(
-      M.getASTContext().Id_bridgeToObjectiveC);
-  assert(Members.size() == 1 &&
-         "There should be exactly one implementation of _bridgeToObjectiveC");
+  auto *NTD = Source.getNominalOrBoundGenericNominal();
+  assert(NTD);
+  SmallVector<ValueDecl *, 4> FoundMembers;
+  ArrayRef<ValueDecl *> Members;
+  Members = NTD->lookupDirect(M.getASTContext().Id_bridgeToObjectiveC);
+  if (Members.empty()) {
+    if (NTD->getDeclContext()->lookupQualified(
+        NTD->getDeclaredType(), M.getASTContext().Id_bridgeToObjectiveC,
+          NLOptions::NL_ProtocolMembers, nullptr, FoundMembers)) {
+      Members = FoundMembers;
+      // Returned members are starting with the most specialized ones.
+      // Thus, the first element is what we are looking for.
+      Members = Members.take_front(1);
+    }
+  }
+
+  // There should be exactly one implementation of _bridgeToObjectiveC.
+  if (Members.size() != 1)
+    return nullptr;
+
   auto BridgeFuncDecl = Members.front();
   auto BridgeFuncDeclRef = SILDeclRef(BridgeFuncDecl);
   ModuleDecl *Mod = M.getASTContext().getLoadedModule(
@@ -1622,8 +1638,10 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   auto MemberDeclRef = SILDeclRef(Results.front());
   auto *BridgedFunc = M.getOrCreateFunction(Loc, MemberDeclRef,
                                             ForDefinition_t::NotForDefinition);
-  assert(BridgedFunc &&
-         "Implementation of _bridgeToObjectiveC could not be found");
+
+  // Implementation of _bridgeToObjectiveC could not be found.
+  if (!BridgedFunc)
+    return nullptr;
 
   if (Inst->getFunction()->isFragile() &&
       !BridgedFunc->hasValidLinkageForFragileRef())
@@ -2704,7 +2722,7 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
       if (ND->getEffectiveAccess() == Accessibility::Open)
         return false;
     }
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case Accessibility::Internal:
     return M.isWholeModule();
   case Accessibility::FilePrivate:

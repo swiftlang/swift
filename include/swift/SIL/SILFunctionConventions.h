@@ -19,7 +19,7 @@
 // The primary purpose of this API is mapping the formal SIL parameter and
 // result conventions onto the SIL argument types. The "formal" conventions are
 // immutably associated with a SILFunctionType--a SIL function's type
-// information never changes. The SIL convenentions determine how those formal
+// information never changes. The SIL conventions determine how those formal
 // conventions will be represented in the body of SIL functions and at call
 // sites.
 //
@@ -56,8 +56,15 @@ public:
 
   static bool isReturnedIndirectlyInSIL(SILType type, SILModule &M);
 
+  static SILModuleConventions getLoweredAddressConventions() {
+    return SILModuleConventions(true);
+  }
+
 private:
   bool loweredAddresses;
+
+  SILModuleConventions(bool loweredAddresses)
+      : loweredAddresses(loweredAddresses) {}
 
 public:
   SILModuleConventions(const SILModule &M);
@@ -273,6 +280,8 @@ public:
   // side. See ApplySite::getCallArgIndexOfFirstAppliedArg().
   //===--------------------------------------------------------------------===//
 
+  unsigned getSILArgIndexOfFirstIndirectResult() const { return 0; }
+
   unsigned getSILArgIndexOfFirstParam() const {
     return getNumIndirectSILResults();
   }
@@ -357,6 +366,8 @@ inline bool SILModuleConventions::isIndirectSILResult(SILResultInfo result,
   case ResultConvention::Autoreleased:
     return false;
   }
+
+  llvm_unreachable("Unhandled ResultConvention in switch.");
 }
 
 inline SILType SILModuleConventions::getSILParamType(SILParameterInfo param,

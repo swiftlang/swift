@@ -96,7 +96,8 @@ public:
 //--- Function prologue and epilogue -------------------------------------------
 public:
   Explosion collectParameters();
-  void emitScalarReturn(SILType resultTy, Explosion &scalars);
+  void emitScalarReturn(SILType resultTy, Explosion &scalars,
+                        bool isSwiftCCReturn);
   void emitScalarReturn(llvm::Type *resultTy, Explosion &scalars);
   
   void emitBBForReturn();

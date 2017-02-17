@@ -123,7 +123,7 @@ internal class InternalClass {
   // CHECK-DAG: sil hidden{{( \[.+\])*}} @_T022accessibility_warnings13InternalClassC9publicVarSifg
   public var publicVar = 0
 
-  // CHECK-DAG: sil hidden @_T022accessibility_warnings13InternalClassC19publicVarPrivateSetSifg
+  // CHECK-DAG: sil hidden [transparent] @_T022accessibility_warnings13InternalClassC19publicVarPrivateSetSifg
   public private(set) var publicVarPrivateSet = 0
 
   public public(set) var publicVarPublicSet = 0

@@ -21,8 +21,8 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/StringExtras.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -461,7 +461,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
     // expression (and that may not always be an expression).
     diagnose(Tok, diag::invalid_postfix_operator);
     Tok.setKind(tok::oper_prefix);
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case tok::oper_prefix:
     Operator = parseExprOperator();
     break;
@@ -835,10 +835,14 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
 static StringRef copyAndStripUnderscores(ASTContext &C, StringRef orig) {
   char *start = static_cast<char*>(C.Allocate(orig.size(), 1));
   char *p = start;
-  
-  for (char c : orig)
-    if (c != '_')
-      *p++ = c;
+
+  if (p) {
+    for (char c : orig) {
+      if (c != '_') {
+        *p++ = c;
+      }
+    }
+  }
   
   return StringRef(start, p - start);
 }
@@ -1091,7 +1095,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     diagnose(Tok.getLoc(), diag::string_literal_no_atsign)
       .fixItRemove(Tok.getLoc());
     consumeToken(tok::at_sign);
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
       
   case tok::string_literal:  // "foo"
     Result = parseExprStringLiteral();
@@ -1128,7 +1132,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     diagnose(Tok.getLoc(), diag::snake_case_deprecated,
              Tok.getText(), replacement)
       .fixItReplace(Tok.getLoc(), replacement);
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   }
   case tok::pound_column:
   case tok::pound_file:
@@ -1169,7 +1173,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       break;
     }
 
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case tok::kw_self:     // self
   case tok::kw_Self:     // Self
     Result = makeParserResult(parseExprIdentifier());
@@ -1910,28 +1914,31 @@ Expr *Parser::parseExprIdentifier() {
     hasGenericArgumentList = !args.empty();
   }
   
-  ValueDecl *D = lookupInScope(name);
-  // FIXME: We want this to work: "var x = { x() }", but for now it's better
-  // to disallow it than to crash.
-  if (D) {
-    for (auto activeVar : DisabledVars) {
-      if (activeVar == D) {
-        diagnose(loc.getBaseNameLoc(), DisabledVarReason);
-        return new (Context) ErrorExpr(loc.getSourceRange());
-      }
-    }
-  } else {
-    for (auto activeVar : DisabledVars) {
-      if (activeVar->getFullName() == name) {
-        DescriptiveDeclKind Kind;
-        if (DisabledVarReason.ID == diag::var_init_self_referential.ID &&
-            shouldAddSelfFixit(CurDeclContext, name, Kind)) {
-          diagnose(loc.getBaseNameLoc(), diag::expected_self_before_reference,
-                   Kind).fixItInsert(loc.getBaseNameLoc(), "self.");
-        } else {
+  ValueDecl *D = nullptr;
+  if (!InPoundIfEnvironment) {
+    D = lookupInScope(name);
+    // FIXME: We want this to work: "var x = { x() }", but for now it's better
+    // to disallow it than to crash.
+    if (D) {
+      for (auto activeVar : DisabledVars) {
+        if (activeVar == D) {
           diagnose(loc.getBaseNameLoc(), DisabledVarReason);
+          return new (Context) ErrorExpr(loc.getSourceRange());
         }
-        return new (Context) ErrorExpr(loc.getSourceRange());
+      }
+    } else {
+      for (auto activeVar : DisabledVars) {
+        if (activeVar->getFullName() == name) {
+          DescriptiveDeclKind Kind;
+          if (DisabledVarReason.ID == diag::var_init_self_referential.ID &&
+              shouldAddSelfFixit(CurDeclContext, name, Kind)) {
+            diagnose(loc.getBaseNameLoc(), diag::expected_self_before_reference,
+                    Kind).fixItInsert(loc.getBaseNameLoc(), "self.");
+          } else {
+            diagnose(loc.getBaseNameLoc(), DisabledVarReason);
+          }
+          return new (Context) ErrorExpr(loc.getSourceRange());
+        }
       }
     }
   }

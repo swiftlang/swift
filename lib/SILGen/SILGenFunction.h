@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILGEN_SILGENFUNCTION_H
 #define SWIFT_SILGEN_SILGENFUNCTION_H
 
+#include "FormalEvaluation.h"
 #include "Initialization.h"
 #include "JumpDest.h"
 #include "SILGen.h"
@@ -22,7 +23,9 @@
 #include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
-  class ParameterList;
+
+class ParameterList;
+
 namespace Lowering {
 
 class ArgumentSource;
@@ -162,7 +165,6 @@ inline ApplyOptions &operator-=(ApplyOptions &lhs, ApplyOptions rhs) {
 }
 
 class PatternMatchContext;
-struct LValueWriteback;
 
 /// A formal section of the function.  This is a SILGen-only concept,
 /// meant to improve locality.  It's only reflected in the generated
@@ -302,16 +304,11 @@ public:
   /// \brief The SIL location corresponding to the AST node being processed.
   SILLocation CurrentSILLoc;
 
-  /// Cleanups - This records information about the currently active cleanups.
+  /// \brief This records information about the currently active cleanups.
   CleanupManager Cleanups;
 
-  /// The stack of pending writebacks.
-  std::vector<LValueWriteback> *WritebackStack = 0;
-  std::vector<LValueWriteback> &getWritebackStack();
-
-  /// freeWritebackStack - Just deletes WritebackStack.  Out of line to avoid
-  /// having to put the definition of LValueWriteback in this header.
-  void freeWritebackStack();
+  /// \brief The current context where formal evaluation cleanups are managed.
+  FormalEvaluationContext FormalEvalContext;
 
   /// VarLoc - representation of an emitted local variable or constant.  There
   /// are three scenarios here:
@@ -861,7 +858,8 @@ public:
   emitOpenExistential(SILLocation loc,
                       ManagedValue existentialValue,
                       CanArchetypeType openedArchetype,
-                      SILType loweredOpenedType);
+                      SILType loweredOpenedType,
+                      AccessKind accessKind);
 
   /// \brief Wrap the given value in an existential container.
   ///
@@ -1108,6 +1106,18 @@ public:
                                                     SILValue borrowedValue);
   ManagedValue emitManagedBorrowedRValueWithCleanup(
       SILValue original, SILValue borrowedValue, const TypeLowering &lowering);
+
+  ManagedValue emitFormalEvaluationManagedBorrowedRValueWithCleanup(
+      SILLocation loc, SILValue original, SILValue borrowedValue);
+  ManagedValue emitFormalEvaluationManagedBorrowedRValueWithCleanup(
+      SILLocation loc, SILValue original, SILValue borrowedValue,
+      const TypeLowering &lowering);
+
+  ManagedValue emitFormalEvaluationManagedBeginBorrow(SILLocation loc,
+                                                      SILValue v);
+  ManagedValue
+  emitFormalEvaluationManagedBeginBorrow(SILLocation loc, SILValue v,
+                                         const TypeLowering &lowering);
 
   ManagedValue emitManagedRValueWithCleanup(SILValue v);
   ManagedValue emitManagedRValueWithCleanup(SILValue v,
@@ -1552,11 +1562,6 @@ public:
   CleanupHandle enterDeinitExistentialCleanup(SILValue valueOrAddr,
                                               CanType concreteFormalType,
                                               ExistentialRepresentation repr);
-
-  /// Enter a cleanup to emit an EndBorrow stating that \p borrowed (the
-  /// borrowed entity) is no longer borrowed from \p original, the original
-  /// value.
-  CleanupHandle enterEndBorrowCleanup(SILValue original, SILValue borrowed);
 
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E, AccessKind accessKind);

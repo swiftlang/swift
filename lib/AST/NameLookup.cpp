@@ -23,7 +23,6 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ReferencedNameTracker.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1184,8 +1183,9 @@ void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
   LookupTable.getPointer()->addMember(member);
 }
 
-ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(DeclName name,
-                                                    bool ignoreNewExtensions) {
+TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
+                                                  DeclName name,
+                                                  bool ignoreNewExtensions) {
   // Make sure we have the complete list of members (in this nominal and in all
   // extensions).
   if (!ignoreNewExtensions) {
@@ -1203,7 +1203,7 @@ ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(DeclName name,
     return { };
 
   // We found something; return it.
-  return { known->second.begin(), known->second.size() };
+  return known->second;
 }
 
 void ClassDecl::createObjCMethodLookup() {

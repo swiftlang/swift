@@ -19,6 +19,7 @@
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/ABI/System.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
 #include "MetadataCache.h"
 #include "Private.h"
@@ -99,6 +100,7 @@ swift::swift_verifyEndOfLifetime(HeapObject *object) {
 /// \brief Allocate a reference-counted object on the heap that
 /// occupies <size> bytes of maximally-aligned storage.  The object is
 /// uninitialized except for its header.
+SWIFT_CC(swift)
 SWIFT_RUNTIME_EXPORT
 HeapObject* swift_bufferAllocate(
   HeapMetadata const* bufferType, size_t size, size_t alignMask)
@@ -112,7 +114,7 @@ intptr_t swift_bufferHeaderSize() { return sizeof(HeapObject); }
 
 namespace {
 /// Heap object destructor for a generic box allocated with swift_allocBox.
-static void destroyGenericBox(HeapObject *o) {
+static SWIFT_CC(swift) void destroyGenericBox(SWIFT_CONTEXT HeapObject *o) {
   auto metadata = static_cast<const GenericBoxHeapMetadata *>(o->metadata);
   // Destroy the object inside.
   auto *value = metadata->project(o);
@@ -134,8 +136,8 @@ public:
                                   type}} {
   }
 
-  long getKeyIntValueForDump() {
-    return reinterpret_cast<long>(Data.BoxedType);
+  intptr_t getKeyIntValueForDump() {
+    return reinterpret_cast<intptr_t>(Data.BoxedType);
   }
 
   int compareWithKey(const Metadata *type) const {
@@ -154,12 +156,11 @@ public:
 
 static SimpleGlobalCache<BoxCacheEntry> Boxes;
 
-SWIFT_CC(swift)
 BoxPair::Return swift::swift_allocBox(const Metadata *type) {
   return SWIFT_RT_ENTRY_REF(swift_allocBox)(type);
 }
 
-SWIFT_CC(swift) SWIFT_RT_ENTRY_IMPL_VISIBILITY
+SWIFT_RT_ENTRY_IMPL_VISIBILITY
 extern "C"
 BoxPair::Return SWIFT_RT_ENTRY_IMPL(swift_allocBox)(const Metadata *type) {
   // Get the heap metadata for the box.
@@ -190,9 +191,8 @@ OpaqueValue *swift::swift_projectBox(HeapObject *o) {
 }
 
 // Forward-declare this, but define it after swift_release.
-extern "C" LLVM_LIBRARY_VISIBILITY void
-_swift_release_dealloc(HeapObject *object) SWIFT_CC(RegisterPreservingCC_IMPL)
-    __attribute__((__noinline__, __used__));
+extern "C" LLVM_LIBRARY_VISIBILITY LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED 
+void _swift_release_dealloc(HeapObject *object) SWIFT_CC(RegisterPreservingCC_IMPL);
 
 void swift::swift_retain(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {

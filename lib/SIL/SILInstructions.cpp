@@ -1641,10 +1641,21 @@ MarkUninitializedBehaviorInst::MarkUninitializedBehaviorInst(
   }
 }
 
-OpenExistentialAddrInst::OpenExistentialAddrInst(
-    SILDebugLocation DebugLoc, SILValue Operand, SILType SelfTy)
-    : UnaryInstructionBase(DebugLoc, Operand, SelfTy) {
+OpenedExistentialAccess swift::getOpenedExistentialAccessFor(AccessKind access) {
+  switch (access) {
+  case AccessKind::Read:
+    return OpenedExistentialAccess::Immutable;
+  case AccessKind::ReadWrite:
+  case AccessKind::Write:
+    return OpenedExistentialAccess::Mutable;
+  }
+  llvm_unreachable("Uncovered covered switch?");
 }
+
+OpenExistentialAddrInst::OpenExistentialAddrInst(
+    SILDebugLocation DebugLoc, SILValue Operand, SILType SelfTy,
+    OpenedExistentialAccess AccessKind)
+    : UnaryInstructionBase(DebugLoc, Operand, SelfTy), ForAccess(AccessKind) {}
 
 OpenExistentialRefInst::OpenExistentialRefInst(
     SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
@@ -1660,6 +1671,11 @@ OpenExistentialBoxInst::OpenExistentialBoxInst(
     SILDebugLocation DebugLoc, SILValue operand, SILType ty)
     : UnaryInstructionBase(DebugLoc, operand, ty) {
 }
+
+OpenExistentialOpaqueInst::OpenExistentialOpaqueInst(SILDebugLocation DebugLoc,
+                                                     SILValue Operand,
+                                                     SILType SelfTy)
+    : UnaryInstructionBase(DebugLoc, Operand, SelfTy) {}
 
 UncheckedRefCastInst *
 UncheckedRefCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,

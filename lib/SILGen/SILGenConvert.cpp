@@ -16,7 +16,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
@@ -122,8 +121,7 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
   SILType optType = optTL.getLoweredType();
   CanType formalOptType = optType.getSwiftRValueType();
 
-  auto formalObjectType = formalOptType.getAnyOptionalObjectType();
-  assert(formalObjectType);
+  assert(formalOptType.getAnyOptionalObjectType());
   auto someDecl = getASTContext().getOptionalSomeDecl();
   
   SILValue result =
@@ -461,7 +459,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
 
       auto nativeError = F(SGFContext());
 
-      WritebackScope writebackScope(*this);
+      FormalEvaluationScope writebackScope(*this);
       auto nsError =
         emitRValueForPropertyLoad(loc, nativeError, concreteFormalType,
                                   /*super*/ false, nsErrorVar,
@@ -733,7 +731,8 @@ SILGenFunction::emitOpenExistential(
        SILLocation loc,
        ManagedValue existentialValue,
        CanArchetypeType openedArchetype,
-       SILType loweredOpenedType) {
+       SILType loweredOpenedType,
+       AccessKind accessKind) {
   // Open the existential value into the opened archetype value.
   bool isUnique = true;
   bool canConsume;
@@ -742,17 +741,26 @@ SILGenFunction::emitOpenExistential(
   SILType existentialType = existentialValue.getType();
   switch (existentialType.getPreferredExistentialRepresentation(SGM.M)) {
   case ExistentialRepresentation::Opaque: {
-    assert(existentialType.isAddress());
-    SILValue archetypeValue = B.createOpenExistentialAddr(
-                                loc, existentialValue.forward(*this),
-                                loweredOpenedType);
-    if (existentialValue.hasCleanup()) {
-      canConsume = true;
-      // Leave a cleanup to deinit the existential container.
-      enterDeinitExistentialCleanup(existentialValue.getValue(), CanType(),
-                                    ExistentialRepresentation::Opaque);
-      archetypeMV = emitManagedBufferWithCleanup(archetypeValue);
+    if (existentialType.isAddress()) {
+      OpenedExistentialAccess allowedAccess =
+          getOpenedExistentialAccessFor(accessKind);
+      SILValue archetypeValue = B.createOpenExistentialAddr(
+          loc, existentialValue.forward(*this), loweredOpenedType,
+          allowedAccess);
+      if (existentialValue.hasCleanup()) {
+        canConsume = true;
+        // Leave a cleanup to deinit the existential container.
+        enterDeinitExistentialCleanup(existentialValue.getValue(), CanType(),
+                                      ExistentialRepresentation::Opaque);
+        archetypeMV = emitManagedBufferWithCleanup(archetypeValue);
+      } else {
+        canConsume = false;
+        archetypeMV = ManagedValue::forUnmanaged(archetypeValue);
+      }
     } else {
+      SILValue archetypeValue = B.createOpenExistentialOpaque(
+          loc, existentialValue.forward(*this), loweredOpenedType);
+      assert(!existentialValue.hasCleanup());
       canConsume = false;
       archetypeMV = ManagedValue::forUnmanaged(archetypeValue);
     }

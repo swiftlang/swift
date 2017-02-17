@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s
 // RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -S -g -o - | %FileCheck %s --check-prefix ASM-CHECK
 
-// REQUIRES: CPU=i386_or_x86_64
+// REQUIRES: CPU=i386 || CPU=x86_64
 
 import Swift
 func markUsed<T>(_ t: T) {}
@@ -22,7 +22,7 @@ func call_me(_ code: @escaping () -> Void)
 }
 
 func main(_ x: Int64) -> Void
-// CHECK: define hidden void @_T09linetable4main{{[_0-9a-zA-Z]*}}F
+// CHECK: define hidden {{.*}} void @_T09linetable4main{{[_0-9a-zA-Z]*}}F
 {
     var my_class = MyClass(input: 10)
 // Linetable continuity. Don't go into the closure expression.

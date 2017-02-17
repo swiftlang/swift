@@ -28,6 +28,7 @@
 #include <condition_variable>
 #include <new>
 #include <cctype>
+#include <iostream>
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 // Avoid defining macro max(), min() which conflict with std::max(), std::min()
@@ -260,8 +261,8 @@ namespace {
       Data.Class = theClass;
     }
 
-    long getKeyIntValueForDump() {
-      return reinterpret_cast<long>(Data.Class);
+    intptr_t getKeyIntValueForDump() {
+      return reinterpret_cast<intptr_t>(Data.Class);
     }
 
     int compareWithKey(const ClassMetadata *theClass) const {
@@ -331,7 +332,7 @@ public:
 
   FunctionCacheEntry(Key key);
 
-  long getKeyIntValueForDump() {
+  intptr_t getKeyIntValueForDump() {
     return 0; // No single meaningful value here.
   }
 
@@ -486,7 +487,7 @@ public:
     return Data.NumElements;
   }
 
-  long getKeyIntValueForDump() {
+  intptr_t getKeyIntValueForDump() {
     return 0; // No single meaningful value
   }
 
@@ -1454,9 +1455,10 @@ static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
   auto globalNode
     = Demangle::NodeFactory::create(Demangle::Node::Kind::Global);
   globalNode->addChild(typeNode);
-  
+
+
   auto string = Demangle::mangleNode(globalNode);
-  
+
   auto fullNameBuf = (char*)swift_slowAlloc(string.size() + 1, 0);
   memcpy(fullNameBuf, string.c_str(), string.size() + 1);
 
@@ -1794,8 +1796,8 @@ namespace {
       Data.InstanceType = instanceType;
     }
 
-    long getKeyIntValueForDump() {
-      return reinterpret_cast<long>(Data.InstanceType);
+    intptr_t getKeyIntValueForDump() {
+      return reinterpret_cast<intptr_t>(Data.InstanceType);
     }
 
     int compareWithKey(const Metadata *instanceType) const {
@@ -1839,8 +1841,8 @@ public:
 
   ExistentialMetatypeValueWitnessTableCacheEntry(unsigned numWitnessTables);
 
-  long getKeyIntValueForDump() {
-    return static_cast<long>(getNumWitnessTables());
+  intptr_t getKeyIntValueForDump() {
+    return static_cast<intptr_t>(getNumWitnessTables());
   }
 
   int compareWithKey(unsigned key) const {
@@ -1861,8 +1863,8 @@ public:
 
   ExistentialMetatypeCacheEntry(const Metadata *instanceMetadata);
 
-  long getKeyIntValueForDump() {
-    return reinterpret_cast<long>(Data.InstanceType);
+  intptr_t getKeyIntValueForDump() {
+    return reinterpret_cast<intptr_t>(Data.InstanceType);
   }
 
   int compareWithKey(const Metadata *instanceType) const {
@@ -1980,7 +1982,7 @@ public:
 
   ExistentialCacheEntry(Key key);
 
-  long getKeyIntValueForDump() {
+  intptr_t getKeyIntValueForDump() {
     return 0;
   }
 
@@ -2016,7 +2018,7 @@ public:
               / sizeof(const WitnessTable *);
   }
 
-  long getKeyIntValueForDump() {
+  intptr_t getKeyIntValueForDump() {
     return getNumWitnessTables();
   }
 
@@ -2043,7 +2045,7 @@ public:
               / sizeof(const WitnessTable *);
   }
 
-  long getKeyIntValueForDump() {
+  intptr_t getKeyIntValueForDump() {
     return getNumWitnessTables();
   }
 
@@ -2803,3 +2805,99 @@ const WitnessTable *swift::swift_getGenericWitnessTable(
 }
 
 uint64_t swift::RelativeDirectPointerNullPtr = 0;
+
+/***************************************************************************/
+/*** Allocator implementation **********************************************/
+/***************************************************************************/
+
+namespace {
+  struct PoolRange {
+    static constexpr uintptr_t PageSize = 16 * 1024;
+    static constexpr uintptr_t MaxPoolAllocationSize = PageSize / 2;
+
+    /// The start of the allocation.
+    char *Begin;
+
+    /// The number of bytes remaining.
+    size_t Remaining;
+  };
+}
+
+// A statically-allocated pool.  It's zero-initialized, so this
+// doesn't cost us anything in binary size.
+LLVM_ALIGNAS(alignof(void*)) static char InitialAllocationPool[64*1024];
+static std::atomic<PoolRange>
+AllocationPool{PoolRange{InitialAllocationPool,
+                         sizeof(InitialAllocationPool)}};
+
+void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
+  assert(alignment <= alignof(void*));
+  assert(size % alignof(void*) == 0);
+
+  // If the size is larger than the maximum, just use malloc.
+  if (size > PoolRange::MaxPoolAllocationSize)
+    return malloc(size);
+
+  // Allocate out of the pool.
+  PoolRange curState = AllocationPool.load(std::memory_order_relaxed);
+  while (true) {
+    char *allocation;
+    PoolRange newState;
+    bool allocatedNewPage;
+
+    // Try to allocate out of the current page.
+    if (size <= curState.Remaining) {
+      allocatedNewPage = false;
+      allocation = curState.Begin;
+      newState = PoolRange{curState.Begin + size, curState.Remaining - size};
+    } else {
+      allocatedNewPage = true;
+      allocation = new char[PoolRange::PageSize];
+      newState = PoolRange{allocation + size, PoolRange::PageSize - size};
+      __asan_poison_memory_region(allocation, PoolRange::PageSize);
+    }
+
+    // Swap in the new state.
+    if (std::atomic_compare_exchange_weak_explicit(&AllocationPool,
+                                                   &curState, newState,
+                                              std::memory_order_relaxed,
+                                              std::memory_order_relaxed)) {
+      // If that succeeded, we've successfully allocated.
+      __msan_allocated_memory(allocation, size);
+      __asan_poison_memory_region(allocation, size);
+      return allocation;
+    }
+
+    // If it failed, go back to a neutral state and try again.
+    if (allocatedNewPage) {
+      delete[] allocation;
+    }
+  }
+}
+
+void MetadataAllocator::Deallocate(const void *allocation, size_t size) {
+  __asan_poison_memory_region(allocation, size);
+
+  if (size > PoolRange::MaxPoolAllocationSize) {
+    free(const_cast<void*>(allocation));
+    return;
+  }
+
+  // Check whether the allocation pool is still in the state it was in
+  // immediately after the given allocation.
+  PoolRange curState = AllocationPool.load(std::memory_order_relaxed);
+  if (reinterpret_cast<const char*>(allocation) + size != curState.Begin) {
+    return;
+  }
+
+  // Try to swap back to the pre-allocation state.  If this fails,
+  // don't bother trying again; we'll just leak the allocation.
+  PoolRange newState = { reinterpret_cast<char*>(const_cast<void*>(allocation)),
+                         curState.Remaining + size };
+  (void)
+    std::atomic_compare_exchange_strong_explicit(&AllocationPool,
+                                                 &curState, newState,
+                                                 std::memory_order_relaxed,
+                                                 std::memory_order_relaxed);
+}
+

@@ -130,6 +130,16 @@ DispatchAPI.test("DispatchWallTime.addSubtract") {
 	expectEqual(DispatchWallTime.distantFuture.rawValue - UInt64(1), then.rawValue)
 }
 
+DispatchAPI.test("DispatchTime.uptimeNanos") {
+	let seconds = 1
+	let nowMach = DispatchTime.now()
+	let oneSecondFromNowMach = nowMach + .seconds(seconds)
+	let nowNanos = nowMach.uptimeNanoseconds
+	let oneSecondFromNowNanos = oneSecondFromNowMach.uptimeNanoseconds 
+	let diffNanos = oneSecondFromNowNanos - nowNanos
+	expectEqual(NSEC_PER_SEC, diffNanos)
+}
+
 DispatchAPI.test("DispatchData.copyBytes") {
 	let source1: [UInt8] = [0, 1, 2, 3]
 	let srcPtr1 = UnsafeBufferPointer(start: source1, count: source1.count)
@@ -290,3 +300,4 @@ DispatchAPI.test("DispatchData.buffers") {
 	data = DispatchData(bytesNoCopy: ptr, deallocator: .custom(nil, {}))
 	expectEqual(data.count, 0)
 }
+

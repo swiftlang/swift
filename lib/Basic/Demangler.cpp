@@ -18,11 +18,10 @@
 #include "swift/Basic/ManglingUtils.h"
 #include "swift/Basic/ManglingMacros.h"
 #include "swift/Basic/Punycode.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Range.h"
 #include "swift/Strings.h"
 #include "llvm/Support/ErrorHandling.h"
-
+#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using swift::Demangle::FunctionSigSpecializationParamKind;
@@ -114,9 +113,86 @@ static bool isFunctionAttr(Node::Kind kind) {
 } // anonymous namespace
 
 namespace swift {
+namespace Demangle {
+
+//////////////////////////////////
+// Context member functions     //
+//////////////////////////////////
+
+// TODO: these functions are just dummy implementations. After lldb has switched
+// to the new Context API, implement the Context (bumpptr allocation based
+// demangling).
+
+Context::Context() {
+}
+
+Context::~Context() {
+}
+
+void Context::clear() {
+}
+
+NodePointer Context::demangleSymbolAsNode(llvm::StringRef MangledName) {
+  return ::demangleSymbolAsNode(MangledName.data(), MangledName.size());
+}
+
+NodePointer Context::demangleTypeAsNode(llvm::StringRef MangledName) {
+  return ::demangleTypeAsNode(MangledName.data(), MangledName.size());
+}
+
+std::string Context::demangleSymbolAsString(llvm::StringRef MangledName,
+                                            const DemangleOptions &Options) {
+  return ::demangleSymbolAsString(MangledName.data(), MangledName.size(),
+                                  Options);
+}
+
+std::string Context::demangleTypeAsString(llvm::StringRef MangledName,
+                                          const DemangleOptions &Options) {
+  return ::demangleTypeAsString(MangledName.data(), MangledName.size(),
+                                Options);
+}
+
+bool Context::isThunkSymbol(llvm::StringRef MangledName) {
+  return ::isThunkSymbol(MangledName.data(), MangledName.size());
+}
+  
+NodePointer Context::createNode(Node::Kind K) {
+  return NodeFactory::create(K);
+}
+
+NodePointer Context::createNode(Node::Kind K, Node::IndexType Index) {
+  return NodeFactory::create(K, Index);
+}
+
+NodePointer Context::createNode(Node::Kind K, llvm::StringRef Text) {
+  return NodeFactory::create(K, Text);
+}
+
+//////////////////////////////////
+// Node member functions        //
+//////////////////////////////////
+
+void Node::addChild(NodePointer Child, NodeFactory &Factory) {
+  addChild(Child);
+}
+
+void Node::addChild(NodePointer Child, Context &Ctx) {
+  addChild(Child);
+}
+
+} // namespace Demangle
+
 namespace NewMangling {
 
+//////////////////////////////////
+// Demangler member functions   //
+//////////////////////////////////
+
 NodePointer Demangler::demangleTopLevel() {
+
+  if (nextIf("_Tt"))
+    return demangleObjCTypeName();
+
   if (!nextIf(MANGLING_PREFIX_STR))
     return nullptr;
 
@@ -152,7 +228,7 @@ NodePointer Demangler::demangleTopLevel() {
             break;
           }
         }
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
       default:
         Parent->addChild(Nd);
         break;
@@ -393,8 +469,9 @@ NodePointer Demangler::demangleIdentifier() {
         WordIdx = c - 'A';
         hasWordSubsts = false;
       }
-      if (WordIdx >= (int)Words.size())
+      if (WordIdx >= NumWords)
         return nullptr;
+      assert(WordIdx < MaxNumWords);
       StringRef Slice = Words[WordIdx];
       Identifier.append(Slice.data(), Slice.size());
     }
@@ -405,7 +482,7 @@ NodePointer Demangler::demangleIdentifier() {
       return nullptr;
     if (isPunycoded)
       nextIf('_');
-    if (Pos + numChars >= Text.size())
+    if (Pos + numChars > Text.size())
       return nullptr;
     StringRef Slice = StringRef(Text.data() + Pos, numChars);
     if (isPunycoded) {
@@ -417,9 +494,9 @@ NodePointer Demangler::demangleIdentifier() {
       for (int Idx = 0, End = (int)Slice.size(); Idx <= End; ++Idx) {
         char c = (Idx < End ? Slice[Idx] : 0);
         if (wordStartPos >= 0 && isWordEnd(c, Slice[Idx - 1])) {
-          if (Idx - wordStartPos >= 2) {
+          if (Idx - wordStartPos >= 2 && NumWords < MaxNumWords) {
             StringRef word(Slice.begin() + wordStartPos, Idx - wordStartPos);
-            Words.push_back(word);
+            Words[NumWords++] = word;
           }
           wordStartPos = -1;
         }
@@ -1703,6 +1780,46 @@ NodePointer Demangler::demangleValueWitness() {
     return nullptr;
   NodePointer VW = NodeFactory::create(Node::Kind::ValueWitness, unsigned(Kind));
   return addChild(VW, popNode(Node::Kind::Type));
+}
+
+NodePointer Demangler::demangleObjCTypeName() {
+  NodePointer Ty = NodeFactory::create(Node::Kind::Type);
+  NodePointer Global = addChild(NodeFactory::create(Node::Kind::Global),
+                         addChild(NodeFactory::create(Node::Kind::TypeMangling),
+                                  Ty));
+  NodePointer Nominal;
+  bool isProto = false;
+  if (nextIf('C')) {
+    Nominal = NodeFactory::create(Node::Kind::Class);
+    addChild(Ty, Nominal);
+  } else if (nextIf('P')) {
+    isProto = true;
+    Nominal = NodeFactory::create(Node::Kind::Protocol);
+    addChild(Ty, addChild(NodeFactory::create(Node::Kind::ProtocolList),
+                    addChild(NodeFactory::create(Node::Kind::TypeList),
+                      addChild(NodeFactory::create(Node::Kind::Type),
+                               Nominal))));
+  } else {
+    return nullptr;
+  }
+
+  NodePointer Ident = demangleIdentifier();
+  if (!Ident)
+    return nullptr;
+  Nominal->addChild(changeKind(Ident, Node::Kind::Module));
+
+  Ident = demangleIdentifier();
+  if (!Ident)
+    return nullptr;
+  Nominal->addChild(Ident);
+
+  if (isProto && !nextIf('_'))
+    return nullptr;
+
+  if (Pos < Text.size())
+    return nullptr;
+
+  return Global;
 }
 
 } // end namespace NewMangling

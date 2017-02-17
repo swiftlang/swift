@@ -153,11 +153,16 @@ private:
   /// All modules this module depends on.
   SmallVector<Dependency, 8> Dependencies;
 
+  struct SearchPath {
+    StringRef Path;
+    bool IsFramework;
+    bool IsSystem;
+  };
   /// Search paths this module may provide.
   ///
   /// This is not intended for use by frameworks, but may show up in debug
   /// modules.
-  std::vector<std::pair<StringRef, bool>> SearchPaths;
+  std::vector<SearchPath> SearchPaths;
 
   /// Info for the (lone) imported header for this module.
   struct {
@@ -312,6 +317,10 @@ private:
   using SerializedDeclTable =
       llvm::OnDiskIterableChainedHashTable<DeclTableInfo>;
 
+  class ExtensionTableInfo;
+  using SerializedExtensionTable =
+      llvm::OnDiskIterableChainedHashTable<ExtensionTableInfo>;
+
   class LocalDeclTableInfo;
   using SerializedLocalDeclTable =
       llvm::OnDiskIterableChainedHashTable<LocalDeclTableInfo>;
@@ -323,9 +332,9 @@ private:
   std::unique_ptr<SerializedDeclTable> TopLevelDecls;
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
   std::unique_ptr<SerializedDeclTable> PrecedenceGroupDecls;
-  std::unique_ptr<SerializedDeclTable> ExtensionDecls;
   std::unique_ptr<SerializedDeclTable> ClassMembersByName;
   std::unique_ptr<SerializedDeclTable> OperatorMethodDecls;
+  std::unique_ptr<SerializedExtensionTable> ExtensionDecls;
   std::unique_ptr<SerializedLocalDeclTable> LocalTypeDecls;
   std::unique_ptr<SerializedNestedTypeDeclsTable> NestedTypeDecls;
 
@@ -445,6 +454,11 @@ private:
   /// index_block::ObjCMethodTableLayout format.
   std::unique_ptr<ModuleFile::SerializedObjCMethodTable>
   readObjCMethodTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+  /// Read an on-disk local decl hash table stored in
+  /// index_block::ExtensionTableLayout format.
+  std::unique_ptr<SerializedExtensionTable>
+  readExtensionTable(ArrayRef<uint64_t> fields, StringRef blobData);
 
   /// Read an on-disk local decl hash table stored in
   /// index_block::NestedTypeDeclsLayout format.

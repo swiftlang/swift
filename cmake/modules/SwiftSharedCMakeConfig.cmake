@@ -1,17 +1,4 @@
 include(CMakeParseArguments)
-
-# Use ${cmake_2_8_12_KEYWORD} instead of KEYWORD in target_link_libraries().
-# These variables are used by LLVM's CMake code.
-set(cmake_2_8_12_INTERFACE INTERFACE)
-set(cmake_2_8_12_PRIVATE PRIVATE)
-
-# Backwards compatible USES_TERMINAL, cargo culted from llvm's cmake configs.
-if(CMAKE_VERSION VERSION_LESS 3.1.20141117)
-  set(cmake_3_2_USES_TERMINAL)
-else()
-  set(cmake_3_2_USES_TERMINAL USES_TERMINAL)
-endif()
-
 include(SwiftXcodeSupport)
 
 macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
@@ -196,6 +183,9 @@ macro(swift_common_standalone_build_config_cmark product)
   set(CMARK_BUILD_INCLUDE_DIR "${PATH_TO_CMARK_BUILD}/src")
   include_directories("${CMARK_MAIN_INCLUDE_DIR}"
                       "${CMARK_BUILD_INCLUDE_DIR}")
+
+  include(${${product}_PATH_TO_CMARK_BUILD}/src/CMarkExports.cmake)
+  add_definitions(-DCMARK_STATIC_DEFINE)
 endmacro()
 
 # Common cmake project config for standalone builds.
@@ -287,8 +277,9 @@ macro(swift_common_cxx_warnings)
 
   # Disable C4068: unknown pragma. This means that MSVC doesn't report hundreds of warnings across
   # the repository for IDE features such as #pragma mark "Title".
-  check_cxx_compiler_flag("/wd4068" CXX_SUPPORTS_UNKNOWN_PRAGMA_FLAG)
-  append_if(CXX_SUPPORTS_UNKNOWN_PRAGMA_FLAG "/wd4068" CMAKE_CXX_FLAGS)
+  if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4068")
+  endif()
 endmacro()
 
 # Like 'llvm_config()', but uses libraries from the selected build

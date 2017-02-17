@@ -107,5 +107,6 @@ class FuncBugReducerTestCase(unittest.TestCase):
         # the relevant command.
         self.assertEquals([], [o for o in output if '-emit-sib' in o])
 
+
 if __name__ == '__main__':
     unittest.main()

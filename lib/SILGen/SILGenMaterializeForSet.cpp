@@ -28,6 +28,7 @@
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
@@ -746,7 +747,7 @@ namespace {
     void emit(SILGenFunction &gen, CleanupLocation loc) override {
       gen.B.createDeallocValueBuffer(loc, ValueType, Buffer);
     }
-    void dump() const override {
+    void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
       llvm::errs() << "DeallocateValueBuffer\n"
                    << "State: " << getState() << "Buffer: " << Buffer << "\n";

@@ -50,7 +50,7 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
 
   // arm64 requires marker assembly for objc_retainAutoreleasedReturnValue.
   target.ObjCRetainAutoreleasedReturnValueMarker =
-    "mov\tfp, fp\t\t; marker for objc_retainAutoreleaseReturnValue";
+    "mov\tfp, fp\t\t# marker for objc_retainAutoreleaseReturnValue";
 
   // arm64 requires ISA-masking.
   target.ObjCUseISAMask = true;

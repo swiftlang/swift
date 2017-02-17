@@ -20,6 +20,9 @@
 // either archetypes or interface types. Care must be exercised to only look up
 // one or the other.
 //
+// SubstitutionMaps are constructed by calling the getSubstitutionMap() method
+// on a GenericSignature or GenericEnvironment.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_AST_SUBSTITUTION_MAP_H
@@ -35,6 +38,8 @@
 
 namespace swift {
 
+class GenericSignature;
+class GenericEnvironment;
 class SubstitutableType;
 
 template<class Type> class CanTypeWrapper;
@@ -43,6 +48,7 @@ typedef CanTypeWrapper<SubstitutableType> CanSubstitutableType;
 class SubstitutionMap {
   using ParentType = std::pair<CanType, AssociatedTypeDecl *>;
 
+  // FIXME: Switch to a more efficient representation.
   llvm::DenseMap<SubstitutableType *, Type> subMap;
   llvm::DenseMap<TypeBase *, SmallVector<ProtocolConformanceRef, 1>>
     conformanceMap;
@@ -77,15 +83,12 @@ public:
   /// Retrieve the conformances for the given type.
   ArrayRef<ProtocolConformanceRef> getConformances(CanType type) const;
 
-  void addSubstitution(CanSubstitutableType type, Type replacement);
-
+  /// Look up the replacement for the given type parameter or interface type.
+  /// Note that this only finds replacements for maps that are directly
+  /// stored inside the map. In most cases, you should call Type::subst()
+  /// instead, since that will resolve member types also.
   Type lookupSubstitution(CanSubstitutableType type) const;
 
-  void addConformance(CanType type, ProtocolConformanceRef conformance);
-
-  void addParent(CanType type, CanType parent,
-                 AssociatedTypeDecl *assocType);
-  
   bool empty() const {
     return subMap.empty();
   }
@@ -142,6 +145,19 @@ public:
   void dump(llvm::raw_ostream &out) const;
 
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in the debugger");
+
+private:
+  friend class GenericSignature;
+  friend class GenericEnvironment;
+
+  // You should not need to call these directly to build SubstitutionMaps;
+  // instead, use GenericSignature::getSubstitutionMap() or
+  // GenericEnvironment::getSubstitutionMap().
+
+  void addSubstitution(CanSubstitutableType type, Type replacement);
+  void addConformance(CanType type, ProtocolConformanceRef conformance);
+  void addParent(CanType type, CanType parent,
+                 AssociatedTypeDecl *assocType);
 };
 
 } // end namespace swift

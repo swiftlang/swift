@@ -82,7 +82,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
     CanType(bridgedErrorPtrType->getAnyPointerElementType(ptrKind));
 
   FullExpr scope(gen.Cleanups, CleanupLocation::get(loc));
-  WritebackScope writebacks(gen);
+  FormalEvaluationScope writebacks(gen);
 
   // Convert the error to a bridged form.
   SILValue bridgedError = errorSrc.emitBridged(gen, loc, bridgedErrorProto);

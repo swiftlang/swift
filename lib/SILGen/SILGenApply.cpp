@@ -11,21 +11,22 @@
 //===----------------------------------------------------------------------===//
 
 #include "ArgumentSource.h"
+#include "FormalEvaluation.h"
+#include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
 #include "Scope.h"
-#include "Initialization.h"
 #include "SpecializedEmitter.h"
 #include "Varargs.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/Module.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Unicode.h"
-#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "swift/SIL/SILArgument.h"
+#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -2380,7 +2381,7 @@ RValue SILGenFunction::emitApply(
   }
 
   // If there's a foreign error parameter, fill it in.
-  Optional<WritebackScope> errorTempWriteback;
+  Optional<FormalEvaluationScope> errorTempWriteback;
   ManagedValue errorTemp;
   if (foreignError) {
     // Error-temporary emission may need writeback.
@@ -2430,7 +2431,7 @@ RValue SILGenFunction::emitApply(
         B.createAutoreleaseValue(loc, lifetimeExtendedSelf, Atomicity::Atomic);
         hasAlreadyLifetimeExtendedSelf = true;
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case ResultConvention::Unowned:
       // Unretained. Retain the value.
@@ -2451,7 +2452,7 @@ RValue SILGenFunction::emitApply(
     {
       Scope S(Cleanups, CleanupLocation::get(loc));
 
-      // First create a rvalue cleanup for our direct result.
+      // First create an rvalue cleanup for our direct result.
       ManagedValue managedDirectResult = emitManagedRValueWithCleanup(rawDirectResult);
       // Then borrow the managed direct result.
       ManagedValue borrowedDirectResult = managedDirectResult.borrow(*this, loc);
@@ -2464,8 +2465,10 @@ RValue SILGenFunction::emitApply(
         SILValue v = elt.copyUnmanaged(*this, loc).forward(*this);
         // We assume that unowned inner pointers, autoreleased values, and
         // indirect values are never returned in tuples.
-        assert(directResult.getConvention() == ResultConvention::Owned ||
-               directResult.getConvention() == ResultConvention::Unowned);
+        // FIXME: can this assertion be removed without lowered addresses?
+        assert(directResult.getConvention() == ResultConvention::Owned
+               || directResult.getConvention() == ResultConvention::Unowned
+               || !substFnConv.useLoweredAddresses());
         copiedResults.push_back({v, directResult});
         ++Index;
       }
@@ -2965,16 +2968,18 @@ namespace {
       // it's not already there.  (Note that this potentially includes
       // conventions which pass indirectly without transferring
       // ownership, like Itanium C++.)
-      if (SGF.silConv.isSILIndirect(param)) {
-        if (specialDest) {
-          emitIndirectInto(std::move(arg), origParamType,
-                           loweredSubstParamType, *specialDest);
-          Args.push_back(ManagedValue::forInContext());
-        } else {
-          auto value = emitIndirect(std::move(arg), loweredSubstArgType,
-                                    origParamType, param);
-          Args.push_back(value);
-        }
+      if (specialDest) {
+        assert(param.isFormalIndirect() &&
+               "SpecialDest should imply indirect parameter");
+        // TODO: Change the way we initialize array storage in opaque mode
+        emitIndirectInto(std::move(arg), origParamType, loweredSubstParamType,
+                         *specialDest);
+        Args.push_back(ManagedValue::forInContext());
+        return;
+      } else if (SGF.silConv.isSILIndirect(param)) {
+        auto value = emitIndirect(std::move(arg), loweredSubstArgType,
+                                  origParamType, param);
+        Args.push_back(value);
         return;
       }
 
@@ -3828,7 +3833,7 @@ public:
     gen.B.createDeallocBox(l, box);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &gen) const override {
 #ifndef NDEBUG
     llvm::errs() << "DeallocateUninitializedBox "
                  << "State:" << getState() << " "
@@ -3934,7 +3939,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   }
 
   // Loadable with payload
-  if (enumTy.isLoadable(SGM.M)) {
+  if (enumTy.isLoadable(SGM.M) || !silConv.useLoweredAddresses()) {
     if (!payloadMV) {
       // If the payload was indirect, we already evaluated it and
       // have a single value. Otherwise, evaluate the payload.
@@ -4175,7 +4180,7 @@ namespace {
     std::vector<CallSite> uncurriedSites;
     std::vector<CallSite> extraSites;
     Callee callee;
-    WritebackScope InitialWritebackScope;
+    FormalEvaluationScope InitialWritebackScope;
     unsigned uncurries;
     bool applied;
     bool AssumedPlusZeroSelf;
@@ -4183,15 +4188,12 @@ namespace {
   public:
     /// Create an emission for a call of the given callee.
     CallEmission(SILGenFunction &gen, Callee &&callee,
-                 WritebackScope &&writebackScope,
+                 FormalEvaluationScope &&writebackScope,
                  bool assumedPlusZeroSelf = false)
-      : gen(gen),
-        callee(std::move(callee)),
-        InitialWritebackScope(std::move(writebackScope)),
-        uncurries(callee.getNaturalUncurryLevel() + 1),
-        applied(false),
-        AssumedPlusZeroSelf(assumedPlusZeroSelf)
-    {
+        : gen(gen), callee(std::move(callee)),
+          InitialWritebackScope(std::move(writebackScope)),
+          uncurries(callee.getNaturalUncurryLevel() + 1), applied(false),
+          AssumedPlusZeroSelf(assumedPlusZeroSelf) {
       // Subtract an uncurry level for captures, if any.
       // TODO: Encapsulate this better in Callee.
       if (this->callee.hasCaptures()) {
@@ -4542,7 +4544,7 @@ namespace {
       // If there are remaining call sites, apply them to the result function.
       // Each chained call gets its own writeback scope.
       for (unsigned i = 0, size = extraSites.size(); i < size; ++i) {
-        WritebackScope writebackScope(gen);
+        FormalEvaluationScope writebackScope(gen);
 
         SILLocation loc = extraSites[i].Loc;
 
@@ -4605,7 +4607,7 @@ namespace {
 
 static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   // Set up writebacks for the call(s).
-  WritebackScope writebacks(gen);
+  FormalEvaluationScope writebacks(gen);
 
   SILGenApply apply(gen);
 
@@ -4709,7 +4711,7 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
   SILConstantInfo initConstant = SGF.getConstantInfo(initRef);
 
   // Scope any further writeback just within this operation.
-  WritebackScope writebackScope(SGF);
+  FormalEvaluationScope writebackScope(SGF);
 
   // Determine the formal and substituted types.
   CanFunctionType substFormalType;
@@ -4958,7 +4960,7 @@ namespace {
       gen.emitUninitializedArrayDeallocation(l, Array);
     }
 
-    void dump() const override {
+    void dump(SILGenFunction &gen) const override {
 #ifndef NDEBUG
       llvm::errs() << "DeallocateUninitializedArray "
                    << "State:" << getState() << " "
@@ -5086,10 +5088,6 @@ struct AccessorBaseArgPreparer final {
   ArgumentSource prepare();
 
 private:
-  bool isDirectGuaranteed() const {
-    return selfParam.getConvention() == ParameterConvention::Direct_Guaranteed;
-  }
-
   /// Prepare our base if we have an address base.
   ArgumentSource prepareAccessorAddressBaseArg();
   /// Prepare our base if we have an object base.
@@ -5281,7 +5279,7 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
                 bool isSuper, bool isDirectUse,
                 RValue &&subscripts, SGFContext c) {
   // Scope any further writeback just within this operation.
-  WritebackScope writebackScope(*this);
+  FormalEvaluationScope writebackScope(*this);
 
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
                                                      substitutions, selfValue,
@@ -5324,7 +5322,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
                                      bool isSuper, bool isDirectUse,
                                      RValue &&subscripts, RValue &&setValue) {
   // Scope any further writeback just within this operation.
-  WritebackScope writebackScope(*this);
+  FormalEvaluationScope writebackScope(*this);
 
   Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
                                                      substitutions, selfValue,
@@ -5378,7 +5376,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                               RValue &&subscripts, SILValue buffer,
                               SILValue callbackStorage) {
   // Scope any further writeback just within this operation.
-  WritebackScope writebackScope(*this);
+  FormalEvaluationScope writebackScope(*this);
 
   Callee callee = emitSpecializedAccessorFunctionRef(*this, loc,
                                                      materializeForSet,
@@ -5464,7 +5462,7 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                       bool isSuper, bool isDirectUse,
                       RValue &&subscripts, SILType addressType) {
   // Scope any further writeback just within this operation.
-  WritebackScope writebackScope(*this);
+  FormalEvaluationScope writebackScope(*this);
 
   Callee callee =
     emitSpecializedAccessorFunctionRef(*this, loc, addressor,

@@ -34,7 +34,10 @@ class Demangler {
   std::vector<NodeWithPos> NodeStack;
   std::vector<NodePointer> Substitutions;
   std::vector<unsigned> PendingSubstitutions;
-  std::vector<StringRef> Words;
+
+  static const int MaxNumWords = 26;
+  StringRef Words[MaxNumWords];
+  int NumWords = 0;
 
   static NodePointer pop_back_val(std::vector<NodePointer> &NodeVector) {
     if (NodeVector.empty())
@@ -240,6 +243,8 @@ private:
   NodePointer demangleGenericRequirement();
   NodePointer demangleGenericType();
   NodePointer demangleValueWitness();
+
+  NodePointer demangleObjCTypeName();
 };
 
 } // end namespace NewMangling

@@ -36,8 +36,10 @@ func test5(_ g: Gizmo) {
   // CHECK: bb0([[ARG:%.*]] : $Gizmo):
   // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
   // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX]]
-  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK:   [[CLASS:%.*]] = metatype $@thick Gizmo.Type
   // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.inspect!1.foreign
   // CHECK:   [[OBJC_CLASS:%[0-9]+]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
@@ -58,8 +60,10 @@ func test6(_ g: Gizmo) {
   // CHECK: bb0([[ARG:%.*]] : $Gizmo):
   // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
   // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX]]
-  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK:   [[CLASS:%.*]] = metatype $@thick Gizmo.Type
   // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[CLASS]] : {{.*}}, #Gizmo.consume!1.foreign
   // CHECK:   [[OBJC_CLASS:%.*]] = thick_to_objc_metatype [[CLASS]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
@@ -82,8 +86,10 @@ func test7(_ g: Gizmo) {
   // CHECK: bb0([[ARG:%.*]] : $Gizmo):
   // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
   // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX]]
-  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK:   [[G:%.*]] = load [copy] [[GIZMO_BOX_PB]]
   // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[G]] : {{.*}}, #Gizmo.fork!1.foreign
   // CHECK:   apply [[METHOD]]([[G]])
@@ -101,11 +107,14 @@ func test8(_ g: Gizmo) -> Gizmo {
   return g.clone()
   // CHECK: bb0([[G:%.*]] : $Gizmo):
   // CHECK-NOT:  copy_value
-  // CHECK:      [[METHOD:%.*]] = class_method [volatile] [[G]] : {{.*}}, #Gizmo.clone!1.foreign
+  // CHECK:      [[BORROWED_G:%.*]] = begin_borrow [[G]]
+  // CHECK:      [[METHOD:%.*]] = class_method [volatile] [[BORROWED_G]] : {{.*}}, #Gizmo.clone!1.foreign
   // CHECK-NOT:  copy_value [[RESULT]]
   // CHECK:      [[RESULT:%.*]] = unchecked_enum_data
   // CHECK-NOT:  copy_value [[RESULT]]
-  // CHECK:      return [[RESULT]]
+  // CHECK:      end_borrow [[BORROWED_G]] from [[G]]
+  // CHECK-NEXT: destroy_value [[G]]
+  // CHECK-NEXT: return [[RESULT]]
 }
 // duplicate returns an autoreleased object at +0.
 // CHECK-LABEL: sil hidden  @_T026objc_ownership_conventions5test9{{[_0-9a-zA-Z]*}}F
@@ -113,18 +122,22 @@ func test9(_ g: Gizmo) -> Gizmo {
   return g.duplicate()
   // CHECK: bb0([[G:%.*]] : $Gizmo):
   // CHECK-NOT:      copy_value [[G:%0]]
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[G]] : {{.*}}, #Gizmo.duplicate!1.foreign
-  // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[G]])
+  // CHECK: [[BORROWED_G:%.*]] = begin_borrow [[G]]
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_G]] : {{.*}}, #Gizmo.duplicate!1.foreign
+  // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[BORROWED_G]])
   // CHECK-NOT:  copy_value [[RESULT]]
   // CHECK:      [[RESULT:%.*]] = unchecked_enum_data
   // CHECK-NOT:  copy_value [[RESULT]]
-  // CHECK:      return [[RESULT]]
+  // CHECK:      end_borrow [[BORROWED_G]] from [[G]]
+  // CHECK-NEXT: destroy_value [[G]]
+  // CHECK-NEXT: return [[RESULT]]
 }
 
 // CHECK-LABEL: sil hidden @_T026objc_ownership_conventions6test10{{[_0-9a-zA-Z]*}}F
 func test10(_ g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : $Gizmo):
-  // CHECK:      [[G_COPY:%.*]] = copy_value [[G]]
+  // CHECK:      [[BORROWED_G:%.*]] = begin_borrow [[G]]
+  // CHECK:      [[G_COPY:%.*]] = copy_value [[BORROWED_G]]
   // CHECK-NEXT: [[NS_G_COPY:%[0-9]+]] = upcast [[G_COPY]] : $Gizmo to $NSObject
   // CHECK-NEXT: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G_COPY]] : $NSObject, #NSObject.classProp!getter.1.foreign : (NSObject) -> () -> AnyObject.Type!, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
   // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_COPY]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
@@ -142,7 +155,8 @@ func test10(_ g: Gizmo) -> AnyClass {
 // CHECK-LABEL: sil hidden @_T026objc_ownership_conventions6test11{{[_0-9a-zA-Z]*}}F
 func test11(_ g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : $Gizmo):
-  // CHECK: [[G_COPY:%.*]] = copy_value [[G]]
+  // CHECK: [[BORROWED_G:%.*]] = begin_borrow [[G]]
+  // CHECK: [[G_COPY:%.*]] = copy_value [[BORROWED_G]]
   // CHECK: [[NS_G_COPY:%[0-9]+]] = upcast [[G_COPY:%[0-9]+]] : $Gizmo to $NSObject
   // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G_COPY]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : (NSObject) -> () -> NSAnsing.Type!, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
   // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_COPY]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
@@ -165,9 +179,13 @@ func test11(_ g: Gizmo) -> AnyClass {
 func applyBlock(_ f: @convention(block) (Gizmo) -> Gizmo, x: Gizmo) -> Gizmo {
   // CHECK:     bb0([[BLOCK:%.*]] : $@convention(block) (Gizmo) -> @autoreleased Gizmo, [[ARG:%.*]] : $Gizmo):
   // CHECK:       [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
-  // CHECK:       [[BLOCK_COPY_COPY:%.*]] = copy_value [[BLOCK_COPY]]
-  // CHECK:       [[RESULT:%.*]] = apply [[BLOCK_COPY_COPY]]([[ARG]])
+  // CHECK:       [[BORROWED_BLOCK_COPY:%.*]] = begin_borrow [[BLOCK_COPY]]
+  // CHECK:       [[BLOCK_COPY_COPY:%.*]] = copy_value [[BORROWED_BLOCK_COPY]]
+  // CHECK:       [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:       [[RESULT:%.*]] = apply [[BLOCK_COPY_COPY]]([[BORROWED_ARG]])
+  // CHECK:       end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK:       destroy_value [[BLOCK_COPY_COPY]]
+  // CHECK:       end_borrow [[BORROWED_BLOCK_COPY]] from [[BLOCK_COPY]]
   // CHECK:       destroy_value [[ARG]]
   // CHECK:       destroy_value [[BLOCK_COPY]]
   // CHECK:       destroy_value [[BLOCK]]
@@ -188,10 +206,12 @@ func useInnerPointer(_ p: UnsafeMutableRawPointer) {}
 // CHECK-LABEL: sil hidden @_T026objc_ownership_conventions18innerPointerMethodySo5GizmoCF : $@convention(thin) (@owned Gizmo) -> () {
 // CHECK: bb0([[ARG:%.*]] : $Gizmo):
 // CHECK:         [[USE:%.*]] = function_ref @_T026objc_ownership_conventions15useInnerPointer{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[METHOD:%.*]] = class_method [volatile] [[ARG]] : $Gizmo, #Gizmo.getBytes!1.foreign : (Gizmo) -> () -> UnsafeMutableRawPointer, $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutableRawPointer
-// CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
-// SEMANTIC ARC TODO: The apply below /should/ be on ARG_COPY
-// CHECK:         [[PTR:%.*]] = apply [[METHOD]]([[ARG]])
+// CHECK:         [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:         [[METHOD:%.*]] = class_method [volatile] [[BORROWED_ARG]] : $Gizmo, #Gizmo.getBytes!1.foreign : (Gizmo) -> () -> UnsafeMutableRawPointer, $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutableRawPointer
+// CHECK:         [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+// => SEMANTIC ARC TODO: The apply below /should/ be on ARG_COPY. It is safe how
+// it is today though since we are using a reference type.
+// CHECK:         [[PTR:%.*]] = apply [[METHOD]]([[BORROWED_ARG]])
 // CHECK:         autorelease_value [[ARG_COPY]]
 // CHECK:         apply [[USE]]([[PTR]])
 // CHECK:         destroy_value [[ARG]]
@@ -202,10 +222,11 @@ func innerPointerMethod(_ g: Gizmo) {
 // CHECK-LABEL: sil hidden @_T026objc_ownership_conventions20innerPointerPropertyySo5GizmoCF : $@convention(thin) (@owned Gizmo) -> () {
 // CHECK:       bb0([[ARG:%.*]] : $Gizmo):
 // CHECK:         [[USE:%.*]] = function_ref @_T026objc_ownership_conventions15useInnerPointer{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[METHOD:%.*]] = class_method [volatile] [[ARG]] : $Gizmo, #Gizmo.innerProperty!getter.1.foreign : (Gizmo) -> () -> UnsafeMutableRawPointer, $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutableRawPointer
-// CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
-// SEMANTIC ARC TODO: The apply below should be on ARG_COPY
-// CHECK:         [[PTR:%.*]] = apply [[METHOD]]([[ARG]])
+// CHECK:         [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:         [[METHOD:%.*]] = class_method [volatile] [[BORROWED_ARG]] : $Gizmo, #Gizmo.innerProperty!getter.1.foreign : (Gizmo) -> () -> UnsafeMutableRawPointer, $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutableRawPointer
+// CHECK:         [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+// => SEMANTIC ARC TODO: The apply below should be on ARG_COPY. It is benign since objc objects are reference types.
+// CHECK:         [[PTR:%.*]] = apply [[METHOD]]([[BORROWED_ARG]])
 // CHECK:         autorelease_value [[ARG_COPY]]
 // CHECK:         apply [[USE]]([[PTR]])
 // CHECK:         destroy_value [[ARG]]

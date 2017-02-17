@@ -272,6 +272,44 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   return finalize();
 }
 
+static bool isPrivate(const NominalTypeDecl *Nominal) {
+  return Nominal->hasAccessibility() &&
+         Nominal->getFormalAccess() <= Accessibility::FilePrivate;
+}
+
+std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
+  DeclContext *Ctx = Nominal->getDeclContext();
+
+  if (Ctx->isModuleScopeContext() && !isPrivate(Nominal)) {
+    // Use the old mangling for non-private top-level classes and protocols.
+    // This is what the ObjC runtime needs to demangle.
+    // TODO: Use new mangling scheme as soon as the ObjC runtime
+    // can demangle it.
+    //
+    // Don't use word-substitutions and punycode encoding.
+    MaxNumWords = 0;
+    UsePunycode = false;
+    Buffer << "_Tt";
+    bool isProto = false;
+    if (isa<ClassDecl>(Nominal)) {
+      Buffer << 'C';
+    } else {
+      isProto = true;
+      assert(isa<ProtocolDecl>(Nominal));
+      Buffer << 'P';
+    }
+    appendModule(Ctx->getParentModule());
+    appendIdentifier(Nominal->getName().str());
+    if (isProto)
+      Buffer << '_';
+    return finalize();
+  }
+  // For all other cases, we can use the new mangling.
+  beginMangling();
+  appendNominalType(Nominal);
+  return finalize();
+}
+
 std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {
   appendContext(type);
   return finalize();

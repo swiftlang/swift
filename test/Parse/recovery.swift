@@ -638,7 +638,7 @@ func testMultiPatternConditionRecovery(x: Int?) {
 
   // <rdar://problem/20883210> QoI: Following a "let" condition with boolean condition spouts nonsensical errors
   guard let x: Int? = 1, x == 1 else {  }
-  // expected-warning @-1 {{explicitly specified type 'Int?' adds an additional level of optional to the initializer, making the optional check always succeed}} {{16-22=Int}}
+  // expected-warning @-1 {{explicitly specified type 'Int?' adds an additional level of optional to the initializer, making the optional check always succeed}} {{16-20=Int}}
 }
 
 // rdar://20866942

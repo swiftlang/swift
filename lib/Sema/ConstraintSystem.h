@@ -1758,10 +1758,6 @@ public:
 
     /// Indicates we're matching an operator parameter.
     TMF_ApplyingOperatorParameter = 0x4,
-
-    /// Indicates we're unwrapping an optional type for a value-to-optional
-    /// conversion.
-    TMF_UnwrappingOptional = 0x8,
   };
 
   /// Options that govern how type matching should proceed.

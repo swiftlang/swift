@@ -29,9 +29,9 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/SmallString.h"
 #include <iterator>
+
 using namespace swift;
 using namespace Mangle;
 using namespace Lowering;
@@ -120,7 +120,7 @@ namespace {
     void emit(SILGenFunction &gen, CleanupLocation l) override {
       gen.B.emitDestroyValueOperation(l, closure);
     }
-    void dump() const override {
+    void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
       llvm::errs() << "CleanupClosureConstant\n"
                    << "State:" << getState() << "\n"
@@ -222,7 +222,7 @@ public:
     gen.B.createEndBorrow(l, borrowed, original);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "EndBorrowCleanup "
                  << "State:" << getState() << "\n"
@@ -246,7 +246,7 @@ public:
       gen.B.emitDestroyValueOperation(l, v);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "ReleaseValueCleanup\n"
                  << "State:" << getState() << "\n"
@@ -267,7 +267,7 @@ public:
     gen.B.createDeallocStack(l, Addr);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "DeallocStackCleanup\n"
                  << "State:" << getState() << "\n"
@@ -288,7 +288,7 @@ public:
     gen.destroyLocalVariable(l, Var);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "DestroyLocalVariable\n"
                  << "State:" << getState() << "\n";
@@ -310,7 +310,7 @@ public:
     gen.deallocateUninitializedLocalVariable(l, Var);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "DeallocateUninitializedLocalVariable\n"
                  << "State:" << getState() << "\n";
@@ -447,7 +447,8 @@ public:
     } else {
       // If this is a let with an initializer or bound value, we only need a
       // buffer if the type is address only.
-      needsTemporaryBuffer = lowering.isAddressOnly();
+      needsTemporaryBuffer =
+          lowering.isAddressOnly() && gen.silConv.useLoweredAddresses();
     }
    
     if (needsTemporaryBuffer) {
@@ -1210,12 +1211,6 @@ CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
   return Cleanups.getTopCleanup();
 }
 
-CleanupHandle SILGenFunction::enterEndBorrowCleanup(SILValue original,
-                                                    SILValue borrowed) {
-  Cleanups.pushCleanup<EndBorrowCleanup>(original, borrowed);
-  return Cleanups.getTopCleanup();
-}
-
 namespace {
   /// A cleanup that deinitializes an opaque existential container
   /// before a value has been stored into it, or after its value was taken.
@@ -1247,7 +1242,7 @@ namespace {
       }
     }
 
-    void dump() const override {
+    void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
       llvm::errs() << "DeinitExistentialCleanup\n"
                    << "State:" << getState() << "\n"
@@ -1799,10 +1794,11 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     genericEnv = witness.getSyntheticEnvironment();
     witnessSubs = witness.getSubstitutions();
 
-    const SubstitutionMap &reqtSubs
-      = witness.getRequirementToSyntheticMap();
-    auto input = reqtOrigTy->getInput().subst(reqtSubs)->getCanonicalType();
-    auto result = reqtOrigTy->getResult().subst(reqtSubs)->getCanonicalType();
+    auto reqtSubs = witness.getRequirementToSyntheticSubs();
+    auto reqtSubMap = reqtOrigTy->getGenericSignature()
+        ->getSubstitutionMap(reqtSubs);
+    auto input = reqtOrigTy->getInput().subst(reqtSubMap);
+    auto result = reqtOrigTy->getResult().subst(reqtSubMap);
 
     if (genericEnv) {
       auto *genericSig = genericEnv->getGenericSignature();
@@ -1811,8 +1807,10 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                  reqtOrigTy->getExtInfo())
           ->getCanonicalType());
     } else {
-      reqtSubstTy = CanFunctionType::get(input, result,
-                                         reqtOrigTy->getExtInfo());
+      reqtSubstTy = cast<FunctionType>(
+        FunctionType::get(input, result,
+                          reqtOrigTy->getExtInfo())
+          ->getCanonicalType());
     }
   } else {
     genericEnv = witnessRef.getDecl()->getInnermostDeclContext()
