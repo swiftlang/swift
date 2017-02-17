@@ -206,6 +206,7 @@ class ErrorKind(object):
     def __repr__(self):
         return 'ErrorKind.%s' % (self.name,)
 
+
 ErrorKind.CONNECTION_INTERRUPTED = ErrorKind(1)
 ErrorKind.REQUEST_INVALID = ErrorKind(2)
 ErrorKind.REQUEST_FAILED = ErrorKind(3)
@@ -293,6 +294,7 @@ class VariantType(object):
 
     def __repr__(self):
         return 'VariantType.%s' % (self.name,)
+
 
 VariantType.NULL = VariantType(0)
 VariantType.DICTIONARY = VariantType(1)
@@ -626,6 +628,7 @@ class Config(object):
             raise LibsourcekitdError(msg)
 
         return library
+
 
 conf = Config()
 conf.lib.sourcekitd_initialize()
