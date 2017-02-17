@@ -127,6 +127,7 @@ set(SWIFTLIB_ESSENTIAL
   StringUnicodeScalarView.swift
   StringUTF16.swift
   StringUTF8.swift
+  Substring.swift.gyb
   SwiftNativeNSArray.swift
   UnavailableStringAPIs.swift.gyb
   Unicode.swift
