@@ -301,7 +301,7 @@ foreach(SDK ${SWIFT_SDKS})
               ${directories}
             DEPENDS ${dependencies}
             COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE}"
-            ${cmake_3_2_USES_TERMINAL})
+            USES_TERMINAL)
       endforeach()
     endforeach()
   endforeach()

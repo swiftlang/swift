@@ -409,12 +409,6 @@ include(SwiftList)
 # Configure swift include, install, build components.
 swift_configure_components()
 
-if("${CMAKE_VERSION}" VERSION_LESS "3.0")
-  set(SWIFT_CMAKE_HAS_GENERATOR_EXPRESSIONS FALSE)
-else()
-  set(SWIFT_CMAKE_HAS_GENERATOR_EXPRESSIONS TRUE)
-endif()
-
 # lipo is used to create universal binaries.
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   include(SwiftDarwin)
@@ -847,8 +841,8 @@ foreach(sdk ${SWIFT_SDKS})
 endforeach()
 
 if(SWIFT_PARALLEL_LINK_JOBS)
-  if(CMAKE_VERSION VERSION_LESS 3.0 OR NOT CMAKE_MAKE_PROGRAM MATCHES "ninja")
-    message(WARNING "Job pooling is only available with Ninja generators and CMake 3.0 and later.")
+  if(NOT CMAKE_MAKE_PROGRAM MATCHES "ninja")
+    message(WARNING "Job pooling is only available with Ninja generators.")
   else()
     set_property(GLOBAL APPEND PROPERTY JOB_POOLS swift_link_job_pool=${SWIFT_PARALLEL_LINK_JOBS})
     set(CMAKE_JOB_POOL_LINK swift_link_job_pool)
