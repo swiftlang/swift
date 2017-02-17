@@ -2250,11 +2250,12 @@ void GenericTypeDecl::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
   ++NumLazyGenericEnvironments;
 }
 
-TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                             SourceLoc NameLoc, GenericParamList *GenericParams,
-                             DeclContext *DC)
+TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, SourceLoc EqualLoc,
+                             Identifier Name, SourceLoc NameLoc,
+                             GenericParamList *GenericParams, DeclContext *DC)
   : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
-    TypeAliasLoc(TypeAliasLoc) {
+    TypeAliasLoc(TypeAliasLoc),
+    EqualLoc(EqualLoc) {
   TypeAliasDeclBits.HasCompletedValidation = false;
 }
 
@@ -3020,12 +3021,12 @@ void ProtocolDecl::computeRequirementSignature() {
   auto selfType = genericSig->getGenericParams()[0];
   auto requirement = genericSig->getRequirements()[0];
 
-  RequirementSource source(RequirementSource::ProtocolRequirementSignatureSelf,
-                           getLoc());
-
-  GenericSignatureBuilder builder(getASTContext(), LookUpConformanceInModule(module));
+  GenericSignatureBuilder builder(getASTContext(),
+                                  LookUpConformanceInModule(module));
   builder.addGenericParameter(selfType);
-  builder.addRequirement(requirement, source);
+  builder.addRequirement(requirement,
+                         RequirementSource::forRequirementSignature(builder,
+                                                                    this));
   builder.finalize(SourceLoc(), { selfType });
   
   RequirementSignature = builder.getGenericSignature();

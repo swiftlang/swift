@@ -2196,9 +2196,9 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
 
     // If the result is indirect, and we have an address to emit into, and
     // there are no abstraction differences, then just do it.
-    if (initAddr && result.isFormalIndirect()
-        && !hasAbstractionDifference(Rep, initAddr->getType(),
-                                     result.getSILStorageType())) {
+    if (initAddr && Gen.silConv.isSILIndirect(result) &&
+        !hasAbstractionDifference(Rep, initAddr->getType(),
+                                  result.getSILStorageType())) {
       IndirectResultAddrs.push_back(initAddr);
       return ResultPlanPtr(new InPlaceInitializationResultPlan(init));
     }

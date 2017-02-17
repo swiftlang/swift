@@ -587,7 +587,7 @@ ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
 
 #define KEYWORD(KW) case tok::kw_##KW: name = #KW; break;
 #define POUND_KEYWORD(KW) case tok::pound_##KW: name = "#"#KW; break;
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
   default:
     llvm_unreachable("unexpected keyword kind");
   }
@@ -628,7 +628,7 @@ void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
   bool IsKeyword = llvm::StringSwitch<bool>(Name.str())
 #define KEYWORD(KW) \
       .Case(#KW, true)
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
       .Default(false);
 
   if (IsKeyword)

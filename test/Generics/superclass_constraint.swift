@@ -65,15 +65,15 @@ extension P2 where Self.T : C {
 
 // CHECK: superclassConformance1
 // CHECK: Requirements:
-// CHECK-NEXT: τ_0_0 : C [explicit @
-// CHECK-NEXT: τ_0_0 : P3 [inherited @
+// CHECK-NEXT: τ_0_0 : C [Explicit @ {{.*}}:46]
+// CHECK-NEXT: τ_0_0 : P3 [Explicit @ {{.*}}:46 -> Superclass (C: P3)]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C>
 func superclassConformance1<T>(t: T) where T : C, T : P3 {}
 
 // CHECK: superclassConformance2
 // CHECK: Requirements:
-// CHECK-NEXT: τ_0_0 : C [explicit @
-// CHECK-NEXT: τ_0_0 : P3 [inherited @
+// CHECK-NEXT: τ_0_0 : C [Explicit @ {{.*}}:46]
+// CHECK-NEXT: τ_0_0 : P3 [Explicit @ {{.*}}:46 -> Superclass (C: P3)]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C>
 func superclassConformance2<T>(t: T) where T : C, T : P3 {}
 
@@ -83,7 +83,7 @@ class C2 : C, P4 { }
 
 // CHECK: superclassConformance3
 // CHECK: Requirements:
-// CHECK-NEXT: τ_0_0 : C2 [explicit @
-// CHECK-NEXT: τ_0_0 : P4 [inherited @
+// CHECK-NEXT: τ_0_0 : C2 [Explicit @ {{.*}}:46]
+// CHECK-NEXT: τ_0_0 : P4 [Explicit @ {{.*}}:46 -> Superclass (C2: P4)]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C2>
 func superclassConformance3<T>(t: T) where T : C, T : P4, T : C2 {}
