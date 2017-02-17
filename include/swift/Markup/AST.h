@@ -38,6 +38,7 @@ struct CommentParts {
   Optional<const ReturnsField *> ReturnsField;
   Optional<const ThrowsField *> ThrowsField;
   ArrayRef<StringRef> Tags;
+  Optional<const LocalizationKeyField *> LocalizationKeyField;
 
   bool isEmpty() const {
     return !Brief.hasValue() &&

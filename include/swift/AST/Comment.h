@@ -63,6 +63,11 @@ public:
     return Parts.BodyNodes;
   }
 
+  Optional<const markup::LocalizationKeyField *>
+  getLocalizationKeyField() const {
+    return Parts.LocalizationKeyField;
+  }
+
   bool isEmpty() const {
     return Parts.isEmpty();
   }

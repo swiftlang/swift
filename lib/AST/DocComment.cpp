@@ -272,6 +272,8 @@ bool extractSimpleField(
       llvm::raw_svector_ostream OS(Scratch);
       printInlinesUnder(TF, OS);
       Tags.insert(MC.allocateCopy(OS.str()));
+    } else if (auto LKF = dyn_cast<markup::LocalizationKeyField>(Field)) {
+      Parts.LocalizationKeyField = LKF;
     } else {
       BodyNodes.push_back(Field);
     }
