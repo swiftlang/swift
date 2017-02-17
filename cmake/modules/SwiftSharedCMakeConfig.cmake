@@ -1,17 +1,4 @@
 include(CMakeParseArguments)
-
-# Use ${cmake_2_8_12_KEYWORD} instead of KEYWORD in target_link_libraries().
-# These variables are used by LLVM's CMake code.
-set(cmake_2_8_12_INTERFACE INTERFACE)
-set(cmake_2_8_12_PRIVATE PRIVATE)
-
-# Backwards compatible USES_TERMINAL, cargo culted from llvm's cmake configs.
-if(CMAKE_VERSION VERSION_LESS 3.1.20141117)
-  set(cmake_3_2_USES_TERMINAL)
-else()
-  set(cmake_3_2_USES_TERMINAL USES_TERMINAL)
-endif()
-
 include(SwiftXcodeSupport)
 
 macro(swift_common_standalone_build_config_llvm product is_cross_compiling)

@@ -16,9 +16,7 @@ function(add_dependencies_multiple_targets)
       "" # single-value args
       "TARGETS;DEPENDS" # multi-value args
       ${ARGN})
-  if(NOT "${ADMT_UNPARSED_ARGUMENTS}" STREQUAL "")
-    message(FATAL_ERROR "unrecognized arguments: ${ADMT_UNPARSED_ARGUMENTS}")
-  endif()
+  precondition(ADMT_UNPARSED_ARGUMENTS NEGATE MESSAGE "unrecognized arguments: ${ADMT_UNPARSED_ARGUMENTS}")
 
   if(NOT "${ADMT_DEPENDS}" STREQUAL "")
     foreach(target ${ADMT_TARGETS})
@@ -297,13 +295,8 @@ function(_add_variant_link_flags)
     ""
     ${ARGN})
 
-  if("${LFLAGS_SDK}" STREQUAL "")
-    message(FATAL_ERROR "Should specify an SDK")
-  endif()
-
-  if("${LFLAGS_ARCH}" STREQUAL "")
-    message(FATAL_ERROR "Should specify an architecture")
-  endif()
+  precondition(LFLAGS_SDK MESSAGE "Should specify an SDK")
+  precondition(LFLAGS_SDK MESSAGE "Should specify an architecture")
 
   set(result ${${LFLAGS_RESULT_VAR_NAME}})
   set(library_search_directories ${${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}})
@@ -435,14 +428,7 @@ function(_add_swift_lipo_target)
   # Gather the source binaries.
   set(source_binaries)
   foreach(source_target ${source_targets})
-    if(SWIFT_CMAKE_HAS_GENERATOR_EXPRESSIONS)
-      list(APPEND source_binaries $<TARGET_FILE:${source_target}>)
-    else()
-      get_property(source_binary
-          TARGET ${source_target}
-          PROPERTY LOCATION)
-      list(APPEND source_binaries "${source_binary}")
-    endif()
+    list(APPEND source_binaries $<TARGET_FILE:${source_target}>)
   endforeach()
 
   is_darwin_based_sdk("${LIPO_SDK}" IS_DARWIN)
@@ -592,17 +578,9 @@ function(_add_swift_library_single target name)
   translate_flags(SWIFTLIB_SINGLE "${SWIFTLIB_SINGLE_options}")
 
   # Check arguments.
-  if ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "")
-    message(FATAL_ERROR "Should specify an SDK")
-  endif()
-
-  if ("${SWIFTLIB_SINGLE_ARCHITECTURE}" STREQUAL "")
-    message(FATAL_ERROR "Should specify an architecture")
-  endif()
-
-  if("${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}" STREQUAL "")
-    message(FATAL_ERROR "INSTALL_IN_COMPONENT is required")
-  endif()
+  precondition(SWIFTLIB_SINGLE_SDK MESSAGE "Should specify an SDK")
+  precondition(SWIFTLIB_SINGLE_ARCHITECTURE MESSAGE "Should specify an architecture")
+  precondition(SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
 
   if(NOT SWIFTLIB_SINGLE_SHARED AND
      NOT SWIFTLIB_SINGLE_STATIC AND
@@ -1394,10 +1372,7 @@ function(add_swift_library name)
   endif()
 
   translate_flags(SWIFTLIB "${SWIFTLIB_options}")
-
-  if("${SWIFTLIB_INSTALL_IN_COMPONENT}" STREQUAL "")
-    message(FATAL_ERROR "INSTALL_IN_COMPONENT is required")
-  endif()
+  precondition(SWIFTLIB_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
 
   if(NOT SWIFTLIB_SHARED AND
      NOT SWIFTLIB_STATIC AND
@@ -1630,10 +1605,7 @@ function(add_swift_library name)
 
         # Determine the subdirectory where this library will be installed.
         set(resource_dir_sdk_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
-
-        if("${resource_dir_sdk_subdir}" STREQUAL "")
-          message(FATAL_ERROR "internal error: the variable should be non-empty")
-        endif()
+        precondition(resource_dir_sdk_subdir)
 
         if(SWIFTLIB_TARGET_LIBRARY)
           if(SWIFTLIB_SHARED)
@@ -1803,13 +1775,8 @@ function(_add_swift_executable_single name)
       SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL_FLAG)
 
   # Check arguments.
-  if (NOT SWIFTEXE_SINGLE_SDK)
-    message(FATAL_ERROR "Should specify an SDK")
-  endif()
-
-  if (NOT SWIFTEXE_SINGLE_ARCHITECTURE)
-    message(FATAL_ERROR "Should specify an architecture")
-  endif()
+  precondition(SWIFTEXE_SINGLE_SDK MESSAGE "Should specify an SDK")
+  precondition(SWIFTEXE_SINGLE_ARCHITECTURE MESSAGE "Should specify an architecture")
 
   # Determine compiler flags.
   set(c_compile_flags)

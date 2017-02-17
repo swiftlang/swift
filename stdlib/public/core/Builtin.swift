@@ -709,7 +709,7 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 /// This unexpected result occurs because the call to `type(of: value)` inside
 /// `printGenericInfo(_:)` must return a metatype that is an instance of
 /// `T.Type`, but `String.self` (the expected dynamic type) is not an instance
-/// of `P.Type` (the concrete metatype of `value`. To get the dynamic type
+/// of `P.Type` (the concrete metatype of `value`). To get the dynamic type
 /// inside `value` in this generic context, cast the parameter to `Any` when
 /// calling `type(of:)`.
 ///
