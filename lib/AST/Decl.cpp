@@ -3020,12 +3020,12 @@ void ProtocolDecl::computeRequirementSignature() {
   auto selfType = genericSig->getGenericParams()[0];
   auto requirement = genericSig->getRequirements()[0];
 
-  RequirementSource source(RequirementSource::ProtocolRequirementSignatureSelf,
-                           getLoc());
-
-  GenericSignatureBuilder builder(getASTContext(), LookUpConformanceInModule(module));
+  GenericSignatureBuilder builder(getASTContext(),
+                                  LookUpConformanceInModule(module));
   builder.addGenericParameter(selfType);
-  builder.addRequirement(requirement, source);
+  builder.addRequirement(requirement,
+                         RequirementSource::forRequirementSignature(builder,
+                                                                    this));
   builder.finalize(SourceLoc(), { selfType });
   
   RequirementSignature = builder.getGenericSignature();
