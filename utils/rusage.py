@@ -30,8 +30,8 @@
 # as a limit in future runs).
 #
 
-import resource
 import argparse
+import resource
 import subprocess
 import sys
 
