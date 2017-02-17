@@ -1,0 +1,207 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+public struct Substring : RangeReplaceableCollection {
+  public typealias Index = String.CharacterView.Index
+  public typealias IndexDistance = String.CharacterView.IndexDistance
+
+  public let base: String
+  public internal(set) var bounds: Range<Index>
+
+
+  public init() {
+    let s = ""
+    self.init(s, s.startIndex..<s.endIndex)
+  }
+
+  internal init(_ base: String, _ bounds: Range<Index>) {
+    self.base = base
+    self.bounds = bounds
+  }
+
+  internal init(_ base: String, _ bounds: ClosedRange<Index>) {
+    self.init(base, base._makeHalfOpen(bounds))
+  }
+
+  public var startIndex: Index { return bounds.lowerBound }
+
+  public var endIndex: Index { return bounds.upperBound }
+
+  public func index(after i: Index) -> Index {
+    _precondition(i < bounds.upperBound, "Cannot increment beyond endIndex")
+    _precondition(i >= bounds.lowerBound, "Cannot increment beyond startIndex")
+    return base.characters.index(after: i)
+  }
+
+  // TODO: swift-3-indexing-model - add docs
+  public func index(before i: Index) -> Index {
+    _precondition(i <= bounds.upperBound, "Cannot decrement an invalid index")
+    _precondition(i > bounds.lowerBound, "Cannot decrement beyond startIndex")
+    return base.characters.index(before: i)
+  }
+
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    let result = base.characters.index(i, offsetBy: n)
+    _precondition(bounds.contains(result),
+      "Operation results in an invalid index")
+    return result
+  }
+
+  public func index(
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    let result =  base.characters.index(i, offsetBy: n, limitedBy: limit)
+    _precondition(result.map { bounds.contains($0) } ?? true,
+      "Operation results in an invalid index")
+    return result
+  }
+
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    return base.characters.distance(from: start, to: end)
+  }
+
+  public subscript(i: Index) -> Character {
+    _precondition(bounds.contains(i), "Invalid index")
+    return base.characters[i]
+  }
+
+  public subscript(bounds: Range<Index>) -> Substring {
+    // FIXME(strings): add checks
+    return Substring(base, bounds)
+  }
+
+  public subscript(bounds: ClosedRange<Index>) -> Substring {
+    // FIXME(strings): add checks
+    return Substring(base, bounds)
+  }
+
+
+  public mutating func replaceSubrange<C>(
+    _ bounds: Range<Index>,
+    with newElements: C
+  ) where C : Collection, C.Iterator.Element == Iterator.Element {
+    fatalError()
+  }
+
+% for Range in ['Range', 'ClosedRange']:
+
+  public mutating func replaceSubrange(
+    _ bounds: ${Range}<Index>, with newElements: Substring
+  ) {
+    replaceSubrange(bounds, with: newElements.base.characters)
+  }
+
+% end
+}
+
+
+extension Substring : CustomReflectable {
+  public var customMirror: Mirror {
+    return String(self).customMirror
+  }
+}
+
+extension Substring : CustomPlaygroundQuickLookable {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return String(self).customPlaygroundQuickLook
+  }
+}
+
+extension Substring : CustomStringConvertible {
+  public var description: String {
+    return String(self)
+  }
+}
+
+extension Substring : LosslessStringConvertible {
+  public init?(_ description: String) {
+    self.init(description, description.startIndex ..< description.endIndex)
+  }
+}
+
+extension Substring : Equatable {
+  public static func ==(lhs: Substring, rhs: Substring) -> Bool {
+    return String(lhs) == String(rhs)
+  }
+
+  // These are not Equatable requirements, but sufficiently similar to be in
+  // this extension.
+  // FIXME(strings): should be gone if/when an implicit conversion from/to
+  // String is available.
+  // FIXME(ABI):
+  public static func ==(lhs: String, rhs: Substring) -> Bool {
+    return lhs == String(rhs)
+  }
+
+  public static func ==(lhs: Substring, rhs: String) -> Bool {
+    return String(lhs) == rhs
+  }
+
+  public static func !=(lhs: String, rhs: Substring) -> Bool {
+    return lhs != String(rhs)
+  }
+
+  public static func !=(lhs: Substring, rhs: String) -> Bool {
+    return String(lhs) != rhs
+  }
+}
+
+extension Substring : Comparable {
+  public static func <(lhs: Substring, rhs: Substring) -> Bool {
+    return String(lhs) < String(rhs)
+  }
+}
+
+extension Substring : Hashable {
+  public var hashValue : Int {
+    return String(self).hashValue
+  }
+}
+
+extension Substring {
+% for (property, ViewPrefix) in [
+%   ('utf8', 'UTF8'),
+%   ('utf16', 'UTF16'),
+%   ('unicodeScalars', 'UnicodeScalar')]:
+  public typealias ${ViewPrefix}Index = String.${ViewPrefix}View.Index
+
+  public var ${property}: String.${ViewPrefix}View {
+    get {
+      return String(self).${property}
+    }
+    set {
+      let base = String(describing: newValue)
+      self = Substring(base, base.startIndex ..< base.endIndex)
+    }
+  }
+% end
+}
+
+extension Substring {
+  public func hasPrefix(_ prefix: String) -> Bool {
+    return String(self).hasPrefix(prefix)
+  }
+
+  public func hasSuffix(_ suffix: String) -> Bool {
+    return String(self).hasSuffix(suffix)
+  }
+}
+
+extension Substring {
+  public func lowercased() -> String {
+    return String(self).lowercased()
+  }
+
+  public func uppercased() -> String {
+    return String(self).uppercased()
+  }
+}

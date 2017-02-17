@@ -158,6 +158,18 @@ public func expectEqual<T : Equatable, U : Equatable, V : Equatable, W : Equatab
   expectEqualTest(expected.3, actual.3, ${trace}, showFrame: false) {$0 == $1}
 }
 
+% for (Lhs, Rhs) in [('String', 'Substring'), ('Substring', 'String')]:
+public func expectEqual(_ expected: ${Lhs}, _ actual: ${Rhs}, ${TRACE}) {
+  if !(expected == actual) {
+    expectationFailure(
+      "expected: \(String(reflecting: expected)) (of type \(String(reflecting: type(of: expected))))\n"
+      + "actual: \(String(reflecting: actual)) (of type \(String(reflecting: type(of: actual))))",
+      trace: ${trace}
+    )
+  }
+}
+% end
+
 public func expectationFailure(
   _ reason: String,
   trace message: String,
