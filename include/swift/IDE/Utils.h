@@ -320,10 +320,14 @@ public:
     size_t preferred_buffer_size() const override {
       return 0;
     }
-    void retrieve(llvm::function_ref<void(StringRef)> F) {
+    void retrieve(llvm::function_ref<void(StringRef)> F) const {
       for (auto P : StartEnds) {
         F(StringRef(OS.begin() + P.first, P.second - P.first));
       }
+    }
+    StringRef operator[](unsigned I) const {
+      auto P = StartEnds[I];
+      return StringRef(OS.begin() + P.first, P.second - P.first);
     }
   };
 } // namespace ide
