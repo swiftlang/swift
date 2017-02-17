@@ -45,11 +45,57 @@ extension MutableCollection where Self : BidirectionalCollection {
 /// An index that traverses the same positions as an underlying index,
 /// with inverted traversal direction.
 public struct ReversedIndex<Base : Collection> : Comparable {
+  /// Creates a new index into a reversed collection for the position before
+  /// the specified index.
+  ///
+  /// When you create an index into a reversed collection using `base`, an
+  /// index from the underlying collection, the resulting index is the
+  /// position of the element *before* the element referenced by `base`. The
+  /// following example creates a new `ReversedIndex` from the index of the
+  /// `"a"` character in a string's character view.
+  ///
+  ///     let name = "Horatio"
+  ///     let aIndex = name.characters.index(of: "a")!
+  ///     // name.characters[aIndex] == "a"
+  ///
+  ///     let reversedCharacters = name.characters.reversed()
+  ///     let i = ReversedIndex<String.CharacterView>(aIndex)
+  ///     // reversedCharacters[i] == "r"
+  ///
+  /// The element at the position created using `ReversedIndex<...>(aIndex)` is
+  /// `"r"`, the character before `"a"` in the `name` string.
+  ///
+  /// - Parameter base: The position after the element to create an index for.
   public init(_ base: Base.Index) {
     self.base = base
   }
 
-  /// The position corresponding to `self` in the underlying collection.
+  /// The position after this position in the underlying collection.
+  ///
+  /// To find the position that corresponds with this index in the original,
+  /// underlying collection, use that collection's `index(before:)` method
+  /// with the `base` property.
+  ///
+  /// The following example declares a function that returns the index of the
+  /// last even number in the passed array, if one is found. First, the
+  /// function finds the position of the last even number as a `ReversedIndex`
+  /// in a reversed view of the array of numbers. Next, the function calls the
+  /// array's `index(before:)` method to return the correct position in the
+  /// passed array.
+  ///
+  ///     func indexOfLastEven(_ numbers: [Int]) -> Int? {
+  ///         let reversedNumbers = numbers.reversed()
+  ///         guard let i = reversedNumbers.index(where: { $0 % 2 == 0 })
+  ///             else { return nil }
+  ///
+  ///         return numbers.index(before: i.base)
+  ///     }
+  ///
+  ///     let numbers = [10, 20, 13, 19, 30, 52, 17, 40, 51]
+  ///     if let lastEven = indexOfLastEven(numbers) {
+  ///         print("Last even number: \(numbers[lastEven])")
+  ///     }
+  ///     // Prints "Last even number: 40"
   public let base: Base.Index
 
   public static func == (
@@ -156,11 +202,59 @@ public struct ReversedCollection<
 public struct ReversedRandomAccessIndex<
   Base : RandomAccessCollection
 > : Comparable {
+  /// Creates a new index into a reversed collection for the position before
+  /// the specified index.
+  ///
+  /// When you create an index into a reversed collection using the index
+  /// passed as `base`, an index from the underlying collection, the resulting
+  /// index is the position of the element *before* the element referenced by
+  /// `base`. The following example creates a new `ReversedIndex` from the
+  /// index of the `"a"` character in a string's character view.
+  ///
+  ///     let name = "Horatio"
+  ///     let aIndex = name.characters.index(of: "a")!
+  ///     // name.characters[aIndex] == "a"
+  ///
+  ///     let reversedCharacters = name.characters.reversed()
+  ///     let i = ReversedIndex<String.CharacterView>(aIndex)
+  ///     // reversedCharacters[i] == "r"
+  ///
+  /// The element at the position created using `ReversedIndex<...>(aIndex)` is
+  /// `"r"`, the character before `"a"` in the `name` string. Viewed from the
+  /// perspective of the `reversedCharacters` collection, of course, `"r"` is
+  /// the element *after* `"a"`.
+  ///
+  /// - Parameter base: The position after the element to create an index for.
   public init(_ base: Base.Index) {
     self.base = base
   }
 
-  /// The position corresponding to `self` in the underlying collection.
+  /// The position after this position in the underlying collection.
+  ///
+  /// To find the position that corresponds with this index in the original,
+  /// underlying collection, use that collection's `index(before:)` method
+  /// with this index's `base` property.
+  ///
+  /// The following example declares a function that returns the index of the
+  /// last even number in the passed array, if one is found. First, the
+  /// function finds the position of the last even number as a `ReversedIndex`
+  /// in a reversed view of the array of numbers. Next, the function calls the
+  /// array's `index(before:)` method to return the correct position in the
+  /// passed array.
+  ///
+  ///     func indexOfLastEven(_ numbers: [Int]) -> Int? {
+  ///         let reversedNumbers = numbers.reversed()
+  ///         guard let i = reversedNumbers.index(where: { $0 % 2 == 0 })
+  ///             else { return nil }
+  ///
+  ///         return numbers.index(before: i.base)
+  ///     }
+  ///
+  ///     let numbers = [10, 20, 13, 19, 30, 52, 17, 40, 51]
+  ///     if let lastEven = indexOfLastEven(numbers) {
+  ///         print("Last even number: \(numbers[lastEven])")
+  ///     }
+  ///     // Prints "Last even number: 40"
   public let base: Base.Index
 
   public static func == (
