@@ -19,6 +19,7 @@
 #ifndef SWIFT_STDLIB_SHIMS_LIBCSHIMS_H
 #define SWIFT_STDLIB_SHIMS_LIBCSHIMS_H
 
+#include "llvm/Support/Compiler.h"
 #include "SwiftStdint.h"
 #include "SwiftStddef.h"
 #include "Visibility.h"
@@ -60,13 +61,13 @@ __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
                                            __swift_size_t nitems);
 
 // String handling <string.h>
-__attribute__((__pure__)) SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
+LLVM_READONLY SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
 _swift_stdlib_strlen(const char *s);
 
-__attribute__((__pure__)) SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
+LLVM_READONLY SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
 _swift_stdlib_strlen_unsigned(const unsigned char *s);
 
-__attribute__((__pure__))
+LLVM_READONLY
 SWIFT_RUNTIME_STDLIB_INTERFACE
 int _swift_stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
 
