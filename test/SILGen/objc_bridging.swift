@@ -5,6 +5,9 @@
 
 // REQUIRES: objc_interop
 
+// rdar://problem/30559806
+// REQUIRES: OS=macosx
+
 import Foundation
 import Appliances
 
