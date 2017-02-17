@@ -1,3 +1,5 @@
+include(SwiftUtils)
+
 # Process the sources within the given variable, pulling out any Swift
 # sources to be compiled with 'swift' directly. This updates
 # ${sourcesvar} in place with the resulting list and ${externalvar} with the
@@ -31,17 +33,9 @@ function(handle_swift_sources
   endif()
 
   # Check arguments.
-  if ("${SWIFTSOURCES_SDK}" STREQUAL "")
-    message(FATAL_ERROR "Should specify an SDK")
-  endif()
-
-  if ("${SWIFTSOURCES_ARCHITECTURE}" STREQUAL "")
-    message(FATAL_ERROR "Should specify an architecture")
-  endif()
-
-  if("${SWIFTSOURCES_INSTALL_IN_COMPONENT}" STREQUAL "")
-    message(FATAL_ERROR "INSTALL_IN_COMPONENT is required")
-  endif()
+  precondition(SWIFTSOURCES_SDK "Should specify an SDK")
+  precondition(SWIFTSOURCES_ARCHITECTURE "Should specify an architecture")
+  precondition(SWIFTSOURCES_INSTALL_IN_COMPONENT "INSTALL_IN_COMPONENT is required")
 
   # Clear the result variable.
   set("${dependency_target_out_var_name}" "" PARENT_SCOPE)
@@ -175,9 +169,7 @@ function(_compile_swift_files
   list(LENGTH SWIFTFILE_OUTPUT num_outputs)
   list(GET SWIFTFILE_OUTPUT 0 first_output)
 
-  if (${num_outputs} EQUAL 0)
-    message(FATAL_ERROR "OUTPUT must not be empty")
-  endif()
+  precondition(num_outputs MESSAGE "OUTPUT must not be empty")
 
   foreach(output ${SWIFTFILE_OUTPUT})
     if (NOT IS_ABSOLUTE "${output}")
@@ -189,17 +181,9 @@ function(_compile_swift_files
     message(FATAL_ERROR "Cannot set both IS_MAIN and IS_STDLIB")
   endif()
 
-  if("${SWIFTFILE_SDK}" STREQUAL "")
-    message(FATAL_ERROR "Should specify an SDK")
-  endif()
-
-  if("${SWIFTFILE_ARCHITECTURE}" STREQUAL "")
-    message(FATAL_ERROR "Should specify an architecture")
-  endif()
-
-  if("${SWIFTFILE_INSTALL_IN_COMPONENT}" STREQUAL "")
-    message(FATAL_ERROR "INSTALL_IN_COMPONENT is required")
-  endif()
+  precondition(SWIFTFILE_SDK MESSAGE "Should specify an SDK")
+  precondition(SWIFTFILE_ARCHITECTURE MESSAGE "Should specify an architecture")
+  precondition(SWIFTFILE_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
 
   if ("${SWIFTFILE_MODULE_NAME}" STREQUAL "")
     get_filename_component(SWIFTFILE_MODULE_NAME "${first_output}" NAME_WE)

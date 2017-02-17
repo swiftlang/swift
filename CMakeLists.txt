@@ -358,9 +358,7 @@ if(SWIFT_BUILT_STANDALONE)
   project(Swift C CXX ASM)
 endif()
 
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "")
-  message(FATAL_ERROR "CMAKE_SYSTEM_NAME is empty!")
-endif()
+precondition(CMAKE_SYSTEM_NAME)
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   set(SWIFT_BUILD_SOURCEKIT_default TRUE)
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
@@ -831,21 +829,10 @@ endif()
 
 list_subtract("${SWIFT_SDKS}" "${SWIFT_CONFIGURED_SDKS}" unknown_sdks)
 
-if(NOT "${unknown_sdks}" STREQUAL "")
-  message(FATAL_ERROR "Unknown SDKs: ${unknown_sdks}")
-endif()
-
-if("${SWIFT_CONFIGURED_SDKS}" STREQUAL "")
-  message(FATAL_ERROR "No SDKs selected.")
-endif()
-
-if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "")
-  message(FATAL_ERROR "No SDK for host tools.")
-endif()
-
-if("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "")
-  message(FATAL_ERROR "No arch for host tools.")
-endif()
+precondition(unknown_sdks NEGATE MESSAGE "Unknown SDKs: ${unknown_sdks}")
+precondition(SWIFT_CONFIGURED_SDKS MESSAGE "No SDKs selected.")
+precondition(SWIFT_HOST_VARIANT_SDK MESSAGE "No SDK for host tools.")
+precondition(SWIFT_HOST_VARIANT_ARCH MESSAGE "No arch for host tools")
 
 set(SWIFT_PRIMARY_VARIANT_SUFFIX
     "-${SWIFT_SDK_${SWIFT_PRIMARY_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_PRIMARY_VARIANT_ARCH}")
