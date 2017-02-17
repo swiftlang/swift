@@ -66,8 +66,10 @@ protected:
   /// Word substitutions in mangled identifiers.
   llvm::SmallVector<SubstitutionWord, 26> Words;
 
+  size_t MaxNumWords = 26;
+
   /// If enabled, non-ASCII names are encoded in modified Punycode.
-  bool UsePunycode;
+  bool UsePunycode = true;
 
   /// A helpful little wrapper for an integer value that should be mangled
   /// in a particular, compressed value.
@@ -88,7 +90,7 @@ protected:
 
 protected:
 
-  Mangler(bool usePunycode) : Buffer(Storage), UsePunycode(usePunycode) { }
+  Mangler() : Buffer(Storage) { }
 
   /// Adds the mangling prefix.
   void beginMangling();
