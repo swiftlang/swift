@@ -163,3 +163,20 @@ func s100_________identity<T>(t: T) -> T {
 struct s110___GuaranteedSelf : Foo {
   func foo() {}
 }
+
+// Tests a corner case wherein we used to do a temporary and return a pointer to T instead of T
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s120______returnValuexxlF : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK: bb0([[ARG:%.*]] : $T):
+// CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY_ARG1:%.*]] = copy_value [[BORROWED_ARG1]] : $T
+// CHECK:   end_borrow [[BORROWED_ARG1]] from [[ARG]]
+// CHECK:   [[BORROWED_ARG2:%.*]] = begin_borrow [[COPY_ARG1]]
+// CHECK:   [[COPY_ARG2:%.*]] = copy_value [[BORROWED_ARG2]] : $T
+// CHECK:   end_borrow [[BORROWED_ARG2]] from [[COPY_ARG1]]
+// CHECK:   return [[COPY_ARG2]] : $T
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s120______returnValuexxlF'
+func s120______returnValue<T>(_ x: T) -> T {
+  let y = x
+  return y
+}
