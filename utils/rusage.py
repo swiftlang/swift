@@ -30,10 +30,11 @@
 # as a limit in future runs).
 #
 
-import resource
 import argparse
+import resource
 import subprocess
 import sys
+
 
 class MemAction(argparse.Action):
     def __init__(self, *args, **kwargs):
@@ -51,6 +52,7 @@ class MemAction(argparse.Action):
             r = int(v)
         setattr(namespace, self.dest, r)
 
+
 class TimeAction(argparse.Action):
     def __init__(self, *args, **kwargs):
         super(TimeAction, self).__init__(*args, **kwargs)
@@ -64,6 +66,7 @@ class TimeAction(argparse.Action):
         else:
             r = float(v)
         setattr(namespace, self.dest, r)
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--mem",

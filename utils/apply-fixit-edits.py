@@ -71,5 +71,6 @@ edits to the source files.""")
     args = parser.parse_args()
     return apply_edits(args.build_dir_path)
 
+
 if __name__ == "__main__":
     sys.exit(main())
