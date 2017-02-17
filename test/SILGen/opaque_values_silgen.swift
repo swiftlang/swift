@@ -195,3 +195,33 @@ func s120______returnValue<T>(_ x: T) -> T {
 func s130_____________wrap<T>(_ x: T) -> T? {
   return x
 }
+
+// Tests For-each statements
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s140______forEachStmtyyF : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[PROJ_BOX_ARG:%.*]] = project_box %{{.*}} : ${ var IndexingIterator<CountableRange<Int>> }
+// CHECK:   [[APPLY_ARG1:%.*]] = apply
+// CHECK-NOT: alloc_stack $Int
+// CHECK-NOT: store [[APPLY_ARG1]] to [trivial]
+// CHECK-NOT: alloc_stack $CountableRange<Int>
+// CHECK-NOT: dealloc_stack
+// CHECK:   [[APPLY_ARG2:%.*]] = apply %{{.*}}<CountableRange<Int>>
+// CHECK:   store [[APPLY_ARG2]] to [trivial] [[PROJ_BOX_ARG]]
+// CHECK:   br bb1
+// CHECK: bb1:
+// CHECK-NOT: alloc_stack $Optional<Int>
+// CHECK:   [[APPLY_ARG3:%.*]] = apply %{{.*}}<CountableRange<Int>>
+// CHECK-NOT: dealloc_stack
+// CHECK:   [[ENUM_ARG:%.*]] = select_enum [[APPLY_ARG3]] : $Optional<Int>
+// CHECK:   cond_br [[ENUM_ARG]], bb3, bb2
+// CHECK: bb2:
+// CHECK:   return %{{.*}} : $()
+// CHECK: bb3:
+// CHECK:   unchecked_enum_data [[APPLY_ARG3]]
+// CHECK:   br bb1
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s140______forEachStmtyyF'
+func s140______forEachStmt() {
+  for _ in 1..<42 {
+  }
+}
