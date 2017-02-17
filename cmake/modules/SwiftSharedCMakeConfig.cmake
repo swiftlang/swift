@@ -1,10 +1,4 @@
 include(CMakeParseArguments)
-
-# Use ${cmake_2_8_12_KEYWORD} instead of KEYWORD in target_link_libraries().
-# These variables are used by LLVM's CMake code.
-set(cmake_2_8_12_INTERFACE INTERFACE)
-set(cmake_2_8_12_PRIVATE PRIVATE)
-
 include(SwiftXcodeSupport)
 
 macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
