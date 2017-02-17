@@ -179,8 +179,10 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
   // *NOTE* In practice, wtable will be deserializedTable, but I do not want to rely
   // on that behavior for now.
   if (deserializeLazily)
-    if (auto deserialized = getSILLoader()->lookupWitnessTable(wtable))
+    if (auto deserialized = getSILLoader()->lookupWitnessTable(wtable)) {
+      linkTransparentFunctions();
       return deserialized;
+    }
 
   // If we fail, just return the declaration.
   return wtable;
@@ -589,8 +591,25 @@ void SILModule::removeFromZombieList(StringRef Name) {
   }
 }
 
+void SILModule::linkTransparentFunctions() {
+  FunctionListType::iterator Iter = functions.begin();
+  if (LastFunctionChecked) {
+    Iter = LastFunctionChecked->getIterator();
+    Iter++;
+  }
+  while (Iter != functions.end()) {
+    SILFunction *F = &*Iter;
+    Iter++;
+    LastFunctionChecked = F;
+    if (F->isTransparent() && F->isExternalDeclaration())
+      linkFunction(F, LinkingMode::LinkNormal);
+  }
+}
+
 /// Erase a function from the module.
 void SILModule::eraseFunction(SILFunction *F) {
+  if (F == LastFunctionChecked)
+    LastFunctionChecked = nullptr;
 
   assert(! F->isZombie() && "zombie function is in list of alive functions");
   if (F->isInlined() || F->isExternallyUsedSymbol()) {
