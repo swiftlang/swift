@@ -294,7 +294,7 @@ getSignatureWithRequirements(GenericSignature *OrigGenSig,
   // First, add the old generic signature.
   Builder.addGenericSignature(OrigGenSig);
 
-  RequirementSource Source(RequirementSource::Explicit, SourceLoc());
+  auto Source = RequirementSource::forAbstract(Builder);
   // For each substitution with a concrete type as a replacement,
   // add a new concrete type equality requirement.
   for (auto &Req : Requirements) {

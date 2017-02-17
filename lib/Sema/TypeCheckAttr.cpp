@@ -1650,9 +1650,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
           secondType->is<ErrorType>())
         continue;
 
-      RequirementSource source(RequirementSource::Kind::Explicit,
-                               req.getEqualLoc());
-
       Type genericType;
       Type concreteType;
       if (interfaceFirstType->hasTypeParameter()) {
@@ -1672,7 +1669,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
             TypeLoc(req.getFirstTypeRepr(), concreteType), req.getEqualLoc(),
             TypeLoc(req.getSecondTypeRepr(), genericType)));
       }
-      Builder.addRequirement(resolvedRequirements.back());
 
       // Convert the requirement into a form which uses canonical interface
       // types.
@@ -1707,7 +1703,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
           req.getLayoutConstraintLoc());
 
       // Add a resolved requirement.
-      Builder.addRequirement(resolvedReq);
       resolvedRequirements.push_back(resolvedReq);
 
       // Convert the requirement into a form which uses canonical interface
@@ -1750,7 +1745,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
           TypeLoc(req.getConstraintRepr(), interfaceLayoutConstraint));
 
       // Add a resolved requirement.
-      Builder.addRequirement(resolvedReq);
       resolvedRequirements.push_back(resolvedReq);
 
       // Convert the requirement into a form which uses canonical interface
@@ -1771,6 +1765,10 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   // Store converted requirements in the attribute so that they are
   // serialized later.
   attr->setRequirements(DC->getASTContext(), convertedRequirements);
+
+  // Add the requirements to the builder.
+  for (auto &req : resolvedRequirements)
+    Builder.addRequirement(&req);
 }
 
 static Accessibility getAccessForDiagnostics(const ValueDecl *D) {
