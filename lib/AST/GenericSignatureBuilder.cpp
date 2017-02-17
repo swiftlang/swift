@@ -794,31 +794,25 @@ static void concretizeNestedTypeFromConcreteParent(
   auto source = parent->getConcreteTypeSource()->viaConcrete(builder, nullptr)
                   ->viaParent(builder);
   auto assocType = nestedPA->getResolvedAssociatedType();
+  if (!assocType) return;
 
-  if (auto *concreteArchetype = concreteParent->getAs<ArchetypeType>()) {
-    // FIXME: I think this code is dead...
-    Type witnessType =
-        concreteArchetype->getNestedType(nestedPA->getNestedName());
+  // FIXME: Get the conformance from the parent.
+  auto conformance = lookupConformance(assocType->getProtocol());
+
+  Type witnessType;
+  if (conformance.isConcrete()) {
+    witnessType = conformance.getConcrete()
+                      ->getTypeWitness(assocType, builder.getLazyResolver())
+                      .getReplacement();
+  } else {
+    witnessType = DependentMemberType::get(concreteParent, assocType);
+  }
+
+  if (auto witnessPA = builder.resolveArchetype(witnessType)) {
+    builder.addSameTypeRequirementBetweenArchetypes(nestedPA, witnessPA,
+                                                    source);
+  } else {
     builder.addSameTypeRequirementToConcrete(nestedPA, witnessType, source);
-  } else if (assocType) {
-    // FIXME: Get the conformance from the parent.
-    auto conformance = lookupConformance(assocType->getProtocol());
-
-    Type witnessType;
-    if (conformance.isConcrete()) {
-      witnessType = conformance.getConcrete()
-                        ->getTypeWitness(assocType, builder.getLazyResolver())
-                        .getReplacement();
-    } else {
-      witnessType = DependentMemberType::get(concreteParent, assocType);
-    }
-
-    if (auto witnessPA = builder.resolveArchetype(witnessType)) {
-      builder.addSameTypeRequirementBetweenArchetypes(nestedPA, witnessPA,
-                                                      source);
-    } else {
-      builder.addSameTypeRequirementToConcrete(nestedPA, witnessType, source);
-    }
   }
 }
 
