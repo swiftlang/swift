@@ -45,8 +45,8 @@ struct LValueWritebackCleanup : Cleanup {
 
   void emit(SILGenFunction &gen, CleanupLocation loc) override {
     auto &evaluation = *gen.FormalEvalContext.find(Depth);
-    assert(evaluation.getKind() == FormalEvaluation::Exclusive);
-    auto &lvalue = static_cast<LValueWriteback &>(evaluation);
+    assert(evaluation.getKind() == FormalAccess::Exclusive);
+    auto &lvalue = static_cast<ExclusiveBorrowFormalAccess &>(evaluation);
     lvalue.performWriteback(gen, /*isFinal*/ false);
   }
 
@@ -75,8 +75,8 @@ static void pushWriteback(SILGenFunction &gen,
       gen.Cleanups.pushCleanup<LValueWritebackCleanup>();
   CleanupHandle handle = gen.Cleanups.getTopCleanup();
 
-  context.push<LValueWriteback>(loc, std::move(comp), base, materialized,
-                                handle);
+  context.push<ExclusiveBorrowFormalAccess>(loc, std::move(comp), base,
+                                            materialized, handle);
   cleanup.Depth = context.stable_begin();
 }
 

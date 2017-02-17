@@ -18,16 +18,16 @@ using namespace swift;
 using namespace Lowering;
 
 //===----------------------------------------------------------------------===//
-//                             Formal Evaluation
+//                               Formal Access
 //===----------------------------------------------------------------------===//
 
-void FormalEvaluation::_anchor() {}
+void FormalAccess::_anchor() {}
 
 //===----------------------------------------------------------------------===//
 //                      Shared Borrow Formal Evaluation
 //===----------------------------------------------------------------------===//
 
-void SharedBorrowFormalEvaluation::finish(SILGenFunction &gen) {
+void SharedBorrowFormalAccess::finish(SILGenFunction &gen) {
   gen.B.createEndBorrow(CleanupLocation::get(loc), borrowedValue,
                         originalValue);
 }
@@ -74,24 +74,24 @@ void FormalEvaluationScope::popImpl() {
   // Then working down the stack until we visit unwrappedSavedDepth...
   for (; iter != unwrappedSavedDepth; ++iter) {
     // Grab the next evaluation...
-    FormalEvaluation &evaluation = *iter;
+    FormalAccess &access = *iter;
 
     // and deactivate the cleanup.
-    gen.Cleanups.setCleanupState(evaluation.getCleanup(), CleanupState::Dead);
+    gen.Cleanups.setCleanupState(access.getCleanup(), CleanupState::Dead);
 
     // Attempt to diagnose problems where obvious aliasing introduces illegal
     // code. We do a simple N^2 comparison here to detect this because it is
     // extremely unlikely more than a few writebacks are active at once.
-    if (evaluation.getKind() == FormalEvaluation::Exclusive) {
+    if (access.getKind() == FormalAccess::Exclusive) {
       iterator j = iter;
       ++j;
 
       for (; j != unwrappedSavedDepth; ++j) {
-        FormalEvaluation &other = *j;
-        if (other.getKind() != FormalEvaluation::Exclusive)
+        FormalAccess &other = *j;
+        if (other.getKind() != FormalAccess::Exclusive)
           continue;
-        auto &lhs = static_cast<LValueWriteback &>(evaluation);
-        auto &rhs = static_cast<LValueWriteback &>(other);
+        auto &lhs = static_cast<ExclusiveBorrowFormalAccess &>(access);
+        auto &rhs = static_cast<ExclusiveBorrowFormalAccess &>(other);
         lhs.diagnoseConflict(rhs, gen);
       }
     }
@@ -101,7 +101,7 @@ void FormalEvaluationScope::popImpl() {
     //
     // This evaluates arbitrary code, so it's best to be paranoid
     // about iterators on the context.
-    evaluation.finish(gen);
+    access.finish(gen);
   }
 
   // Then check that we did not add any additional cleanups to the beginning of

@@ -24,7 +24,7 @@ namespace Lowering {
 class SILGenFunction;
 class LogicalPathComponent;
 
-class FormalEvaluation {
+class FormalAccess {
 public:
   enum Kind { Shared, Exclusive };
 
@@ -36,12 +36,12 @@ protected:
   SILLocation loc;
   CleanupHandle cleanup;
 
-  FormalEvaluation(unsigned allocatedSize, Kind kind, SILLocation loc,
-                   CleanupHandle cleanup)
+  FormalAccess(unsigned allocatedSize, Kind kind, SILLocation loc,
+               CleanupHandle cleanup)
       : allocatedSize(allocatedSize), kind(kind), loc(loc), cleanup(cleanup) {}
 
 public:
-  virtual ~FormalEvaluation() {}
+  virtual ~FormalAccess() {}
 
   // This anchor method serves three purposes: it aligns the class to
   // a pointer boundary, it makes the class a primary base so that
@@ -60,14 +60,14 @@ public:
   virtual void finish(SILGenFunction &gen) = 0;
 };
 
-class SharedBorrowFormalEvaluation : public FormalEvaluation {
+class SharedBorrowFormalAccess : public FormalAccess {
   SILValue originalValue;
   SILValue borrowedValue;
 
 public:
-  SharedBorrowFormalEvaluation(SILLocation loc, CleanupHandle cleanup,
-                               SILValue originalValue, SILValue borrowedValue)
-      : FormalEvaluation(sizeof(*this), FormalEvaluation::Shared, loc, cleanup),
+  SharedBorrowFormalAccess(SILLocation loc, CleanupHandle cleanup,
+                           SILValue originalValue, SILValue borrowedValue)
+      : FormalAccess(sizeof(*this), FormalAccess::Shared, loc, cleanup),
         originalValue(originalValue), borrowedValue(borrowedValue) {}
   void finish(SILGenFunction &gen) override;
 
@@ -76,7 +76,7 @@ public:
 };
 
 class FormalEvaluationContext {
-  DiverseStack<FormalEvaluation, 128> stack;
+  DiverseStack<FormalAccess, 128> stack;
 
 public:
   using stable_iterator = decltype(stack)::stable_iterator;
