@@ -13,7 +13,7 @@
 @_exported import CloudKit
 import Foundation
 
-@available(macOS 10.10, iOS 8.0, *)
+@available(macOS 10.10, iOS 8.0, watchOS 3.0, *)
 extension CKError {
   /// Retrieve partial error results associated by item ID.
   public var partialErrorsByItemID: [AnyHashable: Error]? {
