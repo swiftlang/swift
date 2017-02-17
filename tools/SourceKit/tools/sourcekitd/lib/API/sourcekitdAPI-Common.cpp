@@ -142,6 +142,7 @@ UIdent sourcekitd::KeyBaseName("key.basename");
 UIdent sourcekitd::KeyArgNames("key.argnames");
 UIdent sourcekitd::KeySelectorPieces("key.selectorpieces");
 UIdent sourcekitd::KeyNameKind("key.namekind");
+UIdent sourcekitd::KeyLocalizationKey("key.localization_key");
 
 /// \brief Order for the keys to use when emitting the debug description of
 /// dictionaries.

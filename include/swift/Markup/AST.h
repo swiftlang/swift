@@ -28,6 +28,7 @@ class ParamField;
 class ReturnsField;
 class TagField;
 class ThrowsField;
+class LocalizationKeyField;
 
 /// The basic structure of a doc comment attached to a Swift
 /// declaration.
