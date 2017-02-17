@@ -554,7 +554,9 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
   SmallVector<std::pair<ProtocolDecl *, RequirementSource>, 4>
     conformsTo(rep->ConformsTo.begin(), rep->ConformsTo.end());
   for (auto &conforms : conformsTo) {
-    for (auto member : conforms.first->lookupDirect(nestedName)) {
+    auto proto = conforms.first;
+
+    for (auto member : proto->lookupDirect(nestedName)) {
       PotentialArchetype *pa;
       
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
@@ -563,13 +565,24 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
       } else if (auto alias = dyn_cast<TypeAliasDecl>(member)) {
         // Resolve this nested type to this type alias.
         pa = new PotentialArchetype(this, alias);
-        
+
         if (!alias->hasInterfaceType())
           builder.getLazyResolver()->resolveDeclSignature(alias);
         if (!alias->hasInterfaceType())
           continue;
 
+        // The protocol typealias has an underlying type written in terms
+        // of the protocol's 'Self' type.
         auto type = alias->getDeclaredInterfaceType();
+
+        // Substitute in the type of the current PotentialArchetype in
+        // place of 'Self' here.
+        auto subMap = SubstitutionMap::getProtocolSubstitutions(
+          proto, getDependentType(/*genericParams=*/{},
+                                  /*allowUnresolved=*/true),
+          ProtocolConformanceRef(proto));
+        type = type.subst(subMap, SubstFlags::UseErrorType);
+
         if (auto existingPA = builder.resolveArchetype(type)) {
           builder.addSameTypeRequirementBetweenArchetypes(pa, existingPA,
                                                           redundantSource);
