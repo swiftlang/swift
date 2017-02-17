@@ -3939,7 +3939,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   }
 
   // Loadable with payload
-  if (enumTy.isLoadable(SGM.M)) {
+  if (enumTy.isLoadable(SGM.M) || !silConv.useLoweredAddresses()) {
     if (!payloadMV) {
       // If the payload was indirect, we already evaluated it and
       // have a single value. Otherwise, evaluate the payload.

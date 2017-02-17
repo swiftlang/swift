@@ -180,3 +180,18 @@ func s120______returnValue<T>(_ x: T) -> T {
   let y = x
   return y
 }
+
+// Tests Optional initialization by value
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s130_____________wrapxSgxlF : $@convention(thin) <T> (@in T) -> @out Optional<T> {
+// CHECK: bb0([[ARG:%.*]] : $T):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]] : $T
+// CHECK:   [[OPTIONAL_ARG:%.*]] = enum $Optional<T>, #Optional.some!enumelt.1, [[COPY_ARG]] : $T
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK:   destroy_value [[ARG]] : $T
+// CHECK:   return [[OPTIONAL_ARG]] : $Optional<T>
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s130_____________wrapxSgxlF'
+func s130_____________wrap<T>(_ x: T) -> T? {
+  return x
+}
