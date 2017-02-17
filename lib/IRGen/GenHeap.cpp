@@ -1653,6 +1653,16 @@ Address irgen::emitProjectBox(IRGenFunction &IGF,
                        boxType->getFieldType(IGF.IGM.getSILModule(), 0));
 }
 
+OwnedAddress
+irgen::emitAllocateExistentialBox(IRGenFunction &IGF, SILType boxedType,
+                                  GenericEnvironment *env,
+                                  const llvm::Twine &name) {
+  // Get a box for the boxed value.
+  auto boxType = SILBoxType::get(boxedType.getSwiftRValueType());
+  auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
+  return boxTI.allocate(IGF, boxedType, env, name);
+}
+
 #define DEFINE_VALUE_OP(ID)                                           \
 void IRGenFunction::emit##ID(llvm::Value *value, Atomicity atomicity) { \
   if (doesNotRequireRefCounting(value)) return;                       \
