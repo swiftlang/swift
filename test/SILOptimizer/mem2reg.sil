@@ -342,3 +342,17 @@ sil @dead_use : $@convention(thin) () -> () {
   // CHECK: return [[VAL]]
   return %4 : $()
 }
+
+// CHECK-LABEL: sil @dont_crash_on_dead_arg_use
+// CHECK: bb0{{.*}}:
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @dont_crash_on_dead_arg_use : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  %2 = alloc_stack $Int64
+  %1 = struct_element_addr %0 : $*Int64, #Int64._value
+  %3 = struct_element_addr %2 : $*Int64, #Int64._value
+  dealloc_stack %2 : $*Int64
+  %4 = tuple ()
+  return %4 : $()
+}
