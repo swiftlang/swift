@@ -178,7 +178,7 @@ bool OwnershipModelEliminatorVisitor::visitUnmanagedAutoreleaseValueInst(
   // Now that we have set the unqualified ownership flag, destroy value
   // operation will delegate to the appropriate strong_release, etc.
   B.createAutoreleaseValue(UAVI->getLoc(), UAVI->getOperand(),
-                           Atomicity::Atomic);
+                           UAVI->getAtomicity());
   UAVI->eraseFromParent();
   return true;
 }

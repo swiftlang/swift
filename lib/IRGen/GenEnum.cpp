@@ -1281,7 +1281,7 @@ namespace {
       assert(TIK >= Loadable);
       Explosion tmp;
       loadAsTake(IGF, addr, tmp);
-      copy(IGF, tmp, e, Atomicity::Atomic);
+      copy(IGF, tmp, e, IGF.getDefaultAtomicity());
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address addr) const override {
@@ -1291,7 +1291,7 @@ namespace {
         loadAsTake(IGF, addr, old);
       initialize(IGF, e, addr);
       if (!isPOD(ResilienceExpansion::Maximal))
-        consume(IGF, old, Atomicity::Atomic);
+        consume(IGF, old, IGF.getDefaultAtomicity());
     }
 
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr)
@@ -1503,7 +1503,7 @@ namespace {
         Explosion payloadCopy;
         auto &loadableTI = getLoadablePayloadTypeInfo();
         loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
-        loadableTI.copy(IGF, payloadValue, payloadCopy, Atomicity::Atomic);
+        loadableTI.copy(IGF, payloadValue, payloadCopy, IGF.getDefaultAtomicity());
         (void)payloadCopy.claimAll(); // FIXME: repack if not bit-identical
       }
 
@@ -1536,7 +1536,7 @@ namespace {
         Explosion payloadValue;
         auto &loadableTI = getLoadablePayloadTypeInfo();
         loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
-        loadableTI.consume(IGF, payloadValue, Atomicity::Atomic);
+        loadableTI.consume(IGF, payloadValue, IGF.getDefaultAtomicity());
       }
 
       IGF.Builder.CreateBr(endBB);
@@ -2208,7 +2208,7 @@ namespace {
                                  llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
       case NullableRefcounted:
-        IGF.emitStrongRetain(ptr, Refcounting, Atomicity::Atomic);
+        IGF.emitStrongRetain(ptr, Refcounting, IGF.getDefaultAtomicity());
         return;
       case POD:
       case Normal:
@@ -2232,7 +2232,7 @@ namespace {
                                   llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
       case NullableRefcounted:
-        IGF.emitStrongRelease(ptr, Refcounting, Atomicity::Atomic);
+        IGF.emitStrongRelease(ptr, Refcounting, IGF.getDefaultAtomicity());
         return;
       case POD:
       case Normal:
@@ -2917,7 +2917,7 @@ namespace {
         projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
 
         Explosion tmp;
-        lti.copy(IGF, value, tmp, Atomicity::Atomic);
+        lti.copy(IGF, value, tmp, IGF.getDefaultAtomicity());
         (void)tmp.claimAll(); // FIXME: repack if not bit-identical
       });
 
@@ -2942,7 +2942,7 @@ namespace {
         Explosion value;
         projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
 
-        lti.consume(IGF, value, Atomicity::Atomic);
+        lti.consume(IGF, value, IGF.getDefaultAtomicity());
       });
 
       IGF.Builder.CreateRetVoid();
@@ -3119,7 +3119,7 @@ namespace {
                                  llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
       case TaggedRefcounted:
-        IGF.emitStrongRetain(ptr, Refcounting, Atomicity::Atomic);
+        IGF.emitStrongRetain(ptr, Refcounting, IGF.getDefaultAtomicity());
         return;
       case POD:
       case BitwiseTakable:
@@ -3145,7 +3145,7 @@ namespace {
                                   llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
       case TaggedRefcounted:
-        IGF.emitStrongRelease(ptr, Refcounting, Atomicity::Atomic);
+        IGF.emitStrongRelease(ptr, Refcounting, IGF.getDefaultAtomicity());
         return;
       case POD:
       case BitwiseTakable:
@@ -4060,7 +4060,7 @@ namespace {
 
           loadAsTake(IGF, dest, tmpOld);
           initialize(IGF, tmpSrc, dest);
-          consume(IGF, tmpOld, Atomicity::Atomic);
+          consume(IGF, tmpOld, IGF.getDefaultAtomicity());
           return;
         }
 
@@ -4254,7 +4254,7 @@ namespace {
         if (TI->isLoadable()) {
           Explosion tmp;
           loadAsTake(IGF, addr, tmp);
-          consume(IGF, tmp, Atomicity::Atomic);
+          consume(IGF, tmp, IGF.getDefaultAtomicity());
           return;
         }
 

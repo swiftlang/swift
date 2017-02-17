@@ -1238,7 +1238,8 @@ void SILCloner<ImplClass>::visitUnmanagedAutoreleaseValueInst(
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(
       Inst, getBuilder().createUnmanagedAutoreleaseValue(
-                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                  Inst->getAtomicity()));
 }
 
 template<typename ImplClass>

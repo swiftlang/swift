@@ -344,6 +344,31 @@ void swift::swift_unownedRelease(HeapObject *object)
   }
 }
 
+void swift::swift_nonatomic_unownedRetain(HeapObject *object)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  if (!object)
+    return;
+
+  object->weakRefCount.incrementNonAtomic();
+}
+
+void swift::swift_nonatomic_unownedRelease(HeapObject *object)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  if (!object)
+    return;
+
+  if (object->weakRefCount.decrementShouldDeallocateNonAtomic()) {
+    // Only class objects can be weak-retained and weak-released.
+    auto metadata = object->metadata;
+    assert(metadata->isClassObject());
+    auto classMetadata = static_cast<const ClassMetadata*>(metadata);
+    assert(classMetadata->isTypeMetadata());
+    SWIFT_RT_ENTRY_CALL(swift_slowDealloc)
+        (object, classMetadata->getInstanceSize(),
+         classMetadata->getInstanceAlignMask());
+  }
+}
+
 void swift::swift_unownedRetain_n(HeapObject *object, int n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   if (!isValidPointerForNativeRetain(object))
@@ -449,6 +474,17 @@ void swift::swift_unownedRetainStrong(HeapObject *object)
     swift::swift_abortRetainUnowned(object);
 }
 
+void swift::swift_nonatomic_unownedRetainStrong(HeapObject *object)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  if (!object)
+    return;
+  assert(object->weakRefCount.getCount() &&
+         "object is not currently weakly retained");
+
+  if (! object->refCount.tryIncrementNonAtomic())
+    _swift_abortRetainUnowned(object);
+}
+
 void swift::swift_unownedRetainStrongAndRelease(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   if (!isValidPointerForNativeRetain(object))
@@ -461,6 +497,22 @@ void swift::swift_unownedRetainStrongAndRelease(HeapObject *object)
 
   // This should never cause a deallocation.
   bool dealloc = object->refCounts.decrementUnownedShouldFree(1);
+  assert(!dealloc && "retain-strong-and-release caused dealloc?");
+  (void) dealloc;
+}
+
+void swift::swift_nonatomic_unownedRetainStrongAndRelease(HeapObject *object)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  if (!object)
+    return;
+  assert(object->weakRefCount.getCount() &&
+         "object is not currently weakly retained");
+
+  if (! object->refCount.tryIncrementNonAtomic())
+    _swift_abortRetainUnowned(object);
+
+  // This should never cause a deallocation.
+  bool dealloc = object->weakRefCount.decrementShouldDeallocateNonAtomic();
   assert(!dealloc && "retain-strong-and-release caused dealloc?");
   (void) dealloc;
 }

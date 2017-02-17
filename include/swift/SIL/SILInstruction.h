@@ -3046,8 +3046,11 @@ class UnmanagedAutoreleaseValueInst
                                                 /*HasValue*/ false> {
   friend SILBuilder;
 
-  UnmanagedAutoreleaseValueInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand) {}
+  UnmanagedAutoreleaseValueInst(SILDebugLocation DebugLoc, SILValue operand,
+                                Atomicity atomicity)
+      : UnaryInstructionBase(DebugLoc, operand) {
+    setAtomicity(atomicity);
+  }
 };
 
 /// Transfers ownership of a loadable value to the current autorelease pool.

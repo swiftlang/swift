@@ -859,6 +859,18 @@ class RefCounts {
     return true;
   }
 
+  // Increment the reference count, unless the object is deallocating.
+  bool tryIncrementNonAtomic() {
+    uint32_t oldval = __atomic_load_n(&refCount, __ATOMIC_RELAXED);
+    if (oldval & RC_DEALLOCATING_FLAG) {
+      return false;
+    } else {
+      uint32_t newval = oldval + RC_ONE;
+      __atomic_store_n(&refCount, newval, __ATOMIC_RELAXED);
+      return true;
+    }
+  }
+
   // Simultaneously clear the pinned flag and decrement the reference
   // count. Call _swift_release_dealloc() if the reference count goes to zero.
   //
@@ -878,6 +890,11 @@ class RefCounts {
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool decrementShouldDeinit(uint32_t dec) {
     return doDecrement<DontClearPinnedFlag, DontPerformDeinit>(dec);
+  }
+
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  bool decrementShouldDeinitNonAtomic(uint32_t dec) {
+    return doDecrementNonAtomic<DontClearPinnedFlag, DontPerformDeinit>(dec);
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -1243,6 +1260,8 @@ class HeapObjectSideTableEntry {
     return refCounts.tryIncrementAndPin();
   }
 
+  // Return weak reference count.
+  // Note that this is not equal to the number of outstanding weak pointers.
   uint32_t getCount() const {
     return refCounts.getCount();
   }
