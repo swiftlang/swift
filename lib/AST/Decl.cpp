@@ -27,7 +27,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
@@ -2552,26 +2552,12 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
 static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
                                        llvm::SmallVectorImpl<char> &buffer) {
   {
-    // TODO: Mangling: Use new mangling scheme as soon as the ObjC runtime
-    // can demangle it.
-
-    // Mangle the type.
-    Mangle::Mangler mangler(false/*dwarf*/, false/*punycode*/);
-
-    // We add the "_Tt" prefix to make this a reserved name that will
-    // not conflict with any valid Objective-C class or protocol name.
-    mangler.append("_Tt");
-
-    NominalTypeDecl *NTD = const_cast<NominalTypeDecl*>(nominal);
-    if (isa<ClassDecl>(nominal)) {
-      mangler.mangleNominalType(NTD);
-    } else {
-      mangler.mangleProtocolDecl(cast<ProtocolDecl>(NTD));
-    }
+    NewMangling::ASTMangler Mangler;
+    std::string MangledName = Mangler.mangleObjCRuntimeName(nominal);
 
     buffer.clear();
     llvm::raw_svector_ostream os(buffer);
-    mangler.finalize(os);
+    os << MangledName;
   }
 
   assert(buffer.size() && "Invalid buffer size");

@@ -1914,28 +1914,31 @@ Expr *Parser::parseExprIdentifier() {
     hasGenericArgumentList = !args.empty();
   }
   
-  ValueDecl *D = lookupInScope(name);
-  // FIXME: We want this to work: "var x = { x() }", but for now it's better
-  // to disallow it than to crash.
-  if (D) {
-    for (auto activeVar : DisabledVars) {
-      if (activeVar == D) {
-        diagnose(loc.getBaseNameLoc(), DisabledVarReason);
-        return new (Context) ErrorExpr(loc.getSourceRange());
-      }
-    }
-  } else {
-    for (auto activeVar : DisabledVars) {
-      if (activeVar->getFullName() == name) {
-        DescriptiveDeclKind Kind;
-        if (DisabledVarReason.ID == diag::var_init_self_referential.ID &&
-            shouldAddSelfFixit(CurDeclContext, name, Kind)) {
-          diagnose(loc.getBaseNameLoc(), diag::expected_self_before_reference,
-                   Kind).fixItInsert(loc.getBaseNameLoc(), "self.");
-        } else {
+  ValueDecl *D = nullptr;
+  if (!InPoundIfEnvironment) {
+    D = lookupInScope(name);
+    // FIXME: We want this to work: "var x = { x() }", but for now it's better
+    // to disallow it than to crash.
+    if (D) {
+      for (auto activeVar : DisabledVars) {
+        if (activeVar == D) {
           diagnose(loc.getBaseNameLoc(), DisabledVarReason);
+          return new (Context) ErrorExpr(loc.getSourceRange());
         }
-        return new (Context) ErrorExpr(loc.getSourceRange());
+      }
+    } else {
+      for (auto activeVar : DisabledVars) {
+        if (activeVar->getFullName() == name) {
+          DescriptiveDeclKind Kind;
+          if (DisabledVarReason.ID == diag::var_init_self_referential.ID &&
+              shouldAddSelfFixit(CurDeclContext, name, Kind)) {
+            diagnose(loc.getBaseNameLoc(), diag::expected_self_before_reference,
+                    Kind).fixItInsert(loc.getBaseNameLoc(), "self.");
+          } else {
+            diagnose(loc.getBaseNameLoc(), DisabledVarReason);
+          }
+          return new (Context) ErrorExpr(loc.getSourceRange());
+        }
       }
     }
   }

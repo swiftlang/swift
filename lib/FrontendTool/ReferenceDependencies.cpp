@@ -103,8 +103,7 @@ static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
   mangler.mangleContext(type);
   std::string Old = mangler.finalize();
 
-  NewMangling::ASTMangler NewMangler(/*debug style=*/false,
-                                     /*usePunycode=*/true);
+  NewMangling::ASTMangler NewMangler(/*debug style=*/false);
   std::string New = NewMangler.mangleTypeAsContextUSR(type);
 
   return NewMangling::selectMangling(Old, New);

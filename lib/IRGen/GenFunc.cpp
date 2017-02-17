@@ -880,7 +880,9 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
          && "should have substitutions iff original function is generic");
   WitnessMetadata witnessMetadata;
   if (hasPolymorphicParameters(origType)) {
-    auto subMap = origType->getGenericSignature()->getSubstitutionMap(subs);
+    SubstitutionMap subMap;
+    if (auto genericSig = origType->getGenericSignature())
+      subMap = genericSig->getSubstitutionMap(subs);
     emitPolymorphicArguments(subIGF, origType, substType, subMap,
                              &witnessMetadata, polyArgs);
   }

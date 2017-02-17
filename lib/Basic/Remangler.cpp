@@ -144,6 +144,8 @@ class Remangler {
   std::vector<SubstitutionWord> Words;
   std::vector<WordReplacement> SubstWordsInIdent;
 
+  static const size_t MaxNumWords = 26;
+
   std::unordered_map<SubstitutionEntry, unsigned,
                      SubstitutionEntry::Hasher> Substitutions;
 

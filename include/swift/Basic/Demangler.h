@@ -243,6 +243,8 @@ private:
   NodePointer demangleGenericRequirement();
   NodePointer demangleGenericType();
   NodePointer demangleValueWitness();
+
+  NodePointer demangleObjCTypeName();
 };
 
 } // end namespace NewMangling
