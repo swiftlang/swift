@@ -178,27 +178,6 @@ public:
     }
   }
 
-  /// A dummy implementation for indenting a token with some amount
-  /// of trivia.
-  RC<TokenSyntax> indent(unsigned Count, syntax::TriviaKind TrivKind) const {
-    Trivia NewLeadingTrivia { LeadingTrivia };
-    if (NewLeadingTrivia.empty()) {
-      NewLeadingTrivia.push_back(
-          syntax::TriviaPiece {TrivKind, Count, OwnedString{}});
-    } else {
-      auto Last = NewLeadingTrivia.back();
-      if (Last.Kind == TrivKind) {
-        NewLeadingTrivia.pop_back();
-        NewLeadingTrivia.push_back(
-            syntax::TriviaPiece {TrivKind, Count + Last.Count, OwnedString{}});
-      } else {
-        NewLeadingTrivia.push_back(
-            syntax::TriviaPiece {TrivKind, Count, OwnedString{}});
-      }
-    }
-    return make(TokenKind, Text, Presence, NewLeadingTrivia, TrailingTrivia);
-  }
-
   /// Advance the provided AbsolutePosition by the token's full width and
   /// return the AbsolutePosition of the start of the token's nontrivial text.
   AbsolutePosition accumulateAbsolutePosition(AbsolutePosition &Pos) const;
