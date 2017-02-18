@@ -187,6 +187,28 @@ namespace driver {
       TQ->addTask(Cmd->getExecutable(), Cmd->getArguments(), llvm::None,
                   (void *)Cmd);
     }
+
+    // When a task finishes, we need to reevaluate the other commands that
+    // might have been blocked.
+    void markFinished(const Job *Cmd) {
+      if (Comp.ShowIncrementalBuildDecisions) {
+        llvm::outs() << "Job finished: " << LogJob(Cmd) << "\n";
+      }
+      FinishedCommands.insert(Cmd);
+
+      auto BlockedIter = BlockingCommands.find(Cmd);
+      if (BlockedIter != BlockingCommands.end()) {
+        auto AllBlocked = std::move(BlockedIter->second);
+        if (Comp.ShowIncrementalBuildDecisions) {
+          llvm::outs() << "Scheduling maybe-unblocked jobs: "
+                       << LogJobArray(AllBlocked) << "\n";
+        }
+        BlockingCommands.erase(BlockedIter);
+        for (auto *Blocked : AllBlocked)
+          scheduleCommandIfNecessaryAndPossible(Blocked);
+    }
+  }
+
   };
 } // driver
 } // swift
@@ -387,21 +409,6 @@ int Compilation::performJobsImpl() {
                                  [](raw_ostream &out, const Job *base) {
       out << llvm::sys::path::filename(base->getOutput().getBaseInput(0));
     });
-  };
-
-
-  // When a task finishes, we need to reevaluate the other commands that
-  // might have been blocked.
-  auto markFinished = [&] (const Job *Cmd) {
-    State.FinishedCommands.insert(Cmd);
-
-    auto BlockedIter = State.BlockingCommands.find(Cmd);
-    if (BlockedIter != State.BlockingCommands.end()) {
-      auto AllBlocked = std::move(BlockedIter->second);
-      State.BlockingCommands.erase(BlockedIter);
-      for (auto *Blocked : AllBlocked)
-        State.scheduleCommandIfNecessaryAndPossible(Blocked);
-    }
   };
 
   // Schedule all jobs we can.
@@ -656,7 +663,7 @@ int Compilation::performJobsImpl() {
 
     // When a task finishes, we need to reevaluate the other commands that
     // might have been blocked.
-    markFinished(FinishedCmd);
+    State.markFinished(FinishedCmd);
 
     for (const Job *Cmd : Dependents) {
       DeferredCommands.erase(Cmd);
@@ -718,7 +725,7 @@ int Compilation::performJobsImpl() {
       }
 
       State.ScheduledCommands.insert(Cmd);
-      markFinished(Cmd);
+      State.markFinished(Cmd);
     }
 
     // ...which may allow us to go on and do later tasks.
