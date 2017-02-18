@@ -139,7 +139,7 @@ private:
   /// The actual storage, described by \c storageKind.
   union {
     /// The type representation descibing where the requirement came from.
-    TypeRepr *typeRepr;
+    const TypeRepr *typeRepr;
 
     /// Where a requirement came from.
     const RequirementRepr *requirementRepr;
@@ -194,7 +194,7 @@ public:
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
-                   TypeRepr *typeRepr)
+                    const TypeRepr *typeRepr)
     : kind(kind), storageKind(StorageKind::TypeRepr), parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
@@ -245,7 +245,7 @@ public:
   /// Retrieve a requirement source representing an explicit requirement
   /// stated in an 'inheritance' clause.
   static const RequirementSource *forExplicit(GenericSignatureBuilder &builder,
-                                              TypeRepr *typeRepr);
+                                              const TypeRepr *typeRepr);
 
   /// Retrieve a requirement source representing an explicit requirement
   /// stated in an 'where' clause.
@@ -256,7 +256,7 @@ public:
   /// inferred from some part of a generic declaration's signature, e.g., the
   /// parameter or result type of a generic function.
   static const RequirementSource *forInferred(GenericSignatureBuilder &builder,
-                                              TypeRepr *typeRepr);
+                                              const TypeRepr *typeRepr);
 
   /// Retrieve a requirement source representing the requirement signature
   /// computation for a protocol.
@@ -307,7 +307,7 @@ public:
   int compare(const RequirementSource *other) const;
 
   /// Retrieve the type representation for this requirement, if there is one.
-  TypeRepr *getTypeRepr() const {
+  const TypeRepr *getTypeRepr() const {
     if (storageKind != StorageKind::TypeRepr) return nullptr;
     return storage.typeRepr;
   }
@@ -447,20 +447,11 @@ private:
                         Type T1, Type T2, const RequirementSource *Source,
                         llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
-  /// Add the requirements placed on the given abstract type parameter
+  /// Add the requirements placed on the given type parameter
   /// to the given potential archetype.
-  bool addAbstractTypeParamRequirements(
-         AbstractTypeParamDecl *decl,
-         PotentialArchetype *pa,
-         const RequirementSource *source,
-         llvm::SmallPtrSetImpl<ProtocolDecl *> &visited);
-
-  /// Visit all of the types that show up in the list of inherited
-  /// types.
-  ///
-  /// \returns true if any of the invocations of \c visitor returned true.
-  bool visitInherited(ArrayRef<TypeLoc> inheritedTypes,
-                      llvm::function_ref<bool(Type, SourceLoc)> visitor);
+  bool addInheritedRequirements(TypeDecl *decl, PotentialArchetype *pa,
+                                const RequirementSource *parentSource,
+                                llvm::SmallPtrSetImpl<ProtocolDecl *> &visited);
 
   /// Visit all of the potential archetypes.
   template<typename F>
