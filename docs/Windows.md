@@ -129,7 +129,7 @@ cmake -G "Ninja" "%swift_source_dir%/swift"^
  -DICU_I18N_LIB_NAME="icuin"^
  -DSWIFT_INCLUDE_DOCS=FALSE^
  -DSWIFT_INCLUDE_TESTS=FALSE^
- -DSWIFT_BUILD_SDK_OVERLAY=FALSE^
+ -DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=FALSE^
  -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE
 popd
 cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64/ninja"
@@ -144,7 +144,7 @@ cmake -G "Visual Studio 14" "%swift_source_dir%/swift"^
 
 ## Clang-cl
 
-Follow the instructions for MSVC, but add the following lines to each CMake configuration command. We need to use LLVM's `lld-link.exe` linker, as MSVC's `link.exe` crashes due to corrupt PDB files using `clang-cl`. `Clang-cl` 3.9.0 has been tested.
+Follow the instructions for MSVC, but add the following lines to each CMake configuration command. We need to use LLVM's `lld-link.exe` linker, as MSVC's `link.exe` crashes due to corrupt PDB files using `clang-cl`. `Clang-cl` 3.9.0 has been tested. You can remove the `SWIFT_BUILD_DYNAMIC_SDK_OVERLAY=FALSE` definition, as overlays are supported with `clang-cl`, as it supports modules. 
 
 ```
  -DCMAKE_C_COMPILER="<path-to-llvm-bin>/clang-cl.exe"^
