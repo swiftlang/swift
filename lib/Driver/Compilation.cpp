@@ -108,6 +108,10 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags);
 
 using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
 
+
+using InputInfoMap = llvm::SmallMapVector<const llvm::opt::Arg *,
+                                          CompileJobAction::InputInfo, 16>;
+
 namespace swift {
 namespace driver {
   struct PerformJobsState {
@@ -603,7 +607,51 @@ namespace driver {
       }
     }
 
+    void populateInputInfoMap(InputInfoMap &inputs) const {
+      for (auto &entry : UnfinishedCommands) {
+        for (auto *action : entry.first->getSource().getInputs()) {
+          auto inputFile = dyn_cast<InputAction>(action);
+          if (!inputFile)
+            continue;
 
+          CompileJobAction::InputInfo info;
+          info.previousModTime = entry.first->getInputModTime();
+          info.status = entry.second ?
+            CompileJobAction::InputInfo::NeedsCascadingBuild :
+            CompileJobAction::InputInfo::NeedsNonCascadingBuild;
+          inputs[&inputFile->getInputArg()] = info;
+        }
+      }
+
+      for (const Job *entry : FinishedCommands) {
+        const auto *compileAction = dyn_cast<CompileJobAction>(&entry->getSource());
+        if (!compileAction)
+          continue;
+
+        for (auto *action : compileAction->getInputs()) {
+          auto inputFile = dyn_cast<InputAction>(action);
+          if (!inputFile)
+            continue;
+
+          CompileJobAction::InputInfo info;
+          info.previousModTime = entry->getInputModTime();
+          info.status = CompileJobAction::InputInfo::UpToDate;
+          inputs[&inputFile->getInputArg()] = info;
+        }
+      }
+
+      // Sort the entries by input order.
+      static_assert(IsTriviallyCopyable<CompileJobAction::InputInfo>::value,
+                    "llvm::array_pod_sort relies on trivially-copyable data");
+      using InputInfoEntry = std::decay<decltype(inputs.front())>::type;
+      llvm::array_pod_sort(inputs.begin(), inputs.end(),
+                           [](const InputInfoEntry *lhs,
+                              const InputInfoEntry *rhs) -> int {
+                             auto lhsIndex = lhs->first->getIndex();
+                             auto rhsIndex = rhs->first->getIndex();
+                             return (lhsIndex < rhsIndex) ? -1 : (lhsIndex > rhsIndex) ? 1 : 0;
+                           });
+    }
   };
 } // driver
 } // swift
@@ -616,55 +664,6 @@ Job *Compilation::addJob(std::unique_ptr<Job> J) {
   return result;
 }
 
-using InputInfoMap =
-  llvm::SmallMapVector<const llvm::opt::Arg *, CompileJobAction::InputInfo, 16>;
-
-static void populateInputInfoMap(InputInfoMap &inputs,
-                                 const PerformJobsState &endState) {
-  for (auto &entry : endState.UnfinishedCommands) {
-    for (auto *action : entry.first->getSource().getInputs()) {
-      auto inputFile = dyn_cast<InputAction>(action);
-      if (!inputFile)
-        continue;
-
-      CompileJobAction::InputInfo info;
-      info.previousModTime = entry.first->getInputModTime();
-      info.status = entry.second ?
-          CompileJobAction::InputInfo::NeedsCascadingBuild :
-          CompileJobAction::InputInfo::NeedsNonCascadingBuild;
-      inputs[&inputFile->getInputArg()] = info;
-    }
-  }
-
-  for (const Job *entry : endState.FinishedCommands) {
-    const auto *compileAction = dyn_cast<CompileJobAction>(&entry->getSource());
-    if (!compileAction)
-      continue;
-
-    for (auto *action : compileAction->getInputs()) {
-      auto inputFile = dyn_cast<InputAction>(action);
-      if (!inputFile)
-        continue;
-
-      CompileJobAction::InputInfo info;
-      info.previousModTime = entry->getInputModTime();
-      info.status = CompileJobAction::InputInfo::UpToDate;
-      inputs[&inputFile->getInputArg()] = info;
-    }
-  }
-
-  // Sort the entries by input order.
-  static_assert(IsTriviallyCopyable<CompileJobAction::InputInfo>::value,
-                "llvm::array_pod_sort relies on trivially-copyable data");
-  using InputInfoEntry = std::decay<decltype(inputs.front())>::type;
-  llvm::array_pod_sort(inputs.begin(), inputs.end(),
-                       [](const InputInfoEntry *lhs,
-                          const InputInfoEntry *rhs) -> int {
-    auto lhsIndex = lhs->first->getIndex();
-    auto rhsIndex = rhs->first->getIndex();
-    return (lhsIndex < rhsIndex) ? -1 : (lhsIndex > rhsIndex) ? 1 : 0;
-  });
-}
 
 static void checkForOutOfDateInputs(DiagnosticEngine &diags,
                                     const InputInfoMap &inputs) {
@@ -791,7 +790,7 @@ int Compilation::performJobsImpl() {
 
   if (!CompilationRecordPath.empty() && !SkipTaskExecution) {
     InputInfoMap InputInfo;
-    populateInputInfoMap(InputInfo, State);
+    State.populateInputInfoMap(InputInfo);
     checkForOutOfDateInputs(Diags, InputInfo);
     writeCompilationRecord(CompilationRecordPath, ArgsHash, BuildStartTime,
                            InputInfo);
