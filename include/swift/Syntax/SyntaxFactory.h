@@ -37,6 +37,7 @@ namespace swift {
 namespace syntax {
 
 class ArrayTypeSyntax;
+class BreakStmtSyntax;
 class CodeBlockStmtSyntax;
 class DeclMembersSyntax;
 class DictionaryTypeSyntax;
@@ -106,6 +107,15 @@ struct SyntaxFactory {
   /// marked as missing.
   static FallthroughStmtSyntax makeBlankFallthroughStmt();
 
+  /// Make a break statement with the give `break` keyword and
+  /// destination label.
+  static BreakStmtSyntax
+  makeBreakStmt(RC<TokenSyntax> BreakKeyword, RC<TokenSyntax> Label);
+
+  /// Make a break statement with the `break` keyword
+  /// and destination label marked as missing.
+  static BreakStmtSyntax makeBlankBreakStmtSyntax();
+
 #pragma mark - Tokens
 
   /// Make a 'fallthrough' keyword with the specified leading and
@@ -117,6 +127,11 @@ struct SyntaxFactory {
   /// trailing trivia.
   static RC<TokenSyntax> makeAtSignToken(const Trivia &LeadingTrivia,
                                          const Trivia &TrailingTrivia);
+
+  /// Make a 'break' keyword with the specified leading and
+  /// trailing trivia.
+  static RC<TokenSyntax> makeBreakKeyword(const Trivia &LeadingTrivia,
+                                          const Trivia &TrailingTrivia);
 
   /// Make a left angle '<' token with the specified leading and
   /// trailing trivia.
