@@ -155,6 +155,14 @@ namespace driver {
     /// TaskQueue for execution.
     std::unique_ptr<TaskQueue> TQ;
 
+    /// Cumulative result of PerformJobs(), accumulated from subprocesses.
+    int Result = EXIT_SUCCESS;
+
+    /// Timers for monitoring execution time of subprocesses.
+    llvm::TimerGroup DriverTimerGroup {"driver", "Driver Compilation Time"};
+    llvm::SmallDenseMap<const Job *, std::unique_ptr<llvm::Timer>, 16>
+    DriverTimers;
+
     PerformJobsState(Compilation &Comp) : Comp(Comp) {
       if (Comp.SkipTaskExecution)
         TQ.reset(new DummyTaskQueue(Comp.NumberOfParallelCommands));
@@ -235,8 +243,213 @@ namespace driver {
         BlockingCommands.erase(BlockedIter);
         for (auto *Blocked : AllBlocked)
           scheduleCommandIfNecessaryAndPossible(Blocked);
+      }
     }
-  }
+
+    /// Callback which will be called immediately after a task has started. This
+    /// callback may be used to provide output indicating that the task began.
+    void taskBegan(ProcessId Pid, void *Context) {
+      // TODO: properly handle task began.
+      const Job *BeganCmd = (const Job *)Context;
+
+      if (Comp.ShowDriverTimeCompilation) {
+        llvm::SmallString<128> TimerName;
+        llvm::raw_svector_ostream OS(TimerName);
+        OS << LogJob(BeganCmd);
+        DriverTimers.insert({
+            BeganCmd,
+              std::unique_ptr<llvm::Timer>(
+                new llvm::Timer("task", OS.str(), DriverTimerGroup))
+              });
+        DriverTimers[BeganCmd]->startTimer();
+      }
+
+      // For verbose output, print out each command as it begins execution.
+      if (Comp.Level == OutputLevel::Verbose)
+        BeganCmd->printCommandLine(llvm::errs());
+      else if (Comp.Level == OutputLevel::Parseable)
+        parseable_output::emitBeganMessage(llvm::errs(), *BeganCmd, Pid);
+    }
+
+    /// Callback which will be called immediately after a task has finished
+    /// execution. Determines if execution should continue, and also schedule
+    /// any additional Jobs which we now know we need to run.
+    TaskFinishedResponse
+    taskFinished(ProcessId Pid, int ReturnCode, StringRef Output,
+                 StringRef Errors, void *Context) {
+      const Job *FinishedCmd = (const Job *)Context;
+
+      if (Comp.ShowDriverTimeCompilation) {
+        DriverTimers[FinishedCmd]->stopTimer();
+      }
+
+      if (Comp.Level == OutputLevel::Parseable) {
+        // Parseable output was requested.
+        parseable_output::emitFinishedMessage(llvm::errs(), *FinishedCmd, Pid,
+                                              ReturnCode, Output);
+      } else {
+        // Otherwise, send the buffered output to stderr, though only if we
+        // support getting buffered output.
+        if (TaskQueue::supportsBufferingOutput())
+          llvm::errs() << Output;
+      }
+
+      // In order to handle both old dependencies that have disappeared and new
+      // dependencies that have arisen, we need to reload the dependency file.
+      // Do this whether or not the build succeeded.
+      SmallVector<const Job *, 16> Dependents;
+      if (Comp.getIncrementalBuildEnabled()) {
+        const CommandOutput &Output = FinishedCmd->getOutput();
+        StringRef DependenciesFile =
+          Output.getAdditionalOutputForType(types::TY_SwiftDeps);
+
+        if (DependenciesFile.empty()) {
+          // If this job doesn't track dependencies, it must always be run.
+          // Note: In theory CheckDependencies makes sense as well (for a leaf
+          // node in the dependency graph), and maybe even NewlyAdded (for very
+          // coarse dependencies that always affect downstream nodes), but we're
+          // not using either of those right now, and this logic should probably
+          // be revisited when we are.
+          assert(FinishedCmd->getCondition() == Job::Condition::Always);
+        } else {
+          // If we have a dependency file /and/ the frontend task exited normally,
+          // we can be discerning about what downstream files to rebuild.
+          if (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE) {
+            bool wasCascading = DepGraph.isMarked(FinishedCmd);
+
+            switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
+            case DependencyGraphImpl::LoadResult::HadError:
+              if (ReturnCode == EXIT_SUCCESS) {
+                Comp.disableIncrementalBuild();
+                for (const Job *Cmd : DeferredCommands)
+                  scheduleCommandIfNecessaryAndPossible(Cmd);
+                DeferredCommands.clear();
+                Dependents.clear();
+              } // else, let the next build handle it.
+              break;
+            case DependencyGraphImpl::LoadResult::UpToDate:
+              if (!wasCascading)
+                break;
+              LLVM_FALLTHROUGH;
+            case DependencyGraphImpl::LoadResult::AffectsDownstream:
+              DepGraph.markTransitive(Dependents, FinishedCmd,
+                                      IncrementalTracer);
+              break;
+            }
+          } else {
+            // If there's an abnormal exit (a crash), assume the worst.
+            switch (FinishedCmd->getCondition()) {
+            case Job::Condition::NewlyAdded:
+              // The job won't be treated as newly added next time. Conservatively
+              // mark it as affecting other jobs, because some of them may have
+              // completed already.
+              DepGraph.markTransitive(Dependents, FinishedCmd,
+                                      IncrementalTracer);
+              break;
+            case Job::Condition::Always:
+              // Any incremental task that shows up here has already been marked;
+              // we didn't need to wait for it to finish to start downstream
+              // tasks.
+              assert(DepGraph.isMarked(FinishedCmd));
+              break;
+            case Job::Condition::RunWithoutCascading:
+              // If this file changed, it might have been a non-cascading change
+              // and it might not. Unfortunately, the interface hash has been
+              // updated or compromised, so we don't actually know anymore; we
+              // have to conservatively assume the changes could affect other
+              // files.
+              DepGraph.markTransitive(Dependents, FinishedCmd,
+                                      IncrementalTracer);
+              break;
+            case Job::Condition::CheckDependencies:
+              // If the only reason we're running this is because something else
+              // changed, then we can trust the dependency graph as to whether
+              // it's a cascading or non-cascading change. That is, if whatever
+              // /caused/ the error isn't supposed to affect other files, and
+              // whatever /fixes/ the error isn't supposed to affect other files,
+              // then there's no need to recompile any other inputs. If either of
+              // those are false, we /do/ need to recompile other inputs.
+              break;
+            }
+          }
+        }
+      }
+
+      if (ReturnCode != EXIT_SUCCESS) {
+        // The task failed, so return true without performing any further
+        // dependency analysis.
+
+        // Store this task's ReturnCode as our Result if we haven't stored
+        // anything yet.
+        if (Result == EXIT_SUCCESS)
+          Result = ReturnCode;
+
+        if (!isa<CompileJobAction>(FinishedCmd->getSource()) ||
+            ReturnCode != EXIT_FAILURE) {
+          Comp.Diags.diagnose(SourceLoc(), diag::error_command_failed,
+                              FinishedCmd->getSource().getClassName(),
+                              ReturnCode);
+        }
+
+        return Comp.ContinueBuildingAfterErrors ?
+          TaskFinishedResponse::ContinueExecution :
+          TaskFinishedResponse::StopExecution;
+      }
+
+      // When a task finishes, we need to reevaluate the other commands that
+      // might have been blocked.
+      markFinished(FinishedCmd);
+
+      for (const Job *Cmd : Dependents) {
+        DeferredCommands.erase(Cmd);
+        noteBuilding(Cmd, "because of dependencies discovered later");
+        scheduleCommandIfNecessaryAndPossible(Cmd);
+      }
+
+      return TaskFinishedResponse::ContinueExecution;
+    }
+
+    TaskFinishedResponse
+    taskSignalled(ProcessId Pid, StringRef ErrorMsg, StringRef Output,
+                  StringRef Errors, void *Context, Optional<int> Signal) {
+      const Job *SignalledCmd = (const Job *)Context;
+
+      if (Comp.ShowDriverTimeCompilation) {
+        DriverTimers[SignalledCmd]->stopTimer();
+      }
+
+      if (Comp.Level == OutputLevel::Parseable) {
+        // Parseable output was requested.
+        parseable_output::emitSignalledMessage(llvm::errs(), *SignalledCmd,
+                                               Pid, ErrorMsg, Output, Signal);
+      } else {
+        // Otherwise, send the buffered output to stderr, though only if we
+        // support getting buffered output.
+        if (TaskQueue::supportsBufferingOutput())
+          llvm::errs() << Output;
+      }
+
+      if (!ErrorMsg.empty())
+        Comp.Diags.diagnose(SourceLoc(), diag::error_unable_to_execute_command,
+                            ErrorMsg);
+
+      if (Signal.hasValue()) {
+        Comp.Diags.diagnose(SourceLoc(), diag::error_command_signalled,
+                            SignalledCmd->getSource().getClassName(),
+                            Signal.getValue());
+      } else {
+        Comp.Diags.diagnose(SourceLoc(),
+                            diag::error_command_signalled_without_signal_number,
+                            SignalledCmd->getSource().getClassName());
+      }
+
+      // Since the task signalled, unconditionally set result to -2.
+      Result = -2;
+
+      return TaskFinishedResponse::StopExecution;
+    }
+
+
 
   };
 } // driver
@@ -514,218 +727,15 @@ int Compilation::performJobsImpl() {
     }
   }
 
-  int Result = EXIT_SUCCESS;
-  llvm::TimerGroup DriverTimerGroup("driver", "Driver Compilation Time");
-  llvm::SmallDenseMap<const Job *, std::unique_ptr<llvm::Timer>, 16>
-    DriverTimers;
-
-  // Set up a callback which will be called immediately after a task has
-  // started. This callback may be used to provide output indicating that the
-  // task began.
-  auto taskBegan = [&] (ProcessId Pid, void *Context) {
-    // TODO: properly handle task began.
-    const Job *BeganCmd = (const Job *)Context;
-
-    if (ShowDriverTimeCompilation) {
-      llvm::SmallString<128> TimerName;
-      llvm::raw_svector_ostream OS(TimerName);
-      OS << LogJob(BeganCmd);
-      DriverTimers.insert({
-        BeganCmd,
-        std::unique_ptr<llvm::Timer>(
-          new llvm::Timer("task", OS.str(), DriverTimerGroup))
-      });
-      DriverTimers[BeganCmd]->startTimer();
-    }
-
-    // For verbose output, print out each command as it begins execution.
-    if (Level == OutputLevel::Verbose)
-      BeganCmd->printCommandLine(llvm::errs());
-    else if (Level == OutputLevel::Parseable)
-      parseable_output::emitBeganMessage(llvm::errs(), *BeganCmd, Pid);
-  };
-
-  // Set up a callback which will be called immediately after a task has
-  // finished execution. This callback should determine if execution should
-  // continue (if execution should stop, this callback should return true), and
-  // it should also schedule any additional commands which we now know need
-  // to run.
-  auto taskFinished = [&](ProcessId Pid, int ReturnCode, StringRef Output,
-                          StringRef Errors,
-                          void *Context) -> TaskFinishedResponse {
-    const Job *FinishedCmd = (const Job *)Context;
-
-    if (ShowDriverTimeCompilation) {
-      DriverTimers[FinishedCmd]->stopTimer();
-    }
-
-    if (Level == OutputLevel::Parseable) {
-      // Parseable output was requested.
-      parseable_output::emitFinishedMessage(llvm::errs(), *FinishedCmd, Pid,
-                                            ReturnCode, Output);
-    } else {
-      // Otherwise, send the buffered output to stderr, though only if we
-      // support getting buffered output.
-      if (TaskQueue::supportsBufferingOutput())
-        llvm::errs() << Output;
-    }
-
-    // In order to handle both old dependencies that have disappeared and new
-    // dependencies that have arisen, we need to reload the dependency file.
-    // Do this whether or not the build succeeded.
-    SmallVector<const Job *, 16> Dependents;
-    if (getIncrementalBuildEnabled()) {
-      const CommandOutput &Output = FinishedCmd->getOutput();
-      StringRef DependenciesFile =
-        Output.getAdditionalOutputForType(types::TY_SwiftDeps);
-
-      if (DependenciesFile.empty()) {
-        // If this job doesn't track dependencies, it must always be run.
-        // Note: In theory CheckDependencies makes sense as well (for a leaf
-        // node in the dependency graph), and maybe even NewlyAdded (for very
-        // coarse dependencies that always affect downstream nodes), but we're
-        // not using either of those right now, and this logic should probably
-        // be revisited when we are.
-        assert(FinishedCmd->getCondition() == Job::Condition::Always);
-      } else {
-        // If we have a dependency file /and/ the frontend task exited normally,
-        // we can be discerning about what downstream files to rebuild.
-        if (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE) {
-          bool wasCascading = State.DepGraph.isMarked(FinishedCmd);
-
-          switch (State.DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
-          case DependencyGraphImpl::LoadResult::HadError:
-            if (ReturnCode == EXIT_SUCCESS) {
-              disableIncrementalBuild();
-              for (const Job *Cmd : State.DeferredCommands)
-                State.scheduleCommandIfNecessaryAndPossible(Cmd);
-              State.DeferredCommands.clear();
-              Dependents.clear();
-            } // else, let the next build handle it.
-            break;
-          case DependencyGraphImpl::LoadResult::UpToDate:
-            if (!wasCascading)
-              break;
-            LLVM_FALLTHROUGH;
-          case DependencyGraphImpl::LoadResult::AffectsDownstream:
-            State.DepGraph.markTransitive(Dependents, FinishedCmd,
-                                          State.IncrementalTracer);
-            break;
-          }
-        } else {
-          // If there's an abnormal exit (a crash), assume the worst.
-          switch (FinishedCmd->getCondition()) {
-          case Job::Condition::NewlyAdded:
-            // The job won't be treated as newly added next time. Conservatively
-            // mark it as affecting other jobs, because some of them may have
-            // completed already.
-            State.DepGraph.markTransitive(Dependents, FinishedCmd,
-                                          State.IncrementalTracer);
-            break;
-          case Job::Condition::Always:
-            // Any incremental task that shows up here has already been marked;
-            // we didn't need to wait for it to finish to start downstream
-            // tasks.
-            assert(State.DepGraph.isMarked(FinishedCmd));
-            break;
-          case Job::Condition::RunWithoutCascading:
-            // If this file changed, it might have been a non-cascading change
-            // and it might not. Unfortunately, the interface hash has been
-            // updated or compromised, so we don't actually know anymore; we
-            // have to conservatively assume the changes could affect other
-            // files.
-            State.DepGraph.markTransitive(Dependents, FinishedCmd,
-                                          State.IncrementalTracer);
-            break;
-          case Job::Condition::CheckDependencies:
-            // If the only reason we're running this is because something else
-            // changed, then we can trust the dependency graph as to whether
-            // it's a cascading or non-cascading change. That is, if whatever
-            // /caused/ the error isn't supposed to affect other files, and
-            // whatever /fixes/ the error isn't supposed to affect other files,
-            // then there's no need to recompile any other inputs. If either of
-            // those are false, we /do/ need to recompile other inputs.
-            break;
-          }
-        }
-      }
-    }
-
-    if (ReturnCode != EXIT_SUCCESS) {
-      // The task failed, so return true without performing any further
-      // dependency analysis.
-
-      // Store this task's ReturnCode as our Result if we haven't stored
-      // anything yet.
-      if (Result == EXIT_SUCCESS)
-        Result = ReturnCode;
-
-      if (!isa<CompileJobAction>(FinishedCmd->getSource()) ||
-          ReturnCode != EXIT_FAILURE) {
-        Diags.diagnose(SourceLoc(), diag::error_command_failed,
-                       FinishedCmd->getSource().getClassName(),
-                       ReturnCode);
-      }
-
-      return ContinueBuildingAfterErrors ?
-          TaskFinishedResponse::ContinueExecution :
-          TaskFinishedResponse::StopExecution;
-    }
-
-    // When a task finishes, we need to reevaluate the other commands that
-    // might have been blocked.
-    State.markFinished(FinishedCmd);
-
-    for (const Job *Cmd : Dependents) {
-      State.DeferredCommands.erase(Cmd);
-      State.noteBuilding(Cmd, "because of dependencies discovered later");
-      State.scheduleCommandIfNecessaryAndPossible(Cmd);
-    }
-
-    return TaskFinishedResponse::ContinueExecution;
-  };
-
-  auto taskSignalled = [&](ProcessId Pid, StringRef ErrorMsg, StringRef Output,
-                           StringRef Errors,
-                           void *Context, Optional<int> Signal) -> TaskFinishedResponse {
-    const Job *SignalledCmd = (const Job *)Context;
-
-    if (ShowDriverTimeCompilation) {
-      DriverTimers[SignalledCmd]->stopTimer();
-    }
-
-    if (Level == OutputLevel::Parseable) {
-      // Parseable output was requested.
-      parseable_output::emitSignalledMessage(llvm::errs(), *SignalledCmd, Pid,
-                                             ErrorMsg, Output, Signal);
-    } else {
-      // Otherwise, send the buffered output to stderr, though only if we
-      // support getting buffered output.
-      if (TaskQueue::supportsBufferingOutput())
-        llvm::errs() << Output;
-    }
-
-    if (!ErrorMsg.empty())
-      Diags.diagnose(SourceLoc(), diag::error_unable_to_execute_command,
-                     ErrorMsg);
-    
-    if (Signal.hasValue()) {
-      Diags.diagnose(SourceLoc(), diag::error_command_signalled,
-                     SignalledCmd->getSource().getClassName(), Signal.getValue());
-    } else {
-      Diags.diagnose(SourceLoc(), diag::error_command_signalled_without_signal_number,
-                     SignalledCmd->getSource().getClassName());
-    }
-
-    // Since the task signalled, unconditionally set result to -2.
-    Result = -2;
-
-    return TaskFinishedResponse::StopExecution;
-  };
-
   do {
+    using namespace std::placeholders;
     // Ask the TaskQueue to execute.
-    State.TQ->execute(taskBegan, taskFinished, taskSignalled);
+    State.TQ->execute(std::bind(&PerformJobsState::taskBegan, &State,
+                                _1, _2),
+                      std::bind(&PerformJobsState::taskFinished, &State,
+                                _1, _2, _3, _4, _5),
+                      std::bind(&PerformJobsState::taskSignalled, &State,
+                                _1, _2, _3, _4, _5, _6));
 
     // Mark all remaining deferred commands as skipped.
     for (const Job *Cmd : State.DeferredCommands) {
@@ -740,9 +750,9 @@ int Compilation::performJobsImpl() {
     }
 
     // ...which may allow us to go on and do later tasks.
-  } while (Result == 0 && State.TQ->hasRemainingTasks());
+  } while (State.Result == 0 && State.TQ->hasRemainingTasks());
 
-  if (Result == 0) {
+  if (State.Result == 0) {
     assert(State.BlockingCommands.empty() &&
            "some blocking commands never finished properly");
   } else {
@@ -775,9 +785,9 @@ int Compilation::performJobsImpl() {
                            InputInfo);
   }
 
-  if (Result == 0)
-    Result = Diags.hadAnyError();
-  return Result;
+  if (State.Result == 0)
+    State.Result = Diags.hadAnyError();
+  return State.Result;
 }
 
 int Compilation::performSingleCommand(const Job *Cmd) {
