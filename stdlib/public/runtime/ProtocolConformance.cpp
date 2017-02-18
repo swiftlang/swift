@@ -373,7 +373,7 @@ recur:
     // For generic and resilient types, nondependent conformances
     // are keyed by the nominal type descriptor rather than the
     // metadata, so try that.
-    auto *description = type->getNominalTypeDescriptor().get();
+    const auto description = type->getNominalTypeDescriptor().get();
 
     // Hash and lookup the type-protocol pair in the cache.
     if (auto *Value = C.findCached(description, protocol)) {
@@ -420,7 +420,7 @@ bool isRelatedType(const Metadata *type, const void *candidate,
 
     // If the type is resilient or generic, see if there's a witness table
     // keyed off the nominal type descriptor.
-    auto *description = type->getNominalTypeDescriptor().get();
+    const auto description = type->getNominalTypeDescriptor().get();
     if (description == candidate && !candidateIsMetadata)
       return true;
 
