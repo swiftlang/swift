@@ -219,8 +219,8 @@ we mean a specific instance of a semantic, user-language value.
 For example, consider the following Swift code:
 
 ```
-  var x = [1,2,3]
-  var y = x
+var x = [1,2,3]
+var y = x
 ```
 
 People would often say that `x` and `y` have the same value
@@ -419,14 +419,14 @@ the callee loads a value from its argument, then calls
 a function which the optimizer cannot reason about:
 
 ```
-  extension Array {
-    mutating func organize(_ predicate: (Element) -> Bool) {
-      let first = self[0]
-      if !predicate(first) { return }
-      ...
-      // something here uses first
-    }
+extension Array {
+  mutating func organize(_ predicate: (Element) -> Bool) {
+    let first = self[0]
+    if !predicate(first) { return }
+    ...
+    // something here uses first
   }
+}
 ```
 
 Under a callee-side rule, the optimizer must copy `self[0]`
@@ -917,9 +917,9 @@ semantically necessary when working with non-copyable types.
 We propose to remove this limitation in a straightforward way:
 
 ```
-  inout root = &tree.root
+inout root = &tree.root
 
-  shared elements = self.queue
+shared elements = self.queue
 ```
 
 The initializer is required and must be a storage reference
@@ -947,9 +947,9 @@ cases to be spelled explicitly:
 - A function argument can be explicitly declared `owned`:
 
   ```
-    func append(_ values: owned [Element]) {
-      ...
-    }
+  func append(_ values: owned [Element]) {
+    ...
+  }
   ```
 
   This cannot be combined with `shared` or `inout`.
@@ -961,9 +961,9 @@ cases to be spelled explicitly:
 - A function argument can be explicitly declared `shared`.
 
   ```
-    func ==(left: shared String, right: shared String) -> Bool {
-      ...
-    }
+  func ==(left: shared String, right: shared String) -> Bool {
+    ...
+  }
   ```
 
   This cannot be combined with `owned` or `inout`.
@@ -995,9 +995,9 @@ cases to be spelled explicitly:
 - A method can be explicitly declared `consuming`.
 
   ```
-    consuming func moveElements(into collection: inout [Element]) {
-      ...
-    }
+  consuming func moveElements(into collection: inout [Element]) {
+    ...
+  }
   ```
 
   This causes `self` to be passed as an owned value and therefore
@@ -1061,9 +1061,9 @@ This can be explicitly requested by declaring the iteration
 variable `owned`:
 
 ```
-  for owned employee in company.employees {
-    newCompany.employees.append(employee)
-  }
+for owned employee in company.employees {
+  newCompany.employees.append(employee)
+}
 ```
 
 It is also used implicitly when the requirements for a
@@ -1084,9 +1084,9 @@ This can be explicitly requested by declaring the iteration
 variable `shared`:
 
 ```
-  for shared employee in company.employees {
-    if !employee.respected { throw CatastrophicHRFailure() }
-  }
+for shared employee in company.employees {
+  if !employee.respected { throw CatastrophicHRFailure() }
+}
 ```
 
 It is also used by default when the sequence type is known to
@@ -1094,9 +1094,9 @@ conform to `Collection`, since this is the optimal way of
 iterating over a collection.
 
 ```
-  for employee in company.employees {
-    if !employee.respected { throw CatastrophicHRFailure() }
-  }
+for employee in company.employees {
+  if !employee.respected { throw CatastrophicHRFailure() }
+}
 ```
 
 If the sequence operand is a storage reference expression,
@@ -1118,9 +1118,9 @@ This must be explicitly requested by declaring the
 iteration variable `inout`:
 
 ```
-  for inout employee in company.employees {
-    employee.respected = true
-  }
+for inout employee in company.employees {
+  employee.respected = true
+}
 ```
 
 The sequence operand must be a storage reference expression.
@@ -1146,13 +1146,13 @@ to follow this pattern, we would need to allow the definition
 of generator functions, e.g.:
 
 ```
-  mutating generator iterateMutable() -> inout Element {
-    var i = startIndex, e = endIndex
-    while i != e {
-      yield &self[i]
-      self.formIndex(after: &i)
-    }
+mutating generator iterateMutable() -> inout Element {
+  var i = startIndex, e = endIndex
+  while i != e {
+    yield &self[i]
+    self.formIndex(after: &i)
   }
+}
 ```
 
 On the client side, it is clear how this could be used to
@@ -1194,18 +1194,18 @@ The idea is that, instead of defining `get` and `set`,
 a storage declaration could define `read` and `modify`:
 
 ```
-  var x: String
-  var y: String
-  var first: String {
-    read {
-      if x < y { yield x }
-      else { yield y }
-    }
-    modify {
-      if x < y { yield &x }
-      else { yield &y }
-    }
+var x: String
+var y: String
+var first: String {
+  read {
+    if x < y { yield x }
+    else { yield y }
   }
+  modify {
+    if x < y { yield &x }
+    else { yield &y }
+  }
+}
 ```
 
 A storage declaration must define either a `get` or a `read`
@@ -1232,9 +1232,9 @@ For this reason, we propose the `move` function.  Conceptually,
 library:
 
 ```
-  func move<T>(_ value: T) -> T {
-    return value
-  }
+func move<T>(_ value: T) -> T {
+  return value
+}
 ```
 
 However, it is blessed with some special semantics.  It cannot
@@ -1271,9 +1271,9 @@ variables are initialized before use.
 `copy` is a top-level function in the Swift standard library:
 
 ```
-  func copy<T>(_ value: T) -> T {
-    return value
-  }
+func copy<T>(_ value: T) -> T {
+  return value
+}
 ```
 
 The argument must be a storage reference expression.  The
@@ -1295,7 +1295,7 @@ value is returned.  This is useful for several reasons:
 `endScope` is a top-level function in the Swift standard library:
 
 ```
-  func endScope<T>(_ value: T) -> () {}
+func endScope<T>(_ value: T) -> () {}
 ```
 
 The argument must be a reference to a local `let`, `var`, or
@@ -1327,7 +1327,7 @@ There is some recurring interest in the community in allowing programs
 to abstract over storage, so that you might say:
 
 ```
-  let prop = Widget.weight
+let prop = Widget.weight
 ```
 
 and then `prop` would be an abstract reference to the `weight`
@@ -1409,9 +1409,9 @@ a `moveonly` context are also implicitly `moveonly`.
 A type can be a `moveonly` context:
 
 ```
-  moveonly struct Array<Element> {
-    // Element and Array<Element> are not assumed to be copyable here
-  }
+moveonly struct Array<Element> {
+  // Element and Array<Element> are not assumed to be copyable here
+}
 ```
 
 This suppresses the `Copyable` assumption for the type
@@ -1421,18 +1421,18 @@ hierarchies of associated types.
 An extension can be a `moveonly` context:
 
 ```
-  moveonly extension Array {
-    // Element and Array<Element> are not assumed to be copyable here
-  }
+moveonly extension Array {
+  // Element and Array<Element> are not assumed to be copyable here
+}
 ```
 
 A type can declare conditional copyability using a conditional
 conformance:
 
 ```
-  moveonly extension Array: Copyable where Element: Copyable {
-    ...
-  }
+moveonly extension Array: Copyable where Element: Copyable {
+  ...
+}
 ```
 
 Conformance to `Copyable`, conditional or not, is an
@@ -1451,9 +1451,9 @@ it a non-`moveonly` extension is an error.
 A function can be a `moveonly` context:
 
 ```
-  extension Array {
-    moveonly func report<U>(_ u: U)
-  }
+extension Array {
+  moveonly func report<U>(_ u: U)
+}
 ```
 
 This suppresses the copyability assumption for any new
@@ -1484,30 +1484,30 @@ example, here is a simple file-handle type that ensures
 that the handle is closed when the value is destroyed:
 
 ```
-  moveonly struct File {
-    var descriptor: Int32
+moveonly struct File {
+  var descriptor: Int32
 
-    init(filename: String) throws {
-      descriptor = Darwin.open(filename, O_RDONLY)
+  init(filename: String) throws {
+    descriptor = Darwin.open(filename, O_RDONLY)
 
-      // Abnormally exiting 'init' at any point prevents deinit
-      // from being called.
-      if descriptor == -1 { throw ... }
-    }
-
-    deinit {
-      _ = Darwin.close(descriptor)
-    }
-
-    consuming func close() throws {
-      if Darwin.fsync(descriptor) != 0 { throw ... }
-
-      // This is a consuming function, so it has ownership of self.
-      // It doesn't consume self in any other way, so it will
-      // destroy it when it exits by calling deinit.  deinit
-      // will then handle actually closing the descriptor.
-    }
+    // Abnormally exiting 'init' at any point prevents deinit
+    // from being called.
+    if descriptor == -1 { throw ... }
   }
+
+  deinit {
+    _ = Darwin.close(descriptor)
+  }
+
+  consuming func close() throws {
+    if Darwin.fsync(descriptor) != 0 { throw ... }
+
+    // This is a consuming function, so it has ownership of self.
+    // It doesn't consume self in any other way, so it will
+    // destroy it when it exits by calling deinit.  deinit
+    // will then handle actually closing the descriptor.
+  }
+}
 ```
 
 Swift is permitted to destroy a value (and thus call `deinit`)
