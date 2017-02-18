@@ -21,8 +21,10 @@ func test_concrete_erasure(_ x: ClericalError) -> Error {
 // CHECK:       bb0([[ARG:%.*]] : $ClericalError):
 // CHECK:         [[EXISTENTIAL:%.*]] = alloc_existential_box $Error, $ClericalError
 // CHECK:         [[ADDR:%.*]] = project_existential_box $ClericalError in [[EXISTENTIAL]] : $Error
-// CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:         [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:         [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:         store [[ARG_COPY]] to [init] [[ADDR]] : $*ClericalError
+// CHECK:         end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:         destroy_value [[ARG]]
 // CHECK:         return [[EXISTENTIAL]] : $Error
 
@@ -32,7 +34,7 @@ func test_composition_erasure(_ x: HairType & Error) -> Error {
   return x
 }
 // CHECK-LABEL: sil hidden @_T018boxed_existentials24test_composition_erasures5Error_psAC_AA8HairTypepF
-// CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr [[OLD_EXISTENTIAL:%.*]] : $*Error & HairType to $*[[VALUE_TYPE:@opened\(.*\) Error & HairType]]
+// CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr immutable_access [[OLD_EXISTENTIAL:%.*]] : $*Error & HairType to $*[[VALUE_TYPE:@opened\(.*\) Error & HairType]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $Error, $[[VALUE_TYPE]]
 // CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $Error
 // CHECK:         copy_addr [[VALUE_ADDR]] to [initialization] [[ADDR]]
@@ -56,7 +58,9 @@ func test_property(_ x: Error) -> String {
   return x._domain
 }
 // CHECK-LABEL: sil hidden @_T018boxed_existentials13test_propertySSs5Error_pF
-// CHECK:         [[VALUE:%.*]] = open_existential_box %0 : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
+// CHECK: bb0([[ARG:%.*]] : $Error):
+// CHECK:         [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:         [[VALUE:%.*]] = open_existential_box [[BORROWED_ARG]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
 // FIXME: Extraneous copy here
 // CHECK-NEXT:    [[COPY:%[0-9]+]] = alloc_stack $[[VALUE_TYPE]]
 // CHECK-NEXT:    copy_addr [[VALUE]] to [initialization] [[COPY]] : $*[[VALUE_TYPE]]
@@ -64,7 +68,8 @@ func test_property(_ x: Error) -> String {
 // -- self parameter of witness is @in_guaranteed; no need to copy since
 //    value in box is immutable and box is guaranteed
 // CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[COPY]])
-// CHECK:         destroy_value %0
+// CHECK:         end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK:         destroy_value [[ARG]]
 // CHECK:         return [[RESULT]]
 
 func test_property_of_lvalue(_ x: Error) -> String {
@@ -76,7 +81,8 @@ func test_property_of_lvalue(_ x: Error) -> String {
 // CHECK:       bb0([[ARG:%.*]] : $Error):
 // CHECK:         [[VAR:%.*]] = alloc_box ${ var Error }
 // CHECK:         [[PVAR:%.*]] = project_box [[VAR]]
-// CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]] : $Error
+// CHECK:         [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:         [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]] : $Error
 // CHECK:         store [[ARG_COPY]] to [init] [[PVAR]]
 // CHECK:         [[VALUE_BOX:%.*]] = load [copy] [[PVAR]]
 // CHECK:         [[VALUE:%.*]] = open_existential_box [[VALUE_BOX]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
@@ -97,7 +103,9 @@ extension Error {
 
 // CHECK-LABEL: sil hidden @_T018boxed_existentials21test_extension_methodys5Error_pF
 func test_extension_method(_ error: Error) {
-  // CHECK: [[VALUE:%.*]] = open_existential_box %0
+  // CHECK: bb0([[ARG:%.*]] : $Error):
+  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK: [[VALUE:%.*]] = open_existential_box [[BORROWED_ARG]]
   // CHECK: [[METHOD:%.*]] = function_ref
   // CHECK-NOT: copy_addr
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
@@ -113,6 +121,8 @@ func plusOneError() -> Error { }
 
 // CHECK-LABEL: sil hidden @_T018boxed_existentials31test_open_existential_semanticsys5Error_p_sAC_ptF
 // GUARANTEED-LABEL: sil hidden @_T018boxed_existentials31test_open_existential_semanticsys5Error_p_sAC_ptF
+// CHECK: bb0([[ARG0:%.*]]: $Error,
+// GUARANTEED: bb0([[ARG0:%.*]]: $Error,
 func test_open_existential_semantics(_ guaranteed: Error,
                                      _ immediate: Error) {
   var immediate = immediate
@@ -121,19 +131,23 @@ func test_open_existential_semantics(_ guaranteed: Error,
   // GUARANTEED: [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var Error }
   // GUARANTEED: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
 
-  // CHECK-NOT: copy_value %0
-  // CHECK: [[VALUE:%.*]] = open_existential_box %0
+  // CHECK-NOT: copy_value [[ARG0]]
+  // CHECK: [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
+  // CHECK: [[VALUE:%.*]] = open_existential_box [[BORROWED_ARG0]]
   // CHECK: [[METHOD:%.*]] = function_ref
   // CHECK-NOT: copy_addr
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
-  // CHECK-NOT: destroy_value %0
+  // CHECK: end_borrow [[BORROWED_ARG0]] from [[ARG0]]
+  // CHECK-NOT: destroy_value [[ARG0]]
 
-  // GUARANTEED-NOT: copy_value %0
-  // GUARANTEED: [[VALUE:%.*]] = open_existential_box [[GUARANTEED:%0]]
+  // GUARANTEED-NOT: copy_value [[ARG0]]
+  // GUARANTEED: [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
+  // GUARANTEED: [[VALUE:%.*]] = open_existential_box [[BORROWED_ARG0]]
   // GUARANTEED: [[METHOD:%.*]] = function_ref
   // GUARANTEED: apply [[METHOD]]<{{.*}}>([[VALUE]])
+  // GUARANTEED: end_borrow [[BORROWED_ARG0]] from [[ARG0]]
   // GUARANTEED-NOT: destroy_addr [[VALUE]]
-  // GUARANTEED-NOT: destroy_value [[GUARANTEED]]
+  // GUARANTEED-NOT: destroy_value [[ARG0]]
   guaranteed.extensionMethod()
 
   // CHECK: [[IMMEDIATE:%.*]] = load [copy] [[PB]]

@@ -19,7 +19,7 @@
 // The primary purpose of this API is mapping the formal SIL parameter and
 // result conventions onto the SIL argument types. The "formal" conventions are
 // immutably associated with a SILFunctionType--a SIL function's type
-// information never changes. The SIL convenentions determine how those formal
+// information never changes. The SIL conventions determine how those formal
 // conventions will be represented in the body of SIL functions and at call
 // sites.
 //
@@ -56,8 +56,15 @@ public:
 
   static bool isReturnedIndirectlyInSIL(SILType type, SILModule &M);
 
+  static SILModuleConventions getLoweredAddressConventions() {
+    return SILModuleConventions(true);
+  }
+
 private:
   bool loweredAddresses;
+
+  SILModuleConventions(bool loweredAddresses)
+      : loweredAddresses(loweredAddresses) {}
 
 public:
   SILModuleConventions(const SILModule &M);
@@ -272,6 +279,8 @@ public:
   // callee indices match. Partial apply indices are shifted on the caller
   // side. See ApplySite::getCallArgIndexOfFirstAppliedArg().
   //===--------------------------------------------------------------------===//
+
+  unsigned getSILArgIndexOfFirstIndirectResult() const { return 0; }
 
   unsigned getSILArgIndexOfFirstParam() const {
     return getNumIndirectSILResults();

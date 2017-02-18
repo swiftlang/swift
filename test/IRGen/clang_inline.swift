@@ -12,7 +12,7 @@
 // RUN: %FileCheck %s < %t.ll
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.ll
 
-// REQUIRES: CPU=i386_or_x86_64
+// REQUIRES: CPU=i386 || CPU=x86_64
 // XFAIL: linux
 
 #if IMPORT_EMPTY
@@ -21,7 +21,7 @@ import Empty
 
 import gizmo
 
-// CHECK-LABEL: define hidden i64 @_T012clang_inline16CallStaticInlineC10ReturnZeros5Int64VyF(%C12clang_inline16CallStaticInline*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc i64 @_T012clang_inline16CallStaticInlineC10ReturnZeros5Int64VyF(%C12clang_inline16CallStaticInline* swiftself) {{.*}} {
 class CallStaticInline {
   func ReturnZero() -> Int64 { return Int64(zero()) }
 }
@@ -29,7 +29,7 @@ class CallStaticInline {
 // CHECK-LABEL: define internal i32 @zero()
 // CHECK:         [[INLINEHINT_SSP_UWTABLE:#[0-9]+]] {
 
-// CHECK-LABEL: define hidden i64 @_T012clang_inline17CallStaticInline2C10ReturnZeros5Int64VyF(%C12clang_inline17CallStaticInline2*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc i64 @_T012clang_inline17CallStaticInline2C10ReturnZeros5Int64VyF(%C12clang_inline17CallStaticInline2* swiftself) {{.*}} {
 class CallStaticInline2 {
   func ReturnZero() -> Int64 { return Int64(wrappedZero()) }
 }
@@ -37,7 +37,7 @@ class CallStaticInline2 {
 // CHECK-LABEL: define internal i32 @wrappedZero()
 // CHECK:         [[INLINEHINT_SSP_UWTABLE:#[0-9]+]] {
 
-// CHECK-LABEL: define hidden i32 @_T012clang_inline10testExterns5Int32VyF() {{.*}} {
+// CHECK-LABEL: define hidden swiftcc i32 @_T012clang_inline10testExterns5Int32VyF() {{.*}} {
 func testExtern() -> CInt {
   return wrappedGetInt()
 }
@@ -45,7 +45,7 @@ func testExtern() -> CInt {
 // CHECK-LABEL: define internal i32 @wrappedGetInt()
 // CHECK:         [[INLINEHINT_SSP_UWTABLE:#[0-9]+]] {
 
-// CHECK-LABEL: define hidden i32 @_T012clang_inline16testAlwaysInlines5Int32VyF()
+// CHECK-LABEL: define hidden swiftcc i32 @_T012clang_inline16testAlwaysInlines5Int32VyF()
 // CHECK:       [[SSP:#[0-9]+]] {
 // NEGATIVE-NOT: @alwaysInlineNumber
 // CHECK:   ret i32 17
@@ -53,21 +53,21 @@ func testAlwaysInline() -> CInt {
   return alwaysInlineNumber()
 }
 
-// CHECK-LABEL: define hidden i32 @_T012clang_inline20testInlineRedeclareds5Int32VyF() {{.*}} {
+// CHECK-LABEL: define hidden swiftcc i32 @_T012clang_inline20testInlineRedeclareds5Int32VyF() {{.*}} {
 func testInlineRedeclared() -> CInt {
   return zeroRedeclared()
 }
 
 // CHECK-LABEL: define internal i32 @zeroRedeclared() #{{[0-9]+}} {
 
-// CHECK-LABEL: define hidden i32 @_T012clang_inline27testInlineRedeclaredWrappeds5Int32VyF() {{.*}} {
+// CHECK-LABEL: define hidden swiftcc i32 @_T012clang_inline27testInlineRedeclaredWrappeds5Int32VyF() {{.*}} {
 func testInlineRedeclaredWrapped() -> CInt {
   return wrappedZeroRedeclared()
 }
 
 // CHECK-LABEL: define internal i32 @wrappedZeroRedeclared() #{{[0-9]+}} {
 
-// CHECK-LABEL: define hidden i32 @_T012clang_inline22testStaticButNotInlines5Int32VyF() {{.*}} {
+// CHECK-LABEL: define hidden swiftcc i32 @_T012clang_inline22testStaticButNotInlines5Int32VyF() {{.*}} {
 func testStaticButNotInline() -> CInt {
   return staticButNotInline()
 }

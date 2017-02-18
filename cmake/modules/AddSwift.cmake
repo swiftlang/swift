@@ -16,20 +16,12 @@ function(add_dependencies_multiple_targets)
       "" # single-value args
       "TARGETS;DEPENDS" # multi-value args
       ${ARGN})
-  if(NOT "${ADMT_UNPARSED_ARGUMENTS}" STREQUAL "")
-    message(FATAL_ERROR "unrecognized arguments: ${ADMT_UNPARSED_ARGUMENTS}")
-  endif()
+  precondition(ADMT_UNPARSED_ARGUMENTS NEGATE MESSAGE "unrecognized arguments: ${ADMT_UNPARSED_ARGUMENTS}")
 
   if(NOT "${ADMT_DEPENDS}" STREQUAL "")
     foreach(target ${ADMT_TARGETS})
       add_dependencies("${target}" ${ADMT_DEPENDS})
     endforeach()
-  endif()
-endfunction()
-
-function(_require_empty_list the_list the_message)
-  if(the_list)
-    message(FATAL_ERROR "${the_message}")
   endif()
 endfunction()
 
@@ -303,13 +295,8 @@ function(_add_variant_link_flags)
     ""
     ${ARGN})
 
-  if("${LFLAGS_SDK}" STREQUAL "")
-    message(FATAL_ERROR "Should specify an SDK")
-  endif()
-
-  if("${LFLAGS_ARCH}" STREQUAL "")
-    message(FATAL_ERROR "Should specify an architecture")
-  endif()
+  precondition(LFLAGS_SDK MESSAGE "Should specify an SDK")
+  precondition(LFLAGS_SDK MESSAGE "Should specify an architecture")
 
   set(result ${${LFLAGS_RESULT_VAR_NAME}})
   set(library_search_directories ${${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}})
@@ -328,7 +315,7 @@ function(_add_variant_link_flags)
     RESULT_VAR_NAME result)
 
   if("${LFLAGS_SDK}" STREQUAL "LINUX")
-    list(APPEND result "-lpthread" "-ldl")
+    list(APPEND result "-lpthread" "-latomic" "-ldl")
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
     list(APPEND result "-lpthread")
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
@@ -363,6 +350,16 @@ function(_add_variant_link_flags)
   endif()
   if(NOT "${SWIFT_${LFLAGS_SDK}_ICU_I18N}" STREQUAL "")
     list(APPEND library_search_directories "${SWIFT_${sdk}_ICU_I18N}")
+  endif()
+  
+  if(SWIFT_ENABLE_GOLD_LINKER AND
+     "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
+    list(APPEND result "-fuse-ld=gold")
+  endif()
+  if(SWIFT_ENABLE_LLD_LINKER OR
+     ("${LFLAGS_SDK}" STREQUAL "WINDOWS" AND
+      NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
+    list(APPEND result "-fuse-ld=lld")
   endif()
 
   set("${LFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
@@ -431,14 +428,7 @@ function(_add_swift_lipo_target)
   # Gather the source binaries.
   set(source_binaries)
   foreach(source_target ${source_targets})
-    if(SWIFT_CMAKE_HAS_GENERATOR_EXPRESSIONS)
-      list(APPEND source_binaries $<TARGET_FILE:${source_target}>)
-    else()
-      get_property(source_binary
-          TARGET ${source_target}
-          PROPERTY LOCATION)
-      list(APPEND source_binaries "${source_binary}")
-    endif()
+    list(APPEND source_binaries $<TARGET_FILE:${source_target}>)
   endforeach()
 
   is_darwin_based_sdk("${LIPO_SDK}" IS_DARWIN)
@@ -588,17 +578,9 @@ function(_add_swift_library_single target name)
   translate_flags(SWIFTLIB_SINGLE "${SWIFTLIB_SINGLE_options}")
 
   # Check arguments.
-  if ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "")
-    message(FATAL_ERROR "Should specify an SDK")
-  endif()
-
-  if ("${SWIFTLIB_SINGLE_ARCHITECTURE}" STREQUAL "")
-    message(FATAL_ERROR "Should specify an architecture")
-  endif()
-
-  if("${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}" STREQUAL "")
-    message(FATAL_ERROR "INSTALL_IN_COMPONENT is required")
-  endif()
+  precondition(SWIFTLIB_SINGLE_SDK MESSAGE "Should specify an SDK")
+  precondition(SWIFTLIB_SINGLE_ARCHITECTURE MESSAGE "Should specify an architecture")
+  precondition(SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
 
   if(NOT SWIFTLIB_SINGLE_SHARED AND
      NOT SWIFTLIB_SINGLE_STATIC AND
@@ -976,7 +958,7 @@ function(_add_swift_library_single target name)
   if("${libkind}" STREQUAL "SHARED")
     target_link_libraries("${target}" PRIVATE ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
   elseif("${libkind}" STREQUAL "OBJECT")
-    _require_empty_list(
+    precondition_list_empty(
         "${SWIFTLIB_SINGLE_LINK_LIBRARIES}"
         "OBJECT_LIBRARY may not link to anything")
   else()
@@ -1072,16 +1054,6 @@ function(_add_swift_library_single target name)
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
       )
 
-  if(SWIFT_ENABLE_GOLD_LINKER AND
-     "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-    list(APPEND link_flags "-fuse-ld=gold")
-  endif()
-  if(SWIFT_ENABLE_LLD_LINKER OR
-     ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS" AND
-      NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
-    list(APPEND link_flags "-fuse-ld=lld")
-  endif()
-
   # Configure plist creation for OS X.
   set(PLIST_INFO_PLIST "Info.plist" CACHE STRING "Plist name")
   if("${SWIFTLIB_SINGLE_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS AND SWIFTLIB_SINGLE_IS_STDLIB)
@@ -1153,7 +1125,7 @@ function(_add_swift_library_single target name)
   endif()
 
   if("${libkind}" STREQUAL "OBJECT")
-    _require_empty_list(
+    precondition_list_empty(
         "${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES}"
         "OBJECT_LIBRARY may not link to anything")
   else()
@@ -1161,7 +1133,7 @@ function(_add_swift_library_single target name)
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
   endif()
   if("${libkind}" STREQUAL "OBJECT")
-    _require_empty_list(
+    precondition_list_empty(
         "${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES}"
         "OBJECT_LIBRARY may not link to anything")
   else()
@@ -1400,10 +1372,7 @@ function(add_swift_library name)
   endif()
 
   translate_flags(SWIFTLIB "${SWIFTLIB_options}")
-
-  if("${SWIFTLIB_INSTALL_IN_COMPONENT}" STREQUAL "")
-    message(FATAL_ERROR "INSTALL_IN_COMPONENT is required")
-  endif()
+  precondition(SWIFTLIB_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
 
   if(NOT SWIFTLIB_SHARED AND
      NOT SWIFTLIB_STATIC AND
@@ -1636,10 +1605,7 @@ function(add_swift_library name)
 
         # Determine the subdirectory where this library will be installed.
         set(resource_dir_sdk_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
-
-        if("${resource_dir_sdk_subdir}" STREQUAL "")
-          message(FATAL_ERROR "internal error: the variable should be non-empty")
-        endif()
+        precondition(resource_dir_sdk_subdir)
 
         if(SWIFTLIB_TARGET_LIBRARY)
           if(SWIFTLIB_SHARED)
@@ -1762,6 +1728,19 @@ function(add_swift_library name)
       DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
       DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
       )
+
+      swift_install_in_component(dev
+          TARGETS ${name}
+          ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+          LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+          RUNTIME DESTINATION bin)
+      swift_is_installing_component(dev is_installing)
+      
+      if(NOT is_installing)
+        set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
+      else()
+        set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
+      endif()
   endif()
 endfunction()
 
@@ -1796,13 +1775,8 @@ function(_add_swift_executable_single name)
       SWIFTEXE_SINGLE_EXCLUDE_FROM_ALL_FLAG)
 
   # Check arguments.
-  if (NOT SWIFTEXE_SINGLE_SDK)
-    message(FATAL_ERROR "Should specify an SDK")
-  endif()
-
-  if (NOT SWIFTEXE_SINGLE_ARCHITECTURE)
-    message(FATAL_ERROR "Should specify an architecture")
-  endif()
+  precondition(SWIFTEXE_SINGLE_SDK MESSAGE "Should specify an SDK")
+  precondition(SWIFTEXE_SINGLE_ARCHITECTURE MESSAGE "Should specify an architecture")
 
   # Determine compiler flags.
   set(c_compile_flags)
@@ -1841,16 +1815,6 @@ function(_add_swift_executable_single name)
     list(APPEND link_flags
         "-Xlinker" "-rpath"
         "-Xlinker" "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
-  endif()
-
-  if(SWIFT_ENABLE_GOLD_LINKER AND
-     "${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-    list(APPEND link_flags "-fuse-ld=gold")
-  endif()
-  if(SWIFT_ENABLE_LLD_LINKER OR
-     ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS" AND
-      NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
-    list(APPEND link_flags "-fuse-ld=lld")
   endif()
 
   # Find the names of dependency library targets.
@@ -2091,5 +2055,14 @@ function(add_swift_host_tool executable)
     swift_install_in_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
       TARGETS ${executable}
       RUNTIME DESTINATION bin)
+
+     swift_is_installing_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
+      is_installing)
+  
+    if(NOT is_installing)
+      set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${executable})
+    else()
+      set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${executable})
+    endif()
   endif()
 endfunction()

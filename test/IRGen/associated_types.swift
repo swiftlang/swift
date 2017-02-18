@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s | %FileCheck %s
 
-// REQUIRES: CPU=i386_or_x86_64
+// REQUIRES: CPU=i386 || CPU=x86_64
 
 protocol Runcer {
   associatedtype Runcee
@@ -23,14 +23,14 @@ struct Spoon : Runcible {
 }
 
 struct Owl<T : Runcible, U> {
-  // CHECK: define hidden void @_T016associated_types3OwlV3eat{{[_0-9a-zA-Z]*}}F(%swift.opaque*
+  // CHECK: define hidden swiftcc void @_T016associated_types3OwlV3eat{{[_0-9a-zA-Z]*}}F(%swift.opaque*
   func eat(_ what: T.RuncerType.Runcee, and: T.RuncerType, with: T) { }
 }
 
 class Pussycat<T : Runcible, U> {
   init() {} 
 
-  // CHECK: define hidden void @_T016associated_types8PussycatC3eat{{[_0-9a-zA-Z]*}}F(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %C16associated_types8Pussycat*)
+  // CHECK: define hidden swiftcc void @_T016associated_types8PussycatC3eat{{[_0-9a-zA-Z]*}}F(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %C16associated_types8Pussycat* swiftself)
   func eat(_ what: T.RuncerType.Runcee, and: T.RuncerType, with: T) { }
 }
 
@@ -69,7 +69,8 @@ protocol FastRuncible {
 func testFastRuncible<T: Runcible, U: FastRuncible where T.RuncerType == U.RuncerType>(_ t: T, u: U) {
   U.RuncerType.Runcee.accelerate()
 }
-// CHECK: define hidden void @_T016associated_types16testFastRuncibleyx_q_1utAA0E0RzAA0dE0R_10RuncerTypeQy_AFRtzr0_lF(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U, i8** %T.Runcible, i8** %U.FastRuncible) #0 {
+
+// CHECK: define hidden swiftcc void @_T016associated_types16testFastRuncibleyx_q_1utAA0E0RzAA0dE0R_10RuncerTypeQy_AFRtzr0_lF(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U, i8** %T.Runcible, i8** %U.FastRuncible) #0 {
 //   1. Get the type metadata for U.RuncerType.Runcee.
 //     1a. Get the type metadata for U.RuncerType.
 //         Note that we actually look things up in T, which is going to prove unfortunate.
@@ -94,5 +95,5 @@ func testFastRuncible<T: Runcible, U: FastRuncible where T.RuncerType == U.Runce
 //   3. Perform the actual call.
 // CHECK-NEXT: [[T0:%.*]] = load i8*, i8** %T.RuncerType.Runcee.Speedy,
 // CHECK-NEXT: [[T1:%.*]] = bitcast i8* [[T0]] to void (%swift.type*, %swift.type*, i8**)*
-// CHECK-NEXT: call void [[T1]](%swift.type* %T.RuncerType.Runcee, %swift.type* %T.RuncerType.Runcee, i8** %T.RuncerType.Runcee.Speedy)
+// CHECK-NEXT: call swiftcc void [[T1]](%swift.type* swiftself %T.RuncerType.Runcee, %swift.type* %T.RuncerType.Runcee, i8** %T.RuncerType.Runcee.Speedy)
 

@@ -40,7 +40,7 @@ function(get_test_dependencies SDK result_var_name)
   endif()
 
   set(deps_binaries
-      swift swift-ide-test sil-opt swift-llvm-opt swift-demangle
+      swift swift-ide-test swift-syntax-test sil-opt swift-llvm-opt swift-demangle
       sil-func-extractor sil-llvm-gen sil-nm sil-passpipeline-dumper
       lldb-moduleimport-test swift-reflection-dump swift-remoteast-test
       swift-api-digester)
@@ -301,7 +301,7 @@ foreach(SDK ${SWIFT_SDKS})
               ${directories}
             DEPENDS ${dependencies}
             COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE}"
-            ${cmake_3_2_USES_TERMINAL})
+            USES_TERMINAL)
       endforeach()
     endforeach()
   endforeach()

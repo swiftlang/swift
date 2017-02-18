@@ -7,7 +7,7 @@ import CoreGraphics
 
 // CHECK: [[SWITCHTABLE:@.*]] = private unnamed_addr constant [8 x i64] [i64 0, i64 12, i64 23, i64 34, i64 45, i64 55, i64 67, i64 71]
 
-// CHECK-LABEL: define i64 {{.*}}testEnums{{.*}} {
+// CHECK-LABEL: define swiftcc i64 {{.*}}testEnums{{.*}} {
 public func testEnums(_ model: CGColorSpaceModel) -> Int {
   switch model {
      case .unknown : return 0
@@ -26,7 +26,7 @@ public func testEnums(_ model: CGColorSpaceModel) -> Int {
 // CHECK:   ret i64 [[LOAD]]
 }
 
-// CHECK-LABEL: define void {{.*}}rotationAround{{.*}} {
+// CHECK-LABEL: define swiftcc void {{.*}}rotationAround{{.*}} {
 // Get a transform that will rotate around a given offset
 public func rotationAround(offset: CGPoint, angle: CGFloat,
         transform: CGAffineTransform = .identity) -> CGAffineTransform {
@@ -42,7 +42,7 @@ public func rotationAround(offset: CGPoint, angle: CGFloat,
 // CHECK:   ret void
 }
 
-// CHECK-LABEL: define void {{.*}}trace{{.*}} {
+// CHECK-LABEL: define swiftcc void {{.*}}trace{{.*}} {
 public func trace(in context: CGContext, path: CGPath) {
   let red = CGColor(red: 1, green: 0, blue: 0, alpha: 1)
   context.saveGState()
@@ -60,7 +60,7 @@ public func trace(in context: CGContext, path: CGPath) {
 // CHECK:   ret void
 }
 
-// CHECK-LABEL: define void {{.*}}pdfOperations{{.*}} {
+// CHECK-LABEL: define swiftcc void {{.*}}pdfOperations{{.*}} {
 public func pdfOperations(_ context: CGContext) {
 	context.beginPDFPage(nil)
 	context.endPDFPage()
@@ -74,7 +74,7 @@ public func pdfOperations(_ context: CGContext) {
 
 // Test some more recently renamed APIs
 
-// CHECK-LABEL: define void {{.*}}testColorRenames{{.*}} {
+// CHECK-LABEL: define swiftcc void {{.*}}testColorRenames{{.*}} {
 public func testColorRenames(color: CGColor,
                              intent: CGColorRenderingIntent) {
   let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
@@ -87,7 +87,7 @@ public func testColorRenames(color: CGColor,
 // CHECK:   ret void
 }
 
-// CHECK-LABEL: define void {{.*}}testRenames{{.*}} {
+// CHECK-LABEL: define swiftcc void {{.*}}testRenames{{.*}} {
 public func testRenames(transform: CGAffineTransform, context: CGContext,
                         point: CGPoint, size: CGSize, rect: CGRect,
                         image: CGImage,

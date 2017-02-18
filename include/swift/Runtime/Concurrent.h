@@ -189,8 +189,9 @@ protected:
     // Destroy the node's payload.
     node->~Node();
 
-    // Deallocate the node.
-    this->Deallocate(node, allocSize);
+    // Deallocate the node.  The static_cast here is required
+    // because LLVM's allocator API is insane.
+    this->Deallocate(static_cast<void*>(node), allocSize);
   }
 };
 
@@ -232,7 +233,7 @@ private:
 /// The entry type must provide the following operations:
 ///
 ///   /// For debugging purposes only. Summarize this key as an integer value.
-///   long getKeyIntValueForDump() const;
+///   intptr_t getKeyIntValueForDump() const;
 ///
 ///   /// A ternary comparison.  KeyTy is the type of the key provided
 ///   /// to find or getOrInsert.

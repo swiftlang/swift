@@ -20,8 +20,8 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LinkLibrary.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Dwarf.h"
@@ -465,7 +465,10 @@ TypeID Serializer::addTypeRef(Type ty) {
   if (!ty)
     return 0;
 
+#ifndef NDEBUG
+  PrettyStackTraceType trace(M->getASTContext(), "serializing", ty);
   assert(!ty->hasError() && "Serializing error type");
+#endif
 
   auto &id = DeclAndTypeIDs[ty];
   if (id.first != 0)
@@ -844,10 +847,11 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
     // Put the framework search paths first so that they'll be preferred upon
     // deserialization.
-    for (auto &path : searchPathOpts.FrameworkSearchPaths)
-      SearchPath.emit(ScratchRecord, /*framework=*/true, path);
+    for (auto &framepath : searchPathOpts.FrameworkSearchPaths)
+      SearchPath.emit(ScratchRecord, /*framework=*/true, framepath.IsSystem,
+                      framepath.Path);
     for (auto &path : searchPathOpts.ImportSearchPaths)
-      SearchPath.emit(ScratchRecord, /*framework=*/false, path);
+      SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false, path);
   }
 
   // FIXME: Having to deal with private imports as a superset of public imports
@@ -1198,8 +1202,8 @@ void Serializer::writeSILLayout(SILLayout *layout) {
   using namespace decls_block;
   auto foundLayoutID = SILLayouts.find(layout);
   assert(foundLayoutID != SILLayouts.end() && "layout not referenced properly");
-  auto layoutID = foundLayoutID->second;
-  assert(layoutID - 1 == SILLayoutOffsets.size());
+  assert(foundLayoutID->second - 1 == SILLayoutOffsets.size());
+  (void) foundLayoutID;
   SILLayoutOffsets.push_back(Out.GetCurrentBitNo());
   
   SmallVector<unsigned, 16> data;

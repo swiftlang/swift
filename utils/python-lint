@@ -1,16 +1,38 @@
-#!/bin/bash
+#!/usr/bin/env python
+# python-lint.py - Runs flake8 linting over the repository ------*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
 
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+from __future__ import print_function
 
-python -c 'import flake8; import flake8_import_order' 2>/dev/null
-if [[ $? != 0 ]]; then
-  echo "Missing modules flake8 or flake8-import-order. Please be sure to install these python packages before linting."
-  exit 1
-fi
+import os
+import subprocess
+import sys
 
-cd "$SCRIPT_DIR/.."
-if [[ $? != 0 ]]; then
-  echo "Could not change directory to '$SCRIPT_DIR/..'."
-  exit 1
-fi
-flake8 $@
+
+def main():
+    flake8_result = subprocess.call(
+      [sys.executable, "-c", "import flake8; import flake8_import_order"]
+    )
+    if flake8_result != 0:
+        print("Missing modules flake8 or flake8-import-order. Please be sure "
+              "to install these python packages before linting.")
+
+    utils_directory = os.path.dirname(os.path.abspath(__file__))
+    parent_directory = os.path.dirname(utils_directory)
+    subprocess.call(
+      [sys.executable, "-m", "flake8"] + sys.argv[1:],
+      cwd=parent_directory,
+      universal_newlines=True
+    )
+
+
+if __name__ == '__main__':
+    main()

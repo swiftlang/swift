@@ -2701,25 +2701,28 @@ struct _ObjectiveCBridgeableWitnessTable {
                      const _ObjectiveCBridgeableWitnessTable *witnessTable);
 
   // func _bridgeToObjectiveC() -> _ObjectiveCType
+  SWIFT_CC(swift)
   HeapObject *(*bridgeToObjectiveC)(
-                OpaqueValue *self, const Metadata *Self,
+                SWIFT_CONTEXT OpaqueValue *self, const Metadata *Self,
                 const _ObjectiveCBridgeableWitnessTable *witnessTable);
 
   // class func _forceBridgeFromObjectiveC(x: _ObjectiveCType,
   //                                       inout result: Self?)
+  SWIFT_CC(swift)
   void (*forceBridgeFromObjectiveC)(
          HeapObject *sourceValue,
          OpaqueValue *result,
-         const Metadata *self,
+         SWIFT_CONTEXT const Metadata *self,
          const Metadata *selfType,
          const _ObjectiveCBridgeableWitnessTable *witnessTable);
 
   // class func _conditionallyBridgeFromObjectiveC(x: _ObjectiveCType,
   //                                              inout result: Self?) -> Bool
+  SWIFT_CC(swift)
   bool (*conditionallyBridgeFromObjectiveC)(
          HeapObject *sourceValue,
          OpaqueValue *result,
-         const Metadata *self,
+         SWIFT_CONTEXT const Metadata *self,
          const Metadata *selfType,
          const _ObjectiveCBridgeableWitnessTable *witnessTable);
 };
@@ -3221,6 +3224,7 @@ bool _swift_isClassOrObjCExistentialType(const Metadata *value,
   return swift_isClassOrObjCExistentialTypeImpl(T);
 }
 
+SWIFT_CC(swift)
 const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
   if (const ClassMetadata *classType = theClass->getClassObject())
     if (classHasSuperclass(classType))

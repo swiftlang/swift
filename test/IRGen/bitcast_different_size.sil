@@ -1,12 +1,12 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s -verify | %FileCheck %s
 
-// REQUIRES: CPU=i386_or_x86_64
+// REQUIRES: CPU=i386 || CPU=x86_64
 
 sil_stage canonical
 
 import Swift
 
-// CHECK-LABEL: define{{( protected)?}} i64 @bitcast_different_size1
+// CHECK-LABEL: define{{( protected)?}} swiftcc i64 @bitcast_different_size1
 
 sil @bitcast_different_size1 : $@convention(thin) (Int32) -> Int64 {
 entry(%i : $Int32):

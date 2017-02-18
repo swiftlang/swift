@@ -326,7 +326,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// the enum type.
     unsigned Recursiveness : 2;
 
-    /// \brief Whther or not this element has an associated value.
+    /// \brief Whether or not this element has an associated value.
     unsigned HasArgumentType : 1;
   };
   enum { NumEnumElementDeclBits = NumValueDeclBits + 3 };
@@ -511,8 +511,11 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// it is implicit. This bit is used during parsing and type-checking to
     /// control inserting the implicit destructor.
     unsigned HasDestructorDecl : 1;
+
+    /// Whether the class has @objc ancestry.
+    unsigned ObjCClassKind : 3;
   };
-  enum { NumClassDeclBits = NumNominalTypeDeclBits + 8 };
+  enum { NumClassDeclBits = NumNominalTypeDeclBits + 11 };
   static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
 
   class StructDeclBitfields {
@@ -2426,16 +2429,27 @@ public:
 /// TypeAliasDecl's always have 'MetatypeType' type.
 ///
 class TypeAliasDecl : public GenericTypeDecl {
-  SourceLoc TypeAliasLoc;           // The location of the 'typealias' keyword
+  /// The location of the 'typealias' keyword
+  SourceLoc TypeAliasLoc;
+
+  /// The location of the equal '=' token
+  SourceLoc EqualLoc;
+
+  /// The location of the right-hand side of the typealias binding
   TypeLoc UnderlyingTy;
 
 public:
-  TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
+  TypeAliasDecl(SourceLoc TypeAliasLoc, SourceLoc EqualLoc, Identifier Name,
                 SourceLoc NameLoc, GenericParamList *GenericParams,
                 DeclContext *DC);
 
   SourceLoc getStartLoc() const { return TypeAliasLoc; }
   SourceRange getSourceRange() const;
+
+  /// Returns the location of the equal '=' token
+  SourceLoc getEqualLoc() const {
+    return EqualLoc;
+  }
 
   TypeLoc &getUnderlyingTypeLoc() {
     return UnderlyingTy;
@@ -2851,8 +2865,8 @@ public:
   ///
   /// \param ignoreNewExtensions Whether to avoid loading any new extension.
   /// Used by the module loader to break recursion.
-  ArrayRef<ValueDecl *> lookupDirect(DeclName name,
-                                     bool ignoreNewExtensions = false);
+  TinyPtrVector<ValueDecl *> lookupDirect(DeclName name,
+                                          bool ignoreNewExtensions = false);
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
@@ -4116,11 +4130,13 @@ public:
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its getter selector.
-  ObjCSelector getObjCGetterSelector(LazyResolver *resolver = nullptr) const;
+  ObjCSelector getObjCGetterSelector(LazyResolver *resolver = nullptr,
+                                Identifier preferredName = Identifier()) const;
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its setter selector.
-  ObjCSelector getObjCSetterSelector(LazyResolver *resolver = nullptr) const;
+  ObjCSelector getObjCSetterSelector(LazyResolver *resolver = nullptr,
+                                Identifier preferredName = Identifier()) const;
 
   AbstractStorageDecl *getOverriddenDecl() const {
     return OverriddenDecl;
@@ -4844,7 +4860,8 @@ public:
   const CaptureInfo &getCaptureInfo() const { return Captures; }
 
   /// Retrieve the Objective-C selector that names this method.
-  ObjCSelector getObjCSelector(LazyResolver *resolver = nullptr) const;
+  ObjCSelector getObjCSelector(LazyResolver *resolver = nullptr,
+                               DeclName preferredName = DeclName()) const;
 
   /// Determine whether the given method would produce an Objective-C
   /// instance method.

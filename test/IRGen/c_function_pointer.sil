@@ -8,7 +8,7 @@ entry(%f : $@convention(c) () -> ()):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @call_with_native_c_function_pointer(i8*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @call_with_native_c_function_pointer(i8*)
 sil @call_with_native_c_function_pointer : $@convention(thin) (@convention(c) () -> ()) -> () {
 entry(%f : $@convention(c) () -> ()):
   %c = function_ref @c_native_function_pointer : $@convention(c) (@convention(c) () -> ()) -> ()
@@ -16,7 +16,7 @@ entry(%f : $@convention(c) () -> ()):
   return %z : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @c_function_pointer_metadata()
+// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @c_function_pointer_metadata()
 sil @c_function_pointer_metadata : $@convention(thin) () -> @thick Any.Type {
 entry:
   // CHECK: call %swift.type* @_TMacT_T_()

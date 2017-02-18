@@ -20,6 +20,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/Version.h"
+#include "swift/Syntax/TokenSyntax.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
@@ -62,7 +63,7 @@ namespace swift {
   class Token;
   class TopLevelContext;
   struct TypeLoc;
-  
+
   /// SILParserState - This is a context object used to optionally maintain SIL
   /// parsing context for the parser.
   class SILParserState {
@@ -129,6 +130,16 @@ namespace swift {
                               bool KeepComments = true,
                               bool TokenizeInterpolatedString = true,
                               ArrayRef<Token> SplitTokens = ArrayRef<Token>());
+
+  /// \brief Lex and return a vector of `RC<TokenSyntax>` tokens, which include
+  /// leading and trailing trivia.
+  std::vector<std::pair<syntax::RC<syntax::TokenSyntax>,
+                                   syntax::AbsolutePosition>>
+  tokenizeWithTrivia(const LangOptions &LangOpts,
+                     const SourceManager &SM,
+                     unsigned BufferID,
+                     unsigned Offset = 0,
+                     unsigned EndOffset = 0);
 
   /// Once parsing is complete, this walks the AST to resolve imports, record
   /// operators, and do other top-level validation.

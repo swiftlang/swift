@@ -1477,6 +1477,10 @@ public:
     *this << DMI->getType();
   }
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *OI) {
+    if (OI->getAccessKind() == OpenedExistentialAccess::Immutable)
+      *this << "immutable_access ";
+    else
+      *this << "mutable_access ";
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
   void visitOpenExistentialRefInst(OpenExistentialRefInst *OI) {
@@ -2135,6 +2139,9 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
     break;
   case SILStage::Canonical:
     OS << "canonical";
+    break;
+  case SILStage::Lowered:
+    OS << "lowered";
     break;
   }
   

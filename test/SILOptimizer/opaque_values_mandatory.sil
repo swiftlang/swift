@@ -1,21 +1,36 @@
-// RUN: %target-sil-opt -diagnostics -enable-sil-opaque-values -emit-sorted-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -diagnostics -enable-sil-opaque-values -emit-sorted-sil -new-mangling-for-tests %s | %FileCheck %s
 
 import Builtin
 
 sil_stage raw
 
+typealias Int = Builtin.Int64
+
+// Test trivial, guaranteed copyforwarding.
+// ----
+// CHECK-LABEL: sil hidden @f010_diagnose_identity : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK: bb0(%0 : $T):
+// CHECK: return %0 : $T
+// CHECK-LABEL: } // end sil function 'f010_diagnose_identity'
+sil hidden @f010_diagnose_identity : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $T):
+  %c = copy_value %0 : $T
+  destroy_value %0 : $T
+  return %c : $T
+}
+
 // Test lowerAssignment, createLoad, checkLoadInst, checkStoreInst.
 // ---
-// CHECK-LABEL: sil hidden @assign_inout : $@convention(thin) <T> (@inout T, @in T) -> () {
+// CHECK-LABEL: sil hidden @f020_assign_inout : $@convention(thin) <T> (@inout T, @in T) -> () {
 // CHECK: bb0(%0 : $*T, %1 : $T):
 // CHECK: %[[CPY:.*]] = copy_value %1 : $T
 // CHECK: %[[LD:.*]] = load %0 : $*T
-// CHECK: store %1 to %0 : $*T
+// CHECK: store %2 to %0 : $*T
 // CHECK: destroy_value %[[LD]] : $T
 // CHECK: destroy_value %1 : $T
 // CHECK: return %{{.*}} : $()
-// CHECK-LABEL: } // end sil function 'assign_inout'
-sil hidden @assign_inout : $@convention(thin) <T> (@inout T, @in T) -> () {
+// CHECK-LABEL: } // end sil function 'f020_assign_inout'
+sil hidden @f020_assign_inout : $@convention(thin) <T> (@inout T, @in T) -> () {
 bb0(%0 : $*T, %1 : $T):
   %2 = copy_value %1 : $T
   assign %2 to %0 : $*T
@@ -24,15 +39,44 @@ bb0(%0 : $*T, %1 : $T):
   return %5 : $()
 }
 
-// Test trivial, guaranteed copyforwarding.
-// ----
-// CHECK-LABEL: sil hidden @diagnose_identity : $@convention(thin) <T> (@in T) -> @out T {
+// Test returning an opaque tuple of tuples as a concrete tuple.
+// ---
+// CHECK-LABEL: sil @f030_callMultiResult : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) {
+// CHECK: bb0(%0 : $Builtin.Int64):
+// CHECK:   %1 = function_ref @f040_multiResult : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @out τ_0_0, @out τ_0_0)
+// CHECK:   %2 = apply %1<Builtin.Int64>(%0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @out τ_0_0, @out τ_0_0)
+// CHECK:   %3 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64), 0
+// CHECK:   %4 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64), 1
+// CHECK:   %5 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64), 2
+// CHECK:   %6 = tuple (%3 : $Builtin.Int64, %4 : $Builtin.Int64, %5 : $Builtin.Int64)
+// CHECK:   return %6 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
+// CHECK-LABEL: } // end sil function 'f030_callMultiResult'
+sil @f030_callMultiResult : $@convention(thin) (Int) -> (Int, Int, Int) {
+bb0(%0 : $Int):
+  %1 = function_ref @f040_multiResult : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @out τ_0_0, @out τ_0_0)
+  %2 = apply %1<Int>(%0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @out τ_0_0, @out τ_0_0)
+  %3 = tuple_extract %2 : $(Int, Int, Int), 0
+  %4 = tuple_extract %2 : $(Int, Int, Int), 1
+  %5 = tuple_extract %2 : $(Int, Int, Int), 2
+  %6 = tuple (%3 : $Int, %4 : $Int, %5 : $Int)
+  return %6 : $(Int, Int, Int)
+}
+
+// Test returning an opaque tuple of tuples.
+// ---
+// CHECK-LABEL: sil hidden [noinline] @f040_multiResult : $@convention(thin) <T> (@in T) -> (@out T, @out T, @out T) {
 // CHECK: bb0(%0 : $T):
-// CHECK: return %0 : $T
-// CHECK-LABEL: } // end sil function 'diagnose_identity'
-sil hidden @diagnose_identity : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK:   %1 = copy_value %0 : $T
+// CHECK:   %2 = copy_value %0 : $T
+// CHECK:   %3 = tuple (%1 : $T, %2 : $T, %0 : $T)
+// CHECK:   return %3 : $(T, T, T)
+// CHECK-LABEL: } // end sil function 'f040_multiResult'
+sil hidden [noinline] @f040_multiResult : $@convention(thin) <T> (@in T) -> (@out T, @out T, @out T) {
 bb0(%0 : $T):
-  %c = copy_value %0 : $T
+  %2 = copy_value %0 : $T
+  %3 = copy_value %0 : $T
+  %4 = copy_value %0 : $T
   destroy_value %0 : $T
-  return %c : $T
+  %6 = tuple (%2 : $T, %3 : $T, %4 : $T)
+  return %6 : $(T, T, T)
 }

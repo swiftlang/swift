@@ -63,7 +63,8 @@ public:
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     gen.B.emitDestroyValueOperation(l, box);
   }
-  void dump() const override {
+
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "DeallocateValueBuffer\n"
                  << "State: " << getState() << "box: " << box << "\n";
@@ -168,7 +169,7 @@ public:
       elements.push_back(elt);
     }
 
-    if (tl.isLoadable()) {
+    if (tl.isLoadable() || !gen.silConv.useLoweredAddresses()) {
       SmallVector<SILValue, 4> elementValues;
       if (canBeGuaranteed) {
         // If all of the elements were guaranteed, we can form a guaranteed tuple.

@@ -2496,7 +2496,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto alias = createDecl<TypeAliasDecl>(SourceLoc(), getIdentifier(nameID),
+    auto alias = createDecl<TypeAliasDecl>(SourceLoc(), SourceLoc(),
+                                           getIdentifier(nameID),
                                            SourceLoc(), genericParams, DC);
     declOrOffset = alias;
 
@@ -2576,6 +2577,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     declOrOffset = assocType;
 
     assocType->computeType();
+
+    assert(!assocType->getDeclaredInterfaceType()->hasError() &&
+           "erroneous associated type");
+
     Accessibility parentAccess = cast<ProtocolDecl>(DC)->getFormalAccess();
     assocType->setAccessibility(std::max(parentAccess,Accessibility::Internal));
     if (isImplicit)
@@ -3031,8 +3036,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                           getIdentifier(nameID), None);
     declOrOffset = proto;
 
-    configureGenericEnvironment(proto, genericEnvID);
-
     proto->setRequiresClass(isClassBounded);
     
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
@@ -3041,6 +3044,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       error();
       return nullptr;
     }
+
+    auto genericParams = maybeReadGenericParams(DC);
+    assert(genericParams && "protocol with no generic parameters?");
+    proto->setGenericParams(genericParams);
 
     auto protocols = ctx.Allocate<ProtocolDecl *>(numProtocols);
     for_each(protocols, rawProtocolAndInheritedIDs.slice(0, numProtocols),
@@ -3051,9 +3058,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     handleInherited(proto, rawProtocolAndInheritedIDs.slice(numProtocols));
 
-    auto genericParams = maybeReadGenericParams(DC);
-    assert(genericParams && "protocol with no generic parameters?");
-    proto->setGenericParams(genericParams);
+    configureGenericEnvironment(proto, genericEnvID);
 
     SmallVector<Requirement, 4> requirements;
     readGenericRequirements(requirements, DeclTypeCursor);
@@ -4253,7 +4258,7 @@ Type ModuleFile::getType(TypeID TID) {
   }
 
 #ifndef NDEBUG
-  PrettyStackTraceType(ctx, "deserializing", typeOrOffset.get());
+  PrettyStackTraceType trace(ctx, "deserializing", typeOrOffset.get());
   assert(!typeOrOffset.get()->hasError());
 #endif
 
@@ -4347,7 +4352,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   while (inheritedCount--)
     (void)readConformance(DeclTypeCursor);
 
-  ASTContext &ctx = getContext();
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
 
   while (valueCount--) {
@@ -4355,7 +4359,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto witness = cast_or_null<ValueDecl>(getDecl(*rawIDIter++));
     assert(witness ||
            req->getAttrs().hasAttribute<OptionalAttr>() ||
-           req->getAttrs().isUnavailable(ctx));
+           req->getAttrs().isUnavailable(getContext()));
     if (!witness) {
       conformance->setWitness(req, Witness());
       continue;

@@ -95,13 +95,15 @@ func physical_struct_lvalue(_ c: Int) {
   // CHECK: assign %0 to [[X_1]]
 }
 
-// CHECK-LABEL: sil hidden  @_T010properties21physical_class_lvalue{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden  @_T010properties21physical_class_lvalue{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Ref, Int) -> ()
+// CHECK: bb0([[ARG0:%.*]] : $Ref,
  func physical_class_lvalue(_ r: Ref, a: Int) {
     r.y = a
-
-   // CHECK: [[FN:%[0-9]+]] = class_method %0 : $Ref, #Ref.y!setter.1
-   // CHECK: apply [[FN]](%1, %0) : $@convention(method) (Int, @guaranteed Ref) -> ()
-   // CHECK: destroy_value %0 : $Ref
+   // CHECK: [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
+   // CHECK: [[FN:%[0-9]+]] = class_method [[BORROWED_ARG0]] : $Ref, #Ref.y!setter.1
+   // CHECK: apply [[FN]](%1, [[BORROWED_ARG0]]) : $@convention(method) (Int, @guaranteed Ref) -> ()
+   // CHECK: end_borrow [[BORROWED_ARG0]] from [[ARG0]]
+   // CHECK: destroy_value [[ARG0]] : $Ref
   }
 
 
@@ -109,15 +111,19 @@ func physical_struct_lvalue(_ c: Int) {
 func physical_subclass_lvalue(_ r: RefSubclass, a: Int) {
   // CHECK: bb0([[ARG1:%.*]] : $RefSubclass, [[ARG2:%.*]] : $Int):
   r.y = a
-  // CHECK: [[ARG1_COPY:%.*]] = copy_value [[ARG1]] : $RefSubclass
+  // CHECK: [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
+  // CHECK: [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]] : $RefSubclass
   // CHECK: [[R_SUP:%[0-9]+]] = upcast [[ARG1_COPY]] : $RefSubclass to $Ref
   // CHECK: [[FN:%[0-9]+]] = class_method [[R_SUP]] : $Ref, #Ref.y!setter.1 : (Ref) -> (Int) -> (), $@convention(method) (Int, @guaranteed Ref) -> ()
   // CHECK: apply [[FN]]([[ARG2]], [[R_SUP]]) :
   // CHECK: destroy_value [[R_SUP]]
+  // CHECK: end_borrow [[BORROWED_ARG1]] from [[ARG1]]
   r.w = a
 
-  // CHECK: [[FN:%[0-9]+]] = class_method [[ARG1]] : $RefSubclass, #RefSubclass.w!setter.1
-  // CHECK: apply [[FN]](%1, [[ARG1]]) : $@convention(method) (Int, @guaranteed RefSubclass) -> ()
+  // CHECK: [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
+  // CHECK: [[FN:%[0-9]+]] = class_method [[BORROWED_ARG1]] : $RefSubclass, #RefSubclass.w!setter.1
+  // CHECK: apply [[FN]](%1, [[BORROWED_ARG1]]) : $@convention(method) (Int, @guaranteed RefSubclass) -> ()
+  // CHECK: end_borrow [[BORROWED_ARG1]] from [[ARG1]]
   // CHECK: destroy_value [[ARG1]]
 }
   
@@ -338,12 +344,15 @@ func physical_inout(_ x: Int) {
 /* TODO check writeback to more complex logical prop, check that writeback
  * reuses temporaries */
 
-// CHECK-LABEL: sil hidden  @_T010properties17val_subscript_get{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden  @_T010properties17val_subscript_get{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Val, Int) -> Float
 // CHECK: bb0([[VVAL:%[0-9]+]] : $Val, [[I:%[0-9]+]] : $Int):
 func val_subscript_get(_ v: Val, i: Int) -> Float {
   return v[i]
+  // CHECK: [[BORROWED_VVAL:%.*]] = begin_borrow [[VVAL]]
   // CHECK: [[SUBSCRIPT_GET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV9subscript{{[_0-9a-zA-Z]*}}fg
-  // CHECK: [[RET:%[0-9]+]] = apply [[SUBSCRIPT_GET_METHOD]]([[I]], [[VVAL]]) : $@convention(method) (Int, @guaranteed Val)
+  // CHECK: [[RET:%[0-9]+]] = apply [[SUBSCRIPT_GET_METHOD]]([[I]], [[BORROWED_VVAL]]) : $@convention(method) (Int, @guaranteed Val)
+  // CHECK: end_borrow [[BORROWED_VVAL]] from [[VVAL]]
+  // CHECK: destroy_value [[VVAL]]
   // CHECK: return [[RET]]
 }
 
@@ -847,17 +856,18 @@ class GenericClass<T> {
   init() { fatalError("scaffold") }
 }
 
-// => SEMANTIC SIL TODO: The applies in this function will need to have arg
-// borrowed. They do not today.
-//
 // CHECK-LABEL: sil hidden @_T010properties12genericPropsyAA12GenericClassCySSGF : $@convention(thin) (@owned GenericClass<String>) -> () {
 func genericProps(_ x: GenericClass<String>) {
   // CHECK: bb0([[ARG:%.*]] : $GenericClass<String>):
-  // CHECK:   class_method [[ARG]] : $GenericClass<String>, #GenericClass.x!getter.1
-  // CHECK:   apply {{.*}}<String>({{.*}}, [[ARG]]) : $@convention(method) <τ_0_0> (@guaranteed GenericClass<τ_0_0>) -> @out τ_0_0
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   class_method [[BORROWED_ARG]] : $GenericClass<String>, #GenericClass.x!getter.1
+  // CHECK:   apply {{.*}}<String>({{.*}}, [[BORROWED_ARG]]) : $@convention(method) <τ_0_0> (@guaranteed GenericClass<τ_0_0>) -> @out τ_0_0
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   let _ = x.x
-  // CHECK:   class_method [[ARG]] : $GenericClass<String>, #GenericClass.y!getter.1
-  // CHECK:   apply {{.*}}<String>([[ARG]]) : $@convention(method) <τ_0_0> (@guaranteed GenericClass<τ_0_0>) -> Int
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   class_method [[BORROWED_ARG]] : $GenericClass<String>, #GenericClass.y!getter.1
+  // CHECK:   apply {{.*}}<String>([[BORROWED_ARG]]) : $@convention(method) <τ_0_0> (@guaranteed GenericClass<τ_0_0>) -> Int
+  // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
   let _ = x.y
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[Z:%.*]] = ref_element_addr [[BORROWED_ARG]] : $GenericClass<String>, #GenericClass.z
@@ -1052,13 +1062,13 @@ public class DerivedClassWithPublicProperty : BaseClassWithInternalProperty {
   }
 }
 
-// CHECK-LABEL: sil hidden @_T010properties29BaseClassWithInternalPropertyC1xytfg
+// CHECK-LABEL: sil hidden [transparent] @_T010properties29BaseClassWithInternalPropertyC1xytfg
 
-// CHECK-LABEL: sil @_T010properties30DerivedClassWithPublicPropertyC1xytfg
+// CHECK-LABEL: sil [transparent] [fragile] @_T010properties30DerivedClassWithPublicPropertyC1xytfg
 // CHECK:       bb0([[SELF:%.*]] : $DerivedClassWithPublicProperty):
 // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]] : $DerivedClassWithPublicProperty
 // CHECK-NEXT:    [[SUPER:%.*]] = upcast [[SELF_COPY]] : $DerivedClassWithPublicProperty to $BaseClassWithInternalProperty
-// CHECK:         [[GETTER:%.*]] = function_ref @_T010properties29BaseClassWithInternalPropertyC1xytfg
-// CHECK-NEXT:    [[RESULT:%.*]] = apply [[GETTER]]([[SUPER]]) : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
+// CHECK-NEXT:    [[METHOD:%.*]] = super_method [[SELF_COPY]] : $DerivedClassWithPublicProperty, #BaseClassWithInternalProperty.x!getter.1 : (BaseClassWithInternalProperty) -> () -> (), $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]([[SUPER]]) : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
 // CHECK-NEXT:    destroy_value [[SUPER]] : $BaseClassWithInternalProperty
 // CHECK: } // end sil function '_T010properties30DerivedClassWithPublicPropertyC1xytfg'

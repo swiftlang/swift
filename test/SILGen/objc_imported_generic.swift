@@ -26,7 +26,8 @@ public func genericMethodOnAnyObjectChained(o: AnyObject, b: Bool) -> AnyObject?
 
 // CHECK-LABEL: sil @_TF21objc_imported_generic31genericMethodOnAnyObjectChainedFT1oPs9AnyObject_1bSb_GSqPS0___
 // CHECK: bb0([[ANY:%.*]] : $AnyObject, [[BOOL:%.*]] : $Bool):
-// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
+// CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
+// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened([[TAG:.*]]) AnyObject, #GenericClass.thing!1.foreign, bb1
 // CHECK:   bb1({{%.*}} : $@convention(objc_method) @pseudogeneric (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
@@ -37,8 +38,9 @@ public func genericSubscriptOnAnyObject(o: AnyObject, b: Bool) -> AnyObject? {
 }
 
 // CHECK-LABEL: sil @_TF21objc_imported_generic27genericSubscriptOnAnyObjectFT1oPs9AnyObject_1bSb_GSqPS0___
-// CHECK: bb0([[ANY:%.*]]
-// CHCEK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
+// CHECK: bb0([[ANY:%.*]] : $AnyObject,
+// CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
+// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened([[TAG:.*]]) AnyObject, #GenericClass.subscript!getter.1.foreign, bb1
 // CHECK:   bb1({{%.*}} : $@convention(objc_method) @pseudogeneric (UInt16, @opened([[TAG]]) AnyObject) -> @autoreleased AnyObject):
@@ -50,7 +52,8 @@ public func genericPropertyOnAnyObject(o: AnyObject, b: Bool) -> AnyObject?? {
 
 // CHECK-LABEL: sil @_TF21objc_imported_generic26genericPropertyOnAnyObjectFT1oPs9AnyObject_1bSb_GSqGSqPS0____
 // CHECK: bb0([[ANY:%.*]] : $AnyObject, [[BOOL:%.*]] : $Bool):
-// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
+// CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
+// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened([[TAG:.*]]) AnyObject, #GenericClass.propertyThing!getter.1.foreign, bb1
 // CHECK:   bb1({{%.*}} : $@convention(objc_method) @pseudogeneric (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):

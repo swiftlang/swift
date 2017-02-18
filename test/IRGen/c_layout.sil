@@ -27,7 +27,7 @@ bb0:
   %r = tuple ()
   return %r : $()
 }
-// CHECK-x86_64: define{{( protected)?}} void @test0()
+// CHECK-x86_64: define{{( protected)?}} swiftcc void @test0()
 // CHECK-x86_64:   [[RESULT:%.*]] = alloca %VSC11BitfieldOne, align 8
 // CHECK-x86_64:   [[ARG:%.*]] = alloca %VSC11BitfieldOne, align 8
 //   Make the first call and pull all the values out of the indirect result.
@@ -106,7 +106,7 @@ bb0:
 sil public_external @createSIMDStruct : $@convention(c) () -> SIMDStruct
 sil public_external @consumeSIMDStruct : $@convention(c) SIMDStruct -> ()
 
-// CHECK-x86_64-LABEL: define{{( protected)?}} void @testSIMDStruct()
+// CHECK-x86_64-LABEL: define{{( protected)?}} swiftcc void @testSIMDStruct()
 // CHECK-x86_64:         call <3 x float> @createSIMDStruct
 // CHECK-x86_64:         call void @consumeSIMDStruct(<3 x float>
 sil @testSIMDStruct : $() -> () {
@@ -125,7 +125,7 @@ bb0:
   return %s : $Builtin.Word
 }
 
-// CHECK-x86_64-LABEL: define{{( protected)?}} void @testIntegerExtension
+// CHECK-x86_64-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
 // CHECK-x86_64:         call signext i8 @chareth(i8 signext %0)
 // CHECK-x86_64:         call signext i8 @signedChareth(i8 signext %1)
 // CHECK-x86_64:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
@@ -141,7 +141,7 @@ bb0:
 // CHECK-x86_64-LABEL: declare i32 @ints(i32)
 // CHECK-x86_64-LABEL: declare i32 @unsigneds(i32)
 
-// CHECK-i386-LABEL: define{{( protected)?}} void @testIntegerExtension
+// CHECK-i386-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
 // CHECK-i386:         call signext i8 @chareth(i8 signext %0)
 // CHECK-i386:         call signext i8 @signedChareth(i8 signext %1)
 // CHECK-i386:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
@@ -157,7 +157,7 @@ bb0:
 // CHECK-i386-LABEL: declare i32 @ints(i32)
 // CHECK-i386-LABEL: declare i32 @unsigneds(i32)
 
-// CHECK-armv7-LABEL: define{{( protected)?}} void @testIntegerExtension
+// CHECK-armv7-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
 // CHECK-armv7:         call signext i8 @chareth(i8 signext %0)
 // CHECK-armv7:         call signext i8 @signedChareth(i8 signext %1)
 // CHECK-armv7:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
@@ -173,7 +173,7 @@ bb0:
 // CHECK-armv7-LABEL: declare i32 @ints(i32)
 // CHECK-armv7-LABEL: declare i32 @unsigneds(i32)
 
-// CHECK-armv7s-LABEL: define{{( protected)?}} void @testIntegerExtension
+// CHECK-armv7s-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
 // CHECK-armv7s:         call signext i8 @chareth(i8 signext %0)
 // CHECK-armv7s:         call signext i8 @signedChareth(i8 signext %1)
 // CHECK-armv7s:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
@@ -189,7 +189,7 @@ bb0:
 // CHECK-armv7s-LABEL: declare i32 @ints(i32)
 // CHECK-armv7s-LABEL: declare i32 @unsigneds(i32)
 
-// CHECK-armv7k-LABEL: define{{( protected)?}} void @testIntegerExtension
+// CHECK-armv7k-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
 // CHECK-armv7k:         call signext i8 @chareth(i8 signext %0)
 // CHECK-armv7k:         call signext i8 @signedChareth(i8 signext %1)
 // CHECK-armv7k:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
@@ -205,7 +205,7 @@ bb0:
 // CHECK-armv7k-LABEL: declare i32 @ints(i32)
 // CHECK-armv7k-LABEL: declare i32 @unsigneds(i32)
 
-// CHECK-arm64-LABEL: define{{( protected)?}} void @testIntegerExtension
+// CHECK-arm64-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
 // CHECK-arm64:         call signext i8 @chareth(i8 signext %0)
 // CHECK-arm64:         call signext i8 @signedChareth(i8 signext %1)
 // CHECK-arm64:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
@@ -221,7 +221,7 @@ bb0:
 // CHECK-arm64-LABEL: declare i32 @ints(i32)
 // CHECK-arm64-LABEL: declare i32 @unsigneds(i32)
 
-// CHECK-powerpc64-LABEL: define{{( protected)?}} void @testIntegerExtension
+// CHECK-powerpc64-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
 // CHECK-powerpc64:         call zeroext i8 @chareth(i8 zeroext %0)
 // CHECK-powerpc64:         call zeroext i8 @signedChareth(i8 zeroext %1)
 // CHECK-powerpc64:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
@@ -237,7 +237,7 @@ bb0:
 // CHECK-powerpc64-LABEL: declare signext i32 @ints(i32 signext)
 // CHECK-powerpc64-LABEL: declare zeroext i32 @unsigneds(i32 zeroext)
 
-// CHECK-powerpc64le-LABEL: define{{( protected)?}} void @testIntegerExtension
+// CHECK-powerpc64le-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
 // CHECK-powerpc64le:         call zeroext i8 @chareth(i8 zeroext %0)
 // CHECK-powerpc64le:         call zeroext i8 @signedChareth(i8 zeroext %1)
 // CHECK-powerpc64le:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
@@ -253,7 +253,7 @@ bb0:
 // CHECK-powerpc64le-LABEL: declare signext i32 @ints(i32 signext)
 // CHECK-powerpc64le-LABEL: declare zeroext i32 @unsigneds(i32 zeroext)
 
-// CHECK-s390x-LABEL: define{{( protected)?}} void @testIntegerExtension
+// CHECK-s390x-LABEL: define{{( protected)?}} swiftcc void @testIntegerExtension
 // CHECK-s390x:         call zeroext i8 @chareth(i8 zeroext %0)
 // CHECK-s390x:         call zeroext i8 @signedChareth(i8 zeroext %1)
 // CHECK-s390x:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
@@ -295,7 +295,7 @@ entry(%a : $CChar, %b : $CSignedChar, %c : $CUnsignedChar, %d : $CShort, %e : $C
   return undef : $()
 }
 
-// CHECK-x86_64-LABEL: define{{( protected)?}} i8 @testIntegerExtensionInBlock(%objc_block*, i8)
+// CHECK-x86_64-LABEL: define{{( protected)?}} swiftcc i8 @testIntegerExtensionInBlock(%objc_block*, i8)
 sil @testIntegerExtensionInBlock : $@convention(thin) (@owned @convention(block) (CChar) -> CChar, CChar) -> CChar {
 entry(%b : $@convention(block) (CChar) -> CChar, %c : $CChar):
 // CHECK-x86_64: call signext i8 {{%.*}}(%objc_block* {{%.*}}, i8 signext {{%.*}})
@@ -303,7 +303,7 @@ entry(%b : $@convention(block) (CChar) -> CChar, %c : $CChar):
   return %r : $CChar
 }
 
-// CHECK-x86_64-LABEL: define{{( protected)?}} void @testBitfieldInBlock
+// CHECK-x86_64-LABEL: define{{( protected)?}} swiftcc void @testBitfieldInBlock
 // CHECK-x86_64:         call void {{%.*}}(%VSC11BitfieldOne* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %VSC11BitfieldOne* byval align 8 {{%.*}})
 sil @testBitfieldInBlock : $@convention(thin) (@owned @convention(block) (BitfieldOne) -> BitfieldOne, BitfieldOne) -> BitfieldOne  {
 entry(%b : $@convention(block) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):

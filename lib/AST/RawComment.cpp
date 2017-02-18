@@ -109,7 +109,9 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
   unsigned EndOffset = SourceMgr.getLocOffsetInBuffer(Range.getEnd(), BufferID);
   LangOptions FakeLangOpts;
   Lexer L(FakeLangOpts, SourceMgr, BufferID, nullptr, /*InSILMode=*/false,
-          CommentRetentionMode::ReturnAsTokens, Offset, EndOffset);
+          CommentRetentionMode::ReturnAsTokens,
+          TriviaRetentionMode::WithoutTrivia,
+          Offset, EndOffset);
   SmallVector<SingleRawComment, 16> Comments;
   Token Tok;
   while (true) {

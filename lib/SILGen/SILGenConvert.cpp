@@ -121,8 +121,7 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
   SILType optType = optTL.getLoweredType();
   CanType formalOptType = optType.getSwiftRValueType();
 
-  auto formalObjectType = formalOptType.getAnyOptionalObjectType();
-  assert(formalObjectType);
+  assert(formalOptType.getAnyOptionalObjectType());
   auto someDecl = getASTContext().getOptionalSomeDecl();
   
   SILValue result =
@@ -460,7 +459,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
 
       auto nativeError = F(SGFContext());
 
-      WritebackScope writebackScope(*this);
+      FormalEvaluationScope writebackScope(*this);
       auto nsError =
         emitRValueForPropertyLoad(loc, nativeError, concreteFormalType,
                                   /*super*/ false, nsErrorVar,
@@ -732,7 +731,8 @@ SILGenFunction::emitOpenExistential(
        SILLocation loc,
        ManagedValue existentialValue,
        CanArchetypeType openedArchetype,
-       SILType loweredOpenedType) {
+       SILType loweredOpenedType,
+       AccessKind accessKind) {
   // Open the existential value into the opened archetype value.
   bool isUnique = true;
   bool canConsume;
@@ -742,8 +742,11 @@ SILGenFunction::emitOpenExistential(
   switch (existentialType.getPreferredExistentialRepresentation(SGM.M)) {
   case ExistentialRepresentation::Opaque: {
     if (existentialType.isAddress()) {
+      OpenedExistentialAccess allowedAccess =
+          getOpenedExistentialAccessFor(accessKind);
       SILValue archetypeValue = B.createOpenExistentialAddr(
-          loc, existentialValue.forward(*this), loweredOpenedType);
+          loc, existentialValue.forward(*this), loweredOpenedType,
+          allowedAccess);
       if (existentialValue.hasCleanup()) {
         canConsume = true;
         // Leave a cleanup to deinit the existential container.

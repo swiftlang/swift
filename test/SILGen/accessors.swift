@@ -29,17 +29,19 @@ func test0(_ ref: A) {
 // CHECK: bb0([[ARG:%.*]] : $A):
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
+// CHECK-NEXT: [[BORROWED_ARG_LHS:%.*]] = begin_borrow [[ARG]]
 // CHECK-NEXT: // function_ref accessors.index0 () -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors6index0SiyF
 // CHECK-NEXT: [[INDEX0:%.*]] = apply [[T0]]()
 //   Formal evaluation of RHS.
+// CHECK-NEXT: [[BORROWED_ARG_RHS:%.*]] = begin_borrow [[ARG]]
 // CHECK-NEXT: // function_ref accessors.index1 () -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors6index1SiyF
 // CHECK-NEXT: [[INDEX1:%.*]] = apply [[T0]]()
 //   Formal access to RHS.
 // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $OrdinarySub
-// CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $A, #A.array!getter.1
-// CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[ARG]])
+// CHECK-NEXT: [[T0:%.*]] = class_method [[BORROWED_ARG_RHS]] : $A, #A.array!getter.1
+// CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[BORROWED_ARG_RHS]])
 // CHECK-NEXT: store [[T1]] to [init] [[TEMP]]
 // CHECK-NEXT: [[T0:%.*]] = load [take] [[TEMP]]
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.getter : (Swift.Int) -> Swift.Int
@@ -49,15 +51,13 @@ func test0(_ ref: A) {
 //   Formal access to LHS.
 // CHECK-NEXT: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK-NEXT: [[BUFFER:%.*]] = alloc_stack $OrdinarySub
-// CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER]]
-// CHECK-NEXT: [[T1:%.*]] = class_method [[BORROWED_ARG]] : $A, #A.array!materializeForSet.1
-// CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE]], [[BORROWED_ARG]])
+// CHECK-NEXT: [[T1:%.*]] = class_method [[BORROWED_ARG_LHS]] : $A, #A.array!materializeForSet.1
+// CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE]], [[BORROWED_ARG_LHS]])
 // CHECK-NEXT: [[T3:%.*]] = tuple_extract [[T2]] {{.*}}, 0
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
-// CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*OrdinarySub on %0 : $A
-// CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*OrdinarySub on [[BORROWED_ARG_LHS]] : $A
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.setter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors11OrdinarySubV9subscriptSiSicfs
 // CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[ADDR]])
@@ -66,7 +66,8 @@ func test0(_ ref: A) {
 // CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
 // CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout A, @thick A.Type) -> ()
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $A
-// CHECK-NEXT: store %0 to [init] [[TEMP2]] : $*A
+// SEMANTIC SIL TODO: This is an issue caused by the callback for materializeForSet in the class case taking the value as @inout when it should really take it as @guaranteed.
+// CHECK-NEXT: store [[BORROWED_ARG_LHS]] to [init] [[TEMP2]] : $*A
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick A.Type
 // CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ADDR]] : $*OrdinarySub to $Builtin.RawPointer
 // CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE]], [[TEMP2]], [[T0]])
@@ -77,8 +78,10 @@ func test0(_ ref: A) {
 // CHECK-NEXT: dealloc_stack [[BUFFER]]
 // CHECK-NEXT: dealloc_stack [[STORAGE]]
 // CHECK-NEXT: dealloc_stack [[TEMP]]
+// CHECK-NEXT: end_borrow [[BORROWED_ARG_RHS]] from [[ARG]]
+// CHECK-NEXT: end_borrow [[BORROWED_ARG_LHS]] from [[ARG]]
 //   Balance out the +1 from the function parameter.
-// CHECK-NEXT: destroy_value %0
+// CHECK-NEXT: destroy_value [[ARG]]
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
@@ -99,25 +102,25 @@ func test1(_ ref: B) {
 // CHECK:    bb0([[ARG:%.*]] : $B):
 // CHECK-NEXT: debug_value
 //   Formal evaluation of LHS.
+// CHECK-NEXT: [[BORROWED_ARG_LHS:%.*]] = begin_borrow [[ARG]]
 // CHECK-NEXT: // function_ref accessors.index0 () -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors6index0SiyF
 // CHECK-NEXT: [[INDEX0:%.*]] = apply [[T0]]()
 //   Formal evaluation of RHS.
+// CHECK-NEXT: [[BORROWED_ARG_RHS:%.*]] = begin_borrow [[ARG]]
 // CHECK-NEXT: // function_ref accessors.index1 () -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors6index1SiyF
 // CHECK-NEXT: [[INDEX1:%.*]] = apply [[T0]]()
 //   Formal access to RHS.
 // CHECK-NEXT: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK-NEXT: [[BUFFER:%.*]] = alloc_stack $MutatingSub
-// CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER]]
-// CHECK-NEXT: [[T1:%.*]] = class_method [[BORROWED_ARG]] : $B, #B.array!materializeForSet.1
-// CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE]], [[BORROWED_ARG]])
+// CHECK-NEXT: [[T1:%.*]] = class_method [[BORROWED_ARG_RHS]] : $B, #B.array!materializeForSet.1
+// CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE]], [[BORROWED_ARG_RHS]])
 // CHECK-NEXT: [[T3:%.*]] = tuple_extract [[T2]] {{.*}}, 0
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
-// CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on %0 : $B
-// CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on [[BORROWED_ARG_RHS]] : $B
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.getter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors11MutatingSubV9subscriptSiSicfg : $@convention(method) (Int, @inout MutatingSub) -> Int 
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T0]]([[INDEX1]], [[ADDR]])
@@ -126,7 +129,7 @@ func test1(_ ref: B) {
 // CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
 // CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> ()
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $B
-// CHECK-NEXT: store %0 to [init] [[TEMP2]] : $*B
+// CHECK-NEXT: store [[BORROWED_ARG_RHS]] to [init] [[TEMP2]] : $*B
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick B.Type
 // CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ADDR]] : $*MutatingSub to $Builtin.RawPointer
 // CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE]], [[TEMP2]], [[T0]])
@@ -137,15 +140,13 @@ func test1(_ ref: B) {
 //   Formal access to LHS.
 // CHECK-NEXT: [[STORAGE2:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK-NEXT: [[BUFFER2:%.*]] = alloc_stack $MutatingSub
-// CHECK-NEXT: [[BORROWED_ARG_2:%.*]] = begin_borrow [[ARG]]
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER2]]
-// CHECK-NEXT: [[T1:%.*]] = class_method [[BORROWED_ARG_2]] : $B, #B.array!materializeForSet.1
-// CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE2]], [[BORROWED_ARG_2]])
+// CHECK-NEXT: [[T1:%.*]] = class_method [[BORROWED_ARG_LHS]] : $B, #B.array!materializeForSet.1
+// CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[STORAGE2]], [[BORROWED_ARG_LHS]])
 // CHECK-NEXT: [[T3:%.*]] = tuple_extract [[T2]] {{.*}}, 0
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
-// CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on %0 : $B
-// CHECK-NEXT: end_borrow [[BORROWED_ARG_2]] from [[ARG]]
+// CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on [[BORROWED_ARG_LHS]] : $B
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.setter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_T09accessors11MutatingSubV9subscriptSiSicfs : $@convention(method) (Int, Int, @inout MutatingSub) -> () 
 // CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[ADDR]])
@@ -154,7 +155,7 @@ func test1(_ ref: B) {
 // CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
 // CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> ()
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $B
-// CHECK-NEXT: store %0 to [init] [[TEMP2]] : $*B
+// CHECK-NEXT: store [[BORROWED_ARG_LHS]] to [init] [[TEMP2]] : $*B
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick B.Type
 // CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ADDR]] : $*MutatingSub to $Builtin.RawPointer
 // CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE2]], [[TEMP2]], [[T0]])
@@ -166,8 +167,10 @@ func test1(_ ref: B) {
 // CHECK-NEXT: dealloc_stack [[STORAGE2]]
 // CHECK-NEXT: dealloc_stack [[BUFFER]]
 // CHECK-NEXT: dealloc_stack [[STORAGE]]
+// CHECK: end_borrow [[BORROWED_ARG_RHS]] from [[ARG]]
+// CHECK: end_borrow [[BORROWED_ARG_LHS]] from [[ARG]]
 //   Balance out the +1 from the function parameter.
-// CHECK-NEXT: destroy_value %0
+// CHECK-NEXT: destroy_value [[ARG]]
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 

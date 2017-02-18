@@ -131,8 +131,8 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
     moduleFramework += ".framework";
     isFramework = true;
 
-    for (auto path : ctx.SearchPathOpts.FrameworkSearchPaths) {
-      currPath = path;
+    for (const auto &framepath : ctx.SearchPathOpts.FrameworkSearchPaths) {
+      currPath = framepath.Path;
       llvm::sys::path::append(currPath, moduleFramework.str(),
                               "Modules", moduleFilename.str());
       auto err = openModuleFiles(currPath,

@@ -40,8 +40,10 @@ func inOutFunc(_ f: inout ((Int) -> Int)) { }
 // CHECK: bb0([[ARG:%.*]] : $Foo<Int, Int>):
 // CHECK:   [[XBOX:%.*]] = alloc_box ${ var Foo<Int, Int> }, var, name "x"
 // CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX]] : ${ var Foo<Int, Int> }, 0
-// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:   store [[ARG_COPY]] to [init] [[XBOX_PB]]
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   [[INOUTFUNC:%.*]] = function_ref @_T020property_abstraction9inOutFunc{{[_0-9a-zA-Z]*}}F
 // CHECK:   [[F_ADDR:%.*]] = struct_element_addr [[XBOX_PB]] : $*Foo<Int, Int>, #Foo.f
 // CHECK:   [[F_SUBST_MAT:%.*]] = alloc_stack

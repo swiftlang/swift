@@ -12,11 +12,15 @@ extension Foo {
 }
 
 // CHECK-LABEL: sil hidden @_T015extensions_objc19extensionReferencesyAA3FooCF
+// CHECK: bb0([[ARG:%.*]] : $Foo):
 func extensionReferences(_ x: Foo) {
   // dynamic extension methods are still dynamically dispatched.
-  // CHECK: class_method [volatile] %0 : $Foo, #Foo.kay!1.foreign
+  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK: class_method [volatile] [[BORROWED_ARG]] : $Foo, #Foo.kay!1.foreign
   x.kay()
-  // CHECK: class_method [volatile] %0 : $Foo, #Foo.cox!getter.1.foreign
+
+  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK: class_method [volatile] [[BORROWED_ARG]] : $Foo, #Foo.cox!getter.1.foreign
   _ = x.cox
 
 }

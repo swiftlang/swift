@@ -56,6 +56,7 @@ def _get_default_source_root():
 
     return result
 
+
 # Set SWIFT_SOURCE_ROOT in your environment to control where the sources
 # are found.
 SWIFT_SOURCE_ROOT = os.environ.get(

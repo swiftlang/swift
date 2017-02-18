@@ -25,8 +25,7 @@ using namespace swift;
 
 Type DependentGenericTypeResolver::resolveGenericTypeParamType(
                                      GenericTypeParamType *gp) {
-  auto gpDecl = gp->getDecl();
-  assert(gpDecl && "Missing generic parameter declaration");
+  assert(gp->getDecl() && "Missing generic parameter declaration");
 
   // Don't resolve generic parameters.
   return gp;
@@ -351,7 +350,7 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
       break;
     }
     
-    if (builder && builder->addRequirement(req))
+    if (builder && builder->addRequirement(&req))
       req.setInvalid();
   }
 }

@@ -53,7 +53,9 @@
             }
         },
         "next" : {
-            "aliases": ["next", "master-next", "stable-next", "upstream", "next-upstream"],
+            "aliases": ["next", "master-next",
+                        "stable-next", "upstream",
+                        "next-upstream", "upstream-with-swift"],
             "repos": {
                 "llvm": "upstream-with-swift",
                 "clang": "upstream-with-swift",

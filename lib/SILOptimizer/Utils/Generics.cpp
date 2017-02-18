@@ -200,7 +200,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
 
   // Produce a specialized type, which is the substituted type with
   // the parameters/results passing conventions adjusted according
-  // to the converions selected above.
+  // to the conversions selected above.
   SpecializedType = createSpecializedType(SubstitutedType, M);
 }
 
@@ -294,7 +294,7 @@ getSignatureWithRequirements(GenericSignature *OrigGenSig,
   // First, add the old generic signature.
   Builder.addGenericSignature(OrigGenSig);
 
-  RequirementSource Source(RequirementSource::Explicit, SourceLoc());
+  auto Source = RequirementSource::forAbstract(Builder);
   // For each substitution with a concrete type as a replacement,
   // add a new concrete type equality requirement.
   for (auto &Req : Requirements) {
@@ -319,10 +319,15 @@ checkSpecializationRequirements(ArrayRef<Requirement> Requirements) {
       assert(FirstType && SecondType);
       assert(!FirstType->hasArchetype());
       assert(!SecondType->hasArchetype());
+
       // Only one of the types should be concrete.
       assert(FirstType->hasTypeParameter() != SecondType->hasTypeParameter() &&
              "Only concrete type same-type requirements are supported by "
              "generic specialization");
+
+      (void) FirstType;
+      (void) SecondType;
+
       continue;
     }
 
@@ -748,7 +753,7 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
 
   assert(specConv.useLoweredAddresses());
 
-  // ReInfo.NumIndirectResults correponds to SubstTy's formal indirect
+  // ReInfo.NumIndirectResults corresponds to SubstTy's formal indirect
   // results. SpecTy may have fewer formal indirect results.
   assert(SubstType->getNumIndirectFormalResults()
          >= SpecType->getNumIndirectFormalResults());
@@ -763,7 +768,7 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
         EntryBB->createFunctionArgument(SpecArg->getType(), SpecArg->getDecl());
     Arguments.push_back(NewArg);
   };
-  // ReInfo.NumIndirectResults correponds to SubstTy's formal indirect
+  // ReInfo.NumIndirectResults corresponds to SubstTy's formal indirect
   // results. SpecTy may have fewer formal indirect results.
   assert(SubstType->getNumIndirectFormalResults()
          >= SpecType->getNumIndirectFormalResults());
@@ -1110,7 +1115,7 @@ static SILFunction *lookupExistingSpecialization(SILModule &M,
   // Only check that this function exists, but don't read
   // its body. It can save some compile-time.
   if (isWhitelistedSpecialization(FunctionName))
-    return M.hasFunction(FunctionName, SILLinkage::PublicExternal);
+    return M.findFunction(FunctionName, SILLinkage::PublicExternal);
 
   return nullptr;
 }

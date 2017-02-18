@@ -593,7 +593,7 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
       } else {
         BaseName = Text.substr(0, ArgStart);
         auto ArgEnd = Text.find_last_of(')');
-        if (ArgEnd != StringRef::npos) {
+        if (ArgEnd == StringRef::npos) {
           llvm::errs() << "Swift name is malformed.\n";
           return 1;
         }
@@ -1160,9 +1160,6 @@ static void printNameTranslationInfo(sourcekitd_variant_t Info,
   }
   for (auto S : Selectors) {
     OS << S;
-    if (S != Selectors.back()) {
-      OS << ":";
-    }
   }
   OS << '\n';
 }

@@ -116,7 +116,11 @@ int main(int argc, char **argv) {
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.setImportSearchPaths(ImportPaths);
-  Invocation.setFrameworkSearchPaths(FrameworkPaths);
+  std::vector<swift::SearchPathOptions::FrameworkSearchPath> FramePaths;
+  for (const auto &path : FrameworkPaths) {
+    FramePaths.push_back({path, /*isSystem=*/false});
+  }
+  Invocation.setFrameworkSearchPaths(FramePaths);
 
   if (CI.setup(Invocation))
     return 1;

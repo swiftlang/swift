@@ -362,7 +362,7 @@
     {
       key.kind: source.lang.swift.decl.extension.class,
       key.name: "CC",
-      key.usr: "s:C5index2CC",
+      key.usr: "s:e:s:FC5index2CC5meth2FS0_T_",
       key.line: 49,
       key.column: 11,
       key.related: [

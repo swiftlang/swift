@@ -73,7 +73,6 @@ void IRGenModule::emitCoverageMapping() {
   // Now we need to build up the list of function records.
   llvm::LLVMContext &Ctx = LLVMContext;
   auto *Int32Ty = llvm::Type::getInt32Ty(Ctx);
-  auto *Int8PtrTy = llvm::Type::getInt8PtrTy(Ctx);
 
   llvm::Type *FunctionRecordTypes[] = {
 #define COVMAP_FUNC_RECORD(Type, LLVMType, Name, Init) LLVMType,
@@ -85,7 +84,6 @@ void IRGenModule::emitCoverageMapping() {
       llvm::StructType::get(Ctx, llvm::makeArrayRef(FunctionRecordTypes),
                             /*isPacked=*/true);
 
-  std::vector<llvm::Constant *> FunctionNames;
   std::vector<llvm::Constant *> FunctionRecords;
   std::vector<CounterMappingRegion> Regions;
   for (const auto &M : Mappings) {
@@ -107,9 +105,8 @@ void IRGenModule::emitCoverageMapping() {
         M.isPossiblyUsedExternally() ? llvm::GlobalValue::ExternalLinkage
                                      : llvm::GlobalValue::PrivateLinkage,
         M.getFile());
-    llvm::GlobalVariable *NamePtr = llvm::createPGOFuncNameVar(
+    llvm::createPGOFuncNameVar(
         *getModule(), llvm::GlobalValue::LinkOnceAnyLinkage, NameValue);
-    FunctionNames.push_back(llvm::ConstantExpr::getBitCast(NamePtr, Int8PtrTy));
 
     CurrentSize = OS.str().size();
     unsigned MappingLen = CurrentSize - PrevSize;
@@ -175,12 +172,4 @@ void IRGenModule::emitCoverageMapping() {
   CovData->setSection(getCoverageSection(*this));
   CovData->setAlignment(8);
   addUsedGlobal(CovData);
-
-  if (!FunctionNames.empty()) {
-    auto *NamesArrTy = llvm::ArrayType::get(Int8PtrTy, FunctionNames.size());
-    auto *NamesArrVal = llvm::ConstantArray::get(NamesArrTy, FunctionNames);
-    new llvm::GlobalVariable(*getModule(), NamesArrTy, true,
-                             llvm::GlobalValue::InternalLinkage, NamesArrVal,
-                             llvm::getCoverageUnusedNamesVarName());
-  }
 }

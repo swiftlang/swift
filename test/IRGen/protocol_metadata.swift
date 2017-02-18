@@ -77,7 +77,7 @@ protocol ABO : A, B, O { func abo() }
 
 func reify_metadata<T>(_ x: T) {}
 
-// CHECK: define hidden void @_T017protocol_metadata0A6_types{{[_0-9a-zA-Z]*}}F
+// CHECK: define hidden swiftcc void @_T017protocol_metadata0A6_types{{[_0-9a-zA-Z]*}}F
 func protocol_types(_ a: A,
                     abc: A & B & C,
                     abco: A & B & C & O) {

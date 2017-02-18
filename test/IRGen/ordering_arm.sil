@@ -28,6 +28,6 @@ bb0:
 }
 
 // Make sure that these functions are emitted in the order they
-// CHECK: define{{( protected)?}} void @foo
-// CHECK: define{{( protected)?}} void @bar
-// CHECK: define{{( protected)?}} void @baz
+// CHECK: define{{( protected)?}} swiftcc void @foo
+// CHECK: define{{( protected)?}} swiftcc void @bar
+// CHECK: define{{( protected)?}} swiftcc void @baz

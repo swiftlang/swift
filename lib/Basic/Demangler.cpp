@@ -189,6 +189,10 @@ namespace NewMangling {
 //////////////////////////////////
 
 NodePointer Demangler::demangleTopLevel() {
+
+  if (nextIf("_Tt"))
+    return demangleObjCTypeName();
+
   if (!nextIf(MANGLING_PREFIX_STR))
     return nullptr;
 
@@ -465,8 +469,9 @@ NodePointer Demangler::demangleIdentifier() {
         WordIdx = c - 'A';
         hasWordSubsts = false;
       }
-      if (WordIdx >= (int)Words.size())
+      if (WordIdx >= NumWords)
         return nullptr;
+      assert(WordIdx < MaxNumWords);
       StringRef Slice = Words[WordIdx];
       Identifier.append(Slice.data(), Slice.size());
     }
@@ -477,7 +482,7 @@ NodePointer Demangler::demangleIdentifier() {
       return nullptr;
     if (isPunycoded)
       nextIf('_');
-    if (Pos + numChars >= Text.size())
+    if (Pos + numChars > Text.size())
       return nullptr;
     StringRef Slice = StringRef(Text.data() + Pos, numChars);
     if (isPunycoded) {
@@ -489,9 +494,9 @@ NodePointer Demangler::demangleIdentifier() {
       for (int Idx = 0, End = (int)Slice.size(); Idx <= End; ++Idx) {
         char c = (Idx < End ? Slice[Idx] : 0);
         if (wordStartPos >= 0 && isWordEnd(c, Slice[Idx - 1])) {
-          if (Idx - wordStartPos >= 2) {
+          if (Idx - wordStartPos >= 2 && NumWords < MaxNumWords) {
             StringRef word(Slice.begin() + wordStartPos, Idx - wordStartPos);
-            Words.push_back(word);
+            Words[NumWords++] = word;
           }
           wordStartPos = -1;
         }
@@ -1775,6 +1780,46 @@ NodePointer Demangler::demangleValueWitness() {
     return nullptr;
   NodePointer VW = NodeFactory::create(Node::Kind::ValueWitness, unsigned(Kind));
   return addChild(VW, popNode(Node::Kind::Type));
+}
+
+NodePointer Demangler::demangleObjCTypeName() {
+  NodePointer Ty = NodeFactory::create(Node::Kind::Type);
+  NodePointer Global = addChild(NodeFactory::create(Node::Kind::Global),
+                         addChild(NodeFactory::create(Node::Kind::TypeMangling),
+                                  Ty));
+  NodePointer Nominal;
+  bool isProto = false;
+  if (nextIf('C')) {
+    Nominal = NodeFactory::create(Node::Kind::Class);
+    addChild(Ty, Nominal);
+  } else if (nextIf('P')) {
+    isProto = true;
+    Nominal = NodeFactory::create(Node::Kind::Protocol);
+    addChild(Ty, addChild(NodeFactory::create(Node::Kind::ProtocolList),
+                    addChild(NodeFactory::create(Node::Kind::TypeList),
+                      addChild(NodeFactory::create(Node::Kind::Type),
+                               Nominal))));
+  } else {
+    return nullptr;
+  }
+
+  NodePointer Ident = demangleIdentifier();
+  if (!Ident)
+    return nullptr;
+  Nominal->addChild(changeKind(Ident, Node::Kind::Module));
+
+  Ident = demangleIdentifier();
+  if (!Ident)
+    return nullptr;
+  Nominal->addChild(Ident);
+
+  if (isProto && !nextIf('_'))
+    return nullptr;
+
+  if (Pos < Text.size())
+    return nullptr;
+
+  return Global;
 }
 
 } // end namespace NewMangling

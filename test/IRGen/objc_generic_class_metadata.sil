@@ -21,7 +21,7 @@ sil_vtable Subclass {}
 sil @metatype_sink : $@convention(thin) <T> (@thick T.Type) -> ()
 sil @objc_class_sink : $@convention(thin) <T: AnyObject> (@objc_metatype T.Type) -> ()
 
-// CHECK-LABEL: define void @objc_generic_class_metatypes()
+// CHECK-LABEL: define swiftcc void @objc_generic_class_metatypes()
 sil @objc_generic_class_metatypes : $@convention(thin) () -> () {
 entry:
   %z = function_ref @metatype_sink : $@convention(thin) <T> (@thick T.Type) -> ()
@@ -31,26 +31,26 @@ entry:
   // at runtime.
   // CHECK: [[METADATA:%.*]] = call %swift.type* @_TMaCSo12GenericClass()
   %a = metatype $@thick GenericClass<NSString>.Type
-  // CHECK: call void @metatype_sink(%swift.type* [[METADATA]], %swift.type* [[METADATA]])
+  // CHECK: call swiftcc void @metatype_sink(%swift.type* [[METADATA]], %swift.type* [[METADATA]])
   apply %z<GenericClass<NSString>>(%a) : $@convention(thin) <T> (@thick T.Type) -> ()
 
-  // CHECK: call void @metatype_sink(%swift.type* [[METADATA]], %swift.type* [[METADATA]])
+  // CHECK: call swiftcc void @metatype_sink(%swift.type* [[METADATA]], %swift.type* [[METADATA]])
   %b = metatype $@thick GenericClass<NSObject>.Type
   apply %z<GenericClass<NSObject>>(%b) : $@convention(thin) <T> (@thick T.Type) -> ()
 
   // CHECK: [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_GenericClass",
   // CHECK: [[OBJC_CLASS:%.*]] = call %objc_class* @swift_rt_swift_getInitializedObjCClass(%objc_class* [[T0]])
-  // CHECK: call void @objc_class_sink(%objc_class* [[OBJC_CLASS]], %swift.type* [[METADATA]])
+  // CHECK: call swiftcc void @objc_class_sink(%objc_class* [[OBJC_CLASS]], %swift.type* [[METADATA]])
   %c = metatype $@objc_metatype GenericClass<NSString>.Type
   apply %y<GenericClass<NSString>>(%c) : $@convention(thin) <T: AnyObject> (@objc_metatype T.Type) -> ()
 
   // Check that generic classes are erased at depth.
   // CHECK: [[TUPLE_METADATA:%.*]] = call %swift.type* @_TMaGSaTCSo12GenericClassSi__()
   %d = metatype $@thick Array<(GenericClass<NSString>, Int)>.Type
-  // CHECK: call void @metatype_sink(%swift.type* [[TUPLE_METADATA]], %swift.type* [[TUPLE_METADATA]])
+  // CHECK: call swiftcc void @metatype_sink(%swift.type* [[TUPLE_METADATA]], %swift.type* [[TUPLE_METADATA]])
   apply %z<Array<(GenericClass<NSString>, Int)>>(%d) : $@convention(thin) <T> (@thick T.Type) -> ()
   %e = metatype $@thick Array<(GenericClass<NSObject>, Int)>.Type
-  // CHECK: call void @metatype_sink(%swift.type* [[TUPLE_METADATA]], %swift.type* [[TUPLE_METADATA]])
+  // CHECK: call swiftcc void @metatype_sink(%swift.type* [[TUPLE_METADATA]], %swift.type* [[TUPLE_METADATA]])
   apply %z<Array<(GenericClass<NSObject>, Int)>>(%e) : $@convention(thin) <T> (@thick T.Type) -> ()
 
   return undef : $()

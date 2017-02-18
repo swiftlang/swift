@@ -523,7 +523,7 @@ public struct ContiguousStorage<Element> {
 /// You can access a slice of a collection through its ranged subscript or by
 /// calling methods like `prefix(_:)` or `suffix(from:)`. A slice of a
 /// collection can contain zero or more of the original collection's elements
-/// and shares the the original collection's semantics.
+/// and shares the original collection's semantics.
 ///
 /// The following example, creates a `firstWord` constant by using the
 /// `prefix(_:)` method to get a slice of the `text` string's `characters`

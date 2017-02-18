@@ -847,6 +847,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getSILType(MF->getType(TyID2),
                                (SILValueCategory)TyCategory2)));
     break;
+  case ValueKind::OpenExistentialAddrInst:
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    ResultVal = Builder.createOpenExistentialAddr(
+        Loc, getLocalValue(ValID, getSILType(MF->getType(TyID2),
+                                             (SILValueCategory)TyCategory2)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
+        Attr == 0 ? OpenedExistentialAccess::Immutable
+                  : OpenedExistentialAccess::Mutable);
+    break;
 
 #define ONEOPERAND_ONETYPE_INST(ID)           \
   case ValueKind::ID##Inst:                   \
@@ -858,7 +868,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                (SILValueCategory)TyCategory2)),                \
                   getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));\
     break;
-  ONEOPERAND_ONETYPE_INST(OpenExistentialAddr)
   ONEOPERAND_ONETYPE_INST(OpenExistentialRef)
   ONEOPERAND_ONETYPE_INST(OpenExistentialMetatype)
   ONEOPERAND_ONETYPE_INST(OpenExistentialBox)
@@ -1993,7 +2002,7 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
 /// This function is modeled after readSILFunction. But it does not
 /// create a SILFunction object.
 bool SILDeserializer::hasSILFunction(StringRef Name,
-                                     SILLinkage Linkage) {
+                                     Optional<SILLinkage> Linkage) {
   if (!FuncTable)
     return false;
   auto iter = FuncTable->find(Name);
@@ -2006,8 +2015,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   auto &cacheEntry = Funcs[FID-1];
   if (cacheEntry.isFullyDeserialized() ||
       (cacheEntry.isDeserialized()))
-    return cacheEntry.get()->getLinkage() == Linkage ||
-           Linkage == SILLinkage::Private;
+    return !Linkage || cacheEntry.get()->getLinkage() == *Linkage;
 
   BCOffsetRAII restoreOffset(SILCursor);
   SILCursor.JumpToBit(cacheEntry.getOffset());
@@ -2046,7 +2054,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   }
 
   // Bail if it is not a required linkage.
-  if (linkage.getValue() != Linkage && Linkage != SILLinkage::Private)
+  if (Linkage && linkage.getValue() != *Linkage)
     return false;
 
   DEBUG(llvm::dbgs() << "Found SIL Function: " << Name << "\n");

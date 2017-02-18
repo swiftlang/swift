@@ -7,7 +7,7 @@ enum SinglePayloadSingleEmpty {
   case DataCase(Builtin.Word)
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @select_enum_SinglePayloadSingleEmpty(%O11select_enum24SinglePayloadSingleEmpty* noalias nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @select_enum_SinglePayloadSingleEmpty(%O11select_enum24SinglePayloadSingleEmpty* noalias nocapture dereferenceable({{.*}}))
 sil @select_enum_SinglePayloadSingleEmpty : $@convention(thin) (@in SinglePayloadSingleEmpty) -> () {
 bb0(%0 : $*SinglePayloadSingleEmpty):
   %1 = load %0 : $*SinglePayloadSingleEmpty
@@ -79,10 +79,11 @@ enum NoPayloadSingleton {
   case One
 }
 
-// CHECK-LABEL: define{{( protected)?}} i1 @testOptionalOfNoPayloadSingleton(i1)
+// CHECK-LABEL: define{{( protected)?}} swiftcc i1 @testOptionalOfNoPayloadSingleton(i8)
 sil @testOptionalOfNoPayloadSingleton : $@convention(thin) (MyOptional<NoPayloadSingleton>) -> Builtin.Int1 {
 bb0(%0 : $MyOptional<NoPayloadSingleton>):
-// CHECK:  [[NOT:%.*]] = xor i1 %0, true
+// CHECK:  [[NATIVECCTRUNC:%.*]] = trunc i8 %0 to i1
+// CHECK:  [[NOT:%.*]] = xor i1 [[NATIVECCTRUNC]], true
 // CHECK:  ret i1 [[NOT]]
   %4 = integer_literal $Builtin.Int1, -1          // users: %6, %7
   %5 = integer_literal $Builtin.Int1, 0           // user: %6

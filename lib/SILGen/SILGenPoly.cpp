@@ -200,8 +200,8 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
     // Unwrap zero or more metatype levels
     openedArchetype = getOpenedArchetype(openedType);
 
-    state = SGF.emitOpenExistential(loc, input,
-                                    openedArchetype, loweredOpenedType);
+    state = SGF.emitOpenExistential(loc, input, openedArchetype,
+                                    loweredOpenedType, AccessKind::Read);
     inputType = openedType;
   }
 
@@ -2509,7 +2509,7 @@ buildThunkSignature(SILGenFunction &gen,
   builder.addGenericParameter(newGenericParam);
   Requirement newRequirement(RequirementKind::Conformance, newGenericParam,
                              openedExistential->getOpenedExistentialType());
-  RequirementSource source(RequirementSource::Explicit, SourceLoc());
+  auto source = RequirementSource::forAbstract(builder);
   builder.addRequirement(newRequirement, source);
 
   builder.finalize(SourceLoc(), {newGenericParam},

@@ -8,17 +8,17 @@ import Builtin
 import Swift
 import gizmo
 
-// x86_64-LABEL: define{{( protected)?}} void @optional_objc_metatype(i64)
+// x86_64-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(i64)
 // x86_64:         icmp eq i64 %0, 0
-// i386-LABEL:   define{{( protected)?}} void @optional_objc_metatype(i32)
+// i386-LABEL:   define{{( protected)?}} swiftcc void @optional_objc_metatype(i32)
 // i386:           icmp eq i32 %0, 0
-// arm64-LABEL:  define{{( protected)?}} void @optional_objc_metatype(i64)
+// arm64-LABEL:  define{{( protected)?}} swiftcc void @optional_objc_metatype(i64)
 // arm64:          icmp eq i64 %0, 0
-// armv7-LABEL:  define{{( protected)?}} void @optional_objc_metatype(i32)
+// armv7-LABEL:  define{{( protected)?}} swiftcc void @optional_objc_metatype(i32)
 // armv7:           icmp eq i32 %0, 0
-// armv7s-LABEL: define{{( protected)?}} void @optional_objc_metatype(i32)
+// armv7s-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(i32)
 // armv7s:          icmp eq i32 %0, 0
-// armv7k-LABEL: define{{( protected)?}} void @optional_objc_metatype(i32)
+// armv7k-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(i32)
 // armv7k:          icmp eq i32 %0, 0
 
 sil @optional_objc_metatype : $@convention(thin) (Optional<@objc_metatype Gizmo.Type>) -> () {
@@ -32,17 +32,17 @@ cont:
   return undef : $()
 }
 
-// x86_64-LABEL: define{{( protected)?}} void @optional_swift_metatype(i64)
+// x86_64-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(i64)
 // x86_64:           icmp eq i64 %0, 0
-// i386-LABEL:   define{{( protected)?}} void @optional_swift_metatype(i32)
+// i386-LABEL:   define{{( protected)?}} swiftcc void @optional_swift_metatype(i32)
 // i386:             icmp eq i32 %0, 0
-// arm64-LABEL:  define{{( protected)?}} void @optional_swift_metatype(i64)
+// arm64-LABEL:  define{{( protected)?}} swiftcc void @optional_swift_metatype(i64)
 // arm64:            icmp eq i64 %0, 0
-// armv7-LABEL:  define{{( protected)?}} void @optional_swift_metatype(i32)
+// armv7-LABEL:  define{{( protected)?}} swiftcc void @optional_swift_metatype(i32)
 // armv7:            icmp eq i32 %0, 0
-// armv7s-LABEL: define{{( protected)?}} void @optional_swift_metatype(i32)
+// armv7s-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(i32)
 // armv7s:           icmp eq i32 %0, 0
-// armv7k-LABEL: define{{( protected)?}} void @optional_swift_metatype(i32)
+// armv7k-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(i32)
 // armv7k:           icmp eq i32 %0, 0
 
 sil @optional_swift_metatype : $@convention(thin) (Optional<@thick Gizmo.Type>) -> () {

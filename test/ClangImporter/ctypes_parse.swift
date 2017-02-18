@@ -235,3 +235,9 @@ func testVaList() {
   }
   hasVaList(nil) // expected-error {{nil is not compatible with expected argument type 'CVaListPointer'}}
 }
+
+func testNestedForwardDeclaredStructs() {
+  // Check that we still have a memberwise initializer despite the forward-
+  // declared nested type. rdar://problem/30449400
+  _ = StructWithForwardDeclaredStruct(ptr: nil)
+}

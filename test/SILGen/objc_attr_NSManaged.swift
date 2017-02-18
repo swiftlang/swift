@@ -69,11 +69,14 @@ extension FinalGizmo {
 }
 
 // CHECK-LABEL: sil hidden @_T019objc_attr_NSManaged9testFinalSSAA0E5GizmoCF : $@convention(thin) (@owned FinalGizmo) -> @owned String {
+// CHECK: bb0([[ARG:%.*]] : $FinalGizmo):
+// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK: class_method [volatile] [[BORROWED_ARG]] : $FinalGizmo, #FinalGizmo.kvc2!1.foreign : (FinalGizmo) -> () -> (), $@convention(objc_method) (FinalGizmo) -> ()
+// CHECK-NOT: return
+// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK: class_method [volatile] [[BORROWED_ARG]] : $FinalGizmo, #FinalGizmo.y!getter.1.foreign : (FinalGizmo) -> () -> String, $@convention(objc_method) (FinalGizmo) -> @autoreleased NSString
+// CHECK: return
 func testFinal(_ obj: FinalGizmo) -> String {
-  // CHECK: class_method [volatile] %0 : $FinalGizmo, #FinalGizmo.kvc2!1.foreign : (FinalGizmo) -> () -> (), $@convention(objc_method) (FinalGizmo) -> ()
-  // CHECK-NOT: return
-  // CHECK: class_method [volatile] %0 : $FinalGizmo, #FinalGizmo.y!getter.1.foreign : (FinalGizmo) -> () -> String, $@convention(objc_method) (FinalGizmo) -> @autoreleased NSString
-  // CHECK: return
   obj.kvc2()
   return obj.y
 }

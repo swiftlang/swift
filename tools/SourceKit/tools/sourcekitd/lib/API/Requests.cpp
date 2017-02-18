@@ -801,7 +801,10 @@ handleSemanticRequest(RequestDict Req,
     }
     Input.ArgNames.resize(ArgParts.size() + Selectors.size());
     std::transform(ArgParts.begin(), ArgParts.end(), Input.ArgNames.begin(),
-                   [](const char *C) { return StringRef(C); });
+      [](const char *C) {
+        StringRef Original(C);
+        return Original == "_" ? StringRef() : Original;
+      });
     std::transform(Selectors.begin(), Selectors.end(), Input.ArgNames.begin(),
                    [](const char *C) { return StringRef(C); });
     return Lang.getNameInfo(*SourceFile, Offset, Input, Args,

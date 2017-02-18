@@ -2,7 +2,7 @@
 
 func arch<F>(_ f: F) {}
 
-// CHECK: define hidden void @_TF17function_metadata9test_archFT_T_()
+// CHECK: define hidden swiftcc void @_TF17function_metadata9test_archFT_T_()
 func test_arch() {
   // CHECK: call %swift.type* @swift_getFunctionTypeMetadata1([[WORD:i(64|32)]] 1, i8* bitcast (%swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMT_, i32 0, i32 1) to i8*), %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMT_, i32 0, i32 1)) {{#[0-9]+}}
   arch( {() -> () in } )

@@ -19,34 +19,11 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Syntax/TokenKinds.h"
 #include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
-
-enum class tok {
-  unknown = 0,
-  eof,
-  code_complete,
-  identifier,
-  oper_binary_unspaced,   // "x+y"
-  oper_binary_spaced,     // "x + y"
-  oper_postfix,
-  oper_prefix,
-  dollarident,
-  integer_literal,
-  floating_literal,
-  string_literal,
-  sil_local_name,      // %42 in SIL mode.
-  comment,
-  
-#define KEYWORD(X) kw_ ## X,
-#define PUNCTUATOR(X, Y) X,
-#define POUND_KEYWORD(X) pound_ ## X,
-#include "swift/Parse/Tokens.def"
-  
-  NUM_TOKENS
-};
 
 /// Token - This structure provides full information about a lexed token.
 /// It is not intended to be space efficient, it is intended to return as much
@@ -81,6 +58,10 @@ class Token {
 public:
   Token() : Kind(tok::NUM_TOKENS), AtStartOfLine(false), CommentLength(0),
             EscapedIdentifier(false) {}
+  Token(tok Kind, StringRef Text)
+    : Kind(Kind), AtStartOfLine(false), CommentLength(0),
+      EscapedIdentifier(false),
+      Text(Text) {}
   
   tok getKind() const { return Kind; }
   void setKind(tok K) { Kind = K; }
@@ -220,7 +201,27 @@ public:
   bool isKeyword() const {
     switch (Kind) {
 #define KEYWORD(X) case tok::kw_##X: return true;
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
+    default: return false;
+    }
+  }
+
+  /// True if the token is any literal.
+  bool isLiteral() const {
+    switch(Kind) {
+    case tok::integer_literal:
+    case tok::floating_literal:
+    case tok::string_literal:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  bool isPunctuation() const {
+    switch (Kind) {
+#define PUNCTUATOR(Name, Str) case tok::Name: return true;
+#include "swift/Syntax/TokenKinds.def"
     default: return false;
     }
   }

@@ -2092,7 +2092,7 @@ namespace {
               typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
                             Decl, Accessibility::Public,
                             Impl.importSourceLoc(Decl->getLocStart()),
-                            Name,
+                            SourceLoc(), Name,
                             Impl.importSourceLoc(Decl->getLocation()),
                             /*genericparams*/nullptr, DC);
               typealias->setUnderlyingType(
@@ -2116,7 +2116,7 @@ namespace {
               typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
                             Decl, Accessibility::Public,
                             Impl.importSourceLoc(Decl->getLocStart()),
-                            Name,
+                            SourceLoc(), Name,
                             Impl.importSourceLoc(Decl->getLocation()),
                             /*genericparams*/nullptr, DC);
               typealias->setUnderlyingType(
@@ -2185,7 +2185,7 @@ namespace {
       auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(Decl,
                                       Accessibility::Public,
                                       Impl.importSourceLoc(Decl->getLocStart()),
-                                      Name,
+                                      SourceLoc(), Name,
                                       Loc,
                                       /*genericparams*/nullptr, DC);
       Result->setUnderlyingType(SwiftType);
@@ -2455,7 +2455,9 @@ namespace {
           // Add the ErrorType alias:
           //   public typealias ErrorType
           auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-                         decl, Accessibility::Public, loc, C.Id_ErrorType, loc,
+                         decl,
+                         Accessibility::Public, loc, SourceLoc(),
+                         C.Id_ErrorType, loc,
                          /*genericparams=*/nullptr, enumDecl);
           alias->setUnderlyingType(errorWrapper->getDeclaredInterfaceType());
           enumDecl->addMember(alias);
@@ -2565,7 +2567,11 @@ namespace {
               ImportedName importedName =
                   Impl.importFullName(constant, getActiveSwiftVersion());
               Identifier name = importedName.getDeclName().getBaseName();
-              if (!name.empty()) {
+              if (name.empty()) {
+                // Clear the existing declaration so we don't try to process it
+                // twice later.
+                enumeratorDecl = nullptr;
+              } else {
                 auto original = cast<ValueDecl>(enumeratorDecl);
                 enumeratorDecl = importEnumCaseAlias(name, constant, original,
                                                      decl, enumeratorContext);
@@ -2723,9 +2729,12 @@ namespace {
 
         auto member = Impl.importDecl(nd, getActiveSwiftVersion());
         if (!member) {
-          // We don't know what this field is. Assume it may be important in C.
-          hasUnreferenceableStorage = true;
-          hasMemberwiseInitializer = false;
+          if (!isa<clang::TypeDecl>(nd)) {
+            // We don't know what this field is.
+            // Assume it may be important in C.
+            hasUnreferenceableStorage = true;
+            hasMemberwiseInitializer = false;
+          }
           continue;
         }
 
@@ -3078,8 +3087,6 @@ namespace {
         return nullptr;
 
       DeclName name = owningStorage ? DeclName() : importedName.getDeclName();
-      bool hasCustomName = importedName.hasCustomName();
-
       if (importedName.importAsMember()) {
         assert(!correctSwiftName && "Swift 2 didn't support import-as-member!");
 
@@ -3110,7 +3117,8 @@ namespace {
       auto loc = Impl.importSourceLoc(decl->getLocation());
 
       if (name && name.isSimpleName()) {
-        assert(hasCustomName && "imported function with simple name?");
+        assert(importedName.hasCustomName() &&
+               "imported function with simple name?");
         // Just fill in empty argument labels.
         name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
       }
@@ -4415,7 +4423,7 @@ namespace {
       typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
                     decl, Accessibility::Public,
                     Impl.importSourceLoc(decl->getLocStart()),
-                    name,
+                    SourceLoc(), name,
                     Impl.importSourceLoc(decl->getLocation()),
                     /*genericparams=*/nullptr, dc);
 
@@ -4650,8 +4658,9 @@ Decl *SwiftDeclConverter::importSwift2TypeAlias(const clang::NamedDecl *decl,
 
   // Create the type alias.
   auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-      decl, Accessibility::Public, Impl.importSourceLoc(decl->getLocStart()),
-      swift2Name.getDeclName().getBaseName(),
+      decl,
+      Accessibility::Public, Impl.importSourceLoc(decl->getLocStart()),
+      SourceLoc(), swift2Name.getDeclName().getBaseName(),
       Impl.importSourceLoc(decl->getLocation()),
       genericParams, dc);
   alias->setUnderlyingType(underlyingType);

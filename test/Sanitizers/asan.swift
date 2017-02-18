@@ -5,6 +5,26 @@
 // REQUIRES: asan_runtime
 // XFAIL: linux
 
+// Make sure we can handle swifterror. LLVM's address sanitizer pass needs to
+// ignore swifterror addresses.
+
+enum MyError : Error {
+  case A
+}
+public func foobar(_ x: Int) throws {
+  if x == 0 {
+    throw MyError.A
+  }
+
+}
+
+public func call_foobar() {
+  do {
+    try foobar(1)
+  } catch(_) {
+  }
+}
+
 // Test AddressSanitizer execution end-to-end.
 
 var a = UnsafeMutablePointer<Int>.allocate(capacity: 1)

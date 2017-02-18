@@ -856,7 +856,7 @@ namespace {
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
       lowering.addOpaqueData(offset.asCharUnits(),
-                             getFixedSize().asCharUnits());
+                             (offset + getFixedSize()).asCharUnits());
     }
 
     void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
@@ -1219,18 +1219,20 @@ namespace {
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
-      for (auto &elt : ElementsWithPayload) {
-        // Elements are always stored at offset 0.
-        // This will only be called on strategies for loadable types.
-        cast<LoadableTypeInfo>(elt.ti)->addToAggLowering(IGM, lowering, offset);
-      }
+
+      Size runningOffset = offset;
+      PayloadSchema.forEachType(IGM, [&](llvm::Type *payloadTy) {
+        lowering.addTypedData(payloadTy, runningOffset.asCharUnits());
+        runningOffset += Size(IGM.DataLayout.getTypeStoreSize(payloadTy));
+      });
 
       // Add the extra tag bits.
       if (ExtraTagBitCount > 0) {
         auto tagStoreSize = IGM.DataLayout.getTypeStoreSize(ExtraTagTy);
         auto tagOffset = offset + getOffsetOfExtraTagBits();
+        assert(tagOffset == runningOffset);
         lowering.addOpaqueData(tagOffset.asCharUnits(),
-                               Size(tagStoreSize).asCharUnits());
+                               (tagOffset + Size(tagStoreSize)).asCharUnits());
       }
     }
 

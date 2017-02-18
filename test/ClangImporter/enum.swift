@@ -204,3 +204,7 @@ _ = EmptySet1.default
 _ = EmptySet2.none
 // ...or the original name.
 _ = EmptySet3.None
+
+// Just use this type, making sure that its case alias doesn't cause problems.
+// rdar://problem/30401506
+_ = EnumWithAwkwardDeprecations.normalCase1

@@ -176,8 +176,10 @@ bb0:
   init_existential_addr undef : $*P, $D
   // CHECK: deinit_existential_addr undef : $*P
   deinit_existential_addr undef : $*P
-  // CHECK: open_existential_addr undef : $*P to $*@opened("01234567-89AB-CDEF-0123-000000000000") P
-  open_existential_addr undef : $*P to $*@opened("01234567-89AB-CDEF-0123-000000000000") P
+  // CHECK: open_existential_addr immutable_access undef : $*P to $*@opened("01234567-89AB-CDEF-0123-000000000000") P
+  open_existential_addr immutable_access undef : $*P to $*@opened("01234567-89AB-CDEF-0123-000000000000") P
+  // CHECK: open_existential_addr mutable_access undef : $*P to $*@opened("01234567-89AB-CDEF-0123-100000000000") P
+  open_existential_addr mutable_access undef : $*P to $*@opened("01234567-89AB-CDEF-0123-100000000000") P
   // CHECK: init_existential_ref undef : $D : $D, $ClassP
   init_existential_ref undef : $D : $D, $ClassP
   // CHECK: open_existential_ref undef : $ClassP to $@opened("01234567-89AB-CDEF-0123-000000000001") ClassP

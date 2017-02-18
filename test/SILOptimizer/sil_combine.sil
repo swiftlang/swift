@@ -2522,7 +2522,7 @@ bb0(%0 : $*T):
   %4 = init_existential_addr %3 : $*someProtocol, $T // user: %5
   copy_addr %0 to [initialization] %4 : $*T       // id: %5
   destroy_addr %0 : $*T                           // id: %6
-  %7 = open_existential_addr %3 : $*someProtocol to $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol // users: %8, %9
+  %7 = open_existential_addr immutable_access %3 : $*someProtocol to $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol // users: %8, %9
   %8 = witness_method $@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol, #someProtocol.i!getter.1, %7 : $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol : $@convention(witness_method) <τ_0_0 where τ_0_0 : someProtocol> (@in_guaranteed τ_0_0) -> Int // user: %9
   %9 = apply %8<@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol>(%7) : $@convention(witness_method) <τ_0_0 where τ_0_0 : someProtocol> (@in_guaranteed τ_0_0) -> Int
   destroy_addr %3 : $*someProtocol              // id: %13
@@ -2952,14 +2952,14 @@ bb0(%0 : $*T, %1 : $*T):
 
 // CHECK-LABEL: sil @test_existential_partial_apply_apply
 // CHECK: bb0(%0 : $*FakeProtocol):
-// CHECK-NEXT: [[OPEN:%.*]] = open_existential_addr
+// CHECK-NEXT: [[OPEN:%.*]] = open_existential_addr immutable_access
 // CHECK-NEXT: [[FN:%.*]] = witness_method
 // CHECK-NEXT: apply [[FN]]<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>([[OPEN]])
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 sil @test_existential_partial_apply_apply : $@convention(thin) (@in FakeProtocol) -> () {
 bb0(%0: $*FakeProtocol):
-  %o = open_existential_addr %0 : $*FakeProtocol to $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol
+  %o = open_existential_addr immutable_access %0 : $*FakeProtocol to $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol
   %f1 = witness_method $@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol, #FakeProtocol.requirement!1, %o : $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol : $@convention(witness_method) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
   %pa = partial_apply %f1<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>() : $@convention(witness_method) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
   %a1 = apply %pa(%o) : $@callee_owned (@in_guaranteed @opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol) -> ()
@@ -3113,7 +3113,7 @@ sil @minus : $@convention(method) <Self where Self : PM> (@in_guaranteed Self) -
 
 // CHECK-LABEL: sil @silcombine_dont_change_allocstack_for_opened_archetypes
 // CHECK-NOT: alloc_stack{{.*}}opened
-// CHECK: open_existential_addr {{%[0-9]+}} : $*PM to $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
+// CHECK: open_existential_addr immutable_access {{%[0-9]+}} : $*PM to $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
 // CHECK: return
 sil @silcombine_dont_change_allocstack_for_opened_archetypes : $@convention(thin) (@owned VV) -> () {
 bb0(%0 : $VV):
@@ -3121,7 +3121,7 @@ bb0(%0 : $VV):
   %9 = ref_element_addr %0 : $VV, #VV.m
   %10 = alloc_stack $PM
   copy_addr %9 to [initialization] %10 : $*PM
-  %12 = open_existential_addr %10 : $*PM to $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
+  %12 = open_existential_addr immutable_access %10 : $*PM to $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
   %13 = init_existential_addr %8 : $*PM, $@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
   %14 = function_ref @plus : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> @out τ_0_0
   %15 = apply %14<@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM>(%13, %12) : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> @out τ_0_0

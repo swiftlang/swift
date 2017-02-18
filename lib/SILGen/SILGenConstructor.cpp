@@ -129,10 +129,12 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
       // initializer - it doesn't come from an argument.
       if (!field->isStatic() && field->isLet() &&
           field->getParentInitializer()) {
+#ifndef NDEBUG
         auto fieldTy = decl->getDeclContext()->mapTypeIntoContext(
             field->getInterfaceType());
         assert(fieldTy->isEqual(field->getParentInitializer()->getType())
                && "Checked by sema");
+#endif
 
         // Cleanup after this initialization.
         FullExpr scope(gen.Cleanups, field->getParentPatternBinding());
@@ -775,7 +777,7 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(pattern);
     // Form the lvalue referencing this member.
-    WritebackScope scope(SGF);
+    FormalEvaluationScope scope(SGF);
     LValue memberRef = emitLValueForMemberInit(SGF, pattern, selfDecl,
                                                named->getDecl());
 

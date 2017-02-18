@@ -28,7 +28,7 @@ class BigClass {
 sil_vtable TestClass {}
 sil_vtable BigClass {}
 
-// CHECK-LABEL: define{{( protected)?}} void @simple_promote
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @simple_promote
 // CHECK: %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
 // CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @_T017class_stack_alloc9TestClassCMa()
 // CHECK-NEXT: [[O:%[0-9]+]] = bitcast %[[C]]* %reference.raw to %swift.refcounted*
@@ -51,7 +51,7 @@ bb0:
 // A stack promotion limit of 48 bytes allows that one of the two alloc_refs
 // can be allocated on the stack.
 
-// CHECK-LABEL: define{{( protected)?}} void @exceed_limit
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @exceed_limit
 // CHECK: alloca {{.*}}TestClass
 // CHECK: alloca {{.*}}TestStruct
 // CHECK-NOT: alloca
@@ -79,14 +79,14 @@ bb0:
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @promoted_with_devirtualized_release
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @promoted_with_devirtualized_release
 // CHECK: %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
 // CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @_T017class_stack_alloc9TestClassCMa()
 // CHECK-NEXT: [[O:%[0-9]+]] = bitcast %[[C]]* %reference.raw to %swift.refcounted*
 // CHECK-NEXT: %reference.new = call %swift.refcounted* @swift_initStackObject(%swift.type* [[M]], %swift.refcounted* [[O]])
 // CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C]]*
 // CHECK-NEXT: call {{.*}} @swift_setDeallocating {{.*}}(%[[C]]* [[R]])
-// CHECK-NEXT: call void @not_inlined_destructor(%[[C]]* [[R]])
+// CHECK-NEXT: call swiftcc void @not_inlined_destructor(%[[C]]* [[R]])
 // CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %[[C]]* [[R]] to i8*
 // CHECK-NEXT: call void @llvm.lifetime.end(i64 -1, i8* [[O2]])
 // CHECK-NEXT: ret void
@@ -102,7 +102,7 @@ bb0:
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @promoted_with_inlined_devirtualized_release
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @promoted_with_inlined_devirtualized_release
 // CHECK: %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
 // CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @_T017class_stack_alloc9TestClassCMa()
 // CHECK-NEXT: [[O:%[0-9]+]] = bitcast %[[C]]* %reference.raw to %swift.refcounted*
@@ -123,7 +123,7 @@ bb0:
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @not_promoted_with_inlined_devirtualized_release
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @not_promoted_with_inlined_devirtualized_release
 // CHECK: [[O:%[0-9]+]] = call {{.*}} @swift_rt_swift_allocObject
 // CHECK-NEXT: [[BC:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to
 // CHECK-NEXT: call {{.*}} @swift_setDeallocating {{.*}}({{.*}} [[BC]])

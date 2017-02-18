@@ -438,8 +438,8 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
   // Record the initial set of search paths.
   for (StringRef path : SearchPathOpts.ImportSearchPaths)
     Impl.SearchPathsSet[path] |= SearchPathKind::Import;
-  for (StringRef path : SearchPathOpts.FrameworkSearchPaths)
-    Impl.SearchPathsSet[path] |= SearchPathKind::Framework;
+  for (const auto &framepath : SearchPathOpts.FrameworkSearchPaths)
+    Impl.SearchPathsSet[framepath.Path] |= SearchPathKind::Framework;
 }
 
 ASTContext::~ASTContext() {
@@ -1145,7 +1145,8 @@ void ASTContext::setSubstitutions(TypeBase* type,
   boundGenericSubstitutions[{type, gpContext}] = Subs;
 }
 
-void ASTContext::addSearchPath(StringRef searchPath, bool isFramework) {
+void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
+                               bool isSystem) {
   OptionSet<SearchPathKind> &loaded = Impl.SearchPathsSet[searchPath];
   auto kind = isFramework ? SearchPathKind::Framework : SearchPathKind::Import;
   if (loaded.contains(kind))
@@ -1153,12 +1154,12 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework) {
   loaded |= kind;
 
   if (isFramework)
-    SearchPathOpts.FrameworkSearchPaths.push_back(searchPath);
+    SearchPathOpts.FrameworkSearchPaths.push_back({searchPath, isSystem});
   else
     SearchPathOpts.ImportSearchPaths.push_back(searchPath);
 
   if (auto *clangLoader = getClangModuleLoader())
-    clangLoader->addSearchPath(searchPath, isFramework);
+    clangLoader->addSearchPath(searchPath, isFramework, isSystem);
 }
 
 void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,

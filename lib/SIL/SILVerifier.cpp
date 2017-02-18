@@ -10,31 +10,33 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "silverifier"
-#include "swift/SIL/SILDebugScope.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILOpenedArchetypesTracker.h"
-#include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/SILVTable.h"
-#include "swift/SIL/Dominance.h"
-#include "swift/SIL/DynamicCasts.h"
-#include "swift/AST/AnyFunctionRef.h"
+#define DEBUG_TYPE "sil-verifier"
+#include "TransitivelyUnreachableBlocks.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
-#include "swift/SIL/PrettyStackTrace.h"
-#include "swift/SIL/TypeLowering.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Basic/Range.h"
-#include "llvm/Support/Debug.h"
+#include "swift/ClangImporter/ClangModule.h"
+#include "swift/SIL/Dominance.h"
+#include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/PostOrder.h"
+#include "swift/SIL/PrettyStackTrace.h"
+#include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILOpenedArchetypesTracker.h"
+#include "swift/SIL/SILVTable.h"
+#include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 using namespace swift;
 
 using Lowering::AbstractionPattern;
@@ -106,8 +108,11 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
   SILOpenedArchetypesTracker OpenedArchetypes;
+  SmallVector<StringRef, 16> DebugVars;
   const SILInstruction *CurInstruction = nullptr;
   DominanceInfo *Dominance = nullptr;
+  llvm::Optional<PostOrderFunctionInfo> PostOrderInfo;
+  llvm::Optional<TransitivelyUnreachableBlocksInfo> UnreachableBlockInfo;
   bool SingleFunction = true;
 
   SILVerifier(const SILVerifier&) = delete;
@@ -413,6 +418,7 @@ public:
       : M(F.getModule().getSwiftModule()), F(F),
         fnConv(F.getLoweredFunctionType(), F.getModule()),
         TC(F.getModule().Types), OpenedArchetypes(F), Dominance(nullptr),
+        PostOrderInfo(), UnreachableBlockInfo(),
         SingleFunction(SingleFunction) {
     if (F.isExternalDeclaration())
       return;
@@ -425,7 +431,11 @@ public:
               "Basic blocks must end with a terminator instruction");
     }
 
-    Dominance = new DominanceInfo(const_cast<SILFunction*>(&F));
+    Dominance = new DominanceInfo(const_cast<SILFunction *>(&F));
+    if (isSILOwnershipEnabled()) {
+      PostOrderInfo.emplace(const_cast<SILFunction *>(&F));
+      UnreachableBlockInfo.emplace(PostOrderInfo.getValue());
+    }
 
     auto *DebugScope = F.getDebugScope();
     require(DebugScope, "All SIL functions must have a debug scope");
@@ -476,7 +486,8 @@ public:
     // ownership.
     if (!F->hasQualifiedOwnership())
       return;
-    SILValue(V).verifyOwnership(F->getModule());
+    SILValue(V).verifyOwnership(F->getModule(),
+                                &UnreachableBlockInfo.getValue());
   }
 
   void checkSILInstruction(SILInstruction *I) {
@@ -566,6 +577,38 @@ public:
     SILLocation L = I->getLoc();
     SILLocation::LocationKind LocKind = L.getKind();
     ValueKind InstKind = I->getKind();
+
+    // Check that there is at most one debug variable defined
+    // for each argument slot. This catches SIL transformations
+    // that accidentally remove inline information (stored in the SILDebugScope)
+    // from debug-variable-carrying instructions.
+    if (!DS->InlinedCallSite) {
+      SILDebugVariable VarInfo;
+      if (auto *DI = dyn_cast<AllocStackInst>(I)) {
+        VarInfo = DI->getVarInfo();
+      } else if (auto *DI = dyn_cast<AllocBoxInst>(I)) {
+        VarInfo = DI->getVarInfo();
+      } else if (auto *DI = dyn_cast<DebugValueInst>(I)) {
+        VarInfo = DI->getVarInfo();
+      } else if (auto *DI = dyn_cast<DebugValueAddrInst>(I)) {
+        VarInfo = DI->getVarInfo();
+      }
+
+      if (unsigned ArgNo = VarInfo.ArgNo) {
+        // It is a function argument.
+        if (ArgNo < DebugVars.size() && !DebugVars[ArgNo].empty()) {
+          require(DebugVars[ArgNo] == VarInfo.Name,
+                  "Scope contains conflicting debug variables for one function "
+                  "argument");
+        } else {
+          // Reserve enough space.
+          while (DebugVars.size() <= ArgNo) {
+            DebugVars.push_back(StringRef());
+          }
+        }
+        DebugVars[ArgNo] = VarInfo.Name;
+      }
+    }
 
     // Regular locations are allowed on all instructions.
     if (LocKind == SILLocation::RegularKind)
@@ -3441,10 +3484,6 @@ public:
   }
 
   void verifyBranches(SILFunction *F) {
-    // If we are not in canonical SIL return early.
-    if (F->getModule().getStage() != SILStage::Canonical)
-      return;
-
     // Verify that there is no non_condbr critical edge.
     auto isCriticalEdgePred = [](const TermInst *T, unsigned EdgeIdx) {
       assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
@@ -3464,15 +3503,44 @@ public:
       return true;
     };
 
-    // Check for non-cond_br critical edges.
+    SILModule &M = F->getModule();
     for (auto &BB : *F) {
       TermInst *TI = BB.getTerminator();
-      if (isa<CondBranchInst>(TI))
+
+      // Check for non-cond_br critical edges in canonical SIL.
+      if (!isa<CondBranchInst>(TI) && M.getStage() == SILStage::Canonical) {
+        for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
+          require(!isCriticalEdgePred(TI, Idx),
+                  "non cond_br critical edges not allowed");
+        }
+        continue;
+      }
+
+      // In ownership qualified SIL, ban critical edges from CondBranchInst that
+      // have non-trivial arguments.
+      if (!F->hasQualifiedOwnership())
         continue;
 
-      for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
-        require(!isCriticalEdgePred(TI, Idx),
-                "non cond_br critical edges not allowed");
+      auto *CBI = dyn_cast<CondBranchInst>(TI);
+      if (!CBI)
+        continue;
+      if (isCriticalEdgePred(CBI, CondBranchInst::TrueIdx)) {
+        require(
+            llvm::all_of(CBI->getTrueArgs(),
+                         [](SILValue V) -> bool {
+                           return V.getOwnershipKind() ==
+                                  ValueOwnershipKind::Trivial;
+                         }),
+            "cond_br with critical edges must not have a non-trivial value");
+      }
+      if (isCriticalEdgePred(CBI, CondBranchInst::FalseIdx)) {
+        require(
+            llvm::all_of(CBI->getFalseArgs(),
+                         [](SILValue V) -> bool {
+                           return V.getOwnershipKind() ==
+                                  ValueOwnershipKind::Trivial;
+                         }),
+            "cond_br with critical edges must not have a non-trivial value");
       }
     }
   }

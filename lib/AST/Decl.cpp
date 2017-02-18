@@ -27,7 +27,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
@@ -2250,11 +2250,12 @@ void GenericTypeDecl::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
   ++NumLazyGenericEnvironments;
 }
 
-TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                             SourceLoc NameLoc, GenericParamList *GenericParams,
-                             DeclContext *DC)
+TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, SourceLoc EqualLoc,
+                             Identifier Name, SourceLoc NameLoc,
+                             GenericParamList *GenericParams, DeclContext *DC)
   : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
-    TypeAliasLoc(TypeAliasLoc) {
+    TypeAliasLoc(TypeAliasLoc),
+    EqualLoc(EqualLoc) {
   TypeAliasDeclBits.HasCompletedValidation = false;
 }
 
@@ -2409,6 +2410,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
     = static_cast<unsigned>(StoredInheritsSuperclassInits::Unchecked);
   ClassDeclBits.RawForeignKind = 0;
   ClassDeclBits.HasDestructorDecl = 0;
+  ClassDeclBits.ObjCClassKind = 0;
 }
 
 DestructorDecl *ClassDecl::getDestructor() {
@@ -2502,6 +2504,10 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 }
 
 ObjCClassKind ClassDecl::checkObjCAncestry() const {
+  // See if we've already computed this.
+  if (ClassDeclBits.ObjCClassKind)
+    return ObjCClassKind(ClassDeclBits.ObjCClassKind - 1);
+
   llvm::SmallPtrSet<const ClassDecl *, 8> visited;
   bool genericAncestry = false, isObjC = false;
   const ClassDecl *CD = this;
@@ -2528,14 +2534,18 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
       break;
   }
 
+  ObjCClassKind kind = ObjCClassKind::ObjC;
   if (!isObjC)
-    return ObjCClassKind::NonObjC;
-  if (genericAncestry)
-    return ObjCClassKind::ObjCMembers;
-  if (CD == this || !CD->isObjC())
-    return ObjCClassKind::ObjCWithSwiftRoot;
+    kind = ObjCClassKind::NonObjC;
+  else if (genericAncestry)
+    kind = ObjCClassKind::ObjCMembers;
+  else if (CD == this || !CD->isObjC())
+    kind = ObjCClassKind::ObjCWithSwiftRoot;
 
-  return ObjCClassKind::ObjC;
+  // Save the result for later.
+  const_cast<ClassDecl *>(this)->ClassDeclBits.ObjCClassKind
+    = unsigned(kind) + 1;
+  return kind;
 }
 
 /// Mangle the name of a protocol or class for use in the Objective-C
@@ -2543,26 +2553,12 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
 static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
                                        llvm::SmallVectorImpl<char> &buffer) {
   {
-    // TODO: Mangling: Use new mangling scheme as soon as the ObjC runtime
-    // can demangle it.
-
-    // Mangle the type.
-    Mangle::Mangler mangler(false/*dwarf*/, false/*punycode*/);
-
-    // We add the "_Tt" prefix to make this a reserved name that will
-    // not conflict with any valid Objective-C class or protocol name.
-    mangler.append("_Tt");
-
-    NominalTypeDecl *NTD = const_cast<NominalTypeDecl*>(nominal);
-    if (isa<ClassDecl>(nominal)) {
-      mangler.mangleNominalType(NTD);
-    } else {
-      mangler.mangleProtocolDecl(cast<ProtocolDecl>(NTD));
-    }
+    NewMangling::ASTMangler Mangler;
+    std::string MangledName = Mangler.mangleObjCRuntimeName(nominal);
 
     buffer.clear();
     llvm::raw_svector_ostream os(buffer);
-    mangler.finalize(os);
+    os << MangledName;
   }
 
   assert(buffer.size() && "Invalid buffer size");
@@ -3018,19 +3014,19 @@ void ProtocolDecl::computeRequirementSignature() {
                   genericSig->getRequirements().size() == 1;
   if (!validSig) {
     // This doesn't look like a protocol we can handle, so some other error must
-    // have occured (usually a protocol nested within another declaration)
+    // have occurred (usually a protocol nested within another declaration)
     return;
   }
 
   auto selfType = genericSig->getGenericParams()[0];
   auto requirement = genericSig->getRequirements()[0];
 
-  RequirementSource source(RequirementSource::ProtocolRequirementSignatureSelf,
-                           getLoc());
-
-  GenericSignatureBuilder builder(getASTContext(), LookUpConformanceInModule(module));
+  GenericSignatureBuilder builder(getASTContext(),
+                                  LookUpConformanceInModule(module));
   builder.addGenericParameter(selfType);
-  builder.addRequirement(requirement, source);
+  builder.addRequirement(requirement,
+                         RequirementSource::forRequirementSignature(builder,
+                                                                    this));
   builder.finalize(SourceLoc(), { selfType });
   
   RequirementSignature = builder.getGenericSignature();
@@ -3406,7 +3402,7 @@ void AbstractStorageDecl::setInvalidBracesRange(SourceRange BracesRange) {
 }
 
 ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
-               LazyResolver *resolver) const {
+               LazyResolver *resolver, Identifier preferredName) const {
   // If the getter has an @objc attribute with a name, use that.
   if (auto getter = getGetter()) {
     if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>()) {
@@ -3430,11 +3426,16 @@ ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
 
   // The getter selector is the property name itself.
   auto var = cast<VarDecl>(this);
-  return VarDecl::getDefaultObjCGetterSelector(ctx, var->getObjCPropertyName());
+  auto name = var->getObjCPropertyName();
+
+  // Use preferred name is specified.
+  if (!preferredName.empty())
+    name = preferredName;
+  return VarDecl::getDefaultObjCGetterSelector(ctx, name);
 }
 
 ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
-               LazyResolver *resolver) const {
+               LazyResolver *resolver, Identifier preferredName) const {
   // If the setter has an @objc attribute with a name, use that.
   auto setter = getSetter();
   auto objcAttr = setter ? setter->getAttrs().getAttribute<ObjCAttr>()
@@ -3464,9 +3465,10 @@ ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
   // The setter selector for, e.g., 'fooBar' is 'setFooBar:', with the
   // property name capitalized and preceded by 'set'.
   auto var = cast<VarDecl>(this);
-  auto result = VarDecl::getDefaultObjCSetterSelector(
-                  ctx, 
-                  var->getObjCPropertyName());
+  Identifier Name = var->getObjCPropertyName();
+  if (!preferredName.empty())
+    Name = preferredName;
+  auto result = VarDecl::getDefaultObjCSetterSelector(ctx, Name);
 
   // Cache the result, so we don't perform string manipulation again.
   if (objcAttr)
@@ -4320,7 +4322,7 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
 }
 
 ObjCSelector AbstractFunctionDecl::getObjCSelector(
-               LazyResolver *resolver) const {
+               LazyResolver *resolver, DeclName preferredName) const {
   // If there is an @objc attribute with a name, use that name.
   auto objc = getAttrs().getAttribute<ObjCAttr>();
   if (objc) {
@@ -4329,15 +4331,27 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
   }
 
   auto &ctx = getASTContext();
+  auto baseName = getName();
   auto argNames = getFullName().getArgumentNames();
+
+  // Use the preferred name if specified
+  if (preferredName) {
+    // Return invalid selector if argument count doesn't match.
+    if (argNames.size() != preferredName.getArgumentNames().size()) {
+      return ObjCSelector();
+    }
+    baseName = preferredName.getBaseName();
+    argNames = preferredName.getArgumentNames();
+  }
 
   auto func = dyn_cast<FuncDecl>(this);
   if (func) {
     // For a getter or setter, go through the variable or subscript decl.
     if (func->isGetterOrSetter()) {
       auto asd = cast<AbstractStorageDecl>(func->getAccessorStorageDecl());
-      return func->isGetter() ? asd->getObjCGetterSelector(resolver)
-                              : asd->getObjCSetterSelector(resolver);
+      return func->isGetter() ?
+        asd->getObjCGetterSelector(resolver, baseName) :
+        asd->getObjCSetterSelector(resolver, baseName);
     }
   }
 
@@ -4373,12 +4387,12 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
 
   // If we have no arguments, it's a nullary selector.
   if (numSelectorPieces == 0) {
-    return ObjCSelector(ctx, 0, getName());
+    return ObjCSelector(ctx, 0, baseName);
   }
 
  // If it's a unary selector with no name for the first argument, we're done.
   if (numSelectorPieces == 1 && argNames.size() == 1 && argNames[0].empty()) {
-    return ObjCSelector(ctx, 1, getName());
+    return ObjCSelector(ctx, 1, baseName);
   }
 
   /// Collect the selector pieces.
@@ -4403,7 +4417,7 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
 
     // For the first selector piece, attach either the first parameter
     // or "AndReturnError" to the base name, if appropriate.
-    auto firstPiece = getName();
+    auto firstPiece = baseName;
     llvm::SmallString<32> scratch;
     scratch += firstPiece.str();
     if (errorConvention && piece == errorConvention->getErrorParameterIndex()) {

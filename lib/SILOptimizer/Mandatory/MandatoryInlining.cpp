@@ -538,10 +538,7 @@ class MandatoryInlining : public SILModuleTransform {
     // even if we didn't inline them for some reason.
     // Transparent functions are not available externally, so we
     // have to generate code for them.
-    for (auto &F : *M) {
-      if (F.isTransparent())
-        M->linkFunction(&F, Mode);
-    }
+    M->linkTransparentFunctions();
     
     if (!ShouldCleanup)
       return;

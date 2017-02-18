@@ -1073,7 +1073,7 @@ RequirementEnvironment::RequirementEnvironment(
 
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
-  RequirementSource source(RequirementSource::Explicit, SourceLoc());
+  auto source = RequirementSource::forAbstract(builder);
   for (auto &reqReq : reqSig->getRequirements()) {
     switch (reqReq.getKind()) {
     case RequirementKind::Conformance: {
@@ -1749,7 +1749,8 @@ namespace {
 
     /// Infer associated type witnesses for the given value requirement.
     InferredAssociatedTypesByWitnesses inferTypeWitnessesViaValueWitnesses(
-                                         ValueDecl *req);
+                     const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
+                     ValueDecl *req);
 
     /// Infer associated type witnesses for all relevant value requirements.
     ///
@@ -2279,6 +2280,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     }
 
     auto aliasDecl = new (TC.Context) TypeAliasDecl(SourceLoc(),
+                                                    SourceLoc(),
                                                     assocType->getName(),
                                                     SourceLoc(),
                                                     /*genericparams*/nullptr, 
@@ -2979,7 +2981,9 @@ static bool associatedTypesAreSameEquivalenceClass(AssociatedTypeDecl *a,
 }
 
 InferredAssociatedTypesByWitnesses
-ConformanceChecker::inferTypeWitnessesViaValueWitnesses(ValueDecl *req) {
+ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
+                    const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
+                    ValueDecl *req) {
   InferredAssociatedTypesByWitnesses result;
 
   auto isExtensionUsableForInference = [&](ExtensionDecl *extension) -> bool {
@@ -3038,53 +3042,73 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(ValueDecl *req) {
     // Filter out duplicated inferred types as well as inferred types
     // that don't meet the requirements placed on the associated type.
     llvm::DenseSet<std::pair<AssociatedTypeDecl *, CanType>> known;
-    witnessResult.Inferred.erase(
-      std::remove_if(witnessResult.Inferred.begin(),
-                     witnessResult.Inferred.end(),
-                     [&](const std::pair<AssociatedTypeDecl *, Type> &result) {
-                       // Filter out errors.
-                       if (result.second->hasError())
-                         return true;
+    for (unsigned i = 0; i < witnessResult.Inferred.size(); /*nothing*/) {
+#define REJECT {\
+  witnessResult.Inferred.erase(witnessResult.Inferred.begin() + i); \
+  continue; \
+}
+      auto &result = witnessResult.Inferred[i];
 
-                       // Filter out duplicates.
-                       if (!known.insert({result.first,
-                                         result.second->getCanonicalType()})
-                             .second)
-                         return true;
-                       
-                       // Filter out circular possibilities, e.g. that
-                       // AssocType == S.AssocType or
-                       // AssocType == Foo<S.AssocType>.
-                       bool containsTautologicalType =
-                         result.second.findIf([&](Type t) -> bool {
-                           auto dmt = t->getAs<DependentMemberType>();
-                           if (!dmt)
-                             return false;
-                           if (!associatedTypesAreSameEquivalenceClass(
-                                dmt->getAssocType(), result.first))
-                             return false;
-                           if (!dmt->getBase()->isEqual(Conformance->getType()))
-                             return false;
-                           
-                           return true;
-                         });
-                       
-                       if (containsTautologicalType) {
-                         return true;
-                       }
+      // Filter out errors.
+      if (result.second->hasError())
+        REJECT;
 
-                       // Check that the type witness meets the
-                       // requirements on the associated type.
-                       if (auto failed = checkTypeWitness(TC, DC, result.first,
-                                                          result.second)) {
-                         witnessResult.NonViable.push_back(
-                           std::make_tuple(result.first,result.second,failed));
-                         return true;
-                       }
-
-                       return false;
-                     }),
-      witnessResult.Inferred.end());
+      // Filter out duplicates.
+      if (!known.insert({result.first, result.second->getCanonicalType()})
+                .second)
+        REJECT;
+     
+      // Filter out circular possibilities, e.g. that
+      // AssocType == S.AssocType or
+      // AssocType == Foo<S.AssocType>.
+      bool containsTautologicalType =
+        result.second.findIf([&](Type t) -> bool {
+          auto dmt = t->getAs<DependentMemberType>();
+          if (!dmt)
+            return false;
+          if (!associatedTypesAreSameEquivalenceClass(dmt->getAssocType(),
+                                                      result.first))
+            return false;
+          if (!dmt->getBase()->isEqual(Conformance->getType()))
+            return false;
+          
+          return true;
+        });
+      
+      if (containsTautologicalType)
+        REJECT;
+      
+      // Check that the type witness doesn't contradict an
+      // explicitly-given type witness. If it does contradict, throw out the
+      // witness completely.
+      if (!allUnresolved.count(result.first)) {
+        auto existingWitness =
+        Conformance->getTypeWitness(result.first, nullptr)
+        .getReplacement();
+        // If the deduced type contains an irreducible
+        // DependentMemberType, that indicates a dependency
+        // on another associated type we haven't deduced,
+        // so we can't tell whether there's a contradiction
+        // yet.
+        auto newWitness = result.second->getCanonicalType();
+        if (!newWitness->hasTypeParameter()
+            && !existingWitness->isEqual(newWitness)) {
+          goto next_witness;
+        }
+      }
+      
+      // Check that the type witness meets the
+      // requirements on the associated type.
+      if (auto failed = checkTypeWitness(TC, DC, result.first,
+                                         result.second)) {
+        witnessResult.NonViable.push_back(
+                            std::make_tuple(result.first,result.second,failed));
+        REJECT;
+      }
+      
+      ++i;
+    }
+#undef REJECT
 
     // If no inferred types remain, skip this witness.
     if (witnessResult.Inferred.empty() && witnessResult.NonViable.empty())
@@ -3096,6 +3120,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(ValueDecl *req) {
       witnessResult.Inferred.clear();
 
     result.push_back(std::move(witnessResult));
+next_witness:;
   }
 
   return result;
@@ -3146,7 +3171,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
 
     // Infer associated types from the potential value witnesses for
     // this requirement.
-    auto reqInferred = inferTypeWitnessesViaValueWitnesses(req);
+    auto reqInferred = inferTypeWitnessesViaValueWitnesses(assocTypes, req);
     if (reqInferred.empty())
       continue;
 
@@ -5697,7 +5722,10 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
 
       // Skip types.
       if (isa<TypeDecl>(req)) continue;
-      
+
+      // Skip unavailable requirements.
+      if (req->getAttrs().isUnavailable(Context)) continue;
+
       // Dig out the conformance.
       if (!conformance.hasValue()) {
         SmallVector<ProtocolConformance *, 2> conformances;

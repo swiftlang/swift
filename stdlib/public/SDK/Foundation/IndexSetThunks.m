@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #import <Foundation/Foundation.h>
+#include "swift/Runtime/Config.h"
 
 @interface NSIndexSet (NSRanges)
 - (NSUInteger)rangeCount;
@@ -25,6 +26,7 @@ extern NSUInteger __NSIndexSetRangeCount(id NS_RELEASES_ARGUMENT __nonnull self_
     return result;
 }
 
+SWIFT_CC(swift)
 extern void __NSIndexSetRangeAtIndex(id NS_RELEASES_ARGUMENT __nonnull self_, NSUInteger rangeIndex, NSUInteger * __nonnull location, NSUInteger * __nonnull length) {
     NSIndexSet *indexSet = self_;
     NSRange result = [indexSet rangeAtIndex:rangeIndex];
@@ -33,6 +35,7 @@ extern void __NSIndexSetRangeAtIndex(id NS_RELEASES_ARGUMENT __nonnull self_, NS
     *length = result.length;
 }
 
+SWIFT_CC(swift)
 extern NSUInteger __NSIndexSetIndexOfRangeContainingIndex(id NS_RELEASES_ARGUMENT __nonnull self_, NSUInteger index) {
     NSIndexSet *indexSet = self_;
     NSUInteger result = [indexSet _indexOfRangeContainingIndex:index];

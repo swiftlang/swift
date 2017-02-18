@@ -389,6 +389,7 @@ bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
 /// reference-counting.  The metadata is known to correspond to a class
 /// type, but note that does not imply being known to be a ClassMetadata
 /// due to the existence of ObjCClassWrapper.
+SWIFT_CC(swift)
 SWIFT_RUNTIME_EXPORT
 bool
 swift_objc_class_usesNativeSwiftReferenceCounting(const Metadata *theClass) {
@@ -1454,6 +1455,7 @@ swift_class_getInstanceExtents(const Metadata *c) {
 
 #if SWIFT_OBJC_INTEROP
 
+SWIFT_CC(swift)
 SWIFT_RUNTIME_EXPORT
 ClassExtents::Return
 swift_objc_class_unknownGetInstanceExtents(const ClassMetadata* c) {

@@ -835,10 +835,14 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
 static StringRef copyAndStripUnderscores(ASTContext &C, StringRef orig) {
   char *start = static_cast<char*>(C.Allocate(orig.size(), 1));
   char *p = start;
-  
-  for (char c : orig)
-    if (c != '_')
-      *p++ = c;
+
+  if (p) {
+    for (char c : orig) {
+      if (c != '_') {
+        *p++ = c;
+      }
+    }
+  }
   
   return StringRef(start, p - start);
 }
@@ -1398,14 +1402,14 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:  \
   Result = parseExprObjectLiteral(ObjectLiteralExpr::Name, isExprBasic); \
   break;
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
 
 #define POUND_OLD_OBJECT_LITERAL(Name, NewName, NewArg, OldArg)\
   case tok::pound_##Name:                                               \
     Result = parseExprObjectLiteral(ObjectLiteralExpr::NewName, isExprBasic, \
     "#" #NewName);                                                      \
   break;
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
 
   case tok::code_complete:
     Result = makeParserResult(new (Context) CodeCompletionExpr(Tok.getLoc()));
@@ -1910,28 +1914,31 @@ Expr *Parser::parseExprIdentifier() {
     hasGenericArgumentList = !args.empty();
   }
   
-  ValueDecl *D = lookupInScope(name);
-  // FIXME: We want this to work: "var x = { x() }", but for now it's better
-  // to disallow it than to crash.
-  if (D) {
-    for (auto activeVar : DisabledVars) {
-      if (activeVar == D) {
-        diagnose(loc.getBaseNameLoc(), DisabledVarReason);
-        return new (Context) ErrorExpr(loc.getSourceRange());
-      }
-    }
-  } else {
-    for (auto activeVar : DisabledVars) {
-      if (activeVar->getFullName() == name) {
-        DescriptiveDeclKind Kind;
-        if (DisabledVarReason.ID == diag::var_init_self_referential.ID &&
-            shouldAddSelfFixit(CurDeclContext, name, Kind)) {
-          diagnose(loc.getBaseNameLoc(), diag::expected_self_before_reference,
-                   Kind).fixItInsert(loc.getBaseNameLoc(), "self.");
-        } else {
+  ValueDecl *D = nullptr;
+  if (!InPoundIfEnvironment) {
+    D = lookupInScope(name);
+    // FIXME: We want this to work: "var x = { x() }", but for now it's better
+    // to disallow it than to crash.
+    if (D) {
+      for (auto activeVar : DisabledVars) {
+        if (activeVar == D) {
           diagnose(loc.getBaseNameLoc(), DisabledVarReason);
+          return new (Context) ErrorExpr(loc.getSourceRange());
         }
-        return new (Context) ErrorExpr(loc.getSourceRange());
+      }
+    } else {
+      for (auto activeVar : DisabledVars) {
+        if (activeVar->getFullName() == name) {
+          DescriptiveDeclKind Kind;
+          if (DisabledVarReason.ID == diag::var_init_self_referential.ID &&
+              shouldAddSelfFixit(CurDeclContext, name, Kind)) {
+            diagnose(loc.getBaseNameLoc(), diag::expected_self_before_reference,
+                    Kind).fixItInsert(loc.getBaseNameLoc(), "self.");
+          } else {
+            diagnose(loc.getBaseNameLoc(), DisabledVarReason);
+          }
+          return new (Context) ErrorExpr(loc.getSourceRange());
+        }
       }
     }
   }
@@ -2683,7 +2690,7 @@ bool Parser::isCollectionLiteralStartingWithLSquareLit() {
      case tok::pound_##kw: (void)consumeToken(); break;
 #define POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)\
      case tok::pound_##kw: (void)consumeToken(); break;
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
      default:
        return true;
    }
@@ -2750,7 +2757,7 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
           llvm::StringSwitch<StringRef>(OldArg)
 #define POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)\
             .Case(#old_arg, #new_arg)
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
             .Default("");
        
         if (!NewArg.empty()) {    

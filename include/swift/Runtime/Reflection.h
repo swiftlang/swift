@@ -46,6 +46,7 @@ struct MirrorReturn {
 ///
 /// Produce a mirror for any value.  The runtime produces a mirror that
 /// structurally reflects values of any type.
+SWIFT_CC(swift)
 SWIFT_RUNTIME_EXPORT
 MirrorReturn
 swift_reflectAny(OpaqueValue *value, const Metadata *T);

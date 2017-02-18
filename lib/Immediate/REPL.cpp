@@ -833,6 +833,7 @@ private:
                                  RC.CurIRGenElem);
       performSILLinking(sil.get());
       runSILDiagnosticPasses(*sil);
+      runSILLoweringPasses(*sil);
     }
 
     if (CI.getASTContext().hadError()) {
