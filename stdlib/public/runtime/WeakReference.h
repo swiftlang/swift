@@ -100,13 +100,15 @@ class WeakReferenceBits {
   static_assert((NativeMarkerMask & heap_object_abi::SwiftSpareBitsMask)
                 == NativeMarkerMask,
                 "native marker mask must fall within Swift spare bits");
+#if SWIFT_OBJC_INTEROP
   static_assert((NativeMarkerMask & heap_object_abi::ObjCReservedBitsMask)
                 == heap_object_abi::ObjCReservedBitsMask,
                 "native marker mask must contain all ObjC tagged pointer bits");
   static_assert((NativeMarkerValue & heap_object_abi::ObjCReservedBitsMask)
                 == 0,
                 "native marker value must not interfere with ObjC bits");
-  
+#endif
+
   uintptr_t bits;
 
  public:
