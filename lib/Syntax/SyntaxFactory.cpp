@@ -250,8 +250,16 @@ FallthroughStmtSyntax SyntaxFactory::makeBlankFallthroughStmt() {
 #pragma mark - Tokens
 
 RC<TokenSyntax>
-SyntaxFactory::makeAtSignToken(const swift::syntax::Trivia &LeadingTrivia,
-                               const swift::syntax::Trivia &TrailingTrivia) {
+SyntaxFactory::makeFallthroughKeyword(const Trivia &LeadingTrivia,
+                                      const Trivia &TrailingTrivia) {
+  return TokenSyntax::make(tok::kw_fallthrough, "fallthrough",
+                           SourcePresence::Present,
+                           LeadingTrivia, TrailingTrivia);
+}
+
+RC<TokenSyntax>
+SyntaxFactory::makeAtSignToken(const Trivia &LeadingTrivia,
+                               const Trivia &TrailingTrivia) {
   return TokenSyntax::make(tok::at_sign, "@", SourcePresence::Present,
                            LeadingTrivia, TrailingTrivia);
 }
