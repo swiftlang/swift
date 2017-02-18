@@ -104,6 +104,8 @@ Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
     ShowDriverTimeCompilation(ShowDriverTimeCompilation) {
 };
 
+static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags);
+
 using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
 
 namespace swift {
@@ -144,6 +146,47 @@ namespace driver {
         TQ.reset(new TaskQueue(Comp.NumberOfParallelCommands));
     }
 
+    const Job *findUnfinishedJob(ArrayRef<const Job *> JL) {
+      for (const Job *Cmd : JL) {
+        if (!FinishedCommands.count(Cmd))
+          return Cmd;
+      }
+      return nullptr;
+    }
+
+    // This will only schedule the given command if it has not been scheduled
+    // and if all of its inputs are in FinishedCommands.
+    void scheduleCommandIfNecessaryAndPossible(const Job *Cmd) {
+      if (ScheduledCommands.count(Cmd)) {
+        if (Comp.ShowIncrementalBuildDecisions) {
+          llvm::outs() << "Already scheduled: " << LogJob(Cmd) << "\n";
+        }
+        return;
+      }
+
+      if (auto Blocking = findUnfinishedJob(Cmd->getInputs())) {
+        BlockingCommands[Blocking].push_back(Cmd);
+        if (Comp.ShowIncrementalBuildDecisions) {
+          llvm::outs() << "Blocked by: " << LogJob(Blocking)
+                       << ", now blocking jobs: "
+                       << LogJobArray(BlockingCommands[Blocking]) << "\n";
+        }
+        return;
+      }
+
+      // FIXME: Failing here should not take down the whole process.
+      bool success = writeFilelistIfNecessary(Cmd, Comp.Diags);
+      assert(success && "failed to write filelist");
+      (void)success;
+
+      assert(Cmd->getExtraEnvironment().empty() &&
+             "not implemented for compilations with multiple jobs");
+      ScheduledCommands.insert(Cmd);
+      if (Comp.ShowIncrementalBuildDecisions)
+        llvm::outs() << "Added to TaskQueue: " << LogJob(Cmd) << "\n";
+      TQ->addTask(Cmd->getExecutable(), Cmd->getArguments(), llvm::None,
+                  (void *)Cmd);
+    }
   };
 } // driver
 } // swift
@@ -154,15 +197,6 @@ Job *Compilation::addJob(std::unique_ptr<Job> J) {
   Job *result = J.get();
   Jobs.emplace_back(std::move(J));
   return result;
-}
-
-static const Job *findUnfinishedJob(ArrayRef<const Job *> JL,
-                                    const CommandSet &FinishedCommands) {
-  for (const Job *Cmd : JL) {
-    if (!FinishedCommands.count(Cmd))
-      return Cmd;
-  }
-  return nullptr;
 }
 
 using InputInfoMap =
@@ -355,30 +389,6 @@ int Compilation::performJobsImpl() {
     });
   };
 
-  // Set up scheduleCommandIfNecessaryAndPossible.
-  // This will only schedule the given command if it has not been scheduled
-  // and if all of its inputs are in FinishedCommands.
-  auto scheduleCommandIfNecessaryAndPossible = [&] (const Job *Cmd) {
-    if (State.ScheduledCommands.count(Cmd))
-      return;
-
-    if (auto Blocking = findUnfinishedJob(Cmd->getInputs(),
-                                          State.FinishedCommands)) {
-      State.BlockingCommands[Blocking].push_back(Cmd);
-      return;
-    }
-
-    // FIXME: Failing here should not take down the whole process.
-    bool success = writeFilelistIfNecessary(Cmd, Diags);
-    assert(success && "failed to write filelist");
-    (void)success;
-
-    assert(Cmd->getExtraEnvironment().empty() &&
-           "not implemented for compilations with multiple jobs");
-    State.ScheduledCommands.insert(Cmd);
-    State.TQ->addTask(Cmd->getExecutable(), Cmd->getArguments(), llvm::None,
-                      (void *)Cmd);
-  };
 
   // When a task finishes, we need to reevaluate the other commands that
   // might have been blocked.
@@ -390,14 +400,14 @@ int Compilation::performJobsImpl() {
       auto AllBlocked = std::move(BlockedIter->second);
       State.BlockingCommands.erase(BlockedIter);
       for (auto *Blocked : AllBlocked)
-        scheduleCommandIfNecessaryAndPossible(Blocked);
+        State.scheduleCommandIfNecessaryAndPossible(Blocked);
     }
   };
 
   // Schedule all jobs we can.
   for (const Job *Cmd : getJobs()) {
     if (!getIncrementalBuildEnabled()) {
-      scheduleCommandIfNecessaryAndPossible(Cmd);
+      State.scheduleCommandIfNecessaryAndPossible(Cmd);
       continue;
     }
 
@@ -417,7 +427,7 @@ int Compilation::performJobsImpl() {
         case DependencyGraphImpl::LoadResult::HadError:
           disableIncrementalBuild();
           for (const Job *Cmd : DeferredCommands)
-            scheduleCommandIfNecessaryAndPossible(Cmd);
+            State.scheduleCommandIfNecessaryAndPossible(Cmd);
           DeferredCommands.clear();
           break;
         case DependencyGraphImpl::LoadResult::UpToDate:
@@ -438,7 +448,7 @@ int Compilation::performJobsImpl() {
       LLVM_FALLTHROUGH;
     case Job::Condition::RunWithoutCascading:
       noteBuilding(Cmd, "(initial)");
-      scheduleCommandIfNecessaryAndPossible(Cmd);
+      State.scheduleCommandIfNecessaryAndPossible(Cmd);
       break;
     case Job::Condition::CheckDependencies:
       DeferredCommands.insert(Cmd);
@@ -484,7 +494,7 @@ int Compilation::performJobsImpl() {
     for (auto *AdditionalCmd : AdditionalOutOfDateCommands) {
       if (!DeferredCommands.count(AdditionalCmd))
         continue;
-      scheduleCommandIfNecessaryAndPossible(AdditionalCmd);
+      State.scheduleCommandIfNecessaryAndPossible(AdditionalCmd);
       DeferredCommands.erase(AdditionalCmd);
     }
   }
@@ -573,7 +583,7 @@ int Compilation::performJobsImpl() {
             if (ReturnCode == EXIT_SUCCESS) {
               disableIncrementalBuild();
               for (const Job *Cmd : DeferredCommands)
-                scheduleCommandIfNecessaryAndPossible(Cmd);
+                State.scheduleCommandIfNecessaryAndPossible(Cmd);
               DeferredCommands.clear();
               Dependents.clear();
             } // else, let the next build handle it.
@@ -651,7 +661,7 @@ int Compilation::performJobsImpl() {
     for (const Job *Cmd : Dependents) {
       DeferredCommands.erase(Cmd);
       noteBuilding(Cmd, "because of dependencies discovered later");
-      scheduleCommandIfNecessaryAndPossible(Cmd);
+      State.scheduleCommandIfNecessaryAndPossible(Cmd);
     }
 
     return TaskFinishedResponse::ContinueExecution;
