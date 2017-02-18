@@ -623,14 +623,18 @@ SILValue MaterializeForSetEmitter::emitUsingAddressor(SILGenFunction &gen,
   auto addressor = gen.getAddressorDeclRef(WitnessStorage,
                                            AccessKind::ReadWrite,
                                            isDirect);
-  ArgumentSource baseRV = gen.prepareAccessorBaseArg(loc, self,
-                                                     SubstSelfType, addressor);
-  SILType addressType = WitnessStorageType.getAddressType();
-  auto result = gen.emitAddressorAccessor(loc, addressor, WitnessSubs,
-                                          std::move(baseRV),
-                                          IsSuper, isDirect,
-                                          std::move(indices),
-                                          addressType);
+  std::pair<ManagedValue, ManagedValue> result;
+  {
+    FormalEvaluationScope Scope(gen);
+
+    SILType addressType = WitnessStorageType.getAddressType();
+    ArgumentSource baseRV =
+        gen.prepareAccessorBaseArg(loc, self, SubstSelfType, addressor);
+    result = gen.emitAddressorAccessor(loc, addressor, WitnessSubs,
+                                       std::move(baseRV), IsSuper, isDirect,
+                                       std::move(indices), addressType);
+  }
+
   SILValue address = result.first.getUnmanagedValue();
 
   AddressorKind addressorKind =

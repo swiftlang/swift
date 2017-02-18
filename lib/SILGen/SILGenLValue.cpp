@@ -150,14 +150,10 @@ public:
                                        AccessKind accessKind);
 };
 
-static ManagedValue emitGetIntoTemporary(SILGenFunction &gen,
-                                         SILLocation loc,
-                                         ManagedValue base,
-                                         LogicalPathComponent &&component) {
-  // Create a temporary.
-  auto temporaryInit =
-    gen.emitTemporary(loc, gen.getTypeLowering(component.getTypeOfRValue()));
-
+static ManagedValue
+emitGetIntoTemporary(SILGenFunction &gen, SILLocation loc, ManagedValue base,
+                     std::unique_ptr<TemporaryInitialization> &&temporaryInit,
+                     LogicalPathComponent &&component) {
   // Emit a 'get' into the temporary.
   RValue value =
     std::move(component).get(gen, loc, base, SGFContext(temporaryInit.get()));
@@ -177,7 +173,12 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
   // If this is just for a read, emit a load into a temporary memory
   // location.
   if (kind == AccessKind::Read) {
-    return emitGetIntoTemporary(gen, loc, base, std::move(*this));
+    // Create a temporary.
+    std::unique_ptr<TemporaryInitialization> temporaryInit =
+        gen.emitFormalAccessTemporary(loc,
+                                      gen.getTypeLowering(getTypeOfRValue()));
+    return emitGetIntoTemporary(gen, loc, base, std::move(temporaryInit),
+                                std::move(*this));
   }
 
   assert(gen.InWritebackScope &&
@@ -189,6 +190,11 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
 
   ManagedValue temporary;
   {
+    // Create a temporary.
+    std::unique_ptr<TemporaryInitialization> temporaryInit =
+        gen.emitFormalAccessTemporary(loc,
+                                      gen.getTypeLowering(getTypeOfRValue()));
+
     FormalEvaluationScope Scope(gen);
 
     // Otherwise, we need to emit a get and set.  Borrow the base for
@@ -197,7 +203,8 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
         base ? base.formalEvaluationBorrow(gen, loc) : ManagedValue();
 
     // Emit a 'get' into a temporary and then pop the borrow of base.
-    temporary = emitGetIntoTemporary(gen, loc, getterBase, std::move(*this));
+    temporary = emitGetIntoTemporary(
+        gen, loc, getterBase, std::move(temporaryInit), std::move(*this));
   }
 
   // Push a writeback for the temporary.
