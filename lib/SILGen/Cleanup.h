@@ -204,6 +204,9 @@ public:
 
   /// Dump the output of each cleanup on this stack.
   void dump() const;
+
+  /// Dump the given cleanup handle if it is on the current stack.
+  void dump(CleanupHandle handle) const;
 };
 
 /// An RAII object that allows the state of a cleanup to be
