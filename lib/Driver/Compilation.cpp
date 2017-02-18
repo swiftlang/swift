@@ -549,6 +549,33 @@ namespace driver {
       }
     }
 
+    void runTaskQueueToCompletion() {
+      do {
+        using namespace std::placeholders;
+        // Ask the TaskQueue to execute.
+        TQ->execute(std::bind(&PerformJobsState::taskBegan, this,
+                              _1, _2),
+                    std::bind(&PerformJobsState::taskFinished, this,
+                              _1, _2, _3, _4, _5),
+                    std::bind(&PerformJobsState::taskSignalled, this,
+                              _1, _2, _3, _4, _5, _6));
+
+        // Mark all remaining deferred commands as skipped.
+        for (const Job *Cmd : DeferredCommands) {
+          if (Comp.Level == OutputLevel::Parseable) {
+            // Provide output indicating this command was skipped if parseable output
+            // was requested.
+            parseable_output::emitSkippedMessage(llvm::errs(), *Cmd);
+          }
+
+          ScheduledCommands.insert(Cmd);
+          markFinished(Cmd);
+        }
+
+        // ...which may allow us to go on and do later tasks.
+      } while (Result == 0 && TQ->hasRemainingTasks());
+    }
+
   };
 } // driver
 } // swift
@@ -731,31 +758,7 @@ int Compilation::performJobsImpl() {
 
   State.scheduleInitialJobs();
   State.scheduleAdditionalJobs();
-
-  do {
-    using namespace std::placeholders;
-    // Ask the TaskQueue to execute.
-    State.TQ->execute(std::bind(&PerformJobsState::taskBegan, &State,
-                                _1, _2),
-                      std::bind(&PerformJobsState::taskFinished, &State,
-                                _1, _2, _3, _4, _5),
-                      std::bind(&PerformJobsState::taskSignalled, &State,
-                                _1, _2, _3, _4, _5, _6));
-
-    // Mark all remaining deferred commands as skipped.
-    for (const Job *Cmd : State.DeferredCommands) {
-      if (Level == OutputLevel::Parseable) {
-        // Provide output indicating this command was skipped if parseable output
-        // was requested.
-        parseable_output::emitSkippedMessage(llvm::errs(), *Cmd);
-      }
-
-      State.ScheduledCommands.insert(Cmd);
-      State.markFinished(Cmd);
-    }
-
-    // ...which may allow us to go on and do later tasks.
-  } while (State.Result == 0 && State.TQ->hasRemainingTasks());
+  State.runTaskQueueToCompletion();
 
   if (State.Result == 0) {
     assert(State.BlockingCommands.empty() &&
