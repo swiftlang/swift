@@ -39,6 +39,10 @@ public:
     return Parts;
   }
 
+  ArrayRef<StringRef> getTags() const {
+    return Parts.Tags;
+  }
+
   Optional<const swift::markup::Paragraph *> getBrief() const {
     return Parts.Brief;
   }

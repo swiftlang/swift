@@ -1129,8 +1129,13 @@ static bool isSelfInitUse(SILInstruction *I) {
       LocExpr = TE->getSubExpr();
     else if (auto *FVE = dyn_cast<ForceValueExpr>(LocExpr))
       LocExpr = FVE->getSubExpr();
- }
+    
+  }
 
+  // Look through covariant return, if any.
+  if (auto CRE = dyn_cast<CovariantReturnConversionExpr>(LocExpr))
+    LocExpr = CRE->getSubExpr();
+  
   // This is a self.init call if structured like this:
   //
   // (call_expr type='SomeClass'

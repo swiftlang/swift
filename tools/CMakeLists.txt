@@ -1,7 +1,7 @@
 add_swift_tool_subdirectory(driver)
 add_swift_tool_subdirectory(sil-opt)
 add_swift_tool_subdirectory(swift-ide-test)
-add_swift_tool_subdirectory(swift-format)
+add_swift_tool_subdirectory(swift-syntax-format)
 add_swift_tool_subdirectory(swift-remoteast-test)
 add_swift_tool_subdirectory(swift-demangle)
 add_swift_tool_subdirectory(lldb-moduleimport-test)

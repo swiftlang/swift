@@ -26,6 +26,7 @@ class MarkupASTNode;
 class Paragraph;
 class ParamField;
 class ReturnsField;
+class TagField;
 class ThrowsField;
 
 /// The basic structure of a doc comment attached to a Swift
@@ -36,6 +37,7 @@ struct CommentParts {
   ArrayRef<ParamField *> ParamFields;
   Optional<const ReturnsField *> ReturnsField;
   Optional<const ThrowsField *> ThrowsField;
+  ArrayRef<StringRef> Tags;
 
   bool isEmpty() const {
     return !Brief.hasValue() &&
