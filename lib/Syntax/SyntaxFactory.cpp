@@ -271,6 +271,28 @@ BreakStmtSyntax SyntaxFactory::makeBlankBreakStmtSyntax() {
   return { Data, Data.get() };
 }
 
+#pragma mark - continue-statement
+
+ContinueStmtSyntax
+SyntaxFactory::makeContinueStmt(RC<TokenSyntax> ContinueKeyword,
+                                RC<TokenSyntax> Label) {
+  auto Raw = RawSyntax::make(SyntaxKind::BreakStmt,
+                             {
+                               ContinueKeyword,
+                               Label,
+                             },
+                             SourcePresence::Present);
+  auto Data = ContinueStmtSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+/// Make a break statement with the `break` keyword
+/// and destination label marked as missing.
+ContinueStmtSyntax SyntaxFactory::makeBlankContinueStmtSyntax() {
+  auto Data = ContinueStmtSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
 #pragma mark - Tokens
 
 RC<TokenSyntax>
@@ -295,6 +317,13 @@ SyntaxFactory::makeBreakKeyword(const swift::syntax::Trivia &LeadingTrivia,
                            LeadingTrivia, TrailingTrivia);
 }
 
+RC<TokenSyntax> SyntaxFactory::
+makeContinueKeyword(const swift::syntax::Trivia &LeadingTrivia,
+                    const swift::syntax::Trivia &TrailingTrivia) {
+  return TokenSyntax::make(tok::kw_continue, "continue",
+                           SourcePresence::Present,
+                           LeadingTrivia, TrailingTrivia);
+}
 
 RC<TokenSyntax>
 SyntaxFactory::makeLeftAngleToken(const Trivia &LeadingTrivia,
