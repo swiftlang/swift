@@ -80,38 +80,6 @@ void RawSyntax::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << ')';
 }
 
-RC<RawSyntax> RawSyntax::indent(unsigned Count, TriviaKind TrivKind,
-                                unsigned Depth) const {
-  LayoutList NewLayout;
-  bool IsFirst = Depth == 0;
-
-  for (const auto LE : Layout) {
-    switch (LE->Kind) {
-    case SyntaxKind::Token: {
-      auto Tok = llvm::cast<TokenSyntax>(LE);
-      auto Leading = Tok->LeadingTrivia;
-      auto LeadingNewline = Leading.find(TriviaKind::Newline);
-      auto FoundNewline = LeadingNewline != Leading.end();
-
-      if (IsFirst || FoundNewline) {
-        IsFirst = false;
-        RC<TokenSyntax> IndentedToken = Tok->indent(Count, TrivKind);
-        NewLayout.push_back(IndentedToken);
-      } else {
-        NewLayout.push_back(LE);
-      }
-
-      break;
-    }
-    default:
-      NewLayout.push_back(LE->indent(Count, TrivKind, Depth + 1));
-      break;
-    }
-  }
-
-  return RawSyntax::make(Kind, NewLayout, Presence);
-}
-
 bool RawSyntax::accumulateAbsolutePosition(
     AbsolutePosition &Pos, const RawSyntax *UpToTargetNode) const {
   auto Found = this == UpToTargetNode;
