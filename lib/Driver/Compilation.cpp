@@ -136,6 +136,15 @@ namespace driver {
     /// Only intended for source files.
     llvm::SmallDenseMap<const Job *, bool, 16> UnfinishedCommands;
 
+    // Dependency graph for deciding which jobs are dirty (need running)
+    // or clean (can be skipped).
+    using DependencyGraph = DependencyGraph<const Job *>;
+    DependencyGraph DepGraph;
+
+    // Helper for tracing the propagation of marks in the graph.
+    DependencyGraph::MarkTracer ActualIncrementalTracer;
+    DependencyGraph::MarkTracer *IncrementalTracer = nullptr;
+
     // TaskQueue for execution.
     std::unique_ptr<TaskQueue> TQ;
 
@@ -144,6 +153,20 @@ namespace driver {
         TQ.reset(new DummyTaskQueue(Comp.NumberOfParallelCommands));
       else
         TQ.reset(new TaskQueue(Comp.NumberOfParallelCommands));
+      if (Comp.ShowIncrementalBuildDecisions)
+        IncrementalTracer = &ActualIncrementalTracer;
+    }
+
+    void noteBuilding(const Job *cmd, StringRef reason) {
+      if (!Comp.ShowIncrementalBuildDecisions)
+        return;
+      if (ScheduledCommands.count(cmd))
+        return;
+      llvm::outs() << "Queuing " << reason << ": " << LogJob(cmd) << "\n";
+      IncrementalTracer->printPath(
+        llvm::outs(), cmd, [](raw_ostream &out, const Job *base) {
+          out << llvm::sys::path::filename(base->getOutput().getBaseInput(0));
+        });
     }
 
     const Job *findUnfinishedJob(ArrayRef<const Job *> JL) {
@@ -389,27 +412,8 @@ int Compilation::performJobsImpl() {
 
   PerformJobsState State(*this);
 
-  using DependencyGraph = DependencyGraph<const Job *>;
-  DependencyGraph DepGraph;
   SmallPtrSet<const Job *, 16> DeferredCommands;
   SmallVector<const Job *, 16> InitialOutOfDateCommands;
-
-  DependencyGraph::MarkTracer ActualIncrementalTracer;
-  DependencyGraph::MarkTracer *IncrementalTracer = nullptr;
-  if (ShowIncrementalBuildDecisions)
-    IncrementalTracer = &ActualIncrementalTracer;
-
-  auto noteBuilding = [&] (const Job *cmd, StringRef reason) {
-    if (!ShowIncrementalBuildDecisions)
-      return;
-    if (State.ScheduledCommands.count(cmd))
-      return;
-    llvm::outs() << "Queuing " << reason << ": " << LogJob(cmd) << "\n";
-    IncrementalTracer->printPath(llvm::outs(), cmd,
-                                 [](raw_ostream &out, const Job *base) {
-      out << llvm::sys::path::filename(base->getOutput().getBaseInput(0));
-    });
-  };
 
   // Schedule all jobs we can.
   for (const Job *Cmd : getJobs()) {
@@ -428,9 +432,9 @@ int Compilation::performJobsImpl() {
       Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
     if (!DependenciesFile.empty()) {
       if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
-        DepGraph.addIndependentNode(Cmd);
+        State.DepGraph.addIndependentNode(Cmd);
       } else {
-        switch (DepGraph.loadFromPath(Cmd, DependenciesFile)) {
+        switch (State.DepGraph.loadFromPath(Cmd, DependenciesFile)) {
         case DependencyGraphImpl::LoadResult::HadError:
           disableIncrementalBuild();
           for (const Job *Cmd : DeferredCommands)
@@ -450,11 +454,11 @@ int Compilation::performJobsImpl() {
     case Job::Condition::Always:
       if (getIncrementalBuildEnabled() && !DependenciesFile.empty()) {
         InitialOutOfDateCommands.push_back(Cmd);
-        DepGraph.markIntransitive(Cmd);
+        State.DepGraph.markIntransitive(Cmd);
       }
       LLVM_FALLTHROUGH;
     case Job::Condition::RunWithoutCascading:
-      noteBuilding(Cmd, "(initial)");
+      State.noteBuilding(Cmd, "(initial)");
       State.scheduleCommandIfNecessaryAndPossible(Cmd);
       break;
     case Job::Condition::CheckDependencies:
@@ -472,16 +476,16 @@ int Compilation::performJobsImpl() {
     // files that haven't changed, so that they'll get built in parallel if
     // possible and after the first set of files if it's not.
     for (auto *Cmd : InitialOutOfDateCommands) {
-      DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd,
-                              IncrementalTracer);
+      State.DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd,
+                                    State.IncrementalTracer);
     }
 
     for (auto *transitiveCmd : AdditionalOutOfDateCommands)
-      noteBuilding(transitiveCmd, "because of the initial set:");
+      State.noteBuilding(transitiveCmd, "because of the initial set:");
     size_t firstSize = AdditionalOutOfDateCommands.size();
 
     // Check all cross-module dependencies as well.
-    for (StringRef dependency : DepGraph.getExternalDependencies()) {
+    for (StringRef dependency : State.DepGraph.getExternalDependencies()) {
       llvm::sys::fs::file_status depStatus;
       if (!llvm::sys::fs::status(dependency, depStatus))
         if (depStatus.getLastModificationTime() < LastBuildTime)
@@ -490,12 +494,12 @@ int Compilation::performJobsImpl() {
       // If the dependency has been modified since the oldest built file,
       // or if we can't stat it for some reason (perhaps it's been deleted?),
       // trigger rebuilds through the dependency graph.
-      DepGraph.markExternal(AdditionalOutOfDateCommands, dependency);
+      State.DepGraph.markExternal(AdditionalOutOfDateCommands, dependency);
     }
 
     for (auto *externalCmd :
             llvm::makeArrayRef(AdditionalOutOfDateCommands).slice(firstSize)) {
-      noteBuilding(externalCmd, "because of external dependencies");
+      State.noteBuilding(externalCmd, "because of external dependencies");
     }
 
     for (auto *AdditionalCmd : AdditionalOutOfDateCommands) {
@@ -583,9 +587,9 @@ int Compilation::performJobsImpl() {
         // If we have a dependency file /and/ the frontend task exited normally,
         // we can be discerning about what downstream files to rebuild.
         if (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE) {
-          bool wasCascading = DepGraph.isMarked(FinishedCmd);
+          bool wasCascading = State.DepGraph.isMarked(FinishedCmd);
 
-          switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
+          switch (State.DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
           case DependencyGraphImpl::LoadResult::HadError:
             if (ReturnCode == EXIT_SUCCESS) {
               disableIncrementalBuild();
@@ -600,7 +604,7 @@ int Compilation::performJobsImpl() {
               break;
             LLVM_FALLTHROUGH;
           case DependencyGraphImpl::LoadResult::AffectsDownstream:
-            DepGraph.markTransitive(Dependents, FinishedCmd);
+            State.DepGraph.markTransitive(Dependents, FinishedCmd);
             break;
           }
         } else {
@@ -610,13 +614,13 @@ int Compilation::performJobsImpl() {
             // The job won't be treated as newly added next time. Conservatively
             // mark it as affecting other jobs, because some of them may have
             // completed already.
-            DepGraph.markTransitive(Dependents, FinishedCmd);
+            State.DepGraph.markTransitive(Dependents, FinishedCmd);
             break;
           case Job::Condition::Always:
             // Any incremental task that shows up here has already been marked;
             // we didn't need to wait for it to finish to start downstream
             // tasks.
-            assert(DepGraph.isMarked(FinishedCmd));
+            assert(State.DepGraph.isMarked(FinishedCmd));
             break;
           case Job::Condition::RunWithoutCascading:
             // If this file changed, it might have been a non-cascading change
@@ -624,7 +628,7 @@ int Compilation::performJobsImpl() {
             // updated or compromised, so we don't actually know anymore; we
             // have to conservatively assume the changes could affect other
             // files.
-            DepGraph.markTransitive(Dependents, FinishedCmd);
+            State.DepGraph.markTransitive(Dependents, FinishedCmd);
             break;
           case Job::Condition::CheckDependencies:
             // If the only reason we're running this is because something else
@@ -667,7 +671,7 @@ int Compilation::performJobsImpl() {
 
     for (const Job *Cmd : Dependents) {
       DeferredCommands.erase(Cmd);
-      noteBuilding(Cmd, "because of dependencies discovered later");
+      State.noteBuilding(Cmd, "because of dependencies discovered later");
       State.scheduleCommandIfNecessaryAndPossible(Cmd);
     }
 
@@ -751,7 +755,7 @@ int Compilation::performJobsImpl() {
 
       bool isCascading = true;
       if (getIncrementalBuildEnabled())
-        isCascading = DepGraph.isMarked(Cmd);
+        isCascading = State.DepGraph.isMarked(Cmd);
       State.UnfinishedCommands.insert({Cmd, isCascading});
     }
   }
