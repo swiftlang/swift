@@ -73,3 +73,67 @@ TEST(StmtSyntaxTests, FallthroughStmtMakeAPIs) {
     ASSERT_EQ(OS.str().str(), "");
   }
 }
+
+#pragma mark - break-statement
+
+TEST(StmtSyntaxTests, BreakStmtGetAPIs) {
+  auto BreakKW = SyntaxFactory::makeBreakKeyword({}, Trivia::spaces(1));
+  auto Label = SyntaxFactory::makeIdentifier("forCoffee", {}, {});
+  auto Break = SyntaxFactory::makeBreakStmt(BreakKW, Label);
+
+  ASSERT_EQ(BreakKW, Break.getBreakKeyword());
+  ASSERT_EQ(Label, Break.getLabel());
+}
+
+TEST(StmtSyntaxTests, BreakStmtWithAPIs) {
+  auto BreakKW = SyntaxFactory::makeBreakKeyword({}, {});
+  auto Label = SyntaxFactory::makeIdentifier("forCoffee", {}, {});
+
+  auto Break = SyntaxFactory::makeBlankBreakStmtSyntax();
+
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    Break.print(OS);
+    ASSERT_EQ(OS.str().str(), "");
+  }
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    Break.withBreakKeyword(BreakKW)
+      .print(OS);
+    ASSERT_EQ(OS.str().str(), "break");
+  }
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    Break.withLabel(Label).print(OS);
+    ASSERT_EQ(OS.str().str(), "forCoffee");
+  }
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    Break.withBreakKeyword(BreakKW->withTrailingTrivia(Trivia::spaces(1)))
+      .withLabel(Label)
+      .print(OS);
+    ASSERT_EQ(OS.str().str(), "break forCoffee");
+  }
+}
+
+TEST(StmtSyntaxTests, BreakStmtMakeAPIs) {
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    auto BreakKW = SyntaxFactory::makeBreakKeyword({}, Trivia::spaces(1));
+    auto Label = SyntaxFactory::makeIdentifier("forCoffee", {}, {});
+    auto Break = SyntaxFactory::makeBreakStmt(BreakKW, Label);
+    Break.print(OS);
+    ASSERT_EQ(OS.str().str(), "break forCoffee");
+  }
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    SyntaxFactory::makeBlankBreakStmtSyntax().print(OS);
+    ASSERT_EQ(OS.str().str(), "");
+  }
+}

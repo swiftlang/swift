@@ -111,6 +111,77 @@ CodeBlockStmtSyntaxData::makeBlank() {
                               SourcePresence::Present));
 }
 
+#pragma mark - break-statement Data
+
+BreakStmtSyntaxData::BreakStmtSyntaxData(RC<RawSyntax> Raw,
+                                         const SyntaxData *Parent,
+                                         CursorIndex IndexInParent)
+  : StmtSyntaxData(Raw, Parent, IndexInParent) {
+  assert(Raw->Layout.size() == 2);
+  syntax_assert_child_token_text(Raw, BreakStmtSyntax::Cursor::BreakKeyword,
+                                 tok::kw_break, "break");
+  syntax_assert_child_token(Raw, BreakStmtSyntax::Cursor::Label,
+                            tok::identifier);
+}
+
+RC<BreakStmtSyntaxData>
+BreakStmtSyntaxData::make(RC<RawSyntax> Raw, const SyntaxData *Parent,
+                          CursorIndex IndexInParent) {
+  return RC<BreakStmtSyntaxData> {
+    new BreakStmtSyntaxData {
+      Raw, Parent, IndexInParent
+    }
+  };
+}
+
+RC<BreakStmtSyntaxData> BreakStmtSyntaxData::makeBlank() {
+  return make(RawSyntax::make(SyntaxKind::BreakStmt,
+                              {
+                                TokenSyntax::missingToken(tok::kw_break,
+                                                          "break"),
+                                TokenSyntax::missingToken(tok::identifier, ""),
+                              },
+                              SourcePresence::Present));
+}
+
+#pragma mark - break-statement API
+
+BreakStmtSyntax::BreakStmtSyntax(const RC<SyntaxData> Root,
+                                 BreakStmtSyntaxData *Data)
+  : StmtSyntax(Root, Data) {}
+
+BreakStmtSyntax BreakStmtSyntax::make(RC<RawSyntax> Raw,
+                                      const SyntaxData *Parent,
+                                      CursorIndex IndexInParent) {
+  auto Data = BreakStmtSyntaxData::make(Raw, Parent, IndexInParent);
+  return { Data, Data.get() };
+}
+
+BreakStmtSyntax BreakStmtSyntax::makeBlank() {
+  auto Data = BreakStmtSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
+RC<TokenSyntax> BreakStmtSyntax::getBreakKeyword() const {
+  return cast<TokenSyntax>(getRaw()->getChild(Cursor::BreakKeyword));
+}
+
+BreakStmtSyntax
+BreakStmtSyntax::withBreakKeyword(RC<TokenSyntax> NewBreakKeyword) const {
+  syntax_assert_token_is(NewBreakKeyword, tok::kw_break, "break");
+  return Data->replaceChild<BreakStmtSyntax>(NewBreakKeyword,
+                                             Cursor::BreakKeyword);
+}
+
+RC<TokenSyntax> BreakStmtSyntax::getLabel() const {
+  return cast<TokenSyntax>(getRaw()->getChild(Cursor::Label));
+}
+
+BreakStmtSyntax BreakStmtSyntax::withLabel(RC<TokenSyntax> NewLabel) const {
+  assert(NewLabel->getTokenKind() == tok::identifier);
+  return Data->replaceChild<BreakStmtSyntax>(NewLabel, Cursor::Label);
+}
+
 #pragma mark code-block API
 
 CodeBlockStmtSyntax::CodeBlockStmtSyntax(const RC<SyntaxData> Root,
