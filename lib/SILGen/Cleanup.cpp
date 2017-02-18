@@ -263,3 +263,10 @@ void CleanupManager::dump() const {
   }
 #endif
 }
+
+void CleanupManager::dump(CleanupHandle handle) const {
+  auto iter = Stack.find(handle);
+  const Cleanup &stackCleanup = *iter;
+  llvm::errs() << "CLEANUP DEPTH: " << handle.getDepth() << "\n";
+  stackCleanup.dump(Gen);
+}
