@@ -112,7 +112,7 @@ namespace swift {
 namespace driver {
   struct PerformJobsState {
 
-    // The containing Compilation object.
+    /// The containing Compilation object.
     Compilation &Comp;
 
     /// All jobs which have been scheduled for execution (whether or not
@@ -143,16 +143,16 @@ namespace driver {
     /// .swiftdeps files.
     SmallVector<const Job *, 16> InitialOutOfDateCommands;
 
-    // Dependency graph for deciding which jobs are dirty (need running)
-    // or clean (can be skipped).
+    /// Dependency graph for deciding which jobs are dirty (need running)
+    /// or clean (can be skipped).
     using DependencyGraph = DependencyGraph<const Job *>;
     DependencyGraph DepGraph;
 
-    // Helper for tracing the propagation of marks in the graph.
+    /// Helper for tracing the propagation of marks in the graph.
     DependencyGraph::MarkTracer ActualIncrementalTracer;
     DependencyGraph::MarkTracer *IncrementalTracer = nullptr;
 
-    // TaskQueue for execution.
+    /// TaskQueue for execution.
     std::unique_ptr<TaskQueue> TQ;
 
     PerformJobsState(Compilation &Comp) : Comp(Comp) {
@@ -184,8 +184,8 @@ namespace driver {
       return nullptr;
     }
 
-    // This will only schedule the given command if it has not been scheduled
-    // and if all of its inputs are in FinishedCommands.
+    /// Schedule the given Job if it has not been scheduled and if all of
+    /// its inputs are in FinishedCommands.
     void scheduleCommandIfNecessaryAndPossible(const Job *Cmd) {
       if (ScheduledCommands.count(Cmd)) {
         if (Comp.ShowIncrementalBuildDecisions) {
@@ -218,8 +218,7 @@ namespace driver {
                   (void *)Cmd);
     }
 
-    // When a task finishes, we need to reevaluate the other commands that
-    // might have been blocked.
+    /// When a task finishes, check other Jobs that may be blocked.
     void markFinished(const Job *Cmd) {
       if (Comp.ShowIncrementalBuildDecisions) {
         llvm::outs() << "Job finished: " << LogJob(Cmd) << "\n";
