@@ -19,6 +19,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/Comment.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Version.h"
@@ -42,6 +43,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
+using namespace swift::objc_translation;
 
 static bool isNSObjectOrAnyHashable(ASTContext &ctx, Type type) {
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
@@ -82,65 +84,12 @@ static bool isClangKeyword(Identifier name) {
 
 
 namespace {
-  enum CustomNamesOnly_t : bool {
-    Normal = false,
-    CustomNamesOnly = true,
-  };
-
   /// Whether the type being printed is in function param position.
   enum IsFunctionParam_t : bool {
     IsFunctionParam = true,
     IsNotFunctionParam = false,
   };
 } // end anonymous namespace
-
-static StringRef getNameForObjC(const ValueDecl *VD,
-                                CustomNamesOnly_t customNamesOnly = Normal) {
-  assert(isa<ClassDecl>(VD) || isa<ProtocolDecl>(VD) || isa<StructDecl>(VD) ||
-         isa<EnumDecl>(VD) || isa<EnumElementDecl>(VD));
-  if (auto objc = VD->getAttrs().getAttribute<ObjCAttr>()) {
-    if (auto name = objc->getName()) {
-      assert(name->getNumSelectorPieces() == 1);
-      return name->getSelectorPieces().front().str();
-    }
-  }
-
-  if (customNamesOnly)
-    return StringRef();
-
-  if (auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(VD->getClangDecl())) {
-    if (const clang::IdentifierInfo *II = clangDecl->getIdentifier())
-      return II->getName();
-    if (auto *anonDecl = dyn_cast<clang::TagDecl>(clangDecl))
-      if (auto *anonTypedef = anonDecl->getTypedefNameForAnonDecl())
-        return anonTypedef->getIdentifier()->getName();
-  }
-
-  return VD->getName().str();
-}
-
-/// Print the ObjC name of an enum element decl to OS, also allowing the client
-/// to specify a preferred name other than the decl's original name.
-///
-/// Returns true if the decl has a custom ObjC name (@objc); false otherwise.
-static bool
-printSwiftEnumElemNameInObjC(const EnumElementDecl *EL, llvm::raw_ostream &OS,
-                             Identifier PreferredName = Identifier()) {
-  StringRef ElemName = getNameForObjC(EL, CustomNamesOnly);
-  if (!ElemName.empty()) {
-    OS << ElemName;
-    return true;
-  }
-  OS << getNameForObjC(EL->getDeclContext()->getAsEnumOrEnumExtensionContext());
-  if (PreferredName.empty())
-    ElemName = EL->getName().str();
-  else
-    ElemName = PreferredName.str();
-
-  SmallString<64> Scratch;
-  OS << camel_case::toSentencecase(ElemName, Scratch);
-  return false;
-}
 
 /// Returns true if the given selector might be classified as an init method
 /// by Objective-C ARC.
@@ -2644,34 +2593,4 @@ bool swift::printAsObjC(llvm::raw_ostream &os, ModuleDecl *M,
                         Accessibility minRequiredAccess) {
   llvm::PrettyStackTraceString trace("While generating Objective-C header");
   return ModuleWriter(*M, bridgingHeader, minRequiredAccess).writeToStream(os);
-}
-
-std::pair<Identifier, ObjCSelector> swift::
-getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
-  ASTContext &Ctx = VD->getASTContext();
-  LazyResolver *Resolver = Ctx.getLazyResolver();
-  if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    return {Identifier(), FD->getObjCSelector(Resolver, PreferredName)};
-  } else if (auto *VAD = dyn_cast<VarDecl>(VD)) {
-    if (PreferredName)
-      return {PreferredName.getBaseName(), ObjCSelector()};
-    return {VAD->getObjCPropertyName(), ObjCSelector()};
-  } else if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
-    return getObjCNameForSwiftDecl(SD->getGetter(), PreferredName);
-  } else if (auto *EL = dyn_cast<EnumElementDecl>(VD)) {
-    SmallString<64> Buffer;
-    {
-      llvm::raw_svector_ostream OS(Buffer);
-      printSwiftEnumElemNameInObjC(EL, OS, PreferredName.getBaseName());
-    }
-    return {Ctx.getIdentifier(Buffer.str()), ObjCSelector()};
-  } else {
-    // @objc(ExplicitName) > PreferredName > Swift name.
-    StringRef Name = getNameForObjC(VD, CustomNamesOnly);
-    if (!Name.empty())
-      return {Ctx.getIdentifier(Name), ObjCSelector()};
-    if (!PreferredName.getBaseName().empty())
-      return {PreferredName.getBaseName(), ObjCSelector()};
-    return {Ctx.getIdentifier(getNameForObjC(VD)), ObjCSelector()};
-  }
 }

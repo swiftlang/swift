@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SourceEntityWalker.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -27,7 +28,6 @@
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/XMLUtils.h"
-#include "swift/PrintAsObjC/PrintAsObjC.h"
 #include "swift/Sema/IDETypeChecking.h"
 
 #include "clang/AST/ASTContext.h"
@@ -895,7 +895,8 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
   case NameKind::Swift: {
     NameTranslatingInfo Result;
     auto &Ctx = VD->getDeclContext()->getASTContext();
-    auto ResultPair = getObjCNameForSwiftDecl(VD, getSwiftDeclName(Ctx, Info));
+    auto ResultPair = swift::objc_translation::getObjCNameForSwiftDecl(VD,
+      getSwiftDeclName(Ctx, Info));
     Identifier Name = ResultPair.first;
     if (!Name.empty()) {
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::ObjC);

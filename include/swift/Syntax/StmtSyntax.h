@@ -231,6 +231,68 @@ public:
   }
 };
 
+#pragma mark - break-statement Data
+
+class BreakStmtSyntaxData : public StmtSyntaxData {
+  friend class SyntaxData;
+  friend class BreakStmtSyntax;
+  friend struct SyntaxFactory;
+  BreakStmtSyntaxData(RC<RawSyntax> Raw,
+                            const SyntaxData *Parent = nullptr,
+                            CursorIndex IndexInParent = 0);
+  static RC<BreakStmtSyntaxData> make(RC<RawSyntax> Raw,
+                                      const SyntaxData *Parent = nullptr,
+                                      CursorIndex IndexInParent = 0);
+  static RC<BreakStmtSyntaxData> makeBlank();
+
+public:
+  static bool classof(const SyntaxData *SD) {
+    return SD->getKind() == SyntaxKind::BreakStmt;
+  }
+
+};
+
+#pragma mark - break-statement API
+
+class BreakStmtSyntax : public StmtSyntax {
+  friend struct SyntaxFactory;
+  friend class BreakStmtSyntaxData;
+  friend class SyntaxData;
+
+  using DataType = BreakStmtSyntaxData;
+
+  enum class Cursor : CursorIndex {
+    BreakKeyword,
+    Label
+  };
+
+  BreakStmtSyntax(const RC<SyntaxData> Root,
+                  BreakStmtSyntaxData *Data);
+
+  static BreakStmtSyntax make(RC<RawSyntax> Raw,
+                                    const SyntaxData *Parent = nullptr,
+                                    CursorIndex IndexInParent = 0);
+  static BreakStmtSyntax makeBlank();
+public:
+
+  /// Return the 'break' keyword associated with this break statement.
+  RC<TokenSyntax> getBreakKeyword() const;
+
+  /// Return a new `BreakStmtSyntax` with the given 'break' keyword.
+  BreakStmtSyntax withBreakKeyword(RC<TokenSyntax> NewBreakKeyword) const;
+
+  /// Return the destination label of this break statement. If it doesn't
+  /// have one, the token is marked as missing.
+  RC<TokenSyntax> getLabel() const;
+
+  /// Return a new `BreakStmtSyntax` with the given destination label.
+  BreakStmtSyntax withLabel(RC<TokenSyntax> NewLabel) const;
+
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::BreakStmt;
+  }
+};
+
 } // end namespace syntax
 } // end namespace swift
 
