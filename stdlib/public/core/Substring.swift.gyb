@@ -10,48 +10,54 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct Substring : RangeReplaceableCollection {
-  public typealias Index = String.CharacterView.Index
-  public typealias IndexDistance = String.CharacterView.IndexDistance
+extension String {
+  // FIXME(strings): at least temporarily remove it to see where it was applied
+  public init(_ substring: Substring) {
+    self = String(substring._slice)
 
-  public let base: String
-  public internal(set) var bounds: Range<Index>
+  }
+}
 
+public struct Substring : RangeReplaceableCollection, BidirectionalCollection {
+  public typealias Index = String.Index
+  public typealias IndexDistance = String.IndexDistance
+
+  internal var _slice: RangeReplaceableBidirectionalSlice<String>
 
   public init() {
-    let s = ""
-    self.init(s, s.startIndex..<s.endIndex)
+    _slice = RangeReplaceableBidirectionalSlice()
   }
 
   internal init(_ base: String, _ bounds: Range<Index>) {
-    self.base = base
-    self.bounds = bounds
+    _slice = RangeReplaceableBidirectionalSlice(base: base, bounds: bounds)
   }
 
   internal init(_ base: String, _ bounds: ClosedRange<Index>) {
     self.init(base, base._makeHalfOpen(bounds))
   }
 
-  public var startIndex: Index { return bounds.lowerBound }
-
-  public var endIndex: Index { return bounds.upperBound }
+  public var startIndex: Index { return _slice.startIndex }
+  public var endIndex: Index { return _slice.endIndex }
 
   public func index(after i: Index) -> Index {
-    _precondition(i < bounds.upperBound, "Cannot increment beyond endIndex")
-    _precondition(i >= bounds.lowerBound, "Cannot increment beyond startIndex")
-    return base.characters.index(after: i)
+    _precondition(i < endIndex, "Cannot increment beyond endIndex")
+    _precondition(i >= startIndex, "Cannot increment an invalid index")
+    // FIXME(strings): slice types currently lack necessary bound checks
+    return _slice.index(after: i)
   }
 
-  // TODO: swift-3-indexing-model - add docs
   public func index(before i: Index) -> Index {
-    _precondition(i <= bounds.upperBound, "Cannot decrement an invalid index")
-    _precondition(i > bounds.lowerBound, "Cannot decrement beyond startIndex")
-    return base.characters.index(before: i)
+    _precondition(i <= endIndex, "Cannot decrement an invalid index")
+    _precondition(i > startIndex, "Cannot decrement beyond startIndex")
+    // FIXME(strings): slice types currently lack necessary bound checks
+    return _slice.index(before: i)
   }
 
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    let result = base.characters.index(i, offsetBy: n)
-    _precondition(bounds.contains(result),
+    let result = _slice.index(i, offsetBy: n)
+    // FIXME(strings): slice types currently lack necessary bound checks
+    _precondition(
+      (_slice._startIndex ..< _slice.endIndex).contains(result),
       "Operation results in an invalid index")
     return result
   }
@@ -59,37 +65,34 @@ public struct Substring : RangeReplaceableCollection {
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
-    let result =  base.characters.index(i, offsetBy: n, limitedBy: limit)
-    _precondition(result.map { bounds.contains($0) } ?? true,
+    let result = _slice.index(i, offsetBy: n, limitedBy: limit)
+    // FIXME(strings): slice types currently lack necessary bound checks
+    _precondition(result.map {
+        (_slice._startIndex ..< _slice.endIndex).contains($0)
+      } ?? true,
       "Operation results in an invalid index")
     return result
   }
 
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    return base.characters.distance(from: start, to: end)
+    return _slice.distance(from: start, to: end)
   }
 
   public subscript(i: Index) -> Character {
-    _precondition(bounds.contains(i), "Invalid index")
-    return base.characters[i]
+    return _slice[i]
   }
 
   public subscript(bounds: Range<Index>) -> Substring {
-    // FIXME(strings): add checks
-    return Substring(base, bounds)
+    let subSlice = _slice[bounds]
+    return Substring(_slice._base, subSlice.startIndex ..< subSlice.endIndex)
   }
-
-  public subscript(bounds: ClosedRange<Index>) -> Substring {
-    // FIXME(strings): add checks
-    return Substring(base, bounds)
-  }
-
 
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
   ) where C : Collection, C.Iterator.Element == Iterator.Element {
-    fatalError()
+    // FIXME(strings): slice types currently lack necessary bound checks
+    _slice.replaceSubrange(bounds, with: newElements)
   }
 
 % for Range in ['Range', 'ClosedRange']:
@@ -97,7 +100,7 @@ public struct Substring : RangeReplaceableCollection {
   public mutating func replaceSubrange(
     _ bounds: ${Range}<Index>, with newElements: Substring
   ) {
-    replaceSubrange(bounds, with: newElements.base.characters)
+    replaceSubrange(bounds, with: newElements._slice)
   }
 
 % end
