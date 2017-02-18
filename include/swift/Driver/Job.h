@@ -168,6 +168,9 @@ public:
   /// terminating output with the given \p terminator.
   void printCommandLine(raw_ostream &Stream, StringRef Terminator = "\n") const;
 
+  /// Print a short summary of this Job to the given \p Stream.
+  void printSummary(raw_ostream &Stream) const;
+
   /// Print the command line for this Job to the given \p stream,
   /// and include any extra environment variables that will be set.
   ///

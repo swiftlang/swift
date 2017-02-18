@@ -44,6 +44,45 @@ using namespace swift::sys;
 using namespace swift::driver;
 using namespace llvm::opt;
 
+struct LogJob {
+  const Job *j;
+  LogJob(const Job *j) : j(j) {}
+};
+
+struct LogJobArray {
+  const ArrayRef<const Job *> js;
+  LogJobArray(const ArrayRef<const Job *> js) : js(js) {}
+};
+
+struct LogJobSet {
+  const SmallPtrSetImpl<const Job*> &js;
+  LogJobSet(const SmallPtrSetImpl<const Job*> &js) : js(js) {}
+};
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const LogJob &lj) {
+  lj.j->printSummary(os);
+  return os;
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const LogJobArray &ljs) {
+  os << "[";
+  interleave(ljs.js,
+             [&](Job const *j) { os << LogJob(j); },
+             [&]() { os << ' '; });
+  os << "]";
+  return os;
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const LogJobSet &ljs) {
+  os << "{";
+  interleave(ljs.js,
+             [&](Job const *j) { os << LogJob(j); },
+             [&]() { os << ' '; });
+  os << "}";
+  return os;
+}
+
+
 Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
@@ -309,9 +348,7 @@ int Compilation::performJobsImpl() {
       return;
     if (State.ScheduledCommands.count(cmd))
       return;
-    llvm::outs() << "Queuing "
-                 << llvm::sys::path::filename(cmd->getOutput().getBaseInput(0))
-                 << " " << reason << "\n";
+    llvm::outs() << "Queuing " << reason << ": " << LogJob(cmd) << "\n";
     IncrementalTracer->printPath(llvm::outs(), cmd,
                                  [](raw_ostream &out, const Job *base) {
       out << llvm::sys::path::filename(base->getOutput().getBaseInput(0));
@@ -467,21 +504,7 @@ int Compilation::performJobsImpl() {
     if (ShowDriverTimeCompilation) {
       llvm::SmallString<128> TimerName;
       llvm::raw_svector_ostream OS(TimerName);
-
-      OS << BeganCmd->getSource().getClassName();
-      for (auto A : BeganCmd->getSource().getInputs()) {
-        if (const InputAction *IA = dyn_cast<InputAction>(A)) {
-          OS << " " << IA->getInputArg().getValue();
-        }
-      }
-      for (auto J : BeganCmd->getInputs()) {
-        for (auto A : J->getSource().getInputs()) {
-          if (const InputAction *IA = dyn_cast<InputAction>(A)) {
-            OS << " " << IA->getInputArg().getValue();
-          }
-        }
-      }
-
+      OS << LogJob(BeganCmd);
       DriverTimers.insert({
         BeganCmd,
         std::unique_ptr<llvm::Timer>(
