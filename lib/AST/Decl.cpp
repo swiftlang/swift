@@ -546,6 +546,106 @@ TrailingWhereClause *TrailingWhereClause::create(
   return new (mem) TrailingWhereClause(whereLoc, requirements);
 }
 
+void GenericContext::setGenericParams(GenericParamList *params) {
+  GenericParams = params;
+
+  if (GenericParams) {
+    for (auto param : *GenericParams)
+      param->setDeclContext(this);
+  }
+}
+
+GenericSignature *GenericContext::getGenericSignature() const {
+  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return genericEnv->getGenericSignature();
+
+  if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
+    return genericSig;
+
+  return nullptr;
+}
+
+GenericEnvironment *GenericContext::getGenericEnvironment() const {
+  // Fast case: we already have a generic environment.
+  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return genericEnv;
+
+  // If we only have a generic signature, build the generic environment.
+  if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
+    return getLazyGenericEnvironmentSlow();
+
+  return nullptr;
+}
+
+void GenericContext::setGenericEnvironment(GenericEnvironment *genericEnv) {
+  assert((GenericSigOrEnv.isNull() ||
+          getGenericSignature()->getCanonicalSignature() ==
+            genericEnv->getGenericSignature()->getCanonicalSignature()) &&
+         "set a generic environment with a different generic signature");
+  this->GenericSigOrEnv = genericEnv;
+  if (genericEnv)
+    genericEnv->setOwningDeclContext(this);
+}
+
+GenericEnvironment *
+GenericContext::getLazyGenericEnvironmentSlow() const {
+  assert(GenericSigOrEnv.is<GenericSignature *>() &&
+         "not a lazily deserialized generic environment");
+
+  GenericEnvironment *genericEnv;
+
+  if (auto *extensionDecl = dyn_cast<ExtensionDecl>(this)) {
+    auto contextData = getASTContext().getOrCreateLazyIterableContextData(
+      extensionDecl, nullptr);
+    genericEnv = contextData->loader->loadGenericEnvironment(
+      extensionDecl, contextData->genericEnvData);
+  } else if (auto *typeDecl = dyn_cast<GenericTypeDecl>(this)) {
+    auto contextData = getASTContext().getOrCreateLazyGenericTypeData(
+      typeDecl, nullptr);
+    genericEnv = contextData->loader->loadGenericEnvironment(
+      typeDecl, contextData->genericEnvData);
+  } else if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(this)) {
+    auto contextData = getASTContext().getOrCreateLazyFunctionContextData(
+      funcDecl, nullptr);
+    genericEnv = contextData->loader->loadGenericEnvironment(
+      funcDecl, contextData->genericEnvData);
+  } else {
+    llvm_unreachable("Bad GenericContext kind");
+  }
+
+  const_cast<GenericContext *>(this)->setGenericEnvironment(genericEnv);
+  ++NumLazyGenericEnvironmentsLoaded;
+  return genericEnv;
+}
+
+void GenericContext::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
+                                               GenericSignature *genericSig,
+                                               uint64_t genericEnvData) {
+  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
+  GenericSigOrEnv = genericSig;
+
+  if (auto *extensionDecl = dyn_cast<ExtensionDecl>(this)) {
+    auto contextData =
+      getASTContext().getOrCreateLazyIterableContextData(
+        extensionDecl, lazyLoader);
+    contextData->genericEnvData = genericEnvData;
+  } else if (auto *typeDecl = dyn_cast<GenericTypeDecl>(this)) {
+    auto contextData =
+      getASTContext().getOrCreateLazyGenericTypeData(
+        typeDecl, lazyLoader);
+    contextData->genericEnvData = genericEnvData;
+  } else if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(this)) {
+    auto contextData =
+      getASTContext().getOrCreateLazyFunctionContextData(
+        funcDecl, lazyLoader);
+    contextData->genericEnvData = genericEnvData;
+  } else {
+    llvm_unreachable("Bad GenericContext kind");
+  }
+
+  ++NumLazyGenericEnvironments;
+}
+
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
                                SourceLoc ImportLoc, ImportKind Kind,
                                SourceLoc KindLoc,
@@ -673,17 +773,17 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
                              DeclContext *parent,
                              TrailingWhereClause *trailingWhereClause)
   : Decl(DeclKind::Extension, parent),
-    DeclContext(DeclContextKind::ExtensionDecl, parent),
+    GenericContext(DeclContextKind::ExtensionDecl, parent),
     IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
     ExtensionLoc(extensionLoc),
     ExtendedType(extendedType),
-    Inherited(inherited),
-    TrailingWhere(trailingWhereClause)
+    Inherited(inherited)
 {
   ExtensionDeclBits.Validated = false;
   ExtensionDeclBits.CheckedInheritanceClause = false;
   ExtensionDeclBits.DefaultAndMaxAccessLevel = 0;
   ExtensionDeclBits.HasLazyConformances = false;
+  setTrailingWhereClause(trailingWhereClause);
 }
 
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
@@ -705,72 +805,6 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
     result->setClangNode(clangNode);
 
   return result;
-}
-
-void ExtensionDecl::setGenericParams(GenericParamList *params) {
-  GenericParams = params;
-
-  if (GenericParams) {
-    for (auto param : *GenericParams)
-      param->setDeclContext(this);
-  }
-}
-
-GenericSignature *ExtensionDecl::getGenericSignature() const {
-  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return genericEnv->getGenericSignature();
-
-  if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-    return genericSig;
-
-  return nullptr;
-}
-
-GenericEnvironment *ExtensionDecl::getGenericEnvironment() const {
-  // Fast case: we already have a generic environment.
-  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return genericEnv;
-
-  // If we only have a generic signature, build the generic environment.
-  if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
-    return getLazyGenericEnvironmentSlow();
-
-  return nullptr;
-}
-
-void ExtensionDecl::setGenericEnvironment(GenericEnvironment *genericEnv) {
-  assert((GenericSigOrEnv.isNull() ||
-          getGenericSignature()->getCanonicalSignature() ==
-            genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-         "set a generic environment with a different generic signature");
-  this->GenericSigOrEnv = genericEnv;
-  if (genericEnv)
-    genericEnv->setOwningDeclContext(this);
-}
-
-GenericEnvironment *
-ExtensionDecl::getLazyGenericEnvironmentSlow() const {
-  assert(GenericSigOrEnv.is<GenericSignature *>() &&
-         "not a lazily deserialized generic environment");
-  auto contextData = getASTContext().getOrCreateLazyIterableContextData(this,
-                                                                    nullptr);
-  auto genericEnv = contextData->loader->loadGenericEnvironment(
-                                            this, contextData->genericEnvData);
-  const_cast<ExtensionDecl *>(this)->setGenericEnvironment(genericEnv);
-  ++NumLazyGenericEnvironmentsLoaded;
-  return genericEnv;
-}
-
-void ExtensionDecl::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
-                                              GenericSignature *genericSig,
-                                              uint64_t genericEnvData) {
-  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
-  GenericSigOrEnv = genericSig;
-
-  auto contextData =
-    getASTContext().getOrCreateLazyIterableContextData(this, lazyLoader);
-  contextData->genericEnvData = genericEnvData;
-  ++NumLazyGenericEnvironments;
 }
 
 DeclRange ExtensionDecl::getMembers() const {
@@ -2178,77 +2212,8 @@ GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  MutableArrayRef<TypeLoc> inherited,
                                  GenericParamList *GenericParams) :
     TypeDecl(K, DC, name, nameLoc, inherited),
-    DeclContext(DeclContextKind::GenericTypeDecl, DC) {
+    GenericContext(DeclContextKind::GenericTypeDecl, DC) {
   setGenericParams(GenericParams);
-}
-
-
-void GenericTypeDecl::setGenericParams(GenericParamList *params) {
-  // Set the specified generic parameters onto this type declaration, setting
-  // the parameters' context along the way.
-  GenericParams = params;
-  if (params)
-    for (auto Param : *params)
-      Param->setDeclContext(this);
-}
-
-GenericSignature *GenericTypeDecl::getGenericSignature() const {
-  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return genericEnv->getGenericSignature();
-
-  if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-    return genericSig;
-
-  return nullptr;
-}
-
-GenericEnvironment *GenericTypeDecl::getGenericEnvironment() const {
-  // Fast case: we already have a generic environment.
-  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return genericEnv;
-
-  // If we only have a generic signature, build the generic environment.
-  if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
-    return getLazyGenericEnvironmentSlow();
-
-  return nullptr;
-}
-
-/// Set the generic context of this function.
-void GenericTypeDecl::setGenericEnvironment(GenericEnvironment *genericEnv) {
-  assert((GenericSigOrEnv.isNull() ||
-          getGenericSignature()->getCanonicalSignature() ==
-            genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-         "set a generic environment with a different generic signature");
-  this->GenericSigOrEnv = genericEnv;
-
-  if (genericEnv)
-    genericEnv->setOwningDeclContext(this);
-}
-
-GenericEnvironment *
-GenericTypeDecl::getLazyGenericEnvironmentSlow() const {
-  assert(GenericSigOrEnv.is<GenericSignature *>() &&
-         "not a lazily deserialized generic environment");
-  auto contextData = getASTContext().getOrCreateLazyGenericTypeData(this,
-                                                                    nullptr);
-  auto genericEnv = contextData->loader->loadGenericEnvironment(
-                                            this, contextData->genericEnvData);
-  const_cast<GenericTypeDecl *>(this)->setGenericEnvironment(genericEnv);
-  ++NumLazyGenericEnvironmentsLoaded;
-  return genericEnv;
-}
-
-void GenericTypeDecl::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
-                                                GenericSignature *genericSig,
-                                                uint64_t genericEnvData) {
-  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
-  GenericSigOrEnv = genericSig;
-
-  auto contextData =
-    getASTContext().getOrCreateLazyGenericTypeData(this, lazyLoader);
-  contextData->genericEnvData = genericEnvData;
-  ++NumLazyGenericEnvironments;
 }
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, SourceLoc EqualLoc,
@@ -4059,66 +4024,6 @@ SourceRange SubscriptDecl::getSourceRange() const {
   return { getSubscriptLoc(), ElementTy.getSourceRange().End };
 }
 
-GenericSignature *AbstractFunctionDecl::getGenericSignature() const {
-  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return genericEnv->getGenericSignature();
-
-  if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-    return genericSig;
-
-  return nullptr;
-}
-
-GenericEnvironment *AbstractFunctionDecl::getGenericEnvironment() const {
-  // Fast case: we already have a generic environment.
-  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return genericEnv;
-
-  // If we only have a generic signature, build the generic environment.
-  if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
-    return getLazyGenericEnvironmentSlow();
-
-  return nullptr;
-}
-
-void
-AbstractFunctionDecl::setGenericEnvironment(GenericEnvironment *genericEnv) {
-  assert((GenericSigOrEnv.isNull() ||
-          getGenericSignature()->getCanonicalSignature() ==
-            genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-         "set a generic environment with a different generic signature");
-  this->GenericSigOrEnv = genericEnv;
-
-  if (genericEnv)
-    genericEnv->setOwningDeclContext(this);
-}
-
-GenericEnvironment *
-AbstractFunctionDecl::getLazyGenericEnvironmentSlow() const {
-  assert(GenericSigOrEnv.is<GenericSignature *>() &&
-         "not a lazily deserialized generic environment");
-  auto contextData =
-    getASTContext().getOrCreateLazyFunctionContextData(this, nullptr);
-  auto genericEnv = contextData->loader->loadGenericEnvironment(
-                                            this, contextData->genericEnvData);
-  const_cast<AbstractFunctionDecl *>(this)->setGenericEnvironment(genericEnv);
-  ++NumLazyGenericEnvironmentsLoaded;
-  return genericEnv;
-}
-
-void AbstractFunctionDecl::setLazyGenericEnvironment(
-                                                 LazyMemberLoader *lazyLoader,
-                                                 GenericSignature *genericSig,
-                                                 uint64_t genericEnvData) {
-  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
-  GenericSigOrEnv = genericSig;
-
-  auto contextData =
-    getASTContext().getOrCreateLazyFunctionContextData(this, lazyLoader);
-  contextData->genericEnvData = genericEnvData;
-  ++NumLazyGenericEnvironments;
-}
-
 Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor,
                                                     bool wantDynamicSelf) {
   auto *dc = getDeclContext();
@@ -4217,16 +4122,6 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
 
   return DeclName();
 }
-
-void AbstractFunctionDecl::setGenericParams(GenericParamList *GP) {
-  // Set the specified generic parameters onto this abstract function, setting
-  // the parameters' context to the function along the way.
-  GenericParams = GP;
-  if (GP)
-    for (auto Param : *GP)
-      Param->setDeclContext(this);
-}
-
 
 /// \brief This method returns the implicit 'self' decl.
 ///

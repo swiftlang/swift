@@ -1374,6 +1374,82 @@ public:
   }
 };
 
+class GenericContext : public DeclContext {
+private:
+  GenericParamList *GenericParams = nullptr;
+
+  /// The trailing where clause.
+  ///
+  /// Note that this is not currently serialized, because semantic analysis
+  /// moves the trailing where clause into the generic parameter list.
+  TrailingWhereClause *TrailingWhere = nullptr;
+
+  /// The generic signature or environment of this declaration.
+  ///
+  /// When this declaration stores only a signature, the generic
+  /// environment will be lazily loaded.
+  mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
+    GenericSigOrEnv;
+
+  /// Lazily populate the generic environment.
+  GenericEnvironment *getLazyGenericEnvironmentSlow() const;
+
+protected:
+  GenericContext(DeclContextKind Kind, DeclContext *Parent)
+    : DeclContext(Kind, Parent) { }
+
+public:
+  /// \brief Retrieve the set of parameters to a generic subscript, or null if
+  /// this subscript is not generic.
+  GenericParamList *getGenericParams() const { return GenericParams; }
+
+  void setGenericParams(GenericParamList *GenericParams);
+
+  /// \brief Determine whether this subscript has generic parameters
+  /// of its own.
+  bool isGeneric() const { return GenericParams != nullptr; }
+
+  /// Retrieve the trailing where clause for this extension, if any.
+  TrailingWhereClause *getTrailingWhereClause() const {
+    return TrailingWhere;
+  }
+
+  /// Set the trailing where clause for this extension.
+  void setTrailingWhereClause(TrailingWhereClause *trailingWhereClause) {
+    TrailingWhere = trailingWhereClause;
+  }
+
+  /// Retrieve the generic signature for this subscript.
+  GenericSignature *getGenericSignature() const;
+
+  /// Retrieve the generic context for this subscript.
+  GenericEnvironment *getGenericEnvironment() const;
+
+  /// Retrieve the innermost generic parameter types.
+  ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const {
+    if (auto sig = getGenericSignature())
+      return sig->getInnermostGenericParams();
+    else
+      return { };
+  }
+
+  /// Retrieve the generic requirements.
+  ArrayRef<Requirement> getGenericRequirements() const {
+    if (auto sig = getGenericSignature())
+      return sig->getRequirements();
+    else
+      return { };
+  }
+
+  /// Set a lazy generic environment.
+  void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
+                                 GenericSignature *genericSig,
+                                 uint64_t genericEnvData);
+
+  /// Set the generic context of this subscript.
+  void setGenericEnvironment(GenericEnvironment *genericEnv);
+};
+
 /// Describes what kind of name is being imported.
 ///
 /// If the enumerators here are changed, make sure to update all diagnostics
@@ -1483,7 +1559,7 @@ public:
 /// ExtensionDecl - This represents a type extension containing methods
 /// associated with the type.  This is not a ValueDecl and has no Type because
 /// there are no runtime values of the Extension's type.  
-class ExtensionDecl final : public Decl, public DeclContext,
+class ExtensionDecl final : public Decl, public GenericContext,
                             public IterableDeclContext {
   SourceLoc ExtensionLoc;  // Location of 'extension' keyword.
   SourceRange Braces;
@@ -1491,23 +1567,7 @@ class ExtensionDecl final : public Decl, public DeclContext,
   /// The type being extended.
   TypeLoc ExtendedType;
   
-  /// The generic parameters of the extension.
-  GenericParamList *GenericParams = nullptr;
-
-  /// The generic signature or environment of this extension.
-  ///
-  /// When this extension stores only a signature, the generic environment
-  /// will be lazily loaded.
-  mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
-    GenericSigOrEnv;
-
   MutableArrayRef<TypeLoc> Inherited;
-
-  /// The trailing where clause.
-  ///
-  /// Note that this is not currently serialized, because semantic analysis
-  /// moves the trailing where clause into the generic parameter list.
-  TrailingWhereClause *TrailingWhere;
 
   /// \brief The next extension in the linked list of extensions.
   ///
@@ -1543,9 +1603,6 @@ class ExtensionDecl final : public Decl, public DeclContext,
   /// Slow path for \c takeConformanceLoader().
   std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoaderSlow();
 
-  /// Lazily populate the generic environment.
-  GenericEnvironment *getLazyGenericEnvironmentSlow() const;
-
 public:
   using Decl::getASTContext;
 
@@ -1565,45 +1622,6 @@ public:
 
   SourceRange getBraces() const { return Braces; }
   void setBraces(SourceRange braces) { Braces = braces; }
-
-  /// Retrieve the innermost generic parameter list.
-  GenericParamList *getGenericParams() const {
-    return GenericParams;
-  }
-
-  void setGenericParams(GenericParamList *params);
-
-  /// Retrieve the trailing where clause for this extension, if any.
-  TrailingWhereClause *getTrailingWhereClause() const {
-    return TrailingWhere;
-  }
-
-  /// Set the trailing where clause for this extension.
-  void setTrailingWhereClause(TrailingWhereClause *trailingWhereClause) {
-    TrailingWhere = trailingWhereClause;
-  }
-
-  /// Retrieve the generic requirements.
-  ArrayRef<Requirement> getGenericRequirements() const {
-    if (auto sig = getGenericSignature())
-      return sig->getRequirements();
-    else
-      return { };
-  }
-
-  /// Retrieve the generic signature for this type.
-  GenericSignature *getGenericSignature() const;
-
-  /// Retrieve the generic context for this type.
-  GenericEnvironment *getGenericEnvironment() const;
-
-  /// Set a lazy generic environment.
-  void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
-                                 GenericSignature *genericSig,
-                                 uint64_t genericEnvData);
-
-  /// Set the generic context of this extension.
-  void setGenericEnvironment(GenericEnvironment *genericEnv);
 
   /// Retrieve the type being extended.
   Type getExtendedType() const { return ExtendedType.getType(); }
@@ -2351,60 +2369,12 @@ public:
 
 /// A type declaration that can have generic parameters attached to it.  Because
 /// it has these generic parameters, it is always a DeclContext.
-class GenericTypeDecl : public TypeDecl, public DeclContext {
-  GenericParamList *GenericParams = nullptr;
-
-  /// The generic signature or environment of this type.
-  ///
-  /// When this function stores only a signature, the generic environment
-  /// will be lazily loaded.
-  mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
-    GenericSigOrEnv;
-
-  /// Lazily populate the generic environment.
-  GenericEnvironment *getLazyGenericEnvironmentSlow() const;
-
+class GenericTypeDecl : public TypeDecl, public GenericContext {
 public:
   GenericTypeDecl(DeclKind K, DeclContext *DC,
                   Identifier name, SourceLoc nameLoc,
                   MutableArrayRef<TypeLoc> inherited,
                   GenericParamList *GenericParams);
-
-  GenericParamList *getGenericParams() const { return GenericParams; }
-
-  /// Provide the set of parameters to a generic type, or null if
-  /// this function is not generic.
-  void setGenericParams(GenericParamList *params);
-
-  /// Retrieve the innermost generic parameter types.
-  ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const {
-    if (auto sig = getGenericSignature())
-      return sig->getInnermostGenericParams();
-    else
-      return { };
-  }
-
-  /// Retrieve the generic requirements.
-  ArrayRef<Requirement> getGenericRequirements() const {
-    if (auto sig = getGenericSignature())
-      return sig->getRequirements();
-    else
-      return { };
-  }
-
-  /// Retrieve the generic signature for this type.
-  GenericSignature *getGenericSignature() const;
-
-  /// Retrieve the generic context for this type.
-  GenericEnvironment *getGenericEnvironment() const;
-
-  /// Set a lazy generic environment.
-  void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
-                                 GenericSignature *genericSig,
-                                 uint64_t genericEnvData);
-
-  /// Set the generic context of this function.
-  void setGenericEnvironment(GenericEnvironment *genericEnv);
 
   // Resolve ambiguity due to multiple base classes.
   using TypeDecl::getASTContext;
@@ -4639,7 +4609,7 @@ struct ImportAsMemberStatus {
 };
 
 /// \brief Base class for function-like declarations.
-class AbstractFunctionDecl : public ValueDecl, public DeclContext {
+class AbstractFunctionDecl : public ValueDecl, public GenericContext {
 public:
   enum class BodyKind {
     /// The function did not have a body in the source code file.
@@ -4690,15 +4660,6 @@ protected:
     SourceRange BodyRange;
   };
 
-  GenericParamList *GenericParams;
-
-  /// The generic signature or environment of this function.
-  ///
-  /// When this function stores only a signature, the generic environment
-  /// will be lazily loaded.
-  mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
-    GenericSigOrEnv;
-
   CaptureInfo Captures;
 
   /// Location of the 'throws' token.
@@ -4711,8 +4672,8 @@ protected:
                        unsigned NumParameterLists,
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
-        DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
-        Body(nullptr), GenericParams(nullptr), ThrowsLoc(ThrowsLoc) {
+        GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
+        Body(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParameterLists = NumParameterLists;
@@ -4727,29 +4688,10 @@ protected:
     AbstractFunctionDeclBits.BodyKind = unsigned(K);
   }
 
-  void setGenericParams(GenericParamList *GenericParams);
-
-  /// Lazily populate the generic environment.
-  GenericEnvironment *getLazyGenericEnvironmentSlow() const;
-
 public:
   /// \brief Should this declaration be treated as if annotated with transparent
   /// attribute.
   bool isTransparent() const;
-
-  /// Retrieve the generic signature for this function.
-  GenericSignature *getGenericSignature() const;
-
-  /// Retrieve the generic context for this function.
-  GenericEnvironment *getGenericEnvironment() const;
-
-  /// Set a lazy generic environment.
-  void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
-                                 GenericSignature *genericSig,
-                                 uint64_t genericEnvData);
-
-  /// Set the generic context of this function.
-  void setGenericEnvironment(GenericEnvironment *genericEnv);
 
   // Expose our import as member status
   bool isImportAsMember() const { return IAMStatus.isImportAsMember(); }
@@ -4929,14 +4871,6 @@ public:
     return const_cast<AbstractFunctionDecl*>(this)->getImplicitSelfDecl();
   }
   ParamDecl *getImplicitSelfDecl();
-
-  /// \brief Retrieve the set of parameters to a generic function, or null if
-  /// this function is not generic.
-  GenericParamList *getGenericParams() const { return GenericParams; }
-
-  /// \brief Determine whether this is a generic function, which can only be
-  /// used when each of the archetypes is bound to a particular concrete type.
-  bool isGeneric() const { return GenericParams != nullptr; }
 
   /// Retrieve the declaration that this method overrides, if any.
   AbstractFunctionDecl *getOverriddenDecl() const;
