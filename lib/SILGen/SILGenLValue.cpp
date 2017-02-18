@@ -2446,18 +2446,14 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
 void SILGenFunction::emitAssignLValueToLValue(SILLocation loc,
                                               LValue &&src,
                                               LValue &&dest) {
-  auto skipPeephole = [&]{
-    RValue loaded = emitLoadOfLValue(loc, std::move(src), SGFContext());
-    emitAssignToLValue(loc, std::move(loaded), std::move(dest));
-  };
-  
   // Only perform the peephole if both operands are physical and there's no
   // semantic conversion necessary.
-  if (!src.isPhysical())
-    return skipPeephole();
-  if (!dest.isPhysical())
-    return skipPeephole();
-  
+  if (!src.isPhysical() || !dest.isPhysical()) {
+    RValue loaded = emitLoadOfLValue(loc, std::move(src), SGFContext());
+    emitAssignToLValue(loc, std::move(loaded), std::move(dest));
+    return;
+  }
+
   auto srcAddr = emitAddressOfLValue(loc, std::move(src), AccessKind::Read)
                    .getUnmanagedValue();
   auto destAddr = emitAddressOfLValue(loc, std::move(dest), AccessKind::Write)
