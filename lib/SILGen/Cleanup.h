@@ -33,6 +33,7 @@ class JumpDest;
 class SILGenFunction;
 class ManagedValue;
 class SharedBorrowFormalAccess;
+class FormalEvaluationScope;
 
 /// The valid states that a cleanup can be in.
 enum class CleanupState {
@@ -56,10 +57,11 @@ llvm::raw_ostream &operator<<(raw_ostream &os, CleanupState state);
 
 class LLVM_LIBRARY_VISIBILITY Cleanup {
   unsigned allocatedSize;
-  CleanupState state;
   
   friend class CleanupManager;
 protected:
+  CleanupState state;
+
   Cleanup() {}
   virtual ~Cleanup() {}
   
@@ -69,7 +71,9 @@ public:
   size_t allocated_size() const { return allocatedSize; }
   
   CleanupState getState() const { return state; }
-  void setState(CleanupState newState) { state = newState; }
+  virtual void setState(SILGenFunction &gen, CleanupState newState) {
+    state = newState;
+  }
   bool isActive() const { return state >= CleanupState::Active; }
   bool isDead() const { return state == CleanupState::Dead; }
 
@@ -121,6 +125,7 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
 
   friend class CleanupStateRestorationScope;
   friend class SharedBorrowFormalEvaluation;
+  friend class FormalEvaluationScope;
 
 public:
   CleanupManager(SILGenFunction &Gen)

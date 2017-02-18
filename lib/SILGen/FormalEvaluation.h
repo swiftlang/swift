@@ -26,7 +26,7 @@ class LogicalPathComponent;
 
 class FormalAccess {
 public:
-  enum Kind { Shared, Exclusive };
+  enum Kind { Shared, Exclusive, Owned };
 
 private:
   unsigned allocatedSize;
@@ -35,10 +35,12 @@ private:
 protected:
   SILLocation loc;
   CleanupHandle cleanup;
+  bool finished;
 
   FormalAccess(unsigned allocatedSize, Kind kind, SILLocation loc,
                CleanupHandle cleanup)
-      : allocatedSize(allocatedSize), kind(kind), loc(loc), cleanup(cleanup) {}
+      : allocatedSize(allocatedSize), kind(kind), loc(loc), cleanup(cleanup),
+        finished(false) {}
 
 public:
   virtual ~FormalAccess() {}
@@ -57,7 +59,14 @@ public:
 
   Kind getKind() const { return kind; }
 
-  virtual void finish(SILGenFunction &gen) = 0;
+  void finish(SILGenFunction &gen) { finishImpl(gen); }
+
+  void setFinished() { finished = true; }
+
+  bool isFinished() const { return finished; }
+
+protected:
+  virtual void finishImpl(SILGenFunction &gen) = 0;
 };
 
 class SharedBorrowFormalAccess : public FormalAccess {
@@ -69,10 +78,26 @@ public:
                            SILValue originalValue, SILValue borrowedValue)
       : FormalAccess(sizeof(*this), FormalAccess::Shared, loc, cleanup),
         originalValue(originalValue), borrowedValue(borrowedValue) {}
-  void finish(SILGenFunction &gen) override;
 
   SILValue getBorrowedValue() const { return borrowedValue; }
   SILValue getOriginalValue() const { return originalValue; }
+
+private:
+  void finishImpl(SILGenFunction &gen) override;
+};
+
+class OwnedFormalAccess : public FormalAccess {
+  SILValue value;
+
+public:
+  OwnedFormalAccess(SILLocation loc, CleanupHandle cleanup, SILValue value)
+      : FormalAccess(sizeof(*this), FormalAccess::Owned, loc, cleanup),
+        value(value) {}
+
+  SILValue getValue() const { return value; }
+
+private:
+  void finishImpl(SILGenFunction &gen) override;
 };
 
 class FormalEvaluationContext {
@@ -113,6 +138,8 @@ public:
   /// Pop objects off of the stack until \p the object pointed to by stable_iter
   /// is the top element of the stack.
   void pop(stable_iterator stable_iter) { stack.pop(stable_iter); }
+
+  void dump(SILGenFunction &gen);
 };
 
 class FormalEvaluationScope {

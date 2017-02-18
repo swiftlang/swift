@@ -1533,6 +1533,14 @@ public:
   std::unique_ptr<TemporaryInitialization>
   emitTemporary(SILLocation loc, const TypeLowering &tempTL);
 
+  /// Emit the allocation for a local temporary, provides an
+  /// Initialization that can be used to initialize it, and registers
+  /// cleanups in the current active formal evaluation scope.
+  ///
+  /// The initialization is guaranteed to be a single buffer.
+  std::unique_ptr<TemporaryInitialization>
+  emitFormalAccessTemporary(SILLocation loc, const TypeLowering &tempTL);
+
   /// Provides an Initialization that can be used to initialize an already-
   /// allocated temporary, and registers cleanups in the active scope.
   ///
@@ -1544,6 +1552,12 @@ public:
   /// given address.
   CleanupHandle enterDormantTemporaryCleanup(SILValue temp,
                                              const TypeLowering &tempTL);
+
+  /// Enter a currently-dormant cleanup to destroy the value in the
+  /// given address.
+  CleanupHandle
+  enterDormantFormalAccessTemporaryCleanup(SILValue temp, SILLocation loc,
+                                           const TypeLowering &tempTL);
 
   /// Destroy and deallocate an initialized local variable.
   void destroyLocalVariable(SILLocation L, VarDecl *D);
