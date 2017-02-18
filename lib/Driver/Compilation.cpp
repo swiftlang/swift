@@ -449,7 +449,105 @@ namespace driver {
       return TaskFinishedResponse::StopExecution;
     }
 
+    /// Schedule all jobs we can from the initial list provided by Compilation.
+    void scheduleInitialJobs() {
+      for (const Job *Cmd : Comp.getJobs()) {
+        if (!Comp.getIncrementalBuildEnabled()) {
+          scheduleCommandIfNecessaryAndPossible(Cmd);
+          continue;
+        }
 
+        // Try to load the dependencies file for this job. If there isn't one, we
+        // always have to run the job, but it doesn't affect any other jobs. If
+        // there should be one but it's not present or can't be loaded, we have to
+        // run all the jobs.
+        // FIXME: We can probably do better here!
+        Job::Condition Condition = Job::Condition::Always;
+        StringRef DependenciesFile =
+          Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
+        if (!DependenciesFile.empty()) {
+          if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
+            DepGraph.addIndependentNode(Cmd);
+          } else {
+            switch (DepGraph.loadFromPath(Cmd, DependenciesFile)) {
+            case DependencyGraphImpl::LoadResult::HadError:
+              Comp.disableIncrementalBuild();
+              for (const Job *Cmd : DeferredCommands)
+                scheduleCommandIfNecessaryAndPossible(Cmd);
+              DeferredCommands.clear();
+              break;
+            case DependencyGraphImpl::LoadResult::UpToDate:
+              Condition = Cmd->getCondition();
+              break;
+            case DependencyGraphImpl::LoadResult::AffectsDownstream:
+              llvm_unreachable("we haven't marked anything in this graph yet");
+            }
+          }
+        }
+
+        switch (Condition) {
+        case Job::Condition::Always:
+          if (Comp.getIncrementalBuildEnabled() && !DependenciesFile.empty()) {
+            InitialOutOfDateCommands.push_back(Cmd);
+            DepGraph.markIntransitive(Cmd);
+          }
+          LLVM_FALLTHROUGH;
+        case Job::Condition::RunWithoutCascading:
+          noteBuilding(Cmd, "(initial)");
+          scheduleCommandIfNecessaryAndPossible(Cmd);
+          break;
+        case Job::Condition::CheckDependencies:
+          DeferredCommands.insert(Cmd);
+          break;
+        case Job::Condition::NewlyAdded:
+          llvm_unreachable("handled above");
+        }
+      }
+    }
+
+    /// Schedule transitive closure of initial jobs, and external jobs.
+    void scheduleAdditionalJobs() {
+      if (Comp.getIncrementalBuildEnabled()) {
+        SmallVector<const Job *, 16> AdditionalOutOfDateCommands;
+
+        // We scheduled all of the files that have actually changed. Now add the
+        // files that haven't changed, so that they'll get built in parallel if
+        // possible and after the first set of files if it's not.
+        for (auto *Cmd : InitialOutOfDateCommands) {
+          DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd,
+                                  IncrementalTracer);
+        }
+
+        for (auto *transitiveCmd : AdditionalOutOfDateCommands)
+          noteBuilding(transitiveCmd, "because of the initial set");
+        size_t firstSize = AdditionalOutOfDateCommands.size();
+
+        // Check all cross-module dependencies as well.
+        for (StringRef dependency : DepGraph.getExternalDependencies()) {
+          llvm::sys::fs::file_status depStatus;
+          if (!llvm::sys::fs::status(dependency, depStatus))
+            if (depStatus.getLastModificationTime() < Comp.LastBuildTime)
+              continue;
+
+          // If the dependency has been modified since the oldest built file,
+          // or if we can't stat it for some reason (perhaps it's been deleted?),
+          // trigger rebuilds through the dependency graph.
+          DepGraph.markExternal(AdditionalOutOfDateCommands, dependency);
+        }
+
+        for (auto *externalCmd :
+               llvm::makeArrayRef(AdditionalOutOfDateCommands).slice(firstSize)) {
+          noteBuilding(externalCmd, "because of external dependencies");
+        }
+
+        for (auto *AdditionalCmd : AdditionalOutOfDateCommands) {
+          if (!DeferredCommands.count(AdditionalCmd))
+            continue;
+          scheduleCommandIfNecessaryAndPossible(AdditionalCmd);
+          DeferredCommands.erase(AdditionalCmd);
+        }
+      }
+    }
 
   };
 } // driver
@@ -631,101 +729,8 @@ int Compilation::performJobsImpl() {
 
   PerformJobsState State(*this);
 
-
-  // Schedule all jobs we can.
-  for (const Job *Cmd : getJobs()) {
-    if (!getIncrementalBuildEnabled()) {
-      State.scheduleCommandIfNecessaryAndPossible(Cmd);
-      continue;
-    }
-
-    // Try to load the dependencies file for this job. If there isn't one, we
-    // always have to run the job, but it doesn't affect any other jobs. If
-    // there should be one but it's not present or can't be loaded, we have to
-    // run all the jobs.
-    // FIXME: We can probably do better here!
-    Job::Condition Condition = Job::Condition::Always;
-    StringRef DependenciesFile =
-      Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
-    if (!DependenciesFile.empty()) {
-      if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
-        State.DepGraph.addIndependentNode(Cmd);
-      } else {
-        switch (State.DepGraph.loadFromPath(Cmd, DependenciesFile)) {
-        case DependencyGraphImpl::LoadResult::HadError:
-          disableIncrementalBuild();
-          for (const Job *Cmd : State.DeferredCommands)
-            State.scheduleCommandIfNecessaryAndPossible(Cmd);
-          State.DeferredCommands.clear();
-          break;
-        case DependencyGraphImpl::LoadResult::UpToDate:
-          Condition = Cmd->getCondition();
-          break;
-        case DependencyGraphImpl::LoadResult::AffectsDownstream:
-          llvm_unreachable("we haven't marked anything in this graph yet");
-        }
-      }
-    }
-
-    switch (Condition) {
-    case Job::Condition::Always:
-      if (getIncrementalBuildEnabled() && !DependenciesFile.empty()) {
-        State.InitialOutOfDateCommands.push_back(Cmd);
-        State.DepGraph.markIntransitive(Cmd);
-      }
-      LLVM_FALLTHROUGH;
-    case Job::Condition::RunWithoutCascading:
-      State.noteBuilding(Cmd, "(initial)");
-      State.scheduleCommandIfNecessaryAndPossible(Cmd);
-      break;
-    case Job::Condition::CheckDependencies:
-      State.DeferredCommands.insert(Cmd);
-      break;
-    case Job::Condition::NewlyAdded:
-      llvm_unreachable("handled above");
-    }
-  }
-
-  if (getIncrementalBuildEnabled()) {
-    SmallVector<const Job *, 16> AdditionalOutOfDateCommands;
-
-    // We scheduled all of the files that have actually changed. Now add the
-    // files that haven't changed, so that they'll get built in parallel if
-    // possible and after the first set of files if it's not.
-    for (auto *Cmd : State.InitialOutOfDateCommands) {
-      State.DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd,
-                                    State.IncrementalTracer);
-    }
-
-    for (auto *transitiveCmd : AdditionalOutOfDateCommands)
-      State.noteBuilding(transitiveCmd, "because of the initial set:");
-    size_t firstSize = AdditionalOutOfDateCommands.size();
-
-    // Check all cross-module dependencies as well.
-    for (StringRef dependency : State.DepGraph.getExternalDependencies()) {
-      llvm::sys::fs::file_status depStatus;
-      if (!llvm::sys::fs::status(dependency, depStatus))
-        if (depStatus.getLastModificationTime() < LastBuildTime)
-          continue;
-
-      // If the dependency has been modified since the oldest built file,
-      // or if we can't stat it for some reason (perhaps it's been deleted?),
-      // trigger rebuilds through the dependency graph.
-      State.DepGraph.markExternal(AdditionalOutOfDateCommands, dependency);
-    }
-
-    for (auto *externalCmd :
-            llvm::makeArrayRef(AdditionalOutOfDateCommands).slice(firstSize)) {
-      State.noteBuilding(externalCmd, "because of external dependencies");
-    }
-
-    for (auto *AdditionalCmd : AdditionalOutOfDateCommands) {
-      if (!State.DeferredCommands.count(AdditionalCmd))
-        continue;
-      State.scheduleCommandIfNecessaryAndPossible(AdditionalCmd);
-      State.DeferredCommands.erase(AdditionalCmd);
-    }
-  }
+  State.scheduleInitialJobs();
+  State.scheduleAdditionalJobs();
 
   do {
     using namespace std::placeholders;
