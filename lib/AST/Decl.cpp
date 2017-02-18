@@ -32,6 +32,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -5071,4 +5072,78 @@ void ClassDecl::setSuperclass(Type superclass) {
   assert((!superclass || !superclass->hasArchetype())
          && "superclass must be interface type");
   LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
+}
+
+StringRef swift::objc_translation::
+getNameForObjC(const ValueDecl *VD, CustomNamesOnly_t customNamesOnly) {
+  assert(isa<ClassDecl>(VD) || isa<ProtocolDecl>(VD) || isa<StructDecl>(VD) ||
+         isa<EnumDecl>(VD) || isa<EnumElementDecl>(VD));
+  if (auto objc = VD->getAttrs().getAttribute<ObjCAttr>()) {
+    if (auto name = objc->getName()) {
+      assert(name->getNumSelectorPieces() == 1);
+      return name->getSelectorPieces().front().str();
+    }
+  }
+
+  if (customNamesOnly)
+    return StringRef();
+
+  if (auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(VD->getClangDecl())) {
+    if (const clang::IdentifierInfo *II = clangDecl->getIdentifier())
+      return II->getName();
+    if (auto *anonDecl = dyn_cast<clang::TagDecl>(clangDecl))
+      if (auto *anonTypedef = anonDecl->getTypedefNameForAnonDecl())
+        return anonTypedef->getIdentifier()->getName();
+  }
+
+  return VD->getName().str();
+}
+
+bool swift::objc_translation::
+printSwiftEnumElemNameInObjC(const EnumElementDecl *EL, llvm::raw_ostream &OS,
+                             Identifier PreferredName) {
+  StringRef ElemName = getNameForObjC(EL, CustomNamesOnly);
+  if (!ElemName.empty()) {
+    OS << ElemName;
+    return true;
+  }
+  OS << getNameForObjC(EL->getDeclContext()->getAsEnumOrEnumExtensionContext());
+  if (PreferredName.empty())
+    ElemName = EL->getName().str();
+  else
+    ElemName = PreferredName.str();
+
+  SmallString<64> Scratch;
+  OS << camel_case::toSentencecase(ElemName, Scratch);
+  return false;
+}
+
+std::pair<Identifier, ObjCSelector> swift::objc_translation::
+getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
+  ASTContext &Ctx = VD->getASTContext();
+  LazyResolver *Resolver = Ctx.getLazyResolver();
+  if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD)) {
+    return {Identifier(), FD->getObjCSelector(Resolver, PreferredName)};
+  } else if (auto *VAD = dyn_cast<VarDecl>(VD)) {
+    if (PreferredName)
+      return {PreferredName.getBaseName(), ObjCSelector()};
+    return {VAD->getObjCPropertyName(), ObjCSelector()};
+  } else if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
+    return getObjCNameForSwiftDecl(SD->getGetter(), PreferredName);
+  } else if (auto *EL = dyn_cast<EnumElementDecl>(VD)) {
+    SmallString<64> Buffer;
+    {
+      llvm::raw_svector_ostream OS(Buffer);
+      printSwiftEnumElemNameInObjC(EL, OS, PreferredName.getBaseName());
+    }
+    return {Ctx.getIdentifier(Buffer.str()), ObjCSelector()};
+  } else {
+    // @objc(ExplicitName) > PreferredName > Swift name.
+    StringRef Name = getNameForObjC(VD, CustomNamesOnly);
+    if (!Name.empty())
+      return {Ctx.getIdentifier(Name), ObjCSelector()};
+    if (!PreferredName.getBaseName().empty())
+      return {PreferredName.getBaseName(), ObjCSelector()};
+    return {Ctx.getIdentifier(getNameForObjC(VD)), ObjCSelector()};
+  }
 }
