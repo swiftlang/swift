@@ -28,6 +28,7 @@ class ParamField;
 class ReturnsField;
 class TagField;
 class ThrowsField;
+class LocalizationKeyField;
 
 /// The basic structure of a doc comment attached to a Swift
 /// declaration.
@@ -38,6 +39,7 @@ struct CommentParts {
   Optional<const ReturnsField *> ReturnsField;
   Optional<const ThrowsField *> ThrowsField;
   ArrayRef<StringRef> Tags;
+  Optional<const LocalizationKeyField *> LocalizationKeyField;
 
   bool isEmpty() const {
     return !Brief.hasValue() &&

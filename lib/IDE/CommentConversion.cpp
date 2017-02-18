@@ -443,6 +443,20 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
   return true;
 }
 
+bool ide::getLocalizationKey(const Decl *D, raw_ostream &OS) {
+  swift::markup::MarkupContext MC;
+  auto DC = getCascadingDocComment(MC, D);
+  if (!DC.hasValue())
+    return false;
+
+  if (const auto LKF = DC.getValue()->getLocalizationKeyField()) {
+    printInlinesUnder(LKF.getValue(), OS);
+    return true;
+  }
+
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // Conversion to Doxygen.
 //===----------------------------------------------------------------------===//

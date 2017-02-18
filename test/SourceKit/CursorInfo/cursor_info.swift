@@ -206,6 +206,14 @@ func convention5(_: @convention(method) ()->()) {}
 func convention6(_: @convention(objc_method) ()->()) {}
 func convention7(_: @convention(witness_method) ()->()) {}
 
+/// Brief.
+///
+/// - LocalizationKey: ABC
+struct HasLocalizationKey {}
+
+/// - LocalizationKey: ABC
+func hasLocalizationKey2() {}
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir -p %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -702,3 +710,25 @@ func convention7(_: @convention(witness_method) ()->()) {}
 // RUN: %sourcekitd-test -req=cursor -pos=206:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
 // RUN: %sourcekitd-test -req=cursor -pos=207:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
 // CHECK86: <syntaxtype.attribute.builtin><syntaxtype.attribute.name>@convention</syntaxtype.attribute.name>({{[a-z_]*}})</syntaxtype.attribute.builtin>
+
+// RUN: %sourcekitd-test -req=cursor -pos=212:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK87 %s
+// CHECK87:      source.lang.swift.decl.struct (212:8-212:26)
+// CHECK87-NEXT: HasLocalizationKey
+// CHECK87-NEXT: s:V11cursor_info18HasLocalizationKey
+// CHECK87-NEXT: HasLocalizationKey.Type
+// CHECK87-NEXT: _Tt
+// CHECK87-NEXT: <Declaration>struct HasLocalizationKey</Declaration>
+// CHECK87-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>HasLocalizationKey</decl.name></decl.struct>
+// CHECK87-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="212" column="8"><Name>HasLocalizationKey</Name><USR>s:V11cursor_info18HasLocalizationKey</USR><Declaration>struct HasLocalizationKey</Declaration><Abstract><Para>Brief.</Para></Abstract></Class>
+// CHECK87-NEXT: <LocalizationKey>ABC</LocalizationKey>
+
+// RUN: %sourcekitd-test -req=cursor -pos=215:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK88 %s
+// CHECK88:      source.lang.swift.decl.function.free (215:6-215:27)
+// CHECK88-NEXT: hasLocalizationKey2
+// CHECK88-NEXT: s:F11cursor_info19hasLocalizationKey2FT_T_
+// CHECK88-NEXT: () -> ()
+// CHECK88-NEXT: _Tt
+// CHECK88-NEXT: <Declaration>func hasLocalizationKey2()</Declaration>
+// CHECK88-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>hasLocalizationKey2</decl.name>()</decl.function.free>
+// CHECK88-NEXT: <Function file="{{[^"]+}}cursor_info.swift" line="215" column="6"><Name>hasLocalizationKey2()</Name><USR>s:F11cursor_info19hasLocalizationKey2FT_T_</USR><Declaration>func hasLocalizationKey2()</Declaration></Function
+// CHECK88-NEXT: <LocalizationKey>ABC</LocalizationKey>

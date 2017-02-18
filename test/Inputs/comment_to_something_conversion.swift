@@ -467,3 +467,13 @@ public func codeListingWithDefaultLanguage() {}
 /// ```
 public func codeListingWithOtherLanguage() {}
 // CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>codeListingWithOtherLanguage()</Name><USR>s:14swift_ide_test28codeListingWithOtherLanguageyyF</USR><Declaration>public func codeListingWithOtherLanguage()</Declaration><Abstract><Para>Brief.</Para></Abstract><Discussion><CodeListing language="c++"><zCodeLineNumbered><![CDATA[Something::Something::create();]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
+
+/// Brief.
+///
+/// - LocalizationKey: ABC
+public func localizationKeyShouldNotAppearInDocComments() {}
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>localizationKeyShouldNotAppearInDocComments()</Name><USR>s:14swift_ide_test43localizationKeyShouldNotAppearInDocCommentsyyF</USR><Declaration>public func localizationKeyShouldNotAppearInDocComments()</Declaration><Abstract><Para>Brief.</Para></Abstract></Function>]
+
+/// - LocalizationKey: ABC
+public func localizationKeyShouldNotAppearInDocComments2() {}
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>localizationKeyShouldNotAppearInDocComments2()</Name><USR>s:14swift_ide_test44localizationKeyShouldNotAppearInDocComments2yyF</USR><Declaration>public func localizationKeyShouldNotAppearInDocComments2()</Declaration></Function>]
