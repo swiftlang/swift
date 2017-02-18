@@ -67,8 +67,13 @@ Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
 
 using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
 
-namespace {
+namespace swift {
+namespace driver {
   struct PerformJobsState {
+
+    // The containing Compilation object.
+    Compilation &Comp;
+
     /// All jobs which have been scheduled for execution (whether or not
     /// they've finished execution), or which have been determined that they
     /// don't need to run.
@@ -89,8 +94,20 @@ namespace {
     ///
     /// Only intended for source files.
     llvm::SmallDenseMap<const Job *, bool, 16> UnfinishedCommands;
+
+    // TaskQueue for execution.
+    std::unique_ptr<TaskQueue> TQ;
+
+    PerformJobsState(Compilation &Comp) : Comp(Comp) {
+      if (Comp.SkipTaskExecution)
+        TQ.reset(new DummyTaskQueue(Comp.NumberOfParallelCommands));
+      else
+        TQ.reset(new TaskQueue(Comp.NumberOfParallelCommands));
+    }
+
   };
-} // end anonymous namespace
+} // driver
+} // swift
 
 Compilation::~Compilation() = default;
 
@@ -274,14 +291,8 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
 }
 
 int Compilation::performJobsImpl() {
-  // Create a TaskQueue for execution.
-  std::unique_ptr<TaskQueue> TQ;
-  if (SkipTaskExecution)
-    TQ.reset(new DummyTaskQueue(NumberOfParallelCommands));
-  else
-    TQ.reset(new TaskQueue(NumberOfParallelCommands));
 
-  PerformJobsState State;
+  PerformJobsState State(*this);
 
   using DependencyGraph = DependencyGraph<const Job *>;
   DependencyGraph DepGraph;
@@ -328,8 +339,8 @@ int Compilation::performJobsImpl() {
     assert(Cmd->getExtraEnvironment().empty() &&
            "not implemented for compilations with multiple jobs");
     State.ScheduledCommands.insert(Cmd);
-    TQ->addTask(Cmd->getExecutable(), Cmd->getArguments(), llvm::None,
-                (void *)Cmd);
+    State.TQ->addTask(Cmd->getExecutable(), Cmd->getArguments(), llvm::None,
+                      (void *)Cmd);
   };
 
   // When a task finishes, we need to reevaluate the other commands that
@@ -663,7 +674,7 @@ int Compilation::performJobsImpl() {
 
   do {
     // Ask the TaskQueue to execute.
-    TQ->execute(taskBegan, taskFinished, taskSignalled);
+    State.TQ->execute(taskBegan, taskFinished, taskSignalled);
 
     // Mark all remaining deferred commands as skipped.
     for (const Job *Cmd : DeferredCommands) {
@@ -678,7 +689,7 @@ int Compilation::performJobsImpl() {
     }
 
     // ...which may allow us to go on and do later tasks.
-  } while (Result == 0 && TQ->hasRemainingTasks());
+  } while (Result == 0 && State.TQ->hasRemainingTasks());
 
   if (Result == 0) {
     assert(State.BlockingCommands.empty() &&
