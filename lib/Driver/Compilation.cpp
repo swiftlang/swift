@@ -576,6 +576,34 @@ namespace driver {
       } while (Result == 0 && TQ->hasRemainingTasks());
     }
 
+    void checkUnfinishedJobs() {
+      if (Result == 0) {
+        assert(BlockingCommands.empty() &&
+               "some blocking commands never finished properly");
+      } else {
+        // Make sure we record any files that still need to be rebuilt.
+        for (const Job *Cmd : Comp.getJobs()) {
+          // Skip files that don't use dependency analysis.
+          StringRef DependenciesFile =
+            Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
+          if (DependenciesFile.empty())
+            continue;
+
+          // Don't worry about commands that finished or weren't going to run.
+          if (FinishedCommands.count(Cmd))
+            continue;
+          if (!ScheduledCommands.count(Cmd))
+            continue;
+
+          bool isCascading = true;
+          if (Comp.getIncrementalBuildEnabled())
+            isCascading = DepGraph.isMarked(Cmd);
+          UnfinishedCommands.insert({Cmd, isCascading});
+        }
+      }
+    }
+
+
   };
 } // driver
 } // swift
@@ -759,31 +787,7 @@ int Compilation::performJobsImpl() {
   State.scheduleInitialJobs();
   State.scheduleAdditionalJobs();
   State.runTaskQueueToCompletion();
-
-  if (State.Result == 0) {
-    assert(State.BlockingCommands.empty() &&
-           "some blocking commands never finished properly");
-  } else {
-    // Make sure we record any files that still need to be rebuilt.
-    for (const Job *Cmd : getJobs()) {
-      // Skip files that don't use dependency analysis.
-      StringRef DependenciesFile =
-          Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
-      if (DependenciesFile.empty())
-        continue;
-
-      // Don't worry about commands that finished or weren't going to run.
-      if (State.FinishedCommands.count(Cmd))
-        continue;
-      if (!State.ScheduledCommands.count(Cmd))
-        continue;
-
-      bool isCascading = true;
-      if (getIncrementalBuildEnabled())
-        isCascading = State.DepGraph.isMarked(Cmd);
-      State.UnfinishedCommands.insert({Cmd, isCascading});
-    }
-  }
+  State.checkUnfinishedJobs();
 
   if (!CompilationRecordPath.empty() && !SkipTaskExecution) {
     InputInfoMap InputInfo;
