@@ -245,8 +245,6 @@ class Demangler;
 /// allocations.
 ///
 class Context {
-  Demangler *D;
-
   friend class Node;
 
 public:
