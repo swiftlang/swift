@@ -296,8 +296,7 @@ LegacyASTTransformer::visitStructDecl(StructDecl *D,
   
   if (D->getNameLoc().isValid()) {
     auto Identifier = findTokenSyntax(tok::identifier,
-                                    OwnedString(D->getName().str(),
-                                                StringOwnership::Unowned),
+                                    OwnedString(D->getName().str()),
                                     SourceMgr, D->getNameLoc(), BufferID,
                                     Tokens);
     StructBuilder.useIdentifier(Identifier);

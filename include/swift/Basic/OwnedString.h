@@ -44,28 +44,43 @@ class OwnedString {
   size_t Length;
   StringOwnership Ownership;
 
+  OwnedString(const char* Data, size_t Length, StringOwnership Ownership)
+      : Length(Length), Ownership(Ownership) {
+    assert(Length >= 0 && "expected length to be non-negative");
+
+    if (Ownership == StringOwnership::Copied && Data) {
+      assert(
+        Length <= strlen(Data) &&
+        "expected length to be a valid index, within the length of the string");
+
+      char *substring = static_cast<char *>(malloc(Length + 1));
+      assert(substring && "expected successful malloc of copy");
+
+      memcpy(substring, Data, Length);
+      substring[Length] = '\0';
+
+      this->Data = substring;
+    }
+    else
+      this->Data = Data;
+  }
+
 public:
-  OwnedString()
-    : Data(nullptr), Length(0), Ownership(StringOwnership::Unowned) {}
+  OwnedString() : OwnedString(nullptr, 0, StringOwnership::Unowned) {}
 
-  OwnedString(const char *Data, size_t Length, StringOwnership Ownership)
-    : Data(Ownership == StringOwnership::Copied ? strndup(Data, Length) : Data),
-      Length(Length), Ownership(Ownership) {}
+  OwnedString(const char *Data, size_t Length)
+    : OwnedString(Data, Length, StringOwnership::Unowned) {}
 
-  OwnedString(StringRef Str, StringOwnership Ownership)
-    : OwnedString(Ownership == StringOwnership::Copied
-                  ? strndup(Str.data(), Str.size())
-                  : Str.data(),
-             Str.size(), Ownership) {}
+  OwnedString(StringRef Str) : OwnedString(Str.data(), Str.size()) {}
 
-  OwnedString(const char *Data)
-    : OwnedString(StringRef(Data), StringOwnership::Unowned) {}
+  OwnedString(const char *Data) : OwnedString(StringRef(Data)) {}
 
   OwnedString(const OwnedString &Other)
-    : Data(Other.Ownership == StringOwnership::Copied
-             ? strndup(Other.Data, Other.Length)
-             : Other.Data),
-      Length(Other.Length), Ownership(Other.Ownership) {}
+      : OwnedString(Other.Data, Other.Length, Other.Ownership) {}
+  
+  OwnedString copy() {
+    return OwnedString(Data, Length, StringOwnership::Copied);
+  }
 
   /// Returns the length of the string in bytes.
   size_t size() const {
@@ -96,4 +111,3 @@ public:
 } // end namespace swift
 
 #endif // SWIFT_BASIC_OWNEDSTRING_H
-
