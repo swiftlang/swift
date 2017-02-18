@@ -363,12 +363,8 @@ NSStringAPIs.test("compare(_:options:range:locale:)") {
       "абв".compare("абв", locale: Locale.current))
 }
 
-NSStringAPIs.test("completePath(into:caseSensitive:matchesInto:filterTypes)")
-  // FIXME: temporarily disabled due to OS problems
-  .skip(.always("rdar://29593261"))
-  .code {
+NSStringAPIs.test("completePath(into:caseSensitive:matchesInto:filterTypes)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
-
   do {
     var count = nonExistentPath.completePath(caseSensitive: false)
     expectEqual(0, count)
