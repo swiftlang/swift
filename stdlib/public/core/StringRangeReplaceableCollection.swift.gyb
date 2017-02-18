@@ -11,14 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 
-extension String {
-  // FIXME(strings): at least temporarily remove it to see where it was applied
-  public init(_ substring: Substring) {
-    self = String(substring.base.characters[substring.bounds])
-  }
-}
-
-extension String : RangeReplaceableCollection {
+extension String : RangeReplaceableCollection, BidirectionalCollection {
   /// The index type for subscripting a string.
   public typealias Index = CharacterView.Index
 
