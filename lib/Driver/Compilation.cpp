@@ -136,6 +136,13 @@ namespace driver {
     /// Only intended for source files.
     llvm::SmallDenseMap<const Job *, bool, 16> UnfinishedCommands;
 
+    /// Jobs that incremental-mode has decided it can skip.
+    CommandSet DeferredCommands;
+
+    /// Jobs in the initial set with Condition::Always, or lacking existing
+    /// .swiftdeps files.
+    SmallVector<const Job *, 16> InitialOutOfDateCommands;
+
     // Dependency graph for deciding which jobs are dirty (need running)
     // or clean (can be skipped).
     using DependencyGraph = DependencyGraph<const Job *>;
@@ -412,8 +419,6 @@ int Compilation::performJobsImpl() {
 
   PerformJobsState State(*this);
 
-  SmallPtrSet<const Job *, 16> DeferredCommands;
-  SmallVector<const Job *, 16> InitialOutOfDateCommands;
 
   // Schedule all jobs we can.
   for (const Job *Cmd : getJobs()) {
@@ -437,9 +442,9 @@ int Compilation::performJobsImpl() {
         switch (State.DepGraph.loadFromPath(Cmd, DependenciesFile)) {
         case DependencyGraphImpl::LoadResult::HadError:
           disableIncrementalBuild();
-          for (const Job *Cmd : DeferredCommands)
+          for (const Job *Cmd : State.DeferredCommands)
             State.scheduleCommandIfNecessaryAndPossible(Cmd);
-          DeferredCommands.clear();
+          State.DeferredCommands.clear();
           break;
         case DependencyGraphImpl::LoadResult::UpToDate:
           Condition = Cmd->getCondition();
@@ -453,7 +458,7 @@ int Compilation::performJobsImpl() {
     switch (Condition) {
     case Job::Condition::Always:
       if (getIncrementalBuildEnabled() && !DependenciesFile.empty()) {
-        InitialOutOfDateCommands.push_back(Cmd);
+        State.InitialOutOfDateCommands.push_back(Cmd);
         State.DepGraph.markIntransitive(Cmd);
       }
       LLVM_FALLTHROUGH;
@@ -462,7 +467,7 @@ int Compilation::performJobsImpl() {
       State.scheduleCommandIfNecessaryAndPossible(Cmd);
       break;
     case Job::Condition::CheckDependencies:
-      DeferredCommands.insert(Cmd);
+      State.DeferredCommands.insert(Cmd);
       break;
     case Job::Condition::NewlyAdded:
       llvm_unreachable("handled above");
@@ -475,7 +480,7 @@ int Compilation::performJobsImpl() {
     // We scheduled all of the files that have actually changed. Now add the
     // files that haven't changed, so that they'll get built in parallel if
     // possible and after the first set of files if it's not.
-    for (auto *Cmd : InitialOutOfDateCommands) {
+    for (auto *Cmd : State.InitialOutOfDateCommands) {
       State.DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd,
                                     State.IncrementalTracer);
     }
@@ -503,10 +508,10 @@ int Compilation::performJobsImpl() {
     }
 
     for (auto *AdditionalCmd : AdditionalOutOfDateCommands) {
-      if (!DeferredCommands.count(AdditionalCmd))
+      if (!State.DeferredCommands.count(AdditionalCmd))
         continue;
       State.scheduleCommandIfNecessaryAndPossible(AdditionalCmd);
-      DeferredCommands.erase(AdditionalCmd);
+      State.DeferredCommands.erase(AdditionalCmd);
     }
   }
 
@@ -593,9 +598,9 @@ int Compilation::performJobsImpl() {
           case DependencyGraphImpl::LoadResult::HadError:
             if (ReturnCode == EXIT_SUCCESS) {
               disableIncrementalBuild();
-              for (const Job *Cmd : DeferredCommands)
+              for (const Job *Cmd : State.DeferredCommands)
                 State.scheduleCommandIfNecessaryAndPossible(Cmd);
-              DeferredCommands.clear();
+              State.DeferredCommands.clear();
               Dependents.clear();
             } // else, let the next build handle it.
             break;
@@ -673,7 +678,7 @@ int Compilation::performJobsImpl() {
     State.markFinished(FinishedCmd);
 
     for (const Job *Cmd : Dependents) {
-      DeferredCommands.erase(Cmd);
+      State.DeferredCommands.erase(Cmd);
       State.noteBuilding(Cmd, "because of dependencies discovered later");
       State.scheduleCommandIfNecessaryAndPossible(Cmd);
     }
@@ -724,7 +729,7 @@ int Compilation::performJobsImpl() {
     State.TQ->execute(taskBegan, taskFinished, taskSignalled);
 
     // Mark all remaining deferred commands as skipped.
-    for (const Job *Cmd : DeferredCommands) {
+    for (const Job *Cmd : State.DeferredCommands) {
       if (Level == OutputLevel::Parseable) {
         // Provide output indicating this command was skipped if parseable output
         // was requested.
