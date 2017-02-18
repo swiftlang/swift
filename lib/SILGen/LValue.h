@@ -508,7 +508,7 @@ struct LLVM_LIBRARY_VISIBILITY ExclusiveBorrowFormalAccess : FormalAccess {
     component->writeback(gen, loc, base, materialized, isFinal);
   }
 
-  void finish(SILGenFunction &gen) override {
+  void finishImpl(SILGenFunction &gen) override {
     performWriteback(gen, /*isFinal*/ true);
   }
 };

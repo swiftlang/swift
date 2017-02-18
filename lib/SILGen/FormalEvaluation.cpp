@@ -27,9 +27,21 @@ void FormalAccess::_anchor() {}
 //                      Shared Borrow Formal Evaluation
 //===----------------------------------------------------------------------===//
 
-void SharedBorrowFormalAccess::finish(SILGenFunction &gen) {
+void SharedBorrowFormalAccess::finishImpl(SILGenFunction &gen) {
   gen.B.createEndBorrow(CleanupLocation::get(loc), borrowedValue,
                         originalValue);
+}
+
+//===----------------------------------------------------------------------===//
+//                             OwnedFormalAccess
+//===----------------------------------------------------------------------===//
+
+void OwnedFormalAccess::finishImpl(SILGenFunction &gen) {
+  auto cleanupLoc = CleanupLocation::get(loc);
+  if (value->getType().isAddress())
+    gen.B.createDestroyAddr(cleanupLoc, value);
+  else
+    gen.B.emitDestroyValueOperation(cleanupLoc, value);
 }
 
 //===----------------------------------------------------------------------===//
@@ -76,7 +88,21 @@ void FormalEvaluationScope::popImpl() {
     // Grab the next evaluation...
     FormalAccess &access = *iter;
 
-    // and deactivate the cleanup.
+    // If this access was already finished, continue. This can happen if an
+    // owned formal access was forwarded.
+    if (access.isFinished()) {
+      assert(access.getKind() == FormalAccess::Owned &&
+             "Only owned formal accesses should be forwarded.");
+      // We can not check that our cleanup is actually dead since the cleanup
+      // may have been popped at this point and the stack may have new values.
+      continue;
+    }
+
+    assert(!access.isFinished() && "Can not finish a formal access cleanup "
+                                   "twice");
+
+    // and deactivate the cleanup. This will set the isFinished bit for owned
+    // FormalAccess.
     gen.Cleanups.setCleanupState(access.getCleanup(), CleanupState::Dead);
 
     // Attempt to diagnose problems where obvious aliasing introduces illegal
@@ -111,4 +137,15 @@ void FormalEvaluationScope::popImpl() {
 
   // And then pop off all stack elements until we reach the savedDepth.
   context.pop(savedDepth.getValue());
+}
+
+//===----------------------------------------------------------------------===//
+//                         Formal Evaluation Context
+//===----------------------------------------------------------------------===//
+
+void FormalEvaluationContext::dump(SILGenFunction &gen) {
+  for (auto II = begin(), IE = end(); II != IE; ++II) {
+    FormalAccess &access = *II;
+    gen.Cleanups.dump(access.getCleanup());
+  }
 }
