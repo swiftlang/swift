@@ -165,6 +165,18 @@ class StrongRefCount {
     }
   }
 
+  // Increment the reference count, unless the object is deallocating.
+  bool tryIncrementNonAtomic() {
+    uint32_t oldval = __atomic_load_n(&refCount, __ATOMIC_RELAXED);
+    if (oldval & RC_DEALLOCATING_FLAG) {
+      return false;
+    } else {
+      uint32_t newval = oldval + RC_ONE;
+      __atomic_store_n(&refCount, newval, __ATOMIC_RELAXED);
+      return true;
+    }
+  }
+
   // Simultaneously clear the pinned flag and decrement the reference
   // count.
   //
@@ -442,12 +454,29 @@ class WeakRefCount {
     (void)newval;
   }
 
+  // Increment the weak reference count.
+  void incrementNonAtomic() {
+    uint32_t oldval = __atomic_load_n(&refCount, __ATOMIC_RELAXED);
+    uint32_t newval = oldval + RC_ONE;
+    assert(newval >= RC_ONE  &&  "weak refcount overflow");
+    __atomic_store_n(&refCount, newval, __ATOMIC_RELAXED);
+  }
+
   /// Increment the weak reference count by n.
   void increment(uint32_t n) {
     uint32_t addval = (n << RC_FLAGS_COUNT);
     uint32_t newval = __atomic_add_fetch(&refCount, addval, __ATOMIC_RELAXED);
     assert(newval >= addval  &&  "weak refcount overflow");
     (void)newval;
+  }
+
+  /// Increment the weak reference count by n.
+  void incrementNonAtomic(uint32_t n) {
+    uint32_t oldval = __atomic_load_n(&refCount, __ATOMIC_RELAXED);
+    uint32_t addval = (n << RC_FLAGS_COUNT);
+    uint32_t newval = oldval + addval;
+    assert(newval >= addval  &&  "weak refcount overflow");
+    __atomic_store_n(&refCount, newval, __ATOMIC_RELAXED);
   }
 
   // Decrement the weak reference count.
@@ -460,12 +489,37 @@ class WeakRefCount {
     return (oldval & RC_COUNT_MASK) == RC_ONE;
   }
 
+  // Decrement the weak reference count.
+  // Return true if the caller should deallocate the object.
+  bool decrementShouldDeallocateNonAtomic() {
+    uint32_t oldval = __atomic_load_n(&refCount, __ATOMIC_RELAXED);
+    assert(oldval >= RC_ONE  &&  "weak refcount underflow");
+    uint32_t newval = oldval - RC_ONE;
+    __atomic_store_n(&refCount, newval, __ATOMIC_RELEASE);
+
+    // Should dealloc if count was 1 before decrementing (i.e. it is zero now)
+    return (oldval & RC_COUNT_MASK) == RC_ONE;
+  }
+
   /// Decrement the weak reference count.
   /// Return true if the caller should deallocate the object.
   bool decrementShouldDeallocateN(uint32_t n) {
     uint32_t subval = (n << RC_FLAGS_COUNT);
     uint32_t oldval = __atomic_fetch_sub(&refCount, subval, __ATOMIC_RELAXED);
     assert(oldval >= subval  &&  "weak refcount underflow");
+
+    // Should dealloc if count was subval before decrementing (i.e. it is zero now)
+    return (oldval & RC_COUNT_MASK) == subval;
+  }
+
+  /// Decrement the weak reference count.
+  /// Return true if the caller should deallocate the object.
+  bool decrementShouldDeallocateNNNonAtomic(uint32_t n) {
+    uint32_t oldval = __atomic_load_n(&refCount, __ATOMIC_RELAXED);
+    uint32_t subval = (n << RC_FLAGS_COUNT);
+    uint32_t newval = oldval - subval;
+    assert(oldval >= subval  &&  "weak refcount underflow");
+    __atomic_store_n(&refCount, newval, __ATOMIC_RELAXED);
 
     // Should dealloc if count was subval before decrementing (i.e. it is zero now)
     return (oldval & RC_COUNT_MASK) == subval;

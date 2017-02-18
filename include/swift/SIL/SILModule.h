@@ -651,6 +651,11 @@ public:
 
   /// Returns true if the builtin or intrinsic is no-return.
   bool isNoReturnBuiltinOrIntrinsic(Identifier Name);
+
+  /// Returns true if the default atomicity of the module is Atomic.
+  bool isDefaultAtomic() const {
+    return ! getOptions().AssumeSingleThreaded;
+  }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){

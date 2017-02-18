@@ -2428,7 +2428,7 @@ RValue SILGenFunction::emitApply(
       assert(lifetimeExtendedSelf
              && "did not save lifetime-extended self param");
       if (!hasAlreadyLifetimeExtendedSelf) {
-        B.createAutoreleaseValue(loc, lifetimeExtendedSelf, Atomicity::Atomic);
+        B.createAutoreleaseValue(loc, lifetimeExtendedSelf, B.getDefaultAtomicity());
         hasAlreadyLifetimeExtendedSelf = true;
       }
       LLVM_FALLTHROUGH;
