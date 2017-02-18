@@ -78,16 +78,17 @@ TEST(StmtSyntaxTests, FallthroughStmtMakeAPIs) {
 
 TEST(StmtSyntaxTests, BreakStmtGetAPIs) {
   auto BreakKW = SyntaxFactory::makeBreakKeyword({}, Trivia::spaces(1));
-  auto Label = SyntaxFactory::makeIdentifier("forCoffee", {}, {});
+  auto Label = SyntaxFactory::makeIdentifier("sometimesYouNeedTo", {}, {});
   auto Break = SyntaxFactory::makeBreakStmt(BreakKW, Label);
 
+  /// These should be directly shared through reference-counting.
   ASSERT_EQ(BreakKW, Break.getBreakKeyword());
   ASSERT_EQ(Label, Break.getLabel());
 }
 
 TEST(StmtSyntaxTests, BreakStmtWithAPIs) {
   auto BreakKW = SyntaxFactory::makeBreakKeyword({}, {});
-  auto Label = SyntaxFactory::makeIdentifier("forCoffee", {}, {});
+  auto Label = SyntaxFactory::makeIdentifier("theRules", {}, {});
 
   auto Break = SyntaxFactory::makeBlankBreakStmtSyntax();
 
@@ -108,7 +109,7 @@ TEST(StmtSyntaxTests, BreakStmtWithAPIs) {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     Break.withLabel(Label).print(OS);
-    ASSERT_EQ(OS.str().str(), "forCoffee");
+    ASSERT_EQ(OS.str().str(), "theRules");
   }
   {
     llvm::SmallString<48> Scratch;
@@ -116,7 +117,7 @@ TEST(StmtSyntaxTests, BreakStmtWithAPIs) {
     Break.withBreakKeyword(BreakKW->withTrailingTrivia(Trivia::spaces(1)))
       .withLabel(Label)
       .print(OS);
-    ASSERT_EQ(OS.str().str(), "break forCoffee");
+    ASSERT_EQ(OS.str().str(), "break theRules"); // sometimes
   }
 }
 
@@ -125,10 +126,10 @@ TEST(StmtSyntaxTests, BreakStmtMakeAPIs) {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     auto BreakKW = SyntaxFactory::makeBreakKeyword({}, Trivia::spaces(1));
-    auto Label = SyntaxFactory::makeIdentifier("forCoffee", {}, {});
+    auto Label = SyntaxFactory::makeIdentifier("theBuild", {}, {});
     auto Break = SyntaxFactory::makeBreakStmt(BreakKW, Label);
     Break.print(OS);
-    ASSERT_EQ(OS.str().str(), "break forCoffee");
+    ASSERT_EQ(OS.str().str(), "break theBuild"); // don't you dare
   }
   {
     llvm::SmallString<48> Scratch;
@@ -137,3 +138,69 @@ TEST(StmtSyntaxTests, BreakStmtMakeAPIs) {
     ASSERT_EQ(OS.str().str(), "");
   }
 }
+
+#pragma mark - continue-statement
+
+TEST(StmtSyntaxTests, ContinueStmtGetAPIs) {
+  auto ContinueKW = SyntaxFactory::makeContinueKeyword({}, Trivia::spaces(1));
+  auto Label = SyntaxFactory::makeIdentifier("always", {}, {});
+  auto Continue = SyntaxFactory::makeContinueStmt(ContinueKW, Label);
+
+  /// These should be directly shared through reference-counting.
+  ASSERT_EQ(ContinueKW, Continue.getContinueKeyword());
+  ASSERT_EQ(Label, Continue.getLabel());
+}
+
+TEST(StmtSyntaxTests, ContinueStmtWithAPIs) {
+  auto ContinueKW = SyntaxFactory::makeContinueKeyword({}, {});
+  auto Label = SyntaxFactory::makeIdentifier("toCare", {}, {});
+  auto Continue = SyntaxFactory::makeBlankContinueStmtSyntax();
+
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    Continue.print(OS);
+    ASSERT_EQ(OS.str().str(), "");
+  }
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    Continue.withContinueKeyword(ContinueKW)
+      .print(OS);
+    ASSERT_EQ(OS.str().str(), "continue");
+  }
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    Continue.withLabel(Label).print(OS);
+    ASSERT_EQ(OS.str().str(), "toCare");
+  }
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    Continue
+      .withContinueKeyword(ContinueKW->withTrailingTrivia(Trivia::spaces(1)))
+      .withLabel(Label)
+      .print(OS);
+    ASSERT_EQ(OS.str().str(), "continue toCare"); // for each other
+  }
+}
+
+TEST(StmtSyntaxTests, ContinueStmtMakeAPIs) {
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    auto ContinueKW = SyntaxFactory::makeContinueKeyword({}, Trivia::spaces(1));
+    auto Label = SyntaxFactory::makeIdentifier("toLead", {}, {});
+    auto Continue = SyntaxFactory::makeContinueStmt(ContinueKW, Label);
+    Continue.print(OS);
+    ASSERT_EQ(OS.str().str(), "continue toLead"); // by example
+  }
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    SyntaxFactory::makeBlankContinueStmtSyntax().print(OS);
+    ASSERT_EQ(OS.str().str(), "");
+  }
+}
+
