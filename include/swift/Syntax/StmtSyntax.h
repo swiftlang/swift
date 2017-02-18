@@ -196,6 +196,7 @@ public:
 #pragma mark -
 #pragma mark fallthrough-statement API
 
+/// fallthrough-statement -> 'fallthrough'
 class FallthroughStmtSyntax : public StmtSyntax {
   friend struct SyntaxFactory;
   friend class SyntaxData;
@@ -254,6 +255,8 @@ public:
 
 #pragma mark - break-statement API
 
+/// break-statement -> 'break' label-name?
+/// label-name -> identifier
 class BreakStmtSyntax : public StmtSyntax {
   friend struct SyntaxFactory;
   friend class BreakStmtSyntaxData;
@@ -290,6 +293,70 @@ public:
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::BreakStmt;
+  }
+};
+
+#pragma mark - continue-statement Data
+
+class ContinueStmtSyntaxData : public StmtSyntaxData {
+  friend class SyntaxData;
+  friend class ContinueStmtSyntax;
+  friend struct SyntaxFactory;
+  ContinueStmtSyntaxData(RC<RawSyntax> Raw,
+                      const SyntaxData *Parent = nullptr,
+                      CursorIndex IndexInParent = 0);
+  static RC<ContinueStmtSyntaxData> make(RC<RawSyntax> Raw,
+                                      const SyntaxData *Parent = nullptr,
+                                      CursorIndex IndexInParent = 0);
+  static RC<ContinueStmtSyntaxData> makeBlank();
+
+public:
+  static bool classof(const SyntaxData *SD) {
+    return SD->getKind() == SyntaxKind::ContinueStmt;
+  }
+
+};
+
+#pragma mark - continue-statement API
+
+/// continue-statement -> 'continue' label-name?
+/// label-name -> identifier
+class ContinueStmtSyntax : public StmtSyntax {
+  friend struct SyntaxFactory;
+  friend class ContinueStmtSyntaxData;
+  friend class SyntaxData;
+
+  using DataType = ContinueStmtSyntaxData;
+
+  enum class Cursor : CursorIndex {
+    ContinueKeyword,
+    Label
+  };
+
+  ContinueStmtSyntax(const RC<SyntaxData> Root,
+                     ContinueStmtSyntaxData *Data);
+
+  static ContinueStmtSyntax make(RC<RawSyntax> Raw,
+                                 const SyntaxData *Parent = nullptr,
+                                 CursorIndex IndexInParent = 0);
+  static ContinueStmtSyntax makeBlank();
+public:
+
+  /// Return the 'continue' keyword associated with this continue statement.
+  RC<TokenSyntax> getContinueKeyword() const;
+
+  /// Return a new `ContinueStmtSyntax` with the given 'continue' keyword.
+  ContinueStmtSyntax withContinueKeyword(RC<TokenSyntax> NewBreakKeyword) const;
+
+  /// Return the destination label of this break statement. If it doesn't
+  /// have one, the token is marked as continue.
+  RC<TokenSyntax> getLabel() const;
+
+  /// Return a new `ContinueStmtSyntax` with the given destination label.
+  ContinueStmtSyntax withLabel(RC<TokenSyntax> NewLabel) const;
+
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::ContinueStmt;
   }
 };
 

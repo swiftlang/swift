@@ -57,6 +57,9 @@ Include the following in each entry:
 - break-statement
   - `BreakStmtSyntax`
 
+- continue-statement
+  - `ContinueStmtSyntax`
+
 ### Types
 
 - type
@@ -190,7 +193,6 @@ Include the following in each entry:
 - conditional-operator
 - conformance-requirement
 - constant-declaration
-- continue-statement
 - control-transfer-statement
 - decimal-exponent
 - decimal-fraction
