@@ -604,7 +604,8 @@ int Compilation::performJobsImpl() {
               break;
             LLVM_FALLTHROUGH;
           case DependencyGraphImpl::LoadResult::AffectsDownstream:
-            State.DepGraph.markTransitive(Dependents, FinishedCmd);
+            State.DepGraph.markTransitive(Dependents, FinishedCmd,
+                                          State.IncrementalTracer);
             break;
           }
         } else {
@@ -614,7 +615,8 @@ int Compilation::performJobsImpl() {
             // The job won't be treated as newly added next time. Conservatively
             // mark it as affecting other jobs, because some of them may have
             // completed already.
-            State.DepGraph.markTransitive(Dependents, FinishedCmd);
+            State.DepGraph.markTransitive(Dependents, FinishedCmd,
+                                          State.IncrementalTracer);
             break;
           case Job::Condition::Always:
             // Any incremental task that shows up here has already been marked;
@@ -628,7 +630,8 @@ int Compilation::performJobsImpl() {
             // updated or compromised, so we don't actually know anymore; we
             // have to conservatively assume the changes could affect other
             // files.
-            State.DepGraph.markTransitive(Dependents, FinishedCmd);
+            State.DepGraph.markTransitive(Dependents, FinishedCmd,
+                                          State.IncrementalTracer);
             break;
           case Job::Condition::CheckDependencies:
             // If the only reason we're running this is because something else
