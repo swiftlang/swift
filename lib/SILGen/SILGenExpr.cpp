@@ -178,10 +178,10 @@ struct FormalEvaluationEndBorrowCleanup : Cleanup {
 #endif
   }
 
-  SharedBorrowFormalEvaluation &getEvaluation(SILGenFunction &gen) const {
+  SharedBorrowFormalAccess &getEvaluation(SILGenFunction &gen) const {
     auto &evaluation = *gen.FormalEvalContext.find(Depth);
-    assert(evaluation.getKind() == FormalEvaluation::Shared);
-    return static_cast<SharedBorrowFormalEvaluation &>(evaluation);
+    assert(evaluation.getKind() == FormalAccess::Shared);
+    return static_cast<SharedBorrowFormalAccess &>(evaluation);
   }
 
   SILValue getOriginalValue(SILGenFunction &gen) const {
@@ -239,11 +239,11 @@ SILGenFunction::emitFormalEvaluationManagedBorrowedRValueWithCleanup(
   }
 
   assert(InWritebackScope && "Must be in formal evaluation scope");
-  Cleanups.pushCleanup<FormalEvaluationEndBorrowCleanup>();
+  auto &cleanup = Cleanups.pushCleanup<FormalEvaluationEndBorrowCleanup>();
   CleanupHandle handle = Cleanups.getTopCleanup();
-  FormalEvalContext.push<SharedBorrowFormalEvaluation>(loc, handle, original,
-                                                       borrowed);
-
+  FormalEvalContext.push<SharedBorrowFormalAccess>(loc, handle, original,
+                                                   borrowed);
+  cleanup.Depth = FormalEvalContext.stable_begin();
   return ManagedValue(borrowed, CleanupHandle::invalid());
 }
 

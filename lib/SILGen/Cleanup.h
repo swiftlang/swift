@@ -32,7 +32,7 @@ namespace Lowering {
 class JumpDest;
 class SILGenFunction;
 class ManagedValue;
-class SharedBorrowFormalEvaluation;
+class SharedBorrowFormalAccess;
 
 /// The valid states that a cleanup can be in.
 enum class CleanupState {

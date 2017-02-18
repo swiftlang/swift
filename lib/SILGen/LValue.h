@@ -466,24 +466,27 @@ public:
   ~InOutConversionScope();
 };
 
-struct LLVM_LIBRARY_VISIBILITY LValueWriteback : FormalEvaluation {
+struct LLVM_LIBRARY_VISIBILITY ExclusiveBorrowFormalAccess : FormalAccess {
   std::unique_ptr<LogicalPathComponent> component;
   ManagedValue base;
   MaterializedLValue materialized;
 
-  ~LValueWriteback() {}
-  LValueWriteback(LValueWriteback &&) = default;
-  LValueWriteback &operator=(LValueWriteback &&) = default;
+  ~ExclusiveBorrowFormalAccess() {}
+  ExclusiveBorrowFormalAccess(ExclusiveBorrowFormalAccess &&) = default;
+  ExclusiveBorrowFormalAccess &
+  operator=(ExclusiveBorrowFormalAccess &&) = default;
 
-  LValueWriteback() = default;
-  LValueWriteback(SILLocation loc, std::unique_ptr<LogicalPathComponent> &&comp,
-                  ManagedValue base, MaterializedLValue materialized,
-                  CleanupHandle cleanup)
-      : FormalEvaluation(sizeof(*this), FormalEvaluation::Exclusive, loc,
-                         cleanup),
+  ExclusiveBorrowFormalAccess() = default;
+  ExclusiveBorrowFormalAccess(SILLocation loc,
+                              std::unique_ptr<LogicalPathComponent> &&comp,
+                              ManagedValue base,
+                              MaterializedLValue materialized,
+                              CleanupHandle cleanup)
+      : FormalAccess(sizeof(*this), FormalAccess::Exclusive, loc, cleanup),
         component(std::move(comp)), base(base), materialized(materialized) {}
 
-  void diagnoseConflict(const LValueWriteback &rhs, SILGenFunction &SGF) const {
+  void diagnoseConflict(const ExclusiveBorrowFormalAccess &rhs,
+                        SILGenFunction &SGF) const {
     // If the two writebacks we're comparing are of different kinds (e.g.
     // ownership conversion vs a computed property) then they aren't the
     // same and thus cannot conflict.
