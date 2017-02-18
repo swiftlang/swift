@@ -54,39 +54,37 @@ public:
   // Metatype instructions use the conformances necessary to instantiate the
   // type.
 
-  MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype);
+  MetatypeInst *createMetatype(SILLocation loc, SILType metatype);
 
   // Generic apply instructions use the conformances necessary to form the call.
 
   using SILBuilder::createApply;
 
-  ApplyInst *createApply(SILLocation Loc, SILValue Fn, SILType SubstFnTy,
-                         SILType Result, SubstitutionList Subs,
-                         ArrayRef<SILValue> Args);
+  ApplyInst *createApply(SILLocation loc, SILValue fn, SILType SubstFnTy,
+                         SILType result, SubstitutionList subs,
+                         ArrayRef<SILValue> args);
 
   TryApplyInst *createTryApply(SILLocation loc, SILValue fn, SILType substFnTy,
                                SubstitutionList subs,
                                ArrayRef<SILValue> args, SILBasicBlock *normalBB,
                                SILBasicBlock *errorBB);
 
-  PartialApplyInst *createPartialApply(SILLocation Loc, SILValue Fn,
-                                       SILType SubstFnTy,
-                                       SubstitutionList Subs,
-                                       ArrayRef<SILValue> Args,
-                                       SILType ClosureTy);
+  PartialApplyInst *createPartialApply(SILLocation loc, SILValue fn,
+                                       SILType substFnTy, SubstitutionList subs,
+                                       ArrayRef<SILValue> args,
+                                       SILType closureTy);
 
-  BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
-                             SubstitutionList Subs,
-                             ArrayRef<SILValue> Args);
+  BuiltinInst *createBuiltin(SILLocation loc, Identifier name, SILType resultTy,
+                             SubstitutionList subs, ArrayRef<SILValue> args);
 
   // Existential containers use the conformances needed by the existential
   // box.
 
   InitExistentialAddrInst *
-  createInitExistentialAddr(SILLocation Loc, SILValue Existential,
-                            CanType FormalConcreteType,
-                            SILType LoweredConcreteType,
-                            ArrayRef<ProtocolConformanceRef> Conformances);
+  createInitExistentialAddr(SILLocation loc, SILValue existential,
+                            CanType formalConcreteType,
+                            SILType loweredConcreteType,
+                            ArrayRef<ProtocolConformanceRef> conformances);
 
   InitExistentialMetatypeInst *
   createInitExistentialMetatype(SILLocation loc, SILValue metatype,
@@ -94,14 +92,14 @@ public:
                                 ArrayRef<ProtocolConformanceRef> conformances);
 
   InitExistentialRefInst *
-  createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
-                           CanType FormalConcreteType, SILValue Concrete,
-                           ArrayRef<ProtocolConformanceRef> Conformances);
+  createInitExistentialRef(SILLocation loc, SILType existentialType,
+                           CanType formalConcreteType, SILValue concreteValue,
+                           ArrayRef<ProtocolConformanceRef> conformances);
 
   AllocExistentialBoxInst *
-  createAllocExistentialBox(SILLocation Loc, SILType ExistentialType,
-                            CanType ConcreteType,
-                            ArrayRef<ProtocolConformanceRef> Conformances);
+  createAllocExistentialBox(SILLocation loc, SILType existentialType,
+                            CanType concreteType,
+                            ArrayRef<ProtocolConformanceRef> conformances);
 
   //===---
   // Ownership Endowed APIs
@@ -110,31 +108,34 @@ public:
   using SILBuilder::createStructExtract;
   using SILBuilder::createCopyValue;
   using SILBuilder::createCopyUnownedValue;
-  ManagedValue createStructExtract(SILLocation Loc, ManagedValue Base,
-                                   VarDecl *Decl);
+  ManagedValue createStructExtract(SILLocation loc, ManagedValue base,
+                                   VarDecl *decl);
 
-  ManagedValue createCopyValue(SILLocation Loc, ManagedValue OriginalValue);
+  ManagedValue createCopyValue(SILLocation loc, ManagedValue originalValue);
 
-  ManagedValue createCopyUnownedValue(SILLocation Loc,
-                                      ManagedValue OriginalValue);
+  ManagedValue createCopyUnownedValue(SILLocation loc,
+                                      ManagedValue originalValue);
 
-  ManagedValue createUnsafeCopyUnownedValue(SILLocation Loc,
-                                            ManagedValue OriginalValue);
-  ManagedValue createOwnedPHIArgument(SILType Type);
+  ManagedValue createUnsafeCopyUnownedValue(SILLocation loc,
+                                            ManagedValue originalValue);
+  ManagedValue createOwnedPHIArgument(SILType type);
 
   using SILBuilder::createAllocRef;
-  ManagedValue createAllocRef(SILLocation Loc, SILType RefType, bool objc, bool canAllocOnStack,
-                              ArrayRef<SILType> ElementTypes,
-                              ArrayRef<ManagedValue> ElementCountOperands);
+  ManagedValue createAllocRef(SILLocation loc, SILType refType, bool objc,
+                              bool canAllocOnStack,
+                              ArrayRef<SILType> elementTypes,
+                              ArrayRef<ManagedValue> elementCountOperands);
   using SILBuilder::createAllocRefDynamic;
-  ManagedValue createAllocRefDynamic(SILLocation Loc, ManagedValue Operand, SILType RefType, bool objc,
-                                     ArrayRef<SILType> ElementTypes,
-                                     ArrayRef<ManagedValue> ElementCountOperands);
+  ManagedValue
+  createAllocRefDynamic(SILLocation loc, ManagedValue operand, SILType refType,
+                        bool objc, ArrayRef<SILType> elementTypes,
+                        ArrayRef<ManagedValue> elementCountOperands);
 
   using SILBuilder::createTupleExtract;
-  ManagedValue createTupleExtract(SILLocation Loc, ManagedValue Value, unsigned Index,
-                                  SILType Type);
-  ManagedValue createTupleExtract(SILLocation Loc, ManagedValue Value, unsigned Index);
+  ManagedValue createTupleExtract(SILLocation loc, ManagedValue value,
+                                  unsigned index, SILType type);
+  ManagedValue createTupleExtract(SILLocation loc, ManagedValue value,
+                                  unsigned index);
 };
 
 } // namespace Lowering

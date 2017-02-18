@@ -48,7 +48,7 @@ public:
 ///            | compiler-control-statement ';'?
 class StmtSyntax : public Syntax {
 protected:
-  StmtSyntax(RC<SyntaxData> Root, StmtSyntaxData *Data);
+  StmtSyntax(const RC<SyntaxData> Root, const StmtSyntaxData *Data);
 public:
   static bool classof(const Syntax *S) {
     return S->isStmt();
@@ -189,7 +189,7 @@ class FallthroughStmtSyntaxData final : public StmtSyntaxData {
 
 public:
   static bool classof(const SyntaxData *SD) {
-    return SD->getKind() == SyntaxKind::StmtList;
+    return SD->getKind() == SyntaxKind::FallthroughStmt;
   }
 };
 
@@ -198,13 +198,17 @@ public:
 
 class FallthroughStmtSyntax : public StmtSyntax {
   friend struct SyntaxFactory;
+  friend class SyntaxData;
+  friend class FallthroughStmtSyntaxData;
+
+  using DataType = FallthroughStmtSyntaxData;
 
   enum class Cursor : CursorIndex {
     FallthroughKeyword,
   };
 
   FallthroughStmtSyntax(const RC<SyntaxData> Root,
-                        FallthroughStmtSyntaxData *Data);
+                        const FallthroughStmtSyntaxData *Data);
 
   static FallthroughStmtSyntax make(RC<RawSyntax> Raw,
                                     const SyntaxData *Parent = nullptr,
@@ -212,6 +216,16 @@ class FallthroughStmtSyntax : public StmtSyntax {
   static FallthroughStmtSyntax makeBlank();
 
 public:
+
+  /// Get the 'fallthrough' keyword associated comprising this
+  /// fallthrough statement.
+  RC<TokenSyntax> getFallthroughKeyword() const;
+
+  /// Return a new FallthroughtStmtSyntax with the given fallthrough
+  /// keyword.
+  FallthroughStmtSyntax
+  withFallthroughKeyword(RC<TokenSyntax> NewFallthroughKeyword) const;
+
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::FallthroughStmt;
   }
