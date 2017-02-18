@@ -108,6 +108,11 @@ struct SyntaxFactory {
 
 #pragma mark - Tokens
 
+  /// Make a 'fallthrough' keyword with the specified leading and
+  /// trailing trivia.
+  static RC<TokenSyntax> makeFallthroughKeyword(const Trivia &LeadingTrivia,
+                                                const Trivia &TrailingTrivia);
+
   /// Make an at-sign '@' token with the specified leading and
   /// trailing trivia.
   static RC<TokenSyntax> makeAtSignToken(const Trivia &LeadingTrivia,

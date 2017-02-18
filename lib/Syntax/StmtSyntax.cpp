@@ -16,7 +16,7 @@
 using namespace swift;
 using namespace swift::syntax;
 
-StmtSyntax::StmtSyntax(RC<SyntaxData> Root, StmtSyntaxData *Data)
+StmtSyntax::StmtSyntax(const RC<SyntaxData> Root, const StmtSyntaxData *Data)
   : Syntax(Root, Data) {}
 
 #pragma mark fallthrough-statement Data
@@ -24,7 +24,13 @@ StmtSyntax::StmtSyntax(RC<SyntaxData> Root, StmtSyntaxData *Data)
 FallthroughStmtSyntaxData::FallthroughStmtSyntaxData(RC<RawSyntax> Raw,
                                                      const SyntaxData *Parent,
                                                      CursorIndex IndexInParent)
- : StmtSyntaxData(Raw, Parent, IndexInParent) {}
+ : StmtSyntaxData(Raw, Parent, IndexInParent) {
+   assert(Raw->Kind == SyntaxKind::FallthroughStmt);
+   assert(Raw->Layout.size() == 1);
+   syntax_assert_child_token_text(Raw,
+      FallthroughStmtSyntax::Cursor::FallthroughKeyword,
+      tok::kw_fallthrough, "fallthrough");
+}
 
 RC<FallthroughStmtSyntaxData>
 FallthroughStmtSyntaxData::make(RC<RawSyntax> Raw,
@@ -45,8 +51,9 @@ RC<FallthroughStmtSyntaxData> FallthroughStmtSyntaxData::makeBlank() {
 
 #pragma mark fallthrough-statement API
 
-FallthroughStmtSyntax::FallthroughStmtSyntax(const RC<SyntaxData> Root,
-                                             FallthroughStmtSyntaxData *Data)
+FallthroughStmtSyntax::
+FallthroughStmtSyntax(const RC<SyntaxData> Root,
+                      const FallthroughStmtSyntaxData *Data)
     : StmtSyntax(Root, Data) {}
 
 FallthroughStmtSyntax
@@ -61,6 +68,19 @@ FallthroughStmtSyntax::make(RC<RawSyntax> Raw, const SyntaxData *Parent,
     Data, Data.get(),
   };
 }
+
+RC<TokenSyntax> FallthroughStmtSyntax::getFallthroughKeyword() const {
+  return cast<TokenSyntax>(getRaw()->getChild(Cursor::FallthroughKeyword));
+}
+
+FallthroughStmtSyntax FallthroughStmtSyntax::
+withFallthroughKeyword(RC<TokenSyntax> NewFallthroughKeyword) const {
+  syntax_assert_token_is(NewFallthroughKeyword, tok::kw_fallthrough,
+                         "fallthrough");
+  return Data->replaceChild<FallthroughStmtSyntax>(NewFallthroughKeyword,
+                                                   Cursor::FallthroughKeyword);
+}
+
 
 CodeBlockStmtSyntaxData::CodeBlockStmtSyntaxData(RC<RawSyntax> Raw)
   : StmtSyntaxData(Raw) {
