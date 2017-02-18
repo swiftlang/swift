@@ -321,9 +321,12 @@ function(_add_variant_link_flags)
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
     # No extra libraries required.
   elseif("${LFLAGS_SDK}" STREQUAL "WINDOWS")
-    # NOTE: we do not use "/MD" or "/MDd" and select the runtime via linker
-    # options.  This causes conflicts.
-    list(APPEND result "-nostdlib")
+    # We don't need to add -nostdlib using MSVC or clang-cl, as MSVC and clang-cl rely on auto-linking entirely.
+    if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+      # NOTE: we do not use "/MD" or "/MDd" and select the runtime via linker
+      # options. This causes conflicts.
+      list(APPEND result "-nostdlib")
+    endif()
   elseif("${LFLAGS_SDK}" STREQUAL "ANDROID")
     list(APPEND result
         "-ldl"
@@ -351,15 +354,17 @@ function(_add_variant_link_flags)
   if(NOT "${SWIFT_${LFLAGS_SDK}_ICU_I18N}" STREQUAL "")
     list(APPEND library_search_directories "${SWIFT_${sdk}_ICU_I18N}")
   endif()
-  
-  if(SWIFT_ENABLE_GOLD_LINKER AND
-     "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-    list(APPEND result "-fuse-ld=gold")
-  endif()
-  if(SWIFT_ENABLE_LLD_LINKER OR
-     ("${LFLAGS_SDK}" STREQUAL "WINDOWS" AND
-      NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
-    list(APPEND result "-fuse-ld=lld")
+
+  if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+    if(SWIFT_ENABLE_GOLD_LINKER AND
+       "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
+      list(APPEND result "-fuse-ld=gold")
+    endif()
+    if(SWIFT_ENABLE_LLD_LINKER OR
+       ("${LFLAGS_SDK}" STREQUAL "WINDOWS" AND
+        NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
+      list(APPEND result "-fuse-ld=lld")
+    endif()
   endif()
 
   set("${LFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
