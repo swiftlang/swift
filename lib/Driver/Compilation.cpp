@@ -114,7 +114,7 @@ using InputInfoMap = llvm::SmallMapVector<const llvm::opt::Arg *,
 
 namespace swift {
 namespace driver {
-  struct PerformJobsState {
+  class PerformJobsState {
 
     /// The containing Compilation object.
     Compilation &Comp;
@@ -166,15 +166,6 @@ namespace driver {
     llvm::TimerGroup DriverTimerGroup {"driver", "Driver Compilation Time"};
     llvm::SmallDenseMap<const Job *, std::unique_ptr<llvm::Timer>, 16>
     DriverTimers;
-
-    PerformJobsState(Compilation &Comp) : Comp(Comp) {
-      if (Comp.SkipTaskExecution)
-        TQ.reset(new DummyTaskQueue(Comp.NumberOfParallelCommands));
-      else
-        TQ.reset(new TaskQueue(Comp.NumberOfParallelCommands));
-      if (Comp.ShowIncrementalBuildDecisions)
-        IncrementalTracer = &ActualIncrementalTracer;
-    }
 
     void noteBuilding(const Job *cmd, StringRef reason) {
       if (!Comp.ShowIncrementalBuildDecisions)
@@ -453,6 +444,16 @@ namespace driver {
       return TaskFinishedResponse::StopExecution;
     }
 
+  public:
+    PerformJobsState(Compilation &Comp) : Comp(Comp) {
+      if (Comp.SkipTaskExecution)
+        TQ.reset(new DummyTaskQueue(Comp.NumberOfParallelCommands));
+      else
+        TQ.reset(new TaskQueue(Comp.NumberOfParallelCommands));
+      if (Comp.ShowIncrementalBuildDecisions)
+        IncrementalTracer = &ActualIncrementalTracer;
+    }
+
     /// Schedule all jobs we can from the initial list provided by Compilation.
     void scheduleInitialJobs() {
       for (const Job *Cmd : Comp.getJobs()) {
@@ -652,6 +653,12 @@ namespace driver {
                              return (lhsIndex < rhsIndex) ? -1 : (lhsIndex > rhsIndex) ? 1 : 0;
                            });
     }
+
+    int getResult() {
+      if (Result == 0)
+        Result = Comp.Diags.hadAnyError();
+      return Result;
+    }
   };
 } // driver
 } // swift
@@ -796,9 +803,7 @@ int Compilation::performJobsImpl() {
                            InputInfo);
   }
 
-  if (State.Result == 0)
-    State.Result = Diags.hadAnyError();
-  return State.Result;
+  return State.getResult();
 }
 
 int Compilation::performSingleCommand(const Job *Cmd) {

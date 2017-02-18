@@ -41,7 +41,7 @@ namespace swift {
 namespace driver {
   class Driver;
   class ToolChain;
-  struct PerformJobsState;
+  class PerformJobsState;
 
 /// An enum providing different levels of output which should be produced
 /// by a Compilation.
@@ -57,7 +57,7 @@ enum class OutputLevel {
 };
 
 class Compilation {
-  friend struct PerformJobsState;
+  friend class PerformJobsState;
 private:
   /// The DiagnosticEngine to which this Compilation should emit diagnostics.
   DiagnosticEngine &Diags;
