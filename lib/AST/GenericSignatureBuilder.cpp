@@ -794,31 +794,25 @@ static void concretizeNestedTypeFromConcreteParent(
   auto source = parent->getConcreteTypeSource()->viaConcrete(builder, nullptr)
                   ->viaParent(builder);
   auto assocType = nestedPA->getResolvedAssociatedType();
+  if (!assocType) return;
 
-  if (auto *concreteArchetype = concreteParent->getAs<ArchetypeType>()) {
-    // FIXME: I think this code is dead...
-    Type witnessType =
-        concreteArchetype->getNestedType(nestedPA->getNestedName());
+  // FIXME: Get the conformance from the parent.
+  auto conformance = lookupConformance(assocType->getProtocol());
+
+  Type witnessType;
+  if (conformance.isConcrete()) {
+    witnessType = conformance.getConcrete()
+                      ->getTypeWitness(assocType, builder.getLazyResolver())
+                      .getReplacement();
+  } else {
+    witnessType = DependentMemberType::get(concreteParent, assocType);
+  }
+
+  if (auto witnessPA = builder.resolveArchetype(witnessType)) {
+    builder.addSameTypeRequirementBetweenArchetypes(nestedPA, witnessPA,
+                                                    source);
+  } else {
     builder.addSameTypeRequirementToConcrete(nestedPA, witnessType, source);
-  } else if (assocType) {
-    // FIXME: Get the conformance from the parent.
-    auto conformance = lookupConformance(assocType->getProtocol());
-
-    Type witnessType;
-    if (conformance.isConcrete()) {
-      witnessType = conformance.getConcrete()
-                        ->getTypeWitness(assocType, builder.getLazyResolver())
-                        .getReplacement();
-    } else {
-      witnessType = DependentMemberType::get(concreteParent, assocType);
-    }
-
-    if (auto witnessPA = builder.resolveArchetype(witnessType)) {
-      builder.addSameTypeRequirementBetweenArchetypes(nestedPA, witnessPA,
-                                                      source);
-    } else {
-      builder.addSameTypeRequirementToConcrete(nestedPA, witnessType, source);
-    }
   }
 }
 
@@ -845,7 +839,9 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
   SmallVector<std::pair<ProtocolDecl *, const RequirementSource *>, 4>
     conformsTo(rep->ConformsTo.begin(), rep->ConformsTo.end());
   for (auto &conforms : conformsTo) {
-    for (auto member : conforms.first->lookupDirect(nestedName)) {
+    auto proto = conforms.first;
+
+    for (auto member : proto->lookupDirect(nestedName)) {
       PotentialArchetype *pa;
       
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
@@ -854,13 +850,24 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
       } else if (auto alias = dyn_cast<TypeAliasDecl>(member)) {
         // Resolve this nested type to this type alias.
         pa = new PotentialArchetype(this, alias);
-        
+
         if (!alias->hasInterfaceType())
           builder.getLazyResolver()->resolveDeclSignature(alias);
         if (!alias->hasInterfaceType())
           continue;
 
+        // The protocol typealias has an underlying type written in terms
+        // of the protocol's 'Self' type.
         auto type = alias->getDeclaredInterfaceType();
+
+        // Substitute in the type of the current PotentialArchetype in
+        // place of 'Self' here.
+        auto subMap = SubstitutionMap::getProtocolSubstitutions(
+          proto, getDependentType(/*genericParams=*/{},
+                                  /*allowUnresolved=*/true),
+          ProtocolConformanceRef(proto));
+        type = type.subst(subMap, SubstFlags::UseErrorType);
+
         if (auto existingPA = builder.resolveArchetype(type)) {
           builder.addSameTypeRequirementBetweenArchetypes(pa, existingPA,
                                                           sameNestedTypeSource);
@@ -2052,77 +2059,9 @@ public:
     // FIXME: Inaccurate TypeReprs.
     auto source = RequirementSource::forInferred(Builder, typeRepr);
     for (const auto &rawReq : genericSig->getRequirements()) {
-      auto req =
-          rawReq.subst(getTypeSubstitution, Builder.getLookupConformanceFn());
-      if (!req)
-        continue;
-
-      // FIXME: Use Requirement substitution here.
-      switch (req->getKind()) {
-      case RequirementKind::SameType: {
-        auto firstType = req->getFirstType();
-        auto firstPA = Builder.resolveArchetype(firstType);
-
-        if (firstPA && isOuterArchetype(firstPA))
-          return Action::Continue;
-
-        auto secondType = req->getSecondType();
-        auto secondPA = Builder.resolveArchetype(secondType);
-
-        if (firstPA && secondPA) {
-          if (Builder.addSameTypeRequirementBetweenArchetypes(firstPA, secondPA,
-                                                              source)) {
-            return Action::Stop;
-          }
-        } else if (firstPA || secondPA) {
-          auto PA = firstPA ? firstPA : secondPA;
-          auto concrete = firstPA ? secondType : firstType;
-          if (Builder.addSameTypeRequirementToConcrete(PA, concrete, source)) {
-            return Action::Stop;
-          }
-        }
-        break;
-      }
-
-      case RequirementKind::Superclass:
-      case RequirementKind::Layout:
-      case RequirementKind::Conformance: {
-        auto subjectType = req->getFirstType();
-        auto subjectPA = Builder.resolveArchetype(subjectType);
-        if (!subjectPA) {
-          break;
-        }
-
-        if (isOuterArchetype(subjectPA))
-          return Action::Continue;
-
-        switch (req->getKind()) {
-        case RequirementKind::Conformance: {
-          auto proto = req->getSecondType()->castTo<ProtocolType>();
-          if (Builder.addConformanceRequirement(subjectPA, proto->getDecl(),
-                                                source)) {
-            return Action::Stop;
-          }
-          break;
-        }
-        case RequirementKind::Layout:
-          if (Builder.addLayoutRequirement(
-                  subjectPA, req->getLayoutConstraint(), source)) {
-            return Action::Stop;
-          }
-          break;
-        case RequirementKind::Superclass:
-          if (Builder.addSuperclassRequirement(subjectPA, req->getSecondType(),
-                                               source)) {
-            return Action::Stop;
-          }
-          break;
-        case RequirementKind::SameType:
-          llvm_unreachable("covered by outer switch");
-        }
-        break;
-      }
-      }
+      if (auto req = rawReq.subst(getTypeSubstitution,
+                                  Builder.getLookupConformanceFn()))
+        Builder.addRequirement(*req, source);
     }
 
     return Action::Continue;
