@@ -611,12 +611,12 @@ func supportStructure(_ b: inout Bridge, name: String) throws {
 // CHECK-NEXT: [[INDEX_COPY_1:%.*]] = copy_value [[BORROWED_ARG2]] : $String
 // CHECK-NEXT: [[INDEX_COPY_2:%.*]] = copy_value [[INDEX_COPY_1]] : $String
 // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $Pylon
-// CHECK-NEXT: [[BASE:%.*]] = load [copy] [[ARG1]] : $*Bridge
+// CHECK-NEXT: [[BASE:%.*]] = load_borrow [[ARG1]] : $*Bridge
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[GETTER:%.*]] = function_ref @_TFV6errors6Bridgeg9subscriptFSSVS_5Pylon :
 // CHECK-NEXT: [[T0:%.*]] = apply [[GETTER]]([[INDEX_COPY_1]], [[BASE]])
-// CHECK-NEXT: destroy_value [[BASE]]
 // CHECK-NEXT: store [[T0]] to [init] [[TEMP]]
+// CHECK-NEXT: end_borrow [[BASE]] from [[ARG1]]
 // CHECK-NEXT: try_apply [[SUPPORT]]([[TEMP]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 
 // CHECK:    [[BB_NORMAL]]

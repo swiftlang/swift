@@ -43,11 +43,12 @@ func test0(_ ref: A) {
 // CHECK-NEXT: [[T0:%.*]] = class_method [[BORROWED_ARG_RHS]] : $A, #A.array!getter.1
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[BORROWED_ARG_RHS]])
 // CHECK-NEXT: store [[T1]] to [init] [[TEMP]]
-// CHECK-NEXT: [[T0:%.*]] = load [take] [[TEMP]]
+// CHECK-NEXT: [[T0:%.*]] = load_borrow [[TEMP]]
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.getter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T1:%.*]] = function_ref @_T09accessors11OrdinarySubV9subscriptSiSicfg
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T1]]([[INDEX1]], [[T0]])
-// CHECK-NEXT: destroy_value [[T0]]
+// CHECK-NEXT: end_borrow [[T0]] from [[TEMP]]
+// CHECK-NEXT: destroy_addr [[TEMP]]
 //   Formal access to LHS.
 // CHECK-NEXT: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK-NEXT: [[BUFFER:%.*]] = alloc_stack $OrdinarySub
