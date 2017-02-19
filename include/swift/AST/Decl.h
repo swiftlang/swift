@@ -1399,13 +1399,13 @@ protected:
     : DeclContext(Kind, Parent) { }
 
 public:
-  /// \brief Retrieve the set of parameters to a generic subscript, or null if
-  /// this subscript is not generic.
+  /// \brief Retrieve the set of parameters to a generic context, or null if
+  /// this context is not generic.
   GenericParamList *getGenericParams() const { return GenericParams; }
 
   void setGenericParams(GenericParamList *GenericParams);
 
-  /// \brief Determine whether this subscript has generic parameters
+  /// \brief Determine whether this context has generic parameters
   /// of its own.
   bool isGeneric() const { return GenericParams != nullptr; }
 
@@ -1419,10 +1419,10 @@ public:
     TrailingWhere = trailingWhereClause;
   }
 
-  /// Retrieve the generic signature for this subscript.
+  /// Retrieve the generic signature for this context.
   GenericSignature *getGenericSignature() const;
 
-  /// Retrieve the generic context for this subscript.
+  /// Retrieve the generic context for this context.
   GenericEnvironment *getGenericEnvironment() const;
 
   /// Retrieve the innermost generic parameter types.
@@ -1446,7 +1446,7 @@ public:
                                  GenericSignature *genericSig,
                                  uint64_t genericEnvData);
 
-  /// Set the generic context of this subscript.
+  /// Set the generic context of this context.
   void setGenericEnvironment(GenericEnvironment *genericEnv);
 };
 
