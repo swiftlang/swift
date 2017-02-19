@@ -51,7 +51,8 @@ ManagedValue ManagedValue::formalAccessCopy(SILGenFunction &gen,
   }
 
   SILValue buf = gen.emitTemporaryAllocation(loc, getType());
-  return gen.B.createFormalAccessCopyAddr(loc, *this, buf);
+  return gen.B.createFormalAccessCopyAddr(loc, *this, buf, IsNotTake,
+                                          IsInitialization);
 }
 
 /// Store a copy of this value with independent ownership into the given

@@ -126,7 +126,8 @@ public:
   /// of the current Formal Evaluation Scope.
   ManagedValue createFormalAccessCopyAddr(SILLocation loc,
                                           ManagedValue originalAddr,
-                                          SILValue newAddr);
+                                          SILValue newAddr, IsTake_t isTake,
+                                          IsInitialization_t isInit);
 
   /// Emit a +1 copy of \p originalValue into newAddr that lives until the end
   /// Formal Evaluation Scope.

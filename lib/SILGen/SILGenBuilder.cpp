@@ -308,8 +308,9 @@ SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
 }
 
 ManagedValue SILGenBuilder::createFormalAccessCopyAddr(
-    SILLocation loc, ManagedValue originalAddr, SILValue newAddr) {
-  SILBuilder::createCopyAddr(loc, originalAddr.getValue(), newAddr, IsNotTake,
-                             IsInitialization);
+    SILLocation loc, ManagedValue originalAddr, SILValue newAddr,
+    IsTake_t isTake, IsInitialization_t isInit) {
+  SILBuilder::createCopyAddr(loc, originalAddr.getValue(), newAddr, isTake,
+                             isInit);
   return gen.emitFormalAccessManagedBufferWithCleanup(loc, newAddr);
 }
