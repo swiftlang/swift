@@ -157,8 +157,28 @@ ManagedValue SILGenBuilder::createStructExtract(SILLocation loc,
 
 ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
                                             ManagedValue originalValue) {
-  SILValue result = SILBuilder::createCopyValue(loc, originalValue.getValue());
-  return gen.emitManagedRValueWithCleanup(result);
+  auto &lowering = getFunction().getTypeLowering(originalValue.getType());
+  return createCopyValue(loc, originalValue, lowering);
+}
+
+ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
+                                            ManagedValue originalValue,
+                                            const TypeLowering &lowering) {
+  if (lowering.isTrivial())
+    return originalValue;
+
+  SILType ty = originalValue.getType();
+  assert(!ty.isAddress() && "Can not perform a copy value of an address typed "
+         "value");
+
+  if (ty.isObject() &&
+      originalValue.getOwnershipKind() == ValueOwnershipKind::Trivial) {
+    return originalValue;
+  }
+
+  SILValue result =
+      lowering.emitCopyValue(*this, loc, originalValue.getValue());
+  return gen.emitManagedRValueWithCleanup(result, lowering);
 }
 
 ManagedValue SILGenBuilder::createCopyUnownedValue(SILLocation loc,

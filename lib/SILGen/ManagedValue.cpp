@@ -33,9 +33,9 @@ ManagedValue ManagedValue::copy(SILGenFunction &gen, SILLocation l) {
   assert(!lowering.isTrivial() && "trivial value has cleanup?");
   
   if (!lowering.isAddressOnly()) {
-    return gen.emitManagedRetain(l, getValue(), lowering);
+    return gen.B.createCopyValue(l, *this, lowering);
   }
-  
+
   SILValue buf = gen.emitTemporaryAllocation(l, getType());
   gen.B.createCopyAddr(l, getValue(), buf, IsNotTake, IsInitialization);
   return gen.emitManagedRValueWithCleanup(buf, lowering);
@@ -58,19 +58,13 @@ void ManagedValue::copyInto(SILGenFunction &gen, SILValue dest,
 /// This is the same operation as 'copy', but works on +0 values that don't
 /// have cleanups.  It returns a +1 value with one.
 ManagedValue ManagedValue::copyUnmanaged(SILGenFunction &gen, SILLocation loc) {
-  auto &lowering = gen.getTypeLowering(getType());
-  
-  if (lowering.isTrivial())
-    return *this;
-  
-  SILValue result;
-  if (!lowering.isAddress()) {
-    result = lowering.emitCopyValue(gen.B, loc, getValue());
-  } else {
-    result = gen.emitTemporaryAllocation(loc, getType());
-    gen.B.createCopyAddr(loc, getValue(), result, IsNotTake,IsInitialization);
+  if (getType().isObject()) {
+    return gen.B.createCopyValue(loc, *this);
   }
-  return gen.emitManagedRValueWithCleanup(result, lowering);
+
+  SILValue result = gen.emitTemporaryAllocation(loc, getType());
+  gen.B.createCopyAddr(loc, getValue(), result, IsNotTake, IsInitialization);
+  return gen.emitManagedRValueWithCleanup(result);
 }
 
 /// Disable the cleanup for this value.

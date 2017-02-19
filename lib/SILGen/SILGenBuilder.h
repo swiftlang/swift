@@ -111,7 +111,16 @@ public:
   ManagedValue createStructExtract(SILLocation loc, ManagedValue base,
                                    VarDecl *decl);
 
+  /// Emit a +1 copy on \p originalValue that lives until the end of the current
+  /// lexical scope.
   ManagedValue createCopyValue(SILLocation loc, ManagedValue originalValue);
+
+  /// Emit a +1 copy on \p originalValue that lives until the end of the current
+  /// lexical scope.
+  ///
+  /// This reuses a passed in lowering.
+  ManagedValue createCopyValue(SILLocation loc, ManagedValue originalValue,
+                               const TypeLowering &lowering);
 
   ManagedValue createCopyUnownedValue(SILLocation loc,
                                       ManagedValue originalValue);
