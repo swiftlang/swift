@@ -51,7 +51,8 @@ public:
   LazySKDUID(const char *Name) : Name(Name) { }
 
   sourcekitd_uid_t get() const {
-    if (!UID)
+    sourcekitd_uid_t UIDValue = UID;
+    if (!UIDValue)
       UID = SKDUIDFromUIdent(UIdent(Name));
     return UID;
   }
@@ -333,7 +334,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     ResponseBuilder RB;
     auto dict = RB.getDictionary();
     dict.set(KeyVersionMajor, ProtocolMajorVersion);
-    dict.set(KeyVersionMinor, ProtocolMinorVersion);
+    dict.set(KeyVersionMinor, static_cast<int64_t>(ProtocolMinorVersion));
     return Rec(RB.createResponse());
   }
 
