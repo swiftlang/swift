@@ -4812,35 +4812,12 @@ public:
       gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
 
       auto *sig = TC.validateGenericFuncSignature(FD);
-
-      // Create a fresh generic signature builder.
-      GenericSignatureBuilder builder(
-                             FD->getASTContext(),
-                             LookUpConformanceInModule(FD->getModuleContext()));
-      auto *parentSig = FD->getDeclContext()->getGenericSignatureOfContext();
-      TC.checkGenericParamList(&builder, gp, parentSig, nullptr);
-
-      // Infer requirements from parameter patterns.
-      for (auto pattern : FD->getParameterLists()) {
-        builder.inferRequirements(pattern, gp);
-      }
-
-      // Infer requirements from the result type.
-      if (!FD->getBodyResultTypeLoc().isNull()) {
-        unsigned depth = gp->getDepth();
-        builder.inferRequirements(FD->getBodyResultTypeLoc(),
-                                  /*minDepth=*/depth,
-                                  /*maxDepth=*/depth);
-      }
+      auto *env = sig->createGenericEnvironment(*FD->getModuleContext());
+      FD->setGenericEnvironment(env);
 
       // Revert the types within the signature so it can be type-checked with
       // archetypes below.
       TC.revertGenericFuncSignature(FD);
-
-      // Assign archetypes.
-      builder.finalize(FD->getLoc(), sig->getGenericParams());
-      auto *env = sig->createGenericEnvironment(*FD->getModuleContext());
-      FD->setGenericEnvironment(env);
     } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
       (void)TC.validateGenericFuncSignature(FD);
       // Revert all of the types within the signature of the function.
@@ -6458,24 +6435,12 @@ public:
       gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
 
       auto *sig = TC.validateGenericFuncSignature(CD);
-
-      GenericSignatureBuilder builder(
-                             CD->getASTContext(),
-                             LookUpConformanceInModule(CD->getModuleContext()));
-      auto *parentSig = CD->getDeclContext()->getGenericSignatureOfContext();
-      TC.checkGenericParamList(&builder, gp, parentSig, nullptr);
-
-      // Infer requirements from the parameters of the constructor.
-      builder.inferRequirements(CD->getParameterList(1), gp);
+      auto *env = sig->createGenericEnvironment(*CD->getModuleContext());
+      CD->setGenericEnvironment(env);
 
       // Revert the types within the signature so it can be type-checked with
       // archetypes below.
       TC.revertGenericFuncSignature(CD);
-
-      // Assign archetypes.
-      builder.finalize(CD->getLoc(), sig->getGenericParams());
-      auto *env = sig->createGenericEnvironment(*CD->getModuleContext());
-      CD->setGenericEnvironment(env);
     } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
       (void)TC.validateGenericFuncSignature(CD);
 
