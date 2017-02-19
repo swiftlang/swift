@@ -237,8 +237,8 @@ public:
   }
   
   /// Emit a copy of this value with independent ownership.
-  ManagedValue copy(SILGenFunction &gen, SILLocation l);
-  
+  ManagedValue copy(SILGenFunction &gen, SILLocation loc);
+
   /// Store a copy of this value with independent ownership into the given
   /// uninitialized address.
   void copyInto(SILGenFunction &gen, SILValue dest, SILLocation L);

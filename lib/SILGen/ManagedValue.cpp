@@ -23,21 +23,17 @@ using namespace swift;
 using namespace Lowering;
 
 /// Emit a copy of this value with independent ownership.
-ManagedValue ManagedValue::copy(SILGenFunction &gen, SILLocation l) {
-  if (!cleanup.isValid()) {
-    assert(gen.getTypeLowering(getType()).isTrivial());
-    return *this;
-  }
-  
+ManagedValue ManagedValue::copy(SILGenFunction &gen, SILLocation loc) {
   auto &lowering = gen.getTypeLowering(getType());
-  assert(!lowering.isTrivial() && "trivial value has cleanup?");
-  
-  if (!lowering.isAddressOnly()) {
-    return gen.B.createCopyValue(l, *this, lowering);
+  if (lowering.isTrivial())
+    return *this;
+
+  if (getType().isObject()) {
+    return gen.B.createCopyValue(loc, *this, lowering);
   }
 
-  SILValue buf = gen.emitTemporaryAllocation(l, getType());
-  gen.B.createCopyAddr(l, getValue(), buf, IsNotTake, IsInitialization);
+  SILValue buf = gen.emitTemporaryAllocation(loc, getType());
+  gen.B.createCopyAddr(loc, getValue(), buf, IsNotTake, IsInitialization);
   return gen.emitManagedRValueWithCleanup(buf, lowering);
 }
 
