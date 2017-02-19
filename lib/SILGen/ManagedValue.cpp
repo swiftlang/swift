@@ -114,8 +114,8 @@ ManagedValue ManagedValue::borrow(SILGenFunction &gen, SILLocation loc) const {
   return gen.emitManagedBeginBorrow(loc, getValue());
 }
 
-ManagedValue ManagedValue::formalEvaluationBorrow(SILGenFunction &gen,
-                                                  SILLocation loc) const {
+ManagedValue ManagedValue::formalAccessBorrow(SILGenFunction &gen,
+                                              SILLocation loc) const {
   assert(getValue() && "cannot borrow an invalid or in-context value");
   if (isLValue())
     return *this;

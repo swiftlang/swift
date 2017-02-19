@@ -200,7 +200,7 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
     // Otherwise, we need to emit a get and set.  Borrow the base for
     // the getter.
     ManagedValue getterBase =
-        base ? base.formalEvaluationBorrow(gen, loc) : ManagedValue();
+        base ? base.formalAccessBorrow(gen, loc) : ManagedValue();
 
     // Emit a 'get' into a temporary and then pop the borrow of base.
     temporary = emitGetIntoTemporary(
@@ -810,7 +810,7 @@ namespace {
         // If the base is a +1 r-value, just borrow it for materializeForSet.
         // prepareAccessorArgs will copy it if necessary.
         ManagedValue borrowedBase =
-            base ? base.formalEvaluationBorrow(gen, loc) : ManagedValue();
+            base ? base.formalAccessBorrow(gen, loc) : ManagedValue();
 
         auto args = std::move(*this).prepareAccessorArgs(gen, loc, borrowedBase,
                                                          materializeForSet);

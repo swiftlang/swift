@@ -258,8 +258,7 @@ public:
   ManagedValue borrow(SILGenFunction &gen, SILLocation loc) const;
 
   /// Return a formally evaluated "borrowed" version of this value.
-  ManagedValue formalEvaluationBorrow(SILGenFunction &gen,
-                                      SILLocation loc) const;
+  ManagedValue formalAccessBorrow(SILGenFunction &gen, SILLocation loc) const;
 
   ManagedValue unmanagedBorrow() const {
     return isLValue() ? *this : ManagedValue::forUnmanaged(getValue());
