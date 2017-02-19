@@ -1215,7 +1215,12 @@ public:
                         const TypeLowering &rvalueTL,
                         SGFContext C, IsTake_t isTake,
                         bool isGuaranteedValid = false);
-  
+
+  ManagedValue emitFormalAccessLoad(SILLocation loc, SILValue addr,
+                                    const TypeLowering &rvalueTL, SGFContext C,
+                                    IsTake_t isTake,
+                                    bool isGuaranteedValid = false);
+
   void emitAssignToLValue(SILLocation loc, RValue &&src,
                           LValue &&dest);
   void emitAssignLValueToLValue(SILLocation loc,

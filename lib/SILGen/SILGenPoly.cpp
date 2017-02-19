@@ -3121,7 +3121,8 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
 
   SILLocation loc(witness.getDecl());
   FullExpr scope(Cleanups, CleanupLocation::get(loc));
- 
+  FormalEvaluationScope formalEvalScope(*this);
+
   auto witnessKind = getWitnessDispatchKind(selfType, witness, isFree);
   auto thunkTy = F.getLoweredFunctionType();
 
