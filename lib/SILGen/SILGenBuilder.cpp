@@ -157,8 +157,28 @@ ManagedValue SILGenBuilder::createStructExtract(SILLocation loc,
 
 ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
                                             ManagedValue originalValue) {
-  SILValue result = SILBuilder::createCopyValue(loc, originalValue.getValue());
-  return gen.emitManagedRValueWithCleanup(result);
+  auto &lowering = getFunction().getTypeLowering(originalValue.getType());
+  return createCopyValue(loc, originalValue, lowering);
+}
+
+ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
+                                            ManagedValue originalValue,
+                                            const TypeLowering &lowering) {
+  if (lowering.isTrivial())
+    return originalValue;
+
+  SILType ty = originalValue.getType();
+  assert(!ty.isAddress() && "Can not perform a copy value of an address typed "
+         "value");
+
+  if (ty.isObject() &&
+      originalValue.getOwnershipKind() == ValueOwnershipKind::Trivial) {
+    return originalValue;
+  }
+
+  SILValue result =
+      lowering.emitCopyValue(*this, loc, originalValue.getValue());
+  return gen.emitManagedRValueWithCleanup(result, lowering);
 }
 
 ManagedValue SILGenBuilder::createCopyUnownedValue(SILLocation loc,
@@ -264,4 +284,32 @@ ManagedValue SILGenBuilder::createFormalAccessLoadBorrow(SILLocation loc,
   auto *i = SILBuilder::createLoadBorrow(loc, baseValue);
   return gen.emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc,
                                                                   baseValue, i);
+}
+
+ManagedValue
+SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
+                                           ManagedValue originalValue) {
+  SILType ty = originalValue.getType();
+  const auto &lowering = getFunction().getTypeLowering(ty);
+  if (lowering.isTrivial())
+    return originalValue;
+
+  assert(!lowering.isAddressOnly() && "cannot perform a copy value of an "
+                                      "address only type");
+
+  if (ty.isObject() &&
+      originalValue.getOwnershipKind() == ValueOwnershipKind::Trivial) {
+    return originalValue;
+  }
+
+  SILValue result =
+      lowering.emitCopyValue(*this, loc, originalValue.getValue());
+  return gen.emitFormalAccessManagedRValueWithCleanup(loc, result);
+}
+
+ManagedValue SILGenBuilder::createFormalAccessCopyAddr(
+    SILLocation loc, ManagedValue originalAddr, SILValue newAddr) {
+  SILBuilder::createCopyAddr(loc, originalAddr.getValue(), newAddr, IsNotTake,
+                             IsInitialization);
+  return gen.emitFormalAccessManagedBufferWithCleanup(loc, newAddr);
 }

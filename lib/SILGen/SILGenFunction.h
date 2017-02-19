@@ -1128,6 +1128,11 @@ public:
   ManagedValue emitManagedBufferWithCleanup(SILValue addr,
                                             const TypeLowering &lowering);
 
+  ManagedValue emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
+                                                        SILValue value);
+  ManagedValue emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
+                                                        SILValue addr);
+
   void emitSemanticLoadInto(SILLocation loc, SILValue src,
                             const TypeLowering &srcLowering,
                             SILValue dest,
