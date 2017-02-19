@@ -29,6 +29,7 @@
 #include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -338,6 +339,8 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
     return IsRef ? KindRefAccessorMutableAddress
                  : KindDeclAccessorMutableAddress;
   }
+
+  llvm_unreachable("Unhandled AccessorKind in switch.");
 }
 
 SourceKit::UIdent SwiftLangSupport::getUIDForModuleRef() {
@@ -402,6 +405,8 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
   case CodeCompletionDeclKind::LocalVar: return KindDeclVarLocal;
   case CodeCompletionDeclKind::GlobalVar: return KindDeclVarGlobal;
   }
+
+  llvm_unreachable("Unhandled CodeCompletionDeclKind in switch.");
 }
 
 UIdent SwiftLangSupport::getUIDForSyntaxNodeKind(SyntaxNodeKind SC) {
@@ -463,6 +468,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxNodeKind(SyntaxNodeKind SC) {
   case SyntaxNodeKind::ObjectLiteral:
     return KindObjectLiteral;
   }
+
+  llvm_unreachable("Unhandled SyntaxNodeKind in switch.");
 }
 
 UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
@@ -529,6 +536,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
     case SyntaxStructureKind::Argument:
       return KindExprArg;
   }
+
+  llvm_unreachable("Unhandled SyntaxStructureKind in switch.");
 }
 
 UIdent SwiftLangSupport::getUIDForSyntaxStructureElementKind(
@@ -541,7 +550,10 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureElementKind(
     case SyntaxStructureElementKind::Pattern: return KindStructureElemPattern;
     case SyntaxStructureElementKind::TypeRef: return KindStructureElemTypeRef;
   }
+
+  llvm_unreachable("Unhandled SyntaxStructureElementKind in switch.");
 }
+
 SourceKit::UIdent SwiftLangSupport::
 getUIDForRangeKind(swift::ide::RangeKind Kind) {
   switch (Kind) {
@@ -551,6 +563,8 @@ getUIDForRangeKind(swift::ide::RangeKind Kind) {
     case swift::ide::RangeKind::MultiStatement: return KindRangeMultiStatement;
     case swift::ide::RangeKind::Invalid: return KindRangeInvalid;
   }
+
+  llvm_unreachable("Unhandled RangeKind in switch.");
 }
 
 UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
@@ -642,6 +656,8 @@ SourceKit::UIdent SwiftLangSupport::getUIDForNameKind(swift::ide::NameKind Kind)
   case swift::ide::NameKind::ObjC: return KindNameObjc;
   case swift::ide::NameKind::Swift: return KindNameSwift;
   }
+
+  llvm_unreachable("Unhandled NameKind in switch.");
 }
 
 swift::ide::NameKind SwiftLangSupport::getNameKindForUID(SourceKit::UIdent Id) {
