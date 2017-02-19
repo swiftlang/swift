@@ -285,3 +285,31 @@ ManagedValue SILGenBuilder::createFormalAccessLoadBorrow(SILLocation loc,
   return gen.emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc,
                                                                   baseValue, i);
 }
+
+ManagedValue
+SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
+                                           ManagedValue originalValue) {
+  SILType ty = originalValue.getType();
+  const auto &lowering = getFunction().getTypeLowering(ty);
+  if (lowering.isTrivial())
+    return originalValue;
+
+  assert(!lowering.isAddressOnly() && "cannot perform a copy value of an "
+                                      "address only type");
+
+  if (ty.isObject() &&
+      originalValue.getOwnershipKind() == ValueOwnershipKind::Trivial) {
+    return originalValue;
+  }
+
+  SILValue result =
+      lowering.emitCopyValue(*this, loc, originalValue.getValue());
+  return gen.emitFormalAccessManagedRValueWithCleanup(loc, result);
+}
+
+ManagedValue SILGenBuilder::createFormalAccessCopyAddr(
+    SILLocation loc, ManagedValue originalAddr, SILValue newAddr) {
+  SILBuilder::createCopyAddr(loc, originalAddr.getValue(), newAddr, IsNotTake,
+                             IsInitialization);
+  return gen.emitFormalAccessManagedBufferWithCleanup(loc, newAddr);
+}

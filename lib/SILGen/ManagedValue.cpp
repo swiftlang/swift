@@ -37,6 +37,21 @@ ManagedValue ManagedValue::copy(SILGenFunction &gen, SILLocation loc) {
   return gen.emitManagedRValueWithCleanup(buf, lowering);
 }
 
+/// Emit a copy of this value with independent ownership.
+ManagedValue ManagedValue::formalAccessCopy(SILGenFunction &gen,
+                                            SILLocation loc) {
+  auto &lowering = gen.getTypeLowering(getType());
+  if (lowering.isTrivial())
+    return *this;
+
+  if (getType().isObject()) {
+    return gen.B.createFormalAccessCopyValue(loc, *this);
+  }
+
+  SILValue buf = gen.emitTemporaryAllocation(loc, getType());
+  return gen.B.createFormalAccessCopyAddr(loc, *this, buf);
+}
+
 /// Store a copy of this value with independent ownership into the given
 /// uninitialized address.
 void ManagedValue::copyInto(SILGenFunction &gen, SILValue dest,

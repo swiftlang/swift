@@ -122,6 +122,17 @@ public:
   ManagedValue createCopyValue(SILLocation loc, ManagedValue originalValue,
                                const TypeLowering &lowering);
 
+  /// Emit a +1 copy of \p originalValue into newAddr that lives until the end
+  /// of the current Formal Evaluation Scope.
+  ManagedValue createFormalAccessCopyAddr(SILLocation loc,
+                                          ManagedValue originalAddr,
+                                          SILValue newAddr);
+
+  /// Emit a +1 copy of \p originalValue into newAddr that lives until the end
+  /// Formal Evaluation Scope.
+  ManagedValue createFormalAccessCopyValue(SILLocation loc,
+                                           ManagedValue originalValue);
+
   ManagedValue createCopyUnownedValue(SILLocation loc,
                                       ManagedValue originalValue);
 
