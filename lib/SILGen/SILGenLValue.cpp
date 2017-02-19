@@ -2027,10 +2027,12 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
       return ManagedValue::forUnmanaged(addr);
         
     // Copy the address-only value.
-    SILValue copy = getBufferForExprResult(loc, rvalueTL.getLoweredType(), C);
-    emitSemanticLoadInto(loc, addr, addrTL, copy, rvalueTL,
-                         isTake, IsInitialization);
-    return manageBufferForExprResult(copy, rvalueTL, C);
+    return B.bufferForExpr(
+        loc, rvalueTL.getLoweredType(), rvalueTL, C,
+        [&](SILValue newAddr) {
+          emitSemanticLoadInto(loc, addr, addrTL, newAddr, rvalueTL,
+                               isTake, IsInitialization);
+        });
   }
 
   // Ok, this is something loadable.  If this is a non-take access at plus zero,

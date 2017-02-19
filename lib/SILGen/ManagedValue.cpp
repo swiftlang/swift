@@ -40,6 +40,8 @@ ManagedValue ManagedValue::copy(SILGenFunction &gen, SILLocation loc) {
 /// Emit a copy of this value with independent ownership.
 ManagedValue ManagedValue::formalAccessCopy(SILGenFunction &gen,
                                             SILLocation loc) {
+  assert(gen.InWritebackScope && "Can only perform a formal access copy in a "
+                                 "formal evaluation scope");
   auto &lowering = gen.getTypeLowering(getType());
   if (lowering.isTrivial())
     return *this;
@@ -49,7 +51,8 @@ ManagedValue ManagedValue::formalAccessCopy(SILGenFunction &gen,
   }
 
   SILValue buf = gen.emitTemporaryAllocation(loc, getType());
-  return gen.B.createFormalAccessCopyAddr(loc, *this, buf);
+  return gen.B.createFormalAccessCopyAddr(loc, *this, buf, IsNotTake,
+                                          IsInitialization);
 }
 
 /// Store a copy of this value with independent ownership into the given

@@ -55,19 +55,21 @@ SILGenFunction::emitInjectOptional(SILLocation loc,
   // evaluating into the context.
 
   // Prepare a buffer for the object value.
-  auto optBuf = getBufferForExprResult(loc, optTy.getObjectType(), ctxt);
-  auto objectBuf = B.createInitEnumDataAddr(loc, optBuf, someDecl, objectTy);
+  return B.bufferForExpr(
+      loc, optTy.getObjectType(), optTL, ctxt,
+      [&](SILValue optBuf) {
+        auto objectBuf = B.createInitEnumDataAddr(loc, optBuf, someDecl, objectTy);
 
-  // Evaluate the value in-place into that buffer.
-  TemporaryInitialization init(objectBuf, CleanupHandle::invalid());
-  ManagedValue objectResult = generator(SGFContext(&init));
-  if (!objectResult.isInContext()) {
-    objectResult.forwardInto(*this, loc, objectBuf);
-  }
+        // Evaluate the value in-place into that buffer.
+        TemporaryInitialization init(objectBuf, CleanupHandle::invalid());
+        ManagedValue objectResult = generator(SGFContext(&init));
+        if (!objectResult.isInContext()) {
+          objectResult.forwardInto(*this, loc, objectBuf);
+        }
 
-  // Finalize the outer optional buffer.
-  B.createInjectEnumAddr(loc, optBuf, someDecl);
-  return manageBufferForExprResult(optBuf, optTL, ctxt);
+        // Finalize the outer optional buffer.
+        B.createInjectEnumAddr(loc, optBuf, someDecl);
+      });
 }
 
 void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
@@ -645,27 +647,26 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     }
 
     // Allocate the existential.
-    SILValue existential =
-      getBufferForExprResult(loc, existentialTL.getLoweredType(), C);
-
-    // Allocate the concrete value inside the container.
-    SILValue valueAddr = B.createInitExistentialAddr(
-                            loc, existential,
-                            concreteFormalType,
-                            concreteTLPtr->getLoweredType(),
-                            conformances);
-    // Initialize the concrete value in-place.
-    InitializationPtr init(
-        new ExistentialInitialization(existential, valueAddr, concreteFormalType,
-                                      ExistentialRepresentation::Opaque,
-                                      *this));
-    ManagedValue mv = F(SGFContext(init.get()));
-    if (!mv.isInContext()) {
-      mv.forwardInto(*this, loc, init->getAddress());
-      init->finishInitialization(*this);
-    }
-
-    return manageBufferForExprResult(existential, existentialTL, C);
+    return B.bufferForExpr(
+        loc, existentialTL.getLoweredType(), existentialTL, C,
+        [&](SILValue existential) {
+          // Allocate the concrete value inside the container.
+          SILValue valueAddr = B.createInitExistentialAddr(
+              loc, existential,
+              concreteFormalType,
+              concreteTLPtr->getLoweredType(),
+              conformances);
+          // Initialize the concrete value in-place.
+          InitializationPtr init(
+              new ExistentialInitialization(existential, valueAddr, concreteFormalType,
+                                            ExistentialRepresentation::Opaque,
+                                            *this));
+          ManagedValue mv = F(SGFContext(init.get()));
+          if (!mv.isInContext()) {
+            mv.forwardInto(*this, loc, init->getAddress());
+            init->finishInitialization(*this);
+          }
+        });
   }
   }
 
