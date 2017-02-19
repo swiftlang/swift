@@ -5122,7 +5122,7 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
     return base.isLValue() || base.isPlusZeroRValueOrTrivial();
 
   // If the accessor wants the value directly, we definitely have to
-  // load.  TODO: don't load-and-retain if the value is passed at +0.
+  // load.
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
@@ -5133,28 +5133,34 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
 
 ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
   // If the base is currently an address, we may have to copy it.
-
   if (shouldLoadBaseAddress()) {
-    // The load can only be a take if the base is a +1 rvalue.
-    auto shouldTake = IsTake_t(base.hasCleanup());
+    if (selfParam.isConsumed() ||
+        base.getType().isAddressOnly(SGF.getModule())) {
+      // The load can only be a take if the base is a +1 rvalue.
+      auto shouldTake = IsTake_t(base.hasCleanup());
 
-    base = SGF.emitLoad(loc, base.forward(SGF),
-                        SGF.getTypeLowering(baseLoweredType), SGFContext(),
-                        shouldTake);
+      base = SGF.emitLoad(loc, base.forward(SGF),
+                          SGF.getTypeLowering(baseLoweredType), SGFContext(),
+                          shouldTake);
+      return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
+    }
+
+    // If we do not have a consumed base and need to perform a load, perform a
+    // formal access load borrow.
+    base = SGF.B.createFormalAccessLoadBorrow(loc, base);
     return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
   }
 
   // Handle inout bases specially here.
   if (selfParam.isIndirectInOut()) {
-    // It sometimes happens that we get r-value bases here,
-    // e.g. when calling a mutating setter on a materialized
-    // temporary.  Just don't claim the value.
+    // It sometimes happens that we get r-value bases here, e.g. when calling a
+    // mutating setter on a materialized temporary.  Just don't claim the value.
     if (!base.isLValue()) {
       base = ManagedValue::forLValue(base.getValue());
     }
 
-    // FIXME: this assumes that there's never meaningful
-    // reabstraction of self arguments.
+    // FIXME: this assumes that there's never meaningful reabstraction of self
+    // arguments.
     return ArgumentSource(
         loc, LValue::forAddress(base, AbstractionPattern(baseFormalType),
                                 baseFormalType));

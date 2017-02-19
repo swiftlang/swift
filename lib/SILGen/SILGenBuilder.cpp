@@ -239,3 +239,29 @@ ManagedValue SILGenBuilder::createTupleExtract(SILLocation loc,
   SILType type = value.getType().getTupleElementType(index);
   return createTupleExtract(loc, value, index, type);
 }
+
+ManagedValue SILGenBuilder::createLoadBorrow(SILLocation loc,
+                                             ManagedValue base) {
+  if (getFunction().getTypeLowering(base.getType()).isTrivial()) {
+    auto *i = SILBuilder::createLoad(loc, base.getValue(),
+                                     LoadOwnershipQualifier::Trivial);
+    return ManagedValue::forUnmanaged(i);
+  }
+
+  auto *i = SILBuilder::createLoadBorrow(loc, base.getValue());
+  return gen.emitManagedBorrowedRValueWithCleanup(base.getValue(), i);
+}
+
+ManagedValue SILGenBuilder::createFormalAccessLoadBorrow(SILLocation loc,
+                                                         ManagedValue base) {
+  if (getFunction().getTypeLowering(base.getType()).isTrivial()) {
+    auto *i = SILBuilder::createLoad(loc, base.getValue(),
+                                     LoadOwnershipQualifier::Trivial);
+    return ManagedValue::forUnmanaged(i);
+  }
+
+  SILValue baseValue = base.getValue();
+  auto *i = SILBuilder::createLoadBorrow(loc, baseValue);
+  return gen.emitFormalEvaluationManagedBorrowedRValueWithCleanup(loc,
+                                                                  baseValue, i);
+}
