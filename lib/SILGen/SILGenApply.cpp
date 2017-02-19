@@ -648,36 +648,76 @@ static ManagedValue maybeEnterCleanupForTransformed(SILGenFunction &gen,
   }
 }
 
-static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
-                                     SILDeclRef constant,
-                                     ArgumentSource &selfValue,
-                                     CanFunctionType substFnType,
-                                     SubstitutionList &substitutions) {
-  auto fd = cast<AbstractFunctionDecl>(constant.getDecl());
-  auto protocol = cast<ProtocolDecl>(fd->getDeclContext());
+namespace {
 
-  // Method calls through ObjC protocols require ObjC dispatch.
-  constant = constant.asForeign(protocol->isObjC());
+class ArchetypeCalleeBuilder {
+  SILGenFunction &gen;
+  SILLocation loc;
+  ArgumentSource &selfValue;
+  CanFunctionType substFnType;
+  SILParameterInfo selfParam;
+  AbstractFunctionDecl *fd;
+  ProtocolDecl *protocol;
+  SILDeclRef constant;
 
-  CanType selfTy = selfValue.getSubstRValueType();
+public:
+  ArchetypeCalleeBuilder(SILGenFunction &gen, SILLocation loc,
+                         SILDeclRef inputConstant, ArgumentSource &selfValue,
+                         CanFunctionType substFnType)
+      : gen(gen), loc(loc), selfValue(selfValue), substFnType(substFnType),
+        selfParam(), fd(cast<AbstractFunctionDecl>(inputConstant.getDecl())),
+        protocol(cast<ProtocolDecl>(fd->getDeclContext())),
+        constant(inputConstant.asForeign(protocol->isObjC())) {}
 
-  SILParameterInfo _selfParam;
-  auto getSelfParameter = [&]() -> SILParameterInfo {
-    if (_selfParam != SILParameterInfo()) return _selfParam;
-    auto constantFnType = gen.SGM.Types.getConstantFunctionType(constant);
-    return (_selfParam = constantFnType->getSelfParameter());
-  };
-  auto getSGFContextForSelf = [&]() -> SGFContext {
-    return (getSelfParameter().isConsumed()
-              ? SGFContext() : SGFContext::AllowGuaranteedPlusZero);
-  };
+  Callee build() {
+    // Link back to something to create a data dependency if we have
+    // an opened type.
+    SILValue openingSite;
+    auto archetype =
+        cast<ArchetypeType>(CanType(getSelfType()->getRValueInstanceType()));
+    if (archetype->getOpenedExistentialType()) {
+      openingSite = gen.getArchetypeOpeningSite(archetype);
+    }
 
-  auto setSelfValueToAddress = [&](SILLocation loc, ManagedValue address) {
+    // Then if we need to materialize self into memory, do so.
+    if (shouldMaterializeSelf()) {
+      SILLocation selfLoc = selfValue.getLocation();
+      ManagedValue address = evaluateAddressIntoMemory(selfLoc);
+      setSelfValueToAddress(selfLoc, address);
+    }
+
+    // The protocol self is implicitly decurried.
+    substFnType = cast<FunctionType>(substFnType.getResult());
+
+    return Callee::forArchetype(gen, openingSite, getSelfType(), constant,
+                                substFnType, loc);
+  }
+
+private:
+  CanType getSelfType() const { return selfValue.getSubstRValueType(); }
+
+  SILParameterInfo getSelfParameterInfo() const {
+    if (selfParam == SILParameterInfo()) {
+      auto &Self = const_cast<ArchetypeCalleeBuilder &>(*this);
+      auto constantFnType = gen.SGM.Types.getConstantFunctionType(constant);
+      Self.selfParam = constantFnType->getSelfParameter();
+    }
+
+    return selfParam;
+  }
+
+  SGFContext getSGFContextForSelf() {
+    if (getSelfParameterInfo().isConsumed())
+      return SGFContext();
+    return SGFContext::AllowGuaranteedPlusZero;
+  }
+
+  void setSelfValueToAddress(SILLocation loc, ManagedValue address) {
     assert(address.getType().isAddress());
     assert(address.getType().is<ArchetypeType>());
     auto formalTy = address.getType().getSwiftRValueType();
 
-    if (getSelfParameter().isIndirectMutating()) {
+    if (getSelfParameterInfo().isIndirectMutating()) {
       // Be sure not to consume the cleanup for an inout argument.
       auto selfLV = ManagedValue::forLValue(address.getValue());
       selfValue = ArgumentSource(loc,
@@ -686,68 +726,57 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
     } else {
       selfValue = ArgumentSource(loc, RValue(gen, loc, formalTy, address));
     }
-  };
+  }
 
-  // If we're calling a member of a non-class-constrained protocol,
-  // but our archetype refines it to be class-bound, then
-  // we have to materialize the value in order to pass it indirectly.
-  auto materializeSelfIfNecessary = [&] {
+  bool shouldMaterializeSelf() const {
     // Only an instance method of a non-class protocol is ever passed
     // indirectly.
     if (!fd->isInstanceMember() ||
         protocol->requiresClass() ||
         selfValue.hasLValueType() ||
         !cast<ArchetypeType>(selfValue.getSubstRValueType())->requiresClass())
-      return;
+      return false;
 
-    assert(gen.silConv.useLoweredAddresses()
-           == gen.silConv.isSILIndirect(getSelfParameter()));
+    assert(gen.silConv.useLoweredAddresses() ==
+           gen.silConv.isSILIndirect(getSelfParameterInfo()));
     if (!gen.silConv.useLoweredAddresses())
-      return;
-
-    SILLocation selfLoc = selfValue.getLocation();
-
-    // Evaluate the reference into memory.
-    ManagedValue address = [&]() -> ManagedValue {
-      // Do so at +0 if we can.
-      auto ref = std::move(selfValue)
-                   .getAsSingleValue(gen, getSGFContextForSelf());
-
-      // If we're already in memory for some reason, great.
-      if (ref.getType().isAddress())
-        return ref;
-
-      // Store the reference into a temporary.
-      auto temp =
-        gen.emitTemporaryAllocation(selfLoc, ref.getValue()->getType());
-      gen.B.emitStoreValueOperation(selfLoc, ref.getValue(), temp,
-                                    StoreOwnershipQualifier::Init);
-
-      // If we had a cleanup, create a cleanup at the new address.
-      return maybeEnterCleanupForTransformed(gen, ref, temp);
-    }();
-
-    setSelfValueToAddress(selfLoc, address);
-  };
-
-  // Construct an archetype call.
-
-  // Link back to something to create a data dependency if we have
-  // an opened type.
-  SILValue openingSite;
-  auto archetype =
-    cast<ArchetypeType>(CanType(selfTy->getRValueInstanceType()));
-  if (archetype->getOpenedExistentialType()) {
-    openingSite = gen.getArchetypeOpeningSite(archetype);
+      return false;
+    return true;
   }
 
-  materializeSelfIfNecessary();
+  // If we're calling a member of a non-class-constrained protocol,
+  // but our archetype refines it to be class-bound, then
+  // we have to materialize the value in order to pass it indirectly.
+  ManagedValue evaluateAddressIntoMemory(SILLocation selfLoc) {
+    // Do so at +0 if we can.
+    ManagedValue ref =
+        std::move(selfValue).getAsSingleValue(gen, getSGFContextForSelf());
 
-  // The protocol self is implicitly decurried.
-  substFnType = cast<FunctionType>(substFnType.getResult());
+    // If we're already in memory for some reason, great.
+    if (ref.getType().isAddress())
+      return ref;
 
-  return Callee::forArchetype(gen, openingSite, selfTy,
-                              constant, substFnType, loc);
+    // Store the reference into a temporary.
+    SILValue temp =
+        gen.emitTemporaryAllocation(selfLoc, ref.getValue()->getType());
+    gen.B.emitStoreValueOperation(selfLoc, ref.getValue(), temp,
+                                  StoreOwnershipQualifier::Init);
+
+    // If we had a cleanup, create a cleanup at the new address.
+    return maybeEnterCleanupForTransformed(gen, ref, temp);
+  }
+};
+
+} // end anonymous namespace
+
+static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
+                                     SILDeclRef constant,
+                                     ArgumentSource &selfValue,
+                                     CanFunctionType substFnType,
+                                     SubstitutionList &substitutions) {
+  // Construct an archetype call.
+  ArchetypeCalleeBuilder Builder{gen, loc, constant, selfValue, substFnType};
+  return Builder.build();
 }
 
 /// For ObjC init methods, we generate a shared-linkage Swift allocating entry
