@@ -23,22 +23,33 @@ using namespace swift;
 using namespace Lowering;
 
 /// Emit a copy of this value with independent ownership.
-ManagedValue ManagedValue::copy(SILGenFunction &gen, SILLocation l) {
-  if (!cleanup.isValid()) {
-    assert(gen.getTypeLowering(getType()).isTrivial());
-    return *this;
-  }
-  
+ManagedValue ManagedValue::copy(SILGenFunction &gen, SILLocation loc) {
   auto &lowering = gen.getTypeLowering(getType());
-  assert(!lowering.isTrivial() && "trivial value has cleanup?");
-  
-  if (!lowering.isAddressOnly()) {
-    return gen.emitManagedRetain(l, getValue(), lowering);
+  if (lowering.isTrivial())
+    return *this;
+
+  if (getType().isObject()) {
+    return gen.B.createCopyValue(loc, *this, lowering);
   }
-  
-  SILValue buf = gen.emitTemporaryAllocation(l, getType());
-  gen.B.createCopyAddr(l, getValue(), buf, IsNotTake, IsInitialization);
+
+  SILValue buf = gen.emitTemporaryAllocation(loc, getType());
+  gen.B.createCopyAddr(loc, getValue(), buf, IsNotTake, IsInitialization);
   return gen.emitManagedRValueWithCleanup(buf, lowering);
+}
+
+/// Emit a copy of this value with independent ownership.
+ManagedValue ManagedValue::formalAccessCopy(SILGenFunction &gen,
+                                            SILLocation loc) {
+  auto &lowering = gen.getTypeLowering(getType());
+  if (lowering.isTrivial())
+    return *this;
+
+  if (getType().isObject()) {
+    return gen.B.createFormalAccessCopyValue(loc, *this);
+  }
+
+  SILValue buf = gen.emitTemporaryAllocation(loc, getType());
+  return gen.B.createFormalAccessCopyAddr(loc, *this, buf);
 }
 
 /// Store a copy of this value with independent ownership into the given
@@ -58,19 +69,13 @@ void ManagedValue::copyInto(SILGenFunction &gen, SILValue dest,
 /// This is the same operation as 'copy', but works on +0 values that don't
 /// have cleanups.  It returns a +1 value with one.
 ManagedValue ManagedValue::copyUnmanaged(SILGenFunction &gen, SILLocation loc) {
-  auto &lowering = gen.getTypeLowering(getType());
-  
-  if (lowering.isTrivial())
-    return *this;
-  
-  SILValue result;
-  if (!lowering.isAddress()) {
-    result = lowering.emitCopyValue(gen.B, loc, getValue());
-  } else {
-    result = gen.emitTemporaryAllocation(loc, getType());
-    gen.B.createCopyAddr(loc, getValue(), result, IsNotTake,IsInitialization);
+  if (getType().isObject()) {
+    return gen.B.createCopyValue(loc, *this);
   }
-  return gen.emitManagedRValueWithCleanup(result, lowering);
+
+  SILValue result = gen.emitTemporaryAllocation(loc, getType());
+  gen.B.createCopyAddr(loc, getValue(), result, IsNotTake, IsInitialization);
+  return gen.emitManagedRValueWithCleanup(result);
 }
 
 /// Disable the cleanup for this value.
@@ -114,8 +119,8 @@ ManagedValue ManagedValue::borrow(SILGenFunction &gen, SILLocation loc) const {
   return gen.emitManagedBeginBorrow(loc, getValue());
 }
 
-ManagedValue ManagedValue::formalEvaluationBorrow(SILGenFunction &gen,
-                                                  SILLocation loc) const {
+ManagedValue ManagedValue::formalAccessBorrow(SILGenFunction &gen,
+                                              SILLocation loc) const {
   assert(getValue() && "cannot borrow an invalid or in-context value");
   if (isLValue())
     return *this;
