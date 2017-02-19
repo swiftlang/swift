@@ -32,7 +32,13 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
+#if !defined(_WIN32)
 #include <sys/param.h>
+#else
+#define WIN32_MEAN_AND_LEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 using namespace SourceKit;
 using namespace swift;
@@ -756,10 +762,26 @@ bool SwiftLangSupport::printAccessorUSR(const AbstractStorageDecl *D,
 
 std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
   std::string InputPath = FilePath;
+#if !defined(_WIN32)
   char full_path[MAXPATHLEN];
   if (const char *path = realpath(InputPath.c_str(), full_path))
     return path;
+
   return InputPath;
+#else
+  char full_path[MAX_PATH];
+
+  HANDLE fileHandle = CreateFileA(
+      InputPath.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING,
+      FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+
+  if (fileHandle == INVALID_HANDLE_VALUE)
+    return InputPath;
+
+  DWORD success = GetFinalPathNameByHandleA(
+      fileHandle, full_path, sizeof(full_path), FILE_NAME_NORMALIZED);
+  return (success ? full_path : InputPath);
+#endif
 }
 
 CloseClangModuleFiles::~CloseClangModuleFiles() {
