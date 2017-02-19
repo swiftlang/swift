@@ -8,16 +8,16 @@
 // REQUIRES: objc_interop
 // REQUIRES: CPU=x86_64
 
-12TypeLowering11BasicStructV
+V12TypeLowering11BasicStruct
 // CHECK: (struct TypeLowering.BasicStruct)
 // CHECK: Invalid lowering
 
-12TypeLowering11BasicStructVSg
+GSqV12TypeLowering11BasicStruct_
 // CHECK: (bound_generic_enum Swift.Optional
 // CHECK:   (struct TypeLowering.BasicStruct))
 // CHECK: Invalid lowering
 
-12TypeLowering3BarVyAA11BasicStructVG
+GV12TypeLowering3BarV12TypeLowering11BasicStruct_
 // CHECK: (bound_generic_struct TypeLowering.Bar
 // CHECK:   (struct TypeLowering.BasicStruct))
 // CHECK: Invalid lowering

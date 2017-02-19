@@ -51,7 +51,6 @@
 #include "StructMetadataLayout.h"
 #include "StructLayout.h"
 #include "EnumMetadataLayout.h"
-#include "IRGenMangler.h"
 
 #include "GenMeta.h"
 
@@ -123,9 +122,10 @@ static Address createPointerSizedGEP(IRGenFunction &IGF,
 // It should be removed when fixed. rdar://problem/22674524
 static llvm::Constant *getMangledTypeName(IRGenModule &IGM, CanType type,
                                       bool willBeRelativelyAddressed = false) {
-  IRGenMangler Mangler;
-  std::string Name = Mangler.mangleTypeForMetadata(type);
-  return IGM.getAddrOfGlobalString(Name, willBeRelativelyAddressed);
+  auto name = LinkEntity::forTypeMangling(type);
+  llvm::SmallString<32> mangling;
+  name.mangle(mangling);
+  return IGM.getAddrOfGlobalString(mangling, willBeRelativelyAddressed);
 }
 
 llvm::Value *irgen::emitObjCMetadataRefForMetadata(IRGenFunction &IGF,

@@ -3,7 +3,7 @@
 // RUN: %target-build-swift %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -o %t/libTypesToReflect.%target-dylib-extension
 // RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect.%target-dylib-extension -binary-filename %platform-module-dir/libswiftCore.%target-dylib-extension -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 
-12TypeLowering11BasicStructV
+V12TypeLowering11BasicStruct
 // CHECK-64:      (struct TypeLowering.BasicStruct)
 
 // CHECK-64-NEXT: (struct size=16 alignment=4 stride=16 num_extra_inhabitants=0
@@ -71,7 +71,7 @@
 // CHECK-32-NEXT:           (field name=_value offset=0
 // CHECK-32-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0)))))))
 
-12TypeLowering05AssocA6StructV
+V12TypeLowering15AssocTypeStruct
 // CHECK-64:      (struct TypeLowering.AssocTypeStruct)
 // CHECK-64-NEXT: (struct size=36 alignment=2 stride=36 num_extra_inhabitants=0
 // CHECK-64-NEXT:   (field name=t1 offset=0
@@ -358,7 +358,7 @@
 // CHECK-32-NEXT:                   (field name=_value offset=0
 // CHECK-32-NEXT:                     (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0)))))))))))
 
-12TypeLowering3BoxVys5Int16VG_s5Int32Vt
+TGV12TypeLowering3BoxVs5Int16_Vs5Int32_
 // CHECK-64-NEXT: (tuple
 // CHECK-64-NEXT:   (bound_generic_struct TypeLowering.Box
 // CHECK-64-NEXT:     (struct Swift.Int16))
@@ -394,7 +394,7 @@
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0)))))
 
 
-12TypeLowering15ReferenceStructV
+V12TypeLowering15ReferenceStruct
 // CHECK-64:      (struct TypeLowering.ReferenceStruct)
 // CHECK-64-NEXT: (struct size=72 alignment=8 stride=72 num_extra_inhabitants=[[PTR_XI:2048|4096|2147483647]]
 // CHECK-64-NEXT:   (field name=strongRef offset=0
@@ -453,7 +453,7 @@
 // CHECK-32-NEXT:   (field name=unmanagedRef offset=32
 // CHECK-32-NEXT:     (reference kind=unmanaged refcounting=native)))
 
-12TypeLowering14FunctionStructV
+V12TypeLowering14FunctionStruct
 // CHECK-64:      (struct TypeLowering.FunctionStruct)
 // CHECK-64-NEXT: (struct size=64 alignment=8 stride=64 num_extra_inhabitants=[[PTR_XI_2:4096|2147483647]]
 // CHECK-64-NEXT:   (field name=thickFunction offset=0
@@ -512,7 +512,7 @@
 // CHECK-32-NEXT:       (field name=some offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096)))))
 
-12TypeLowering17ExistentialStructV
+V12TypeLowering17ExistentialStruct
 // CHECK-64:      (struct TypeLowering.ExistentialStruct)
 // CHECK-64-NEXT: (struct size=448 alignment=8 stride=448 num_extra_inhabitants=0
 // CHECK-64-NEXT:   (field name=any offset=0
@@ -763,7 +763,7 @@
 // CHECK-32-NEXT:       (field name=wtable offset=4
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1)))))
 
-12TypeLowering14MetatypeStructV
+V12TypeLowering14MetatypeStruct
 // CHECK-64:      (struct TypeLowering.MetatypeStruct)
 // CHECK-64-NEXT: (struct size=152 alignment=8 stride=152 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:   (field name=any offset=0
@@ -910,7 +910,7 @@
 // CHECK-32-NEXT:       (field name=u offset=4
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096)))))
 
-12TypeLowering10EnumStructV
+V12TypeLowering10EnumStruct
 // CHECK-64: (struct TypeLowering.EnumStruct)
 // CHECK-64-NEXT: (struct size=81 alignment=8 stride=88 num_extra_inhabitants=0
 // CHECK-64-NEXT:   (field name=empty offset=0

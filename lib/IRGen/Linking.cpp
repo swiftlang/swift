@@ -342,7 +342,7 @@ std::string LinkEntity::mangleNew() const {
       //   global ::= 't' type
       // Abstract type manglings just follow <type>.
     case Kind::TypeMangling:
-      return mangler.mangleTypeForMetadata(getType());
+      return mangleOld();
 
       //   global ::= 'Ma' type               // type metadata access function
     case Kind::TypeMetadataAccessFunction:
