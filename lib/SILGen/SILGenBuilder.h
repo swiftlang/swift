@@ -20,6 +20,7 @@ namespace swift {
 namespace Lowering {
 
 class SILGenFunction;
+class SGFContext;
 
 /// A subclass of SILBuilder that tracks used protocol conformances and will
 /// eventually only traffic in ownership endowed APIs.
@@ -126,7 +127,8 @@ public:
   /// of the current Formal Evaluation Scope.
   ManagedValue createFormalAccessCopyAddr(SILLocation loc,
                                           ManagedValue originalAddr,
-                                          SILValue newAddr);
+                                          SILValue newAddr, IsTake_t isTake,
+                                          IsInitialization_t isInit);
 
   /// Emit a +1 copy of \p originalValue into newAddr that lives until the end
   /// Formal Evaluation Scope.
@@ -161,6 +163,18 @@ public:
   using SILBuilder::createLoadBorrow;
   ManagedValue createLoadBorrow(SILLocation loc, ManagedValue base);
   ManagedValue createFormalAccessLoadBorrow(SILLocation loc, ManagedValue base);
+
+  /// Prepares a buffer to receive the result of an expression, either using the
+  /// 'emit into' initialization buffer if available, or allocating a temporary
+  /// allocation if not. After the buffer has been prepared, the rvalueEmitter
+  /// closure will be called with the buffer ready for initialization. After the
+  /// emitter has been called, the buffer will complete its initialization.
+  ///
+  /// \return an empty value if the buffer was taken from the context.
+  ManagedValue bufferForExpr(SILLocation loc, SILType ty,
+                             const TypeLowering &lowering,
+                             SGFContext context,
+                             std::function<void(SILValue)> rvalueEmitter);
 };
 
 } // namespace Lowering

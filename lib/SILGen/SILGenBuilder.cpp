@@ -308,8 +308,38 @@ SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
 }
 
 ManagedValue SILGenBuilder::createFormalAccessCopyAddr(
-    SILLocation loc, ManagedValue originalAddr, SILValue newAddr) {
-  SILBuilder::createCopyAddr(loc, originalAddr.getValue(), newAddr, IsNotTake,
-                             IsInitialization);
+    SILLocation loc, ManagedValue originalAddr, SILValue newAddr,
+    IsTake_t isTake, IsInitialization_t isInit) {
+  SILBuilder::createCopyAddr(loc, originalAddr.getValue(), newAddr, isTake,
+                             isInit);
   return gen.emitFormalAccessManagedBufferWithCleanup(loc, newAddr);
+}
+
+ManagedValue SILGenBuilder::bufferForExpr(
+    SILLocation loc, SILType ty, const TypeLowering &lowering,
+    SGFContext context, std::function<void (SILValue)> rvalueEmitter) {
+  // If we have a single-buffer "emit into" initialization, use that for the
+  // result.
+  SILValue address = context.getAddressForInPlaceInitialization();
+
+  // If we couldn't emit into the Initialization, emit into a temporary
+  // allocation.
+  if (!address) {
+    address = gen.emitTemporaryAllocation(loc, ty.getObjectType());
+  }
+
+  rvalueEmitter(address);
+
+  // If we have a single-buffer "emit into" initialization, use that for the
+  // result.
+  if (context.getAddressForInPlaceInitialization()) {
+    context.getEmitInto()->finishInitialization(gen);
+    return ManagedValue::forInContext();
+  }
+
+  // Add a cleanup for the temporary we allocated.
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(address);
+
+  return gen.emitManagedBufferWithCleanup(address);
 }

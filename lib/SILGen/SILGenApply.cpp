@@ -3927,10 +3927,10 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
     }
 
     // Emit the enum directly into the context if possible
-    SILValue resultSlot = getBufferForExprResult(loc, enumTy, C);
-    B.createInjectEnumAddr(loc, resultSlot, element);
-    return manageBufferForExprResult(resultSlot,
-                                     getTypeLowering(enumTy), C);
+    return B.bufferForExpr(loc, enumTy, getTypeLowering(enumTy), C,
+                           [&](SILValue newAddr) {
+                             B.createInjectEnumAddr(loc, newAddr, element);
+                           });
   }
 
   ManagedValue payloadMV;
@@ -3983,37 +3983,36 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   }
 
   // Address-only with payload
-  SILValue resultSlot = getBufferForExprResult(loc, enumTy, C);
+  return B.bufferForExpr(
+      loc, enumTy, getTypeLowering(enumTy), C,
+      [&](SILValue bufferAddr) {
+        SILValue resultData =
+          B.createInitEnumDataAddr(loc, bufferAddr, element,
+                                   loweredPayloadType.getAddressType());
 
-  SILValue resultData =
-      B.createInitEnumDataAddr(loc, resultSlot, element,
-                               loweredPayloadType.getAddressType());
+        if (payloadMV) {
+          // If the payload was indirect, we already evaluated it and
+          // have a single value. Store it into the result.
+          B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
+                                    StoreOwnershipQualifier::Init);
+        } else if (payloadTL.isLoadable()) {
+          // The payload of this specific enum case might be loadable
+          // even if the overall enum is address-only.
+          payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType);
+          B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
+                                    StoreOwnershipQualifier::Init);
+        } else {
+          // The payload is address-only. Evaluate it directly into
+          // the enum.
+          
+          TemporaryInitialization dest(resultData, CleanupHandle::invalid());
+          std::move(payload).forwardInto(*this, origFormalType,
+                                         &dest, payloadTL);
+        }
 
-  if (payloadMV) {
-    // If the payload was indirect, we already evaluated it and
-    // have a single value. Store it into the result.
-    B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
-                              StoreOwnershipQualifier::Init);
-  } else if (payloadTL.isLoadable()) {
-    // The payload of this specific enum case might be loadable
-    // even if the overall enum is address-only.
-    payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType);
-    B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
-                              StoreOwnershipQualifier::Init);
-  } else {
-    // The payload is address-only. Evaluate it directly into
-    // the enum.
-
-    TemporaryInitialization dest(resultData, CleanupHandle::invalid());
-    std::move(payload).forwardInto(*this, origFormalType,
-                                   &dest, payloadTL);
-  }
-
-  // The payload is initialized, now apply the tag.
-  B.createInjectEnumAddr(loc, resultSlot, element);
-
-  return manageBufferForExprResult(resultSlot,
-                                   getTypeLowering(enumTy), C);
+        // The payload is initialized, now apply the tag.
+        B.createInjectEnumAddr(loc, bufferAddr, element);
+  });
 }
 
 namespace {

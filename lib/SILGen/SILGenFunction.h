@@ -104,7 +104,16 @@ public:
   Initialization *getEmitInto() const {
     return state.getPointer();
   }
-  
+
+  /// If we have an emit into, return the address of the emit into. Otherwise,
+  /// return an empty SILValue.
+  SILValue getAddressForInPlaceInitialization() const {
+    if (auto *init = getEmitInto()) {
+      return init->getAddressForInPlaceInitialization();
+    }
+    return SILValue();
+  }
+
   /// Return true if a ManagedValue producer is allowed to return at
   /// +0, given that it cannot guarantee that the value will be valid
   /// until the end of the current evaluation.
