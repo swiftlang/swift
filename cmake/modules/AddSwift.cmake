@@ -205,19 +205,26 @@ function(_add_variant_c_compile_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
-    list(APPEND result -Xclang;--dependent-lib=oldnames)
-    # TODO(compnerd) handle /MT, /MTd, /MD, /MDd
-    if("${CMAKE_BUILD_TYPE}" STREQUAL "RELEASE")
-      list(APPEND result "-D_MD")
-      list(APPEND result -Xclang;--dependent-lib=msvcrt)
-    else()
-      list(APPEND result "-D_MDd")
-      list(APPEND result -Xclang;--dependent-lib=msvcrtd)
+    # MSVC doesn't support -Xclang. We don't need to manually specify
+    # -D_MD or D_MDd either, as CMake does this automatically.
+    if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
+      list(APPEND result -Xclang;--dependent-lib=oldnames)
+      # TODO(compnerd) handle /MT, /MTd, /MD, /MDd
+      if("${CMAKE_BUILD_TYPE}" STREQUAL "RELEASE")
+        list(APPEND result "-D_MD")
+        list(APPEND result -Xclang;--dependent-lib=msvcrt)
+      else()
+        list(APPEND result "-D_MDd")
+        list(APPEND result -Xclang;--dependent-lib=msvcrtd)
+      endif()
     endif()
-    list(APPEND result -fno-pic)
-  endif()
 
-  if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
+    # MSVC/clang-cl don't support -fno-pic or -fms-compatability-version.
+    if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+      list(APPEND result -fno-pic)
+      list(APPEND result "-fms-compatibility-version=1900")
+    endif()
+
     list(APPEND result "-DLLVM_ON_WIN32")
     list(APPEND result "-D_CRT_SECURE_NO_WARNINGS")
     list(APPEND result "-D_CRT_NONSTDC_NO_WARNINGS")
@@ -225,7 +232,6 @@ function(_add_variant_c_compile_flags)
     list(APPEND result "-D_CRT_USE_WINAPI_FAMILY_DESKTOP_APP")
     # TODO(compnerd) handle /MT
     list(APPEND result "-D_DLL")
-    list(APPEND result "-fms-compatibility-version=1900")
   endif()
 
   if(CFLAGS_ENABLE_ASSERTIONS)
