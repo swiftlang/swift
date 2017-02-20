@@ -991,11 +991,14 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
                                    argTy.getSwiftType());
     SILValue argValue;
 
-    if (nativeInputs[i].isConsumed())
+    if (nativeInputs[i].isConsumed()) {
       argValue = native.forward(gen);
-    else
+    } else if (nativeInputs[i].isGuaranteed()) {
+      argValue = native.borrow(gen, loc).getUnmanagedValue();
+    } else {
       argValue = native.getValue();
-    
+    }
+
     args.push_back(argValue);
   }
 

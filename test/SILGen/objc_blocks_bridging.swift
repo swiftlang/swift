@@ -13,8 +13,10 @@ import Foundation
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[THUNK:%.*]] = function_ref @_T0SiSiIyByd_SiSiIxyd_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[ARG1_COPY]])
+  // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @_T020objc_blocks_bridging3FooC3foo{{[_0-9a-zA-Z]*}}F : $@convention(method) (@owned @callee_owned (Int) -> Int, Int, @guaranteed Foo) -> Int
-  // CHECK:         apply [[NATIVE]]([[BRIDGED]], {{.*}}, [[SELF_COPY]])
+  // CHECK:         apply [[NATIVE]]([[BRIDGED]], {{.*}}, [[BORROWED_SELF_COPY]])
+  // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK: } // end sil function '_T020objc_blocks_bridging3FooC3fooSiSiSic_Si1xtFTo'
   dynamic func foo(_ f: (Int) -> Int, x: Int) -> Int {
     return f(x)
@@ -27,8 +29,10 @@ import Foundation
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[THUNK:%.*]] = function_ref @_T0So8NSStringCABIyBya_SSSSIxxo_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[BLOCK_COPY]])
+  // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @_T020objc_blocks_bridging3FooC3bar{{[_0-9a-zA-Z]*}}F : $@convention(method) (@owned @callee_owned (@owned String) -> @owned String, @owned String, @guaranteed Foo) -> @owned String
-  // CHECK:         apply [[NATIVE]]([[BRIDGED]], {{%.*}}, [[SELF_COPY]])
+  // CHECK:         apply [[NATIVE]]([[BRIDGED]], {{%.*}}, [[BORROWED_SELF_COPY]])
+  // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK: } // end sil function '_T020objc_blocks_bridging3FooC3barSSSSSSc_SS1xtFTo'
   dynamic func bar(_ f: (String) -> String, x: String) -> String {
     return f(x)
@@ -41,8 +45,10 @@ import Foundation
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[THUNK:%.*]] = function_ref @_T0So8NSStringCSgABSgIyBya_SSSgSSSgIxxo_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[BLOCK_COPY]])
+  // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @_T020objc_blocks_bridging3FooC3bas{{[_0-9a-zA-Z]*}}F : $@convention(method) (@owned @callee_owned (@owned Optional<String>) -> @owned Optional<String>, @owned Optional<String>, @guaranteed Foo) -> @owned Optional<String>
-  // CHECK:         apply [[NATIVE]]([[BRIDGED]], {{%.*}}, [[SELF_COPY]])
+  // CHECK:         apply [[NATIVE]]([[BRIDGED]], {{%.*}}, [[BORROWED_SELF_COPY]])
+  // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   dynamic func bas(_ f: (String?) -> String?, x: String?) -> String? {
     return f(x)
   }
@@ -50,8 +56,10 @@ import Foundation
   // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC16cFunctionPointer{{[_0-9a-zA-Z]*}}FTo
   // CHECK:       bb0([[F:%.*]] : $@convention(c) (Int) -> Int, [[X:%.*]] : $Int, [[SELF:%.*]] : $Foo):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
+  // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @_T020objc_blocks_bridging3FooC16cFunctionPointer{{[_0-9a-zA-Z]*}}F
-  // CHECK:         apply [[NATIVE]]([[F]], [[X]], [[SELF_COPY]])
+  // CHECK:         apply [[NATIVE]]([[F]], [[X]], [[BORROWED_SELF_COPY]])
+  // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK:         destroy_value [[SELF_COPY]]
   dynamic func cFunctionPointer(_ fp: @convention(c) (Int) -> Int, x: Int) -> Int {
     _ = fp(x)
