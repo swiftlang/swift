@@ -525,6 +525,14 @@ public:
     return ResolvedType(t);
   }
 
+  // FIXME: this probably shouldn't exist, the potential archetype modelling of
+  // generic typealiases is fundamentally broken (aka they're not modelled at
+  // all), but some things with them mostly work, so we just maintain that,
+  // despite this causing crashes and weird behaviour.
+  static ResolvedType forConcreteTypeFromGenericTypeAlias(Type t) {
+    return ResolvedType(t);
+  }
+
   static ResolvedType forPotentialArchetype(PotentialArchetype *pa) {
     assert(!(pa->getParent() && pa->getTypeAliasDecl()) &&
            "typealias is only considered resolved when new");
@@ -1347,12 +1355,17 @@ auto GenericSignatureBuilder::resolveArchetype(Type type) -> PotentialArchetype 
   return nullptr;
 }
 
-auto GenericSignatureBuilder::resolve(UnresolvedType paOrT) -> ResolvedType {
+auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
+                                      bool hackTypeFromGenericTypeAlias)
+    -> ResolvedType {
   auto pa = paOrT.dyn_cast<PotentialArchetype *>();
   if (auto type = paOrT.dyn_cast<Type>()) {
     pa = resolveArchetype(type);
-    if (!pa)
+    if (!pa) {
+      if (hackTypeFromGenericTypeAlias)
+        return ResolvedType::forConcreteTypeFromGenericTypeAlias(type);
       return ResolvedType::forConcreteType(type);
+    }
   }
 
   pa = pa->getRepresentative();
@@ -1370,12 +1383,17 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT) -> ResolvedType {
   // The right-hand side of the typealias could itself be an archetype
   // (e.g. protocol P { associatedtype A; typealias B = A }), so we need to
   // resolve that.  However, the archetype should always be resolved far enough
-  // upon creation to not be another type alias (verified by the assertion
-  // below), and hence this function doesn't need to be recursive..
+  // upon creation to not be another type alias (verified by the ResolvedType
+  // constructors below), and hence this function doesn't need to be recursive.
   auto concrete = pa->getConcreteType();
   auto rhsPA = resolveArchetype(concrete);
-  if (!rhsPA)
+  if (!rhsPA) {
+    // FIXME: same as hackTypeFromGenericTypeAlias
+    if (pa->getTypeAliasDecl()->getGenericParams())
+      return ResolvedType::forConcreteTypeFromGenericTypeAlias(concrete);
+
     return ResolvedType::forConcreteType(concrete);
+  }
 
   return ResolvedType::forPotentialArchetype(rhsPA);
 }
