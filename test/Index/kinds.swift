@@ -123,24 +123,24 @@ protocol AProtocol {
 
 // Extension
 extension AnEnumeration { func extFn() {} }
-// CHECK: [[@LINE-1]]:11 | extension/ext-enum/Swift | AnEnumeration | s:e:s:14swift_ide_test13AnEnumerationO5extFnyyF | Def | rel: 0
+// CHECK: [[@LINE-1]]:11 | extension/ext-enum/Swift | AnEnumeration | [[EXT_AnEnumeration_USR:s:e:s:14swift_ide_test13AnEnumerationO5extFnyyF]] | Def | rel: 0
 // CHECK: [[@LINE-2]]:11 | enum/Swift | AnEnumeration | s:14swift_ide_test13AnEnumerationO | Ref,RelExt | rel: 1
-// CHECK-NEXT: RelExt | AnEnumeration | s:14swift_ide_test13AnEnumerationO
+// CHECK-NEXT: RelExt | AnEnumeration | [[EXT_AnEnumeration_USR]]
 
 extension AStruct { func extFn() {} }
-// CHECK: [[@LINE-1]]:11 | extension/ext-struct/Swift | AStruct | s:e:s:14swift_ide_test7AStructV5extFnyyF | Def | rel: 0
+// CHECK: [[@LINE-1]]:11 | extension/ext-struct/Swift | AStruct | [[EXT_AStruct_USR:s:e:s:14swift_ide_test7AStructV5extFnyyF]] | Def | rel: 0
 // CHECK: [[@LINE-2]]:11 | struct/Swift | AStruct | s:14swift_ide_test7AStructV | Ref,RelExt | rel: 1
-// CHECK-NEXT: RelExt | AStruct | s:14swift_ide_test7AStructV
+// CHECK-NEXT: RelExt | AStruct | [[EXT_AStruct_USR]]
 
 extension AClass { func extFn() {} }
-// CHECK: [[@LINE-1]]:11 | extension/ext-class/Swift | AClass | s:e:s:14swift_ide_test6AClassC5extFnyyF | Def | rel: 0
+// CHECK: [[@LINE-1]]:11 | extension/ext-class/Swift | AClass | [[EXT_AClass_USR:s:e:s:14swift_ide_test6AClassC5extFnyyF]] | Def | rel: 0
 // CHECK: [[@LINE-2]]:11 | class/Swift | AClass | s:14swift_ide_test6AClassC | Ref,RelExt | rel: 1
-// CHECK-NEXT: RelExt | AClass | s:14swift_ide_test6AClassC
+// CHECK-NEXT: RelExt | AClass | [[EXT_AClass_USR]]
 
 extension AProtocol { func extFn() }
-// CHECK: [[@LINE-1]]:11 | extension/ext-protocol/Swift | AProtocol | s:e:s:14swift_ide_test9AProtocolPAAE5extFnyyF | Def | rel: 0
+// CHECK: [[@LINE-1]]:11 | extension/ext-protocol/Swift | AProtocol | [[EXT_AProtocol_USR:s:e:s:14swift_ide_test9AProtocolPAAE5extFnyyF]] | Def | rel: 0
 // CHECK: [[@LINE-2]]:11 | protocol/Swift | AProtocol | s:14swift_ide_test9AProtocolP | Ref,RelExt | rel: 1
-// CHECK-NEXT: RelExt | AProtocol | s:14swift_ide_test9AProtocolP
+// CHECK-NEXT: RelExt | AProtocol | [[EXT_AProtocol_USR]]
 
 // TypeAlias
 typealias SomeAlias = AStruct

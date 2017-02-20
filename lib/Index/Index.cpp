@@ -189,15 +189,21 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     return false;
   }
 
-  bool addRelation(IndexSymbol &Info, SymbolRoleSet RelationRoles, ValueDecl *D) {
+  bool addRelation(IndexSymbol &Info, SymbolRoleSet RelationRoles, Decl *D) {
     assert(D);
     StringRef Name, USR;
     SymbolInfo SymInfo = getSymbolInfoForDecl(D);
 
     if (SymInfo.Kind == SymbolKind::Unknown)
       return true;
-    if (getNameAndUSR(D, /*ExtD=*/nullptr, Name, USR))
-      return true;
+    if (auto *ExtD = dyn_cast<ExtensionDecl>(D)) {
+      NominalTypeDecl *NTD = ExtD->getExtendedType()->getAnyNominal();
+      if (getNameAndUSR(NTD, ExtD, Name, USR))
+        return true;
+    } else {
+      if (getNameAndUSR(cast<ValueDecl>(D), /*ExtD=*/nullptr, Name, USR))
+        return true;
+    }
 
     Info.Relations.push_back(IndexRelation(RelationRoles, D, SymInfo, Name, USR));
     Info.roles |= RelationRoles;
@@ -339,9 +345,9 @@ private:
   bool startEntity(Decl *D, IndexSymbol &Info);
   bool startEntityDecl(ValueDecl *D);
 
-  bool reportRelatedRef(ValueDecl *D, SourceLoc Loc, SymbolRoleSet Relations, ValueDecl *Related);
-  bool reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations, ValueDecl *Related);
-  bool reportInheritedTypeRefs(ArrayRef<TypeLoc> Inherited, ValueDecl *Inheritee);
+  bool reportRelatedRef(ValueDecl *D, SourceLoc Loc, SymbolRoleSet Relations, Decl *Related);
+  bool reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations, Decl *Related);
+  bool reportInheritedTypeRefs(ArrayRef<TypeLoc> Inherited, Decl *Inheritee);
   NominalTypeDecl *getTypeLocAsNominalTypeDecl(const TypeLoc &Ty);
 
   bool reportPseudoGetterDecl(VarDecl *D) {
@@ -609,7 +615,7 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
   return startEntity(D, Info);
 }
 
-bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, SymbolRoleSet Relations, ValueDecl *Related) {
+bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, SymbolRoleSet Relations, Decl *Related) {
   if (!shouldIndex(D))
     return true;
 
@@ -628,7 +634,7 @@ bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, SymbolRo
   return !Cancelled;
 }
 
-bool IndexSwiftASTWalker::reportInheritedTypeRefs(ArrayRef<TypeLoc> Inherited, ValueDecl *Inheritee) {
+bool IndexSwiftASTWalker::reportInheritedTypeRefs(ArrayRef<TypeLoc> Inherited, Decl *Inheritee) {
   for (auto Base : Inherited) {
     if(!reportRelatedTypeRef(Base, (SymbolRoleSet) SymbolRole::RelationBaseOf, Inheritee))
       return false;
@@ -636,7 +642,7 @@ bool IndexSwiftASTWalker::reportInheritedTypeRefs(ArrayRef<TypeLoc> Inherited, V
   return true;
 }
 
-bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations, ValueDecl *Related) {
+bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations, Decl *Related) {
 
   if (IdentTypeRepr *T = dyn_cast_or_null<IdentTypeRepr>(Ty.getTypeRepr())) {
     auto Comps = T->getComponentRange();
@@ -718,7 +724,10 @@ IndexSwiftASTWalker::getTypeLocAsNominalTypeDecl(const TypeLoc &Ty) {
 }
 
 bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
-  SourceLoc Loc = D->getExtendedTypeLoc().getSourceRange().Start;
+  // Use the 'End' token of the range, in case it is a compound name, e.g.
+  //   extension A.B {}
+  // we want the location of 'B' token.
+  SourceLoc Loc = D->getExtendedTypeLoc().getSourceRange().End;
   if (!D->getExtendedType())
     return true;
   NominalTypeDecl *NTD = D->getExtendedType()->getAnyNominal();
@@ -734,11 +743,10 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
   if (!startEntity(D, Info))
     return false;
 
-  // FIXME: make extensions their own entity
   if (!reportRelatedRef(NTD, Loc, (SymbolRoleSet)SymbolRole::RelationExtendedBy,
-                        NTD))
+                        D))
       return false;
-  if (!reportInheritedTypeRefs(D->getInherited(), NTD))
+  if (!reportInheritedTypeRefs(D->getInherited(), D))
       return false;
 
   return true;
