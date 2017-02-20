@@ -134,6 +134,7 @@ class AClass {
 }
 
 protocol AProtocol {
+  // CHECK: [[@LINE-1]]:10 | protocol/Swift | AProtocol | [[AProtocol_USR:.*]] | Def | rel: 0
   func foo() -> Int
   // CHECK: [[@LINE-1]]:8 | instance-method/Swift | foo() | s:FP14swift_ide_test9AProtocol3fooFT_Si | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | AProtocol | s:P14swift_ide_test9AProtocol
@@ -157,15 +158,30 @@ class ASubClass : AClass, AProtocol {
 }
 
 // RelationExtendedBy
-// FIXME give extensions their own USR like ObjC?
 extension AClass {
-  // CHECK: [[@LINE-1]]:11 | extension/ext-class/Swift | AClass | s:e:s:FC14swift_ide_test6AClass3barFT_Si | Def | rel: 0
+  // CHECK: [[@LINE-1]]:11 | extension/ext-class/Swift | AClass | [[EXT_ACLASS_USR:.*]] | Def | rel: 0
   // CHECK: [[@LINE-2]]:11 | class/Swift | AClass | s:C14swift_ide_test6AClass | Ref,RelExt | rel: 1
-  // CHECK-NEXT: RelExt | AClass | s:C14swift_ide_test6AClass
+  // CHECK-NEXT: RelExt | AClass | [[EXT_ACLASS_USR]]
 
   func bar() -> Int { return 2 }
   // CHECK: [[@LINE-1]]:8 | instance-method/Swift | bar() | s:FC14swift_ide_test6AClass3barFT_Si | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | AClass | s:C14swift_ide_test6AClass
+}
+
+struct OuterS {
+// CHECK: [[@LINE-1]]:8 | struct/Swift | OuterS | [[OUTERS_USR:.*]] | Def | rel: 0
+  struct InnerS {}
+  // CHECK: [[@LINE-1]]:10 | struct/Swift | InnerS | [[INNERS_USR:.*]] | Def,RelChild | rel: 1
+  // CHECK-NEXT: RelChild | OuterS | [[OUTERS_USR]]
+}
+extension OuterS.InnerS : AProtocol {
+  // CHECK: [[@LINE-1]]:18 | extension/ext-struct/Swift | InnerS | [[EXT_INNERS_USR:.*]] | Def | rel: 0
+  // CHECK: [[@LINE-2]]:18 | struct/Swift | InnerS | [[INNERS_USR]] | Ref,RelExt | rel: 1
+  // CHECK-NEXT: RelExt | InnerS | [[EXT_INNERS_USR]]
+  // CHECK: [[@LINE-4]]:27 | protocol/Swift | AProtocol | [[AProtocol_USR]] | Ref,RelBase | rel: 1
+  // CHECK-NEXT: RelBase | InnerS | [[EXT_INNERS_USR]]
+  // CHECK: [[@LINE-6]]:11 | struct/Swift | OuterS | [[OUTERS_USR]] | Ref | rel: 0
+  func foo() {}
 }
 
 var anInstance = AClass(x: 1)
