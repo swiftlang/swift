@@ -1,0 +1,101 @@
+{
+  key.hash: <hash>,
+  key.dependencies: [
+    {
+      key.kind: source.lang.swift.import.module.swift,
+      key.name: "Swift",
+      key.filepath: Swift.swiftmodule,
+      key.hash: <hash>,
+      key.is_system: 1
+    }
+  ],
+  key.entities: [
+    {
+      key.kind: source.lang.swift.decl.protocol,
+      key.name: "P",
+      key.usr: "s:P7sr_38151P",
+      key.line: 4,
+      key.column: 10,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.typealias,
+          key.name: "Index",
+          key.usr: "s:P7sr_38151P5Index",
+          key.line: 5,
+          key.column: 13,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 5,
+              key.column: 21
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "f()",
+          key.usr: "s:FP7sr_38151P1fFT_T_",
+          key.line: 6,
+          key.column: 8
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.struct,
+      key.name: "S",
+      key.usr: "s:V7sr_38151S",
+      key.line: 9,
+      key.column: 8,
+      key.related: [
+        {
+          key.kind: source.lang.swift.ref.protocol,
+          key.name: "P",
+          key.usr: "s:P7sr_38151P",
+          key.line: 9,
+          key.column: 12
+        }
+      ],
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.protocol,
+          key.name: "P",
+          key.usr: "s:P7sr_38151P",
+          key.line: 9,
+          key.column: 12
+        },
+        {
+          key.kind: source.lang.swift.decl.typealias,
+          key.name: "Index",
+          key.usr: "s:V7sr_38151S5Index",
+          key.line: 10,
+          key.column: 13,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 10,
+              key.column: 21
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "f()",
+          key.usr: "s:FV7sr_38151S1fFT_T_",
+          key.line: 12,
+          key.column: 8,
+          key.related: [
+            {
+              key.kind: source.lang.swift.ref.function.method.instance,
+              key.name: "f()",
+              key.usr: "s:FP7sr_38151P1fFT_T_"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
