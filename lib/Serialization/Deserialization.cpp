@@ -992,8 +992,7 @@ void ModuleFile::readGenericRequirements(
 }
 
 void ModuleFile::configureGenericEnvironment(
-             llvm::PointerUnion3<GenericTypeDecl *, ExtensionDecl *,
-                                 AbstractFunctionDecl *> genericDecl,
+             GenericContext *genericDecl,
              serialization::GenericEnvironmentID envID) {
   if (envID == 0) return;
 
@@ -1002,33 +1001,15 @@ void ModuleFile::configureGenericEnvironment(
   // If we just have a generic signature, set up lazy generic environment
   // creation.
   if (auto genericSig = sigOrEnv.dyn_cast<GenericSignature *>()) {
-    if (auto type = genericDecl.dyn_cast<GenericTypeDecl *>()) {
-      type->setLazyGenericEnvironment(this, genericSig, envID);
-      DelayedGenericEnvironments.push_back(type);
-    } else if (auto func = genericDecl.dyn_cast<AbstractFunctionDecl *>()) {
-      func->setLazyGenericEnvironment(this, genericSig, envID);
-      DelayedGenericEnvironments.push_back(func);
-    } else {
-      auto ext = genericDecl.get<ExtensionDecl *>();
-      ext->setLazyGenericEnvironment(this, genericSig, envID);
-      DelayedGenericEnvironments.push_back(ext);
-    }
-
+    genericDecl->setLazyGenericEnvironment(this, genericSig, envID);
+    DelayedGenericEnvironments.push_back(genericDecl);
     return;
   }
 
   // If we have a full generic environment, it's because it happened to be
   // deserialized already. Record it directly.
   if (auto genericEnv = sigOrEnv.dyn_cast<GenericEnvironment *>()) {
-    if (auto type = genericDecl.dyn_cast<GenericTypeDecl *>()) {
-      type->setGenericEnvironment(genericEnv);
-    } else if (auto func = genericDecl.dyn_cast<AbstractFunctionDecl *>()) {
-      func->setGenericEnvironment(genericEnv);
-    } else {
-      auto ext = genericDecl.get<ExtensionDecl *>();
-      ext->setGenericEnvironment(genericEnv);
-    }
-
+    genericDecl->setGenericEnvironment(genericEnv);
     return;
   }
 }
@@ -4441,7 +4422,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   }
 }
 
-GenericEnvironment *ModuleFile::loadGenericEnvironment(const Decl *decl,
+GenericEnvironment *ModuleFile::loadGenericEnvironment(const DeclContext *decl,
                                                        uint64_t contextData) {
   return getGenericEnvironment(contextData);
 }
