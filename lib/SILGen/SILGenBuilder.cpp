@@ -343,3 +343,52 @@ ManagedValue SILGenBuilder::bufferForExpr(
 
   return gen.emitManagedBufferWithCleanup(address);
 }
+
+ManagedValue SILGenBuilder::createUncheckedEnumData(SILLocation loc,
+                                                    ManagedValue operand,
+                                                    EnumElementDecl *element) {
+  if (operand.hasCleanup()) {
+    SILValue newValue =
+        SILBuilder::createUncheckedEnumData(loc, operand.forward(gen), element);
+    return gen.emitManagedRValueWithCleanup(newValue);
+  }
+
+  ManagedValue borrowedBase = operand.borrow(gen, loc);
+  SILValue newValue = SILBuilder::createUncheckedEnumData(
+      loc, borrowedBase.getValue(), element);
+  return ManagedValue::forUnmanaged(newValue);
+}
+
+ManagedValue SILGenBuilder::createUncheckedTakeEnumDataAddr(
+    SILLocation loc, ManagedValue operand, EnumElementDecl *element,
+    SILType ty) {
+  // First see if we have a cleanup. If we do, we are going to forward and emit
+  // a managed buffer with cleanup.
+  if (operand.hasCleanup()) {
+    return gen.emitManagedBufferWithCleanup(
+        SILBuilder::createUncheckedTakeEnumDataAddr(loc, operand.forward(gen),
+                                                    element, ty));
+  }
+
+  SILValue result = SILBuilder::createUncheckedTakeEnumDataAddr(
+      loc, operand.getUnmanagedValue(), element, ty);
+  if (operand.isLValue())
+    return ManagedValue::forLValue(result);
+  return ManagedValue::forUnmanaged(result);
+}
+
+ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v) {
+  auto &lowering = getFunction().getTypeLowering(v.getType());
+  return createLoadTake(loc, v, lowering);
+}
+
+ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v,
+                                           const TypeLowering &lowering) {
+  assert(lowering.getLoweredType().getAddressType() == v.getType());
+  SILValue result =
+      lowering.emitLoadOfCopy(*this, loc, v.forward(gen), IsTake);
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(result);
+  assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
+  return gen.emitManagedRValueWithCleanup(result, lowering);
+}

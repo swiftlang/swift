@@ -395,11 +395,9 @@ namespace {
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
-      // Assert that the optional value is present.
-      gen.emitPreconditionOptionalHasValue(loc, base.getValue());
-
-      // Project out the payload.
-      return getAddressOfOptionalValue(gen, loc, base, getTypeData());
+      // Assert that the optional value is present and return the projected out
+      // payload.
+      return gen.emitPreconditionOptionalHasValue(loc, base);
     }
 
     void print(raw_ostream &OS) const override {
