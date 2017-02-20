@@ -784,8 +784,10 @@ public:
   SILValue emitDoesOptionalHaveValue(SILLocation loc, SILValue addrOrValue);
 
   /// \brief Emit a switch_enum to call the library intrinsic
-  /// _diagnoseUnexpectedNilOptional if the optional has no value.
-  void emitPreconditionOptionalHasValue(SILLocation loc, SILValue addr);
+  /// _diagnoseUnexpectedNilOptional if the optional has no value. Return the
+  /// MangedValue resulting from the success case.
+  ManagedValue emitPreconditionOptionalHasValue(SILLocation loc,
+                                                ManagedValue optional);
 
   /// \brief Emit a call to the library intrinsic _getOptionalValue
   /// given the address of the optional, which checks that an optional contains

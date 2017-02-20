@@ -171,20 +171,28 @@ static void emitSourceLocationArgs(SILGenFunction &gen,
   args[3] = ManagedValue::forUnmanaged(literal);
 }
 
-void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
-                                                      SILValue optional) {
+ManagedValue
+SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
+                                                 ManagedValue optional) {
   // Generate code to the optional is present, and if not, abort with a message
   // (provided by the stdlib).
   SILBasicBlock *contBB = createBasicBlock();
   SILBasicBlock *failBB = createBasicBlock();
 
+  bool hadCleanup = optional.hasCleanup();
+  bool hadLValue = optional.isLValue();
+
   auto noneDecl = getASTContext().getOptionalNoneDecl();
   auto someDecl = getASTContext().getOptionalSomeDecl();
-  if (optional->getType().isAddress()) {
-    B.createSwitchEnumAddr(loc, optional, /*defaultDest*/ nullptr,
+  if (optional.getType().isAddress()) {
+    // We forward in the creation routine for
+    // unchecked_take_enum_data_addr. switch_enum_addr is a +0 operation.
+    B.createSwitchEnumAddr(loc, optional.getValue(),
+                           /*defaultDest*/ nullptr,
                            {{someDecl, contBB}, {noneDecl, failBB}});
   } else {
-    B.createSwitchEnum(loc, optional, /*defaultDest*/ nullptr,
+    B.createSwitchEnum(loc, optional.forward(*this),
+                       /*defaultDest*/ nullptr,
                        {{someDecl, contBB}, {noneDecl, failBB}});
   }
   B.emitBlock(failBB);
@@ -202,6 +210,26 @@ void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   B.createUnreachable(loc);
   B.clearInsertionPoint();
   B.emitBlock(contBB);
+
+  ManagedValue result;
+  SILType payloadType = optional.getType().getAnyOptionalObjectType();
+
+  if (payloadType.isObject()) {
+    result = B.createOwnedPHIArgument(payloadType);
+  } else {
+    result =
+        B.createUncheckedTakeEnumDataAddr(loc, optional, someDecl, payloadType);
+  }
+
+  if (hadCleanup) {
+    return result;
+  }
+
+  if (hadLValue) {
+    return ManagedValue::forLValue(result.forward(*this));
+  }
+
+  return ManagedValue::forUnmanaged(result.forward(*this));
 }
 
 SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
@@ -222,8 +250,8 @@ ManagedValue SILGenFunction::emitCheckedGetOptionalValueFrom(SILLocation loc,
                                                       ManagedValue src,
                                                       const TypeLowering &optTL,
                                                       SGFContext C) {
-  emitPreconditionOptionalHasValue(loc, src.getValue());
-  return emitUncheckedGetOptionalValueFrom(loc, src, optTL, C);
+  // TODO: Make this take optTL.
+  return emitPreconditionOptionalHasValue(loc, src);
 }
 
 ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,

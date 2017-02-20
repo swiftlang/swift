@@ -110,7 +110,7 @@ func test8(_ g: Gizmo) -> Gizmo {
   // CHECK:      [[BORROWED_G:%.*]] = begin_borrow [[G]]
   // CHECK:      [[METHOD:%.*]] = class_method [volatile] [[BORROWED_G]] : {{.*}}, #Gizmo.clone!1.foreign
   // CHECK-NOT:  copy_value [[RESULT]]
-  // CHECK:      [[RESULT:%.*]] = unchecked_enum_data
+  // CHECK:      bb2([[RESULT:%.*]] : $Gizmo):
   // CHECK-NOT:  copy_value [[RESULT]]
   // CHECK:      end_borrow [[BORROWED_G]] from [[G]]
   // CHECK-NEXT: destroy_value [[G]]
@@ -126,7 +126,7 @@ func test9(_ g: Gizmo) -> Gizmo {
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_G]] : {{.*}}, #Gizmo.duplicate!1.foreign
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[BORROWED_G]])
   // CHECK-NOT:  copy_value [[RESULT]]
-  // CHECK:      [[RESULT:%.*]] = unchecked_enum_data
+  // CHECK: bb2([[RESULT:%.*]] : $Gizmo):
   // CHECK-NOT:  copy_value [[RESULT]]
   // CHECK:      end_borrow [[BORROWED_G]] from [[G]]
   // CHECK-NEXT: destroy_value [[G]]
@@ -145,7 +145,7 @@ func test10(_ g: Gizmo) -> AnyClass {
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
   // CHECK:      [[T0:%.*]] = enum $Optional<@thick AnyObject.Type>, #Optional.some!enumelt.1, [[THICK]]
-  // CHECK:      [[RES:%.*]] = unchecked_enum_data
+  // CHECK:   bb5([[RES:%.*]] : $@thick AnyObject.Type):
   // CHECK:      destroy_value [[G_COPY]] : $Gizmo
   // CHECK:      destroy_value [[G]] : $Gizmo
   // CHECK-NEXT: return [[RES]] : $@thick AnyObject.Type
@@ -164,7 +164,7 @@ func test11(_ g: Gizmo) -> AnyClass {
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
   // CHECK:      [[T0:%.*]] = enum $Optional<@thick NSAnsing.Type>, #Optional.some!enumelt.1, [[THICK]]
-  // CHECK:      [[RES:%.*]] = unchecked_enum_data
+  // CHECK:   bb5([[RES:%.*]] : $@thick NSAnsing.Type):
   // CHECK:      [[OPENED:%.*]] = open_existential_metatype [[RES]]
   // CHECK:      [[RES_ANY:%.*]] = init_existential_metatype [[OPENED]]
   // CHECK:      destroy_value [[G_COPY]] : $Gizmo
