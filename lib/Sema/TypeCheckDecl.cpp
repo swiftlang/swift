@@ -3887,6 +3887,9 @@ public:
     assert(dc->isTypeContext() &&
            "Decl parsing must prevent subscripts outside of types!");
 
+    // Inherit the generic signature and environment from the outer context.
+    SD->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessibility(SD);
 

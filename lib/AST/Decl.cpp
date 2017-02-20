@@ -592,26 +592,10 @@ GenericContext::getLazyGenericEnvironmentSlow() const {
   assert(GenericSigOrEnv.is<GenericSignature *>() &&
          "not a lazily deserialized generic environment");
 
-  GenericEnvironment *genericEnv;
-
-  if (auto *extensionDecl = dyn_cast<ExtensionDecl>(this)) {
-    auto contextData = getASTContext().getOrCreateLazyIterableContextData(
-      extensionDecl, nullptr);
-    genericEnv = contextData->loader->loadGenericEnvironment(
-      extensionDecl, contextData->genericEnvData);
-  } else if (auto *typeDecl = dyn_cast<GenericTypeDecl>(this)) {
-    auto contextData = getASTContext().getOrCreateLazyGenericTypeData(
-      typeDecl, nullptr);
-    genericEnv = contextData->loader->loadGenericEnvironment(
-      typeDecl, contextData->genericEnvData);
-  } else if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(this)) {
-    auto contextData = getASTContext().getOrCreateLazyFunctionContextData(
-      funcDecl, nullptr);
-    genericEnv = contextData->loader->loadGenericEnvironment(
-      funcDecl, contextData->genericEnvData);
-  } else {
-    llvm_unreachable("Bad GenericContext kind");
-  }
+  auto contextData = getASTContext().getOrCreateLazyGenericContextData(
+    this, nullptr);
+  auto *genericEnv = contextData->loader->loadGenericEnvironment(
+    this, contextData->genericEnvData);
 
   const_cast<GenericContext *>(this)->setGenericEnvironment(genericEnv);
   ++NumLazyGenericEnvironmentsLoaded;
@@ -624,24 +608,9 @@ void GenericContext::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
   assert(GenericSigOrEnv.isNull() && "already have a generic signature");
   GenericSigOrEnv = genericSig;
 
-  if (auto *extensionDecl = dyn_cast<ExtensionDecl>(this)) {
-    auto contextData =
-      getASTContext().getOrCreateLazyIterableContextData(
-        extensionDecl, lazyLoader);
-    contextData->genericEnvData = genericEnvData;
-  } else if (auto *typeDecl = dyn_cast<GenericTypeDecl>(this)) {
-    auto contextData =
-      getASTContext().getOrCreateLazyGenericTypeData(
-        typeDecl, lazyLoader);
-    contextData->genericEnvData = genericEnvData;
-  } else if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(this)) {
-    auto contextData =
-      getASTContext().getOrCreateLazyFunctionContextData(
-        funcDecl, lazyLoader);
-    contextData->genericEnvData = genericEnvData;
-  } else {
-    llvm_unreachable("Bad GenericContext kind");
-  }
+  auto contextData =
+    getASTContext().getOrCreateLazyGenericContextData(this, lazyLoader);
+  contextData->genericEnvData = genericEnvData;
 
   ++NumLazyGenericEnvironments;
 }

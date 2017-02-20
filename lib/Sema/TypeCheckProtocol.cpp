@@ -6060,3 +6060,16 @@ void TypeChecker::recordKnownWitness(NormalProtocolConformance *conformance,
   conformance->setWitness(req,
                           match.getWitness(Context, std::move(reqEnvironment)));
 }
+
+Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
+                                 ProtocolConformanceRef conformance,
+                                 Identifier name,
+                                 Diag<> brokenProtocolDiag) {
+  Type ty = ProtocolConformanceRef::getTypeWitnessByName(type, conformance,
+                                                         name, this);
+  if (!ty &&
+      !(conformance.isConcrete() && conformance.getConcrete()->isInvalid()))
+    diagnose(protocol->getLoc(), brokenProtocolDiag);
+
+  return ty;
+}
