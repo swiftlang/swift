@@ -507,8 +507,7 @@ private:
   /// Set up a (potentially lazy) generic environment for the given type,
   /// function or extension.
   void configureGenericEnvironment(
-                   llvm::PointerUnion3<GenericTypeDecl *, ExtensionDecl *,
-                                       AbstractFunctionDecl *> genericDecl,
+                   GenericContext *genericDecl,
                    serialization::GenericEnvironmentID envID);
 
   /// Populates the vector with members of a DeclContext from \c DeclTypeCursor.
@@ -711,7 +710,7 @@ public:
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
 
-  GenericEnvironment *loadGenericEnvironment(const Decl *decl,
+  GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
                                              uint64_t contextData) override;
 
   Optional<StringRef> getGroupNameById(unsigned Id) const;
