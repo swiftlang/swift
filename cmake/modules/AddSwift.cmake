@@ -186,7 +186,11 @@ function(_add_variant_c_compile_flags)
       list(APPEND result "-momit-leaf-frame-pointer")
     endif()
   else()
-    list(APPEND result "-O0")
+    if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+      list(APPEND result "-O0")
+    else()
+      list(APPEND result "/Od")
+    endif()
   endif()
 
   # CMake automatically adds the flags for debug info if we use MSVC/clang-cl.
