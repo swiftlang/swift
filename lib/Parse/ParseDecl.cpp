@@ -5442,7 +5442,8 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   auto *Subscript = new (Context) SubscriptDecl(name,
                                                 SubscriptLoc, Indices.get(),
                                                 ArrowLoc, ElementTy.get(),
-                                                CurDeclContext);
+                                                CurDeclContext,
+                                                /*GenericParams=*/nullptr);
   Subscript->getAttrs() = Attributes;
   
   Decls.push_back(Subscript);

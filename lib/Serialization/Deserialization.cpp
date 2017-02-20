@@ -3379,8 +3379,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       argNames.push_back(getIdentifier(argNameID));
 
     DeclName name(ctx, ctx.Id_subscript, argNames);
+    // FIXME: Serialize generic subscripts
     auto subscript = createDecl<SubscriptDecl>(name, SourceLoc(), nullptr,
-                                               SourceLoc(), TypeLoc(), DC);
+                                               SourceLoc(), TypeLoc(), DC,
+                                               /*GenericParams=*/nullptr);
     declOrOffset = subscript;
 
     subscript->setIndices(readParameterList());

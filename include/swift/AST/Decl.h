@@ -4527,18 +4527,20 @@ enum class ObjCSubscriptKind {
 /// A given type can have multiple subscript declarations, so long as the
 /// signatures (indices and element type) are distinct.
 ///
-class SubscriptDecl : public AbstractStorageDecl, public DeclContext {
+class SubscriptDecl : public AbstractStorageDecl, public GenericContext {
   SourceLoc ArrowLoc;
   ParameterList *Indices;
   TypeLoc ElementTy;
 
 public:
   SubscriptDecl(DeclName Name, SourceLoc SubscriptLoc, ParameterList *Indices,
-                SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent)
+                SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent,
+                GenericParamList *GenericParams)
     : AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc),
-      DeclContext(DeclContextKind::SubscriptDecl, Parent),
+      GenericContext(DeclContextKind::SubscriptDecl, Parent),
       ArrowLoc(ArrowLoc), Indices(nullptr), ElementTy(ElementTy) {
     setIndices(Indices);
+    setGenericParams(GenericParams);
   }
   
   SourceLoc getSubscriptLoc() const { return getNameLoc(); }
