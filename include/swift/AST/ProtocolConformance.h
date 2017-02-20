@@ -211,11 +211,9 @@ public:
       if (!valueReq || isa<AssociatedTypeDecl>(valueReq) ||
           valueReq->isInvalid())
         continue;
-      
-      // Ignore accessors.
-      if (auto *FD = dyn_cast<FuncDecl>(valueReq))
-        if (FD->isAccessor())
-          continue;
+
+      if (!valueReq->isProtocolRequirement())
+        continue;
 
       // If we don't have and cannot resolve witnesses, skip it.
       if (!resolver && !hasWitness(valueReq))

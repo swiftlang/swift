@@ -4325,7 +4325,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
     return;
   }
 
-  if (!TC.isRequirement(requirement))
+  if (!requirement->isProtocolRequirement())
     return;
 
   // Resolve all associated types before trying to resolve this witness.
@@ -4490,7 +4490,7 @@ void ConformanceChecker::checkConformance() {
       continue;
 
     // Type aliases don't have requirements themselves.
-    if (!TC.isRequirement(requirement))
+    if (!requirement->isProtocolRequirement())
       continue;
 
     /// Local function to finalize the witness.
@@ -5515,7 +5515,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       auto proto = conformance->getProtocol();
       for (auto member : proto->getMembers()) {
         auto req = dyn_cast<ValueDecl>(member);
-        if (!req) continue;
+        if (!req || !req->isProtocolRequirement()) continue;
 
         // If the requirement is unsatisfied, we might want to warn
         // about near misses; record it.
@@ -5967,17 +5967,6 @@ void DefaultWitnessChecker::recordWitness(
                                         storage);
 }
 
-// Not all protocol members are requirements.
-bool TypeChecker::isRequirement(const ValueDecl *requirement) {
-  if (auto *FD = dyn_cast<FuncDecl>(requirement))
-    if (FD->isAccessor())
-      return false;
-  if (isa<TypeAliasDecl>(requirement) ||
-      isa<NominalTypeDecl>(requirement))
-    return false;
-  return true;
-}
-
 void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
   DefaultWitnessChecker checker(*this, proto);
 
@@ -5992,7 +5981,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     if (isa<TypeDecl>(valueDecl))
       continue;
 
-    if (!isRequirement(valueDecl))
+    if (!valueDecl->isProtocolRequirement())
       continue;
 
     checker.resolveWitnessViaLookup(valueDecl);

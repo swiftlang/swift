@@ -100,7 +100,8 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
     
   // Protocol requirements are not versioned because there's no
   // global entry point.
-  if (isa<ProtocolDecl>(D->getDeclContext()) && isRequirement(D))
+  if (isa<ProtocolDecl>(D->getDeclContext()) &&
+      D->isProtocolRequirement())
     return false;
 
   // FIXME: Figure out what to do with typealiases
