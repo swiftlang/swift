@@ -3028,6 +3028,8 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
       // Evaluate the condition, to validate it.
       ConfigState = classifyConditionalCompilationExpr(Condition, Context,
                                                        Diags);
+      if (foundActive)
+        ConfigState.setConditionActive(false);
     }
 
     foundActive |= ConfigState.isConditionActive();
