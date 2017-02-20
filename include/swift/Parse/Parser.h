@@ -791,13 +791,17 @@ public:
   };
 
   bool parseGetSetImpl(ParseDeclOptions Flags,
-                       ParameterList *Indices, TypeLoc ElementTy,
+                       GenericParamList *GenericParams,
+                       ParameterList *Indices,
+                       TypeLoc ElementTy,
                        ParsedAccessors &accessors,
                        SourceLoc &LastValidLoc,
                        SourceLoc StaticLoc, SourceLoc VarLBLoc,
                        SmallVectorImpl<Decl *> &Decls);
   bool parseGetSet(ParseDeclOptions Flags,
-                   ParameterList *Indices, TypeLoc ElementTy,
+                   GenericParamList *GenericParams,
+                   ParameterList *Indices,
+                   TypeLoc ElementTy,
                    ParsedAccessors &accessors,
                    SourceLoc StaticLoc, SmallVectorImpl<Decl *> &Decls);
   void recordAccessors(AbstractStorageDecl *storage, ParseDeclOptions flags,

@@ -788,7 +788,11 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
   if (initFuncTy)
     cast<ConstructorDecl>(func)->setInitializerInterfaceType(initFuncTy);
 
-  checkReferencedGenericParams(func, sig, *this);
+  // We get bogus errors here with generic subscript materializeForSet.
+  if (!isa<FuncDecl>(func) ||
+      cast<FuncDecl>(func)->getAccessorKind() !=
+        AccessorKind::IsMaterializeForSet)
+    checkReferencedGenericParams(func, sig, *this);
 }
 
 ///
