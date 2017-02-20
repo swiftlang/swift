@@ -5653,7 +5653,7 @@ namespace {
     
     void addInherited() {
       // If there are no inherited protocols, produce null.
-      auto inherited = Protocol->getInheritedProtocols(nullptr);
+      auto inherited = Protocol->getInheritedProtocols();
       if (inherited.empty()) {
         addWord(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
         return;

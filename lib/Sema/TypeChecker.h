@@ -1221,7 +1221,7 @@ public:
                               GenericTypeResolver *resolver = nullptr);
 
   /// Retrieve the set of inherited protocols for this protocol type.
-  ArrayRef<ProtocolDecl *> getDirectConformsTo(ProtocolDecl *proto);
+  llvm::TinyPtrVector<ProtocolDecl *> getDirectConformsTo(ProtocolDecl *proto);
 
   /// \brief Add any implicitly-defined constructors required for the given
   /// struct or class.

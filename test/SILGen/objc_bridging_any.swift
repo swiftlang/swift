@@ -725,7 +725,7 @@ class AnyHashableClass : NSObject {
 }
 
 // CHECK-LABEL: sil_witness_table shared [fragile] GenericOption: Hashable module objc_generics {
-// CHECK-NEXT: base_protocol _Hashable: GenericOption: _Hashable module objc_generics
 // CHECK-NEXT: base_protocol Equatable: GenericOption: Equatable module objc_generics
+// CHECK-NEXT: base_protocol _Hashable: GenericOption: _Hashable module objc_generics
 // CHECK-NEXT: method #Hashable.hashValue!getter.1: {{.*}} : @_TTWVSC13GenericOptions8Hashable13objc_genericsFS0_g9hashValueSi
 // CHECK-NEXT: }

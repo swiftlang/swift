@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 319; // Last change: generic subscripts
+const uint16_t VERSION_MINOR = 320; // Last change: inherited protocols
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -831,8 +831,7 @@ namespace decls_block {
     BCFixed<1>,             // objc?
     GenericEnvironmentIDField, // generic environment
     AccessibilityKindField, // accessibility
-    BCVBR<4>,               // number of protocols
-    BCArray<DeclIDField>    // protocols and inherited types
+    BCArray<DeclIDField>    // inherited types
     // Trailed by the generic parameters (if any), the members record, and
     // the default witness table record
   >;

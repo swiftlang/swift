@@ -344,7 +344,7 @@ private:
          << "@protocol " << customName;
     }
 
-    printProtocols(PD->getInheritedProtocols(nullptr));
+    printProtocols(PD->getInheritedProtocols());
     os << "\n";
     assert(!protocolMembersOptional && "protocols start required");
     printMembers(PD->getMembers());
@@ -2158,7 +2158,7 @@ public:
 
     bool allRequirementsSatisfied = true;
 
-    for (auto proto : PD->getInheritedProtocols(nullptr)) {
+    for (auto proto : PD->getInheritedProtocols()) {
       assert(proto->isObjC());
       allRequirementsSatisfied &= require(proto);
     }

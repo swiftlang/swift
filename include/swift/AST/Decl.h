@@ -3372,8 +3372,6 @@ private:
 class ProtocolDecl : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
 
-  ArrayRef<ProtocolDecl *> InheritedProtocols;
-
   llvm::DenseMap<ValueDecl *, Witness> DefaultWitnesses;
 
   /// The generic signature representing exactly the new requirements introduced
@@ -3383,9 +3381,6 @@ class ProtocolDecl : public NominalTypeDecl {
   /// True if the protocol has requirements that cannot be satisfied (e.g.
   /// because they could not be imported from Objective-C).
   unsigned HasMissingRequirements : 1;
-
-  /// Whether we have already set the list of inherited protocols.
-  unsigned InheritedProtocolsSet : 1;
 
   /// If this is a compiler-known protocol, this will be a KnownProtocolKind
   /// value, plus one. Otherwise, it will be 0.
@@ -3404,7 +3399,7 @@ public:
   using Decl::getASTContext;
 
   /// Retrieve the set of protocols inherited from this protocol.
-  ArrayRef<ProtocolDecl *> getInheritedProtocols(LazyResolver *resolver) const;
+  llvm::TinyPtrVector<ProtocolDecl *> getInheritedProtocols() const;
 
   /// \brief Determine whether this protocol inherits from the given ("super")
   /// protocol.
@@ -3535,22 +3530,6 @@ public:
 
   /// Record the default witness for a requirement.
   void setDefaultWitness(ValueDecl *requirement, Witness witness);
-
-  /// Set the list of inherited protocols.
-  void setInheritedProtocols(ArrayRef<ProtocolDecl *> protocols) {
-    assert(!InheritedProtocolsSet && "protocols already set");
-    InheritedProtocolsSet = true;
-    InheritedProtocols = protocols;
-  }
-
-  void clearInheritedProtocols() {
-    InheritedProtocolsSet = true;
-    InheritedProtocols = { };
-  }
-
-  bool isInheritedProtocolsValid() const {
-    return InheritedProtocolsSet;
-  }
 
   /// Retrieve the name to use for this protocol when interoperating
   /// with the Objective-C runtime.

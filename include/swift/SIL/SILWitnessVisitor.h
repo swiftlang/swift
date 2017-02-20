@@ -54,7 +54,7 @@ public:
     // It would be abstractly good to allow conversion to a base
     // protocol to be trivial, but it's not clear that there's
     // really a structural guarantee we can rely on here.
-    for (auto baseProto : protocol->getInheritedProtocols(nullptr)) {
+    for (auto baseProto : protocol->getInheritedProtocols()) {
       // ObjC protocols do not have witnesses.
       if (!Lowering::TypeConverter::protocolRequiresWitnessTable(baseProto))
         continue;

@@ -142,7 +142,7 @@ Optional<T> SubstitutionMap::forEachConformance(
     }
 
     // Search inherited conformances.
-    for (auto inherited : proto->getInheritedProtocols(nullptr)) {
+    for (auto inherited : proto->getInheritedProtocols()) {
       if (auto found = searchInConformance(conformance.getInherited(inherited),
                                            associatedTypeName,
                                            visited))

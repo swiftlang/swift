@@ -220,7 +220,13 @@ bool IterativeTypeChecker::breakCycleForTypeCheckRawType(EnumDecl *enumDecl) {
 // Inherited protocols
 //===----------------------------------------------------------------------===//
 bool IterativeTypeChecker::isInheritedProtocolsSatisfied(ProtocolDecl *payload){
-  return payload->isInheritedProtocolsValid();
+  auto inheritedClause = payload->getInherited();
+  for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
+    TypeLoc &inherited = inheritedClause[i];
+    if (!inherited.getType()) return false;
+  }
+
+  return true;
 }
 
 void IterativeTypeChecker::processInheritedProtocols(
@@ -250,8 +256,7 @@ void IterativeTypeChecker::processInheritedProtocols(
       for (auto inheritedProtocol: protocols) {
         if (inheritedProtocol == protocol ||
             inheritedProtocol->inheritsFrom(protocol)) {
-          if (!diagnosedCircularity &&
-              !protocol->isInheritedProtocolsValid()) {
+          if (!diagnosedCircularity) {
             diagnose(protocol,
                      diag::circular_protocol_def, protocol->getName().str())
                     .fixItRemove(inherited.getSourceRange());
@@ -267,20 +272,12 @@ void IterativeTypeChecker::processInheritedProtocols(
   // If we enumerated any dependencies, we can't complete this request.
   if (anyDependencies)
     return;
-
-  // FIXME: Hack to deal with recursion elsewhere.
-  // We recurse through DeclContext::getLocalProtocols() -- this should be
-  // redone to use the IterativeDeclChecker also.
-  if (protocol->isInheritedProtocolsValid())
-    return;
-  protocol->setInheritedProtocols(getASTContext().AllocateCopy(allProtocols));
 }
 
 bool IterativeTypeChecker::breakCycleForInheritedProtocols(
        ProtocolDecl *protocol) {
   // FIXME: We'd like to drop just the problematic protocols, not
   // everything.
-  protocol->setInheritedProtocols({});
   return true;
 }
 

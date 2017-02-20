@@ -180,7 +180,7 @@ bool FulfillmentMap::searchWitnessTable(IRGenModule &IGM,
   bool hadFulfillment = false;
 
   auto nextInheritedIndex = 0;
-  for (auto inherited : protocol->getInheritedProtocols(nullptr)) {
+  for (auto inherited : protocol->getInheritedProtocols()) {
     auto index = nextInheritedIndex++;
 
     // Ignore protocols that don't have witness tables.

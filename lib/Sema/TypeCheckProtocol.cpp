@@ -3490,7 +3490,7 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
     if (!protos1.insert(p).second)
       return;
 
-    for (auto parent : p->getInheritedProtocols(&TC))
+    for (auto parent : p->getInheritedProtocols())
       insertProtocol(parent);
   };
   
@@ -3527,7 +3527,7 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
       return;
 
     protos2AreSubsetOf1 &= protos1.erase(p);
-    for (auto parent : p->getInheritedProtocols(&TC))
+    for (auto parent : p->getInheritedProtocols())
       removeProtocol(parent);
   };
 
@@ -4849,7 +4849,7 @@ checkConformsToProtocol(TypeChecker &TC,
   }
 
   // Check that T conforms to all inherited protocols.
-  for (auto InheritedProto : Proto->getInheritedProtocols(&TC)) {
+  for (auto InheritedProto : Proto->getInheritedProtocols()) {
     auto InheritedConformance =
       TC.conformsToProtocol(T, InheritedProto, DC,
                             ConformanceCheckFlags::Used,
