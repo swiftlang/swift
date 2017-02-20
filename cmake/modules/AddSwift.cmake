@@ -215,13 +215,12 @@ function(_add_variant_c_compile_flags)
       endif()
     endif()
 
-    # MSVC/clang-cl don't support -fno-pic.
+    # MSVC/clang-cl don't support -fno-pic or -fms-compatability-version.
     if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
       list(APPEND result -fno-pic)
+      list(APPEND result "-fms-compatibility-version=1900")
     endif()
-  endif()
 
-  if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
     list(APPEND result "-DLLVM_ON_WIN32")
     list(APPEND result "-D_CRT_SECURE_NO_WARNINGS")
     list(APPEND result "-D_CRT_NONSTDC_NO_WARNINGS")
@@ -229,10 +228,6 @@ function(_add_variant_c_compile_flags)
     list(APPEND result "-D_CRT_USE_WINAPI_FAMILY_DESKTOP_APP")
     # TODO(compnerd) handle /MT
     list(APPEND result "-D_DLL")
-
-    if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
-      list(APPEND result "-fms-compatibility-version=1900")
-    endif()
   endif()
 
   if(CFLAGS_ENABLE_ASSERTIONS)
