@@ -513,7 +513,9 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
   // of one of the protocols to which the parent potential
   // archetype conforms.
   for (auto &conforms : ConformsTo) {
-    for (auto member : conforms.first->lookupDirect(nestedName)) {
+    auto *proto = conforms.first;
+
+    for (auto member : proto->lookupDirect(nestedName)) {
       PotentialArchetype *pa;
       
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
@@ -529,6 +531,11 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
           continue;
 
         auto type = alias->getDeclaredInterfaceType();
+        TypeSubstitutionMap subs;
+        subs[cast<GenericTypeParamType>(proto->getSelfInterfaceType()->getCanonicalType())]
+          = getDependentType({}, true);
+        type = type.subst(QueryTypeSubstitutionMap{subs},
+                          builder.Impl->LookupConformance);
         if (auto existingPA = builder.resolveArchetype(type)) {
           builder.addSameTypeRequirementBetweenArchetypes(pa, existingPA,
                                                           redundantSource);
