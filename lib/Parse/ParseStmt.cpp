@@ -1796,6 +1796,8 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
       // Evaluate the condition, to validate it.
       ConfigState = classifyConditionalCompilationExpr(Condition, Context,
                                                        Diags);
+      if (foundActive)
+        ConfigState.setConditionActive(false);
     }
 
     foundActive |= ConfigState.isConditionActive();
