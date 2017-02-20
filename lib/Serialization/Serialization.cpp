@@ -2884,6 +2884,8 @@ void Serializer::writeDecl(const Decl *D) {
                                 subscript->isImplicit(),
                                 subscript->isObjC(),
                                 (unsigned) accessors.Kind,
+                                addGenericEnvironmentRef(
+                                            subscript->getGenericEnvironment()),
                                 addTypeRef(subscript->getInterfaceType()),
                                 addDeclRef(accessors.Get),
                                 addDeclRef(accessors.Set),
@@ -2897,6 +2899,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 rawSetterAccessLevel,
                                 nameComponents);
 
+    writeGenericParams(subscript->getGenericParams());
     writeParameterList(subscript->getIndices());
     break;
   }
