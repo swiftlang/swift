@@ -178,14 +178,14 @@ void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   SILBasicBlock *contBB = createBasicBlock();
   SILBasicBlock *failBB = createBasicBlock();
 
-  auto NoneEnumElementDecl = getASTContext().getOptionalNoneDecl();
+  auto noneDecl = getASTContext().getOptionalNoneDecl();
+  auto someDecl = getASTContext().getOptionalSomeDecl();
   if (optional->getType().isAddress()) {
-    B.createSwitchEnumAddr(loc, optional, /*defaultDest*/contBB,
-                           { { NoneEnumElementDecl, failBB }});
+    B.createSwitchEnumAddr(loc, optional, /*defaultDest*/ nullptr,
+                           {{someDecl, contBB}, {noneDecl, failBB}});
   } else {
-    B.createSwitchEnum(loc, optional, /*defaultDest*/contBB,
-                       { { NoneEnumElementDecl, failBB }});
-    
+    B.createSwitchEnum(loc, optional, /*defaultDest*/ nullptr,
+                       {{someDecl, contBB}, {noneDecl, failBB}});
   }
   B.emitBlock(failBB);
 
