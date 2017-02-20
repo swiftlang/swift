@@ -304,7 +304,7 @@ void printContext(raw_ostream &os, DeclContext *dc);
 bool printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
                           Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS);
 
-/// Print a keyword directly by its kind.
+/// Print a keyword or punctuator directly by its kind.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, tok keyword);
 
 } // namespace swift
