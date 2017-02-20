@@ -1123,6 +1123,20 @@ public:
                              GenericSignature *parentSig,
                              GenericTypeResolver *resolver);
 
+  /// Validate the signature of a generic subscript.
+  ///
+  /// \param subscript The generic subscript.
+  GenericSignature *validateGenericSubscriptSignature(SubscriptDecl *subscript);
+
+  /// Revert the signature of a generic function to its pre-type-checked state,
+  /// so that it can be type checked again when we have resolved its generic
+  /// parameters.
+  void revertGenericSubscriptSignature(SubscriptDecl *subscript);
+
+  /// Configure the interface type of a subscript declaration.
+  void configureInterfaceType(SubscriptDecl *subscript,
+                              GenericSignature *sig);
+
   /// Construct a new generic environment for the given declaration context.
   ///
   /// \param genericParams The generic parameters to validate.

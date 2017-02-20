@@ -260,8 +260,10 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
   TypeResolutionOptions options;
   DeclContext *lookupDC = genericParams->begin()[0]->getDeclContext();
   if (!lookupDC->isModuleScopeContext()) {
-    assert(isa<GenericTypeDecl>(lookupDC) || isa<ExtensionDecl>(lookupDC) ||
-           isa<AbstractFunctionDecl>(lookupDC) &&
+    assert((isa<GenericTypeDecl>(lookupDC) ||
+            isa<ExtensionDecl>(lookupDC) ||
+            isa<AbstractFunctionDecl>(lookupDC) ||
+            isa<SubscriptDecl>(lookupDC)) &&
            "not a proper generic parameter context?");
     options = TR_GenericSignature;
   }    
@@ -787,6 +789,154 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
     cast<ConstructorDecl>(func)->setInitializerInterfaceType(initFuncTy);
 
   checkReferencedGenericParams(func, sig, *this);
+}
+
+///
+/// Generic subscripts
+///
+/// FIXME: A lot of this code is duplicated from the generic functions
+/// path above. We could consolidate more of this.
+///
+
+/// Check the signature of a generic subscript.
+static bool checkGenericSubscriptSignature(TypeChecker &tc,
+                                           GenericSignatureBuilder *builder,
+                                           SubscriptDecl *subscript,
+                                           GenericTypeResolver &resolver) {
+  bool badType = false;
+
+  // Check the generic parameter list.
+  auto genericParams = subscript->getGenericParams();
+
+  auto *dc = subscript->getDeclContext();
+
+  tc.checkGenericParamList(
+                    builder, genericParams,
+                    dc->getGenericSignatureOfContext(),
+                    &resolver);
+
+  // Check the element type.
+  badType |= tc.validateType(subscript->getElementTypeLoc(), subscript,
+                             TypeResolutionOptions(),
+                             &resolver);
+
+  // Infer requirements from it.
+  if (genericParams && builder &&
+      subscript->getElementTypeLoc().getTypeRepr()) {
+    unsigned depth = genericParams->getDepth();
+    builder->inferRequirements(subscript->getElementTypeLoc(),
+                               /*minDepth=*/depth,
+                               /*maxDepth=*/depth);
+  }
+
+  // Check the indices.
+  auto params = subscript->getIndices();
+
+  badType |= tc.typeCheckParameterList(params, subscript,
+                                       TypeResolutionOptions(),
+                                       resolver);
+
+  // Infer requirements from the pattern.
+  if (builder)
+    builder->inferRequirements(params, genericParams);
+
+  return badType;
+}
+
+void TypeChecker::revertGenericSubscriptSignature(SubscriptDecl *subscript) {
+  // Revert the element type.
+  if (!subscript->getElementTypeLoc().isNull())
+    revertDependentTypeLoc(subscript->getElementTypeLoc());
+
+  // Revert the indices.
+  for (auto &param : *subscript->getIndices())
+    revertDependentTypeLoc(param->getTypeLoc());
+}
+
+GenericSignature *
+TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
+  bool invalid = false;
+
+  auto *gp = subscript->getGenericParams();
+  if (gp)
+    prepareGenericParamList(gp, subscript);
+
+  // Collect the generic parameters.
+  SmallVector<GenericTypeParamType *, 4> allGenericParams;
+  if (auto parentSig = subscript->getDeclContext()->getGenericSignatureOfContext())
+    allGenericParams.append(parentSig->getGenericParams().begin(),
+                            parentSig->getGenericParams().end());
+  addGenericParamTypes(gp, allGenericParams);
+
+  // Create the generic signature builder.
+  GenericSignatureBuilder builder(Context,
+                       LookUpConformanceInModule(subscript->getParentModule()));
+
+  // Type check the function declaration, treating all generic type
+  // parameters as dependent, unresolved.
+  DependentGenericTypeResolver dependentResolver(builder, allGenericParams);
+  if (checkGenericSubscriptSignature(*this, &builder, subscript,
+                                     dependentResolver))
+    invalid = true;
+
+  // Finalize the generic requirements.
+  (void)builder.finalize(subscript->getLoc(), allGenericParams);
+
+  // The generic signature builder now has all of the requirements, although
+  // there might still be errors that have not yet been diagnosed. Revert the
+  // generic function signature and type-check it again, completely.
+  revertGenericSubscriptSignature(subscript);
+  if (gp)
+    revertGenericParamList(gp);
+
+  CompleteGenericTypeResolver completeResolver(*this, builder,
+                                               allGenericParams);
+  if (checkGenericSubscriptSignature(*this, nullptr, subscript, completeResolver))
+    invalid = true;
+  if (builder.diagnoseRemainingRenames(subscript->getLoc(), allGenericParams))
+    invalid = true;
+
+  // The generic subscript signature is complete and well-formed. Determine
+  // the type of the generic subscript.
+  auto sig = builder.getGenericSignature();
+
+  if (!invalid)
+    invalid = checkProtocolSelfRequirements(sig, subscript, *this);
+
+  // Debugging of the generic signature builder and generic signature generation.
+  if (Context.LangOpts.DebugGenericSignatures) {
+    subscript->dumpRef(llvm::errs());
+    llvm::errs() << "\n";
+    builder.dump(llvm::errs());
+    llvm::errs() << "Generic signature: ";
+    sig->print(llvm::errs());
+    llvm::errs() << "\n";
+    llvm::errs() << "Canonical generic signature: ";
+    sig->getCanonicalSignature()->print(llvm::errs());
+    llvm::errs() << "\n";
+  }
+
+  if (invalid) {
+    subscript->setInterfaceType(ErrorType::get(Context));
+    subscript->setInvalid();
+    // null doesn't mean error here: callers still expect the signature.
+    return sig;
+  }
+
+  configureInterfaceType(subscript, sig);
+  return sig;
+}
+
+void TypeChecker::configureInterfaceType(SubscriptDecl *subscript,
+                                         GenericSignature *sig) {
+  auto elementTy = subscript->getElementTypeLoc().getType();
+  auto indicesTy = subscript->getIndices()->getInterfaceType(Context);
+  auto funcTy = FunctionType::get(indicesTy, elementTy);
+
+  // Record the interface type.
+  subscript->setInterfaceType(funcTy);
+
+  checkReferencedGenericParams(subscript, sig, *this);
 }
 
 ///
