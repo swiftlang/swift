@@ -182,7 +182,7 @@ function(_add_variant_c_compile_flags)
     list(APPEND result "-O2")
 
     # Omit leaf frame pointers on x86.
-    if("${CFLAGS_ARCH}" STREQUAL "i386" OR "${CFLAGS_ARCH}" STREQUAL "i686" OR "${CFLAGS_ARCH}" STREQUAL "x86_64")
+    if("${CFLAGS_ARCH}" STREQUAL "i386" OR "${CFLAGS_ARCH}" STREQUAL "i686")
       if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
         list(APPEND result "-momit-leaf-frame-pointer")
       else()
