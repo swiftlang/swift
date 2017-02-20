@@ -864,14 +864,44 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
 
     for (auto member : proto->lookupDirect(nestedName)) {
       PotentialArchetype *pa;
-      
+      std::function<void(Type, Type)> diagnoseMismatch;
+
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         // Resolve this nested type to this associated type.
         pa = new PotentialArchetype(this, assocType);
+
+        diagnoseMismatch = [&](Type first, Type second) {
+          llvm_unreachable(
+              "associated type shouldn't result in new mismatches");
+        };
       } else if (auto alias = dyn_cast<TypeAliasDecl>(member)) {
         // Resolve this nested type to this type alias.
         pa = new PotentialArchetype(this, alias);
 
+        diagnoseMismatch = [&](Type first, Type second) {
+          if (auto NAT = dyn_cast<NameAliasType>(first.getPointer())) {
+            if (NAT->getDecl() == member) {
+              // If we have typealias T = Foo and Foo is completely concrete
+              // (e.g. Array<Int?>), then the subst will leave the NameAliasType
+              // intact. However, this means, if there's a
+              // concrete-type-mismatch at the top level, the default error
+              // message will be "ProtocolName.T (aka Foo)", but the "T" bit is
+              // already in the error message so it's better to print only
+              // "Foo".
+              first = NAT->getSinglyDesugaredType();
+            }
+          }
+          builder.Diags.diagnose(member->getLoc(),
+                                 diag::protocol_typealias_conflict,
+                                 member->getName(), first, second);
+        };
+
+        // FIXME (recursive decl validation): if the alias doesn't have an
+        // interface type when getNestedType is called while building a
+        // protocol's generic signature (i.e. during validation), then it'll
+        // fail completely, because building that alias's interface type
+        // requires the protocol to be validated. This seems to occur when the
+        // alias's RHS involves archetypes from the protocol.
         if (!alias->hasInterfaceType())
           builder.getLazyResolver()->resolveDeclSignature(alias);
         if (!alias->hasInterfaceType())
@@ -891,7 +921,7 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
 
         builder.addSameTypeRequirement(ResolvedType::forNewTypeAlias(pa),
                                        builder.resolve(type),
-                                       sameNestedTypeSource);
+                                       sameNestedTypeSource, diagnoseMismatch);
       } else
         continue;
 
@@ -904,12 +934,14 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
 
         // Produce a same-type constraint between the two same-named
         // potential archetypes.
-        builder.addSameTypeRequirement(pa, nested.front(), sameNestedTypeSource);
+        builder.addSameTypeRequirement(pa, nested.front(), sameNestedTypeSource,
+                                       diagnoseMismatch);
       } else {
         nested.push_back(pa);
 
         if (repNested) {
-          builder.addSameTypeRequirement(pa, repNested, sameNestedTypeSource);
+          builder.addSameTypeRequirement(pa, repNested, sameNestedTypeSource,
+                                         diagnoseMismatch);
         }
       }
 
@@ -1478,8 +1510,14 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
         if (addInheritedRequirements(AssocType, AssocPA, Source, Visited))
           return true;
       }
-
-      continue;
+    } else if (auto TypeAlias = dyn_cast<TypeAliasDecl>(Member)) {
+        // FIXME: this should check that the typealias is makes sense (e.g. has
+        // the same/compatible type as typealiases in parent protocols) and
+        // set-up any same type requirements required. Forcing the PA to be
+        // created with getNestedType is currently worse than useless due to the
+        // 'recursive decl validation' FIXME in that function: it creates an
+        // unresolved PA that prints an error later.
+      (void)TypeAlias;
     }
 
     // FIXME: Requirement declarations.
