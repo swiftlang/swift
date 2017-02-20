@@ -2619,12 +2619,38 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   ProtocolDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
   HasMissingRequirements = false;
-  InheritedProtocolsSet = false;
 }
 
-ArrayRef<ProtocolDecl *>
-ProtocolDecl::getInheritedProtocols(LazyResolver *resolver) const {
-  return InheritedProtocols;
+llvm::TinyPtrVector<ProtocolDecl *>
+ProtocolDecl::getInheritedProtocols() const {
+  llvm::TinyPtrVector<ProtocolDecl *> result;
+
+  // FIXME: Gather inherited protocols from the "inherited" list.
+  // We shouldn't need this, but it shows up in recursive invocations.
+  if (!isRequirementSignatureComputed()) {
+    for (auto inherited : getInherited()) {
+      SmallPtrSet<ProtocolDecl *, 4> known;
+      if (auto type = inherited.getType()) {
+        SmallVector<ProtocolDecl *, 4> protocols;
+        if (type->isExistentialType(protocols)) {
+          for (auto proto : protocols) {
+            if (known.insert(proto).second)
+              result.push_back(proto);
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  // Gather inherited protocols from the requirement signature.
+  auto selfType = getProtocolSelfType();
+  for (auto req : getRequirementSignature()->getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance &&
+        req.getFirstType()->isEqual(selfType))
+      result.push_back(req.getSecondType()->castTo<ProtocolType>()->getDecl());
+  }
+  return result;
 }
 
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
@@ -2637,10 +2663,11 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
 }
 
 bool ProtocolDecl::requiresClassSlow() {
+  if (!isRequirementSignatureComputed()) return false;
+
   ProtocolDeclBits.RequiresClass = false;
 
   // Ensure that the result cannot change in future.
-  assert(isInheritedProtocolsValid());
 
   if (getAttrs().hasAttribute<ObjCAttr>() || isObjC()) {
     ProtocolDeclBits.RequiresClass = true;
@@ -2648,7 +2675,7 @@ bool ProtocolDecl::requiresClassSlow() {
   }
 
   // Check inherited protocols for class-ness.
-  for (auto *proto : getInheritedProtocols(nullptr)) {
+  for (auto *proto : getInheritedProtocols()) {
     if (proto->requiresClass()) {
       ProtocolDeclBits.RequiresClass = true;
       return true;
@@ -2689,7 +2716,7 @@ bool ProtocolDecl::existentialConformsToSelfSlow() {
   // Check whether any of the inherited protocols fail to conform to
   // themselves.
   // FIXME: does this need a resolver?
-  for (auto proto : getInheritedProtocols(nullptr)) {
+  for (auto proto : getInheritedProtocols()) {
     if (!proto->existentialConformsToSelf()) {
       ProtocolDeclBits.ExistentialConformsToSelf = false;
       return false;
@@ -2883,7 +2910,7 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
 
   // Check whether all of the inherited protocols can have existential
   // types themselves.
-  for (auto proto : getInheritedProtocols(resolver)) {
+  for (auto proto : getInheritedProtocols()) {
     if (!proto->existentialTypeSupported(resolver)) {
       ProtocolDeclBits.ExistentialTypeSupported = false;
       return false;
