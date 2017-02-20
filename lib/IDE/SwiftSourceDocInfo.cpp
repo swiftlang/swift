@@ -217,6 +217,10 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
     OS << "<Entry>Multi</Entry>\n";
   }
 
+  if (ThrowingUnhandledError) {
+    OS << "<Error>Throwing</Error>\n";
+  }
+
   if (Orphan != OrphanKind::None) {
     OS << "<Orphan>";
     switch (Orphan) {
@@ -258,6 +262,43 @@ bool DeclaredDecl::operator==(const DeclaredDecl& Other) {
 
 bool ReferencedDecl::operator==(const ReferencedDecl& Other) {
   return VD == Other.VD && Ty.getPointer() == Other.Ty.getPointer();
+}
+
+static bool hasUnhandledError(ArrayRef<ASTNode> Nodes) {
+  class ThrowingEntityAnalyzer : public SourceEntityWalker {
+    bool Throwing;
+  public:
+    ThrowingEntityAnalyzer(): Throwing(false) {}
+    bool walkToStmtPre(Stmt *S) override {
+      if (auto DCS = dyn_cast<DoCatchStmt>(S)) {
+        if (DCS->isSyntacticallyExhaustive())
+          return false;
+        Throwing = true;
+      } else if (auto TS = dyn_cast<ThrowStmt>(S)) {
+        Throwing = true;
+      }
+      return !Throwing;
+    }
+    bool walkToExprPre(Expr *E) override {
+      if (auto TE = dyn_cast<TryExpr>(E)) {
+        Throwing = true;
+      }
+      return !Throwing;
+    }
+    bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+      return false;
+    }
+    bool walkToDeclPost(Decl *D) override { return !Throwing; }
+    bool walkToStmtPost(Stmt *S) override { return !Throwing; }
+    bool walkToExprPost(Expr *E) override { return !Throwing; }
+    bool isThrowing() { return Throwing; }
+  };
+
+  return Nodes.end() != std::find_if(Nodes.begin(), Nodes.end(), [](ASTNode N) {
+    ThrowingEntityAnalyzer Analyzer;
+    N.walk(Analyzer);
+    return Analyzer.isThrowing();
+  });
 }
 
 struct RangeResolver::Implementation {
@@ -319,24 +360,28 @@ private:
     assert(ContainedASTNodes.size() == 1);
     // Single node implies single entry point, or is it?
     bool SingleEntry = true;
+    bool UnhandledError = hasUnhandledError({Node});
     OrphanKind Kind = getOrphanKind(ContainedASTNodes);
     if (Node.is<Expr*>())
       return ResolvedRangeInfo(RangeKind::SingleExpression,
                                resolveNodeType(Node), Content,
-                               getImmediateContext(), SingleEntry, Kind,
+                               getImmediateContext(), SingleEntry,
+                               UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     else if (Node.is<Stmt*>())
       return ResolvedRangeInfo(RangeKind::SingleStatement, resolveNodeType(Node),
-                               Content, getImmediateContext(), SingleEntry, Kind,
+                               Content, getImmediateContext(), SingleEntry,
+                               UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     else {
       assert(Node.is<Decl*>());
       return ResolvedRangeInfo(RangeKind::SingleDecl, Type(), Content,
-                               getImmediateContext(), SingleEntry, Kind,
+                               getImmediateContext(), SingleEntry,
+                               UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
@@ -606,6 +651,7 @@ public:
                 /* Last node has the type */
                 resolveNodeType(DCInfo.EndMatches.back()), Content,
                 getImmediateContext(), hasSingleEntryPoint(ContainedASTNodes),
+                hasUnhandledError(ContainedASTNodes),
                 getOrphanKind(ContainedASTNodes),
                 llvm::makeArrayRef(ContainedASTNodes),
                 llvm::makeArrayRef(DeclaredDecls),

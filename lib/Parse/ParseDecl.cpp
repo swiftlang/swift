@@ -3028,6 +3028,8 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
       // Evaluate the condition, to validate it.
       ConfigState = classifyConditionalCompilationExpr(Condition, Context,
                                                        Diags);
+      if (foundActive)
+        ConfigState.setConditionActive(false);
     }
 
     foundActive |= ConfigState.isConditionActive();
@@ -5442,7 +5444,8 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   auto *Subscript = new (Context) SubscriptDecl(name,
                                                 SubscriptLoc, Indices.get(),
                                                 ArrowLoc, ElementTy.get(),
-                                                CurDeclContext);
+                                                CurDeclContext,
+                                                /*GenericParams=*/nullptr);
   Subscript->getAttrs() = Attributes;
   
   Decls.push_back(Subscript);

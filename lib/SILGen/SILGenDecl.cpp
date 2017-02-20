@@ -1353,6 +1353,16 @@ SILGenFunction::emitTemporary(SILLocation loc, const TypeLowering &tempTL) {
   return useBufferAsTemporary(addr, tempTL);
 }
 
+std::unique_ptr<TemporaryInitialization>
+SILGenFunction::emitFormalAccessTemporary(SILLocation loc,
+                                          const TypeLowering &tempTL) {
+  SILValue addr = emitTemporaryAllocation(loc, tempTL.getLoweredType());
+  CleanupHandle cleanup =
+      enterDormantFormalAccessTemporaryCleanup(addr, loc, tempTL);
+  return std::unique_ptr<TemporaryInitialization>(
+      new TemporaryInitialization(addr, cleanup));
+}
+
 /// Create an Initialization for an uninitialized buffer.
 std::unique_ptr<TemporaryInitialization>
 SILGenFunction::useBufferAsTemporary(SILValue addr,
@@ -1370,6 +1380,90 @@ SILGenFunction::enterDormantTemporaryCleanup(SILValue addr,
 
   Cleanups.pushCleanupInState<ReleaseValueCleanup>(CleanupState::Dormant, addr);
   return Cleanups.getCleanupsDepth();
+}
+
+namespace {
+
+struct FormalAccessReleaseValueCleanup : Cleanup {
+  FormalEvaluationContext::stable_iterator Depth;
+
+  FormalAccessReleaseValueCleanup() : Depth() {}
+
+  void setState(SILGenFunction &gen, CleanupState newState) override {
+    if (newState == CleanupState::Dead) {
+      getEvaluation(gen).setFinished();
+    }
+
+    state = newState;
+  }
+
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    getEvaluation(gen).finish(gen);
+  }
+
+  void dump(SILGenFunction &gen) const override {
+#ifndef NDEBUG
+    llvm::errs() << "FormalAccessReleaseValueCleanup "
+                 << "State:" << getState() << "\n"
+                 << "Value:" << getValue(gen) << "\n";
+#endif
+  }
+
+  OwnedFormalAccess &getEvaluation(SILGenFunction &gen) const {
+    auto &evaluation = *gen.FormalEvalContext.find(Depth);
+    assert(evaluation.getKind() == FormalAccess::Owned);
+    return static_cast<OwnedFormalAccess &>(evaluation);
+  }
+
+  SILValue getValue(SILGenFunction &gen) const {
+    return getEvaluation(gen).getValue();
+  }
+};
+
+} // end anonymous namespace
+
+ManagedValue
+SILGenFunction::emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
+                                                         SILValue addr) {
+  assert(InWritebackScope && "Must be in formal evaluation scope");
+  auto &lowering = F.getTypeLowering(addr->getType());
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(addr);
+
+  auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
+  CleanupHandle handle = Cleanups.getTopCleanup();
+  FormalEvalContext.push<OwnedFormalAccess>(loc, handle, addr);
+  cleanup.Depth = FormalEvalContext.stable_begin();
+  return ManagedValue(addr, handle);
+}
+
+ManagedValue
+SILGenFunction::emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
+                                                         SILValue value) {
+  assert(InWritebackScope && "Must be in formal evaluation scope");
+  auto &lowering = F.getTypeLowering(value->getType());
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(value);
+
+  auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
+  CleanupHandle handle = Cleanups.getTopCleanup();
+  FormalEvalContext.push<OwnedFormalAccess>(loc, handle, value);
+  cleanup.Depth = FormalEvalContext.stable_begin();
+  return ManagedValue(value, handle);
+}
+
+CleanupHandle SILGenFunction::enterDormantFormalAccessTemporaryCleanup(
+    SILValue addr, SILLocation loc, const TypeLowering &tempTL) {
+  assert(InWritebackScope && "Must be in formal evaluation scope");
+  if (tempTL.isTrivial())
+    return CleanupHandle::invalid();
+
+  auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
+  CleanupHandle handle = Cleanups.getTopCleanup();
+  Cleanups.setCleanupState(handle, CleanupState::Dormant);
+  FormalEvalContext.push<OwnedFormalAccess>(loc, handle, addr);
+  cleanup.Depth = FormalEvalContext.stable_begin();
+  return handle;
 }
 
 void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {

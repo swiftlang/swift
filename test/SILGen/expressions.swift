@@ -547,7 +547,7 @@ func dontEmitIgnoredLoadExpr(_ a : NonTrivialStruct) -> NonTrivialStruct.Type {
 // CHECK: bb0(%0 : $Optional<((Int, Int), Int)>):
 func implodeRecursiveTuple(_ expr: ((Int, Int), Int)?) {
 
-  // CHECK:      [[WHOLE:%[0-9]+]] = unchecked_enum_data {{.*}} : $Optional<((Int, Int), Int)>
+  // CHECK: bb2([[WHOLE:%.*]] : $((Int, Int), Int)):
   // CHECK-NEXT: [[X:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 0
   // CHECK-NEXT: [[X0:%[0-9]+]] = tuple_extract [[X]] : $(Int, Int), 0
   // CHECK-NEXT: [[X1:%[0-9]+]] = tuple_extract [[X]] : $(Int, Int), 1

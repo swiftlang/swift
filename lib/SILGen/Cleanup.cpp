@@ -179,7 +179,7 @@ void CleanupManager::setCleanupState(Cleanup &cleanup, CleanupState state) {
   // Do the transition now to avoid doing it in N places below.
   CleanupState oldState = cleanup.getState();
   (void)oldState;
-  cleanup.setState(state);
+  cleanup.setState(Gen, state);
 
   assert(state != oldState && "trivial cleanup state change");
   assert(oldState != CleanupState::Dead && "changing state of dead cleanup");
@@ -201,7 +201,7 @@ void CleanupStateRestorationScope::pushCleanupState(CleanupHandle handle,
          "changing state of dead cleanup");
 
   CleanupState oldState = cleanup.getState();
-  cleanup.setState(newState);
+  cleanup.setState(Cleanups.Gen, newState);
 
   SavedStates.push_back({handle, oldState});
 }
@@ -229,7 +229,7 @@ void CleanupStateRestorationScope::pop() {
     Cleanup &cleanup = *iter;
     assert(cleanup.getState() != CleanupState::Dead &&
            "changing state of dead cleanup");
-    cleanup.setState(stateToRestore);
+    cleanup.setState(Cleanups.Gen, stateToRestore);
   }
 }
 
@@ -262,4 +262,11 @@ void CleanupManager::dump() const {
     Stack.checkIterator(begin);
   }
 #endif
+}
+
+void CleanupManager::dump(CleanupHandle handle) const {
+  auto iter = Stack.find(handle);
+  const Cleanup &stackCleanup = *iter;
+  llvm::errs() << "CLEANUP DEPTH: " << handle.getDepth() << "\n";
+  stackCleanup.dump(Gen);
 }

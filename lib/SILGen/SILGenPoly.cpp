@@ -473,11 +473,19 @@ ManagedValue Transform::transform(ManagedValue v,
                            v.getCleanup());
     }
 
-    // Upcast to a superclass.
-    return ManagedValue(SGF.B.createUpcast(Loc,
-                                           v.getValue(),
-                                           loweredResultTy),
-                        v.getCleanup());
+    if (outputSubstType->isExactSuperclassOf(inputSubstType, nullptr)) {
+      // Upcast to a superclass.
+      return ManagedValue(SGF.B.createUpcast(Loc,
+                                             v.getValue(),
+                                             loweredResultTy),
+                          v.getCleanup());
+    } else {
+      // Unchecked-downcast to a covariant return type.
+      assert(inputSubstType->isExactSuperclassOf(outputSubstType, nullptr)
+             && "should be inheritance relationship between input and output");
+      return SGF.emitManagedRValueWithCleanup(
+        SGF.B.createUncheckedRefCast(Loc, v.forward(SGF), loweredResultTy));      
+    }
   }
 
   //  - upcasts from an archetype

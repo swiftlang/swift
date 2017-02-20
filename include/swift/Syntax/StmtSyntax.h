@@ -48,7 +48,7 @@ public:
 ///            | compiler-control-statement ';'?
 class StmtSyntax : public Syntax {
 protected:
-  StmtSyntax(RC<SyntaxData> Root, StmtSyntaxData *Data);
+  StmtSyntax(const RC<SyntaxData> Root, const StmtSyntaxData *Data);
 public:
   static bool classof(const Syntax *S) {
     return S->isStmt();
@@ -189,22 +189,27 @@ class FallthroughStmtSyntaxData final : public StmtSyntaxData {
 
 public:
   static bool classof(const SyntaxData *SD) {
-    return SD->getKind() == SyntaxKind::StmtList;
+    return SD->getKind() == SyntaxKind::FallthroughStmt;
   }
 };
 
 #pragma mark -
 #pragma mark fallthrough-statement API
 
+/// fallthrough-statement -> 'fallthrough'
 class FallthroughStmtSyntax : public StmtSyntax {
   friend struct SyntaxFactory;
+  friend class SyntaxData;
+  friend class FallthroughStmtSyntaxData;
+
+  using DataType = FallthroughStmtSyntaxData;
 
   enum class Cursor : CursorIndex {
     FallthroughKeyword,
   };
 
   FallthroughStmtSyntax(const RC<SyntaxData> Root,
-                        FallthroughStmtSyntaxData *Data);
+                        const FallthroughStmtSyntaxData *Data);
 
   static FallthroughStmtSyntax make(RC<RawSyntax> Raw,
                                     const SyntaxData *Parent = nullptr,
@@ -212,8 +217,146 @@ class FallthroughStmtSyntax : public StmtSyntax {
   static FallthroughStmtSyntax makeBlank();
 
 public:
+
+  /// Get the 'fallthrough' keyword associated comprising this
+  /// fallthrough statement.
+  RC<TokenSyntax> getFallthroughKeyword() const;
+
+  /// Return a new FallthroughtStmtSyntax with the given fallthrough
+  /// keyword.
+  FallthroughStmtSyntax
+  withFallthroughKeyword(RC<TokenSyntax> NewFallthroughKeyword) const;
+
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::FallthroughStmt;
+  }
+};
+
+#pragma mark - break-statement Data
+
+class BreakStmtSyntaxData : public StmtSyntaxData {
+  friend class SyntaxData;
+  friend class BreakStmtSyntax;
+  friend struct SyntaxFactory;
+  BreakStmtSyntaxData(RC<RawSyntax> Raw,
+                            const SyntaxData *Parent = nullptr,
+                            CursorIndex IndexInParent = 0);
+  static RC<BreakStmtSyntaxData> make(RC<RawSyntax> Raw,
+                                      const SyntaxData *Parent = nullptr,
+                                      CursorIndex IndexInParent = 0);
+  static RC<BreakStmtSyntaxData> makeBlank();
+
+public:
+  static bool classof(const SyntaxData *SD) {
+    return SD->getKind() == SyntaxKind::BreakStmt;
+  }
+
+};
+
+#pragma mark - break-statement API
+
+/// break-statement -> 'break' label-name?
+/// label-name -> identifier
+class BreakStmtSyntax : public StmtSyntax {
+  friend struct SyntaxFactory;
+  friend class BreakStmtSyntaxData;
+  friend class SyntaxData;
+
+  using DataType = BreakStmtSyntaxData;
+
+  enum class Cursor : CursorIndex {
+    BreakKeyword,
+    Label
+  };
+
+  BreakStmtSyntax(const RC<SyntaxData> Root,
+                  BreakStmtSyntaxData *Data);
+
+  static BreakStmtSyntax make(RC<RawSyntax> Raw,
+                                    const SyntaxData *Parent = nullptr,
+                                    CursorIndex IndexInParent = 0);
+  static BreakStmtSyntax makeBlank();
+public:
+
+  /// Return the 'break' keyword associated with this break statement.
+  RC<TokenSyntax> getBreakKeyword() const;
+
+  /// Return a new `BreakStmtSyntax` with the given 'break' keyword.
+  BreakStmtSyntax withBreakKeyword(RC<TokenSyntax> NewBreakKeyword) const;
+
+  /// Return the destination label of this break statement. If it doesn't
+  /// have one, the token is marked as missing.
+  RC<TokenSyntax> getLabel() const;
+
+  /// Return a new `BreakStmtSyntax` with the given destination label.
+  BreakStmtSyntax withLabel(RC<TokenSyntax> NewLabel) const;
+
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::BreakStmt;
+  }
+};
+
+#pragma mark - continue-statement Data
+
+class ContinueStmtSyntaxData : public StmtSyntaxData {
+  friend class SyntaxData;
+  friend class ContinueStmtSyntax;
+  friend struct SyntaxFactory;
+  ContinueStmtSyntaxData(RC<RawSyntax> Raw,
+                      const SyntaxData *Parent = nullptr,
+                      CursorIndex IndexInParent = 0);
+  static RC<ContinueStmtSyntaxData> make(RC<RawSyntax> Raw,
+                                      const SyntaxData *Parent = nullptr,
+                                      CursorIndex IndexInParent = 0);
+  static RC<ContinueStmtSyntaxData> makeBlank();
+
+public:
+  static bool classof(const SyntaxData *SD) {
+    return SD->getKind() == SyntaxKind::ContinueStmt;
+  }
+
+};
+
+#pragma mark - continue-statement API
+
+/// continue-statement -> 'continue' label-name?
+/// label-name -> identifier
+class ContinueStmtSyntax : public StmtSyntax {
+  friend struct SyntaxFactory;
+  friend class ContinueStmtSyntaxData;
+  friend class SyntaxData;
+
+  using DataType = ContinueStmtSyntaxData;
+
+  enum class Cursor : CursorIndex {
+    ContinueKeyword,
+    Label
+  };
+
+  ContinueStmtSyntax(const RC<SyntaxData> Root,
+                     ContinueStmtSyntaxData *Data);
+
+  static ContinueStmtSyntax make(RC<RawSyntax> Raw,
+                                 const SyntaxData *Parent = nullptr,
+                                 CursorIndex IndexInParent = 0);
+  static ContinueStmtSyntax makeBlank();
+public:
+
+  /// Return the 'continue' keyword associated with this continue statement.
+  RC<TokenSyntax> getContinueKeyword() const;
+
+  /// Return a new `ContinueStmtSyntax` with the given 'continue' keyword.
+  ContinueStmtSyntax withContinueKeyword(RC<TokenSyntax> NewBreakKeyword) const;
+
+  /// Return the destination label of this break statement. If it doesn't
+  /// have one, the token is marked as continue.
+  RC<TokenSyntax> getLabel() const;
+
+  /// Return a new `ContinueStmtSyntax` with the given destination label.
+  ContinueStmtSyntax withLabel(RC<TokenSyntax> NewLabel) const;
+
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::ContinueStmt;
   }
 };
 

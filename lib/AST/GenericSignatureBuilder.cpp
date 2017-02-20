@@ -211,7 +211,7 @@ const RequirementSource *RequirementSource::forAbstract(
 
 const RequirementSource *RequirementSource::forExplicit(
                                              GenericSignatureBuilder &builder,
-                                             TypeRepr *typeRepr) {
+                                             const TypeRepr *typeRepr) {
   REQUIREMENT_SOURCE_FACTORY_BODY(Explicit, nullptr, typeRepr);
 }
 
@@ -223,7 +223,7 @@ const RequirementSource *RequirementSource::forExplicit(
 
 const RequirementSource *RequirementSource::forInferred(
                                               GenericSignatureBuilder &builder,
-                                              TypeRepr *typeRepr) {
+                                              const TypeRepr *typeRepr) {
   REQUIREMENT_SOURCE_FACTORY_BODY(Inferred, nullptr, typeRepr);
 }
 
@@ -310,7 +310,7 @@ int RequirementSource::compare(const RequirementSource *other) const {
   if (thisIsDerived != otherIsDerived)
     return thisIsDerived ? -1 : +1;
 
-  // FIXME: Arbitrary hack to allow later requirement sources to stop on
+  // FIXME: Arbitrary hack to allow later requirement sources to stomp on
   // earlier ones. We need a proper ordering here.
   return +1;
 }
@@ -702,7 +702,6 @@ static int compareDependentTypes(
   }
 
   // Make sure typealiases are properly ordered, to avoid crashers.
-  // FIXME: Ideally we would eliminate typealiases earlier.
   if (auto *aa = a->getTypeAliasDecl()) {
     auto *ab = b->getTypeAliasDecl();
     assert(ab != nullptr && "Should have handled this case above");
@@ -717,7 +716,6 @@ static int compareDependentTypes(
           = ProtocolType::compareProtocols(&protoa, &protob))
       return compareProtocols;
 
-    // FIXME: Arbitrarily break the result here.
     if (aa != ab)
       return aa < ab ? -1 : +1;
   }
@@ -1311,19 +1309,8 @@ bool GenericSignatureBuilder::addGenericParameterRequirements(
   auto PA = Impl->PotentialArchetypes[Key.findIndexIn(Impl->GenericParams)];
   
   // Add the requirements from the declaration.
-  // FIXME: addAbstractTypeParamRequirements() should supply the source itself
-  // based on a parent source.
-  const RequirementSource *source;
-  if (GenericParam->getInherited().size() > 0 &&
-      GenericParam->getInherited()[0].getTypeRepr()) {
-    source = RequirementSource::forExplicit(
-                                *this,
-                                GenericParam->getInherited()[0].getTypeRepr());
-  } else {
-    source = RequirementSource::forAbstract(*this);
-  }
   llvm::SmallPtrSet<ProtocolDecl *, 8> visited;
-  return addAbstractTypeParamRequirements(GenericParam, PA, source, visited);
+  return addInheritedRequirements(GenericParam, PA, nullptr, visited);
 }
 
 void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
@@ -1347,6 +1334,44 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   return addConformanceRequirement(PAT, Proto, Source, Visited);
 }
 
+/// Visit all of the types that show up in the list of inherited
+/// types.
+///
+/// \returns true if any of the invocations of \c visitor returned true.
+static bool visitInherited(
+                   ArrayRef<TypeLoc> inheritedTypes,
+                   llvm::function_ref<bool(Type, const TypeRepr *)> visitor) {
+  // Local function that (recursively) adds inherited types.
+  bool isInvalid = false;
+  std::function<void(Type, const TypeRepr *)> visitInherited;
+  visitInherited = [&](Type inheritedType, const TypeRepr *typeRepr) {
+    // Decompose protocol compositions.
+    auto composition = dyn_cast_or_null<CompositionTypeRepr>(typeRepr);
+    if (auto compositionType
+          = inheritedType->getAs<ProtocolCompositionType>()) {
+      unsigned index = 0;
+      for (auto protoType : compositionType->getProtocols()) {
+        if (composition && index < composition->getTypes().size())
+          visitInherited(protoType, composition->getTypes()[index]);
+        else
+          visitInherited(protoType, typeRepr);
+
+        ++index;
+      }
+      return;
+    }
+
+    isInvalid |= visitor(inheritedType, typeRepr);
+  };
+
+  // Visit all of the inherited types.
+  for (auto inherited : inheritedTypes) {
+    visitInherited(inherited.getType(), inherited.getTypeRepr());
+  }
+
+  return isInvalid;
+}
+
 bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
                                                  ProtocolDecl *Proto,
                                                  const RequirementSource *Source,
@@ -1361,8 +1386,9 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   bool inserted = Visited.insert(Proto).second;
   assert(inserted);
   (void) inserted;
-
-  auto InnerSource = Source->viaAbstractProtocolRequirement(*this, Proto);
+  SWIFT_DEFER {
+    Visited.erase(Proto);
+  };
 
   // Use the requirement signature to avoid rewalking the entire protocol.  This
   // cannot compute the requirement signature directly, because that may be
@@ -1374,46 +1400,41 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
     auto subMap = SubstitutionMap::getProtocolSubstitutions(
         Proto, concreteSelf, ProtocolConformanceRef(Proto));
 
+    auto innerSource = Source->viaAbstractProtocolRequirement(*this, Proto);
     for (auto rawReq : reqSig->getRequirements()) {
       auto req = rawReq.subst(subMap);
       assert(req && "substituting Self in requirement shouldn't fail");
-      addRequirement(*req, InnerSource, Visited);
-    }
-  } else {
-    // Add all of the inherited protocol requirements, recursively.
-    if (auto resolver = getLazyResolver())
-      resolver->resolveInheritedProtocols(Proto);
-
-    for (auto InheritedProto :
-         Proto->getInheritedProtocols(getLazyResolver())) {
-      if (Visited.count(InheritedProto)) {
-        markPotentialArchetypeRecursive(T, InheritedProto, InnerSource);
-        continue;
-      }
-      if (addConformanceRequirement(T, InheritedProto, InnerSource, Visited))
+      if (addRequirement(*req, innerSource, Visited))
         return true;
     }
 
-    // Add requirements for each of the associated types.
-    for (auto Member : getProtocolMembers(Proto)) {
-      if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
-        // Add requirements placed directly on this associated type.
-        auto AssocPA = T->getNestedType(AssocType, *this);
-
-        if (AssocPA != T) {
-          if (addAbstractTypeParamRequirements(AssocType, AssocPA, InnerSource,
-                                               Visited))
-            return true;
-        }
-
-        continue;
-      }
-
-      // FIXME: Requirement declarations.
-    }
+    return false;
   }
 
-  Visited.erase(Proto);
+  // Add all of the inherited protocol requirements, recursively.
+  if (auto resolver = getLazyResolver())
+    resolver->resolveInheritedProtocols(Proto);
+
+  if (addInheritedRequirements(Proto, PAT, Source, Visited))
+    return true;
+
+  // Add requirements for each of the associated types.
+  for (auto Member : getProtocolMembers(Proto)) {
+    if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
+      // Add requirements placed directly on this associated type.
+      auto AssocPA = T->getNestedType(AssocType, *this);
+
+      if (AssocPA != T) {
+        if (addInheritedRequirements(AssocType, AssocPA, Source, Visited))
+          return true;
+      }
+
+      continue;
+    }
+
+    // FIXME: Requirement declarations.
+  }
+
   return false;
 }
 
@@ -1520,11 +1541,28 @@ bool GenericSignatureBuilder::addSuperclassRequirement(PotentialArchetype *T,
     // then the second `U: Foo<T>` constraint introduces a `T == Int`
     // constraint.
     } else if (!Superclass->isExactSuperclassOf(T->Superclass, nullptr)) {
-      Diags.diagnose(Source->getLoc(),
-                     diag::requires_superclass_conflict,
-                     T->getDependentType(/*FIXME: */{ }, true),
-                     T->Superclass, Superclass)
-        .highlight(T->SuperclassSource->getLoc());
+      if (Source->getLoc().isValid()) {
+        // Figure out what kind of subject we have; it will affect the
+        // diagnostic.
+        auto subjectType = T->getDependentType(/*FIXME: */{ }, true);
+        unsigned kind;
+        if (auto gp = subjectType->getAs<GenericTypeParamType>()) {
+          if (gp->getDecl() &&
+              isa<ProtocolDecl>(gp->getDecl()->getDeclContext())) {
+            kind = 1;
+            subjectType = cast<ProtocolDecl>(gp->getDecl()->getDeclContext())
+                            ->getDeclaredInterfaceType();
+          } else {
+            kind = 0;
+          }
+        } else {
+          kind = 2;
+        }
+
+        Diags.diagnose(Source->getLoc(), diag::requires_superclass_conflict,
+                       kind, subjectType, T->Superclass, Superclass)
+          .highlight(T->SuperclassSource->getLoc());
+      }
       return true;
     }
 
@@ -1813,67 +1851,66 @@ void GenericSignatureBuilder::markPotentialArchetypeRecursive(
   assocType->setInvalid();
 }
 
-bool GenericSignatureBuilder::addAbstractTypeParamRequirements(
-       AbstractTypeParamDecl *decl,
-       PotentialArchetype *pa,
-       const RequirementSource *source,
-       llvm::SmallPtrSetImpl<ProtocolDecl *> &visited) {
+bool GenericSignatureBuilder::addInheritedRequirements(
+                             TypeDecl *decl,
+                             PotentialArchetype *pa,
+                             const RequirementSource *parentSource,
+                             llvm::SmallPtrSetImpl<ProtocolDecl *> &visited) {
   if (isa<AssociatedTypeDecl>(decl) &&
       decl->hasInterfaceType() &&
       decl->getInterfaceType()->is<ErrorType>())
     return false;
 
-  // Otherwise, walk the 'inherited' list to identify requirements.
+  // Walk the 'inherited' list to identify requirements.
   if (auto resolver = getLazyResolver())
     resolver->resolveInheritanceClause(decl);
-  return visitInherited(decl->getInherited(), [&](Type inheritedType,
-                                                  SourceLoc loc) -> bool {
+
+  return visitInherited(
+                    decl->getInherited(),
+                    [&](Type inheritedType, const TypeRepr *typeRepr) -> bool {
+    // Local function to get the source.
+    auto getSource = [&] {
+      if (parentSource) {
+        if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
+          // FIXME: Pass along the typeRepr!
+          auto proto = assocType->getProtocol();
+          return parentSource->viaAbstractProtocolRequirement(*this, proto);
+        }
+
+        // FIXME: Pass along the typeRepr.
+        auto proto = cast<ProtocolDecl>(decl);
+        return parentSource->viaAbstractProtocolRequirement(*this, proto);
+      }
+
+      // Explicit requirement.
+      if (typeRepr)
+        return RequirementSource::forExplicit(*this, typeRepr);
+
+      // An abstract explicit requirement.
+      return RequirementSource::forAbstract(*this);
+    };
+
     // Protocol requirement.
     if (auto protocolType = inheritedType->getAs<ProtocolType>()) {
       if (visited.count(protocolType->getDecl())) {
-        markPotentialArchetypeRecursive(pa, protocolType->getDecl(), source);
+        markPotentialArchetypeRecursive(pa, protocolType->getDecl(),
+                                        getSource());
 
         return true;
       }
 
-      return addConformanceRequirement(pa, protocolType->getDecl(), source,
+      return addConformanceRequirement(pa, protocolType->getDecl(), getSource(),
                                        visited);
     }
 
     // Superclass requirement.
     if (inheritedType->getClassOrBoundGenericClass()) {
-      return addSuperclassRequirement(pa, inheritedType, source);
+      return addSuperclassRequirement(pa, inheritedType, getSource());
     }
 
     // Note: anything else is an error, to be diagnosed later.
     return false;
   });
-}
-
-bool GenericSignatureBuilder::visitInherited(
-       ArrayRef<TypeLoc> inheritedTypes,
-       llvm::function_ref<bool(Type, SourceLoc)> visitor) {
-  // Local function that (recursively) adds inherited types.
-  bool isInvalid = false;
-  std::function<void(Type, SourceLoc)> visitInherited;
-  visitInherited = [&](Type inheritedType, SourceLoc loc) {
-    // Decompose protocol compositions.
-    if (auto compositionType
-          = inheritedType->getAs<ProtocolCompositionType>()) {
-      for (auto protoType : compositionType->getProtocols())
-        visitInherited(protoType, loc);
-      return;
-    }
-
-    isInvalid |= visitor(inheritedType, loc);
-  };
-
-  // Visit all of the inherited types.
-  for (auto inherited : inheritedTypes) {
-    visitInherited(inherited.getType(), inherited.getLoc());
-  }
-
-  return isInvalid;
 }
 
 bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req) {

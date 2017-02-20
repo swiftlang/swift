@@ -45,8 +45,8 @@ struct LValueWritebackCleanup : Cleanup {
 
   void emit(SILGenFunction &gen, CleanupLocation loc) override {
     auto &evaluation = *gen.FormalEvalContext.find(Depth);
-    assert(evaluation.getKind() == FormalEvaluation::Exclusive);
-    auto &lvalue = static_cast<LValueWriteback &>(evaluation);
+    assert(evaluation.getKind() == FormalAccess::Exclusive);
+    auto &lvalue = static_cast<ExclusiveBorrowFormalAccess &>(evaluation);
     lvalue.performWriteback(gen, /*isFinal*/ false);
   }
 
@@ -75,8 +75,8 @@ static void pushWriteback(SILGenFunction &gen,
       gen.Cleanups.pushCleanup<LValueWritebackCleanup>();
   CleanupHandle handle = gen.Cleanups.getTopCleanup();
 
-  context.push<LValueWriteback>(loc, std::move(comp), base, materialized,
-                                handle);
+  context.push<ExclusiveBorrowFormalAccess>(loc, std::move(comp), base,
+                                            materialized, handle);
   cleanup.Depth = context.stable_begin();
 }
 
@@ -150,14 +150,10 @@ public:
                                        AccessKind accessKind);
 };
 
-static ManagedValue emitGetIntoTemporary(SILGenFunction &gen,
-                                         SILLocation loc,
-                                         ManagedValue base,
-                                         LogicalPathComponent &&component) {
-  // Create a temporary.
-  auto temporaryInit =
-    gen.emitTemporary(loc, gen.getTypeLowering(component.getTypeOfRValue()));
-
+static ManagedValue
+emitGetIntoTemporary(SILGenFunction &gen, SILLocation loc, ManagedValue base,
+                     std::unique_ptr<TemporaryInitialization> &&temporaryInit,
+                     LogicalPathComponent &&component) {
   // Emit a 'get' into the temporary.
   RValue value =
     std::move(component).get(gen, loc, base, SGFContext(temporaryInit.get()));
@@ -177,7 +173,12 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
   // If this is just for a read, emit a load into a temporary memory
   // location.
   if (kind == AccessKind::Read) {
-    return emitGetIntoTemporary(gen, loc, base, std::move(*this));
+    // Create a temporary.
+    std::unique_ptr<TemporaryInitialization> temporaryInit =
+        gen.emitFormalAccessTemporary(loc,
+                                      gen.getTypeLowering(getTypeOfRValue()));
+    return emitGetIntoTemporary(gen, loc, base, std::move(temporaryInit),
+                                std::move(*this));
   }
 
   assert(gen.InWritebackScope &&
@@ -189,15 +190,21 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
 
   ManagedValue temporary;
   {
+    // Create a temporary.
+    std::unique_ptr<TemporaryInitialization> temporaryInit =
+        gen.emitFormalAccessTemporary(loc,
+                                      gen.getTypeLowering(getTypeOfRValue()));
+
     FormalEvaluationScope Scope(gen);
 
     // Otherwise, we need to emit a get and set.  Borrow the base for
     // the getter.
     ManagedValue getterBase =
-        base ? base.formalEvaluationBorrow(gen, loc) : ManagedValue();
+        base ? base.formalAccessBorrow(gen, loc) : ManagedValue();
 
     // Emit a 'get' into a temporary and then pop the borrow of base.
-    temporary = emitGetIntoTemporary(gen, loc, getterBase, std::move(*this));
+    temporary = emitGetIntoTemporary(
+        gen, loc, getterBase, std::move(temporaryInit), std::move(*this));
   }
 
   // Push a writeback for the temporary.
@@ -388,11 +395,9 @@ namespace {
     
     ManagedValue offset(SILGenFunction &gen, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
-      // Assert that the optional value is present.
-      gen.emitPreconditionOptionalHasValue(loc, base.getValue());
-
-      // Project out the payload.
-      return getAddressOfOptionalValue(gen, loc, base, getTypeData());
+      // Assert that the optional value is present and return the projected out
+      // payload.
+      return gen.emitPreconditionOptionalHasValue(loc, base);
     }
 
     void print(raw_ostream &OS) const override {
@@ -803,7 +808,7 @@ namespace {
         // If the base is a +1 r-value, just borrow it for materializeForSet.
         // prepareAccessorArgs will copy it if necessary.
         ManagedValue borrowedBase =
-            base ? base.formalEvaluationBorrow(gen, loc) : ManagedValue();
+            base ? base.formalAccessBorrow(gen, loc) : ManagedValue();
 
         auto args = std::move(*this).prepareAccessorArgs(gen, loc, borrowedBase,
                                                          materializeForSet);
@@ -2020,10 +2025,12 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
       return ManagedValue::forUnmanaged(addr);
         
     // Copy the address-only value.
-    SILValue copy = getBufferForExprResult(loc, rvalueTL.getLoweredType(), C);
-    emitSemanticLoadInto(loc, addr, addrTL, copy, rvalueTL,
-                         isTake, IsInitialization);
-    return manageBufferForExprResult(copy, rvalueTL, C);
+    return B.bufferForExpr(
+        loc, rvalueTL.getLoweredType(), rvalueTL, C,
+        [&](SILValue newAddr) {
+          emitSemanticLoadInto(loc, addr, addrTL, newAddr, rvalueTL,
+                               isTake, IsInitialization);
+        });
   }
 
   // Ok, this is something loadable.  If this is a non-take access at plus zero,
@@ -2446,18 +2453,14 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
 void SILGenFunction::emitAssignLValueToLValue(SILLocation loc,
                                               LValue &&src,
                                               LValue &&dest) {
-  auto skipPeephole = [&]{
-    RValue loaded = emitLoadOfLValue(loc, std::move(src), SGFContext());
-    emitAssignToLValue(loc, std::move(loaded), std::move(dest));
-  };
-  
   // Only perform the peephole if both operands are physical and there's no
   // semantic conversion necessary.
-  if (!src.isPhysical())
-    return skipPeephole();
-  if (!dest.isPhysical())
-    return skipPeephole();
-  
+  if (!src.isPhysical() || !dest.isPhysical()) {
+    RValue loaded = emitLoadOfLValue(loc, std::move(src), SGFContext());
+    emitAssignToLValue(loc, std::move(loaded), std::move(dest));
+    return;
+  }
+
   auto srcAddr = emitAddressOfLValue(loc, std::move(src), AccessKind::Read)
                    .getUnmanagedValue();
   auto destAddr = emitAddressOfLValue(loc, std::move(dest), AccessKind::Write)

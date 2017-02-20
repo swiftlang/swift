@@ -333,7 +333,7 @@ findDeclContextForType(TypeChecker &TC,
 
       // If not, walk into the superclass and inherited protocols, if any.
       if (auto *protoDecl = dyn_cast<ProtocolDecl>(parentNominal)) {
-        for (auto *refined : protoDecl->getInheritedProtocols(&TC))
+        for (auto *refined : protoDecl->getInheritedProtocols())
           pushDecl(refined);
       } else {
         if (auto *classDecl = dyn_cast<ClassDecl>(parentNominal))

@@ -35,6 +35,7 @@
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/Subsystems.h"
 
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Mutex.h"
 
@@ -976,6 +977,8 @@ static UIdent getAccessibilityUID(Accessibility Access) {
   case Accessibility::Open:
     return AccessOpen;
   }
+
+  llvm_unreachable("Unhandled Accessibility in switch.");
 }
 
 static Accessibility inferDefaultAccessibility(const ExtensionDecl *ED) {
@@ -1023,6 +1026,8 @@ static Accessibility inferAccessibility(const ValueDecl *D) {
   case DeclContextKind::ExtensionDecl:
     return inferDefaultAccessibility(cast<ExtensionDecl>(DC));
   }
+
+  llvm_unreachable("Unhandled DeclContextKind in switch.");
 }
 
 static Optional<Accessibility>

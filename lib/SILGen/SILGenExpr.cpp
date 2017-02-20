@@ -154,8 +154,8 @@ struct EndBorrowCleanup : Cleanup {
 #ifndef NDEBUG
     llvm::errs() << "EndBorrowCleanup "
                  << "State:" << getState() << "\n"
-                 << "original:" << originalValue << "\n"
-                 << "borrowed:" << borrowedValue << "\n";
+                 << "original:" << originalValue << "borrowed:" << borrowedValue
+                 << "\n";
 #endif
   }
 };
@@ -178,10 +178,10 @@ struct FormalEvaluationEndBorrowCleanup : Cleanup {
 #endif
   }
 
-  SharedBorrowFormalEvaluation &getEvaluation(SILGenFunction &gen) const {
+  SharedBorrowFormalAccess &getEvaluation(SILGenFunction &gen) const {
     auto &evaluation = *gen.FormalEvalContext.find(Depth);
-    assert(evaluation.getKind() == FormalEvaluation::Shared);
-    return static_cast<SharedBorrowFormalEvaluation &>(evaluation);
+    assert(evaluation.getKind() == FormalAccess::Shared);
+    return static_cast<SharedBorrowFormalAccess &>(evaluation);
   }
 
   SILValue getOriginalValue(SILGenFunction &gen) const {
@@ -239,11 +239,11 @@ SILGenFunction::emitFormalEvaluationManagedBorrowedRValueWithCleanup(
   }
 
   assert(InWritebackScope && "Must be in formal evaluation scope");
-  Cleanups.pushCleanup<FormalEvaluationEndBorrowCleanup>();
+  auto &cleanup = Cleanups.pushCleanup<FormalEvaluationEndBorrowCleanup>();
   CleanupHandle handle = Cleanups.getTopCleanup();
-  FormalEvalContext.push<SharedBorrowFormalEvaluation>(loc, handle, original,
-                                                       borrowed);
-
+  FormalEvalContext.push<SharedBorrowFormalAccess>(loc, handle, original,
+                                                   borrowed);
+  cleanup.Depth = FormalEvalContext.stable_begin();
   return ManagedValue(borrowed, CleanupHandle::invalid());
 }
 
@@ -970,18 +970,13 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
   return alloc;
 }
 
-// Return an initialization address we can emit directly into.
-static SILValue getAddressForInPlaceInitialization(const Initialization *I) {
-  return I ? I->getAddressForInPlaceInitialization() : SILValue();
-}
-
 SILValue SILGenFunction::
 getBufferForExprResult(SILLocation loc, SILType ty, SGFContext C) {
   // If you change this, change manageBufferForExprResult below as well.
 
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  if (SILValue address = getAddressForInPlaceInitialization(C.getEmitInto()))
+  if (SILValue address = C.getAddressForInPlaceInitialization())
     return address;
   
   // If we couldn't emit into the Initialization, emit into a temporary
@@ -994,7 +989,7 @@ manageBufferForExprResult(SILValue buffer, const TypeLowering &bufferTL,
                           SGFContext C) {
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  if (getAddressForInPlaceInitialization(C.getEmitInto())) {
+  if (C.getAddressForInPlaceInitialization()) {
     C.getEmitInto()->finishInitialization(*this);
     return ManagedValue::forInContext();
   }
@@ -3092,6 +3087,10 @@ namespace {
   };
 } // end anonymous namespace
 
+// Return an initialization address we can emit directly into.
+static SILValue getAddressForInPlaceInitialization(const Initialization *I) {
+  return I ? I->getAddressForInPlaceInitialization() : SILValue();
+}
 
 /// emitOptimizedOptionalEvaluation - Look for cases where we can short-circuit
 /// evaluation of an OptionalEvaluationExpr by pattern matching the AST.

@@ -4,6 +4,8 @@
 # where some compiler crashers have been fixed, and move them into the
 # "fixed" testsuite, removing the "--crash" in the process.
 
+from __future__ import print_function
+
 import os
 import re
 import sys

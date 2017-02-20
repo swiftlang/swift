@@ -4035,18 +4035,8 @@ namespace {
     }
 
     Decl *VisitObjCInterfaceDecl(const clang::ObjCInterfaceDecl *decl) {
-      Optional<ImportedName> correctSwiftName;
-      auto importedName = importFullName(decl, correctSwiftName);
-      if (!importedName) return nullptr;
-
-      // If we've been asked to produce a Swift 2 stub, handle it via a
-      // typealias.
-      if (correctSwiftName)
-        return importSwift2TypeAlias(decl, importedName, *correctSwiftName);
-
-      auto name = importedName.getDeclName().getBaseName();
-
-      auto createRootClass = [=](DeclContext *dc = nullptr) -> ClassDecl * {
+      auto createRootClass = [=](Identifier name,
+                                 DeclContext *dc = nullptr) -> ClassDecl * {
         if (!dc) {
           dc = Impl.getClangModuleForDecl(decl->getCanonicalDecl(),
                                           /*allowForwardDeclaration=*/true);
@@ -4081,10 +4071,25 @@ namespace {
         const ClassDecl *nsObjectDecl =
           nsObjectTy->getClassOrBoundGenericClass();
 
-        auto result = createRootClass(nsObjectDecl->getDeclContext());
+        auto result = createRootClass(Impl.SwiftContext.Id_Protocol,
+                                      nsObjectDecl->getDeclContext());
         result->setForeignClassKind(ClassDecl::ForeignKind::RuntimeOnly);
         return result;
       }
+
+      if (auto *definition = decl->getDefinition())
+        decl = definition;
+
+      Optional<ImportedName> correctSwiftName;
+      auto importedName = importFullName(decl, correctSwiftName);
+      if (!importedName) return nullptr;
+
+      // If we've been asked to produce a Swift 2 stub, handle it via a
+      // typealias.
+      if (correctSwiftName)
+        return importSwift2TypeAlias(decl, importedName, *correctSwiftName);
+
+      auto name = importedName.getDeclName().getBaseName();
 
       if (!decl->hasDefinition()) {
         // Check if this class is implemented in its adapter.
@@ -4097,7 +4102,7 @@ namespace {
 
         if (Impl.ImportForwardDeclarations) {
           // Fake it by making an unavailable opaque @objc root class.
-          auto result = createRootClass();
+          auto result = createRootClass(name);
           result->setImplicit();
           auto attr = AvailableAttr::createPlatformAgnostic(Impl.SwiftContext,
               "This Objective-C class has only been forward-declared; "
@@ -4109,9 +4114,6 @@ namespace {
         forwardDeclaration = true;
         return nullptr;
       }
-
-      decl = decl->getDefinition();
-      assert(decl);
 
       auto dc =
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
@@ -5984,16 +5986,18 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   auto subscript = Impl.createDeclWithClangNode<SubscriptDecl>(
       getter->getClangNode(), getOverridableAccessibility(dc), name,
       decl->getLoc(), bodyParams, decl->getLoc(),
-      TypeLoc::withoutLoc(elementContextTy), dc);
+      TypeLoc::withoutLoc(elementContextTy), dc,
+      /*GenericParams=*/nullptr);
 
   /// Record the subscript as an alternative declaration.
   Impl.addAlternateDecl(associateWithSetter ? setter : getter, subscript);
+
+  subscript->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
   subscript->makeComputed(SourceLoc(), getterThunk, setterThunk, nullptr,
                           SourceLoc());
   auto indicesType = bodyParams->getType(C);
 
-  // TODO: no good when generics are around
   auto fnType = FunctionType::get(indicesType, elementTy);
   subscript->setInterfaceType(fnType);
 
@@ -6041,7 +6045,7 @@ void SwiftDeclConverter::addProtocols(
     return;
 
   protocols.push_back(protocol);
-  for (auto inherited : protocol->getInheritedProtocols(Impl.getTypeResolver()))
+  for (auto inherited : protocol->getInheritedProtocols())
     addProtocols(inherited, protocols, known);
 }
 
@@ -6069,15 +6073,8 @@ void SwiftDeclConverter::importObjCProtocols(
 
 void SwiftDeclConverter::addObjCProtocolConformances(
     Decl *decl, ArrayRef<ProtocolDecl *> protocols) {
-  // Set the inherited protocols of a protocol.
-  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-    // Copy the list of protocols.
-    MutableArrayRef<ProtocolDecl *> allProtocols =
-        Impl.SwiftContext.AllocateCopy(protocols);
-    proto->setInheritedProtocols(allProtocols);
-
-    return;
-  }
+  // Nothing to do for protocols.
+  if (isa<ProtocolDecl>(decl)) return;
 
   Impl.recordImportedProtocols(decl, protocols);
 
@@ -6925,7 +6922,7 @@ void ClangImporter::Implementation::finishProtocolConformance(
 
   // And make sure any inherited conformances also get completed, if necessary.
   SmallVector<ProtocolDecl *, 8> inheritedProtos;
-  for (auto *inherited : proto->getInheritedProtocols(/*resolver=*/nullptr)) {
+  for (auto *inherited : proto->getInheritedProtocols()) {
     inheritedProtos.push_back(inherited);
   }
   // Sort for deterministic import.

@@ -235,6 +235,7 @@ struct ResolvedRangeInfo {
   Type Ty;
   StringRef Content;
   bool HasSingleEntry;
+  bool ThrowingUnhandledError;
   OrphanKind Orphan;
 
   // The topmost ast nodes contained in the given range.
@@ -244,20 +245,20 @@ struct ResolvedRangeInfo {
   DeclContext* RangeContext;
   ResolvedRangeInfo(RangeKind Kind, Type Ty, StringRef Content,
                     DeclContext* RangeContext,
-                    bool HasSingleEntry,
-                    OrphanKind Orphan,
-                    ArrayRef<ASTNode> ContainedNodes,
+                    bool HasSingleEntry, bool ThrowingUnhandledError,
+                    OrphanKind Orphan, ArrayRef<ASTNode> ContainedNodes,
                     ArrayRef<DeclaredDecl> DeclaredDecls,
                     ArrayRef<ReferencedDecl> ReferencedDecls): Kind(Kind),
                       Ty(Ty), Content(Content), HasSingleEntry(HasSingleEntry),
-                      Orphan(Orphan),
-                      ContainedNodes(ContainedNodes),
+                      ThrowingUnhandledError(ThrowingUnhandledError),
+                      Orphan(Orphan), ContainedNodes(ContainedNodes),
                       DeclaredDecls(DeclaredDecls),
                       ReferencedDecls(ReferencedDecls),
                       RangeContext(RangeContext) {}
   ResolvedRangeInfo() :
   ResolvedRangeInfo(RangeKind::Invalid, Type(), StringRef(), nullptr,
-                    /*Single entry*/true, OrphanKind::None, {}, {}, {}) {}
+                    /*Single entry*/true, /*unhandled error*/false,
+                    OrphanKind::None, {}, {}, {}) {}
   void print(llvm::raw_ostream &OS);
 };
 

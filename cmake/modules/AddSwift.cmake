@@ -186,34 +186,49 @@ function(_add_variant_c_compile_flags)
       list(APPEND result "-momit-leaf-frame-pointer")
     endif()
   else()
-    list(APPEND result "-O0")
-  endif()
-  is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
-  if(debuginfo)
-    _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
-    if(_lto_flag_out)
-      list(APPEND result "-gline-tables-only")
+    if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+      list(APPEND result "-O0")
     else()
-      list(APPEND result "-g")
+      list(APPEND result "/Od")
     endif()
-  else()
-    list(APPEND result "-g0")
+  endif()
+
+  # CMake automatically adds the flags for debug info if we use MSVC/clang-cl.
+  if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+    is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
+    if(debuginfo)
+      _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
+      if(_lto_flag_out)
+        list(APPEND result "-gline-tables-only")
+      else()
+        list(APPEND result "-g")
+      endif()
+    else()
+      list(APPEND result "-g0")
+    endif()
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
-    list(APPEND result -Xclang;--dependent-lib=oldnames)
-    # TODO(compnerd) handle /MT, /MTd, /MD, /MDd
-    if("${CMAKE_BUILD_TYPE}" STREQUAL "RELEASE")
-      list(APPEND result "-D_MD")
-      list(APPEND result -Xclang;--dependent-lib=msvcrt)
-    else()
-      list(APPEND result "-D_MDd")
-      list(APPEND result -Xclang;--dependent-lib=msvcrtd)
+    # MSVC doesn't support -Xclang. We don't need to manually specify
+    # -D_MD or D_MDd either, as CMake does this automatically.
+    if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
+      list(APPEND result -Xclang;--dependent-lib=oldnames)
+      # TODO(compnerd) handle /MT, /MTd, /MD, /MDd
+      if("${CMAKE_BUILD_TYPE}" STREQUAL "RELEASE")
+        list(APPEND result "-D_MD")
+        list(APPEND result -Xclang;--dependent-lib=msvcrt)
+      else()
+        list(APPEND result "-D_MDd")
+        list(APPEND result -Xclang;--dependent-lib=msvcrtd)
+      endif()
     endif()
-    list(APPEND result -fno-pic)
-  endif()
 
-  if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
+    # MSVC/clang-cl don't support -fno-pic or -fms-compatability-version.
+    if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+      list(APPEND result -fno-pic)
+      list(APPEND result "-fms-compatibility-version=1900")
+    endif()
+
     list(APPEND result "-DLLVM_ON_WIN32")
     list(APPEND result "-D_CRT_SECURE_NO_WARNINGS")
     list(APPEND result "-D_CRT_NONSTDC_NO_WARNINGS")
@@ -221,7 +236,6 @@ function(_add_variant_c_compile_flags)
     list(APPEND result "-D_CRT_USE_WINAPI_FAMILY_DESKTOP_APP")
     # TODO(compnerd) handle /MT
     list(APPEND result "-D_DLL")
-    list(APPEND result "-fms-compatibility-version=1900")
   endif()
 
   if(CFLAGS_ENABLE_ASSERTIONS)
@@ -321,9 +335,12 @@ function(_add_variant_link_flags)
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
     # No extra libraries required.
   elseif("${LFLAGS_SDK}" STREQUAL "WINDOWS")
-    # NOTE: we do not use "/MD" or "/MDd" and select the runtime via linker
-    # options.  This causes conflicts.
-    list(APPEND result "-nostdlib")
+    # We don't need to add -nostdlib using MSVC or clang-cl, as MSVC and clang-cl rely on auto-linking entirely.
+    if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+      # NOTE: we do not use "/MD" or "/MDd" and select the runtime via linker
+      # options. This causes conflicts.
+      list(APPEND result "-nostdlib")
+    endif()
   elseif("${LFLAGS_SDK}" STREQUAL "ANDROID")
     list(APPEND result
         "-ldl"
@@ -351,15 +368,17 @@ function(_add_variant_link_flags)
   if(NOT "${SWIFT_${LFLAGS_SDK}_ICU_I18N}" STREQUAL "")
     list(APPEND library_search_directories "${SWIFT_${sdk}_ICU_I18N}")
   endif()
-  
-  if(SWIFT_ENABLE_GOLD_LINKER AND
-     "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-    list(APPEND result "-fuse-ld=gold")
-  endif()
-  if(SWIFT_ENABLE_LLD_LINKER OR
-     ("${LFLAGS_SDK}" STREQUAL "WINDOWS" AND
-      NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
-    list(APPEND result "-fuse-ld=lld")
+
+  if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+    if(SWIFT_ENABLE_GOLD_LINKER AND
+       "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
+      list(APPEND result "-fuse-ld=gold")
+    endif()
+    if(SWIFT_ENABLE_LLD_LINKER OR
+       ("${LFLAGS_SDK}" STREQUAL "WINDOWS" AND
+        NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
+      list(APPEND result "-fuse-ld=lld")
+    endif()
   endif()
 
   set("${LFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)

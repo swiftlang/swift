@@ -36,25 +36,8 @@
 namespace swift {
 namespace syntax {
 
-class ArrayTypeSyntax;
-class CodeBlockStmtSyntax;
-class DeclMembersSyntax;
-class DictionaryTypeSyntax;
-class FallthroughStmtSyntax;
-class FunctionTypeSyntax;
-class GenericParameterSyntax;
-class GenericWhereClauseSyntax;
-class ImplicitlyUnwrappedOptionalTypeSyntax;
-class MetatypeTypeSyntax;
-class OptionalTypeSyntax;
-class SameTypeRequirementSyntax;
-class StmtListSyntax;
-class StructDeclSyntax;
-class TupleTypeElementSyntax;
-class TupleTypeSyntax;
-class TypeArgumentListSyntax;
-class TypeAttributesSyntax;
-class TypeAliasDeclSyntax;
+#define SYNTAX(Id, Parent) class Id##Syntax;
+#include "swift/Syntax/SyntaxKinds.def"
 class UnknownSyntax;
 struct TokenSyntax;
 
@@ -106,12 +89,45 @@ struct SyntaxFactory {
   /// marked as missing.
   static FallthroughStmtSyntax makeBlankFallthroughStmt();
 
+  /// Make a break statement with the give `break` keyword and
+  /// destination label.
+  static BreakStmtSyntax
+  makeBreakStmt(RC<TokenSyntax> BreakKeyword, RC<TokenSyntax> Label);
+
+  /// Make a break statement with the `break` keyword
+  /// and destination label marked as missing.
+  static BreakStmtSyntax makeBlankBreakStmtSyntax();
+
+  /// Make a continue statement with the give `continue` keyword and
+  /// destination label.
+  static ContinueStmtSyntax
+  makeContinueStmt(RC<TokenSyntax> ContinueKeyword, RC<TokenSyntax> Label);
+
+  /// Make a continue statement with the `continue` keyword
+  /// and destination label marked as missing.
+  static ContinueStmtSyntax makeBlankContinueStmtSyntax();
+
 #pragma mark - Tokens
+
+  /// Make a 'fallthrough' keyword with the specified leading and
+  /// trailing trivia.
+  static RC<TokenSyntax> makeFallthroughKeyword(const Trivia &LeadingTrivia,
+                                                const Trivia &TrailingTrivia);
 
   /// Make an at-sign '@' token with the specified leading and
   /// trailing trivia.
   static RC<TokenSyntax> makeAtSignToken(const Trivia &LeadingTrivia,
                                          const Trivia &TrailingTrivia);
+
+  /// Make a 'break' keyword with the specified leading and
+  /// trailing trivia.
+  static RC<TokenSyntax> makeBreakKeyword(const Trivia &LeadingTrivia,
+                                          const Trivia &TrailingTrivia);
+
+  /// Make a 'continue' keyword with the specified leading and
+  /// trailing trivia.
+  static RC<TokenSyntax> makeContinueKeyword(const Trivia &LeadingTrivia,
+                                             const Trivia &TrailingTrivia);
 
   /// Make a left angle '<' token with the specified leading and
   /// trailing trivia.

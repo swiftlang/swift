@@ -1,5 +1,5 @@
-add_swift_host_tool(swift-format
-  swift-format.cpp
+add_swift_host_tool(swift-syntax-format
+  swift-syntax-format.cpp
   LINK_LIBRARIES
     swiftAST
     swiftDriver

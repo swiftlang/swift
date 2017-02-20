@@ -1087,9 +1087,6 @@ public:
   /// Introduce the accessors for a 'lazy' variable.
   void introduceLazyVarAccessors(VarDecl *var) override;
 
-  // Not all protocol members are requirements.
-  bool isRequirement(const ValueDecl *requirement);
-
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);
 
@@ -1221,7 +1218,7 @@ public:
                               GenericTypeResolver *resolver = nullptr);
 
   /// Retrieve the set of inherited protocols for this protocol type.
-  ArrayRef<ProtocolDecl *> getDirectConformsTo(ProtocolDecl *proto);
+  llvm::TinyPtrVector<ProtocolDecl *> getDirectConformsTo(ProtocolDecl *proto);
 
   /// \brief Add any implicitly-defined constructors required for the given
   /// struct or class.

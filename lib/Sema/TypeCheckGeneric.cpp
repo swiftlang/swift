@@ -23,6 +23,10 @@
 
 using namespace swift;
 
+///
+/// GenericTypeResolver implementations
+///
+
 Type DependentGenericTypeResolver::resolveGenericTypeParamType(
                                      GenericTypeParamType *gp) {
   assert(gp->getDecl() && "Missing generic parameter declaration");
@@ -230,6 +234,10 @@ CompleteGenericTypeResolver::recordParamType(ParamDecl *decl, Type type) {
   decl->setInterfaceType(type);
 }
 
+///
+/// Common code for generic functions, generic types
+///
+
 /// Check the generic parameters in the given generic parameter list (and its
 /// parent generic parameter lists) according to the given resolver.
 void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
@@ -355,6 +363,86 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
   }
 }
 
+void
+TypeChecker::prepareGenericParamList(GenericParamList *gp,
+                                     DeclContext *dc) {
+  Accessibility access;
+  if (auto *fd = dyn_cast<FuncDecl>(dc))
+    access = fd->getFormalAccess();
+  else if (auto *nominal = dyn_cast<NominalTypeDecl>(dc))
+    access = nominal->getFormalAccess();
+  else
+    access = Accessibility::Internal;
+  access = std::max(access, Accessibility::Internal);
+
+  unsigned depth = gp->getDepth();
+  for (auto paramDecl : *gp) {
+    paramDecl->setDepth(depth);
+    if (!paramDecl->hasAccessibility())
+      paramDecl->setAccessibility(access);
+  }
+}
+
+/// Add the generic parameter types from the given list to the vector.
+static void addGenericParamTypes(GenericParamList *gpList,
+                                 SmallVectorImpl<GenericTypeParamType *> &params) {
+  if (!gpList) return;
+
+  for (auto gpDecl : *gpList) {
+    params.push_back(
+            gpDecl->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
+  }
+}
+
+static void revertDependentTypeLoc(TypeLoc &tl) {
+  // If there's no type representation, there's nothing to revert.
+  if (!tl.getTypeRepr())
+    return;
+
+  // Don't revert an error type; we've already complained.
+  if (tl.wasValidated() && tl.isError())
+    return;
+
+  // Make sure we validate the type again.
+  tl.setType(Type(), /*validated=*/false);
+}
+
+/// Revert the dependent types within the given generic parameter list.
+void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
+  // Revert the inherited clause of the generic parameter list.
+  for (auto param : *genericParams) {
+    param->setCheckedInheritanceClause(false);
+    for (auto &inherited : param->getInherited())
+      revertDependentTypeLoc(inherited);
+  }
+
+  // Revert the requirements of the generic parameter list.
+  for (auto &req : genericParams->getRequirements()) {
+    if (req.isInvalid())
+      continue;
+
+    switch (req.getKind()) {
+    case RequirementReprKind::TypeConstraint: {
+      revertDependentTypeLoc(req.getSubjectLoc());
+      revertDependentTypeLoc(req.getConstraintLoc());
+      break;
+    }
+    case RequirementReprKind::LayoutConstraint: {
+      revertDependentTypeLoc(req.getSubjectLoc());
+      break;
+    }
+    case RequirementReprKind::SameType:
+      revertDependentTypeLoc(req.getFirstTypeLoc());
+      revertDependentTypeLoc(req.getSecondTypeLoc());
+      break;
+    }
+  }
+}
+
+///
+/// Generic functions
+///
+
 /// Check the signature of a generic function.
 static bool checkGenericFuncSignature(TypeChecker &tc,
                                       GenericSignatureBuilder *builder,
@@ -409,6 +497,20 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   return badType;
 }
 
+void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
+  // Revert the result type.
+  if (auto fn = dyn_cast<FuncDecl>(func))
+    if (!fn->getBodyResultTypeLoc().isNull())
+      revertDependentTypeLoc(fn->getBodyResultTypeLoc());
+
+  // Revert the body parameter types.
+  for (auto paramList : func->getParameterLists()) {
+    for (auto &param : *paramList) {
+      revertDependentTypeLoc(param->getTypeLoc());
+    }
+  }
+}
+
 /// Determine whether the given type is \c Self, an associated type of \c Self,
 /// or a concrete type.
 static bool isSelfDerivedOrConcrete(Type protoSelf, Type type) {
@@ -427,35 +529,43 @@ static bool isSelfDerivedOrConcrete(Type protoSelf, Type type) {
   return false;
 }
 
-void
-TypeChecker::prepareGenericParamList(GenericParamList *gp,
-                                     DeclContext *dc) {
-  Accessibility access;
-  if (auto *fd = dyn_cast<FuncDecl>(dc))
-    access = fd->getFormalAccess();
-  else if (auto *nominal = dyn_cast<NominalTypeDecl>(dc))
-    access = nominal->getFormalAccess();
-  else
-    access = Accessibility::Internal;
-  access = std::max(access, Accessibility::Internal);
+// For a generic requirement in a protocol, make sure that the requirement
+// set didn't add any requirements to Self or its associated types.
+static bool checkProtocolSelfRequirements(GenericSignature *sig,
+                                          ValueDecl *decl,
+                                          TypeChecker &TC) {
+  // For a generic requirement in a protocol, make sure that the requirement
+  // set didn't add any requirements to Self or its associated types.
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+    auto protoSelf = proto->getSelfInterfaceType();
+    for (auto req : sig->getRequirements()) {
+      // If one of the types in the requirement is dependent on a non-Self
+      // type parameter, this requirement is okay.
+      if (!isSelfDerivedOrConcrete(protoSelf, req.getFirstType()) ||
+          !isSelfDerivedOrConcrete(protoSelf, req.getSecondType()))
+        continue;
 
-  unsigned depth = gp->getDepth();
-  for (auto paramDecl : *gp) {
-    paramDecl->setDepth(depth);
-    if (!paramDecl->hasAccessibility())
-      paramDecl->setAccessibility(access);
+      // The conformance of 'Self' to the protocol is okay.
+      if (req.getKind() == RequirementKind::Conformance &&
+          req.getSecondType()->getAs<ProtocolType>()->getDecl() == proto &&
+          req.getFirstType()->is<GenericTypeParamType>())
+        continue;
+
+      TC.diagnose(decl,
+                  TC.Context.LangOpts.EffectiveLanguageVersion[0] >= 4
+                    ? diag::requirement_restricts_self
+                    : diag::requirement_restricts_self_swift3,
+                  decl->getDescriptiveKind(), decl->getFullName(),
+                  req.getFirstType().getString(),
+                  static_cast<unsigned>(req.getKind()),
+                  req.getSecondType().getString());
+
+      if (TC.Context.LangOpts.EffectiveLanguageVersion[0] >= 4)
+        return true;
+    }
   }
-}
 
-/// Add the generic parameter types from the given list to the vector.
-static void addGenericParamTypes(GenericParamList *gpList,
-                                 SmallVectorImpl<GenericTypeParamType *> &params) {
-  if (!gpList) return;
-
-  for (auto gpDecl : *gpList) {
-    params.push_back(
-            gpDecl->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
-  }
+  return false;
 }
 
 GenericSignature *
@@ -504,38 +614,8 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   // the type of the generic function.
   auto sig = builder.getGenericSignature();
 
-  // For a generic requirement in a protocol, make sure that the requirement
-  // set didn't add any requirements to Self or its associated types.
-  if (!invalid && func->getGenericParams() &&
-      isa<ProtocolDecl>(func->getDeclContext())) {
-    auto proto = cast<ProtocolDecl>(func->getDeclContext());
-    auto protoSelf = proto->getSelfInterfaceType();
-    for (auto req : sig->getRequirements()) {
-      // If one of the types in the requirement is dependent on a non-Self
-      // type parameter, this requirement is okay.
-      if (!isSelfDerivedOrConcrete(protoSelf, req.getFirstType()) ||
-          !isSelfDerivedOrConcrete(protoSelf, req.getSecondType()))
-        continue;
-
-      // The conformance of 'Self' to the protocol is okay.
-      if (req.getKind() == RequirementKind::Conformance &&
-          req.getSecondType()->getAs<ProtocolType>()->getDecl() == proto &&
-          req.getFirstType()->is<GenericTypeParamType>())
-        continue;
-
-      diagnose(func,
-               Context.LangOpts.EffectiveLanguageVersion[0] >= 4
-                 ? diag::requirement_restricts_self
-                 : diag::requirement_restricts_self_swift3,
-               func->getDescriptiveKind(), func->getFullName(),
-               req.getFirstType().getString(),
-               static_cast<unsigned>(req.getKind()),
-               req.getSecondType().getString());
-
-      if (Context.LangOpts.EffectiveLanguageVersion[0] >= 4)
-        invalid = true;
-    }
-  }
+  if (!invalid)
+    invalid = checkProtocolSelfRequirements(sig, func, *this);
 
   // Debugging of the generic signature builder and generic signature generation.
   if (Context.LangOpts.DebugGenericSignatures) {
@@ -696,6 +776,10 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
   }
 }
 
+///
+/// Generic types
+///
+
 /// Visit the given generic parameter lists from the outermost to the innermost,
 /// calling the visitor function for each list.
 static void visitOuterToInner(
@@ -807,51 +891,6 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
   return sig->createGenericEnvironment(*module);
 }
 
-static void revertDependentTypeLoc(TypeLoc &tl) {
-  // If there's no type representation, there's nothing to revert.
-  if (!tl.getTypeRepr())
-    return;
-
-  // Don't revert an error type; we've already complained.
-  if (tl.wasValidated() && tl.isError())
-    return;
-
-  // Make sure we validate the type again.
-  tl.setType(Type(), /*validated=*/false);
-}
-
-/// Revert the dependent types within the given generic parameter list.
-void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
-  // Revert the inherited clause of the generic parameter list.
-  for (auto param : *genericParams) {
-    param->setCheckedInheritanceClause(false);
-    for (auto &inherited : param->getInherited())
-      revertDependentTypeLoc(inherited);
-  }
-
-  // Revert the requirements of the generic parameter list.
-  for (auto &req : genericParams->getRequirements()) {
-    if (req.isInvalid())
-      continue;
-
-    switch (req.getKind()) {
-    case RequirementReprKind::TypeConstraint: {
-      revertDependentTypeLoc(req.getSubjectLoc());
-      revertDependentTypeLoc(req.getConstraintLoc());
-      break;
-    }
-    case RequirementReprKind::LayoutConstraint: {
-      revertDependentTypeLoc(req.getSubjectLoc());
-      break;
-    }
-    case RequirementReprKind::SameType:
-      revertDependentTypeLoc(req.getFirstTypeLoc());
-      revertDependentTypeLoc(req.getSecondTypeLoc());
-      break;
-    }
-  }
-}
-
 void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   auto *gp = typeDecl->getGenericParams();
   auto *dc = typeDecl->getDeclContext();
@@ -871,19 +910,9 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   typeDecl->setGenericEnvironment(env);
 }
 
-void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
-  // Revert the result type.
-  if (auto fn = dyn_cast<FuncDecl>(func))
-    if (!fn->getBodyResultTypeLoc().isNull())
-      revertDependentTypeLoc(fn->getBodyResultTypeLoc());
-
-  // Revert the body parameter types.
-  for (auto paramList : func->getParameterLists()) {
-    for (auto &param : *paramList) {
-      revertDependentTypeLoc(param->getTypeLoc());
-    }
-  }
-}
+///
+/// Checking bound generic type arguments
+///
 
 std::pair<bool, bool> TypeChecker::checkGenericArguments(
     DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
@@ -981,17 +1010,4 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
   }
 
   return std::make_pair(false, true);
-}
-
-Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
-                                 ProtocolConformanceRef conformance,
-                                 Identifier name,
-                                 Diag<> brokenProtocolDiag) {
-  Type ty = ProtocolConformanceRef::getTypeWitnessByName(type, conformance,
-                                                         name, this);
-  if (!ty &&
-      !(conformance.isConcrete() && conformance.getConcrete()->isInvalid()))
-    diagnose(protocol->getLoc(), brokenProtocolDiag);
-
-  return ty;
 }

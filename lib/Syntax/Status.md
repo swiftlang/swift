@@ -54,6 +54,12 @@ Include the following in each entry:
 - fallthrough-statement
   - `FallthroughStmtSyntax`
 
+- break-statement
+  - `BreakStmtSyntax`
+
+- continue-statement
+  - `ContinueStmtSyntax`
+
 ### Types
 
 - type
@@ -162,7 +168,6 @@ Include the following in each entry:
 - binary-operator
 - boolean-literal
 - branch-statement
-- break-statement
 - capture-list
 - capture-list-item
 - capture-list-items
@@ -188,7 +193,6 @@ Include the following in each entry:
 - conditional-operator
 - conformance-requirement
 - constant-declaration
-- continue-statement
 - control-transfer-statement
 - decimal-exponent
 - decimal-fraction

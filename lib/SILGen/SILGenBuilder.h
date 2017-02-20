@@ -20,6 +20,7 @@ namespace swift {
 namespace Lowering {
 
 class SILGenFunction;
+class SGFContext;
 
 /// A subclass of SILBuilder that tracks used protocol conformances and will
 /// eventually only traffic in ownership endowed APIs.
@@ -54,39 +55,37 @@ public:
   // Metatype instructions use the conformances necessary to instantiate the
   // type.
 
-  MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype);
+  MetatypeInst *createMetatype(SILLocation loc, SILType metatype);
 
   // Generic apply instructions use the conformances necessary to form the call.
 
   using SILBuilder::createApply;
 
-  ApplyInst *createApply(SILLocation Loc, SILValue Fn, SILType SubstFnTy,
-                         SILType Result, SubstitutionList Subs,
-                         ArrayRef<SILValue> Args);
+  ApplyInst *createApply(SILLocation loc, SILValue fn, SILType SubstFnTy,
+                         SILType result, SubstitutionList subs,
+                         ArrayRef<SILValue> args);
 
   TryApplyInst *createTryApply(SILLocation loc, SILValue fn, SILType substFnTy,
                                SubstitutionList subs,
                                ArrayRef<SILValue> args, SILBasicBlock *normalBB,
                                SILBasicBlock *errorBB);
 
-  PartialApplyInst *createPartialApply(SILLocation Loc, SILValue Fn,
-                                       SILType SubstFnTy,
-                                       SubstitutionList Subs,
-                                       ArrayRef<SILValue> Args,
-                                       SILType ClosureTy);
+  PartialApplyInst *createPartialApply(SILLocation loc, SILValue fn,
+                                       SILType substFnTy, SubstitutionList subs,
+                                       ArrayRef<SILValue> args,
+                                       SILType closureTy);
 
-  BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
-                             SubstitutionList Subs,
-                             ArrayRef<SILValue> Args);
+  BuiltinInst *createBuiltin(SILLocation loc, Identifier name, SILType resultTy,
+                             SubstitutionList subs, ArrayRef<SILValue> args);
 
   // Existential containers use the conformances needed by the existential
   // box.
 
   InitExistentialAddrInst *
-  createInitExistentialAddr(SILLocation Loc, SILValue Existential,
-                            CanType FormalConcreteType,
-                            SILType LoweredConcreteType,
-                            ArrayRef<ProtocolConformanceRef> Conformances);
+  createInitExistentialAddr(SILLocation loc, SILValue existential,
+                            CanType formalConcreteType,
+                            SILType loweredConcreteType,
+                            ArrayRef<ProtocolConformanceRef> conformances);
 
   InitExistentialMetatypeInst *
   createInitExistentialMetatype(SILLocation loc, SILValue metatype,
@@ -94,14 +93,14 @@ public:
                                 ArrayRef<ProtocolConformanceRef> conformances);
 
   InitExistentialRefInst *
-  createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
-                           CanType FormalConcreteType, SILValue Concrete,
-                           ArrayRef<ProtocolConformanceRef> Conformances);
+  createInitExistentialRef(SILLocation loc, SILType existentialType,
+                           CanType formalConcreteType, SILValue concreteValue,
+                           ArrayRef<ProtocolConformanceRef> conformances);
 
   AllocExistentialBoxInst *
-  createAllocExistentialBox(SILLocation Loc, SILType ExistentialType,
-                            CanType ConcreteType,
-                            ArrayRef<ProtocolConformanceRef> Conformances);
+  createAllocExistentialBox(SILLocation loc, SILType existentialType,
+                            CanType concreteType,
+                            ArrayRef<ProtocolConformanceRef> conformances);
 
   //===---
   // Ownership Endowed APIs
@@ -110,31 +109,84 @@ public:
   using SILBuilder::createStructExtract;
   using SILBuilder::createCopyValue;
   using SILBuilder::createCopyUnownedValue;
-  ManagedValue createStructExtract(SILLocation Loc, ManagedValue Base,
-                                   VarDecl *Decl);
+  ManagedValue createStructExtract(SILLocation loc, ManagedValue base,
+                                   VarDecl *decl);
 
-  ManagedValue createCopyValue(SILLocation Loc, ManagedValue OriginalValue);
+  /// Emit a +1 copy on \p originalValue that lives until the end of the current
+  /// lexical scope.
+  ManagedValue createCopyValue(SILLocation loc, ManagedValue originalValue);
 
-  ManagedValue createCopyUnownedValue(SILLocation Loc,
-                                      ManagedValue OriginalValue);
+  /// Emit a +1 copy on \p originalValue that lives until the end of the current
+  /// lexical scope.
+  ///
+  /// This reuses a passed in lowering.
+  ManagedValue createCopyValue(SILLocation loc, ManagedValue originalValue,
+                               const TypeLowering &lowering);
 
-  ManagedValue createUnsafeCopyUnownedValue(SILLocation Loc,
-                                            ManagedValue OriginalValue);
-  ManagedValue createOwnedPHIArgument(SILType Type);
+  /// Emit a +1 copy of \p originalValue into newAddr that lives until the end
+  /// of the current Formal Evaluation Scope.
+  ManagedValue createFormalAccessCopyAddr(SILLocation loc,
+                                          ManagedValue originalAddr,
+                                          SILValue newAddr, IsTake_t isTake,
+                                          IsInitialization_t isInit);
+
+  /// Emit a +1 copy of \p originalValue into newAddr that lives until the end
+  /// Formal Evaluation Scope.
+  ManagedValue createFormalAccessCopyValue(SILLocation loc,
+                                           ManagedValue originalValue);
+
+  ManagedValue createCopyUnownedValue(SILLocation loc,
+                                      ManagedValue originalValue);
+
+  ManagedValue createUnsafeCopyUnownedValue(SILLocation loc,
+                                            ManagedValue originalValue);
+  ManagedValue createOwnedPHIArgument(SILType type);
 
   using SILBuilder::createAllocRef;
-  ManagedValue createAllocRef(SILLocation Loc, SILType RefType, bool objc, bool canAllocOnStack,
-                              ArrayRef<SILType> ElementTypes,
-                              ArrayRef<ManagedValue> ElementCountOperands);
+  ManagedValue createAllocRef(SILLocation loc, SILType refType, bool objc,
+                              bool canAllocOnStack,
+                              ArrayRef<SILType> elementTypes,
+                              ArrayRef<ManagedValue> elementCountOperands);
   using SILBuilder::createAllocRefDynamic;
-  ManagedValue createAllocRefDynamic(SILLocation Loc, ManagedValue Operand, SILType RefType, bool objc,
-                                     ArrayRef<SILType> ElementTypes,
-                                     ArrayRef<ManagedValue> ElementCountOperands);
+  ManagedValue
+  createAllocRefDynamic(SILLocation loc, ManagedValue operand, SILType refType,
+                        bool objc, ArrayRef<SILType> elementTypes,
+                        ArrayRef<ManagedValue> elementCountOperands);
 
   using SILBuilder::createTupleExtract;
-  ManagedValue createTupleExtract(SILLocation Loc, ManagedValue Value, unsigned Index,
-                                  SILType Type);
-  ManagedValue createTupleExtract(SILLocation Loc, ManagedValue Value, unsigned Index);
+
+  ManagedValue createTupleExtract(SILLocation loc, ManagedValue value,
+                                  unsigned index, SILType type);
+  ManagedValue createTupleExtract(SILLocation loc, ManagedValue value,
+                                  unsigned index);
+
+  using SILBuilder::createLoadBorrow;
+  ManagedValue createLoadBorrow(SILLocation loc, ManagedValue base);
+  ManagedValue createFormalAccessLoadBorrow(SILLocation loc, ManagedValue base);
+
+  /// Prepares a buffer to receive the result of an expression, either using the
+  /// 'emit into' initialization buffer if available, or allocating a temporary
+  /// allocation if not. After the buffer has been prepared, the rvalueEmitter
+  /// closure will be called with the buffer ready for initialization. After the
+  /// emitter has been called, the buffer will complete its initialization.
+  ///
+  /// \return an empty value if the buffer was taken from the context.
+  ManagedValue bufferForExpr(SILLocation loc, SILType ty,
+                             const TypeLowering &lowering,
+                             SGFContext context,
+                             std::function<void(SILValue)> rvalueEmitter);
+
+  using SILBuilder::createUncheckedEnumData;
+  ManagedValue createUncheckedEnumData(SILLocation loc, ManagedValue operand,
+                                       EnumElementDecl *element);
+
+  using SILBuilder::createUncheckedTakeEnumDataAddr;
+  ManagedValue createUncheckedTakeEnumDataAddr(SILLocation loc, ManagedValue operand,
+                                               EnumElementDecl *element, SILType ty);
+
+  ManagedValue createLoadTake(SILLocation loc, ManagedValue addr);
+  ManagedValue createLoadTake(SILLocation loc, ManagedValue addr,
+                              const TypeLowering &lowering);
 };
 
 } // namespace Lowering

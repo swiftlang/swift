@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
-// Disabled for optimization until rdar://problem/30579713 is fixed.
-// REQUIRES: swift_test_mode_optimize_none
-
 import StdlibUnittest
 import StdlibCollectionUnittest
 

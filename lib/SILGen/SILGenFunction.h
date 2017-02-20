@@ -104,7 +104,16 @@ public:
   Initialization *getEmitInto() const {
     return state.getPointer();
   }
-  
+
+  /// If we have an emit into, return the address of the emit into. Otherwise,
+  /// return an empty SILValue.
+  SILValue getAddressForInPlaceInitialization() const {
+    if (auto *init = getEmitInto()) {
+      return init->getAddressForInPlaceInitialization();
+    }
+    return SILValue();
+  }
+
   /// Return true if a ManagedValue producer is allowed to return at
   /// +0, given that it cannot guarantee that the value will be valid
   /// until the end of the current evaluation.
@@ -398,6 +407,7 @@ public:
   }
   
   SILFunction &getFunction() { return F; }
+  SILModule &getModule() { return F.getModule(); }
   SILGenBuilder &getBuilder() { return B; }
   
   const TypeLowering &getTypeLowering(AbstractionPattern orig, Type subst) {
@@ -774,8 +784,10 @@ public:
   SILValue emitDoesOptionalHaveValue(SILLocation loc, SILValue addrOrValue);
 
   /// \brief Emit a switch_enum to call the library intrinsic
-  /// _diagnoseUnexpectedNilOptional if the optional has no value.
-  void emitPreconditionOptionalHasValue(SILLocation loc, SILValue addr);
+  /// _diagnoseUnexpectedNilOptional if the optional has no value. Return the
+  /// MangedValue resulting from the success case.
+  ManagedValue emitPreconditionOptionalHasValue(SILLocation loc,
+                                                ManagedValue optional);
 
   /// \brief Emit a call to the library intrinsic _getOptionalValue
   /// given the address of the optional, which checks that an optional contains
@@ -1126,6 +1138,11 @@ public:
   ManagedValue emitManagedBufferWithCleanup(SILValue addr);
   ManagedValue emitManagedBufferWithCleanup(SILValue addr,
                                             const TypeLowering &lowering);
+
+  ManagedValue emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
+                                                        SILValue value);
+  ManagedValue emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
+                                                        SILValue addr);
 
   void emitSemanticLoadInto(SILLocation loc, SILValue src,
                             const TypeLowering &srcLowering,
@@ -1533,6 +1550,14 @@ public:
   std::unique_ptr<TemporaryInitialization>
   emitTemporary(SILLocation loc, const TypeLowering &tempTL);
 
+  /// Emit the allocation for a local temporary, provides an
+  /// Initialization that can be used to initialize it, and registers
+  /// cleanups in the current active formal evaluation scope.
+  ///
+  /// The initialization is guaranteed to be a single buffer.
+  std::unique_ptr<TemporaryInitialization>
+  emitFormalAccessTemporary(SILLocation loc, const TypeLowering &tempTL);
+
   /// Provides an Initialization that can be used to initialize an already-
   /// allocated temporary, and registers cleanups in the active scope.
   ///
@@ -1544,6 +1569,12 @@ public:
   /// given address.
   CleanupHandle enterDormantTemporaryCleanup(SILValue temp,
                                              const TypeLowering &tempTL);
+
+  /// Enter a currently-dormant cleanup to destroy the value in the
+  /// given address.
+  CleanupHandle
+  enterDormantFormalAccessTemporaryCleanup(SILValue temp, SILLocation loc,
+                                           const TypeLowering &tempTL);
 
   /// Destroy and deallocate an initialized local variable.
   void destroyLocalVariable(SILLocation L, VarDecl *D);

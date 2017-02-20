@@ -230,10 +230,6 @@ struct RawSyntax : public llvm::ThreadSafeRefCountedBase<RawSyntax> {
     return Kind >= SyntaxKind::First_Stmt && Kind <= SyntaxKind::Last_Stmt;
   }
 
-
-  RC<RawSyntax> indent(unsigned Count, TriviaKind TrivKind,
-                       unsigned Depth = 0) const;
-
   /// Get the absolute position of this raw syntax: its offset, line,
   /// and column.
   AbsolutePosition getAbsolutePosition(RC<RawSyntax> Root) const;

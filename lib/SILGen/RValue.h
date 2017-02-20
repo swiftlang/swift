@@ -9,12 +9,15 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// A storage structure for holding a destructured rvalue with an optional
-// cleanup(s).
-// Ownership of the rvalue can be "forwarded" to disable the associated
-// cleanup(s).
-//
+///
+/// \file
+///
+/// A storage structure for holding a destructured rvalue with an optional
+/// cleanup(s).
+///
+/// Ownership of the rvalue can be "forwarded" to disable the associated
+/// cleanup(s).
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_LOWERING_RVALUE_H

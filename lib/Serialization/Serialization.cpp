@@ -2687,12 +2687,9 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(proto->getDeclContext());
 
-    SmallVector<DeclID, 8> protocolsAndInherited;
-    for (auto proto : proto->getInheritedProtocols(nullptr))
-      protocolsAndInherited.push_back(addDeclRef(proto));
-    unsigned numProtocols = protocolsAndInherited.size();
-    for (auto inherited : proto->getInherited())
-      protocolsAndInherited.push_back(addTypeRef(inherited.getType()));
+    SmallVector<DeclID, 8> inherited;
+    for (auto element : proto->getInherited())
+      inherited.push_back(addTypeRef(element.getType()));
 
     uint8_t rawAccessLevel =
       getRawStableAccessibility(proto->getFormalAccess());
@@ -2708,8 +2705,7 @@ void Serializer::writeDecl(const Decl *D) {
                                addGenericEnvironmentRef(
                                                 proto->getGenericEnvironment()),
                                rawAccessLevel,
-                               numProtocols,
-                               protocolsAndInherited);
+                               inherited);
 
     writeGenericParams(proto->getGenericParams());
     writeGenericRequirements(
@@ -2884,6 +2880,8 @@ void Serializer::writeDecl(const Decl *D) {
                                 subscript->isImplicit(),
                                 subscript->isObjC(),
                                 (unsigned) accessors.Kind,
+                                addGenericEnvironmentRef(
+                                            subscript->getGenericEnvironment()),
                                 addTypeRef(subscript->getInterfaceType()),
                                 addDeclRef(accessors.Get),
                                 addDeclRef(accessors.Set),
@@ -2897,6 +2895,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 rawSetterAccessLevel,
                                 nameComponents);
 
+    writeGenericParams(subscript->getGenericParams());
     writeParameterList(subscript->getIndices());
     break;
   }

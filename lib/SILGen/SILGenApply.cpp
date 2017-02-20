@@ -648,36 +648,76 @@ static ManagedValue maybeEnterCleanupForTransformed(SILGenFunction &gen,
   }
 }
 
-static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
-                                     SILDeclRef constant,
-                                     ArgumentSource &selfValue,
-                                     CanFunctionType substFnType,
-                                     SubstitutionList &substitutions) {
-  auto fd = cast<AbstractFunctionDecl>(constant.getDecl());
-  auto protocol = cast<ProtocolDecl>(fd->getDeclContext());
+namespace {
 
-  // Method calls through ObjC protocols require ObjC dispatch.
-  constant = constant.asForeign(protocol->isObjC());
+class ArchetypeCalleeBuilder {
+  SILGenFunction &gen;
+  SILLocation loc;
+  ArgumentSource &selfValue;
+  CanFunctionType substFnType;
+  SILParameterInfo selfParam;
+  AbstractFunctionDecl *fd;
+  ProtocolDecl *protocol;
+  SILDeclRef constant;
 
-  CanType selfTy = selfValue.getSubstRValueType();
+public:
+  ArchetypeCalleeBuilder(SILGenFunction &gen, SILLocation loc,
+                         SILDeclRef inputConstant, ArgumentSource &selfValue,
+                         CanFunctionType substFnType)
+      : gen(gen), loc(loc), selfValue(selfValue), substFnType(substFnType),
+        selfParam(), fd(cast<AbstractFunctionDecl>(inputConstant.getDecl())),
+        protocol(cast<ProtocolDecl>(fd->getDeclContext())),
+        constant(inputConstant.asForeign(protocol->isObjC())) {}
 
-  SILParameterInfo _selfParam;
-  auto getSelfParameter = [&]() -> SILParameterInfo {
-    if (_selfParam != SILParameterInfo()) return _selfParam;
-    auto constantFnType = gen.SGM.Types.getConstantFunctionType(constant);
-    return (_selfParam = constantFnType->getSelfParameter());
-  };
-  auto getSGFContextForSelf = [&]() -> SGFContext {
-    return (getSelfParameter().isConsumed()
-              ? SGFContext() : SGFContext::AllowGuaranteedPlusZero);
-  };
+  Callee build() {
+    // Link back to something to create a data dependency if we have
+    // an opened type.
+    SILValue openingSite;
+    auto archetype =
+        cast<ArchetypeType>(CanType(getSelfType()->getRValueInstanceType()));
+    if (archetype->getOpenedExistentialType()) {
+      openingSite = gen.getArchetypeOpeningSite(archetype);
+    }
 
-  auto setSelfValueToAddress = [&](SILLocation loc, ManagedValue address) {
+    // Then if we need to materialize self into memory, do so.
+    if (shouldMaterializeSelf()) {
+      SILLocation selfLoc = selfValue.getLocation();
+      ManagedValue address = evaluateAddressIntoMemory(selfLoc);
+      setSelfValueToAddress(selfLoc, address);
+    }
+
+    // The protocol self is implicitly decurried.
+    substFnType = cast<FunctionType>(substFnType.getResult());
+
+    return Callee::forArchetype(gen, openingSite, getSelfType(), constant,
+                                substFnType, loc);
+  }
+
+private:
+  CanType getSelfType() const { return selfValue.getSubstRValueType(); }
+
+  SILParameterInfo getSelfParameterInfo() const {
+    if (selfParam == SILParameterInfo()) {
+      auto &Self = const_cast<ArchetypeCalleeBuilder &>(*this);
+      auto constantFnType = gen.SGM.Types.getConstantFunctionType(constant);
+      Self.selfParam = constantFnType->getSelfParameter();
+    }
+
+    return selfParam;
+  }
+
+  SGFContext getSGFContextForSelf() {
+    if (getSelfParameterInfo().isConsumed())
+      return SGFContext();
+    return SGFContext::AllowGuaranteedPlusZero;
+  }
+
+  void setSelfValueToAddress(SILLocation loc, ManagedValue address) {
     assert(address.getType().isAddress());
     assert(address.getType().is<ArchetypeType>());
     auto formalTy = address.getType().getSwiftRValueType();
 
-    if (getSelfParameter().isIndirectMutating()) {
+    if (getSelfParameterInfo().isIndirectMutating()) {
       // Be sure not to consume the cleanup for an inout argument.
       auto selfLV = ManagedValue::forLValue(address.getValue());
       selfValue = ArgumentSource(loc,
@@ -686,68 +726,57 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
     } else {
       selfValue = ArgumentSource(loc, RValue(gen, loc, formalTy, address));
     }
-  };
+  }
 
-  // If we're calling a member of a non-class-constrained protocol,
-  // but our archetype refines it to be class-bound, then
-  // we have to materialize the value in order to pass it indirectly.
-  auto materializeSelfIfNecessary = [&] {
+  bool shouldMaterializeSelf() const {
     // Only an instance method of a non-class protocol is ever passed
     // indirectly.
     if (!fd->isInstanceMember() ||
         protocol->requiresClass() ||
         selfValue.hasLValueType() ||
         !cast<ArchetypeType>(selfValue.getSubstRValueType())->requiresClass())
-      return;
+      return false;
 
-    assert(gen.silConv.useLoweredAddresses()
-           == gen.silConv.isSILIndirect(getSelfParameter()));
+    assert(gen.silConv.useLoweredAddresses() ==
+           gen.silConv.isSILIndirect(getSelfParameterInfo()));
     if (!gen.silConv.useLoweredAddresses())
-      return;
-
-    SILLocation selfLoc = selfValue.getLocation();
-
-    // Evaluate the reference into memory.
-    ManagedValue address = [&]() -> ManagedValue {
-      // Do so at +0 if we can.
-      auto ref = std::move(selfValue)
-                   .getAsSingleValue(gen, getSGFContextForSelf());
-
-      // If we're already in memory for some reason, great.
-      if (ref.getType().isAddress())
-        return ref;
-
-      // Store the reference into a temporary.
-      auto temp =
-        gen.emitTemporaryAllocation(selfLoc, ref.getValue()->getType());
-      gen.B.emitStoreValueOperation(selfLoc, ref.getValue(), temp,
-                                    StoreOwnershipQualifier::Init);
-
-      // If we had a cleanup, create a cleanup at the new address.
-      return maybeEnterCleanupForTransformed(gen, ref, temp);
-    }();
-
-    setSelfValueToAddress(selfLoc, address);
-  };
-
-  // Construct an archetype call.
-
-  // Link back to something to create a data dependency if we have
-  // an opened type.
-  SILValue openingSite;
-  auto archetype =
-    cast<ArchetypeType>(CanType(selfTy->getRValueInstanceType()));
-  if (archetype->getOpenedExistentialType()) {
-    openingSite = gen.getArchetypeOpeningSite(archetype);
+      return false;
+    return true;
   }
 
-  materializeSelfIfNecessary();
+  // If we're calling a member of a non-class-constrained protocol,
+  // but our archetype refines it to be class-bound, then
+  // we have to materialize the value in order to pass it indirectly.
+  ManagedValue evaluateAddressIntoMemory(SILLocation selfLoc) {
+    // Do so at +0 if we can.
+    ManagedValue ref =
+        std::move(selfValue).getAsSingleValue(gen, getSGFContextForSelf());
 
-  // The protocol self is implicitly decurried.
-  substFnType = cast<FunctionType>(substFnType.getResult());
+    // If we're already in memory for some reason, great.
+    if (ref.getType().isAddress())
+      return ref;
 
-  return Callee::forArchetype(gen, openingSite, selfTy,
-                              constant, substFnType, loc);
+    // Store the reference into a temporary.
+    SILValue temp =
+        gen.emitTemporaryAllocation(selfLoc, ref.getValue()->getType());
+    gen.B.emitStoreValueOperation(selfLoc, ref.getValue(), temp,
+                                  StoreOwnershipQualifier::Init);
+
+    // If we had a cleanup, create a cleanup at the new address.
+    return maybeEnterCleanupForTransformed(gen, ref, temp);
+  }
+};
+
+} // end anonymous namespace
+
+static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
+                                     SILDeclRef constant,
+                                     ArgumentSource &selfValue,
+                                     CanFunctionType substFnType,
+                                     SubstitutionList &substitutions) {
+  // Construct an archetype call.
+  ArchetypeCalleeBuilder Builder{gen, loc, constant, selfValue, substFnType};
+  return Builder.build();
 }
 
 /// For ObjC init methods, we generate a shared-linkage Swift allocating entry
@@ -3898,10 +3927,10 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
     }
 
     // Emit the enum directly into the context if possible
-    SILValue resultSlot = getBufferForExprResult(loc, enumTy, C);
-    B.createInjectEnumAddr(loc, resultSlot, element);
-    return manageBufferForExprResult(resultSlot,
-                                     getTypeLowering(enumTy), C);
+    return B.bufferForExpr(loc, enumTy, getTypeLowering(enumTy), C,
+                           [&](SILValue newAddr) {
+                             B.createInjectEnumAddr(loc, newAddr, element);
+                           });
   }
 
   ManagedValue payloadMV;
@@ -3954,37 +3983,36 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   }
 
   // Address-only with payload
-  SILValue resultSlot = getBufferForExprResult(loc, enumTy, C);
+  return B.bufferForExpr(
+      loc, enumTy, getTypeLowering(enumTy), C,
+      [&](SILValue bufferAddr) {
+        SILValue resultData =
+          B.createInitEnumDataAddr(loc, bufferAddr, element,
+                                   loweredPayloadType.getAddressType());
 
-  SILValue resultData =
-      B.createInitEnumDataAddr(loc, resultSlot, element,
-                               loweredPayloadType.getAddressType());
+        if (payloadMV) {
+          // If the payload was indirect, we already evaluated it and
+          // have a single value. Store it into the result.
+          B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
+                                    StoreOwnershipQualifier::Init);
+        } else if (payloadTL.isLoadable()) {
+          // The payload of this specific enum case might be loadable
+          // even if the overall enum is address-only.
+          payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType);
+          B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
+                                    StoreOwnershipQualifier::Init);
+        } else {
+          // The payload is address-only. Evaluate it directly into
+          // the enum.
+          
+          TemporaryInitialization dest(resultData, CleanupHandle::invalid());
+          std::move(payload).forwardInto(*this, origFormalType,
+                                         &dest, payloadTL);
+        }
 
-  if (payloadMV) {
-    // If the payload was indirect, we already evaluated it and
-    // have a single value. Store it into the result.
-    B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
-                              StoreOwnershipQualifier::Init);
-  } else if (payloadTL.isLoadable()) {
-    // The payload of this specific enum case might be loadable
-    // even if the overall enum is address-only.
-    payloadMV = std::move(payload).getAsSingleValue(*this, origFormalType);
-    B.emitStoreValueOperation(loc, payloadMV.forward(*this), resultData,
-                              StoreOwnershipQualifier::Init);
-  } else {
-    // The payload is address-only. Evaluate it directly into
-    // the enum.
-
-    TemporaryInitialization dest(resultData, CleanupHandle::invalid());
-    std::move(payload).forwardInto(*this, origFormalType,
-                                   &dest, payloadTL);
-  }
-
-  // The payload is initialized, now apply the tag.
-  B.createInjectEnumAddr(loc, resultSlot, element);
-
-  return manageBufferForExprResult(resultSlot,
-                                   getTypeLowering(enumTy), C);
+        // The payload is initialized, now apply the tag.
+        B.createInjectEnumAddr(loc, bufferAddr, element);
+  });
 }
 
 namespace {
@@ -5122,7 +5150,7 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
     return base.isLValue() || base.isPlusZeroRValueOrTrivial();
 
   // If the accessor wants the value directly, we definitely have to
-  // load.  TODO: don't load-and-retain if the value is passed at +0.
+  // load.
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
@@ -5133,28 +5161,34 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
 
 ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
   // If the base is currently an address, we may have to copy it.
-
   if (shouldLoadBaseAddress()) {
-    // The load can only be a take if the base is a +1 rvalue.
-    auto shouldTake = IsTake_t(base.hasCleanup());
+    if (selfParam.isConsumed() ||
+        base.getType().isAddressOnly(SGF.getModule())) {
+      // The load can only be a take if the base is a +1 rvalue.
+      auto shouldTake = IsTake_t(base.hasCleanup());
 
-    base = SGF.emitLoad(loc, base.forward(SGF),
-                        SGF.getTypeLowering(baseLoweredType), SGFContext(),
-                        shouldTake);
+      base = SGF.emitLoad(loc, base.forward(SGF),
+                          SGF.getTypeLowering(baseLoweredType), SGFContext(),
+                          shouldTake);
+      return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
+    }
+
+    // If we do not have a consumed base and need to perform a load, perform a
+    // formal access load borrow.
+    base = SGF.B.createFormalAccessLoadBorrow(loc, base);
     return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
   }
 
   // Handle inout bases specially here.
   if (selfParam.isIndirectInOut()) {
-    // It sometimes happens that we get r-value bases here,
-    // e.g. when calling a mutating setter on a materialized
-    // temporary.  Just don't claim the value.
+    // It sometimes happens that we get r-value bases here, e.g. when calling a
+    // mutating setter on a materialized temporary.  Just don't claim the value.
     if (!base.isLValue()) {
       base = ManagedValue::forLValue(base.getValue());
     }
 
-    // FIXME: this assumes that there's never meaningful
-    // reabstraction of self arguments.
+    // FIXME: this assumes that there's never meaningful reabstraction of self
+    // arguments.
     return ArgumentSource(
         loc, LValue::forAddress(base, AbstractionPattern(baseFormalType),
                                 baseFormalType));

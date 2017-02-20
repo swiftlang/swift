@@ -95,11 +95,10 @@ func fail4<T: Barrable>(_ t: T) -> (Y, Z)
   return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Z'}}
 }
 
-// TODO: repeat diagnostic
 func fail5<T: Barrable>(_ t: T) -> (Y, Z)
   where
   T.Bar.Foo == Z,
-  T.Bar == Y { // expected-error 2{{generic parameter 'T.Bar.Foo' cannot be equal to both 'Z' and 'X'}}
+  T.Bar == Y { // expected-error{{generic parameter 'T.Bar.Foo' cannot be equal to both 'Z' and 'X'}}
   return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Z'}}
 }
 
@@ -110,7 +109,7 @@ func testAssocTypeEquivalence<T: Fooable>(_ fooable: T) -> X.Type
   return T.Foo.self
 }
 
-func fail6<T>(_ t: T) -> Int where T == Int { // expected-error 2{{same-type requirement makes generic parameter 'T' non-generic}}
+func fail6<T>(_ t: T) -> Int where T == Int { // expected-error{{same-type requirement makes generic parameter 'T' non-generic}}
   return t
 }
 
@@ -161,7 +160,7 @@ struct S1<T : P> {
 S1<Q>().foo(x: 1, y: 2)
 
 struct S2<T : P> where T.A == T.B {
-  func foo<X, Y>(x: X, y: Y) where X == T.A, Y == T.B {  // expected-error 2{{same-type requirement makes generic parameters 'X' and 'Y' equivalent}}
+  func foo<X, Y>(x: X, y: Y) where X == T.A, Y == T.B {  // expected-error{{same-type requirement makes generic parameters 'X' and 'Y' equivalent}}
     print(X.self)
     print(Y.self)
     print(x)
@@ -171,7 +170,7 @@ struct S2<T : P> where T.A == T.B {
 S2<Q>().foo(x: 1, y: 2)
 
 struct S3<T : P> {
-  func foo<X, Y>(x: X, y: Y) where X == T.A, Y == T.A {} // expected-error 2{{same-type requirement makes generic parameters 'X' and 'Y' equivalent}}
+  func foo<X, Y>(x: X, y: Y) where X == T.A, Y == T.A {} // expected-error{{same-type requirement makes generic parameters 'X' and 'Y' equivalent}}
 }
 S3<Q>().foo(x: 1, y: 2)
 
@@ -211,25 +210,19 @@ protocol P1 {
 func structuralSameType1<A: P1, B: P1, T, U, V, W>(_: A, _: B, _: T, _: U, _: V, _: W)
   where A.Assoc == X1<T, U>, B.Assoc == X1<V, W>, A.Assoc == B.Assoc { }
 // expected-error@-1{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
-// expected-error@-2{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
-// expected-error@-3{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
-// expected-error@-4{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
+// expected-error@-2{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
 
 typealias Tuple2<T, U> = (T, U)
 
 func structuralSameType2<A: P1, B: P1, T, U, V, W>(_: A, _: B, _: T, _: U, _: V, _: W)
   where A.Assoc == Tuple2<T, U>, B.Assoc == Tuple2<V, W>, A.Assoc == B.Assoc { }
 // expected-error@-1{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
-// expected-error@-2{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
-// expected-error@-3{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
-// expected-error@-4{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
+// expected-error@-2{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
 
 func structuralSameType3<T, U, V, W>(_: T, _: U, _: V, _: W)
   where X1<T, U> == X1<V, W> { }
 // expected-error@-1{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
-// expected-error@-2{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
-// expected-error@-3{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
-// expected-error@-4{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
+// expected-error@-2{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
 
 protocol P2 {
   associatedtype Assoc1
@@ -237,7 +230,7 @@ protocol P2 {
 }
 
 func structuralSameTypeRecursive1<T: P2, U>(_: T, _: U)
-  where T.Assoc1 == Tuple2<T.Assoc1, U> // expected-error 2{{same-type constraint 'T.Assoc1' == '(T.Assoc1, U)' is recursive}}
+  where T.Assoc1 == Tuple2<T.Assoc1, U> // expected-error{{same-type constraint 'T.Assoc1' == '(T.Assoc1, U)' is recursive}}
 { }
 
 

@@ -28,7 +28,7 @@ function(add_swift_unittest test_dirname)
 
     set(new_libnames)
     foreach(dep ${libnames})
-      if("${dep}" MATCHES "^(LLVM|Clang|gtest)")
+      if("${dep}" MATCHES "^(LLVM|Clang|gtest)" AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
         list(APPEND new_libnames "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
       else()
         list(APPEND new_libnames "${dep}")
