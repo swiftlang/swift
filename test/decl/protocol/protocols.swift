@@ -75,13 +75,15 @@ struct NotFormattedPrintable : FormattedPrintable { // expected-error{{type 'Not
 
 // Circular protocols
 
-protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error {{circular protocol inheritance CircleMiddle}}
+protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error 2 {{circular protocol inheritance CircleMiddle}}
+// expected-error@-1{{circular protocol inheritance 'CircleMiddle' -> 'CircleStart' -> 'CircleEnd' -> 'CircleMiddle'}}
 // expected-error @+1 {{circular protocol inheritance CircleStart}}
-protocol CircleStart : CircleEnd { func circle_start() }
-protocol CircleEnd : CircleMiddle { func circle_end()}
+protocol CircleStart : CircleEnd { func circle_start() } // expected-error 2{{circular protocol inheritance CircleStart}}
+// expected-note@-1{{protocol 'CircleStart' declared here}}
+protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note{{protocol 'CircleEnd' declared here}}
 
 protocol CircleEntry : CircleTrivial { }
-protocol CircleTrivial : CircleTrivial { } // expected-error{{circular protocol inheritance CircleTrivial}}
+protocol CircleTrivial : CircleTrivial { } // expected-error 3{{circular protocol inheritance CircleTrivial}}
 
 struct Circle {
   func circle_start() {}

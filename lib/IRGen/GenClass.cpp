@@ -1030,7 +1030,7 @@ namespace {
       // Objective-C protocol conformances.
       // FIXME: We can't use visitConformances() because there are no
       // conformances for protocols to protocols right now.
-      for (ProtocolDecl *p : theProtocol->getInheritedProtocols(nullptr)) {
+      for (ProtocolDecl *p : theProtocol->getInheritedProtocols()) {
         if (!p->isObjC())
           continue;
         // Don't emit the magic AnyObject conformance.

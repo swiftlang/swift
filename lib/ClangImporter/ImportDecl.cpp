@@ -6043,7 +6043,7 @@ void SwiftDeclConverter::addProtocols(
     return;
 
   protocols.push_back(protocol);
-  for (auto inherited : protocol->getInheritedProtocols(Impl.getTypeResolver()))
+  for (auto inherited : protocol->getInheritedProtocols())
     addProtocols(inherited, protocols, known);
 }
 
@@ -6071,15 +6071,8 @@ void SwiftDeclConverter::importObjCProtocols(
 
 void SwiftDeclConverter::addObjCProtocolConformances(
     Decl *decl, ArrayRef<ProtocolDecl *> protocols) {
-  // Set the inherited protocols of a protocol.
-  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-    // Copy the list of protocols.
-    MutableArrayRef<ProtocolDecl *> allProtocols =
-        Impl.SwiftContext.AllocateCopy(protocols);
-    proto->setInheritedProtocols(allProtocols);
-
-    return;
-  }
+  // Nothing to do for protocols.
+  if (isa<ProtocolDecl>(decl)) return;
 
   Impl.recordImportedProtocols(decl, protocols);
 
@@ -6927,7 +6920,7 @@ void ClangImporter::Implementation::finishProtocolConformance(
 
   // And make sure any inherited conformances also get completed, if necessary.
   SmallVector<ProtocolDecl *, 8> inheritedProtos;
-  for (auto *inherited : proto->getInheritedProtocols(/*resolver=*/nullptr)) {
+  for (auto *inherited : proto->getInheritedProtocols()) {
     inheritedProtos.push_back(inherited);
   }
   // Sort for deterministic import.
