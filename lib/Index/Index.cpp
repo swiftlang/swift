@@ -593,7 +593,6 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
   }
 
   if (auto Parent = getParentDecl()) {
-    // FIXME handle extensions properly
     if (auto ParentVD = dyn_cast<ValueDecl>(Parent)) {
       SymbolRoleSet RelationsToParent = (SymbolRoleSet)SymbolRole::RelationChildOf;
       if (Info.symInfo.SubKind == SymbolSubKind::AccessorGetter ||
@@ -606,7 +605,7 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
 
     } else if (auto ParentED = dyn_cast<ExtensionDecl>(Parent)) {
       if (NominalTypeDecl *NTD = ParentED->getExtendedType()->getAnyNominal()) {
-        if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationChildOf, NTD))
+        if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationChildOf, ParentED))
           return false;
       }
     }
