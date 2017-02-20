@@ -155,7 +155,7 @@ def diff():
     parser.add_argument('new_hex')
     parser.add_argument('new_mode')
     args = parser.parse_args()
-    print 'FILENAME', os.path.basename(args.new_file)
+    print('FILENAME', os.path.basename(args.new_file))
     sys.stdout.flush()
     subprocess.call(['diff', '-U0', args.old_file, args.new_file])
     return 0
