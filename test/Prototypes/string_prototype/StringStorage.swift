@@ -15,6 +15,8 @@ extension CopyConstructible {
 final class _StringStorage<Element: UnsignedInteger>
  : /*_SwiftNativeNSString,*/ _NSStringCore, CopyConstructible {
 
+  // NOTE: If you change these stored properties, edit the
+  // definitions in GlobalObjects.h and GlobalObject.cpp
   var count: Int
   var capacity: Int // Should be a let.
 
@@ -37,6 +39,14 @@ final class _StringStorage<Element: UnsignedInteger>
     self.count = count
     self.capacity = realCapacity
   }
+
+  /// The empty singleton that is used for every single empty String.
+  /// The contents of the storage should never be mutated.
+  internal static var empty: _StringStorage {
+    return Builtin.bridgeFromRawPointer(
+      Builtin.addressof(&_swiftEmptyStringStorage))
+  }
+
 
   @_versioned
   internal func withUnsafeMutableBufferPointer<R>(
@@ -128,8 +138,7 @@ extension _StringBuffer : RandomAccessCollection, MutableCollection {
 
 extension _StringBuffer : RangeReplaceableCollection {
   init() {
-    // FIXME: replace with EmptyStringStorage
-    self.init(_StringStorage(count: 0, minimumCapacity: 0))
+    self.init(_StringStorage.empty)
   }
 
   mutating func replaceSubrange<C: Collection>(

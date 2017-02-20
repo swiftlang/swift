@@ -39,6 +39,23 @@ struct _SwiftEmptyArrayStorage {
 SWIFT_RUNTIME_STDLIB_INTERFACE
 struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
 
+
+
+struct _SwiftStringBodyStorage {
+  __swift_intptr_t count;
+  __swift_intptr_t capacity;
+};
+
+struct _SwiftEmptyStringStorage {
+  struct HeapObject header;
+  struct _SwiftStringBodyStorage body;
+};
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+struct _SwiftEmptyStringStorage _swiftEmptyStringStorage;
+
+
+
 struct _SwiftUnsafeBitMap {
   __swift_uintptr_t *values;
   __swift_intptr_t bitCount;

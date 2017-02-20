@@ -52,6 +52,13 @@ struct SwiftCanonicalString {
       Encoding.self
     )
   }
+
+  init() {
+    // Empty strings have all the encodings!
+    self.isKnownASCII = true
+    self.isKnownLatin1 = true
+    self.storage = UnicodeStorage(CodeUnits(), Encoding.self)
+  }
 }
 
 extension SwiftCanonicalString {
@@ -166,6 +173,10 @@ struct String {
 
   init(_ str: SwiftCanonicalString) {
     self.contents = .canonical(str)
+  }
+
+  init() {
+    self.contents = .canonical(SwiftCanonicalString())
   }
 }
 
