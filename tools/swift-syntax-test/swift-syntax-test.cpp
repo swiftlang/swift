@@ -36,7 +36,7 @@ using namespace swift;
 using llvm::StringRef;
 
 enum class ActionType {
-  DumpTokenSyntaxs,
+  DumpTokenSyntax,
   FullLexRoundTrip,
   FullParseRoundTrip,
   None
@@ -47,7 +47,7 @@ static llvm::cl::opt<ActionType>
 Action(llvm::cl::desc("Action (required):"),
        llvm::cl::init(ActionType::None),
        llvm::cl::values(
-        clEnumValN(ActionType::DumpTokenSyntaxs,
+        clEnumValN(ActionType::DumpTokenSyntax,
                    "dump-full-tokens",
                    "Lex the source file and dump the tokens "
                    "and their absolute line/column locations"),
@@ -220,7 +220,7 @@ int main(int argc, char *argv[]) {
   }
 
   switch (options::Action) {
-  case ActionType::DumpTokenSyntaxs:
+  case ActionType::DumpTokenSyntax:
     ExitCode = doDumpTokenSyntax(options::InputSourceFilename);
     break;
   case ActionType::FullLexRoundTrip:
