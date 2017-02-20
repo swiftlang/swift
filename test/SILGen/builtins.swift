@@ -511,7 +511,7 @@ func assumeNonNegative(_ x: Builtin.Word) -> Builtin.Word {
 // CHECK: bb0([[ARG:%.*]] : $O):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:   autorelease_value [[ARG_COPY]]
+// CHECK:   unmanaged_autorelease_value [[ARG_COPY]]
 // CHECK:   destroy_value [[ARG_COPY]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]]
@@ -865,4 +865,57 @@ func unsafeGuaranteedEnd(_ t: Builtin.Int8) {
 // CHECK: }
 func bindMemory<T>(ptr: Builtin.RawPointer, idx: Builtin.Word, _: T.Type) {
   Builtin.bindMemory(ptr, idx, T.self)
+}
+
+//===----------------------------------------------------------------------===//
+// RC Operations
+//===----------------------------------------------------------------------===//
+
+// SILGen test:
+//
+// CHECK-LABEL: sil hidden @_T08builtins6retain{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[P:%.*]] : $Builtin.NativeObject):
+// CHECK:   [[BORROWED_P:%.*]] = begin_borrow [[P]]
+// CHECK:   [[COPIED_P:%.*]] = copy_value [[BORROWED_P]]
+// CHECK:   unmanaged_retain_value [[COPIED_P]]
+// CHECK:   destroy_value [[COPIED_P]]
+// CHECK:   end_borrow [[BORROWED_P]] from [[P]]
+// CHECK:   destroy_value [[P]]
+// CHECK: } // end sil function '_T08builtins6retain{{[_0-9a-zA-Z]*}}F'
+
+// SIL Test. This makes sure that we properly clean up in -Onone SIL.
+// CANONICAL-LABEL: sil hidden @_T08builtins6retain{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CANONICAL: bb0([[P:%.*]] : $Builtin.NativeObject):
+// CANONICAL-NOT: retain
+// CANONICAL-NOT: release
+// CANONICAL: } // end sil function '_T08builtins6retain{{[_0-9a-zA-Z]*}}F'
+func retain(ptr: Builtin.NativeObject) {
+  Builtin.retain(ptr)
+}
+
+// SILGen test:
+//
+// CHECK-LABEL: sil hidden @_T08builtins7release{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[P:%.*]] : $Builtin.NativeObject):
+// CHECK:   [[BORROWED_P:%.*]] = begin_borrow [[P]]
+// CHECK:   [[COPIED_P:%.*]] = copy_value [[BORROWED_P]]
+// CHECK:   unmanaged_release_value [[COPIED_P]]
+// CHECK:   destroy_value [[COPIED_P]]
+// CHECK:   end_borrow [[BORROWED_P]] from [[P]]
+// CHECK:   destroy_value [[P]]
+// CHECK: } // end sil function '_T08builtins7release{{[_0-9a-zA-Z]*}}F'
+
+// SIL Test. Make sure even in -Onone code, we clean this up properly:
+// CANONICAL-LABEL: sil hidden @_T08builtins7release{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CANONICAL: bb0([[P:%.*]] : $Builtin.NativeObject):
+// CANONICAL-NEXT:   debug_value
+// CANONICAL-NEXT:   tuple
+// CANONICAL-NEXT:   strong_release [[P]]
+// CANONICAL-NEXT:   strong_release [[P]]
+// CANONICAL-NEXT:   tuple
+// CANONICAL-NEXT:   return
+// CANONICAL: } // end sil function '_T08builtins7release{{[_0-9a-zA-Z]*}}F'
+
+func release(ptr: Builtin.NativeObject) {
+  Builtin.release(ptr)
 }
