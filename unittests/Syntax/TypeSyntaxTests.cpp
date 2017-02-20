@@ -344,12 +344,15 @@ TEST(TypeSyntaxTest, MetatypeTypeWithAPIs) {
       .print(OS);
     ASSERT_EQ(OS.str(), "T.Protocol");
   }
+
+#ifndef NDEBUG
   ASSERT_DEATH({
     SyntaxFactory::makeBlankMetatypeType()
     .withBaseTypeSyntax(Int)
     .withDotToken(Dot)
     .withTypeToken(SyntaxFactory::makeIdentifier("WRONG", {}, {}));
   }, "");
+#endif
 }
 
 TEST(TypeSyntaxTest, ArrayTypeWithAPIs) {
