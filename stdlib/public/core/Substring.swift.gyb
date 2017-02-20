@@ -208,3 +208,15 @@ extension Substring {
     return String(self).uppercased()
   }
 }
+
+extension Substring : TextOutputStream {
+  public mutating func write(_ other: String) {
+    append(contentsOf: other)
+  }
+}
+
+extension Substring : TextOutputStreamable {
+  public func write<Target : TextOutputStream>(to target: inout Target) {
+    target.write(String(self))
+  }
+}
