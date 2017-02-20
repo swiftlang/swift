@@ -266,6 +266,18 @@ namespace driver {
         parseable_output::emitBeganMessage(llvm::errs(), *BeganCmd, Pid);
     }
 
+    void
+    dependencyLoadFailed(StringRef DependenciesFile, bool Warn=true) {
+      if (Warn)
+        Comp.Diags.diagnose(SourceLoc(),
+                            diag::warn_unable_to_load_dependencies,
+                            DependenciesFile);
+      Comp.disableIncrementalBuild();
+      for (const Job *Cmd : DeferredCommands)
+        scheduleCommandIfNecessaryAndPossible(Cmd);
+      DeferredCommands.clear();
+    }
+
     /// Helper that reloads a job's .swiftdeps file after the job exits, and
     /// re-runs transitive marking to ensure everything is properly invalidated
     /// by any new dependency edges introduced by it.
@@ -294,10 +306,7 @@ namespace driver {
           switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
           case DependencyGraphImpl::LoadResult::HadError:
             if (ReturnCode == EXIT_SUCCESS) {
-              Comp.disableIncrementalBuild();
-              for (const Job *Cmd : DeferredCommands)
-                scheduleCommandIfNecessaryAndPossible(Cmd);
-              DeferredCommands.clear();
+              dependencyLoadFailed(DependenciesFile);
               Dependents.clear();
             } // else, let the next build handle it.
             break;
@@ -486,10 +495,7 @@ namespace driver {
           } else {
             switch (DepGraph.loadFromPath(Cmd, DependenciesFile)) {
             case DependencyGraphImpl::LoadResult::HadError:
-              Comp.disableIncrementalBuild();
-              for (const Job *Cmd : DeferredCommands)
-                scheduleCommandIfNecessaryAndPossible(Cmd);
-              DeferredCommands.clear();
+              dependencyLoadFailed(DependenciesFile, /*Warn=*/false);
               break;
             case DependencyGraphImpl::LoadResult::UpToDate:
               Condition = Cmd->getCondition();
