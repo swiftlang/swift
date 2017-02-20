@@ -165,7 +165,7 @@ extension AClass {
 
   func bar() -> Int { return 2 }
   // CHECK: [[@LINE-1]]:8 | instance-method/Swift | bar() | s:FC14swift_ide_test6AClass3barFT_Si | Def,RelChild | rel: 1
-  // CHECK-NEXT: RelChild | AClass | s:C14swift_ide_test6AClass
+  // CHECK-NEXT: RelChild | AClass | [[EXT_ACLASS_USR]]
 }
 
 struct OuterS {
