@@ -12,22 +12,6 @@
 
 @_exported import Foundation // Clang module
 
-/// Keys used in the result of `URLResourceValues.thumbnailDictionary`.
-@available(OSX 10.10, iOS 8.0, *)
-public struct URLThumbnailSizeKey : RawRepresentable, Hashable {
-    public typealias RawValue = String
-    
-    public init(rawValue: RawValue) { self.rawValue = rawValue }
-    private(set) public var rawValue: RawValue
-    
-    /// Key for a 1024 x 1024 thumbnail image.
-    static public let none: URLThumbnailSizeKey = URLThumbnailSizeKey(rawValue: URLThumbnailDictionaryItem.NSThumbnail1024x1024SizeKey.rawValue)
-  
-    public var hashValue: Int {
-        return rawValue.hashValue
-    }
-}
-
 /**
  URLs to file system resources support the properties defined below. Note that not all property values will exist for all file system URLs. For example, if a file is located on a volume that does not support creation dates, it is valid to request the creation date property, but the returned value will be nil, and no error will be generated.
  
