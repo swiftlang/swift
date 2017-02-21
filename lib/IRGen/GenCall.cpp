@@ -517,6 +517,7 @@ namespace {
       case clang::Type::RValueReference:
       case clang::Type::MemberPointer:
       case clang::Type::Auto:
+      case clang::Type::DeducedTemplateSpecialization:
         llvm_unreachable("C++ type in ABI lowering?");
 
       case clang::Type::Pipe:
