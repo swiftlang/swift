@@ -92,9 +92,17 @@ bool SemaLocResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {
 }
 
 bool SemaLocResolver::tryResolve(Stmt *St) {
-  if (St->getStartLoc() == LocToResolve) {
-    SemaTok = { St };
-    return true;
+  if (auto *LST = dyn_cast<LabeledStmt>(St)) {
+    if (LST->getStartLoc() == LocToResolve) {
+      SemaTok = { St };
+      return true;
+    }
+  }
+  if (auto *CS = dyn_cast<CaseStmt>(St)) {
+    if (CS->getStartLoc() == LocToResolve) {
+      SemaTok = { St };
+      return true;
+    }
   }
   return false;
 }
