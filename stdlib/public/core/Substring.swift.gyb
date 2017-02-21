@@ -125,6 +125,12 @@ extension Substring : CustomStringConvertible {
   }
 }
 
+extension Substring : CustomDebugStringConvertible {
+  public var debugDescription: String {
+    return String(self).debugDescription
+  }
+}
+
 extension Substring : LosslessStringConvertible {
   public init?(_ description: String) {
     self.init(description, description.startIndex ..< description.endIndex)
@@ -174,7 +180,8 @@ extension Substring {
 % for (property, ViewPrefix) in [
 %   ('utf8', 'UTF8'),
 %   ('utf16', 'UTF16'),
-%   ('unicodeScalars', 'UnicodeScalar')]:
+%   ('unicodeScalars', 'UnicodeScalar'),
+%   ('characters', 'Character')]:
   public typealias ${ViewPrefix}Index = String.${ViewPrefix}View.Index
 
   public var ${property}: String.${ViewPrefix}View {
