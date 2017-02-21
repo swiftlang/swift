@@ -260,6 +260,14 @@ public:
     printStructurePre(Kind, D);
   }
 
+  /// Make a callback to printStructurePost(), performing any necessary
+  /// bookkeeping.
+  void callPrintStructurePost(PrintStructureKind Kind,
+                              const Decl *D = nullptr) {
+    forceNewlines();
+    printStructurePost(Kind, D);
+  }
+
   /// To sanitize a malformed utf8 string to a well-formed one.
   static std::string sanitizeUtf8(StringRef Text);
   static ValueDecl* findConformancesWithDocComment(ValueDecl *VD);
