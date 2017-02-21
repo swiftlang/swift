@@ -64,6 +64,7 @@ static long double swift_strtold_l(const char *nptr,
 #include <xlocale.h>
 #endif
 #include <limits>
+#include <thread>
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "swift/Runtime/Debug.h"
@@ -537,11 +538,5 @@ int swift::_swift_stdlib_putc_stderr(int C) {
 }
 
 size_t swift::_swift_stdlib_getHardwareConcurrency() {
-#if defined(_WIN32)
-  SYSTEM_INFO SystemInfo;
-  GetSystemInfo(&SystemInfo);
-  return SystemInfo.dwNumberOfProcessors;
-#else
-  return sysconf(_SC_NPROCESSORS_ONLN);
-#endif
+  return std::thread::hardware_concurrency();
 }
