@@ -23,9 +23,12 @@ function check_thin_archive_for_bitcode() {
     local BASE_TEMPDIR=$1
     local ARCHIVE=$2
 
-    local LIB_NAME=$(basename ${ARCHIVE})
-    local LIB_ARCH=$(basename $(dirname ${ARCHIVE}))
-    local LIB_PLATFORM=$(basename $(dirname $(dirname ${ARCHIVE})))
+    local LIB_NAME
+    LIB_NAME=$(basename ${ARCHIVE})
+    local LIB_ARCH
+    LIB_ARCH=$(basename $(dirname ${ARCHIVE}))
+    local LIB_PLATFORM
+    LIB_PLATFORM=$(basename $(dirname $(dirname ${ARCHIVE})))
 
     LIB_TEMP_DIR="${BASE_TEMPDIR}/${LIB_PLATFORM}-${LIB_ARCH}-${LIB_NAME}"
     mkdir -p "${LIB_TEMP_DIR}"
@@ -52,8 +55,10 @@ function check_thick_archive_for_bitcode() {
     local BASE_TEMPDIR=$1
     local ARCHIVE=$2
 
-    local LIB_NAME=$(basename ${ARCHIVE})
-    local LIB_PLATFORM=$(basename $(dirname ${ARCHIVE}))
+    local LIB_NAME
+    LIB_NAME=$(basename ${ARCHIVE})
+    local LIB_PLATFORM
+    LIB_PLATFORM=$(basename $(dirname ${ARCHIVE}))
 
     LIB_TEMP_DIR="${BASE_TEMPDIR}/${LIB_PLATFORM}-thick-${LIB_NAME}"
     LIB_ARCHIVE_DIR="${LIB_TEMP_DIR}/archive"

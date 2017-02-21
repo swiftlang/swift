@@ -797,7 +797,7 @@ additional semantic concerns.
 A shared value can be used in the scope that binds it
 just like an ordinary parameter or `let` binding.
 If the shared value is used in a place that requires
-ownership, Swift will simply implicitly copy the value —
+ownership, Swift will simply implicitly copy the value --
 again, just like an ordinary parameter or `let` binding.
 
 #### Limitations of shared values
@@ -861,7 +861,7 @@ born from a trio of concerns:
   lexical and maintains the ability to run arbitrary code
   at the end of an access.  Imagine what it would take to
   implement a loop that added these temporary mutable
-  references to an array — each iteration of the loop would
+  references to an array -- each iteration of the loop would
   have to be able to queue up arbitrary code to run as a clean-up
   when the function was finished with the array.  This would
   hardly be a low-cost abstraction!  A more Rust-like
