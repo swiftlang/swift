@@ -89,5 +89,6 @@ public class Positron : Lepton {
   public dynamic var spin: Float = 0.5
 }
 
-// CHECK-LABEL: sil [transparent] [thunk] @_TTWC14objc_witnesses8PositronS_6LeptonS_FS1_g4spinSf
-// CHECK-LABEL: sil shared [transparent] [thunk] @_TTDFC14objc_witnesses8Positrong4spinSf
+// CHECK-LABEL: sil [transparent] [fragile] [thunk] @_TTWC14objc_witnesses8PositronS_6LeptonS_FS1_g4spinSf
+// CHECK-LABEL: sil shared [transparent] [fragile] [thunk] @_TTDFC14objc_witnesses8Positrong4spinSf
+

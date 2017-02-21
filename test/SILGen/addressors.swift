@@ -306,7 +306,8 @@ class G {
     }
   }
 }
-// CHECK: sil hidden @_TFC10addressors1Gg5valueVs5Int32 : $@convention(method) (@guaranteed G) -> Int32 {
+
+// CHECK: sil hidden [transparent] @_TFC10addressors1Gg5valueVs5Int32 : $@convention(method) (@guaranteed G) -> Int32 {
 // CHECK: bb0([[SELF:%0]] : $G):
 // CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Glo5valueVs5Int32 : $@convention(method) (@guaranteed G) -> (UnsafePointer<Int32>, @owned Builtin.NativeObject)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
@@ -319,7 +320,7 @@ class G {
 // CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
 // CHECK:   return [[VALUE]] : $Int32
 
-// CHECK: sil hidden @_TFC10addressors1Gs5valueVs5Int32 : $@convention(method) (Int32, @guaranteed G) -> () {
+// CHECK: sil hidden [transparent] @_TFC10addressors1Gs5valueVs5Int32 : $@convention(method) (Int32, @guaranteed G) -> () {
 // CHECK: bb0([[VALUE:%0]] : $Int32, [[SELF:%1]] : $G):
 // CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Gao5valueVs5Int32 : $@convention(method) (@guaranteed G) -> (UnsafeMutablePointer<Int32>, @owned Builtin.NativeObject)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
@@ -332,7 +333,7 @@ class G {
 // CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
 
 //   materializeForSet for G.value
-// CHECK-LABEL: sil hidden @_TFC10addressors1Gm5valueVs5Int32 : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed G) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Gm5valueVs5Int32 : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed G) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $G):
 //   Call the addressor.
 // CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Gao5valueVs5Int32 : $@convention(method) (@guaranteed G) -> (UnsafeMutablePointer<Int32>, @owned Builtin.NativeObject)
@@ -356,7 +357,7 @@ class G {
 // CHECK:   return [[RESULT]]
 
 //   materializeForSet callback for G.value
-// CHECK-LABEL: sil hidden @_TFFC10addressors1Gm5valueVs5Int32U_T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout G, @thick G.Type) -> () {
+// CHECK-LABEL: sil hidden [transparent] @_TFFC10addressors1Gm5valueVs5Int32U_T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout G, @thick G.Type) -> () {
 // CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $*G, [[SELFTYPE:%3]] : $@thick G.Type):
 // CHECK:   [[T0:%.*]] = project_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
 // CHECK:   [[OWNER:%.*]] = load [[T0]]
@@ -426,7 +427,8 @@ class I {
     }
   }
 }
-// CHECK-LABEL: sil hidden @_TFC10addressors1Ig5valueVs5Int32 : $@convention(method) (@guaranteed I) -> Int32 {
+
+// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Ig5valueVs5Int32 : $@convention(method) (@guaranteed I) -> Int32 {
 // CHECK: bb0([[SELF:%0]] : $I):
 // CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Ilp5valueVs5Int32 : $@convention(method) (@guaranteed I) -> (UnsafePointer<Int32>, @owned Optional<Builtin.NativeObject>)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
@@ -439,7 +441,7 @@ class I {
 // CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
 // CHECK:   return [[VALUE]] : $Int32
 
-// CHECK-LABEL: sil hidden @_TFC10addressors1Is5valueVs5Int32 : $@convention(method) (Int32, @guaranteed I) -> () {
+// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Is5valueVs5Int32 : $@convention(method) (Int32, @guaranteed I) -> () {
 // CHECK: bb0([[VALUE:%0]] : $Int32, [[SELF:%1]] : $I):
 // CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Iap5valueVs5Int32 : $@convention(method) (@guaranteed I) -> (UnsafeMutablePointer<Int32>, @owned Optional<Builtin.NativeObject>)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
@@ -451,7 +453,7 @@ class I {
 // CHECK:   store [[VALUE]] to [[T2]] : $*Int32
 // CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
 
-// CHECK-LABEL: sil hidden @_TFC10addressors1Im5valueVs5Int32 : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed I) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Im5valueVs5Int32 : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed I) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $I):
 //   Call the addressor.
 // CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Iap5valueVs5Int32 : $@convention(method) (@guaranteed I) -> (UnsafeMutablePointer<Int32>, @owned Optional<Builtin.NativeObject>)
@@ -475,7 +477,8 @@ class I {
 // CHECK:   return [[RESULT]]
 
 //   materializeForSet callback for I.value
-// CHECK-LABEL: sil hidden @_TFFC10addressors1Im5valueVs5Int32U_T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout I, @thick I.Type) -> () {
+
+// CHECK-LABEL: sil hidden [transparent] @_TFFC10addressors1Im5valueVs5Int32U_T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout I, @thick I.Type) -> () {
 // CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $*I, [[SELFTYPE:%3]] : $@thick I.Type):
 // CHECK:   [[T0:%.*]] = project_value_buffer $Optional<Builtin.NativeObject> in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
 // CHECK:   [[OWNER:%.*]] = load [[T0]]

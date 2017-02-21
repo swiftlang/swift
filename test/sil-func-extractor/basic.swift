@@ -54,8 +54,8 @@
 
 // EXTRACT-NOW-LABEL:   sil hidden @_TFC5basic7Vehicle3nowfT_Si : $@convention(method) (@guaranteed Vehicle) -> Int {
 // EXTRACT-NOW:         bb0
-// EXTRACT-NOW:           = function_ref
-// EXTRACT-NOW-NEXT:      apply
+// EXTRACT-NOW:           ref_element_addr
+// EXTRACT-NOW-NEXT:      load
 // EXTRACT-NOW-NEXT:      return
 
 struct X {

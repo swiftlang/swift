@@ -1673,6 +1673,18 @@ ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
   return NTD->getSatisfiedProtocolRequirementsForMember(this, Sorted);
 }
 
+bool ValueDecl::isProtocolRequirement() const {
+  assert(isa<ProtocolDecl>(getDeclContext()));
+
+  if (auto *FD = dyn_cast<FuncDecl>(this))
+    if (FD->isAccessor())
+      return false;
+  if (isa<TypeAliasDecl>(this) ||
+      isa<NominalTypeDecl>(this))
+    return false;
+  return true;
+}
+
 bool ValueDecl::hasInterfaceType() const {
   return !TypeAndAccess.getPointer().isNull();
 }
@@ -2407,6 +2419,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
     = static_cast<unsigned>(StoredInheritsSuperclassInits::Unchecked);
   ClassDeclBits.RawForeignKind = 0;
   ClassDeclBits.HasDestructorDecl = 0;
+  ClassDeclBits.ObjCClassKind = 0;
 }
 
 DestructorDecl *ClassDecl::getDestructor() {
@@ -2500,6 +2513,10 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 }
 
 ObjCClassKind ClassDecl::checkObjCAncestry() const {
+  // See if we've already computed this.
+  if (ClassDeclBits.ObjCClassKind)
+    return ObjCClassKind(ClassDeclBits.ObjCClassKind - 1);
+
   llvm::SmallPtrSet<const ClassDecl *, 8> visited;
   bool genericAncestry = false, isObjC = false;
   const ClassDecl *CD = this;
@@ -2526,14 +2543,18 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
       break;
   }
 
+  ObjCClassKind kind = ObjCClassKind::ObjC;
   if (!isObjC)
-    return ObjCClassKind::NonObjC;
-  if (genericAncestry)
-    return ObjCClassKind::ObjCMembers;
-  if (CD == this || !CD->isObjC())
-    return ObjCClassKind::ObjCWithSwiftRoot;
+    kind = ObjCClassKind::NonObjC;
+  else if (genericAncestry)
+    kind = ObjCClassKind::ObjCMembers;
+  else if (CD == this || !CD->isObjC())
+    kind = ObjCClassKind::ObjCWithSwiftRoot;
 
-  return ObjCClassKind::ObjC;
+  // Save the result for later.
+  const_cast<ClassDecl *>(this)->ClassDeclBits.ObjCClassKind
+    = unsigned(kind) + 1;
+  return kind;
 }
 
 /// Mangle the name of a protocol or class for use in the Objective-C
