@@ -91,6 +91,14 @@ bool SemaLocResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {
   return false;
 }
 
+bool SemaLocResolver::tryResolve(Stmt *St) {
+  if (St->getStartLoc() == LocToResolve) {
+    SemaTok = { St };
+    return true;
+  }
+  return false;
+}
+
 bool SemaLocResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                               bool IsOpenBracket) {
   // We should treat both open and close brackets equally
@@ -133,7 +141,7 @@ bool SemaLocResolver::walkToStmtPre(Stmt *S) {
   // non-implicit Stmts (fix Stmts created for lazy vars).
   if (!S->isImplicit() && !rangeContainsLoc(S->getSourceRange()))
     return false;
-  return true;
+  return !tryResolve(S);
 }
 
 bool SemaLocResolver::walkToStmtPost(Stmt *S) {
