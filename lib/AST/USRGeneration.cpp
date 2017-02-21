@@ -46,7 +46,7 @@ bool ide::printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS) {
   return false;
 }
 
-static bool printObjCNameFragment(const ValueDecl *D, StringRef ObjCName,
+static bool printObjCUSRFragment(const ValueDecl *D, StringRef ObjCName,
                                   raw_ostream &OS) {
   if (!D)
     return true;
@@ -65,53 +65,73 @@ static bool printObjCNameFragment(const ValueDecl *D, StringRef ObjCName,
     OS << "@" << ObjCName;
   } else {
     llvm_unreachable("Unexpected value decl");
-    return true;
   }
   return false;
 }
 
-static bool printObjCUSR(const ValueDecl *D, raw_ostream &OS, Identifier Ident,
-                         ObjCSelector Selector) {
+static bool printObjCUSRForAccessor(const AbstractStorageDecl *ASD,
+                                    AccessorKind Kind,
+                                    raw_ostream &OS) {
+  ObjCSelector Selector;
+  switch (Kind) {
+    case swift::AccessorKind::IsGetter:
+      Selector = ASD->getObjCGetterSelector();
+      break;
+    case swift::AccessorKind::IsSetter:
+      Selector = ASD->getObjCSetterSelector();
+      break;
+    default:
+      llvm_unreachable("invalid accessor kind");
+  }
+  assert(Selector);
+  llvm::SmallString<128> Buf;
+  clang::index::generateUSRForObjCMethod(Selector.getString(Buf),
+                                         ASD->isInstanceMember(), OS);
+  return false;
+}
+
+static bool printObjCUSR(const ValueDecl *D, raw_ostream &OS) {
   OS << clang::index::getUSRSpacePrefix();
 
-  if (D->getDeclContext()->isTypeContext()) {
-    auto *Parent = D->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (auto *Parent = D->getDeclContext()->
+        getAsNominalTypeOrNominalTypeExtensionContext()) {
     auto ObjCName = objc_translation::getObjCNameForSwiftDecl(Parent);
-    if (printObjCNameFragment(Parent, ObjCName.first.str(), OS))
+    if (printObjCUSRFragment(Parent, ObjCName.first.str(), OS))
       return true;
   }
 
-  if (!Ident.empty())
-    return printObjCNameFragment(D, Ident.str(), OS);
-  if (Selector) {
-    llvm::SmallString<128> Buf;
-    return printObjCNameFragment(D, Selector.getString(Buf), OS);
-  }
-  return false;
+  auto ObjCName = objc_translation::getObjCNameForSwiftDecl(D);
+
+  if (!ObjCName.first.empty())
+    return printObjCUSRFragment(D, ObjCName.first.str(), OS);
+
+  assert(ObjCName.second);
+  llvm::SmallString<128> Buf;
+  return printObjCUSRFragment(D, ObjCName.second.getString(Buf), OS);
 }
 
-static bool ShouldUseObjCName(const Decl *D) {
+static bool ShouldUseObjCUSR(const Decl *D) {
   // Only the subscript getter/setter are visible to ObjC rather than the
   // subscript itself
   if (isa<SubscriptDecl>(D))
     return false;
 
   auto Parent = D->getDeclContext()->getInnermostDeclarationDeclContext();
-  if (Parent && (!ShouldUseObjCName(Parent) || // parent should be visible too
-                    !D->getDeclContext()->isTypeContext() || // no local decls
-                    isa<TypeDecl>(D))) // nested types aren't supported
+  if (Parent && (!ShouldUseObjCUSR(Parent) || // parent should be visible too
+                 !D->getDeclContext()->isTypeContext() || // no local decls
+                 isa<TypeDecl>(D))) // nested types aren't supported
     return false;
 
   if (const ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
     if (isa<EnumElementDecl>(VD))
-      return Parent;
+      return true;
     return objc_translation::isVisibleToObjC(VD, Accessibility::Internal);
   }
 
   if (const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
     if (auto ExtendedType = ED->getExtendedType()) {
       auto baseClass = ExtendedType->getClassOrBoundGenericClass();
-      return baseClass && ShouldUseObjCName(baseClass) && !baseClass->isForeign();
+      return baseClass && ShouldUseObjCUSR(baseClass) && !baseClass->isForeign();
     }
   }
   return false;
@@ -179,9 +199,8 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     return Ignore;
   }
 
-  if (ShouldUseObjCName(VD)) {
-    auto ObjCName = objc_translation::getObjCNameForSwiftDecl(D);
-    return printObjCUSR(VD, OS, ObjCName.first, ObjCName.second);
+  if (ShouldUseObjCUSR(VD)) {
+    return printObjCUSR(VD, OS);
   }
 
   if (!D->hasInterfaceType())
@@ -237,15 +256,8 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
   // addressor.
 
   AbstractStorageDecl *SD = const_cast<AbstractStorageDecl*>(D);
-  if (ShouldUseObjCName(SD)) {
-    switch(AccKind) {
-    case AccessorKind::IsGetter:
-      return printObjCUSR(SD, OS, Identifier(), SD->getObjCGetterSelector());
-    case AccessorKind::IsSetter:
-      return printObjCUSR(SD, OS, Identifier(), SD->getObjCSetterSelector());
-    default:
-      llvm_unreachable("unhandled accessor kind");
-    }
+  if (ShouldUseObjCUSR(SD)) {
+    return printObjCUSRForAccessor(SD, AccKind, OS);
   }
 
   std::string Old = getUSRSpacePrefix().str();

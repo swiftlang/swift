@@ -14,6 +14,7 @@
 #define SWIFT_NAME_TRANSLATION_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/AST/AttrKind.h"
 
 namespace swift {
   class ValueDecl;

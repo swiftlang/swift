@@ -165,8 +165,8 @@ class ObjCClass1 {
     set {}
   }
 
-  // CHECK: [[@LINE+1]]:14 c:objc(cs)ObjCClass1(cpy)typeComputed{{$}}
-  static var typeComputed: Int {
+  // CHECK: [[@LINE+1]]:13 c:objc(cs)ObjCClass1(cpy)typeComputed{{$}}
+  class var typeComputed: Int {
     // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(cm)typeComputed{{$}}
     get { return 1 }
     // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(cm)setTypeComputed:{{$}}
