@@ -290,13 +290,13 @@ static bool hasUnhandledError(ArrayRef<ASTNode> Nodes) {
         if (DCS->isSyntacticallyExhaustive())
           return false;
         Throwing = true;
-      } else if (auto TS = dyn_cast<ThrowStmt>(S)) {
+      } else if (isa<ThrowStmt>(S)) {
         Throwing = true;
       }
       return !Throwing;
     }
     bool walkToExprPre(Expr *E) override {
-      if (auto TE = dyn_cast<TryExpr>(E)) {
+      if (isa<TryExpr>(E)) {
         Throwing = true;
       }
       return !Throwing;
