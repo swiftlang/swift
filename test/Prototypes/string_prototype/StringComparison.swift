@@ -116,17 +116,24 @@ where
   }
 }
 
+//
+// We are still deciding on the most desirable normal form, but it might end up
+// being NFC or maybe FCC. For now, I'm calling this "TODO-normal-form" aka
+// "NFT" for normal form T[ODO]. When we decide, we replace all NFT with real
+// normal form.
+//
+
 // For now, sort order semantics are: the unicode scalar value order when in
-// TODO-normal-form. This may be refined more in the future as I learn more
+// NFT. This may be refined more in the future as I learn more
 // about Unicode.
 
 // Mocked-up extra bits of info we might want from Unicode/UnicodeStorage
 extension Unicode {
-  // Whether the string only contains unicode scalar values in the GMP plane.
-  // This is useful as it ensures trivial-decodability for UTF16 as well as
-  // making code-unit-wise ordering reflect scalar value ordering for normalized
-  // UTF16.
-  func isGMP(scan: Bool = true) -> Bool {
+  // Whether the string only contains unicode scalar values in the Basic
+  // Multilingual Plane (BMP). This is useful as it ensures trivial-decodability
+  // for UTF16 as well as making code-unit-wise ordering reflect scalar value
+  // ordering for normalized UTF16.
+  func isBMP(scan: Bool = true) -> Bool {
     return false
   }
 }
@@ -160,7 +167,7 @@ extension Unicode {
 //
 // TODO: notion of mutually-bitwise-comparable encodings, wherein strings in
 // these encodings can be ordered through bitwise comparison alone. I need a
-// better name, as this notion needs to be paired with TODO-normal-form. This
+// better name, as this notion needs to be paired with NFT. This
 // happens when the encodings are the same, or when they have the same bitsize
 // and each of their contents are mutually-trivially-decodable.
 //
@@ -175,15 +182,15 @@ extension Unicode {
 // When they apply:
 //
 //  #1 can be used on entire strings when all of the following are satisfied:
-//    * Both strings are in TODO-normal-form
-//    * Both strings are mutually-bitwise-comparable
+//    * Both strings are in NFT
+//    * Both strings have trivially-decodable code units //are mutually-bitwise-comparable
 //
 //  #2 can be used on entire strings when all of the following are satisfied:
-//    * Both strings are in TODO-normal-form
-//    * Both strings are mutually-bitwise-comparable-modulo-zero-extension TODO:
+//    * Both strings are in NFT
+//    * Both strings have trivially-decodable code units //are mutually-bitwise-comparable
 //
 //  #3 can be used on entire strings when all of the following are satisfied:
-//    * Both strings are in TODO-normal-form
+//    * Both strings are in NFT
 //
 //  #4 is used for all the rest.
 //
@@ -205,6 +212,24 @@ extension Unicode {
 // #4 can do bitwise/zero-extension compare whenever both compared code units
 // are trivially-decodable AND the following code units are definitely
 // normalization-sequence-starters.
+//
+
+
+//
+// For the slow path, ideally we would have a normalized-scalar-view that we can
+// iterate over to compare. Ideally, this would be done without needing to call
+// out to ICU, but I don't know if we'd need full grapheme-break detection.
+// Regardless, we'd need significant portions of the UCD bundled with the stdlib
+// to avoid ICU.
+//
+// I mock up this functionality using Character and then stable-sorting
+// constintuent scalars, but this is not necessarily producing a C normal form.
+// I perform composition yet...
+//
+
+//
+// String sort order in Swift, absent any locale, is the sort order of the
+// string's sequence of NFT unicode scalar values.
 //
 
 
