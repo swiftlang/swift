@@ -13,7 +13,19 @@
 #ifndef SWIFT_STDLIB_SHIMS_SWIFT_STDDEF_H
 #define SWIFT_STDLIB_SHIMS_SWIFT_STDDEF_H
 
+// stddef.h is provided by Clang, but it dispatches to libc's stddef.h.  As a
+// result, using stddef.h here would pull in Darwin module (which includes
+// libc). This creates a dependency cycle, so we can't use stddef.h in
+// SwiftShims.
+// On Linux, the story is different. We get the error message
+// "/usr/include/x86_64-linux-gnu/sys/types.h:146:10: error: 'stddef.h' file not
+// found"
+// This is a known Clang/Ubuntu bug.
+#if !defined(__APPLE__) && !defined(__linux__)
+#include <stddef.h>
+typedef size_t __swift_size_t;
+#else
 typedef __SIZE_TYPE__ __swift_size_t;
+#endif
 
 #endif // SWIFT_STDLIB_SHIMS_SWIFT_STDDEF_H
-
