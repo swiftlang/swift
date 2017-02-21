@@ -1288,6 +1288,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   case clang::DeclarationName::CXXLiteralOperatorName:
   case clang::DeclarationName::CXXOperatorName:
   case clang::DeclarationName::CXXUsingDirective:
+  case clang::DeclarationName::CXXDeductionGuideName:
     // Handling these is part of C++ interoperability.
     llvm_unreachable("unhandled C++ interoperability");
 

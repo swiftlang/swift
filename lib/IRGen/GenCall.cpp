@@ -517,6 +517,7 @@ namespace {
       case clang::Type::RValueReference:
       case clang::Type::MemberPointer:
       case clang::Type::Auto:
+      case clang::Type::DeducedTemplateSpecialization:
         llvm_unreachable("C++ type in ABI lowering?");
 
       case clang::Type::Pipe:
@@ -654,7 +655,6 @@ namespace {
       case clang::BuiltinType::OCLEvent:
       case clang::BuiltinType::OCLClkEvent:
       case clang::BuiltinType::OCLQueue:
-      case clang::BuiltinType::OCLNDRange:
       case clang::BuiltinType::OCLReserveID:
         llvm_unreachable("OpenCL type in ABI lowering");
 
