@@ -1583,6 +1583,20 @@ SILCloner<ImplClass>::visitInitExistentialAddrInst(InitExistentialAddrInst *Inst
                                        conformances));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitInitExistentialOpaqueInst(
+    InitExistentialOpaqueInst *Inst) {
+  CanType origFormalType = Inst->getFormalConcreteType();
+  auto conformances =
+      getOpConformances(origFormalType, Inst->getConformances());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+                getBuilder().createInitExistentialOpaque(
+                    getOpLocation(Inst->getLoc()), getOpType(Inst->getType()),
+                    getOpASTType(origFormalType),
+                    getOpValue(Inst->getOperand()), conformances));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::

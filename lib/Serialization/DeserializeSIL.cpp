@@ -951,6 +951,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
 
   case ValueKind::InitExistentialAddrInst:
+  case ValueKind::InitExistentialOpaqueInst:
   case ValueKind::InitExistentialMetatypeInst:
   case ValueKind::InitExistentialRefInst:
   case ValueKind::AllocExistentialBoxInst: {

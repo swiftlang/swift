@@ -120,7 +120,8 @@
                   'words) . font-lock-keyword-face)
    ;; Protocol and Protocol Composition Types
    `(,(regexp-opt '("init_existential_addr" "deinit_existential_addr"
-                    "open_existential_addr" "open_existential_opaque"
+                    "open_existential_addr"
+                    "init_existential_opaque" "open_existential_opaque"
                     "alloc_existential_box" "project_existential_box"
                     "open_existential_box" "dealloc_existential_box"
                     "init_existential_ref" "open_existential_ref"

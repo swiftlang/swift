@@ -1499,6 +1499,10 @@ public:
     *this << getIDAndType(AEI->getOperand()) << ", $"
           << AEI->getFormalConcreteType();
   }
+  void visitInitExistentialOpaqueInst(InitExistentialOpaqueInst *AEI) {
+    *this << getIDAndType(AEI->getOperand()) << ", $"
+          << AEI->getFormalConcreteType() << ", " << AEI->getType();
+  }
   void visitInitExistentialRefInst(InitExistentialRefInst *AEI) {
     *this << getIDAndType(AEI->getOperand()) << " : $"
           << AEI->getFormalConcreteType() << ", " << AEI->getType();

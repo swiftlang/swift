@@ -883,6 +883,7 @@ public:
   void visitOpenExistentialRefInst(OpenExistentialRefInst *i);
   void visitOpenExistentialOpaqueInst(OpenExistentialOpaqueInst *i);
   void visitInitExistentialAddrInst(InitExistentialAddrInst *i);
+  void visitInitExistentialOpaqueInst(InitExistentialOpaqueInst *i);
   void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *i);
   void visitInitExistentialRefInst(InitExistentialRefInst *i);
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *i);
@@ -4465,6 +4466,11 @@ void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrIn
   Address address =
     srcTI.allocateBuffer(*this, buffer, i->getLoweredConcreteType());  
   setLoweredAddress(i, address);
+}
+
+void IRGenSILFunction::visitInitExistentialOpaqueInst(
+    swift::InitExistentialOpaqueInst *i) {
+  llvm_unreachable("unsupported instruction during IRGen");
 }
 
 void IRGenSILFunction::visitInitExistentialMetatypeInst(

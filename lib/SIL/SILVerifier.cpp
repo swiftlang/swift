@@ -2331,6 +2331,31 @@ public:
     verifyOpenedArchetype(AEI, AEI->getFormalConcreteType());
   }
 
+  void checkInitExistentialOpaqueInst(InitExistentialOpaqueInst *IEI) {
+    SILType concreteType = IEI->getOperand()->getType();
+    require(!concreteType.isAddress(),
+            "init_existential_opaque must not be used on addresses");
+    require(!IEI->getType().isAddress(),
+            "init_existential_opaque result must not be an address");
+    // The operand must be at the right abstraction level for the existential.
+    SILType exType = IEI->getType();
+    auto archetype = ArchetypeType::getOpened(exType.getSwiftRValueType());
+    auto loweredTy = F.getModule().Types.getLoweredType(
+        Lowering::AbstractionPattern(archetype), IEI->getFormalConcreteType());
+    requireSameType(
+        concreteType, loweredTy,
+        "init_existential_opaque operand must be lowered to the right "
+        "abstraction level for the existential");
+
+    require(isLoweringOf(IEI->getOperand()->getType(),
+                         IEI->getFormalConcreteType()),
+            "init_existential_opaque operand must be a lowering of the formal "
+            "concrete type");
+
+    checkExistentialProtocolConformances(exType, IEI->getConformances());
+    verifyOpenedArchetype(IEI, IEI->getFormalConcreteType());
+  }
+
   void checkInitExistentialRefInst(InitExistentialRefInst *IEI) {
     SILType concreteType = IEI->getOperand()->getType();
     require(concreteType.getSwiftType()->isBridgeableObjectType(),

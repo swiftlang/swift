@@ -3746,6 +3746,27 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
                                         conformances);
     break;
   }
+  case ValueKind::InitExistentialOpaqueInst: {
+    CanType FormalConcreteTy;
+    SILType ExistentialTy;
+    SourceLoc TyLoc;
+
+    if (parseTypedValueRef(Val, B) ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
+        parseASTType(FormalConcreteTy, TyLoc) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILType(ExistentialTy) || parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    ArrayRef<ProtocolConformanceRef> conformances =
+        collectExistentialConformances(P, FormalConcreteTy, TyLoc,
+                                       ExistentialTy.getSwiftRValueType());
+
+    ResultVal = B.createInitExistentialOpaque(
+        InstLoc, ExistentialTy, FormalConcreteTy, Val, conformances);
+    break;
+  }
   case ValueKind::AllocExistentialBoxInst: {
     SILType ExistentialTy;
     CanType ConcreteFormalTy;

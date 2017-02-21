@@ -1135,6 +1135,15 @@ public:
         LoweredConcreteType, Conformances, &F, OpenedArchetypes));
   }
 
+  InitExistentialOpaqueInst *
+  createInitExistentialOpaque(SILLocation Loc, SILType ExistentialType,
+                              CanType FormalConcreteType, SILValue Concrete,
+                              ArrayRef<ProtocolConformanceRef> Conformances) {
+    return insert(InitExistentialOpaqueInst::create(
+        getSILDebugLocation(Loc), ExistentialType, FormalConcreteType, Concrete,
+        Conformances, &F, OpenedArchetypes));
+  }
+
   InitExistentialMetatypeInst *
   createInitExistentialMetatype(SILLocation Loc, SILValue metatype,
                                 SILType existentialType,
