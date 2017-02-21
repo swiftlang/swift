@@ -116,6 +116,16 @@ InitExistentialAddrInst *SILGenBuilder::createInitExistentialAddr(
       loc, existential, formalConcreteType, loweredConcreteType, conformances);
 }
 
+InitExistentialOpaqueInst *SILGenBuilder::createInitExistentialOpaque(
+    SILLocation Loc, SILType ExistentialType, CanType FormalConcreteType,
+    SILValue Concrete, ArrayRef<ProtocolConformanceRef> Conformances) {
+  for (auto conformance : Conformances)
+    getSILGenModule().useConformance(conformance);
+
+  return SILBuilder::createInitExistentialOpaque(
+      Loc, ExistentialType, FormalConcreteType, Concrete, Conformances);
+}
+
 InitExistentialMetatypeInst *SILGenBuilder::createInitExistentialMetatype(
     SILLocation loc, SILValue metatype, SILType existentialType,
     ArrayRef<ProtocolConformanceRef> conformances) {

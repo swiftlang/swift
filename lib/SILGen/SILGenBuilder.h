@@ -87,6 +87,11 @@ public:
                             SILType loweredConcreteType,
                             ArrayRef<ProtocolConformanceRef> conformances);
 
+  InitExistentialOpaqueInst *
+  createInitExistentialOpaque(SILLocation Loc, SILType ExistentialType,
+                              CanType FormalConcreteType, SILValue Concrete,
+                              ArrayRef<ProtocolConformanceRef> Conformances);
+
   InitExistentialMetatypeInst *
   createInitExistentialMetatype(SILLocation loc, SILValue metatype,
                                 SILType existentialType,
