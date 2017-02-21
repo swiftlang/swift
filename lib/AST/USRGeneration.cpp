@@ -15,6 +15,7 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
@@ -42,6 +43,77 @@ bool ide::printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS) {
   Mangler Mangler(true);
   Mangler.mangleDeclTypeForDebugger(D);
   Mangler.finalize(OS);
+  return false;
+}
+
+static bool printObjCNameFragment(const ValueDecl *D, StringRef ObjCName,
+                                  raw_ostream &OS) {
+  if (!D)
+    return true;
+
+  if (isa<ClassDecl>(D)) {
+    clang::index::generateUSRForObjCClass(ObjCName, OS);
+  } else if (isa<ProtocolDecl>(D)) {
+    clang::index::generateUSRForObjCProtocol(ObjCName, OS);
+  } else if (isa<VarDecl>(D)) {
+    clang::index::generateUSRForObjCProperty(ObjCName, D->isStatic(), OS);
+  } else if (isa<AbstractFunctionDecl>(D)) {
+    clang::index::generateUSRForObjCMethod(ObjCName, D->isInstanceMember(), OS);
+  } else if (isa<EnumDecl>(D)) {
+    OS << "@E@" << ObjCName; // FIXME: expose clang API to handle enum names
+  } else if (isa<EnumElementDecl>(D)) {
+    OS << "@" << ObjCName;
+  } else {
+    llvm_unreachable("Unexpected value decl");
+    return true;
+  }
+  return false;
+}
+
+static bool printObjCUSR(const ValueDecl *D, raw_ostream &OS, Identifier Ident,
+                         ObjCSelector Selector) {
+  OS << clang::index::getUSRSpacePrefix();
+
+  if (D->getDeclContext()->isTypeContext()) {
+    auto *Parent = D->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto ObjCName = objc_translation::getObjCNameForSwiftDecl(Parent);
+    if (printObjCNameFragment(Parent, ObjCName.first.str(), OS))
+      return true;
+  }
+
+  if (!Ident.empty())
+    return printObjCNameFragment(D, Ident.str(), OS);
+  if (Selector) {
+    llvm::SmallString<128> Buf;
+    return printObjCNameFragment(D, Selector.getString(Buf), OS);
+  }
+  return false;
+}
+
+static bool ShouldUseObjCName(const Decl *D) {
+  // Only the subscript getter/setter are visible to ObjC rather than the
+  // subscript itself
+  if (isa<SubscriptDecl>(D))
+    return false;
+
+  auto Parent = D->getDeclContext()->getInnermostDeclarationDeclContext();
+  if (Parent && (!ShouldUseObjCName(Parent) || // parent should be visible too
+                    !D->getDeclContext()->isTypeContext() || // no local decls
+                    isa<TypeDecl>(D))) // nested types aren't supported
+    return false;
+
+  if (const ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+    if (isa<EnumElementDecl>(VD))
+      return Parent;
+    return objc_translation::isVisibleToObjC(VD, Accessibility::Internal);
+  }
+
+  if (const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
+    if (auto ExtendedType = ED->getExtendedType()) {
+      auto baseClass = ExtendedType->getClassOrBoundGenericClass();
+      return baseClass && ShouldUseObjCName(baseClass) && !baseClass->isForeign();
+    }
+  }
   return false;
 }
 
@@ -107,6 +179,11 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     return Ignore;
   }
 
+  if (ShouldUseObjCName(VD)) {
+    auto ObjCName = objc_translation::getObjCNameForSwiftDecl(D);
+    return printObjCUSR(VD, OS, ObjCName.first, ObjCName.second);
+  }
+
   if (!D->hasInterfaceType())
     return true;
 
@@ -160,6 +237,17 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
   // addressor.
 
   AbstractStorageDecl *SD = const_cast<AbstractStorageDecl*>(D);
+  if (ShouldUseObjCName(SD)) {
+    switch(AccKind) {
+    case AccessorKind::IsGetter:
+      return printObjCUSR(SD, OS, Identifier(), SD->getObjCGetterSelector());
+    case AccessorKind::IsSetter:
+      return printObjCUSR(SD, OS, Identifier(), SD->getObjCSetterSelector());
+    default:
+      llvm_unreachable("unhandled accessor kind");
+    }
+  }
+
   std::string Old = getUSRSpacePrefix().str();
   Mangler Mangler;
   Mangler.mangleAccessorEntity(AccKind, AddressorKind::NotAddressor, SD);

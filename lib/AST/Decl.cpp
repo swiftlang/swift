@@ -5042,3 +5042,20 @@ getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
     return {Ctx.getIdentifier(getNameForObjC(VD)), ObjCSelector()};
   }
 }
+
+bool swift::objc_translation::
+isVisibleToObjC(const ValueDecl *VD, Accessibility minRequiredAccess,
+                 bool checkParent) {
+  if (!(VD->isObjC() || VD->getAttrs().hasAttribute<CDeclAttr>()))
+    return false;
+  if (VD->getFormalAccess() >= minRequiredAccess) {
+    return true;
+  } else if (checkParent) {
+    if (auto ctor = dyn_cast<ConstructorDecl>(VD)) {
+      // Check if we're overriding an initializer that is visible to obj-c
+      if (auto parent = ctor->getOverriddenDecl())
+        return isVisibleToObjC(parent, minRequiredAccess, false);
+    }
+  }
+  return false;
+}

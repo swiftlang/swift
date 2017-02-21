@@ -44,6 +44,11 @@ namespace objc_translation {
   std::pair<Identifier, ObjCSelector>
   getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName = DeclName());
 
+  /// Returns true if the given value decl D is visible to ObjC of its
+  /// own accord (i.e. without considering its context)
+  bool isVisibleToObjC(const ValueDecl *VD, Accessibility minRequiredAccess,
+                     bool checkParent = true);
+
 } // end namespace objc_translation
 } // end namespace swift
 
