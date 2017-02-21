@@ -144,7 +144,7 @@ bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *CVI) {
 bool OwnershipModelEliminatorVisitor::visitCopyUnownedValueInst(
     CopyUnownedValueInst *CVI) {
   B.createStrongRetainUnowned(CVI->getLoc(), CVI->getOperand(),
-                              Atomicity::Atomic);
+                              B.getDefaultAtomicity());
   // Users of copy_value_unowned expect an owned value. So we need to convert
   // our unowned value to a ref.
   auto *UTRI =
