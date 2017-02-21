@@ -298,6 +298,11 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
     return nullptr;
   }
 
+  if (!EnableSILInliningOfGenerics && AI.hasSubstitutions()) {
+    // Inlining of generics is not allowed.
+    return nullptr;
+  }
+
   // IRGen cannot handle partial_applies containing opened_extistentials
   // in its substitutions list.
   if (calleeHasPartialApplyWithOpenedExistentials(AI)) {
@@ -321,6 +326,8 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
                                                  int &NumCallerBlocks) {
   SILFunction *Callee = AI.getReferencedFunction();
   bool IsGeneric = !AI.getSubstitutions().empty();
+
+  assert(EnableSILInliningOfGenerics || !IsGeneric);
 
   // Bail out if this generic call can be optimized by means of
   // the generic specialization, because we prefer generic specialization
@@ -381,8 +388,8 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
 
         auto Subs = FAI.getSubstitutions();
 
-        // Bail if it is not a generic call.
-        if (Subs.empty())
+        // Bail if it is not a generic call or inlining of generics is forbidden.
+        if (!EnableSILInliningOfGenerics || Subs.empty())
           continue;
 
         if (!isa<FunctionRefInst>(def) && !isa<ClassMethodInst>(def) &&
@@ -539,6 +546,9 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   assert(!AI.getSubstitutions().empty() &&
          "Expected a generic apply");
 
+  if (!EnableSILInliningOfGenerics)
+    return false;
+
   // If all substitutions are concrete, then there is no need to perform the
   // generic inlining. Let the generic specializer create a specialized
   // function and then decide if it is beneficial to inline it.
@@ -559,9 +569,6 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   // AlwaysInline or transparent.
   if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent())
     return true;
-
-  if (!EnableSILInliningOfGenerics)
-    return false;
 
   // It is not clear yet if this function should be decided or not.
   return None;
