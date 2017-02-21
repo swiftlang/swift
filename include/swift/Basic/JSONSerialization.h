@@ -34,7 +34,7 @@ namespace json {
 /// to/from a JSON object.  For example:
 ///
 ///     struct ObjectTraits<MyStruct> {
-///       static void mapping(Output &out, MyStruct &s) {
+///       static void mapping(Output &out, const MyStruct &s) {
 ///         out.mapRequired("name", s.name);
 ///         out.mapRequired("size", s.size);
 ///         out.mapOptional("age",  s.age);
@@ -43,9 +43,9 @@ namespace json {
 template<class T>
 struct ObjectTraits {
   // Must provide:
-  // static void mapping(Output &out, T &fields);
+  // static void mapping(Output &out, const T &fields);
   // Optionally may provide:
-  // static StringRef validate(Output &out, T &fields);
+  // static StringRef validate(Output &out, const T &fields);
 };
 
 
@@ -54,7 +54,7 @@ struct ObjectTraits {
 /// in-memory values and a string in JSON.  For example:
 ///
 ///     struct ScalarEnumerationTraits<Colors> {
-///         static void enumeration(Output &out, Colors &value) {
+///         static void enumeration(Output &out, const Colors &value) {
 ///           out.enumCase(value, "red",   cRed);
 ///           out.enumCase(value, "blue",  cBlue);
 ///           out.enumCase(value, "green", cGreen);
@@ -63,7 +63,7 @@ struct ObjectTraits {
 template<typename T>
 struct ScalarEnumerationTraits {
   // Must provide:
-  // static void enumeration(Output &out, T &value);
+  // static void enumeration(Output &out, const T &value);
 };
 
 
@@ -72,7 +72,7 @@ struct ScalarEnumerationTraits {
 /// strings.  For example:
 ///
 ///      struct ScalarBitSetTraits<MyFlags> {
-///        static void bitset(Output &out, MyFlags &value) {
+///        static void bitset(Output &out, const MyFlags &value) {
 ///          out.bitSetCase(value, "big",   flagBig);
 ///          out.bitSetCase(value, "flat",  flagFlat);
 ///          out.bitSetCase(value, "round", flagRound);
@@ -81,7 +81,7 @@ struct ScalarEnumerationTraits {
 template<typename T>
 struct ScalarBitSetTraits {
   // Must provide:
-  // static void bitset(Output &out, T &value);
+  // static void bitset(Output &out, const T &value);
 };
 
 
@@ -101,7 +101,7 @@ struct ScalarTraits {
   // Must provide:
   //
   // Function to write the value as a string:
-  //static void output(const T &value, void *ctxt, llvm::raw_ostream &out);
+  //static void output(const T &value, llvm::raw_ostream &out);
   //
   // Function to determine if the value should be quoted.
   //static bool mustQuote(StringRef);
@@ -113,20 +113,18 @@ struct ScalarTraits {
 ///
 ///    template<>
 ///    struct ArrayTraits< std::vector<MyType> > {
-///      static size_t size(Output &out, std::vector<MyType> &seq) {
+///      static size_t size(Output &out, const std::vector<MyType> &seq) {
 ///        return seq.size();
 ///      }
-///      static MyType& element(Output &, std::vector<MyType> &seq, size_t index) {
-///        if (index >= seq.size())
-///          seq.resize(index+1);
+///      static const MyType& element(Output &, const std::vector<MyType> &seq, size_t index) {
 ///        return seq[index];
 ///      }
 ///    };
 template<typename T>
 struct ArrayTraits {
   // Must provide:
-  // static size_t size(Output &out, T &seq);
-  // static T::value_type& element(Output &out, T &seq, size_t index);
+  // static size_t size(Output &out, const T &seq);
+  // static const T::value_type& element(Output &out, const T &seq, size_t index);
 };
 
 // Only used by compiler if both template types are the same
@@ -141,7 +139,7 @@ struct MissingTrait;
 template <class T>
 struct has_ScalarEnumerationTraits
 {
-  typedef void (*Signature_enumeration)(class Output&, T&);
+  typedef void (*Signature_enumeration)(class Output&, const T&);
 
   template <typename U>
   static char test(SameType<Signature_enumeration, &U::enumeration>*);
@@ -159,7 +157,7 @@ public:
 template <class T>
 struct has_ScalarBitSetTraits
 {
-  typedef void (*Signature_bitset)(class Output&, T&);
+  typedef void (*Signature_bitset)(class Output&, const T&);
 
   template <typename U>
   static char test(SameType<Signature_bitset, &U::bitset>*);
@@ -196,7 +194,7 @@ public:
 template <class T>
 struct has_ObjectTraits
 {
-  typedef void (*Signature_mapping)(class Output&, T&);
+  typedef void (*Signature_mapping)(class Output&, const T&);
 
   template <typename U>
   static char test(SameType<Signature_mapping, &U::mapping>*);
@@ -212,7 +210,7 @@ public:
 template <class T>
 struct has_ObjectValidateTraits
 {
-  typedef StringRef (*Signature_validate)(class Output&, T&);
+  typedef StringRef (*Signature_validate)(class Output&, const T&);
 
   template <typename U>
   static char test(SameType<Signature_validate, &U::validate>*);
@@ -230,7 +228,7 @@ public:
 template <class T>
 struct has_ArrayMethodTraits
 {
-  typedef size_t (*Signature_size)(class Output&, T&);
+  typedef size_t (*Signature_size)(class Output&, const T&);
 
   template <typename U>
   static char test(SameType<Signature_size, &U::size>*);
@@ -239,7 +237,7 @@ struct has_ArrayMethodTraits
   static double test(...);
   
 public:
-  static bool const value =  (sizeof(test<ArrayTraits<T> >(nullptr)) == 1);
+  static bool const value = (sizeof(test<ArrayTraits<T> >(nullptr)) == 1);
 };
 
 // Test if ArrayTraits<T> is defined on type T
@@ -324,54 +322,48 @@ public:
 
   void beginObject();
   void endObject();
-  bool preflightKey(const char*, bool, bool, bool &, void *&);
+  bool preflightKey(const char*, bool, bool, void *&);
   void postflightKey(void*);
 
   void beginEnumScalar();
-  bool matchEnumScalar(const char*, bool);
+  void matchEnumScalar(const char*, bool);
   void endEnumScalar();
 
   bool beginBitSetScalar(bool &);
-  bool bitSetMatch(const char*, bool);
+  void bitSetMatch(const char*, bool);
   void endBitSetScalar();
 
   void scalarString(StringRef &, bool);
 
   template <typename T>
-  void enumCase(T &Val, const char* Str, const T ConstVal) {
-    if (matchEnumScalar(Str, Val == ConstVal)) {
-      Val = ConstVal;
-    }
+  void enumCase(const T &Val, const char* Str, const T ConstVal) {
+    matchEnumScalar(Str, Val == ConstVal);
   }
 
   template <typename T>
-  void bitSetCase(T &Val, const char* Str, const T ConstVal) {
-    if (bitSetMatch(Str, (Val & ConstVal) == ConstVal)) {
-      Val = Val | ConstVal;
-    }
+  void bitSetCase(const T &Val, const char* Str, const T ConstVal) {
+    bitSetMatch(Str, (Val & ConstVal) == ConstVal);
   }
 
   template <typename T>
-  void maskedBitSetCase(T &Val, const char *Str, T ConstVal, T Mask) {
-    if (bitSetMatch(Str, (Val & Mask) == ConstVal))
-      Val = Val | ConstVal;
+  void maskedBitSetCase(const T &Val, const char *Str, T ConstVal, T Mask) {
+    bitSetMatch(Str, (Val & Mask) == ConstVal);
   }
 
   template <typename T>
-  void maskedBitSetCase(T &Val, const char *Str, uint32_t ConstVal,
+  void maskedBitSetCase(const T &Val, const char *Str, uint32_t ConstVal,
                         uint32_t Mask) {
-    if (bitSetMatch(Str, (Val & Mask) == ConstVal))
-      Val = Val | ConstVal;
+    bitSetMatch(Str, (Val & Mask) == ConstVal);
   }
 
   template <typename T>
-  void mapRequired(const char* Key, T& Val) {
+  void mapRequired(const char* Key, const T& Val) {
     this->processKey(Key, Val, true);
   }
 
   template <typename T>
   typename std::enable_if<has_ArrayTraits<T>::value,void>::type
-  mapOptional(const char* Key, T& Val) {
+  mapOptional(const char* Key, const T& Val) {
     // omit key/value instead of outputting empty array
     if (this->canElideEmptyArray() && !(Val.begin() != Val.end()))
       return;
@@ -379,63 +371,50 @@ public:
   }
 
   template <typename T>
-  void mapOptional(const char* Key, Optional<T> &Val) {
+  void mapOptional(const char* Key, const Optional<T> &Val) {
     processKeyWithDefault(Key, Val, Optional<T>(), /*Required=*/false);
   }
 
   template <typename T>
   typename std::enable_if<!has_ArrayTraits<T>::value,void>::type
-  mapOptional(const char* Key, T& Val) {
+  mapOptional(const char* Key, const T& Val) {
     this->processKey(Key, Val, false);
   }
 
   template <typename T>
-  void mapOptional(const char* Key, T& Val, const T& Default) {
+  void mapOptional(const char* Key, const T& Val, const T& Default) {
     this->processKeyWithDefault(Key, Val, Default, false);
   }
 
 private:
   template <typename T>
-  void processKeyWithDefault(const char *Key, Optional<T> &Val,
+  void processKeyWithDefault(const char *Key, const Optional<T> &Val,
                              const Optional<T> &DefaultValue, bool Required) {
     assert(!DefaultValue.hasValue() &&
            "Optional<T> shouldn't have a value!");
     void *SaveInfo;
-    bool UseDefault;
     const bool sameAsDefault = !Val.hasValue();
-    if (!Val.hasValue())
-      Val = T();
-    if (this->preflightKey(Key, Required, sameAsDefault, UseDefault,
-                           SaveInfo)) {
-      jsonize(*this, Val.getValue(), Required);
+    if (this->preflightKey(Key, Required, sameAsDefault, SaveInfo)) {
+      jsonize(*this, Val.hasValue() ? Val.getValue() : T(), Required);
       this->postflightKey(SaveInfo);
-    } else {
-      if (UseDefault)
-        Val = DefaultValue;
     }
   }
 
   template <typename T>
-  void processKeyWithDefault(const char *Key, T &Val, const T& DefaultValue,
+  void processKeyWithDefault(const char *Key, const T &Val, const T& DefaultValue,
                              bool Required) {
     void *SaveInfo;
-    bool UseDefault;
     const bool sameAsDefault = Val == DefaultValue;
-    if (this->preflightKey(Key, Required, sameAsDefault, UseDefault,
-                           SaveInfo)) {
+    if (this->preflightKey(Key, Required, sameAsDefault, SaveInfo)) {
       jsonize(*this, Val, Required);
       this->postflightKey(SaveInfo);
-    } else {
-      if (UseDefault)
-        Val = DefaultValue;
     }
   }
 
   template <typename T>
-  void processKey(const char *Key, T &Val, bool Required) {
+  void processKey(const char *Key, const T &Val, bool Required) {
     void *SaveInfo;
-    bool UseDefault;
-    if (this->preflightKey(Key, Required, false, UseDefault, SaveInfo)) {
+    if (this->preflightKey(Key, Required, false, SaveInfo)) {
       jsonize(*this, Val, Required);
       this->postflightKey(SaveInfo);
     }
@@ -535,7 +514,7 @@ struct ScalarTraits<double> {
 
 template<typename T>
 typename std::enable_if<has_ScalarEnumerationTraits<T>::value,void>::type
-jsonize(Output &out, T &Val, bool) {
+jsonize(Output &out, const T &Val, bool) {
   out.beginEnumScalar();
   ScalarEnumerationTraits<T>::enumeration(out, Val);
   out.endEnumScalar();
@@ -543,7 +522,7 @@ jsonize(Output &out, T &Val, bool) {
 
 template<typename T>
 typename std::enable_if<has_ScalarBitSetTraits<T>::value,void>::type
-jsonize(Output &out, T &Val, bool) {
+jsonize(Output &out, const T &Val, bool) {
   bool DoClear;
   if (out.beginBitSetScalar(DoClear)) {
     if (DoClear)
@@ -556,7 +535,7 @@ jsonize(Output &out, T &Val, bool) {
 
 template<typename T>
 typename std::enable_if<has_ScalarTraits<T>::value,void>::type
-jsonize(Output &out, T &Val, bool) {
+jsonize(Output &out, const T &Val, bool) {
   {
     std::string Storage;
     llvm::raw_string_ostream Buffer(Storage);
@@ -569,7 +548,7 @@ jsonize(Output &out, T &Val, bool) {
 
 template<typename T>
 typename std::enable_if<validatedObjectTraits<T>::value, void>::type
-jsonize(Output &out, T &Val, bool) {
+jsonize(Output &out, const T &Val, bool) {
   out.beginObject();
   {
     StringRef Err = ObjectTraits<T>::validate(out, Val);
@@ -584,7 +563,7 @@ jsonize(Output &out, T &Val, bool) {
 
 template<typename T>
 typename std::enable_if<unvalidatedObjectTraits<T>::value, void>::type
-jsonize(Output &out, T &Val, bool) {
+jsonize(Output &out, const T &Val, bool) {
   out.beginObject();
   ObjectTraits<T>::mapping(out, Val);
   out.endObject();
@@ -592,13 +571,13 @@ jsonize(Output &out, T &Val, bool) {
 
 template<typename T>
 typename std::enable_if<missingTraits<T>::value, void>::type
-jsonize(Output &out, T &Val, bool) {
+jsonize(Output &out, const T &Val, bool) {
   char missing_json_trait_for_type[sizeof(MissingTrait<T>)];
 }
 
 template<typename T>
 typename std::enable_if<has_ArrayTraits<T>::value,void>::type
-jsonize(Output &out, T &Seq, bool) {
+jsonize(Output &out, const T &Seq, bool) {
   {
     out.beginArray();
     unsigned count = ArrayTraits<T>::size(out, Seq);
@@ -618,7 +597,7 @@ template <typename T>
 inline
 typename
 std::enable_if<swift::json::has_ObjectTraits<T>::value, Output &>::type
-operator<<(Output &yout, T &map) {
+operator<<(Output &yout, const T &map) {
   jsonize(yout, map, true);
   return yout;
 }
@@ -628,7 +607,7 @@ template <typename T>
 inline
 typename
 std::enable_if<swift::json::has_ArrayTraits<T>::value, Output &>::type
-operator<<(Output &yout, T &seq) {
+operator<<(Output &yout, const T &seq) {
   jsonize(yout, seq, true);
   return yout;
 }
