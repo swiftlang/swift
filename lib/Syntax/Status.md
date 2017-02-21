@@ -60,6 +60,14 @@ Include the following in each entry:
 - continue-statement
   - `ContinueStmtSyntax`
 
+- return-statement
+  - `ReturnStmtSyntax`
+
+### Expressions
+
+- integer-literal
+  - `IntegerLiteralExprSyntax`
+
 ### Types
 
 - type
@@ -271,7 +279,6 @@ Include the following in each entry:
 - initializer-declaration
 - initializer-expression
 - initializer-head
-- integer-literal
 - interpolated-string-literal
 - interpolated-text
 - interpolated-text-item
@@ -342,7 +349,6 @@ Include the following in each entry:
 - repeat-while-statement
 - requirement
 - requirement-list
-- return-statement
 - selector-expression
 - self-expression
 - self-initializer-expression

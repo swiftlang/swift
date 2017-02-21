@@ -23,8 +23,15 @@
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/SyntaxData.h"
 
+using llvm::Optional;
+
 namespace swift {
 namespace syntax {
+
+class ExprSyntax;
+class ExprSyntaxData;
+
+#pragma mark - statement Data
 
 class StmtSyntaxData : public SyntaxData {
 protected:
@@ -36,6 +43,8 @@ public:
     return S->isStmt();
   }
 };
+
+#pragma mark - statement API
 
 /// statement -> expression ';'?
 ///            | declaration ';'?
@@ -55,6 +64,39 @@ public:
   }
 };
 
+#pragma mark - unknown-statement Data
+
+class UnknownStmtSyntaxData : public StmtSyntaxData {
+  UnknownStmtSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
+                        CursorIndex IndexInParent = 0);
+public:
+  static RC<UnknownStmtSyntaxData> make(RC<RawSyntax> Raw,
+                                        const SyntaxData *Parent = nullptr,
+                                        CursorIndex IndexInParent = 0);
+
+  static bool classof(const SyntaxData *S) {
+    return S->getKind() == SyntaxKind::UnknownStmt;
+  }
+};
+
+#pragma mark - unknown-statement API
+
+class UnknownStmtSyntax : public StmtSyntax {
+  friend class SyntaxData;
+  friend class UnknownStmtSyntaxData;
+  friend class LegacyASTTransformer;
+
+  using DataType = UnknownExprSyntaxData;
+
+  UnknownStmtSyntax(const RC<SyntaxData> Root,
+                    const UnknownStmtSyntaxData *Data);
+
+public:
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::UnknownStmt;
+  }
+};
+
 #pragma mark -
 #pragma mark code-block Data
 
@@ -63,8 +105,11 @@ class CodeBlockStmtSyntaxData final : public StmtSyntaxData {
   friend class CodeBlockStmtSyntax;
   friend struct SyntaxFactory;
 
-  CodeBlockStmtSyntaxData(RC<RawSyntax> Raw);
-  static RC<CodeBlockStmtSyntaxData> make(RC<RawSyntax> Raw);
+  CodeBlockStmtSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
+                          CursorIndex IndexInParent = 0);
+  static RC<CodeBlockStmtSyntaxData> make(RC<RawSyntax> Raw,
+                                          const SyntaxData *Parent = nullptr,
+                                          CursorIndex IndexInParent = 0);
   static RC<CodeBlockStmtSyntaxData> makeBlank();
 public:
   static bool classof(const SyntaxData *SD) {
@@ -357,6 +402,72 @@ public:
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::ContinueStmt;
+  }
+};
+
+#pragma mark - return-statement Data
+
+class ReturnStmtSyntaxData : public StmtSyntaxData {
+  friend class SyntaxData;
+  friend class ReturnStmtSyntax;
+  friend struct SyntaxFactory;
+
+  RC<ExprSyntaxData> CachedExpression;
+
+  ReturnStmtSyntaxData(RC<RawSyntax> Raw,
+                       const SyntaxData *Parent = nullptr,
+                       CursorIndex IndexInParent = 0);
+  static RC<ReturnStmtSyntaxData> make(RC<RawSyntax> Raw,
+                                       const SyntaxData *Parent = nullptr,
+                                       CursorIndex IndexInParent = 0);
+  static RC<ReturnStmtSyntaxData> makeBlank();
+
+public:
+  static bool classof(const SyntaxData *SD) {
+    return SD->getKind() == SyntaxKind::ReturnStmt;
+  }
+  
+};
+
+#pragma mark - return-statement API
+
+/// return-statement -> 'return' expression? ';'?
+class ReturnStmtSyntax : public StmtSyntax {
+  friend struct SyntaxFactory;
+  friend class ReturnStmtSyntaxData;
+  friend class SyntaxData;
+  friend class Syntax;
+
+  using DataType = ReturnStmtSyntaxData;
+
+  enum class Cursor : CursorIndex {
+    ReturnKeyword,
+    Expression
+  };
+
+  ReturnStmtSyntax(const RC<SyntaxData> Root,
+                   const ReturnStmtSyntaxData *Data);
+
+  static ReturnStmtSyntax make(RC<RawSyntax> Raw,
+                               const SyntaxData *Parent = nullptr,
+                               CursorIndex IndexInParent = 0);
+  static ReturnStmtSyntax makeBlank();
+public:
+
+  /// Return the 'return' keyword associated with this return statement.
+  RC<TokenSyntax> getReturnKeyword() const;
+
+  /// Return a new `ReturnStmtSyntax` with the given 'return' keyword.
+  ReturnStmtSyntax withReturnKeyword(RC<TokenSyntax> NewReturnKeyword) const;
+
+  /// Return the expression of this return statement.
+  Optional<ExprSyntax> getExpression() const;
+
+  /// Return a new `ReturnStmtSyntax` with the given destination label.
+  ReturnStmtSyntax withExpression(ExprSyntax NewExpression) const;
+
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::ReturnStmt;
   }
 };
 

@@ -230,6 +230,11 @@ struct RawSyntax : public llvm::ThreadSafeRefCountedBase<RawSyntax> {
     return Kind >= SyntaxKind::First_Stmt && Kind <= SyntaxKind::Last_Stmt;
   }
 
+  /// Returns true if this raw syntax node is some kind of expression.
+  bool isExpr() const {
+    return Kind >= SyntaxKind::First_Expr && Kind <= SyntaxKind::Last_Expr;
+  }
+
   /// Get the absolute position of this raw syntax: its offset, line,
   /// and column.
   AbsolutePosition getAbsolutePosition(RC<RawSyntax> Root) const;
