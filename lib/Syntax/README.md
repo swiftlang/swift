@@ -358,6 +358,11 @@ parameter clause. At first, this is only represented in the raw syntax. On first
 ask, we thaw those out by creating a new `GenericParameterClauseSyntaxData`,
 cache it as our child, set its parent to `this`, and send it back to the caller.
 
+You can think of `SyntaxData` as "concrete" or "realized" syntax nodes. They
+represent a specific piece of source code, have an absolute location, line and
+column number, etc. `RawSyntax` are more like the integer 1 - existing in theory
+everywhere it occurs.
+
 Beyond this, `SyntaxData` nodes have *no signficant public API*.
 
 - `SyntaxData` are immutable.
@@ -386,6 +391,67 @@ it's especially important that the APIs in `Syntax` nodes remain intuitive and
 do what you expect with no weird side effects, necessary contexts to maintain,
 etc. If you have a handle on a `Syntax` node, you're safe to query anything
 about it without other processes pulling out the rug from under you.
+
+### Example Object Diagram: `{ return 1}`
+
+Here's an example of what you might have as a result of the following C++
+code:
+
+```c++
+auto LeftBrace = SyntaxFactory::makeLeftBraceToken({}, Trivia::spaces(1));
+
+auto IntegerTok = SyntaxFactory::makeIntegerLiteralToken("1", {}, Trivia::spaces(1));
+auto Integer = SyntaxFactory::makeIntegerLiteralExpr(IntegerTok);
+
+auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
+
+// This ReturnStmtSyntax is floating, with no root.
+auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, Integer);
+
+auto RightBrace = SyntaxFactory::makeLeftBraceToken({}, {});
+
+auto Statements = SyntaxFactory::makeBlankStmtList()
+  .addExpr(Return);
+
+auto Block = SyntaxFactory::makeBlankCodeBlockStmt()
+  // Takes a reference of the token directly and increments the
+  // reference count.
+  .withLeftBraceToken(LeftBrace)
+
+  // Only takes a strong reference to the RawSyntax of the
+  // ReturnStmtSyntax above.
+  .withStatements(Statements)
+
+  // Takes a reference of the token directly and increments the
+  // reference count.
+  .withRightBraceToken(RightBrace);
+
+// Returns a new ReturnStmtSyntax with the root set to the Block
+// above, and the parent set to the StmtListSyntax.
+auto MyReturn = Block.getStatement(0).castTo<ReturnStmt>;
+```
+
+And here's what the object diagram would look like starting with `MyReturn`.
+
+![Syntax Example](.doc/SyntaxExample.png)
+
+Legend:
+- Green: `RawSyntax` types (`TokenSyntax` is a `RawSyntax`)
+- Red: `SyntaxData` types
+- Blue: `Syntax` types
+- Gray: `Trivia`
+- Solid Arrows: Strong references
+- Dashed Arrows: Weak references
+
+A couple of interesting points and reminders:
+- All strong references point downward in the tree.
+- One `SyntaxData` for each `RawSyntax`.  
+  Remember, a `SyntaxData` is essentially a `RawSyntax` with a parent pointer
+  and cached `SyntaxData` children.
+- Parent pointers are omitted here but there are weak references pointing
+  upward among `SyntaxData` (red) nodes.
+- Clients only work with `Syntax` (blue) nodes and `Trivia` (gray), and should
+  never see `SyntaxData` (red) or `RawSyntax` (green) nodes.
 
 ## Adding new Syntax Nodes
 
