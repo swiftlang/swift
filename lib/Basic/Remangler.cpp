@@ -837,6 +837,7 @@ void Remangler::mangleFunctionSignatureSpecialization(Node *node) {
             std::string Buffer = "_";
             Buffer.append(Text.data(), Text.size());
             TextNd = NodeFactory::create(Node::Kind::Identifier, Buffer);
+            TemporaryNodes.push_back(TextNd);
           }
           mangleIdentifier(TextNd.get());
           break;
