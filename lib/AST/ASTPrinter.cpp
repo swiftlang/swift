@@ -1313,7 +1313,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
   }
 
   if (printRequirements) {
-    // Print the requirements.
     bool isFirstReq = true;
     for (const auto &req : requirements) {
       auto first = req.getFirstType();
@@ -1348,6 +1347,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         Printer << ", ";
       }
 
+      Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
       if (second) {
         Requirement substReq(req.getKind(), first, second);
         printRequirement(substReq);
@@ -1355,6 +1355,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         Requirement substReq(req.getKind(), first, req.getLayoutConstraint());
         printRequirement(substReq);
       }
+      Printer.callPrintStructurePost(PrintStructureKind::GenericRequirement);
     }
   }
 
