@@ -482,27 +482,28 @@ static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
   return false;
 }
 
-Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
-                                ArrayRef<GenericTypeParamType *> &genericParams,
-                                unsigned &initialParamDepth,
-                                ArrayRef<Requirement> &requirements,
-                                SmallVectorImpl<Requirement> &requirementsBuf) {
+CanType Mangler::getDeclTypeForMangling(
+    const ValueDecl *decl,
+    ArrayRef<GenericTypeParamType *> &genericParams,
+    unsigned &initialParamDepth,
+    ArrayRef<Requirement> &requirements,
+    SmallVectorImpl<Requirement> &requirementsBuf) {
   auto &C = decl->getASTContext();
   if (!decl->hasInterfaceType())
-    return ErrorType::get(C);
+    return ErrorType::get(C)->getCanonicalType();
 
-  Type type = decl->getInterfaceType();
+  auto type = decl->getInterfaceType()->getCanonicalType();
 
   initialParamDepth = 0;
   CanGenericSignature sig;
-  if (auto gft = type->getAs<GenericFunctionType>()) {
-    sig = gft->getGenericSignature()->getCanonicalSignature();
+  if (auto gft = dyn_cast<GenericFunctionType>(type)) {
+    sig = gft.getGenericSignature();
     CurGenericSignature = sig;
     genericParams = sig->getGenericParams();
     requirements = sig->getRequirements();
 
-    type = FunctionType::get(gft->getInput(), gft->getResult(),
-                             gft->getExtInfo());
+    type = CanFunctionType::get(gft.getInput(), gft.getResult(),
+                                gft->getExtInfo());
   } else {
     genericParams = {};
     requirements = {};
@@ -511,7 +512,7 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
   // Shed the 'self' type and generic requirements from method manglings.
   if (isMethodDecl(decl) && type && !type->hasError()) {
     // Drop the Self argument clause from the type.
-    type = type->castTo<AnyFunctionType>()->getResult();
+    type = cast<AnyFunctionType>(type).getResult();
 
     // Drop generic parameters and requirements from the method's context.
     if (auto parentGenericSig =
@@ -564,7 +565,7 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> requirementsBuf;
   Mod = decl->getModuleContext();
-  Type type = getDeclTypeForMangling(decl,
+  auto type = getDeclTypeForMangling(decl,
                                      genericParams, initialParamDepth,
                                      requirements, requirementsBuf);
 
