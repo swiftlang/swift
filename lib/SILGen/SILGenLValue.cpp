@@ -330,8 +330,9 @@ namespace {
              "base for ref element component must be an object");
       assert(base.getType().hasReferenceSemantics() &&
              "base for ref element component must be a reference type");
-      // Borrow the ref element addr.
-      base = base.borrow(gen, loc);
+      // Borrow the ref element addr using formal access. If we need the ref
+      // element addr, we will load it in this expression.
+      base = base.formalAccessBorrow(gen, loc);
       auto Res = gen.B.createRefElementAddr(loc, base.getUnmanagedValue(),
                                             Field, SubstFieldType);
       return ManagedValue::forLValue(Res);
