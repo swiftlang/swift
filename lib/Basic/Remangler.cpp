@@ -830,17 +830,9 @@ void Remangler::mangleFunctionSignatureSpecialization(Node *node) {
         case FunctionSigSpecializationParamKind::ConstantPropGlobal:
           mangleIdentifier(Param->getChild(1).get());
           break;
-        case FunctionSigSpecializationParamKind::ConstantPropString: {
-          NodePointer TextNd = Param->getChild(2);
-          StringRef Text = TextNd->getText();
-          if (Text.size() > 0 && (isDigit(Text[0]) || Text[0] == '_')) {
-            std::string Buffer = "_";
-            Buffer.append(Text.data(), Text.size());
-            TextNd = NodeFactory::create(Node::Kind::Identifier, Buffer);
-          }
-          mangleIdentifier(TextNd.get());
+        case FunctionSigSpecializationParamKind::ConstantPropString:
+          mangleIdentifier(Param->getChild(2).get());
           break;
-        }
         case FunctionSigSpecializationParamKind::ClosureProp:
           mangleIdentifier(Param->getChild(1).get());
           for (unsigned i = 2, e = Param->getNumChildren(); i != e; ++i) {
