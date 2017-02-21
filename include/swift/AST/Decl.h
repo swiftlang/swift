@@ -2065,6 +2065,11 @@ public:
   /// swift code.
   bool isDefinition() const;
 
+  /// \brief Return true if this protocol member is a protocol requirement.
+  ///
+  /// Asserts if this is not a member of a protocol.
+  bool isProtocolRequirement() const;
+
   /// Determine whether we have already checked whether this
   /// declaration is a redeclaration.
   bool alreadyCheckedRedeclaration() const { 
