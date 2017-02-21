@@ -262,12 +262,31 @@ static void maybeMarkTransparent(FuncDecl *accessor,
                                  AbstractStorageDecl *storage,
                                  TypeChecker &TC) {
   auto *DC = storage->getDeclContext();
-  if (isa<ProtocolDecl>(DC) || isa<ClassDecl>(DC))
+  auto *nominalDecl = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+
+  // Global variable accessors are not @_transparent.
+  if (!nominalDecl)
     return;
 
-  auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
-  if (nominal && nominal->hasFixedLayout())
-    accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
+  // Accessors for stored properties of resilient types are not
+  // @_transparent.
+  if (!nominalDecl->hasFixedLayout())
+    return;
+
+  // Accessors for protocol storage requirements are never @_transparent
+  // since they do not have bodies.
+  //
+  // FIXME: Revisit this if we ever get 'real' default implementations.
+  if (isa<ProtocolDecl>(nominalDecl))
+    return;
+
+  // Accessors for classes with @objc ancestry are not @_transparent,
+  // since they use a field offset variable which is not exported.
+  if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
+    if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC)
+      return;
+
+  accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
 }
 
 static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,

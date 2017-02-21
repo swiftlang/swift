@@ -68,8 +68,8 @@ protocol Proto {
 
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Fooc
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foo10objcMethod
-// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foog8objcPropSi
-// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foos8objcPropSi
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC7dynamic3Foog8objcPropSi
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC7dynamic3Foos8objcPropSi
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foog9subscriptFT4objcPs9AnyObject__Si
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foos9subscriptFT4objcPs9AnyObject__Si
 
@@ -81,8 +81,8 @@ protocol Proto {
 
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Fooc
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foo13dynamicMethod
-// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foog11dynamicPropSi
-// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foos11dynamicPropSi
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC7dynamic3Foog11dynamicPropSi
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC7dynamic3Foos11dynamicPropSi
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foog9subscriptFT7dynamicSi_Si
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foos9subscriptFT7dynamicSi_Si
 

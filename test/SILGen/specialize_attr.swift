@@ -70,7 +70,7 @@ public class ASubscriptable<Element> : TestSubscriptable {
 // CHECK-LABEL: sil [_specialize <Int>] @_TFC15specialize_attr14ASubscriptables9subscriptFSix : $@convention(method) <Element> (@in Element, Int, @guaranteed ASubscriptable<Element>) -> () {
 
 // ASubscriptable.subscript.materializeForSet with no attribute
-// CHECK-LABEL: sil @_TFC15specialize_attr14ASubscriptablem9subscriptFSix : $@convention(method) <Element> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @guaranteed ASubscriptable<Element>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil [transparent] [fragile] @_TFC15specialize_attr14ASubscriptablem9subscriptFSix : $@convention(method) <Element> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @guaranteed ASubscriptable<Element>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 
 public class Addressable<Element> : TestSubscriptable {
   var storage: UnsafeMutablePointer<Element>
@@ -99,10 +99,10 @@ public class Addressable<Element> : TestSubscriptable {
 
 
 // Addressable.subscript.getter with no attribute
-// CHECK-LABEL: sil @_TFC15specialize_attr11Addressableg9subscriptFSix : $@convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> @out Element {
+// CHECK-LABEL: sil [transparent] [fragile] @_TFC15specialize_attr11Addressableg9subscriptFSix : $@convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> @out Element {
 
 // Addressable.subscript.setter with no attribute
-// CHECK-LABEL: sil @_TFC15specialize_attr11Addressables9subscriptFSix : $@convention(method) <Element> (@in Element, Int, @guaranteed Addressable<Element>) -> () {
+// CHECK-LABEL: sil [transparent] [fragile] @_TFC15specialize_attr11Addressables9subscriptFSix : $@convention(method) <Element> (@in Element, Int, @guaranteed Addressable<Element>) -> () {
 
 // Addressable.subscript.materializeForSet with no attribute
-// CHECK-LABEL: sil @_TFC15specialize_attr11Addressablem9subscriptFSix : $@convention(method) <Element> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @guaranteed Addressable<Element>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil [transparent] [fragile] @_TFC15specialize_attr11Addressablem9subscriptFSix : $@convention(method) <Element> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @guaranteed Addressable<Element>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
