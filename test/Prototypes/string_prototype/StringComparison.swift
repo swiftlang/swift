@@ -229,8 +229,43 @@ extension Unicode {
 
 //
 // String sort order in Swift, absent any locale, is the sort order of the
-// string's sequence of NFT unicode scalar values.
+// string's sequence of NFT unicode scalar values, where normalization-sequences
+// must be finished before moving on to the next unicode scalar value.
 //
+
+
+//
+// Sort order is preserved when breaking on grapheme boundaries. Sort order is
+// preserved when breaking on canonical combining sequence boundaries. Sort
+// order may not be preserved if broken inside of a canonical combining
+// sequences. For example:
+//
+// Example:
+//   1.  ă ́ ̠  (U+0103 U+0301 U+0320)
+//   2.  ă ́ b  (U+0103 U+0301 U+0062)
+//   3.  ă ́ 日 (U+0103 U+0301 U+65E5)
+//
+// These will be ordered #2, #1, #3. This is because the combining character
+// U+0320 comes after 'b'. This seems undesirable at first, but it afford memcmp
+// semantics and does still preserve relative ordering at grapheme and
+// canonical-combining-sequence boundaries.
+//
+// That is, if substrings up to a particular index compare equivalently, then
+// the sort order of the rest of the strings is the same sort order of the
+// entire strings only if the index lies on a grapheme or canonical-combining-
+// sequence boundary. Otherwise, if breaking apart raw scalars inside of a
+// canonical-combining-sequence, the sort order result might differ.
+//
+
+
+enum StringComparisonStrategy {
+  case bitwise
+  case zext(threshold: UInt32?)
+
+  case scalars
+}
+
+
 
 
 
