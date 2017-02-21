@@ -1128,50 +1128,15 @@ to the underlying encoding of the string.
 
 While the goal of the String rewrite is to achieve good performance for most usage scenarios without jeopardizing Unicode compliance or type and memory safety, we recognize the importance of being able to squeeze the last bit of performance by dropping down to unsafe APIs.
 
-The following extension makes it possible to access and mutate the content of the String viewed as a contiguous buffer. 
+We expect the Unsafe String API to mimic capabilities offered by the Array API, namely the following two functions on arrays:
 
 ```swift
-extension String {
-    /// The base address of the continuous buffer containing the String elements
-    /// if the String is backed by a contiguous buffer.
-    ///
-    /// There is no guarantee that the String is backed by a contiguous buffer.
-    /// Even if it is, there is no guarantee that the buffer is writable.
-    public var baseAddress: UnsafeRawPointer? { get }
+/// Calls a closure with a pointer to the array’s contiguous storage.
+func withUnsafeBufferPointer<R>((UnsafeBufferPointer<Element>) -> R)
 
-    /// The number of elements stored in the buffer.
-    ///
-    /// The count must not be increased beyond the buffer size for an immutable buffer
-    /// or capacity for a mutable buffer.
-    public var elementCount: Int { get set }
-
-    /// The read-only width of the elements stored in the buffer (1 or 2).
-    public var elementWidth: Int { get }
-
-    /// The read-only capacity of the String buffer if the String is backed by a mutable contiguous buffer.
-    public var capacity: Int? { get }
-
-    /// Ensures that the String is backed by a uniquely owned mutable contiguous buffer with at least
-    /// the requested capacity and returns the base address of this buffer.
-    ///
-    /// This call may require copying the String elements into a new buffer and modifying the element size.
-    /// The reserved capacity may be greater than the requested capacity.
-    /// Repeated calls with the same or lower capacity requirements are no ops.
-    ///
-    /// - Parameter capacity: the requested String capacity (number of elements).
-    /// - Parameter minElementWidth: the requested minimum element width.
-    /// - Returns: the base address of the mutable contiguous buffer backing the String.
-    @discardableResult public mutating func claimOwnership(withCapacity capacity: Int? = nil, withMinElementWidth minElementWidth: Int = 1) -> UnsafeMutableRawPointer
-}
+/// Calls the given closure with a pointer to the array’s mutable contiguous storage.
+func withUnsafeMutableBufferPointer<R>((inout UnsafeMutableBufferPointer<Element>) -> R)
 ```
-
-Most Strings are backed by a contiguous buffer. For such Strings, the `baseAddress` property provides read-only access to the buffer.
-
-In order to obtain write access to the buffer, it is necessary to call the `claimOwnership` function that allocates if necessary a new String buffer to ensure it is writable and uniquely owned by the callee.
-
-The `elementCount` property can be adjusted within the bounds of the buffer. For an immutable String such as a String literal, the upper limit is the String size. For a claimed String, the limit is the String capacity. Mutating the buffer content or element count is guaranteed not to affect other Strings.
-
-The API does not bound checks accesses to the byte buffer or the element count. It does not validate the String encoding.
 
 ## Language Support
 
