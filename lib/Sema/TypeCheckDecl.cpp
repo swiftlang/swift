@@ -979,20 +979,13 @@ static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
   return true;
 }
 
-/// Validate the given pattern binding declaration.
-static void validatePatternBindingDecl(TypeChecker &tc,
-                                       PatternBindingDecl *binding,
-                                       unsigned entryNumber) {
+/// Validate the \c entryNumber'th entry in \c binding.
+static void validatePatternBindingEntry(TypeChecker &tc,
+                                        PatternBindingDecl *binding,
+                                        unsigned entryNumber) {
   // If the pattern already has a type, we're done.
-  if (binding->getPattern(entryNumber)->hasType() ||
-      binding->isBeingValidated())
+  if (binding->getPattern(entryNumber)->hasType())
     return;
-
-  binding->setIsBeingValidated();
-
-  // On any path out of this function, make sure to mark the binding as done
-  // being type checked.
-  SWIFT_DEFER { binding->setIsBeingValidated(false); };
 
   // Resolve the pattern.
   auto *pattern = tc.resolvePattern(binding->getPattern(entryNumber),
@@ -1076,6 +1069,19 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   if (binding->getPattern(entryNumber)->hasType())
     if (auto var = binding->getSingleVar())
       tc.checkTypeModifyingDeclAttributes(var);
+}
+
+/// Validate the entries in the given pattern binding declaration.
+static void validatePatternBindingEntries(TypeChecker &tc,
+                                          PatternBindingDecl *binding) {
+  if (binding->hasValidationStarted())
+    return;
+
+  binding->setIsBeingValidated();
+  SWIFT_DEFER { binding->setIsBeingValidated(false); };
+
+  for (unsigned i = 0, e = binding->getNumPatternEntries(); i != e; ++i)
+    validatePatternBindingEntry(tc, binding, i);
 }
 
 void swift::makeFinal(ASTContext &ctx, ValueDecl *D) {
@@ -3430,7 +3436,7 @@ void TypeChecker::validateDecl(PrecedenceGroupDecl *PGD) {
   checkDeclAttributesEarly(PGD);
   checkDeclAttributes(PGD);
 
-  if (PGD->isInvalid() || PGD->isBeingValidated())
+  if (PGD->isInvalid() || PGD->hasValidationStarted())
     return;
   PGD->setIsBeingValidated();
   SWIFT_DEFER { PGD->setIsBeingValidated(false); };
@@ -3752,8 +3758,7 @@ public:
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     // Check all the pattern/init pairs in the PBD.
-    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i)
-      validatePatternBindingDecl(TC, PBD, i);
+    validatePatternBindingEntries(TC, PBD);
 
     if (PBD->isBeingValidated())
       return;
@@ -6907,8 +6912,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   // Handling validation failure due to re-entrancy is left
   // up to the caller, who must call hasValidSignature() to
   // check that validateDecl() returned a fully-formed decl.
-  if (D->isBeingValidated())
+  if (D->hasValidationStarted()) {
+    // If this isn't reentrant (i.e. D has already been validated), the
+    // signature better be valid.
+    assert(D->isBeingValidated() || D->hasValidSignature());
     return;
+  }
 
   PrettyStackTraceDecl StackTrace("validating", D);
 
@@ -6951,9 +6960,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     llvm_unreachable("handled above");
 
   case DeclKind::AssociatedType: {
-    if (D->hasInterfaceType())
-      return;
-
     auto assocType = cast<AssociatedTypeDecl>(D);
 
     assocType->setIsBeingValidated();
@@ -6977,14 +6983,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
 
   case DeclKind::TypeAlias: {
-    // Type aliases may not have an underlying type yet.
     auto typeAlias = cast<TypeAliasDecl>(D);
-
-    if (typeAlias->hasCompletedValidation())
-      return;
-
-    typeAlias->setHasCompletedValidation();
-
     // Check generic parameters, if needed.
     typeAlias->setIsBeingValidated();
     SWIFT_DEFER { typeAlias->setIsBeingValidated(false); };
@@ -7016,8 +7015,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Struct:
   case DeclKind::Class: {
     auto nominal = cast<NominalTypeDecl>(D);
-    if (nominal->hasInterfaceType())
-      return;
     nominal->computeType();
 
     // Check generic parameters, if needed.
@@ -7055,8 +7052,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
-    if (proto->hasInterfaceType())
-      return;
     proto->computeType();
 
     // Validate the generic type signature, which is just <Self : P>.
@@ -7109,8 +7104,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           diagnose(VD, diag::pattern_used_in_type, VD->getName());
 
         } else {
-          for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i)
-            validatePatternBindingDecl(*this, PBD, i);
+          validatePatternBindingEntries(*this, PBD);
         }
 
         auto parentPattern = VD->getParentPattern();
@@ -7220,23 +7214,17 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
       
   case DeclKind::Func: {
-    if (D->hasInterfaceType())
-      return;
     typeCheckDecl(D, true);
     break;
   }
 
   case DeclKind::Subscript:
   case DeclKind::Constructor:
-    if (D->hasInterfaceType())
-      return;
     typeCheckDecl(D, true);
     break;
 
   case DeclKind::Destructor:
   case DeclKind::EnumElement: {
-    if (D->hasInterfaceType())
-      return;
     if (auto container = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
       validateDecl(container);
       typeCheckDecl(D, true);
@@ -7429,11 +7417,10 @@ GenericParamList *cloneGenericParams(ASTContext &ctx,
 } // namespace swift
 
 void TypeChecker::validateExtension(ExtensionDecl *ext) {
-  // If we already validated this extension, there's nothing more to do.
-  if (ext->validated())
+  // If we're currently validating, or have already validated this extension,
+  // there's nothing more to do now.
+  if (ext->hasValidationStarted())
     return;
-
-  ext->setValidated();
 
   ext->setIsBeingValidated();
   SWIFT_DEFER { ext->setIsBeingValidated(false); };

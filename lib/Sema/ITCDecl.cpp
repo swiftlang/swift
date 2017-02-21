@@ -311,7 +311,7 @@ bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
     } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
       if (ext->isBeingValidated())
         return true;
-      if (ext->validated())
+      if (ext->hasValidationStarted())
         return false;
     } else {
       break;
@@ -329,7 +329,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
     if (typeAliasDecl->getDeclContext()->isModuleScopeContext() &&
         typeAliasDecl->getGenericParams() == nullptr) {
-      typeAliasDecl->setHasCompletedValidation();
+      typeAliasDecl->setValidationStarted();
 
       TypeResolutionOptions options;
       if (typeAliasDecl->getFormalAccess() <= Accessibility::FilePrivate)
