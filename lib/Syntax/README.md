@@ -392,7 +392,7 @@ do what you expect with no weird side effects, necessary contexts to maintain,
 etc. If you have a handle on a `Syntax` node, you're safe to query anything
 about it without other processes pulling out the rug from under you.
 
-### Example Object Diagram: `{ return 1}`
+### Example Object Diagram: `{ return 1 }`
 
 Here's an example of what you might have as a result of the following C++
 code:
