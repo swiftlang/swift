@@ -270,6 +270,10 @@ option(SWIFT_STDLIB_ENABLE_RESILIENCE
     "Build the standard libraries and overlays with resilience enabled; see docs/LibraryEvolution.rst"
     FALSE)
 
+option(SWIFT_STDLIB_USE_NONATOMIC_RC
+    "Build the standard libraries and overlays with nonatomic reference count operations enabled"
+    FALSE)
+
 option(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP
   "Build the standard libraries and overlays with sil ownership enabled."
   FALSE)
