@@ -30,7 +30,7 @@ llvm::cl::opt<bool> PrintShortestPathInfo(
     llvm::cl::desc("Print shortest-path information for inlining"));
 
 llvm::cl::opt<bool> EnableSILInliningOfGenerics(
-  "sil-inline-generics", llvm::cl::init(false),
+  "sil-inline-generics", llvm::cl::init(true),
   llvm::cl::desc("Enable inlining of generics"));
 
 //===----------------------------------------------------------------------===//

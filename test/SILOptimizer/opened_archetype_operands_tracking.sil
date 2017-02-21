@@ -18,7 +18,7 @@ extension P {
 
 public func process(s: P)
 
-sil @invokeClosure : $@convention(method) <Self where Self : P> (@owned @callee_owned () -> @error Error, @in_guaranteed Self) -> @error Error {
+sil [noinline] @invokeClosure : $@convention(method) <Self where Self : P> (@owned @callee_owned () -> @error Error, @in_guaranteed Self) -> @error Error {
 bb0(%0 : $@callee_owned () -> @error Error, %1 : $*Self):
   strong_release %0 : $@callee_owned () -> @error Error
   %5 = tuple ()
