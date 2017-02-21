@@ -56,7 +56,7 @@ public:
 #pragma mark balanced-tokens API
 
 /// balanced-tokens -> Any identifier, keyword, literal, or operator
-///                  | Any punctuation except (­, )­, [­, ]­, {­, or }­
+///                  | Any punctuation except (, ), [, ], {, or }
 class BalancedTokensSyntax final : public Syntax {
   friend struct SyntaxFactory;
   friend class SyntaxData;
@@ -229,16 +229,16 @@ public:
 #pragma mark -
 #pragma mark type-syntax API
 
-/// type -> array-type­
-///       | dictionary-type­
-///       | function-type­
-///       | type-identifier­
-///       | tuple-type­
-///       | optional-type­
-///       | implicitly-unwrapped-optional-type­
-///       | protocol-composition-type­
-///       | metatype-type­
-///       | 'Any­'
+/// type -> array-type
+///       | dictionary-type
+///       | function-type
+///       | type-identifier
+///       | tuple-type
+///       | optional-type
+///       | implicitly-unwrapped-optional-type
+///       | protocol-composition-type
+///       | metatype-type
+///       | 'Any'
 ///       | 'Self'
 class TypeSyntax : public Syntax {
   using DataType = TypeSyntaxData;

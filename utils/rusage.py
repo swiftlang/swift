@@ -133,5 +133,5 @@ if over_time:
                      % args.time)
 
 if over_mem or over_time:
-    exit(-1)
-exit(ret)
+    sys.exit(-1)
+sys.exit(ret)

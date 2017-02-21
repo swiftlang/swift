@@ -677,7 +677,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     if (!C.getEmitInto() && !silConv.useLoweredAddresses()) {
       // We should never create new buffers just for init_existential under
       // opaque values mode: This is a case of an opaque value that we can
-      // “treat” as a by-value one
+      // "treat" as a by-value one
       ManagedValue sub = F(SGFContext());
       SILValue v = B.createInitExistentialOpaque(
           loc, existentialTL.getLoweredType(), concreteFormalType,
