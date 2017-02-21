@@ -65,15 +65,71 @@ where
   }
 }
 
-// TODO: notion of mutually-trivially-decodable, where each code unit is
-// trivially-decodable in its own encoding as well as the other one. For
-// example, ASCII code units are mutually-trivially-decodable between UTF8 and
-// UTF16, but not Latin1 code units.
+// TODO: put these on protocol decl, and have impls provide functionality
+// instead
+//
+// The below establishes the concept of a *normalization-sequence-starter code
+// unit*, which is any code unit that begins a unicode scalar value whose
+// canonical combining class in the UCD is zero. Such code units start a new
+// sequence for the purposes of normalization and thus also serve as natural
+// canonical ordering breaks.
+extension UnicodeEncoding
+where
+  EncodedScalar.Iterator.Element : UnsignedInteger
+{
+  // Whether the given code unit is a normalization-sequence-starter code unit.
+  // This function is meant as a quick check, involving very few operations, to
+  // check for large and common ranges of starter code units.
+  static func quickCheckNormalizationSequenceStarter(
+    _ codeUnit: CodeUnit
+  ) -> Bool {
+    // Trivial
+    if (Self.self == Latin1.self) {
+      return true
+    }
 
+    if (Self.self == UTF8.self) {
+      // FIXME: instead, find the ranges of the leading byte that must fall
+      // within our ranges. This might be subject to known-validity
+
+      if _fastPath(codeUnit < 0x7f) {
+        return true
+      }
+
+      // UTF8 preserves ordering of encoded unicode scalar values. If this code
+      // unit begins a new sequence, return whether that sequence can only
+      // represent normalization-sequence-starters.
+
+      // TODO: check top two bits, then return codeUnit < 0xcc for our 0x300
+      // threshold.
+      return false
+    }
+
+    assert(Self.self == UTF16.self || Self.self == UTF32.self)
+
+    // TODO: Determine strategy for unallocated or reserved code points. There
+    // are very large ranges of common characters if we are allowed to treat
+    // reserved and/or unallocated code points as being normalization-sequence-
+    // starters: e.g. ~30k CJK characters, ~20k Middle Eastern and African, etc.
+
+    return codeUnit < 0x300
+  }
+}
 
 // For now, sort order semantics are: the unicode scalar value order when in
 // TODO-normal-form. This may be refined more in the future as I learn more
 // about Unicode.
+
+// Mocked-up extra bits of info we might want from Unicode/UnicodeStorage
+extension Unicode {
+  // Whether the string only contains unicode scalar values in the GMP plane.
+  // This is useful as it ensures trivial-decodability for UTF16 as well as
+  // making code-unit-wise ordering reflect scalar value ordering for normalized
+  // UTF16.
+  func isGMP(scan: Bool = true) -> Bool {
+    return false
+  }
+}
 
 
 //
@@ -84,17 +140,18 @@ where
 //  1) bitwise comparison: compare bits; roughly equivalent to C's memcmp.
 //
 //  2) zero-extend and compare: zero extend the smaller code unit and then
-//  compare bits. Done using a lazy zero-extending view.
+//  compare bits. Done using a lazy zero-extending view over the smaller-
+//  bitwidth string.
 //
-//  3) scalar value comparison: compare the unicode scalar values, and sort
-//  based on those. This is a decode-and-bit-compare. Implemented through a
-//  transcoded view targeting (valud?) UTF32. Fast path: use bit/zext comparison
-//  whenever both code units happen to be trivially-decodable.
+//  3) scalar value comparison: compare the unicode scalar values, and compare
+//  those. This is a decode-and-then-bit-compare. Implemented through a
+//  transcoded view targeting (valid?) UTF32.
 //
 //  4) normalized scalar comparison: compare sequence of normalized scalar
-//  values. Currently implemented as grapheme-based comparison, but that does
-//  more work than strictly necessary. Need to make a normalized view, then we
-//  can just compare across that. Fast path: so long as the next CUs begin a new
+//  values. Currently implemented as grapheme-based comparison (requiring
+//  grapheme break logic which currently uses libICU), but that does more work
+//  than strictly necessary. Need to make a normalized view, then we can just
+//  compare across that. Fast path: so long as the next CUs begin a new
 //  grapheme, can compare non-normalized: scalars as above and corresponding
 //  fast-paths from above.
 //
@@ -113,7 +170,7 @@ where
 // grapheme breaks are equivalence-class-breaks, but some additional unicode
 // scalars are as well...
 //
-
+//
 //
 // When they apply:
 //
@@ -134,7 +191,7 @@ where
 //  particular encodings. The faster methods can situationally be used for
 //  comparing segments of strings when some conditions are satisfied.
 //
-
+//
 //
 // Fast paths
 //
@@ -143,8 +200,12 @@ where
 // #2 needs no fast paths. If #1 isn't possible, then #2 *is* the fastest path.
 //
 // #3 can do bitwise/zero-extension compare whenever both compared code units
-//    are mutually-trivially-decodable.
+//    are trivially-decodable.
 //
-// #4 can do bitwise/zero-extension compare whenever both compared code units are mutually-trivially-decodable AND to following code units  definitely do
+// #4 can do bitwise/zero-extension compare whenever both compared code units
+// are trivially-decodable AND the following code units are definitely
+// normalization-sequence-starters.
 //
-//
+
+
+
