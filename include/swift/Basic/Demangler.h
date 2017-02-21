@@ -224,6 +224,9 @@ private:
   NodePointer demangleGenericSpecialization(Node::Kind SpecKind);
   NodePointer demangleFunctionSpecialization();
   NodePointer demangleFuncSpecParam(Node::IndexType ParamIdx);
+  NodePointer addFuncSpecParamIdentifier(NodePointer Param,
+                                  FunctionSigSpecializationParamKind Kind,
+                                  StringRef FirstParam = StringRef());
   NodePointer addFuncSpecParamNumber(NodePointer Param,
                               FunctionSigSpecializationParamKind Kind);
 

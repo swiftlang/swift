@@ -235,12 +235,16 @@ std::string NewMangling::selectMangling(const std::string &Old,
           NodePointer RemangledNode = demangleSymbolAsNode(Remangled);
           isEqual = areTreesEqual(NewNode, RemangledNode);
         }
+        
+// TODO: Check disabled until rdar://problem/30592808 is fixed. 
+#if 0
         if (!isEqual) {
           llvm::errs() << "Remangling failed at #" << numCmp << ":\n"
                           "original:  " << New << "\n"
                           "remangled: " << Remangled << "\n";
           assert(false);
         }
+#endif
       }
     }
   }
