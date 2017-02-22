@@ -993,14 +993,10 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // For lookups within the generic signature, look at the generic
   // parameters (only), then move up to the enclosing context.
   if (options.contains(TR_GenericSignature)) {
-    GenericParamList *genericParams;
-    if (auto *generic = dyn_cast<GenericTypeDecl>(DC)) {
-      genericParams = generic->getGenericParams();
-    } else if (auto *ext = dyn_cast<ExtensionDecl>(DC)) {
-      genericParams = ext->getGenericParams();
-    } else {
-      genericParams = cast<AbstractFunctionDecl>(DC)->getGenericParams();
-    }
+    GenericParamList *genericParams = nullptr;
+
+    if (DC->isInnermostContextGeneric())
+      genericParams = DC->getGenericParamsOfContext();
 
     if (genericParams) {
       auto matchingParam =
