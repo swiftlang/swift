@@ -596,6 +596,9 @@ extension UnsignedInteger {
 
 extension Character {
   func ordered(with other: Character) -> SortOrder {
+    // FIXME: this will do UCA-based ordering :-(. We can't even use the unicode
+    // scalars as those are not guarenteed to be canonicalized :-(. Such
+    // sadness.
     if _fastPath(self == other) {
       return .same
     }
