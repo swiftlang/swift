@@ -13,6 +13,7 @@
 import os
 import platform
 import sys
+from distutils.sysconfig import get_python_lib
 
 config.llvm_src_root = "@LLVM_MAIN_SRC_DIR@"
 config.llvm_obj_root = "@LLVM_BINARY_DIR@"
@@ -81,10 +82,8 @@ config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
 
 if "@LLDB_ENABLE@" == "TRUE":
     config.available_features.add('lldb')
-    for root, dirs, files in os.walk("@LLDB_BUILD_DIR@"):
-        if root.endswith("site-packages"):
-            config.substitutions.append(('%lldb-python-path', root))
-            break
+    python_lib_dir = get_python_lib(True, False, "@LLDB_BUILD_DIR@")
+    config.substitutions.append(('%lldb-python-path', python_lib_dir))
 
 # Let the main config do the real work.
 if config.test_exec_root is None:
