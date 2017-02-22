@@ -3021,8 +3021,11 @@ class UnmanagedRetainValueInst
                                   /*HasValue*/ false> {
   friend SILBuilder;
 
-  UnmanagedRetainValueInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand) {}
+  UnmanagedRetainValueInst(SILDebugLocation DebugLoc, SILValue operand,
+                           Atomicity atomicity)
+      : UnaryInstructionBase(DebugLoc, operand) {
+    setAtomicity(atomicity);
+  }
 };
 
 /// Destroys a loadable value in an unmanaged, unbalanced way. Only meant for
@@ -3034,8 +3037,11 @@ class UnmanagedReleaseValueInst
                                   /*HasValue*/ false> {
   friend SILBuilder;
 
-  UnmanagedReleaseValueInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand) {}
+  UnmanagedReleaseValueInst(SILDebugLocation DebugLoc, SILValue operand,
+                            Atomicity atomicity)
+      : UnaryInstructionBase(DebugLoc, operand) {
+    setAtomicity(atomicity);
+  }
 };
 
 /// Transfers ownership of a loadable value to the current autorelease
