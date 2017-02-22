@@ -185,11 +185,11 @@ extension Unicode {
 //
 //  #1 can be used on entire strings when all of the following are satisfied:
 //    * Both strings are in NFT
-//    * Both strings have trivially-decodable code units //are mutually-bitwise-comparable
+//    * Both strings have trivially-decodable code units
 //
 //  #2 can be used on entire strings when all of the following are satisfied:
 //    * Both strings are in NFT
-//    * Both strings have trivially-decodable code units //are mutually-bitwise-comparable
+//    * Both strings have trivially-decodable code units
 //
 //  #3 can be used on entire strings when all of the following are satisfied:
 //    * Both strings are in NFT
@@ -332,11 +332,12 @@ extension UnicodeStorage {
 enum SortOrder { case before, same, after }
 
 enum StringComparisonStrategy {
-  case bitwise
-  case bitwiseWithSurrogatesGreater
-  case zextwise
-  case scalarwise
-  case normalizedScalarwise
+  case bits
+  // TODO: worth refactoring to have associated values
+  case bitsWithSurrogatesGreater
+  case zextBits
+  case unicodescalarValues
+  case normalizedUnicodeScalarValues
 }
 
 func determineComparisonStrategy<
@@ -356,7 +357,7 @@ where
 {
   // Without normalization, all bets are off
   guard lhs.isNFT() && rhs.isNFT() else {
-    return .normalizedScalarwise
+    return .normalizedUnicodeScalarValues
   }
 
   // Same encodings usually mean bitwise comparison except for UTF16 outside of
@@ -364,24 +365,24 @@ where
   if _fastPath(LHSEncoding.self == RHSEncoding.self) {
     if LHSEncoding.self == UTF16.self {
       if _fastPath(lhs.isBMP() && rhs.isBMP()) {
-        return .bitwise
+        return .bits
       }
       // So long as one is BMP, we can use a trick: bitwise using a surrogate
       // filter: when the other has a surrogate bitpattern, that CU is greater.
       if lhs.isBMP() || rhs.isBMP() {
-        return .bitwiseWithSurrogatesGreater
+        return .bitsWithSurrogatesGreater
       }
 
 
     }
 
-    return .bitwise
+    return .bits
   }
 
   // Choose between bitwise and zextwise based on size of code units
   let bitwiseOrZextwise = {
     return LHSEncoding.CodeUnit.bitWidth == RHSEncoding.CodeUnit.bitWidth
-      ? StringComparisonStrategy.bitwise : StringComparisonStrategy.zextwise
+      ? StringComparisonStrategy.bits : StringComparisonStrategy.zextBits
   }
 
   // ASCII is common subset of all encodings
@@ -391,7 +392,7 @@ where
 
   // All other UTF8 combinations require decoding
   if LHSEncoding.self == UTF8.self || RHSEncoding.self == UTF8.self {
-    return .scalarwise
+    return .unicodescalarValues
   }
 
   // Latin1 is a common subset for everything but UTF8
@@ -407,11 +408,11 @@ where
 
   // BMP is common subset of UTF16 and UTF32
   if lhs.isBMP() || rhs.isBMP() {
-    return .zextwise
+    return .zextBits
   }
 
   // Otherwise, requires decoding
-  return .scalarwise
+  return .unicodescalarValues
 }
 
 
@@ -425,8 +426,8 @@ enum PartialFastCompare<
 }
 
 // TODO: this shouldn't be one monolithic function, but instead be specialized
-// into the two cases where it's most applicable: pre-normalized-scalarwise
-// compare and normalized-scalarwise compare
+// into the two cases where it's most applicable: pre-normalized-unicodescalarValues
+// compare and normalized-unicodescalarValues compare
 func partialFastCompare<
   LHSCodeUnits: RandomAccessCollection,
   LHSEncoding: UnicodeEncoding,
@@ -436,8 +437,7 @@ func partialFastCompare<
 (
   _ lhs: UnicodeStorage<LHSCodeUnits, LHSEncoding>,
   _ rhs: UnicodeStorage<RHSCodeUnits, RHSEncoding>,
-  lhsIsPreNormalized: Bool,
-  rhsIsPreNormalized: Bool
+  preNormalized: Bool
 ) -> PartialFastCompare<LHSCodeUnits.Index, RHSCodeUnits.Index>
 where
   LHSCodeUnits.Iterator.Element : UnsignedInteger,
@@ -484,12 +484,12 @@ where
   }
   // Check for starter status, if applicable.
   func checkLHSNextStarterCU(_ lhsNextIdx: LHSCodeUnits.Index) -> Bool {
-    return lhsIsPreNormalized
+    return preNormalized
       || lhsNextIdx == lhsEndIdx
       || LHSEncoding.quickCheckStarter(lhs.codeUnits[lhsNextIdx])
   }
   func checkRHSNextStarterCU(_ rhsNextIdx: RHSCodeUnits.Index) -> Bool {
-    return rhsIsPreNormalized
+    return preNormalized
       || rhsNextIdx == rhsEndIdx
       || RHSEncoding.quickCheckStarter(rhs.codeUnits[rhsNextIdx])
   }
@@ -606,27 +606,29 @@ extension EncodedScalarProtocol {
 
 extension UnicodeStorage
 where
- CodeUnits.SubSequence == CodeUnits,
- CodeUnits.Iterator.Element : UnsignedInteger,
- CodeUnits.Iterator.Element : FixedWidthInteger
+  CodeUnits.Index : UnsignedInteger,
+  CodeUnits.SubSequence == CodeUnits,
+  CodeUnits.Iterator.Element : UnsignedInteger,
+  CodeUnits.Iterator.Element : FixedWidthInteger
 {
   func order<
     OtherCodeUnits: RandomAccessCollection, OtherEncoding: UnicodeEncoding
   >(_ other: UnicodeStorage<OtherCodeUnits, OtherEncoding>) -> SortOrder
   where
-   OtherCodeUnits.SubSequence == OtherCodeUnits,
-   OtherCodeUnits.SubSequence == OtherCodeUnits,
-   OtherCodeUnits.Iterator.Element : UnsignedInteger,
-   OtherCodeUnits.Iterator.Element : FixedWidthInteger
+    OtherCodeUnits.Index : UnsignedInteger,
+    OtherCodeUnits.SubSequence == OtherCodeUnits,
+    OtherCodeUnits.SubSequence == OtherCodeUnits,
+    OtherCodeUnits.Iterator.Element : UnsignedInteger,
+    OtherCodeUnits.Iterator.Element : FixedWidthInteger
   {
     let lhs = self
     let rhs = other
     switch determineComparisonStrategy(lhs, rhs) {
-    case .bitwise:
+    case .bits:
       // TODO: ensure this compiles to memcmp, otherwise rewrite as lower level
       return lhs.codeUnits.lexicographicCompare(rhs.codeUnits)
 
-    case .bitwiseWithSurrogatesGreater:
+    case .bitsWithSurrogatesGreater:
       // TODO: ensure this compiles well, otherwise rewrite at lower level
       // TODO: better to have the known BMP on one side and the unknown on the
       // other.
@@ -642,34 +644,56 @@ where
         return lhsCU.ordered(with: rhsCU)
       }
 
-    case .zextwise:
-      // FIXME: use when my ZextView is not broken :-(
-      fatalError("ZextView currently broken")
-
-    case .scalarwise:
-      // First, get as far as we can with fast paths
-      // TODO: call fast path partical compare function
-
-      // Fall back to decoding and comparing decoded scalars
-      return self.scalars.lexicographicCompare(other.scalars) {
-        lhsScalar, rhsScalar in
-        return lhsScalar.ordered(with: rhsScalar)
+    case .zextBits:
+      // FIXME: use my ZextView when not broken :-(
+      return lhs.codeUnits.lexicographicCompare(rhs.codeUnits) {
+        lhsCU, rhsCU in
+        lhsCU.ordered(with: rhsCU)
       }
 
-    case .normalizedScalarwise:
+    case .unicodescalarValues:
       // First, get as far as we can with fast paths
-      // TODO: call fast partial compare function
+      //
+      // TODO: fast path function might actually just finish the comparison for
+      // us, that is it can do the decoding and continue...
+      let partialResult = partialFastCompare(
+        lhs, rhs, preNormalized: true
+      )
+      switch partialResult {
+        case .result(let res):
+          return res
+        case .moreProcessingRequired(let lhsIdx, let rhsIdx):
+          let lhsRest = UnicodeStorage(
+            lhs.codeUnits.suffix(from: lhsIdx), Encoding.self)
+          let rhsRest = UnicodeStorage<OtherCodeUnits, OtherEncoding>(
+            rhs.codeUnits.suffix(from: rhsIdx), OtherEncoding.self)
+          // Fall back to decoding and comparing decoded scalars
+          return lhsRest.scalars.lexicographicCompare(rhsRest.scalars) {
+            lhsScalar, rhsScalar in
+            return lhsScalar.ordered(with: rhsScalar)
+          }
+      }
 
-      // TODO: instead, use normalized scalar view
-      return self.characters.lexicographicCompare(other.characters) {
-        lhsChar, rhsChar in
-        return lhsChar.ordered(with: rhsChar)
+    case .normalizedUnicodeScalarValues:
+      // First, get as far as we can with fast paths
+      let partialResult = partialFastCompare(
+        lhs, rhs, preNormalized: false
+      )
+      switch partialResult {
+        case .result(let res):
+          return res
+        case .moreProcessingRequired(let lhsIdx, let rhsIdx):
+          let lhsRest = UnicodeStorage(
+            lhs.codeUnits.suffix(from: lhsIdx), Encoding.self)
+          let rhsRest = UnicodeStorage<OtherCodeUnits, OtherEncoding>(
+            rhs.codeUnits.suffix(from: rhsIdx), OtherEncoding.self)
+          // TODO: instead, use normalized scalar view
+          return lhsRest.characters.lexicographicCompare(rhsRest.characters) {
+            lhsChar, rhsChar in
+            return lhsChar.ordered(with: rhsChar)
+          }
       }
     }
   }
-
-
 }
-
-
 
