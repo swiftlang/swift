@@ -10,22 +10,73 @@
 //
 //===----------------------------------------------------------------------===//
 
+
+// FIXME: these should all be internal, not public. Needs to be public to use in String prototype.
+
+public protocol _PointerFunction {
+  associatedtype Element
+  func call(_: UnsafeMutablePointer<Element>, count: Int)
+}
+
+public struct _IgnorePointer<T> : _PointerFunction {
+  public func call(_: UnsafeMutablePointer<T>, count: Int) {
+    _sanityCheck(count == 0)
+  }
+}
+
+public struct _InitializeMemoryFromCollection<
+  C: Collection
+> : _PointerFunction {
+  public func call(_ rawMemory: UnsafeMutablePointer<C.Iterator.Element>, count: Int) {
+    var p = rawMemory
+    var q = newValues.startIndex
+    for _ in 0..<count {
+      p.initialize(to: newValues[q])
+      newValues.formIndex(after: &q)
+      p += 1
+    }
+    _expectEnd(of: newValues, is: q)
+  }
+
+  init(_ newValues: C) {
+    self.newValues = newValues
+  }
+
+  var newValues: C
+}
+
+// Just a quick little thing to abstract over _ContiguousArrayBuffer 
+// and String's native buffer
+// @_versioned
+public protocol _ContiguousBufferProtocol {
+  associatedtype Element
+
+  var count: Int { get nonmutating set }
+  var firstElementAddress: UnsafeMutablePointer<Element> { get }
+
+  init(_uninitializedCount: Int, minimumCapacity: Int)
+}
+
+extension _ContiguousArrayBuffer: _ContiguousBufferProtocol { }
+
 /// The underlying buffer for an ArrayType conforms to
 /// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
-@_versioned
-internal protocol _ArrayBufferProtocol
+// @_versioned
+public protocol _ArrayBufferProtocol
   : MutableCollection, RandomAccessCollection {
 
   associatedtype Indices : RandomAccessCollection = CountableRange<Int>
 
   /// The type of elements stored in the buffer.
   associatedtype Element
+  associatedtype Buffer: _ContiguousBufferProtocol
+  associatedtype SliceBuffer
 
   /// Create an empty buffer.
   init()
 
   /// Adopt the entire buffer, presenting it at the provided `startIndex`.
-  init(_buffer: _ContiguousArrayBuffer<Element>, shiftedToStartIndex: Int)
+  init(_buffer: Buffer, shiftedToStartIndex: Int)
 
   /// Copy the elements in `bounds` from this buffer into uninitialized
   /// memory starting at `target`.  Return a pointer "past the end" of the
@@ -52,7 +103,7 @@ internal protocol _ArrayBufferProtocol
   ///   unnecessary reallocation.
   mutating func requestUniqueMutableBackingBuffer(
     minimumCapacity: Int
-  ) -> _ContiguousArrayBuffer<Element>?
+  ) -> Buffer?
 
   /// Returns `true` iff this buffer is backed by a uniquely-referenced mutable
   /// _ContiguousArrayBuffer.
@@ -65,21 +116,23 @@ internal protocol _ArrayBufferProtocol
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
-  func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>?
+  func requestNativeBuffer() -> Buffer?
 
-  /// Replace the given `subRange` with the first `newCount` elements of
-  /// the given collection.
+  /// Subroutine of replaceSubrange that assumes everything is inbounds
+  /// and that `isMutableAndUniquelyReferenced()` returned true.
   ///
-  /// - Precondition: This buffer is backed by a uniquely-referenced
-  /// `_ContiguousArrayBuffer`.
-  mutating func replaceSubrange<C>(
+  /// Slices should override this to do subrange adjustments for their owner
+  /// and post-processing of their own range.
+  mutating func replaceSubrangeInPlace<C>(
     _ subrange: Range<Int>,
-    with newCount: Int,
-    elementsOf newValues: C
-  ) where C : Collection, C.Iterator.Element == Element
+    with newValues: C,
+    insertCount: Int
+  ) where 
+    C : Collection, 
+    C.Iterator.Element == Element
 
   /// Returns a `_SliceBuffer` containing the elements in `bounds`.
-  subscript(bounds: Range<Int>) -> _SliceBuffer<Element> { get }
+  subscript(bounds: Range<Int>) -> SliceBuffer { get }
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is
@@ -127,30 +180,55 @@ internal protocol _ArrayBufferProtocol
   var endIndex: Int { get }
 }
 
-extension _ArrayBufferProtocol {
+extension _ArrayBufferProtocol 
+  where Buffer.Element == Element
+{
 
-  internal var subscriptBaseAddress: UnsafeMutablePointer<Element> {
+  // @_versioned
+  public var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }
 
-  internal mutating func replaceSubrange<C>(
+  public mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
-    with newCount: Int,
-    elementsOf newValues: C
+    with newValues: C
   ) where C : Collection, C.Iterator.Element == Element {
-    _sanityCheck(startIndex == 0, "_SliceBuffer should override this function.")
+
     let oldCount = self.count
     let eraseCount = subrange.count
+    let insertCount = numericCast(newValues.count) as Int
+    let growth = insertCount - eraseCount
+    let newCount = oldCount + growth
 
-    let growth = newCount - eraseCount
-    self.count = oldCount + growth
+    if self.requestUniqueMutableBackingBuffer(
+          minimumCapacity: newCount) == nil {
+      self._arrayOutOfPlaceReplace(subrange, with: newValues, 
+          insertCount: insertCount)
+    } else {
+      replaceSubrangeInPlace(subrange, 
+        with: newValues, insertCount: insertCount)
+    }
+  }
 
+  @inline(never)
+  public mutating func replaceSubrangeInPlace<C>(
+    _ subrange: Range<Int>,
+    with newValues: C,
+    insertCount: Int
+  ) where 
+    C : Collection, 
+    C.Iterator.Element == Element {
+    
+    _sanityCheck(startIndex == 0, "Slices should override this function.")
+
+    let growth = insertCount - subrange.count
     let elements = self.subscriptBaseAddress
     let oldTailIndex = subrange.upperBound
     let oldTailStart = elements + oldTailIndex
     let newTailIndex = oldTailIndex + growth
     let newTailStart = oldTailStart + growth
-    let tailCount = oldCount - subrange.upperBound
+    let tailCount = self.count - subrange.upperBound
+    self.count += growth
 
     if growth > 0 {
       // Slide the tail part of the buffer forwards, in reverse order
@@ -174,7 +252,7 @@ extension _ArrayBufferProtocol {
       // Assign all the new elements into the start of the subrange
       var i = subrange.lowerBound
       var j = newValues.startIndex
-      for _ in 0..<newCount {
+      for _ in 0..<insertCount {
         elements[i] = newValues[j]
         i += 1
         newValues.formIndex(after: &j)
@@ -206,6 +284,208 @@ extension _ArrayBufferProtocol {
         (newTailStart + tailCount).deinitialize(
           count: shrinkage - tailCount)
       }
+    }
+  }
+
+  @inline(never)
+  internal mutating func _arrayOutOfPlaceReplace<C : Collection>(
+    _ bounds: Range<Int>,
+    with newValues: C,
+    insertCount: Int
+  ) where 
+    C.Iterator.Element == Element,
+    Buffer.Element == Element {
+
+    let growth = insertCount - bounds.count
+    let newCount = self.count + growth
+    var newBuffer = _forceCreateUniqueMutableBuffer(
+      newCount: newCount, requiredCapacity: newCount)
+
+    _arrayOutOfPlaceUpdate(
+      &newBuffer,
+      bounds.lowerBound - startIndex, insertCount,
+      _InitializeMemoryFromCollection(newValues)
+    )
+  }
+
+  /// Initialize the elements of dest by copying the first headCount
+  /// items from source, calling initializeNewElements on the next
+  /// uninitialized element, and finally by copying the last N items
+  /// from source into the N remaining uninitialized elements of dest.
+  ///
+  /// As an optimization, may move elements out of source rather than
+  /// copying when it isUniquelyReferenced.
+  @inline(never)
+  internal mutating func _arrayOutOfPlaceUpdate<Initializer>(
+    _ dest: inout Buffer,
+    _ headCount: Int, // Count of initial source elements to copy/move
+    _ newCount: Int,  // Number of new elements to insert
+    _ initializeNewElements: Initializer
+  ) where
+    Initializer : _PointerFunction,
+    Initializer.Element == Element {
+
+    _sanityCheck(headCount >= 0)
+    _sanityCheck(newCount >= 0)
+
+    // Count of trailing source elements to copy/move
+    let sourceCount = self.count
+    let tailCount = dest.count - headCount - newCount
+    _sanityCheck(headCount + tailCount <= sourceCount)
+
+    let oldCount = sourceCount - headCount - tailCount
+    let destStart = dest.firstElementAddress
+    let newStart = destStart + headCount
+    let newEnd = newStart + newCount
+
+    // Check to see if we have storage we can move from
+    if let backing = requestUniqueMutableBackingBuffer(
+      minimumCapacity: sourceCount) {
+
+      let sourceStart = firstElementAddress
+      let oldStart = sourceStart + headCount
+
+      // Destroy any items that may be lurking in a _SliceBuffer before
+      // its real first element
+      let backingStart = backing.firstElementAddress
+      let sourceOffset = sourceStart - backingStart
+      backingStart.deinitialize(count: sourceOffset)
+
+      // Move the head items
+      destStart.moveInitialize(from: sourceStart, count: headCount)
+
+      // Destroy unused source items
+      oldStart.deinitialize(count: oldCount)
+
+      initializeNewElements.call(newStart, count: newCount)
+
+      // Move the tail items
+      newEnd.moveInitialize(from: oldStart + oldCount, count: tailCount)
+
+      // Destroy any items that may be lurking in a _SliceBuffer after
+      // its real last element
+      let backingEnd = backingStart + backing.count
+      let sourceEnd = sourceStart + sourceCount
+      sourceEnd.deinitialize(count: backingEnd - sourceEnd)
+      backing.count = 0
+    }
+    else {
+      let headStart = startIndex
+      let headEnd = headStart + headCount
+      let newStart = _copyContents(
+        subRange: headStart..<headEnd,
+        initializing: destStart)
+      initializeNewElements.call(newStart, count: newCount)
+      let tailStart = headEnd + oldCount
+      let tailEnd = endIndex
+      _copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
+    }
+    self = Self(_buffer: dest, shiftedToStartIndex: startIndex)
+  }
+
+  /// Create a unique mutable buffer that has enough capacity to hold 'newCount'
+  /// elements and at least 'requiredCapacity' elements. Set the count of the new
+  /// buffer to 'newCount'. The content of the buffer is uninitialized.
+  /// The formula used to compute the new buffers capacity is:
+  ///   max(requiredCapacity, source.capacity)  if newCount <= source.capacity
+  ///   max(requiredCapacity, _growArrayCapacity(source.capacity)) otherwise
+  @inline(never)
+  internal func _forceCreateUniqueMutableBuffer(
+    newCount: Int, requiredCapacity: Int
+  ) -> Buffer {
+    return _forceCreateUniqueMutableBufferImpl(
+      countForBuffer: newCount, minNewCapacity: newCount,
+      requiredCapacity: requiredCapacity)
+  }
+
+  /// Create a unique mutable buffer that has enough capacity to hold
+  /// 'minNewCapacity' elements and set the count of the new buffer to
+  /// 'countForNewBuffer'. The content of the buffer uninitialized.
+  /// The formula used to compute the new buffers capacity is:
+  ///   max(minNewCapacity, source.capacity) if minNewCapacity <= source.capacity
+  ///   max(minNewCapacity, _growArrayCapacity(source.capacity)) otherwise
+  @inline(never)
+  internal func _forceCreateUniqueMutableBuffer(
+    countForNewBuffer: Int, minNewCapacity: Int
+  ) -> Buffer {
+    return _forceCreateUniqueMutableBufferImpl(
+      countForBuffer: countForNewBuffer, minNewCapacity: minNewCapacity,
+      requiredCapacity: minNewCapacity)
+  }
+
+  /// Create a unique mutable buffer that has enough capacity to hold
+  /// 'minNewCapacity' elements and at least 'requiredCapacity' elements and set
+  /// the count of the new buffer to 'countForBuffer'. The content of the buffer
+  /// uninitialized.
+  /// The formula used to compute the new capacity is:
+  ///  max(requiredCapacity, source.capacity) if minNewCapacity <= source.capacity
+  ///  max(requiredCapacity, _growArrayCapacity(source.capacity))  otherwise
+  internal func _forceCreateUniqueMutableBufferImpl(
+    countForBuffer: Int, minNewCapacity: Int,
+    requiredCapacity: Int
+  ) -> Buffer {
+    _sanityCheck(countForBuffer >= 0)
+    _sanityCheck(requiredCapacity >= countForBuffer)
+    _sanityCheck(minNewCapacity >= countForBuffer)
+
+    let minimumCapacity = Swift.max(requiredCapacity,
+      minNewCapacity > capacity
+         ? _growArrayCapacity(capacity) : capacity)
+
+    return Buffer(
+      _uninitializedCount: countForBuffer, minimumCapacity: minimumCapacity)
+  }
+
+  @_versioned
+  @inline(never)
+  internal mutating func _outlinedMakeUniqueBuffer(bufferCount: Int) {
+
+    if _fastPath(
+        requestUniqueMutableBackingBuffer(minimumCapacity: bufferCount) != nil) {
+      return
+    }
+
+    var newBuffer = _forceCreateUniqueMutableBuffer(
+      newCount: bufferCount, requiredCapacity: bufferCount)
+    _arrayOutOfPlaceUpdate(&newBuffer, bufferCount, 0, _IgnorePointer<Buffer.Element>())
+  }
+
+  /// Append items from `newItems` to a buffer.
+  internal mutating func _arrayAppendSequence<S : Sequence>(
+    _ newItems: S
+  ) where S.Iterator.Element == Element {
+    
+    // this function is only ever called from append(contentsOf:)
+    // which should always have exhausted its capacity before calling
+    _sanityCheck(count == capacity)
+    var newCount = self.count
+
+    // there might not be any elements to append remaining,
+    // so check for nil element first, then increase capacity,
+    // then inner-loop to fill that capacity with elements
+    var stream = newItems.makeIterator()
+    var nextItem = stream.next()
+    while nextItem != nil {
+
+      // grow capacity, first time around and when filled
+      var newBuffer = _forceCreateUniqueMutableBuffer(
+        countForNewBuffer: newCount, 
+        // minNewCapacity handles the exponential growth, just
+        // need to request 1 more than current count/capacity
+        minNewCapacity: newCount + 1)
+
+      _arrayOutOfPlaceUpdate(&newBuffer, newCount, 0, _IgnorePointer<Buffer.Element>())
+
+      let currentCapacity = self.capacity
+      let base = self.firstElementAddress
+
+      // fill while there is another item and spare capacity
+      while let next = nextItem, newCount < currentCapacity {
+        (base + newCount).initialize(to: next)
+        newCount += 1
+        nextItem = stream.next()
+      }
+      self.count = newCount
     }
   }
 }
