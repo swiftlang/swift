@@ -122,9 +122,7 @@ public:
   bool AssumeUnqualifiedOwnershipWhenParsing = false;
 
   /// Assume that code will be executed in a single-threaded environment.
-  /// TODO: return to false when we pass "-Xfrontend -assume-single-threaded"
-  ///       to swift compiler while building standard library.
-  bool AssumeSingleThreaded = std::getenv("SWIFT_ASSUME_SINGLE_THREADED");
+  bool AssumeSingleThreaded = false;
 };
 
 } // end namespace swift
