@@ -1332,6 +1332,11 @@ public:
     return depth;
   }
 
+  /// Create a copy of the generic parameter list and all of its generic
+  /// parameter declarations. The copied generic parameters are re-parented
+  /// to the given DeclContext.
+  GenericParamList *clone(DeclContext *dc) const;
+
   void print(raw_ostream &OS);
   void dump();
 };
@@ -2501,6 +2506,8 @@ class GenericTypeParamDecl : public AbstractTypeParamDecl {
   unsigned Index : 16;
 
 public:
+  static const unsigned InvalidDepth = 0xFFFF;
+
   /// Construct a new generic type parameter.
   ///
   /// \param dc The DeclContext in which the generic type parameter's owner

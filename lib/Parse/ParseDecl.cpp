@@ -4219,6 +4219,27 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     }
   }
 
+  #if 0
+  // Subscript accessors are not logically nested inside the subscript,
+  // once all the accessors are in place, we must clone the subscript's
+  // generic parameter list for each accessor.
+  if (auto *subscript = dyn_cast<SubscriptDecl>(storage)) {
+    if (auto *genericParams = subscript->getGenericParams()) {
+      auto prepareSubscriptAccessor = [&](FuncDecl *func) {
+        if (func)
+          func->setGenericParams(genericParams->clone(func));
+      };
+
+      prepareSubscriptAccessor(Get);
+      prepareSubscriptAccessor(Set);
+      prepareSubscriptAccessor(Addressor);
+      prepareSubscriptAccessor(MutableAddressor);
+      prepareSubscriptAccessor(WillSet);
+      prepareSubscriptAccessor(DidSet);
+    }
+  }
+  #endif
+
   if (Set || Get) {
     if (attrs.hasAttribute<SILStoredAttr>())
       // Turn this into a stored property with trivial accessors.
