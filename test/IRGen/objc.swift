@@ -9,14 +9,14 @@ import Foundation
 import gizmo
 
 // CHECK: [[TYPE:%swift.type]] = type
-// CHECK: [[BLAMMO:%C4objc6Blammo]] = type
-// CHECK: [[MYBLAMMO:%C4objc8MyBlammo]] = type
-// CHECK: [[TEST2:%C4objc5Test2]] = type
+// CHECK: [[BLAMMO:%T4objc6BlammoC]] = type
+// CHECK: [[MYBLAMMO:%T4objc8MyBlammoC]] = type
+// CHECK: [[TEST2:%T4objc5Test2C]] = type
 // CHECK: [[OBJC:%objc_object]] = type
-// CHECK: [[ID:%V4objc2id]] = type <{ %Ps9AnyObject_ }>
-// CHECK: [[GIZMO:%CSo5Gizmo]] = type
-// CHECK: [[RECT:%VSC4Rect]] = type
-// CHECK: [[FLOAT:%Sf]] = type
+// CHECK: [[ID:%T4objc2idV]] = type <{ %Ts9AnyObjectP }>
+// CHECK: [[GIZMO:%TSo5GizmoC]] = type
+// CHECK: [[RECT:%TSC4RectV]] = type
+// CHECK: [[FLOAT:%TSf]] = type
 
 // CHECK: @"\01L_selector_data(bar)" = private global [4 x i8] c"bar\00", section "__TEXT,__objc_methname,cstring_literals", align 1
 // CHECK: @"\01L_selector(bar)" = private externally_initialized global i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(bar)", i64 0, i64 0), section "__DATA,__objc_selrefs,literal_pointers,no_dead_strip", align 8

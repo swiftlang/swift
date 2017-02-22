@@ -108,11 +108,11 @@ bb0(%0 : $Error):
 
 // rdar://21084084 - Partial application of throwing functions.
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @partial_apply_single(%C6errors1A*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @partial_apply_single(%T6errors1AC*)
 // CHECK:       insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*, %swift.error**)* @_TPA_partial_apply_single_helper to i8*), %swift.refcounted* undef },
 // CHECK: define internal swiftcc void @_TPA_partial_apply_single_helper(%swift.refcounted* swiftself, %swift.error**{{( )?}}[[SWIFTERROR]])
-// CHECK:       [[T0:%.*]] = bitcast %swift.refcounted* {{%.*}} to %C6errors1A*
-// CHECK-NEXT:  tail call swiftcc void @partial_apply_single_helper(%C6errors1A* [[T0]], %swift.refcounted* swiftself undef, %swift.error**{{( )?}}[[SWIFTERROR]]{{( )?}}{{%.*}})
+// CHECK:       [[T0:%.*]] = bitcast %swift.refcounted* {{%.*}} to %T6errors1AC*
+// CHECK-NEXT:  tail call swiftcc void @partial_apply_single_helper(%T6errors1AC* [[T0]], %swift.refcounted* swiftself undef, %swift.error**{{( )?}}[[SWIFTERROR]]{{( )?}}{{%.*}})
 // CHECK-NEXT:  ret void
 sil @partial_apply_single : $@convention(thin) (@owned A) -> @callee_owned () -> @error Error {
 entry(%0 : $A):

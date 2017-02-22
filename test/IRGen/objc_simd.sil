@@ -42,20 +42,20 @@ sil @simd_c_args_float3 : $@convention(c) (float3) -> float3 {
 entry(%x : $float3):
 // x86_64: [[COERCE:%.*]] = alloca <3 x float>, align 16
 // x86_64: store <3 x float> %0, <3 x float>* [[COERCE]]
-// x86_64: [[COERCED:%.*]] = bitcast <3 x float>* [[COERCE]] to %V4simd6float3*
+// x86_64: [[COERCED:%.*]] = bitcast <3 x float>* [[COERCE]] to %T4simd6float3V*
   return %x : $float3
 }
 
 // x86_64-LABEL: define{{( protected)?}} swiftcc { i64, i64 } @simd_native_args(i64, i64)
-// i386-LABEL: define{{( protected)?}} swiftcc void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
+// i386-LABEL: define{{( protected)?}} swiftcc void @simd_native_args(%T4simd6float4V* noalias nocapture sret, %T4simd6float4V* noalias nocapture dereferenceable({{.*}}))
 // arm64-LABEL: define{{( protected)?}} swiftcc { i64, i64 } @simd_native_args(i64, i64)
-// armv6-LABEL: define{{( protected)?}} swiftcc void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
+// armv6-LABEL: define{{( protected)?}} swiftcc void @simd_native_args(%T4simd6float4V* noalias nocapture sret, %T4simd6float4V* noalias nocapture dereferenceable({{.*}}))
 // armv7-LABEL: define{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float, float, float, float)
 // armv7s-LABEL: define{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float, float, float, float)
 // armv7k-LABEL: define{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float, float, float, float)
-// powerpc64-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
-// powerpc64le-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
-// s390x-LABEL: define{{( protected)?}} void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
+// powerpc64-LABEL: define{{( protected)?}} void @simd_native_args(%T4simd6float4V* noalias nocapture sret, %T4simd6float4V* noalias nocapture dereferenceable({{.*}}))
+// powerpc64le-LABEL: define{{( protected)?}} void @simd_native_args(%T4simd6float4V* noalias nocapture sret, %T4simd6float4V* noalias nocapture dereferenceable({{.*}}))
+// s390x-LABEL: define{{( protected)?}} void @simd_native_args(%T4simd6float4V* noalias nocapture sret, %T4simd6float4V* noalias nocapture dereferenceable({{.*}}))
 sil @simd_native_args : $@convention(thin) (float4) -> float4 {
 entry(%x : $float4):
   %f = function_ref @simd_c_args : $@convention(c) (float4) -> float4

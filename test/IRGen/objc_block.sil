@@ -16,15 +16,15 @@ entry(%b : $@convention(block) Foo -> Foo, %x : $Foo):
   %y = apply %b(%x) : $@convention(block) Foo -> Foo
   return %y : $Foo
 }
-// CHECK-LABEL: define{{( protected)?}} swiftcc %C10objc_block3Foo* @call_block(%objc_block*, %C10objc_block3Foo*) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc %T10objc_block3FooC* @call_block(%objc_block*, %T10objc_block3FooC*) {{.*}} {
 // CHECK:       entry:
 // CHECK:         %2 = getelementptr inbounds %objc_block, %objc_block* %0, i32 0, i32 3
 // CHECK:         %3 = load i8*, i8** %2
 // CHECK:         %4 = bitcast i8* %3 to i8* (%objc_block*, i8*)*
-// CHECK:         %5 = bitcast %C10objc_block3Foo* %1 to i8*
+// CHECK:         %5 = bitcast %T10objc_block3FooC* %1 to i8*
 // CHECK:         %6 = call i8* %4(%objc_block* %0, i8* %5)
-// CHECK:         %7 = bitcast i8* %6 to %C10objc_block3Foo*
-// CHECK:         ret %C10objc_block3Foo* %7
+// CHECK:         %7 = bitcast i8* %6 to %T10objc_block3FooC*
+// CHECK:         ret %T10objc_block3FooC* %7
 // CHECK:       }
 
 sil @generic : $@convention(thin) <T> (@in T) -> ()

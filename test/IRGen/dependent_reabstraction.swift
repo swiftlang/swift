@@ -8,7 +8,7 @@ protocol A {
 }
 
 struct X<Y> : A {
-  // CHECK-LABEL: define hidden swiftcc void @_T023dependent_reabstraction1XVyxGAA1AAAlAaDP1by1BQzFTW(%swift.type** noalias nocapture dereferenceable({{.*}}), %V23dependent_reabstraction1X* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
+  // CHECK-LABEL: define hidden swiftcc void @_T023dependent_reabstraction1XVyxGAA1AAAlAaDP1by1BQzFTW(%swift.type** noalias nocapture dereferenceable({{.*}}), %T23dependent_reabstraction1XV* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
   func b(_ b: X.Type) {
     let x: Any = b
     markUsed(b as X.Type)

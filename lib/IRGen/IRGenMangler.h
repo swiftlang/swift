@@ -169,6 +169,10 @@ public:
   std::string mangleTypeForReflection(Type Ty, ModuleDecl *Module,
                                       bool isSingleFieldOfBox);
 
+  std::string mangleTypeForLLVMTypeName(CanType Ty);
+
+  std::string mangleProtocolForLLVMTypeName(ProtocolCompositionType *type);
+
 protected:
 
   std::string mangleTypeSymbol(Type type, const char *Op) {

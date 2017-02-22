@@ -3,9 +3,9 @@
 // REQUIRES: CPU=x86_64
 
 // CHECK: [[TYPE:%swift.type]] = type
-// CHECK: [[C:%C7unowned1C]] = type <{ [[REF:%swift.refcounted]] }>
+// CHECK: [[C:%T7unowned1CC]] = type <{ [[REF:%swift.refcounted]] }>
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
-// CHECK: [[A:%V7unowned1A]] = type <{ %swift.unowned }>
+// CHECK: [[A:%T7unowned1AV]] = type <{ %swift.unowned }>
 
 class C {}
 sil_vtable C {}
