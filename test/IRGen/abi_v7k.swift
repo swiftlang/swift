@@ -114,7 +114,8 @@ func testClike2(x: CLike2) -> Int {
 // CHECK: [[ID:%[0-9]+]] = phi i32 [ -1, {{.*}} ], [ 1, {{.*}} ]
 // CHECK: ret i32 [[ID]]
 // V7K-LABEL: __TF8test_v7k10testClike8
-// V7K: tst r1, #7
+// V7K: sxtb    r1, r1
+// V7K: cmp     r1, #0
 // V7K: movw r0, #1
 // V7K: mvn r0, #0
 enum CLike8 {
@@ -201,13 +202,14 @@ func testMultiP(x: MultiPayload) -> Double {
 // CHECK: ret float [[ID]]
 // V7K-LABEL: __TF8test_v7k7testOpt
 // V7K:         tst     r1, #1
-// V7K:         str     r0, [r7, #-4]
+// V7K:         str     r0, [r7, #-20]
 // V7K:         beq     [[RET:LBB.*]]
 // V7K: [[RET]]:
-// V7K:         ldr     r0, [r7, #-4]
-// V7K:         vmov    s0, r0
-// V7K:         mov     sp, r7
-// V7K:         pop     {r7, pc}
+// V7K:         ldr     r0, [r7, #-20]
+// V7K;         vmov    s0, r0
+// V7K;         sub     sp, r7, #16
+// V7K;         pop     {r11}
+// V7K;         pop     {r4, r5, r6, r7, pc}
 func testOpt(x: Float?) -> Float {
   return x!
 }
