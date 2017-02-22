@@ -16,7 +16,7 @@ func genericTypeof<T>(_ x: T) -> T.Type {
 struct Foo {}
 class Bar {}
 
-// CHECK-LABEL: define hidden swiftcc %swift.type* @_T017generic_metatypes27remapToSubstitutedMetatypes{{.*}}(%C17generic_metatypes3Bar*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc %swift.type* @_T017generic_metatypes27remapToSubstitutedMetatypes{{.*}}(%T17generic_metatypes3BarC*) {{.*}} {
 func remapToSubstitutedMetatypes(_ x: Foo, y: Bar)
   -> (Foo.Type, Bar.Type)
 {
@@ -39,11 +39,11 @@ func genericMetatypes<T, U>(_ t: T.Type, _ u: U.Type) {}
 
 protocol Bas {}
 
-// CHECK: define hidden swiftcc { %swift.type*, i8** } @_T017generic_metatypes14protocolTypeof{{.*}}(%P17generic_metatypes3Bas_* noalias nocapture dereferenceable({{.*}}))
+// CHECK: define hidden swiftcc { %swift.type*, i8** } @_T017generic_metatypes14protocolTypeof{{.*}}(%T17generic_metatypes3BasP* noalias nocapture dereferenceable({{.*}}))
 func protocolTypeof(_ x: Bas) -> Bas.Type {
-  // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %P17generic_metatypes3Bas_, %P17generic_metatypes3Bas_* [[X:%.*]], i32 0, i32 1
+  // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %T17generic_metatypes3BasP, %T17generic_metatypes3BasP* [[X:%.*]], i32 0, i32 1
   // CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]
-  // CHECK: [[BUFFER:%.*]] = getelementptr inbounds %P17generic_metatypes3Bas_, %P17generic_metatypes3Bas_* [[X]], i32 0, i32 0
+  // CHECK: [[BUFFER:%.*]] = getelementptr inbounds %T17generic_metatypes3BasP, %T17generic_metatypes3BasP* [[X]], i32 0, i32 0
   // CHECK: [[METADATA_I8:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
   // CHECK-32: [[VW_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_I8]], i32 -1
   // CHECK-64: [[VW_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_I8]], i64 -1
@@ -56,7 +56,7 @@ func protocolTypeof(_ x: Bas) -> Bas.Type {
   // CHECK-32: [[PROJECTION:%.*]] = call %swift.opaque* [[PROJECT]]([12 x i8]* [[BUFFER]], %swift.type* [[METADATA]])
   // CHECK-64: [[PROJECTION:%.*]] = call %swift.opaque* [[PROJECT]]([24 x i8]* [[BUFFER]], %swift.type* [[METADATA]])
   // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* [[PROJECTION]], %swift.type* [[METADATA]], i1 true)
-  // CHECK: [[T0:%.*]] = getelementptr inbounds %P17generic_metatypes3Bas_, %P17generic_metatypes3Bas_* [[X]], i32 0, i32 2
+  // CHECK: [[T0:%.*]] = getelementptr inbounds %T17generic_metatypes3BasP, %T17generic_metatypes3BasP* [[X]], i32 0, i32 2
   // CHECK-32: [[WTABLE:%.*]] = load i8**, i8*** [[T0]], align 4
   // CHECK-64: [[WTABLE:%.*]] = load i8**, i8*** [[T0]], align 8
   // CHECK: [[T0:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* [[METATYPE]], 0

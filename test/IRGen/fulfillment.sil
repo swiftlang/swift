@@ -27,8 +27,8 @@ bb0(%0 : $@thick A<T>.Type):
 
 sil hidden_external @use_all : $@convention(thin) <T, U where T : P, U : P> () -> ()
 
-// CHECK-LABEL: define hidden swiftcc void @class_pointer(%C11fulfillment1B*, i8** %T.P)
-// CHECK:      [[T0:%.*]] = bitcast %C11fulfillment1B* %0 to %swift.type**
+// CHECK-LABEL: define hidden swiftcc void @class_pointer(%T11fulfillment1BC*, i8** %T.P)
+// CHECK:      [[T0:%.*]] = bitcast %T11fulfillment1BC* %0 to %swift.type**
 // CHECK-NEXT: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
 // CHECK:      [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 10
@@ -47,7 +47,7 @@ bb0(%0 : $B<T, U>):
   return %3 : $()
 }
 
-// CHECK-LABEL: define hidden swiftcc void @test_23121786(%C11fulfillment1A*, %C11fulfillment1A{{.*}}*)
+// CHECK-LABEL: define hidden swiftcc void @test_23121786(%T11fulfillment1AC*, %T11fulfillment1AC{{.*}}*)
 sil hidden @test_23121786 : $@convention(thin) <T> (@owned A<A<T>>, @owned A<T>) -> () {
 bb0(%0 : $A<A<T>>, %1 : $A<T>):
   %2 = tuple ()

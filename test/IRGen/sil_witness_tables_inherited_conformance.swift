@@ -23,7 +23,7 @@ class Anesthesiologist<T: Cat> : Veterinarian<T> { }
 
 func breed<T : Panda>(_ t: T) { }
 
-// CHECK-LABEL: define hidden swiftcc void @_T040sil_witness_tables_inherited_conformance4feed{{[_0-9a-zA-Z]*}}F(%C40sil_witness_tables_inherited_conformance3Cat*, %swift.type* %T)
+// CHECK-LABEL: define hidden swiftcc void @_T040sil_witness_tables_inherited_conformance4feed{{[_0-9a-zA-Z]*}}F(%T40sil_witness_tables_inherited_conformance3CatC*, %swift.type* %T)
 func feed<T : Cat>(_ t: T) {
   // CHECK: call swiftcc void @_T040sil_witness_tables_inherited_conformance5breed{{[_0-9a-zA-Z]*}}F{{.*}} @_T040sil_witness_tables_inherited_conformance3CatCAA5PandaAAWP
   breed(t)

@@ -12,8 +12,8 @@ enum NullableObjCRefcounted {
 }
 // CHECK-LABEL: define linkonce_odr hidden void @_T039enum_value_semantics_special_cases_objc22NullableObjCRefcountedOwxx(%swift.opaque* %object, %swift.type* %NullableObjCRefcounted) {{.*}} {
 // CHECK: entry:
-// CHECK:   %0 = bitcast %swift.opaque* %object to %O39enum_value_semantics_special_cases_objc22NullableObjCRefcounted*
-// CHECK:   %1 = bitcast %O39enum_value_semantics_special_cases_objc22NullableObjCRefcounted* %0 to %objc_object**
+// CHECK:   %0 = bitcast %swift.opaque* %object to %T39enum_value_semantics_special_cases_objc22NullableObjCRefcountedO*
+// CHECK:   %1 = bitcast %T39enum_value_semantics_special_cases_objc22NullableObjCRefcountedO* %0 to %objc_object**
 // CHECK:   %2 = load %objc_object*, %objc_object** %1, align 8
 // CHECK:   call void @objc_release(%objc_object* %2) {{#[0-9]+}}
 // CHECK:   ret void
@@ -33,8 +33,8 @@ enum AllMixedRefcounted {
 
 // CHECK-LABEL: define linkonce_odr hidden void @_T039enum_value_semantics_special_cases_objc18AllMixedRefcountedOwxx(%swift.opaque* %object, %swift.type* %AllMixedRefcounted) {{.*}} {
 // CHECK: entry:
-// CHECK:   %0 = bitcast %swift.opaque* %object to %O39enum_value_semantics_special_cases_objc18AllMixedRefcounted*
-// CHECK:   %1 = bitcast %O39enum_value_semantics_special_cases_objc18AllMixedRefcounted* %0 to i64*
+// CHECK:   %0 = bitcast %swift.opaque* %object to %T39enum_value_semantics_special_cases_objc18AllMixedRefcountedO*
+// CHECK:   %1 = bitcast %T39enum_value_semantics_special_cases_objc18AllMixedRefcountedO* %0 to i64*
 // CHECK:   %2 = load i64, i64* %1, align 8
 // --                         0x3fffffffffffffff
 // CHECK:   %3 = and i64 %2, 4611686018427387903

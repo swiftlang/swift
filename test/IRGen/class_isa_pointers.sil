@@ -17,8 +17,8 @@ class Purebred {
 }
 sil_vtable Purebred {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @purebred_method(%C18class_isa_pointers8Purebred*) {{.*}} {
-// CHECK:         [[ISA_PTR:%.*]] = bitcast %C18class_isa_pointers8Purebred* %0 to %swift.type**
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @purebred_method(%T18class_isa_pointers8PurebredC*) {{.*}} {
+// CHECK:         [[ISA_PTR:%.*]] = bitcast %T18class_isa_pointers8PurebredC* %0 to %swift.type**
 // CHECK:         [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_PTR]]
 // CHECK:         [[VTABLE:%.*]] = bitcast %swift.type* [[ISA]]
 // CHECK:         getelementptr inbounds {{.*}} [[VTABLE]]
@@ -38,7 +38,7 @@ class Mongrel: Gizmo {
 }
 sil_vtable Mongrel {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @mongrel_method(%C18class_isa_pointers7Mongrel*) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @mongrel_method(%T18class_isa_pointers7MongrelC*) {{.*}} {
 // CHECK:         [[T0:%.*]] = bitcast {{.*}} %0 to i64*
 // CHECK-NEXT:    [[T1:%.*]] = load i64, i64* [[T0]], align 8
 // CHECK-NEXT:    [[T2:%.*]] = load i64, i64* @swift_isaMask, align 8

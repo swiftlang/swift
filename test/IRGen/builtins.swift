@@ -6,8 +6,8 @@
 import Swift
 
 // CHECK-DAG: [[REFCOUNT:%swift.refcounted.*]] = type
-// CHECK-DAG: [[X:%C8builtins1X]] = type
-// CHECK-DAG: [[Y:%C8builtins1Y]] = type
+// CHECK-DAG: [[X:%T8builtins1XC]] = type
+// CHECK-DAG: [[Y:%T8builtins1YC]] = type
 
 typealias Int = Builtin.Int32
 typealias Bool = Builtin.Int1

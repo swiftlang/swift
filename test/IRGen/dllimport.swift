@@ -47,7 +47,7 @@ public func g() {
 // CHECK-NO-OPT-DAG: @_TMT_ = external dllimport global %swift.full_type
 // CHECK-NO-OPT-DAG: @_TWVBo = external dllimport global i8*
 // CHECK-NO-OPT-DAG: declare dllimport swiftcc i8* @_TF9dllexportau2ciCS_1c()
-// CHECK-NO-OPT-DAG: declare dllimport swiftcc %swift.refcounted* @_TFC9dllexport1cd(%C9dllexport1c* swiftself)
+// CHECK-NO-OPT-DAG: declare dllimport swiftcc %swift.refcounted* @_TFC9dllexport1cd(%T9dllexport1cC* swiftself)
 // CHECK-NO-OPT-DAG: declare dllimport %swift.type* @_TMaC9dllexport1c()
 // CHECK-NO-OPT-DAG: declare dllimport void @swift_deallocClassInstance(%swift.refcounted*, i32, i32)
 // CHECK-NO-OPT-DAG: define linkonce_odr hidden i8* @swift_rt_swift_slowAlloc(i32, i32)
@@ -64,7 +64,7 @@ public func g() {
 // CHECK-OPT-DAG: declare dllimport swiftcc i8* @_TF9dllexportau2ciCS_1c()
 // CHECK-OPT-DAG: declare dllimport %swift.type* @_TMaC9dllexport1c()
 // CHECK-OPT-DAG: declare dllimport void @swift_deallocClassInstance(%swift.refcounted*, i32, i32)
-// CHECK-OPT-DAG: declare dllimport swiftcc %swift.refcounted* @_TFC9dllexport1cd(%C9dllexport1c* swiftself)
+// CHECK-OPT-DAG: declare dllimport swiftcc %swift.refcounted* @_TFC9dllexport1cd(%T9dllexport1cC* swiftself)
 // CHECK-OPT-DAG: define linkonce_odr hidden i8* @swift_rt_swift_slowAlloc(i32, i32)
 // CHECK-OPT-DAG: define linkonce_odr hidden void @swift_rt_swift_slowDealloc(i8*, i32, i32)
 

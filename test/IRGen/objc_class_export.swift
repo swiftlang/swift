@@ -6,13 +6,13 @@
 // REQUIRES: objc_interop
 
 // CHECK: %swift.refcounted = type
-// CHECK: [[HOOZIT:%C17objc_class_export6Hoozit]] = type <{ [[REF:%swift.refcounted]] }>
-// CHECK: [[FOO:%C17objc_class_export3Foo]] = type <{ [[REF]], %Si }>
-// CHECK: [[INT:%Si]] = type <{ i64 }>
-// CHECK: [[DOUBLE:%Sd]] = type <{ double }>
-// CHECK: [[NSRECT:%VSC6NSRect]] = type <{ %VSC7NSPoint, %VSC6NSSize }>
-// CHECK: [[NSPOINT:%VSC7NSPoint]] = type <{ %Sd, %Sd }>
-// CHECK: [[NSSIZE:%VSC6NSSize]] = type <{ %Sd, %Sd }>
+// CHECK: [[HOOZIT:%T17objc_class_export6HoozitC]] = type <{ [[REF:%swift.refcounted]] }>
+// CHECK: [[FOO:%T17objc_class_export3FooC]] = type <{ [[REF]], %TSi }>
+// CHECK: [[INT:%TSi]] = type <{ i64 }>
+// CHECK: [[DOUBLE:%TSd]] = type <{ double }>
+// CHECK: [[NSRECT:%TSC6NSRectV]] = type <{ %TSC7NSPointV, %TSC6NSSizeV }>
+// CHECK: [[NSPOINT:%TSC7NSPointV]] = type <{ %TSd, %TSd }>
+// CHECK: [[NSSIZE:%TSC6NSSizeV]] = type <{ %TSd, %TSd }>
 // CHECK: [[OBJC:%objc_object]] = type opaque
 
 // CHECK: @"OBJC_METACLASS_$__TtC17objc_class_export3Foo" = hidden global %objc_class {
