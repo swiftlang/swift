@@ -21,7 +21,6 @@
 #include "llvm/ADT/StringRef.h"
 #include <string>
 #include <climits>
-#include <cstdlib>
 
 namespace swift {
 
