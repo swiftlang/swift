@@ -1263,6 +1263,8 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
       !ED->getExtendedType()->hasError()) {
     if (NominalTypeDecl *nominal = ED->getExtendedType()->getAnyNominal()) {
       validateDecl(nominal);
+      if (ED->hasDefaultAccessibility())
+        return;
       maxAccess = std::max(nominal->getFormalAccess(),
                            Accessibility::FilePrivate);
     }
@@ -3986,7 +3988,7 @@ public:
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
-    if (!assocType->hasInterfaceType())
+    if (!assocType->hasValidationStarted())
       TC.validateDecl(assocType);
   }
 
@@ -6965,6 +6967,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     assocType->setIsBeingValidated();
     SWIFT_DEFER { assocType->setIsBeingValidated(false); };
 
+    validateAccessibility(assocType);
+
     checkDeclAttributesEarly(assocType);
     checkInheritanceClause(assocType);
 
@@ -6976,7 +6980,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     // Finally, set the interface type.
-    assocType->computeType();
+    if (!assocType->hasInterfaceType())
+      assocType->computeType();
 
     checkDeclAttributes(assocType);
     break;
@@ -7052,7 +7057,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
-    proto->computeType();
+    if (!proto->hasInterfaceType())
+      proto->computeType();
 
     // Validate the generic type signature, which is just <Self : P>.
     proto->setIsBeingValidated();
@@ -7238,6 +7244,39 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   assert(D->hasValidSignature());
 }
 
+void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
+  switch (D->getKind()) {
+  case DeclKind::Protocol: {
+    auto proto = cast<ProtocolDecl>(D);
+    if (proto->hasInterfaceType())
+      return;
+    proto->computeType();
+    // Record inherited protocols.
+    resolveInheritedProtocols(proto);
+
+    validateAccessibility(proto);
+
+    for (auto member : proto->getMembers()) {
+      if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
+        validateDeclForNameLookup(ATD);
+      }
+    }
+    break;
+  }
+  case DeclKind::AssociatedType: {
+    auto assocType = cast<AssociatedTypeDecl>(D);
+    if (assocType->hasInterfaceType())
+      return;
+    assocType->computeType();
+    validateAccessibility(assocType);
+    break;
+  }
+
+  default:
+    validateDecl(D);
+    break;
+  }
+}
 
 void TypeChecker::validateAccessibility(ValueDecl *D) {
   if (D->hasAccessibility())
