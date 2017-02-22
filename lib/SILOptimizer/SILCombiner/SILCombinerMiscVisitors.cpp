@@ -391,6 +391,33 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   return eraseInstFromFunction(*AS);
 }
 
+SILInstruction *SILCombiner::visitAllocRefInst(AllocRefInst *AR) {
+  if (!AR)
+    return nullptr;
+  // Check if the only uses are deallocating stack or deallocating.
+  SmallPtrSet<SILInstruction *, 16> ToDelete;
+  bool HasNonRemovableUses = false;
+  for (auto UI = AR->use_begin(), UE = AR->use_end(); UI != UE;) {
+    auto *Op = *UI;
+    ++UI;
+    auto *User = Op->getUser();
+    if (!isa<DeallocRefInst>(User) && !isa<SetDeallocatingInst>(User)) {
+      HasNonRemovableUses = true;
+      break;
+    }
+    ToDelete.insert(User);
+  }
+
+  if (HasNonRemovableUses)
+    return nullptr;
+
+  // Remove the instruction and all its uses.
+  for (auto *I : ToDelete)
+    eraseInstFromFunction(*I);
+  eraseInstFromFunction(*AR);
+  return nullptr;
+}
+
 SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // (load (upcast-ptr %x)) -> (upcast-ref (load %x))
   Builder.setCurrentDebugScope(LI->getDebugScope());
