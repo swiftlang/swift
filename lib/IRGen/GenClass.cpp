@@ -1046,19 +1046,35 @@ namespace {
     /// Gather protocol records for all of the explicitly-specified Objective-C
     /// protocol conformances.
     void visitConformances(DeclContext *dc) {
+      llvm::SmallSetVector<ProtocolDecl *, 2> protocols;
       for (auto conformance : dc->getLocalConformances(
                                 ConformanceLookupKind::OnlyExplicit,
                                 nullptr, /*sorted=*/true)) {
         ProtocolDecl *proto = conformance->getProtocol();
-        if (!proto->isObjC())
-          continue;
+        getObjCProtocols(proto, protocols);
+      }
 
+      for (ProtocolDecl *proto : protocols) {
         // Don't emit the magic AnyObject conformance.
         if (auto known = proto->getKnownProtocolKind())
           if (*known == KnownProtocolKind::AnyObject)
             continue;
 
         Protocols.push_back(buildProtocolRef(proto));
+      }
+    }
+
+    /// Add the protocol to the vector, if it's Objective-C protocol,
+    /// or search its superprotocols.
+    void getObjCProtocols(ProtocolDecl *proto,
+                          llvm::SmallSetVector<ProtocolDecl *, 2> &result) {
+      if (proto->isObjC()) {
+        result.insert(proto);
+      } else {
+        for (ProtocolDecl *inherited : proto->getInheritedProtocols()) {
+          // Recursively check inherited protocol for objc conformance.
+          getObjCProtocols(inherited, result);
+        }
       }
     }
 
