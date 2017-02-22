@@ -210,8 +210,6 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     return false;
   }
 
-
-
 public:
   IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
                       unsigned BufferID)
@@ -327,14 +325,18 @@ private:
 
   }
 
+  Expr *getContainingExpr(size_t index) {
+    if (ExprStack.size() > index)
+      return ExprStack.end()[-(index + 1)];
+    return nullptr;
+  }
+
   Expr *getCurrentExpr() {
     return ExprStack.empty() ? nullptr : ExprStack.back();
   }
 
   Expr *getParentExpr() {
-    if (ExprStack.size() >= 2)
-      return ExprStack.end()[-2];
-    return nullptr;
+    return getContainingExpr(1);
   }
 
 
@@ -376,8 +378,7 @@ private:
   bool initIndexSymbol(ExtensionDecl *D, ValueDecl *ExtendedD, SourceLoc Loc,
                        IndexSymbol &Info);
   bool initFuncDeclIndexSymbol(FuncDecl *D, IndexSymbol &Info);
-  bool initFuncRefIndexSymbol(Expr *CurrentE, Expr *ParentE, ValueDecl *D,
-                              SourceLoc Loc, IndexSymbol &Info);
+  bool initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc, IndexSymbol &Info);
   bool initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D, SourceLoc Loc,
                               IndexSymbol &Info);
 
@@ -685,7 +686,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
     // AbstractStorageDecl.
     assert(getParentDecl() == D);
     auto PreviousTop = EntitiesStack.pop_back_val();
-    bool initFailed = initFuncRefIndexSymbol(getCurrentExpr(), getParentExpr(), D, Loc, Info);
+    bool initFailed = initFuncRefIndexSymbol(D, Loc, Info);
     EntitiesStack.push_back(PreviousTop);
 
     if (initFailed)
@@ -821,7 +822,7 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
     return true; // keep walking
 
   if (isa<AbstractFunctionDecl>(D)) {
-    if (initFuncRefIndexSymbol(getCurrentExpr(), getParentExpr(), D, Loc, Info))
+    if (initFuncRefIndexSymbol(D, Loc, Info))
       return true;
   } else if (isa<AbstractStorageDecl>(D)) {
     if (initVarRefIndexSymbols(getCurrentExpr(), D, Loc, Info))
@@ -1021,33 +1022,49 @@ static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
   return true;
 }
 
-bool IndexSwiftASTWalker::initFuncRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
-                                                 ValueDecl *D, SourceLoc Loc,
+static bool isBeingCalled(Expr *Target, Expr *Parent, Expr *GrandParent) {
+    if (!Target || !Parent || !isa<ApplyExpr>(Parent))
+      return false;
+
+    if (!isa<SelfApplyExpr>(Parent))
+      return cast<ApplyExpr>(Parent)->getFn() == Target;
+
+  return GrandParent && isa<CallExpr>(GrandParent) &&
+    cast<CallExpr>(GrandParent)->getFn() == Parent;
+}
+
+bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
                                                  IndexSymbol &Info) {
 
   if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
     return true;
 
+  Expr *CurrentE = getCurrentExpr();
   if (!CurrentE)
     return false;
+
+  Expr *ParentE = getParentExpr();
 
   // FIXME: the below check maintains existing indexing behavior with
   // pseudo/accessor output but seems incorrect. E.g otherGlobal in:
   // let global = otherGlobal
   // will not have a parent expression so no accessor call is reported
-  if (!ParentE)
+  if (isa<AbstractStorageDecl>(D) && !ParentE)
     return true;
 
-  Info.roles |= (unsigned)SymbolRole::Call;
+  if (!isa<AbstractStorageDecl>(D) &&
+      !isBeingCalled(CurrentE, ParentE, getContainingExpr(2)))
+    return false;
 
-  Decl *ParentD = getParentDecl();
-  if (ParentD && isa<ValueDecl>(ParentD)) {
-    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationCalledBy, cast<ValueDecl>(ParentD)))
-        return true;
+
+  Info.roles |= (unsigned)SymbolRole::Call;
+  if (auto *Caller = dyn_cast_or_null<AbstractFunctionDecl>(getParentDecl())) {
+    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationCalledBy, Caller))
+      return true;
   }
 
   Expr *BaseE = nullptr;
-  if (auto DotE = dyn_cast<DotSyntaxCallExpr>(ParentE))
+  if (auto DotE = dyn_cast_or_null<DotSyntaxCallExpr>(ParentE))
     BaseE = DotE->getBase();
   else if (auto MembE = dyn_cast<MemberRefExpr>(CurrentE))
     BaseE = MembE->getBase();

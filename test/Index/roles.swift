@@ -68,6 +68,9 @@ func aCaller() {
   // CHECK-NEXT: RelCall | aCaller() | s:F14swift_ide_test7aCallerFT_T_
 }
 
+let _ = aCalledFunction
+// CHECK: [[@LINE-1]]:9 | function/Swift | aCalledFunction() | s:F14swift_ide_test15aCalledFunctionFT_T_ | Ref | rel: 0
+
 // RelationChildOf, Implicit
 struct AStruct {
   var x: Int
@@ -132,6 +135,17 @@ class AClass {
     return z[0]
   }
 }
+
+let _ = AClass.foo
+// CHECK: [[@LINE-1]]:16 | instance-method/Swift | foo() | s:FC14swift_ide_test6AClass3fooFT_Si | Ref | rel: 0
+let _ = AClass(x: 1).foo
+// CHECK: [[@LINE-1]]:22 | instance-method/Swift | foo() | s:FC14swift_ide_test6AClass3fooFT_Si | Ref | rel: 0
+let _ = AClass(x: 1)[1]
+// CHECK: [[@LINE-1]]:21 | instance-property/subscript/Swift | subscript(_:) | s:iC14swift_ide_test6AClass9subscriptFSiSi | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:21 | function/acc-get/Swift | getter:subscript(_:) | s:FC14swift_ide_test6AClassg9subscriptFSiSi | Ref,Call,Dyn,Impl,RelRec | rel: 1
+let _ = AClass(x: 1)[1] = 2
+// CHECK: [[@LINE-1]]:21 | instance-property/subscript/Swift | subscript(_:) | s:iC14swift_ide_test6AClass9subscriptFSiSi | Ref,Writ | rel: 0
+// CHECK: [[@LINE-2]]:21 | function/acc-set/Swift | setter:subscript(_:) | s:FC14swift_ide_test6AClasss9subscriptFSiSi | Ref,Call,Dyn,Impl,RelRec | rel: 1
 
 protocol AProtocol {
   // CHECK: [[@LINE-1]]:10 | protocol/Swift | AProtocol | [[AProtocol_USR:.*]] | Def | rel: 0
