@@ -58,7 +58,7 @@ where
       // be affected by churn in future Unicode versions.
       //
       // TODO: cost/benefit investigation of more complex check here...
-      return codeUnit < 0xD800
+      return codeUnit < 0xD800 || codeUnit > 0xDFFF
     }
 
     fatalError("unimplemented")
@@ -68,11 +68,10 @@ where
 // TODO: put these on protocol decl, and have impls provide functionality
 // instead
 //
-// The below establishes the concept of a *normalization-sequence-starter code
-// unit*, which is any code unit that begins a unicode scalar value whose
-// canonical combining class in the UCD is zero. Such code units start a new
-// sequence for the purposes of normalization and thus also serve as natural
-// canonical ordering breaks.
+// The below establishes the concept of a *starter code unit*, which is any code
+// unit that begins a unicode scalar value whose canonical combining class in
+// the UCD is zero. Such code units start a new sequence for the purposes of
+// normalization and thus also serve as natural canonical ordering breaks.
 extension UnicodeEncoding
 where
   EncodedScalar.Iterator.Element : UnsignedInteger
@@ -80,7 +79,10 @@ where
   // Whether the given code unit is a normalization-sequence-starter code unit.
   // This function is meant as a quick check, involving very few operations, to
   // check for large and common ranges of starter code units.
-  static func quickCheckNormalizationSequenceStarter(
+  //
+  // TODO: this will likely be a threshold value instead, for a simd fast path,
+  // as well as a more exhaustive check for the scalar fast path.
+  static func quickCheckStarter(
     _ codeUnit: CodeUnit
   ) -> Bool {
     // Trivial
@@ -235,37 +237,439 @@ extension Unicode {
 
 
 //
-// Sort order is preserved when breaking on grapheme boundaries. Sort order is
-// preserved when breaking on canonical combining sequence boundaries. Sort
-// order may not be preserved if broken inside of a canonical combining
-// sequences. For example:
+// Sort order is preserved with consistent use of indices. For example:
 //
-// Example:
 //   1.  ă ́ ̠  (U+0103 U+0301 U+0320)
 //   2.  ă ́ b  (U+0103 U+0301 U+0062)
 //   3.  ă ́ 日 (U+0103 U+0301 U+65E5)
 //
 // These will be ordered #2, #1, #3. This is because the combining character
-// U+0320 comes after 'b'. This seems undesirable at first, but it afford memcmp
-// semantics and does still preserve relative ordering at grapheme and
-// canonical-combining-sequence boundaries.
+// U+0320 comes after 'b'. This seems undesirable at first, but it affords
+// memcmp semantics and still preserves consistent ordering at grapheme,
+// canonical-combining-sequence, and even scalar boundaries.
 //
 // That is, if substrings up to a particular index compare equivalently, then
 // the sort order of the rest of the strings is the same sort order of the
-// entire strings only if the index lies on a grapheme or canonical-combining-
-// sequence boundary. Otherwise, if breaking apart raw scalars inside of a
-// canonical-combining-sequence, the sort order result might differ.
+// entire strings.
+//
+// This does expose a chance of user error if the user determines the scalar
+// index of divergence, then tries to advance grapheme indices to that point to
+// resume comparison. In that case, the graphme index would advance past the
+// point of divergence. This would be a misuse of our indices and comparison
+// semantics, and I can't think of a good way to address it. Note that it would
+// also apply even at canonical-combining-sequence boundaries that were not also
+// grapheme boundaries.
+//
+// That is, the lexicographic invariant is preserved.
+//
+// TODO: given that lexicographic ordering is monoidal, figure out the fancy
+// term for this property.
 //
 
 
+extension UnicodeStorage {
+  // TODO: a properties struct formed by a single pass instead of the below.
+
+  func isASCII(scan: Bool = true) -> Bool {
+    // TODO: is US the right place for this?
+    // TODO: do
+    return false
+  }
+  func isLatin1(scan: Bool = true) -> Bool {
+    // TODO: is US the right place for this?
+    // TODO: do
+    return false
+  }
+  func isBMP(scan: Bool = true) -> Bool {
+    // TODO: is US the right place for this?
+    // TODO: do
+    return false
+  }
+  // Normal Form TODO, whatever normal form we decide on
+  func isNFT(scan: Bool = true) -> Bool {
+    // TODO: is US the right place for this?
+    // TODO: do
+    return false
+  }
+}
+
+// TODO: This currently asserts in irgen::emitStructMetadata, need to
+// investigate and file a JIRA.
+//
+// extension UnicodeStorage
+// where CodeUnits.Iterator.Element: UnsignedInteger {
+//   struct ZextView : BidirectionalCollection {
+
+//     let codeUnits: CodeUnits
+
+//     init(_ codeUnits: CodeUnits) {
+//       self.codeUnits = codeUnits
+//     }
+
+//     public var startIndex: CodeUnits.Index {
+//       return codeUnits.startIndex
+//     }
+//     public var endIndex: CodeUnits.Index {
+//       return codeUnits.endIndex
+//     }
+//     public subscript(i: CodeUnits.Index) -> UInt32 {
+//       return numericCast(codeUnits[i])
+//     }
+//     public func index(after i: CodeUnits.Index) -> CodeUnits.Index {
+//       return codeUnits.index(after: i)
+//     }
+//     public func index(before i: CodeUnits.Index) -> CodeUnits.Index {
+//       return codeUnits.index(before: i)
+//     }
+//     typealias SubSequence = BidirectionalSlice<ZextView>
+//   }
+
+//   var zextCodeUnits : ZextView { return ZextView(codeUnits) }
+
+// }
+
+// TODO: replace with eventual comparison order
+enum SortOrder { case before, same, after }
+
 enum StringComparisonStrategy {
   case bitwise
-  case zext(threshold: UInt32?)
+  case bitwiseWithSurrogatesGreater
+  case zextwise
+  case scalarwise
+  case normalizedScalarwise
+}
 
-  case scalars
+func determineComparisonStrategy<
+  LHSCodeUnits: RandomAccessCollection,
+  LHSEncoding: UnicodeEncoding,
+  RHSCodeUnits: RandomAccessCollection,
+  RHSEncoding: UnicodeEncoding
+>(
+  _ lhs: UnicodeStorage<LHSCodeUnits, LHSEncoding>,
+  _ rhs: UnicodeStorage<RHSCodeUnits, RHSEncoding>
+) -> StringComparisonStrategy
+where
+  LHSEncoding.CodeUnit: UnsignedInteger,
+  RHSEncoding.CodeUnit: UnsignedInteger,
+  LHSEncoding.CodeUnit: FixedWidthInteger,
+  RHSEncoding.CodeUnit: FixedWidthInteger
+{
+  // Without normalization, all bets are off
+  guard lhs.isNFT() && rhs.isNFT() else {
+    return .normalizedScalarwise
+  }
+
+  // Same encodings usually mean bitwise comparison except for UTF16 outside of
+  // the BMP, as surrogate code points do not occur at the end of the BMP.
+  if _fastPath(LHSEncoding.self == RHSEncoding.self) {
+    if LHSEncoding.self == UTF16.self {
+      if _fastPath(lhs.isBMP() && rhs.isBMP()) {
+        return .bitwise
+      }
+      // So long as one is BMP, we can use a trick: bitwise using a surrogate
+      // filter: when the other has a surrogate bitpattern, that CU is greater.
+      if lhs.isBMP() || rhs.isBMP() {
+        return .bitwiseWithSurrogatesGreater
+      }
+
+
+    }
+
+    return .bitwise
+  }
+
+  // Choose between bitwise and zextwise based on size of code units
+  let bitwiseOrZextwise = {
+    return LHSEncoding.CodeUnit.bitWidth == RHSEncoding.CodeUnit.bitWidth
+      ? StringComparisonStrategy.bitwise : StringComparisonStrategy.zextwise
+  }
+
+  // ASCII is common subset of all encodings
+  if lhs.isASCII() || rhs.isASCII() {
+    return bitwiseOrZextwise()
+  }
+
+  // All other UTF8 combinations require decoding
+  if LHSEncoding.self == UTF8.self || RHSEncoding.self == UTF8.self {
+    return .scalarwise
+  }
+
+  // Latin1 is a common subset for everything but UTF8
+  if lhs.isLatin1() || rhs.isLatin1() {
+    return bitwiseOrZextwise()
+  }
+
+  // Final remaining options: UTF16 compared to UTF32, normalized
+  assert(
+    LHSEncoding.self == UTF16.self && RHSEncoding.self == UTF32.self
+    || LHSEncoding.self == UTF32.self && RHSEncoding.self == UTF16.self
+  )
+
+  // BMP is common subset of UTF16 and UTF32
+  if lhs.isBMP() || rhs.isBMP() {
+    return .zextwise
+  }
+
+  // Otherwise, requires decoding
+  return .scalarwise
 }
 
 
+enum PartialFastCompare<
+  LHSIndex: UnsignedInteger,
+  RHSIndex: UnsignedInteger
+>
+{
+  case result(SortOrder)
+  case moreProcessingRequired(LHSIndex, RHSIndex)
+}
+
+// TODO: this shouldn't be one monolithic function, but instead be specialized
+// into the two cases where it's most applicable: pre-normalized-scalarwise
+// compare and normalized-scalarwise compare
+func partialFastCompare<
+  LHSCodeUnits: RandomAccessCollection,
+  LHSEncoding: UnicodeEncoding,
+  RHSCodeUnits: RandomAccessCollection,
+  RHSEncoding: UnicodeEncoding
+>
+(
+  _ lhs: UnicodeStorage<LHSCodeUnits, LHSEncoding>,
+  _ rhs: UnicodeStorage<RHSCodeUnits, RHSEncoding>,
+  lhsIsPreNormalized: Bool,
+  rhsIsPreNormalized: Bool
+) -> PartialFastCompare<LHSCodeUnits.Index, RHSCodeUnits.Index>
+where
+  LHSCodeUnits.Iterator.Element : UnsignedInteger,
+  RHSCodeUnits.Iterator.Element : UnsignedInteger,
+  LHSCodeUnits.SubSequence : RandomAccessCollection,
+  LHSCodeUnits.SubSequence.Index == LHSCodeUnits.Index,
+  LHSCodeUnits.SubSequence.SubSequence == LHSCodeUnits.SubSequence,
+  LHSCodeUnits.SubSequence.Iterator.Element == LHSCodeUnits.Iterator.Element,
+  RHSCodeUnits.SubSequence : RandomAccessCollection,
+  RHSCodeUnits.SubSequence.Index == RHSCodeUnits.Index,
+  RHSCodeUnits.SubSequence.SubSequence == RHSCodeUnits.SubSequence,
+  RHSCodeUnits.SubSequence.Iterator.Element == RHSCodeUnits.Iterator.Element
+{
+  var lhsIdx = lhs.codeUnits.startIndex
+  var rhsIdx = rhs.codeUnits.startIndex
+  let lhsEndIdx = lhs.codeUnits.endIndex
+  let rhsEndIdx = rhs.codeUnits.endIndex
+  // Returns a value if termination conditions are satisfied, otherwise nil.
+  // The value returned is the result of `compare`.
+  // Captures the indices declared above
+  func checkTerminationCondition() -> SortOrder? {
+    // If both are consumed, success!
+    if lhsIdx == lhsEndIdx && rhsIdx == rhsEndIdx {
+      return .same
+    }
+    // One if finished, the other is not
+    if lhsIdx == lhsEndIdx {
+      return .before
+    }
+    if rhsIdx == rhsEndIdx {
+      return .after
+    }
+    return nil
+  }
+  // Orders two numbers
+  func order(_ lhs: UInt32, _ rhs: UInt32) -> SortOrder {
+    if lhs < rhs {
+      return .before
+    }
+    if lhs == rhs {
+      return .same
+    }
+    return .after
+  }
+  // Check for starter status, if applicable.
+  func checkLHSNextStarterCU(_ lhsNextIdx: LHSCodeUnits.Index) -> Bool {
+    return lhsIsPreNormalized
+      || lhsNextIdx == lhsEndIdx
+      || LHSEncoding.quickCheckStarter(lhs.codeUnits[lhsNextIdx])
+  }
+  func checkRHSNextStarterCU(_ rhsNextIdx: RHSCodeUnits.Index) -> Bool {
+    return rhsIsPreNormalized
+      || rhsNextIdx == rhsEndIdx
+      || RHSEncoding.quickCheckStarter(rhs.codeUnits[rhsNextIdx])
+  }
+  // Trivial: we're finished
+  if let res = checkTerminationCondition() {
+    return .result(res)
+  }
+  // Fast loop while possible
+  while true {
+    // Ensure mutual trivial decodability
+    guard _slowPath(
+      LHSEncoding.isTriviallyDecodable(lhs.codeUnits[lhsIdx]) &&
+      RHSEncoding.isTriviallyDecodable(rhs.codeUnits[rhsIdx])) else {
+      // FIXME: if non-pre-normalized, still faster to just decode on the fly
+      // and continue so long as we can.
+      // Need to fall out to decoded comparison
+      return .moreProcessingRequired(lhsIdx, rhsIdx)
+    }
+    let lhsCU: UInt32 = numericCast(lhs.codeUnits[lhsIdx])
+    let rhsCU: UInt32 = numericCast(rhs.codeUnits[rhsIdx])
+    let lhsNextIdx = lhs.codeUnits.index(after: lhsIdx)
+    let rhsNextIdx = rhs.codeUnits.index(after: rhsIdx)
+    let lhsNextIsEnd = lhsNextIdx == lhsEndIdx
+    let rhsNextIsEnd = rhsNextIdx == rhsEndIdx
+    // If we're on the last code units, we can just compare directly and
+    // return.
+    if lhsNextIsEnd && rhsNextIsEnd {
+      return .result(order(lhsCU, rhsCU))
+    }
+    // If we're not pre-normalized, then we need to ensure that the next code
+    // units are starter code units.
+    guard checkLHSNextStarterCU(lhsNextIdx)
+       && checkRHSNextStarterCU(rhsNextIdx) else {
+      return .moreProcessingRequired(lhsIdx, rhsIdx)
+    }
+    // Can now just compare code units
+    if lhsCU != rhsCU {
+      return .result(order(lhsCU, rhsCU))
+    }
+    if let res = checkTerminationCondition() {
+      return .result(res)
+    }
+    // Continue
+    lhsIdx = lhsNextIdx
+    rhsIdx = rhsNextIdx
+  }
+}
+
+extension Collection {
+  func lexicographicCompare<
+    OtherC: Collection
+  >(_ other: OtherC) -> SortOrder
+  where
+    Self.Iterator.Element: FixedWidthInteger,
+    Self.Iterator.Element: UnsignedInteger,
+    OtherC.Iterator.Element: FixedWidthInteger,
+    OtherC.Iterator.Element: UnsignedInteger
+  {
+    for (lhs, rhs) in zip(self, other) {
+      let ord = lhs.ordered(with: rhs)
+      guard ord == .same else {
+        return ord
+      }
+    }
+    return .same
+  }
+
+  func lexicographicCompare<
+    OtherC: Collection
+  >(
+    _ other: OtherC,
+    using order: (Self.Iterator.Element, OtherC.Iterator.Element) -> SortOrder
+  ) -> SortOrder
+  {
+    for (lhs, rhs) in zip(self, other) {
+      let ord = order(lhs, rhs)
+      guard ord == .same else {
+        return ord
+      }
+    }
+    return .same
+  }
+}
+
+extension UnsignedInteger {
+  func ordered<Other: UnsignedInteger>(with other: Other) -> SortOrder {
+    // FIXME: not overflow safe...
+    let lhs = numericCast(self) as Int
+    let rhs = numericCast(other) as Int
+    if _fastPath(lhs == rhs) {
+      return .same
+    }
+
+    return lhs < rhs ? .before : .after
+  }
+}
+
+extension Character {
+  func ordered(with other: Character) -> SortOrder {
+    if _fastPath(self == other) {
+      return .same
+    }
+    return self < other ? .before : .after
+  }
+}
+
+extension EncodedScalarProtocol {
+  func ordered<Other: EncodedScalarProtocol>(with other: Other) -> SortOrder {
+    let lhs = self.utf32[0]
+    let rhs = other.utf32[0]
+    return lhs.ordered(with: rhs)
+  }
+}
+
+extension UnicodeStorage
+where
+ CodeUnits.SubSequence == CodeUnits,
+ CodeUnits.Iterator.Element : UnsignedInteger,
+ CodeUnits.Iterator.Element : FixedWidthInteger
+{
+  func order<
+    OtherCodeUnits: RandomAccessCollection, OtherEncoding: UnicodeEncoding
+  >(_ other: UnicodeStorage<OtherCodeUnits, OtherEncoding>) -> SortOrder
+  where
+   OtherCodeUnits.SubSequence == OtherCodeUnits,
+   OtherCodeUnits.SubSequence == OtherCodeUnits,
+   OtherCodeUnits.Iterator.Element : UnsignedInteger,
+   OtherCodeUnits.Iterator.Element : FixedWidthInteger
+  {
+    let lhs = self
+    let rhs = other
+    switch determineComparisonStrategy(lhs, rhs) {
+    case .bitwise:
+      // TODO: ensure this compiles to memcmp, otherwise rewrite as lower level
+      return lhs.codeUnits.lexicographicCompare(rhs.codeUnits)
+
+    case .bitwiseWithSurrogatesGreater:
+      // TODO: ensure this compiles well, otherwise rewrite at lower level
+      // TODO: better to have the known BMP on one side and the unknown on the
+      // other.
+      return lhs.codeUnits.lexicographicCompare(rhs.codeUnits) {
+        lhsCU, rhsCU in
+        // Check surrogate patterns
+        guard Encoding.isTriviallyDecodable(lhsCU) else {
+          return .after
+        }
+        guard OtherEncoding.isTriviallyDecodable(rhsCU) else {
+          return .before
+        }
+        return lhsCU.ordered(with: rhsCU)
+      }
+
+    case .zextwise:
+      // FIXME: use when my ZextView is not broken :-(
+      fatalError("ZextView currently broken")
+
+    case .scalarwise:
+      // First, get as far as we can with fast paths
+      // TODO: call fast path partical compare function
+
+      // Fall back to decoding and comparing decoded scalars
+      return self.scalars.lexicographicCompare(other.scalars) {
+        lhsScalar, rhsScalar in
+        return lhsScalar.ordered(with: rhsScalar)
+      }
+
+    case .normalizedScalarwise:
+      // First, get as far as we can with fast paths
+      // TODO: call fast partial compare function
+
+      // TODO: instead, use normalized scalar view
+      return self.characters.lexicographicCompare(other.characters) {
+        lhsChar, rhsChar in
+        return lhsChar.ordered(with: rhsChar)
+      }
+    }
+  }
+
+
+}
 
 
 
