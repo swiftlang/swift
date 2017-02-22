@@ -50,7 +50,6 @@
 
 #include "WeakReference.h"
 
-#include <cstdlib>
 #include <cstring>
 #include <type_traits>
 
@@ -192,7 +191,11 @@ template <class Impl, class T> struct RetainableBoxBase {
   static constexpr size_t stride = sizeof(T);
   static constexpr bool isPOD = false;
   static constexpr bool isBitwiseTakable = true;
-  static const bool isAtomic;
+#ifdef SWIFT_STDLIB_USE_NONATOMIC_RC
+  static constexpr bool isAtomic = false;
+#else
+  static constexpt bool isAtomic = true;
+#endif
 
   static void destroy(T *addr) {
     Impl::release(*addr);
@@ -259,9 +262,6 @@ template <class Impl, class T> struct RetainableBoxBase {
     return swift_getHeapObjectExtraInhabitantIndex((HeapObject* const *) src);
   }
 };
-
-template <class Impl, class T>
-const bool RetainableBoxBase<Impl,T>::isAtomic = ! std::getenv("SWIFT_ASSUME_SINGLE_THREADED");
 
 /// A box implementation class for Swift object pointers.
 struct SwiftRetainableBox :

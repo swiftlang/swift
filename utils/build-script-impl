@@ -1655,6 +1655,9 @@ function swift_c_flags() {
     if [[ $(is_cmake_release_build_type "${SWIFT_BUILD_TYPE}") ]] ; then
         echo -n " -fno-stack-protector"
     fi
+    if [[ "$(true_false "${SWIFT_STDLIB_USE_NONATOMIC_RC}")" == "TRUE" ]]; then
+        echo -n " -DSWIFT_STDLIB_USE_NONATOMIC_RC"
+    fi
 }
 
 function cmake_config_opt() {
