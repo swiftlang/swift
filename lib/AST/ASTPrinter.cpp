@@ -1355,7 +1355,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         Requirement substReq(req.getKind(), first, req.getLayoutConstraint());
         printRequirement(substReq);
       }
-      Printer.callPrintStructurePost(PrintStructureKind::GenericRequirement);
+      Printer.printStructurePost(PrintStructureKind::GenericRequirement);
     }
   }
 
