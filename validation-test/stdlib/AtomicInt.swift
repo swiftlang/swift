@@ -4,7 +4,7 @@
 // RUN: %target-build-swift -module-name a %s -o %t.out -O
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
-// REQUIRES: no_nonatomic_rc
+// UNSUPPORTED: nonatomic_rc
 
 import SwiftPrivate
 import StdlibUnittest

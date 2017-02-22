@@ -70,8 +70,6 @@ if "@SWIFT_STDLIB_ENABLE_RESILIENCE@" == "TRUE":
 
 if "@SWIFT_STDLIB_USE_NONATOMIC_RC@" == "TRUE":
     config.available_features.add("nonatomic_rc")
-else:
-    config.available_features.add("no_nonatomic_rc")
 
 if "@CMAKE_GENERATOR@" == "Xcode":
     xcode_bin_dir = os.path.join(config.llvm_obj_root, "@LLVM_BUILD_TYPE@",

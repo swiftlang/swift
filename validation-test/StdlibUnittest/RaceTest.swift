@@ -1,6 +1,6 @@
 // RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out
 // RUN: %target-run %t.out | %FileCheck %s
-// REQUIRES: no_nonatomic_rc
+// UNSUPPORTED: nonatomic_rc
 
 import StdlibUnittest
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
