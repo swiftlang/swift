@@ -3105,12 +3105,6 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
   return address;
 }
 
-/// Mangle the name of a type.
-StringRef IRGenModule::mangleType(CanType type, SmallVectorImpl<char> &buffer) {
-  LinkEntity::forTypeMangling(type).mangle(buffer);
-  return StringRef(buffer.data(), buffer.size());
-}
-
 /// Do we have to use resilient access patterns when working with this
 /// declaration?
 ///
