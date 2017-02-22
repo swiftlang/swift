@@ -132,17 +132,12 @@ extension SwiftCanonicalString : Comparable {
   static func ==(
     _ lhs: SwiftCanonicalString, rhs: SwiftCanonicalString
   ) -> Bool {
-    return lhs.characters.elementsEqual(rhs.characters)
+    return lhs.storage.ordered(with: rhs.storage) == .same
   }
   static func <(
     _ lhs: SwiftCanonicalString, rhs: SwiftCanonicalString
   ) -> Bool {
-    for (lhsChar, rhsChar) in zip(lhs.characters, rhs.characters) {
-      if lhsChar != rhsChar {
-        return lhsChar < rhsChar
-      }
-    }
-    return lhs.characters.count < rhs.characters.count
+    return lhs.storage.ordered(with: rhs.storage) == .before
   }
 }
 
@@ -280,13 +275,23 @@ extension String : Unicode {
   }
 }
 
-extension String : Equatable {
+extension String : Comparable {
   static func ==(
     _ lhs: String, rhs: String
   ) -> Bool {
     switch (lhs.contents, rhs.contents) {
     case (.canonical(let lhsStr), .canonical(let rhsStr)):
       return lhsStr == rhsStr
+    default:
+      fatalError("TODO")
+    }
+  }
+  static func <(
+    _ lhs: String, rhs: String
+  ) -> Bool {
+    switch (lhs.contents, rhs.contents) {
+    case (.canonical(let lhsStr), .canonical(let rhsStr)):
+      return lhsStr < rhsStr
     default:
       fatalError("TODO")
     }
