@@ -28,25 +28,27 @@ public func call_foobar() {
 // Test ThreadSanitizer execution end-to-end.
 
 import Darwin
-var user_interactive_thread: pthread_t?
-var user_interactive_thread2: pthread_t?
+
+var threads: [pthread_t?] = []
 var racey_x: Int;
 
-pthread_create(&user_interactive_thread, nil, { _ in
+for _ in 1...5 {
+  var t : pthread_t?
+  pthread_create(&t, nil, { _ in
     print("pthread ran")
     racey_x = 5;
 
     return nil
-}, nil)
+  }, nil)
+  threads.append(t)
+}
 
-pthread_create(&user_interactive_thread2, nil, { _ in
-    print("pthread2 ran")
-    racey_x = 6;
-
-    return nil
-}, nil)
-
-pthread_join(user_interactive_thread!, nil)
-pthread_join(user_interactive_thread2!, nil)
+for t in threads {
+  if t == nil {
+    print("nil thread")
+    continue
+  }
+  pthread_join(t!, nil)
+}
 
 // CHECK: ThreadSanitizer: data race
