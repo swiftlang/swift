@@ -73,7 +73,7 @@ class C2 {}
 // RUN: %sourcekitd-test -req=translate -swift-name "A2" -pos=41:10 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK14 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "C3" -pos=48:8 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK15 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "bar(_:other:)" -pos=51:36 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK16 %s
-dec
+
 // CHECK-NONE: <empty name translation info>
 // CHECK1: fooWithA:b:c:
 // CHECK2: fooWithA1:b1:c1:
