@@ -9,6 +9,7 @@
     - [Smoke Testing](#smoke-testing)
     - [Validation Testing](#validation-testing)
     - [Lint Testing](#lint-testing)
+    - [Specific Preset Testing](#specific-preset-testing)
 - [Cross Repository Testing](#cross-repository-testing)
 - [ci.swift.org bots](#ciswiftorg-bots)
 
