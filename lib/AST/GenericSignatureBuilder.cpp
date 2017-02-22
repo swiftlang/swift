@@ -580,8 +580,6 @@ public:
   }
 
   static ResolvedType forPotentialArchetype(PotentialArchetype *pa) {
-    assert(!(pa->getParent() && pa->getTypeAliasDecl()) &&
-           "typealias is only considered resolved when new");
     return ResolvedType(pa);
   }
 
@@ -899,7 +897,14 @@ static void concretizeNestedTypeFromConcreteParent(
     witnessType = DependentMemberType::get(concreteParent, assocType);
   }
 
-  builder.addSameTypeRequirement(nestedPA, witnessType, source);
+  builder.addSameTypeRequirement(nestedPA, witnessType, source,
+     [&](Type type1, Type type2) {
+       builder.getASTContext().Diags.diagnose(
+                              source->getLoc(),
+                              diag::requires_same_type_conflict,
+                              nestedPA->getDependentType(/*FIXME: */{ }, true),
+                              type1, type2);
+     });
 }
 
 auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
@@ -1431,34 +1436,23 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
     }
   }
 
-  pa = pa->getRepresentative();
-  if (!pa->getParent() || !pa->getTypeAliasDecl())
+  auto rep = pa->getRepresentative();
+  if (!rep->getParent() || !rep->getTypeAliasDecl())
     return ResolvedType::forPotentialArchetype(pa);
 
   // We're assuming that an equivalence class with a type alias representative
   // doesn't have a "true" (i.e. associated type) potential archetype.
-  assert(llvm::all_of(pa->getEquivalenceClass(),
+  assert(llvm::all_of(rep->getEquivalenceClass(),
                       [&](PotentialArchetype *pa) {
                         return pa->getParent() && pa->getTypeAliasDecl();
                       }) &&
          "unexpected typealias representative with non-typealias equivalent");
 
-  // The right-hand side of the typealias could itself be an archetype
-  // (e.g. protocol P { associatedtype A; typealias B = A }), so we need to
-  // resolve that.  However, the archetype should always be resolved far enough
-  // upon creation to not be another type alias (verified by the ResolvedType
-  // constructors below), and hence this function doesn't need to be recursive.
-  auto concrete = pa->getConcreteType();
-  auto rhsPA = resolveArchetype(concrete);
-  if (!rhsPA) {
-    // FIXME: same as hackTypeFromGenericTypeAlias
-    if (pa->getTypeAliasDecl()->getGenericParams())
-      return ResolvedType::forConcreteTypeFromGenericTypeAlias(concrete);
+  // Recursively resolve the concrete type.
+  if (auto concrete = pa->getConcreteType())
+    return resolve(concrete);
 
-    return ResolvedType::forConcreteType(concrete);
-  }
-
-  return ResolvedType::forPotentialArchetype(rhsPA);
+  return ResolvedType::forPotentialArchetype(pa);
 }
 
 void GenericSignatureBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
@@ -1853,7 +1847,13 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
     for (auto T2Nested : equivT2->NestedTypes) {
       auto T1Nested = T1->getNestedType(T2Nested.first, *this);
       if (addSameTypeRequirement(T1Nested, T2Nested.second.front(),
-                                 sameNestedTypeSource))
+                                 sameNestedTypeSource,
+                                 [&](Type type1, Type type2) {
+            Diags.diagnose(Source->getLoc(),
+                           diag::requires_same_type_conflict,
+                           T1Nested->getDependentType(/*FIXME: */{ }, true),
+                           type1, type2);
+            }))
         return true;
     }
   }
@@ -2029,8 +2029,10 @@ bool GenericSignatureBuilder::addSameTypeRequirement(
 bool GenericSignatureBuilder::addSameTypeRequirement(ResolvedType paOrT1,
                                                      ResolvedType paOrT2,
                                                      const RequirementSource *source) {
-  return addSameTypeRequirement(paOrT1, paOrT2, source, [&](Type, Type) {
-    llvm_unreachable("unexpected concrete type mismatch");
+  return addSameTypeRequirement(paOrT1, paOrT2, source,
+                                [&](Type type1, Type type2) {
+    Diags.diagnose(source->getLoc(), diag::requires_same_concrete_type,
+                   type1, type2);
   });
 }
 

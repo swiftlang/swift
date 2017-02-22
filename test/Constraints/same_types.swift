@@ -63,7 +63,7 @@ func fail1<
 func fail2<
   T: Fooable, U: Fooable
 >(_ t: T, u: U) -> (X, Y)
-  where T.Foo == U.Foo, T.Foo == X, U.Foo == Y { // expected-error{{generic parameter 'T.Foo' cannot be equal to both 'X' and 'Y'}}
+  where T.Foo == U.Foo, T.Foo == X, U.Foo == Y { // expected-error{{generic parameter 'U.Foo' cannot be equal to both 'X' and 'Y'}}
   return (t.foo, u.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Y'}}
 }
 
