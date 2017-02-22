@@ -8,9 +8,9 @@ public protocol IGiveOutInts {
 }
 
 // CHECK: define {{.*}}@_T011protocolarg16printSomeNumbersyAA12IGiveOutInts_pF
-// CHECK: @llvm.dbg.declare(metadata %P11protocolarg12IGiveOutInts_* %
+// CHECK: @llvm.dbg.declare(metadata %T11protocolarg12IGiveOutIntsP* %
 // CHECK-SAME:              metadata ![[VAR:.*]], metadata ![[EMPTY:.*]])
-// CHECK: @llvm.dbg.declare(metadata %P11protocolarg12IGiveOutInts_** %
+// CHECK: @llvm.dbg.declare(metadata %T11protocolarg12IGiveOutIntsP** %
 // CHECK-SAME:              metadata ![[ARG:.*]], metadata ![[DEREF:.*]])
 
 // CHECK: ![[EMPTY]] = !DIExpression()

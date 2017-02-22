@@ -28,9 +28,9 @@ bb0(%0 : $Builtin.Int32):
 }
 
 // CHECK: define{{( protected)?}} swiftcc void @non_trivial(
-// CHECK: [[GEP1:%.*]] = getelementptr inbounds %V24copy_value_destroy_value3Foo, %V24copy_value_destroy_value3Foo* %0, i32 0, i32 2
+// CHECK: [[GEP1:%.*]] = getelementptr inbounds %T019copy_value_destroy_B03FooV, %T019copy_value_destroy_B03FooV* %0, i32 0, i32 2
 // CHECK: [[VAL1:%.*]] = load %swift.refcounted*, %swift.refcounted** [[GEP1]], align 8
-// CHECK: [[GEP2:%.*]] = getelementptr inbounds %V24copy_value_destroy_value3Foo, %V24copy_value_destroy_value3Foo* %0, i32 0, i32 5
+// CHECK: [[GEP2:%.*]] = getelementptr inbounds %T019copy_value_destroy_B03FooV, %T019copy_value_destroy_B03FooV* %0, i32 0, i32 5
 // CHECK: [[VAL2:%.*]] = load %swift.refcounted*, %swift.refcounted** [[GEP2]], align 8
 // CHECK: call void @swift_rt_swift_retain(%swift.refcounted* [[VAL1]])
 // CHECK: call void @swift_rt_swift_retain(%swift.refcounted* [[VAL2]])

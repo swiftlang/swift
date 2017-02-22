@@ -5998,7 +5998,12 @@ SwiftDeclConverter::importSubscript(Decl *decl,
                           SourceLoc());
   auto indicesType = bodyParams->getType(C);
 
-  auto fnType = FunctionType::get(indicesType, elementTy);
+  AnyFunctionType *fnType;
+  if (auto *sig = dc->getGenericSignatureOfContext())
+    fnType = GenericFunctionType::get(sig, indicesType, elementTy,
+                                      AnyFunctionType::ExtInfo());
+  else
+    fnType = FunctionType::get(indicesType, elementTy);
   subscript->setInterfaceType(fnType);
 
   addObjCAttribute(subscript, None);

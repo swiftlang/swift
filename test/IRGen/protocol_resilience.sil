@@ -186,7 +186,7 @@ struct ConformingStruct : ResilientProtocol {
   static func defaultF()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @noDefaultA(%V19protocol_resilience16ConformingStruct* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @noDefaultA(%T19protocol_resilience16ConformingStructV* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
 sil @noDefaultA : $@convention(witness_method) (@in_guaranteed ConformingStruct) -> () {
@@ -195,7 +195,7 @@ bb0(%0 : $*ConformingStruct):
   // Make sure we can emit direct references to default implementations with a
   // concrete Self type.
 
-  // CHECK-NEXT: [[SELF:%.*]] = bitcast %V19protocol_resilience16ConformingStruct* %0 to %swift.opaque*
+  // CHECK-NEXT: [[SELF:%.*]] = bitcast %T19protocol_resilience16ConformingStructV* %0 to %swift.opaque*
   // CHECK-NEXT: call swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself [[SELF]], %swift.type* bitcast ({{i32|i64}}* {{.*}}) to %swift.type*), i8** getelementptr inbounds ([8 x i8*], [8 x i8*]* @_T019protocol_resilience16ConformingStructVAA17ResilientProtocolAAWP, i32 0, i32 0))
   %fn1 = function_ref @defaultC : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
   %ignore1 = apply %fn1<ConformingStruct>(%0) : $@convention(witness_method) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
@@ -206,7 +206,7 @@ bb0(%0 : $*ConformingStruct):
 }
 
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @noDefaultB(%V19protocol_resilience16ConformingStruct* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @noDefaultB(%T19protocol_resilience16ConformingStructV* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
 sil @noDefaultB : $@convention(witness_method) (@in_guaranteed ConformingStruct) -> () {
@@ -251,12 +251,12 @@ bb0(%0 : $*T):
   return %result : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @passConformingType(%V19protocol_resilience23ResilientConformingType* noalias nocapture)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @passConformingType(%T19protocol_resilience23ResilientConformingTypeV* noalias nocapture)
 sil @passConformingType : $@convention(thin) (@in ResilientConformingType) -> () {
 bb0(%0 : $*ResilientConformingType):
 
   // CHECK-NEXT: entry:
-  // CHECK-NEXT: [[ARG:%.*]] = bitcast %V19protocol_resilience23ResilientConformingType* %0 to %swift.opaque*
+  // CHECK-NEXT: [[ARG:%.*]] = bitcast %T19protocol_resilience23ResilientConformingTypeV* %0 to %swift.opaque*
   // CHECK-NEXT: [[WTABLE:%.*]] = call i8** @_T019protocol_resilience23ResilientConformingTypeVAC010resilient_A005OtherC8ProtocolAAWl()
   // CHECK-NEXT: call swiftcc void @doSomething(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @_T019protocol_resilience23ResilientConformingTypeVMf, i32 0, i32 1) to %swift.type*), i8** [[WTABLE]])
 
@@ -316,12 +316,12 @@ bb0(%0 : $*T):
   return %result : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @passConformingTypeRefined(%V19protocol_resilience23AnotherConformingStruct* noalias nocapture)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @passConformingTypeRefined(%T19protocol_resilience23AnotherConformingStructV* noalias nocapture)
 sil @passConformingTypeRefined : $@convention(thin) (@in AnotherConformingStruct) -> () {
 bb0(%0 : $*AnotherConformingStruct):
 
   // CHECK-NEXT: entry:
-  // CHECK-NEXT: [[ARG:%.*]] = bitcast %V19protocol_resilience23AnotherConformingStruct* %0 to %swift.opaque*
+  // CHECK-NEXT: [[ARG:%.*]] = bitcast %T19protocol_resilience23AnotherConformingStructV* %0 to %swift.opaque*
   // CHECK-NEXT: [[WTABLE:%.*]] = call i8** @_T019protocol_resilience23AnotherConformingStructVAcA29RefinesOtherResilientProtocolAAWl()
   // CHECK-NEXT: call swiftcc void @doSomethingRefined(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @_T019protocol_resilience23AnotherConformingStructVMf, i32 0, i32 1) to %swift.type*), i8** [[WTABLE]])
 
@@ -360,12 +360,12 @@ bb0(%0 : $*T):
   return %result : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @passConformingTypeAssoc(%V19protocol_resilience26ConformsWithResilientAssoc* noalias nocapture)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @passConformingTypeAssoc(%T19protocol_resilience26ConformsWithResilientAssocV* noalias nocapture)
 sil @passConformingTypeAssoc : $@convention(thin) (@in ConformsWithResilientAssoc) -> () {
 bb0(%0 : $*ConformsWithResilientAssoc):
 
   // CHECK-NEXT: entry:
-  // CHECK-NEXT: [[ARG:%.*]] = bitcast %V19protocol_resilience26ConformsWithResilientAssoc* %0 to %swift.opaque*
+  // CHECK-NEXT: [[ARG:%.*]] = bitcast %T19protocol_resilience26ConformsWithResilientAssocV* %0 to %swift.opaque*
   // CHECK-NEXT: call swiftcc void @doSomethingAssoc(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @_T019protocol_resilience26ConformsWithResilientAssocVMf, i32 0, i32 1) to %swift.type*), i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* @_T019protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP, i32 0, i32 0))
 
   %fn = function_ref @doSomethingAssoc : $@convention(thin) <T : HasResilientAssoc> (@in T) -> ()

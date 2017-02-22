@@ -1458,8 +1458,7 @@ void ASTMangler::appendInitializerEntity(const VarDecl *var) {
 /// Self type out of its mangling.
 static bool isMethodDecl(const Decl *decl) {
   return isa<AbstractFunctionDecl>(decl)
-    && (isa<NominalTypeDecl>(decl->getDeclContext())
-        || isa<ExtensionDecl>(decl->getDeclContext()));
+    && decl->getDeclContext()->isTypeContext();
 }
 
 static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
@@ -1501,28 +1500,32 @@ CanType ASTMangler::getDeclTypeForMangling(
     requirements = {};
   }
 
-  // Shed the 'self' type and generic requirements from method manglings.
-  if (isMethodDecl(decl) && type && !type->hasError()) {
-    // Drop the Self argument clause from the type.
-    type = cast<AnyFunctionType>(type).getResult();
+  if (!type->hasError()) {
+    // Shed the 'self' type and generic requirements from method manglings.
+    if (isMethodDecl(decl)) {
+      // Drop the Self argument clause from the type.
+      type = cast<AnyFunctionType>(type).getResult();
+    }
 
-    // Drop generic parameters and requirements from the method's context.
-    if (auto parentGenericSig =
-          decl->getDeclContext()->getGenericSignatureOfContext()) {
-      // The method's depth starts below the depth of the context.
-      if (!parentGenericSig->getGenericParams().empty())
-        initialParamDepth =
-          parentGenericSig->getGenericParams().back()->getDepth()+1;
+    if (isMethodDecl(decl) || isa<SubscriptDecl>(decl)) {
+      // Drop generic parameters and requirements from the method's context.
+      auto parentGenericSig =
+        decl->getDeclContext()->getGenericSignatureOfContext();
+      if (parentGenericSig && sig) {
+        // The method's depth starts below the depth of the context.
+        if (!parentGenericSig->getGenericParams().empty())
+          initialParamDepth =
+            parentGenericSig->getGenericParams().back()->getDepth()+1;
 
-      while (!genericParams.empty()) {
-        if (genericParams.front()->getDepth() >= initialParamDepth)
-          break;
-        genericParams = genericParams.slice(1);
-      }
+        while (!genericParams.empty()) {
+          if (genericParams.front()->getDepth() >= initialParamDepth)
+            break;
+          genericParams = genericParams.slice(1);
+        }
 
-      requirementsBuf.clear();
-      for (auto &reqt : sig->getRequirements()) {
-        switch (reqt.getKind()) {
+        requirementsBuf.clear();
+        for (auto &reqt : sig->getRequirements()) {
+          switch (reqt.getKind()) {
         case RequirementKind::Conformance:
         case RequirementKind::Layout:
         case RequirementKind::Superclass:
@@ -1538,12 +1541,13 @@ CanType ASTMangler::getDeclTypeForMangling(
               !genericParamIsBelowDepth(reqt.getSecondType(),initialParamDepth))
             continue;
           break;
-        }
+          }
 
-        // If we fell through the switch, mangle the requirement.
-        requirementsBuf.push_back(reqt);
+          // If we fell through the switch, mangle the requirement.
+          requirementsBuf.push_back(reqt);
+        }
+        requirements = requirementsBuf;
       }
-      requirements = requirementsBuf;
     }
   }
   return type->getCanonicalType();

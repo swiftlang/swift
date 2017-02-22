@@ -40,7 +40,7 @@
   subscript (i : Int) -> SomeObject {
     // CHECK: define internal [[OPAQUE0:%.*]]* @_T015objc_subscripts10SomeObjectC9subscriptACSicfgTo([[OPAQUE1]]*, i8*, i64) unnamed_addr
     get {
-      // CHECK: call swiftcc %C15objc_subscripts10SomeObject* @_T015objc_subscripts10SomeObjectC9subscriptACSicfg
+      // CHECK: call swiftcc %T15objc_subscripts10SomeObjectC* @_T015objc_subscripts10SomeObjectC9subscriptACSicfg
       return self
     }
 

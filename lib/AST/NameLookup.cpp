@@ -711,6 +711,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
           // Look in the generic parameters after checking our local declaration.
           GenericParams = AFD->getGenericParams();
+        } else if (auto *SD = dyn_cast<SubscriptDecl>(DC)) {
+          GenericParams = SD->getGenericParams();
         } else if (auto *ACE = dyn_cast<AbstractClosureExpr>(DC)) {
           // Look for local variables; normally, the parser resolves these
           // for us, but it can't do the right thing inside local types.
@@ -847,6 +849,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             dcGenericParams = nominal->getGenericParams();
           else if (auto ext = dyn_cast<ExtensionDecl>(DC))
             dcGenericParams = ext->getGenericParams();
+          else if (auto subscript = dyn_cast<SubscriptDecl>(DC))
+            dcGenericParams = subscript->getGenericParams();
 
           while (dcGenericParams) {
             namelookup::FindLocalVal localVal(SM, Loc, Consumer);
