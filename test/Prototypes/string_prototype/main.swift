@@ -162,7 +162,7 @@ testSuite.test("SwiftCanonicalString") {
   let s16to32 = UnicodeStorage.TranscodedView(s16, from: UTF16.self, to: UTF32.self)
   let s16to8 = UnicodeStorage.TranscodedView(s16, from: UTF16.self, to: UTF8.self)
   let s8to16 = UnicodeStorage.TranscodedView(s8, from: UTF8.self, to: UTF16.self)
-  let s8Vto16 = UnicodeStorage.TranscodedView(s8, from: ValidUTF8.self, to: UTF16.self)
+  let _ = UnicodeStorage.TranscodedView(s8, from: ValidUTF8.self, to: UTF16.self)
 
   let sncFrom32 = String(SwiftCanonicalString(
     codeUnits: s32.map { $0 }, encodedWith: UTF32.self
@@ -236,6 +236,16 @@ testSuite.test("trivially-decodable") {
   expectEqual(utf8CUs[1], 0x9F)
   expectEqual(utf8CUs[2], 0x82)
   expectEqual(utf8CUs[3], 0xA1)
+}
+
+testSuite.test("string-compare") {
+  let s1 = "abcdez"
+  let s2 = "abcdfz"
+  let s3 = "abcde\(UnicodeScalar(0x304)!)z"
+  let s4 = "abcd\(UnicodeScalar(113)!)z"
+
+
+
 }
 
 runAllTests()
