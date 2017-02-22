@@ -1073,7 +1073,6 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
   switch (getKind()) {
   // Most type metadata depend on the formal linkage of their type.
   case Kind::ValueWitnessTable:
-  case Kind::TypeMangling:
     return getSILLinkage(getTypeLinkage(getType()), forDefinition);
 
   case Kind::TypeMetadata:
@@ -1210,7 +1209,6 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
     return ::isAvailableExternally(IGM, getProtocolConformance()->getDeclContext());
 
   case Kind::ObjCClassRef:
-  case Kind::TypeMangling:
   case Kind::ValueWitness:
   case Kind::WitnessTableOffset:
   case Kind::TypeMetadataAccessFunction:

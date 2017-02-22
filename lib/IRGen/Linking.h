@@ -206,10 +206,6 @@ class LinkEntity {
     /// The pointer is a canonical TypeBase*.
     ForeignTypeMetadataCandidate,
     
-    /// A type which is being mangled just for its string.
-    /// The pointer is a canonical TypeBase*.
-    TypeMangling,
-
     /// A reflection metadata descriptor for a builtin or imported type.
     ReflectionBuiltinDescriptor,
 
@@ -417,12 +413,6 @@ public:
   static LinkEntity forValueWitnessTable(CanType type) {
     LinkEntity entity;
     entity.setForType(Kind::ValueWitnessTable, type);
-    return entity;
-  }
-
-  static LinkEntity forTypeMangling(CanType type) {
-    LinkEntity entity;
-    entity.setForType(Kind::TypeMangling, type);
     return entity;
   }
 
