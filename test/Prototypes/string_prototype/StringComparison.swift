@@ -336,11 +336,12 @@ enum StringComparisonStrategy {
   // TODO: worth refactoring to have associated values
   case bitsWithSurrogatesGreater
   case zextBits
-  case unicodescalarValues
+  case zextBitsWithSurrogatesGreater
+  case unicodeScalarValues
   case normalizedUnicodeScalarValues
 }
 
-func determineComparisonStrategy<
+func _determineComparisonStrategy<
   LHSCodeUnits: RandomAccessCollection,
   LHSEncoding: UnicodeEncoding,
   RHSCodeUnits: RandomAccessCollection,
@@ -373,7 +374,7 @@ where
         return .bitsWithSurrogatesGreater
       }
 
-
+      return .unicodeScalarValues
     }
 
     return .bits
@@ -394,7 +395,7 @@ where
 
   // All other UTF8 combinations require decoding
   if LHSEncoding.self == UTF8.self || RHSEncoding.self == UTF8.self {
-    return .unicodescalarValues
+    return .unicodeScalarValues
   }
 
   // Latin1 is a common subset for everything but UTF8
@@ -409,12 +410,16 @@ where
   )
 
   // BMP is common subset of UTF16 and UTF32
-  if lhs.isBMP() || rhs.isBMP() {
-    return .zextBits
+  if _fastPath(lhs.isBMP() || rhs.isBMP()) {
+    if _fastPath(lhs.isBMP() && rhs.isBMP()) {
+      return .zextBits
+    }
+    // Otherwise, we need to be careful about surrogates
+    return .zextBitsWithSurrogatesGreater
   }
 
   // Otherwise, requires decoding
-  return .unicodescalarValues
+  return .unicodeScalarValues
 }
 
 
@@ -429,8 +434,8 @@ enum PartialFastCompare<
 
 // TODO: this shouldn't be one monolithic function, but instead be specialized
 // into the two cases where it's most applicable: pre-normalized-
-// unicodescalarValues compare and normalized-unicodescalarValues compare
-func partialFastCompare<
+// unicodeScalarValues compare and normalized-unicodeScalarValues compare
+func _partialFastCompare<
   LHSCodeUnits: RandomAccessCollection,
   LHSEncoding: UnicodeEncoding,
   RHSCodeUnits: RandomAccessCollection,
@@ -591,6 +596,9 @@ extension UnsignedInteger {
 
 extension Character {
   func ordered(with other: Character) -> SortOrder {
+    // FIXME: this will do UCA-based ordering :-(. We can't even use the unicode
+    // scalars as those are not guarenteed to be canonicalized :-(. Such
+    // sadness.
     if _fastPath(self == other) {
       return .same
     }
@@ -624,7 +632,7 @@ where
   {
     let lhs = self
     let rhs = other
-    switch determineComparisonStrategy(lhs, rhs) {
+    switch _determineComparisonStrategy(lhs, rhs) {
     case .bits:
       // TODO: ensure this compiles to memcmp, otherwise rewrite as lower level
       return lhs.codeUnits.lexicographicCompare(rhs.codeUnits)
@@ -646,18 +654,34 @@ where
       }
 
     case .zextBits:
-      // FIXME: use my ZextView when not broken :-(
+      // TODO: ensure this compiles well, otherwise rewrite at lower level
       return lhs.codeUnits.lexicographicCompare(rhs.codeUnits) {
         lhsCU, rhsCU in
         lhsCU.ordered(with: rhsCU)
       }
 
-    case .unicodescalarValues:
+    case .zextBitsWithSurrogatesGreater:
+      // TODO: ensure this compiles well, otherwise rewrite at lower level
+      // TODO: better to have the known BMP on one side and the unknown on the
+      // other.
+      return lhs.codeUnits.lexicographicCompare(rhs.codeUnits) {
+        lhsCU, rhsCU in
+        // Check surrogate patterns
+        guard Encoding.isTriviallyDecodable(lhsCU) else {
+          return .after
+        }
+        guard OtherEncoding.isTriviallyDecodable(rhsCU) else {
+          return .before
+        }
+        return lhsCU.ordered(with: rhsCU)
+      }
+
+    case .unicodeScalarValues:
       // First, get as far as we can with fast paths
       //
       // TODO: fast path function might actually just finish the comparison for
       // us, that is it can do the decoding and continue...
-      let partialResult = partialFastCompare(
+      let partialResult = _partialFastCompare(
         lhs, rhs, preNormalized: true
       )
       switch partialResult {
@@ -680,7 +704,7 @@ where
 
     case .normalizedUnicodeScalarValues:
       // First, get as far as we can with fast paths
-      let partialResult = partialFastCompare(
+      let partialResult = _partialFastCompare(
         lhs, rhs, preNormalized: false
       )
       switch partialResult {

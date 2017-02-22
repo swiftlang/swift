@@ -242,13 +242,13 @@ testSuite.test("string-compare") {
   let s1 = "abcdez"
   let s2 = "abcdfz"
   let s3 = "abcde\(UnicodeScalar(0x304)!)z"
-  let s4 = "abcd\(UnicodeScalar(113)!)z"
+  let s4 = "abcd\(UnicodeScalar(0x113)!)z"
 
   typealias UTF16String = UnicodeStorage<[UInt16], UTF16>
   let s1u16 = UTF16String(s1.utf16.map { $0 })
-  let s2u16 = UTF16String(s1.utf16.map { $0 })
-  let s3u16 = UTF16String(s1.utf16.map { $0 })
-  let s4u16 = UTF16String(s1.utf16.map { $0 })
+  let s2u16 = UTF16String(s2.utf16.map { $0 })
+  let s3u16 = UTF16String(s3.utf16.map { $0 })
+  let s4u16 = UTF16String(s4.utf16.map { $0 })
 
   // FIXME: doesn't work, as UInt16 is not FixedWidthInteger...
   //
@@ -257,7 +257,13 @@ testSuite.test("string-compare") {
   expectEqual(.same, s3u16.ordered(with: s3u16))
   expectEqual(.same, s4u16.ordered(with: s4u16))
 
+  expectEqual(.before, s1u16.ordered(with: s2u16))
+  // FIXME: bug, or Character following UCA instead?: expectEqual(.before, s2u16.ordered(with: s3u16))
+  expectEqual(.same, s3u16.ordered(with: s4u16))
 
+  expectEqual(.after, s2u16.ordered(with: s1u16))
+  // FIXME: bug, or Character following UCA instead?: expectEqual(.after, s3u16.ordered(with: s2u16))
+  expectEqual(.same, s4u16.ordered(with: s3u16))
 }
 
 runAllTests()
