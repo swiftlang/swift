@@ -114,6 +114,12 @@ extension Zang : Frungible {
 // CHECK:   ]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
+@objc protocol BaseProtocol { }
+protocol InheritingProtocol : BaseProtocol { }
+// -- Make sure that base protocol conformance is registered
+// CHECK: @_PROTOCOLS__TtC14objc_protocols17ImplementingClass {{.*}} @_PROTOCOL__TtP14objc_protocols12BaseProtocol_
+class ImplementingClass : InheritingProtocol { }
+
 // -- Force generation of witness for Zim.
 // CHECK: define hidden swiftcc { %objc_object*, i8** } @_T014objc_protocols22mixed_heritage_erasure{{[_0-9a-zA-Z]*}}F
 func mixed_heritage_erasure(_ x: Zim) -> Frungible {
