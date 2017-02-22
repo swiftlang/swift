@@ -591,10 +591,17 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
       // Subscript decls have function type.  For the purposes of later type
       // checker consumption, model this as returning an lvalue.
       assert(isa<SubscriptDecl>(storage));
-      auto *RFT = requestedType->castTo<FunctionType>();
+      auto *RFT = requestedType->castTo<AnyFunctionType>();
       return FunctionType::get(RFT->getInput(),
                                LValueType::get(RFT->getResult()),
                                RFT->getExtInfo());
+    }
+
+    // FIXME: Fix downstream callers.
+    if (auto *genericFn = requestedType->getAs<GenericFunctionType>()) {
+      return FunctionType::get(genericFn->getInput(),
+                               genericFn->getResult(),
+                               genericFn->getExtInfo());
     }
   }
 
