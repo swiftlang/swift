@@ -372,8 +372,8 @@ struct SwiftSemanticToken {
   // The code-completion kinds are a good match for the semantic kinds we want.
   // FIXME: Maybe rename CodeCompletionDeclKind to a more general concept ?
   CodeCompletionDeclKind Kind : 6;
-  bool IsRef : 1;
-  bool IsSystem : 1;
+  unsigned IsRef : 1;
+  unsigned IsSystem : 1;
 
   SwiftSemanticToken(CodeCompletionDeclKind Kind,
                      unsigned ByteOffset, unsigned Length,
@@ -381,8 +381,12 @@ struct SwiftSemanticToken {
     : ByteOffset(ByteOffset), Length(Length), Kind(Kind),
       IsRef(IsRef), IsSystem(IsSystem) { }
 
+  bool getIsRef() const { return static_cast<bool>(IsRef); }
+
+  bool getIsSystem() const { return static_cast<bool>(IsSystem); }
+
   UIdent getUIdentForKind() const {
-    return SwiftLangSupport::getUIDForCodeCompletionDeclKind(Kind, IsRef);
+    return SwiftLangSupport::getUIDForCodeCompletionDeclKind(Kind, getIsRef());
   }
 };
 static_assert(sizeof(SwiftSemanticToken) == 8, "Too big");
@@ -1785,7 +1789,7 @@ void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
     unsigned Offset = SemaTok.ByteOffset;
     unsigned Length = SemaTok.Length;
     UIdent Kind = SemaTok.getUIdentForKind();
-    bool IsSystem = SemaTok.IsSystem;
+    bool IsSystem = SemaTok.getIsSystem();
     if (Kind.isValid())
       if (!Consumer.handleSemanticAnnotation(Offset, Length, Kind, IsSystem))
         break;
