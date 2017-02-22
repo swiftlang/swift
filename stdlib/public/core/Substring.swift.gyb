@@ -227,3 +227,17 @@ extension Substring : TextOutputStreamable {
     target.write(String(self))
   }
 }
+
+extension String {
+  //@available(swift, obsoleted: 4)
+  @available(*, unavailable, message: "")
+  public subscript(bounds: Range<Index>) -> String {
+    return String(characters[bounds])
+  }
+
+  //@available(swift, obsoleted: 4)
+  @available(*, unavailable, message: "")
+  public subscript(bounds: ClosedRange<Index>) -> String {
+    return String(characters[bounds])
+  }
+}
