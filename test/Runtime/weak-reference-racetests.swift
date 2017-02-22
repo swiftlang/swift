@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// REQUIRES: no_nonatomic_rc
 
 import StdlibUnittest
 
