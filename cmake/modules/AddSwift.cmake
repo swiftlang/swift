@@ -181,9 +181,13 @@ function(_add_variant_c_compile_flags)
   if(optimized OR CFLAGS_FORCE_BUILD_OPTIMIZED)
     list(APPEND result "-O2")
 
-    # Add -momit-leaf-frame-pointer on x86.
-    if("${CFLAGS_ARCH}" STREQUAL "i386" OR "${CFLAGS_ARCH}" STREQUAL "x86_64")
-      list(APPEND result "-momit-leaf-frame-pointer")
+    # Omit leaf frame pointers on x86.
+    if("${CFLAGS_ARCH}" STREQUAL "i386" OR "${CFLAGS_ARCH}" STREQUAL "i686")
+      if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+        list(APPEND result "-momit-leaf-frame-pointer")
+      else()
+        list(APPEND result "/Oy")
+      endif()
     endif()
   else()
     if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
