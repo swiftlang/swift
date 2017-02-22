@@ -1837,9 +1837,13 @@ public struct URLError : _BridgedStoredNSError {
     case cannotDecodeRawData = -1015
     case cannotDecodeContentData = -1016
     case cannotParseResponse = -1017
+    //@available(macOS, introduced: 10.11) @available(iOS, introduced: 9.0)
+    case appTransportSecurityRequiresSecureConnection = -1022
     case fileDoesNotExist = -1100
     case fileIsDirectory = -1101
     case noPermissionsToReadFile = -1102
+    @available(macOS, introduced: 10.5) @available(iOS, introduced: 2.0)
+    case dataLengthExceedsMaximum = -1103
     case secureConnectionFailed = -1200
     case serverCertificateHasBadDate = -1201
     case serverCertificateUntrusted = -1202
@@ -1869,20 +1873,14 @@ public struct URLError : _BridgedStoredNSError {
     @available(OSX, introduced: 10.7) @available(iOS, introduced: 3.0)
     case requestBodyStreamExhausted = -1021
 
-    @available(OSX, introduced: 10.10) @available(iOS, introduced: 8.0)
-    static var backgroundSessionRequiresSharedContainer: Code {
-      return Code(rawValue: -995)!
-    }
+    //@available(OSX, introduced: 10.10) @available(iOS, introduced: 8.0)
+    case backgroundSessionRequiresSharedContainer = -995
 
-    @available(OSX, introduced: 10.10) @available(iOS, introduced: 8.0)
-    static var backgroundSessionInUseByAnotherProcess: Code {
-      return Code(rawValue: -996)!
-    }
+    //@available(OSX, introduced: 10.10) @available(iOS, introduced: 8.0)
+    case backgroundSessionInUseByAnotherProcess = -996
 
-    @available(OSX, introduced: 10.10) @available(iOS, introduced: 8.0)
-    static var backgroundSessionWasDisconnected: Code {
-      return Code(rawValue: -997)!
-    }
+    //@available(OSX, introduced: 10.10) @available(iOS, introduced: 8.0)
+    case backgroundSessionWasDisconnected = -997
   }
 }
 
@@ -1992,6 +1990,11 @@ public extension URLError {
     return .cannotParseResponse
   }
 
+  @available(macOS, introduced: 10.11) @available(iOS, introduced: 9.0)
+  public static var appTransportSecurityRequiresSecureConnection: URLError.Code {
+    return .appTransportSecurityRequiresSecureConnection
+  }
+
   public static var fileDoesNotExist: URLError.Code {
     return .fileDoesNotExist
   }
@@ -2002,6 +2005,11 @@ public extension URLError {
 
   public static var noPermissionsToReadFile: URLError.Code {
     return .noPermissionsToReadFile
+  }
+
+  @available(macOS, introduced: 10.5) @available(iOS, introduced: 2.0)
+  public static var dataLengthExceedsMaximum: URLError.Code {
+    return .dataLengthExceedsMaximum
   }
 
   public static var secureConnectionFailed: URLError.Code {
@@ -2205,6 +2213,11 @@ extension URLError {
     fatalError("unavailable accessor can't be called")
   }
 
+  @available(*, unavailable, renamed: "appTransportSecurityRequiresSecureConnection")
+  public static var AppTransportSecurityRequiresSecureConnection: URLError.Code {
+    fatalError("unavailable accessor can't be called")
+  }
+
   @available(*, unavailable, renamed: "fileDoesNotExist")
   public static var FileDoesNotExist: URLError.Code {
     fatalError("unavailable accessor can't be called")
@@ -2217,6 +2230,11 @@ extension URLError {
 
   @available(*, unavailable, renamed: "noPermissionsToReadFile")
   public static var NoPermissionsToReadFile: URLError.Code {
+    fatalError("unavailable accessor can't be called")
+  }
+
+  @available(*, unavailable, renamed: "dataLengthExceedsMaximum")
+  public static var DataLengthExceedsMaximum: URLError.Code {
     fatalError("unavailable accessor can't be called")
   }
 
