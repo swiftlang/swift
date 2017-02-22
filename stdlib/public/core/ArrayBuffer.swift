@@ -288,11 +288,14 @@ extension _ArrayBuffer {
   }
 
   /// The number of elements the buffer stores.
+  @_versioned
   internal var count: Int {
     @inline(__always)
+    @_silgen_name("asdsdzxczxasdadasas")
     get {
       return _fastPath(_isNative) ? _native.count : _nonNative.count
     }
+    @_silgen_name("asdfdsfdsdasdadasas")
     set {
       _sanityCheck(_isNative, "attempting to update count of Cocoa array")
       _native.count = newValue
