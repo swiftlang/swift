@@ -194,7 +194,7 @@ template <class Impl, class T> struct RetainableBoxBase {
 #ifdef SWIFT_STDLIB_USE_NONATOMIC_RC
   static constexpr bool isAtomic = false;
 #else
-  static constexpt bool isAtomic = true;
+  static constexpr bool isAtomic = true;
 #endif
 
   static void destroy(T *addr) {
