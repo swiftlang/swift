@@ -41,35 +41,3 @@ extension Set where Element == AnyHashable {
       .map { $0.base as! ConcreteElement }
   }
 }
-
-//===----------------------------------------------------------------------===//
-// Convenience APIs for Dictionary<AnyHashable, *>
-//===----------------------------------------------------------------------===//
-
-extension Dictionary where Key == AnyHashable {
-  public subscript(_ key: _Hashable) -> Value? {
-    // FIXME(ABI)#40 (Generic subscripts): replace this API with a
-    // generic subscript.
-    get {
-      return self[key._toAnyHashable()]
-    }
-    set {
-      self[key._toAnyHashable()] = newValue
-    }
-  }
-
-  @discardableResult
-  public mutating func updateValue<ConcreteKey : Hashable>(
-    _ value: Value, forKey key: ConcreteKey
-  ) -> Value? {
-    return updateValue(value, forKey: AnyHashable(key))
-  }
-
-  @discardableResult
-  public mutating func removeValue<ConcreteKey : Hashable>(
-    forKey key: ConcreteKey
-  ) -> Value? {
-    return removeValue(forKey: AnyHashable(key))
-  }
-}
-
