@@ -238,4 +238,14 @@ testSuite.test("trivially-decodable") {
   expectEqual(utf8CUs[3], 0xA1)
 }
 
+testSuite.test("string-compare") {
+  let s1 = "abcdez"
+  let s2 = "abcdfz"
+  let s3 = "abcde\(UnicodeScalar(0x304)!)z"
+  let s4 = "abcd\(UnicodeScalar(113)!)z"
+
+
+
+}
+
 runAllTests()

@@ -417,8 +417,8 @@ where
 
 
 enum PartialFastCompare<
-  LHSIndex: UnsignedInteger,
-  RHSIndex: UnsignedInteger
+  LHSIndex,
+  RHSIndex
 >
 {
   case result(SortOrder)
@@ -426,8 +426,8 @@ enum PartialFastCompare<
 }
 
 // TODO: this shouldn't be one monolithic function, but instead be specialized
-// into the two cases where it's most applicable: pre-normalized-unicodescalarValues
-// compare and normalized-unicodescalarValues compare
+// into the two cases where it's most applicable: pre-normalized-
+// unicodescalarValues compare and normalized-unicodescalarValues compare
 func partialFastCompare<
   LHSCodeUnits: RandomAccessCollection,
   LHSEncoding: UnicodeEncoding,
@@ -611,12 +611,11 @@ where
   CodeUnits.Iterator.Element : UnsignedInteger,
   CodeUnits.Iterator.Element : FixedWidthInteger
 {
-  func order<
+  func ordered<
     OtherCodeUnits: RandomAccessCollection, OtherEncoding: UnicodeEncoding
-  >(_ other: UnicodeStorage<OtherCodeUnits, OtherEncoding>) -> SortOrder
+  >(with other: UnicodeStorage<OtherCodeUnits, OtherEncoding>) -> SortOrder
   where
-    OtherCodeUnits.Index : UnsignedInteger,
-    OtherCodeUnits.SubSequence == OtherCodeUnits,
+    OtherCodeUnits.Index == CodeUnits.Index,
     OtherCodeUnits.SubSequence == OtherCodeUnits,
     OtherCodeUnits.Iterator.Element : UnsignedInteger,
     OtherCodeUnits.Iterator.Element : FixedWidthInteger
