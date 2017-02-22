@@ -397,6 +397,20 @@ FUNCTION(UnownedReleaseN, swift_unownedRelease_n,
          ARGS(RefCountedPtrTy, Int32Ty),
          ATTRS(NoUnwind))
 
+// void swift_nonatomic_unownedRetain_n(void *ptr, int32_t n);
+FUNCTION(NonAtomicUnownedRetainN, swift_nonatomic_unownedRetain_n,
+         RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_unownedRelease_n(void *ptr, int32_t n);
+FUNCTION(NonAtomicUnownedReleaseN, swift_nonatomic_unownedRelease_n,
+         RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
 // void swift_unownedRetainStrong(void *ptr);
 FUNCTION(NativeStrongRetainUnowned, swift_unownedRetainStrong, RegisterPreservingCC,
          RETURNS(VoidTy),

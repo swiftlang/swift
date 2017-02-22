@@ -394,6 +394,31 @@ void swift::swift_unownedRelease_n(HeapObject *object, int n)
   }
 }
 
+void swift::swift_nonatomic_unownedRetain_n(HeapObject *object, int n)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  if (!object)
+    return;
+
+  object->weakRefCount.incrementNonAtomic(n);
+}
+
+void swift::swift_nonatomic_unownedRelease_n(HeapObject *object, int n)
+    SWIFT_CC(RegisterPreservingCC_IMPL) {
+  if (!object)
+    return;
+
+  if (object->weakRefCount.decrementShouldDeallocateNNonAtomic(n)) {
+    // Only class objects can be weak-retained and weak-released.
+    auto metadata = object->metadata;
+    assert(metadata->isClassObject());
+    auto classMetadata = static_cast<const ClassMetadata*>(metadata);
+    assert(classMetadata->isTypeMetadata());
+    SWIFT_RT_ENTRY_CALL(swift_slowDealloc)
+        (object, classMetadata->getInstanceSize(),
+         classMetadata->getInstanceAlignMask());
+  }
+}
+
 HeapObject *swift::swift_tryPin(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
   assert(isValidPointerForNativeRetain(object));
