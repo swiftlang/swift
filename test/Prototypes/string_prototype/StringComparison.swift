@@ -341,7 +341,7 @@ enum StringComparisonStrategy {
   case normalizedUnicodeScalarValues
 }
 
-func determineComparisonStrategy<
+func _determineComparisonStrategy<
   LHSCodeUnits: RandomAccessCollection,
   LHSEncoding: UnicodeEncoding,
   RHSCodeUnits: RandomAccessCollection,
@@ -435,7 +435,7 @@ enum PartialFastCompare<
 // TODO: this shouldn't be one monolithic function, but instead be specialized
 // into the two cases where it's most applicable: pre-normalized-
 // unicodeScalarValues compare and normalized-unicodeScalarValues compare
-func partialFastCompare<
+func _partialFastCompare<
   LHSCodeUnits: RandomAccessCollection,
   LHSEncoding: UnicodeEncoding,
   RHSCodeUnits: RandomAccessCollection,
@@ -629,7 +629,7 @@ where
   {
     let lhs = self
     let rhs = other
-    switch determineComparisonStrategy(lhs, rhs) {
+    switch _determineComparisonStrategy(lhs, rhs) {
     case .bits:
       // TODO: ensure this compiles to memcmp, otherwise rewrite as lower level
       return lhs.codeUnits.lexicographicCompare(rhs.codeUnits)
@@ -678,7 +678,7 @@ where
       //
       // TODO: fast path function might actually just finish the comparison for
       // us, that is it can do the decoding and continue...
-      let partialResult = partialFastCompare(
+      let partialResult = _partialFastCompare(
         lhs, rhs, preNormalized: true
       )
       switch partialResult {
@@ -701,7 +701,7 @@ where
 
     case .normalizedUnicodeScalarValues:
       // First, get as far as we can with fast paths
-      let partialResult = partialFastCompare(
+      let partialResult = _partialFastCompare(
         lhs, rhs, preNormalized: false
       )
       switch partialResult {
