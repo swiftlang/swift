@@ -297,10 +297,16 @@ static Type addCurriedSelfType(ASTContext &ctx, Type type, DeclContext *dc) {
   if (!dc->isTypeContext())
     return type;
 
-  auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
-  auto selfTy = nominal->getInterfaceType()->castTo<MetatypeType>()
-                  ->getInstanceType();
-  if (auto sig = nominal->getGenericSignatureOfContext())
+  GenericSignature *sig = dc->getGenericSignatureOfContext();
+  if (auto *genericFn = type->getAs<GenericFunctionType>()) {
+    sig = genericFn->getGenericSignature();
+    type = FunctionType::get(genericFn->getInput(),
+                             genericFn->getResult(),
+                             genericFn->getExtInfo());
+  }
+
+  auto selfTy = dc->getDeclaredInterfaceType();
+  if (sig)
     return GenericFunctionType::get(sig, selfTy, type,
                                     AnyFunctionType::ExtInfo());
   return FunctionType::get(selfTy, type);
@@ -315,31 +321,38 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
   
   if (decl1->getKind() != decl2->getKind() || isa<TypeDecl>(decl1))
     return false;
-  
+
+  GenericParamList *gp1 = nullptr, *gp2 = nullptr;
+
   auto func1 = dyn_cast<FuncDecl>(decl1);
   auto func2 = dyn_cast<FuncDecl>(decl2);
-  
   if (func1 && func2) {
-    
-    auto gp1 = func1->getGenericParams();
-    auto gp2 = func2->getGenericParams();
-    
-    if (gp1 && gp2) {
-      auto params1 = gp1->getParams();
-      auto params2 = gp2->getParams();
+    gp1 = func1->getGenericParams();
+    gp2 = func2->getGenericParams();
+  }
+
+  auto subscript1 = dyn_cast<SubscriptDecl>(decl1);
+  auto subscript2 = dyn_cast<SubscriptDecl>(decl2);
+  if (subscript1 && subscript2) {
+    gp1 = subscript1->getGenericParams();
+    gp2 = subscript2->getGenericParams();
+  }
+
+  if (gp1 && gp2) {
+    auto params1 = gp1->getParams();
+    auto params2 = gp2->getParams();
       
-      if (params1.size() == params2.size()) {
-        for (size_t i = 0; i < params1.size(); i++) {
-          auto p1 = params1[i];
-          auto p2 = params2[i];
+    if (params1.size() == params2.size()) {
+      for (size_t i = 0; i < params1.size(); i++) {
+        auto p1 = params1[i];
+        auto p2 = params2[i];
           
-          int np1 = static_cast<int>(p1->getConformingProtocols().size());
-          int np2 = static_cast<int>(p2->getConformingProtocols().size());
-          int aDelta = np1 - np2;
+        int np1 = static_cast<int>(p1->getConformingProtocols().size());
+        int np2 = static_cast<int>(p2->getConformingProtocols().size());
+        int aDelta = np1 - np2;
           
-          if (aDelta)
-            return aDelta > 0;
-        }
+        if (aDelta)
+          return aDelta > 0;
       }
     }
   }
@@ -475,9 +488,14 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       // A non-generic declaration is more specialized than a generic declaration.
       if (auto func1 = dyn_cast<AbstractFunctionDecl>(decl1)) {
         auto func2 = cast<AbstractFunctionDecl>(decl2);
-        if (static_cast<bool>(func1->getGenericParams()) !=
-              static_cast<bool>(func2->getGenericParams()))
-          return func2->getGenericParams();
+        if (func1->isGeneric() != func2->isGeneric())
+          return func2->isGeneric();
+      }
+
+      if (auto subscript1 = dyn_cast<SubscriptDecl>(decl1)) {
+        auto subscript2 = cast<SubscriptDecl>(decl2);
+        if (subscript1->isGeneric() != subscript2->isGeneric())
+          return subscript2->isGeneric();
       }
 
       // A witness is always more specialized than the requirement it satisfies.
@@ -531,8 +549,6 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         }
       } else {
         // Add a curried 'self' type.
-        assert(!type1->is<GenericFunctionType>() && "Odd generic function type?");
-        assert(!type2->is<GenericFunctionType>() && "Odd generic function type?");
         type1 = addCurriedSelfType(tc.Context, type1, decl1->getDeclContext());
         type2 = addCurriedSelfType(tc.Context, type2, decl2->getDeclContext());
 
