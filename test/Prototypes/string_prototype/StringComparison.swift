@@ -351,9 +351,9 @@ func determineComparisonStrategy<
 ) -> StringComparisonStrategy
 where
   LHSEncoding.CodeUnit: UnsignedInteger,
-  RHSEncoding.CodeUnit: UnsignedInteger,
-  LHSEncoding.CodeUnit: FixedWidthInteger,
-  RHSEncoding.CodeUnit: FixedWidthInteger
+  RHSEncoding.CodeUnit: UnsignedInteger
+  // LHSEncoding.CodeUnit: FixedWidthInteger,
+  // RHSEncoding.CodeUnit: FixedWidthInteger
 {
   // Without normalization, all bets are off
   guard lhs.isNFT() && rhs.isNFT() else {
@@ -380,9 +380,11 @@ where
   }
 
   // Choose between bitwise and zextwise based on size of code units
-  let bitwiseOrZextwise = {
-    return LHSEncoding.CodeUnit.bitWidth == RHSEncoding.CodeUnit.bitWidth
-      ? StringComparisonStrategy.bits : StringComparisonStrategy.zextBits
+  let bitwiseOrZextwise: () -> StringComparisonStrategy = {
+    // FIXME: can't use bitWidth? UInt16 is not FixedWidthInteger???
+    let sameSize = MemoryLayout<LHSEncoding.CodeUnit>.size
+      == MemoryLayout<RHSEncoding.CodeUnit>.size
+    return sameSize ? .bits : .zextBits
   }
 
   // ASCII is common subset of all encodings
@@ -543,9 +545,9 @@ extension Collection {
     OtherC: Collection
   >(_ other: OtherC) -> SortOrder
   where
-    Self.Iterator.Element: FixedWidthInteger,
+    // Self.Iterator.Element: FixedWidthInteger,
     Self.Iterator.Element: UnsignedInteger,
-    OtherC.Iterator.Element: FixedWidthInteger,
+    // OtherC.Iterator.Element: FixedWidthInteger,
     OtherC.Iterator.Element: UnsignedInteger
   {
     for (lhs, rhs) in zip(self, other) {
@@ -606,19 +608,19 @@ extension EncodedScalarProtocol {
 
 extension UnicodeStorage
 where
-  CodeUnits.Index : UnsignedInteger,
-  CodeUnits.SubSequence == CodeUnits,
-  CodeUnits.Iterator.Element : UnsignedInteger,
-  CodeUnits.Iterator.Element : FixedWidthInteger
+  // CodeUnits.Index : UnsignedInteger,
+  // FIXME: something like: CodeUnits.SubSequence == CodeUnits,
+  // CodeUnits.Iterator.Element : FixedWidthInteger,
+  CodeUnits.Iterator.Element : UnsignedInteger
 {
   func ordered<
     OtherCodeUnits: RandomAccessCollection, OtherEncoding: UnicodeEncoding
   >(with other: UnicodeStorage<OtherCodeUnits, OtherEncoding>) -> SortOrder
   where
     OtherCodeUnits.Index == CodeUnits.Index,
-    OtherCodeUnits.SubSequence == OtherCodeUnits,
-    OtherCodeUnits.Iterator.Element : UnsignedInteger,
-    OtherCodeUnits.Iterator.Element : FixedWidthInteger
+    // OtherCodeUnits.SubSequence == OtherCodeUnits,
+    // OtherCodeUnits.Iterator.Element : FixedWidthInteger,
+    OtherCodeUnits.Iterator.Element : UnsignedInteger
   {
     let lhs = self
     let rhs = other
@@ -662,10 +664,13 @@ where
         case .result(let res):
           return res
         case .moreProcessingRequired(let lhsIdx, let rhsIdx):
-          let lhsRest = UnicodeStorage(
-            lhs.codeUnits.suffix(from: lhsIdx), Encoding.self)
-          let rhsRest = UnicodeStorage<OtherCodeUnits, OtherEncoding>(
-            rhs.codeUnits.suffix(from: rhsIdx), OtherEncoding.self)
+          // FIXME: avoid the copy into array once I get constraints right...
+          let lhsRest = UnicodeStorage<[CodeUnits.Iterator.Element], Encoding>(
+            lhs.codeUnits.suffix(from: lhsIdx).map { $0 }, Encoding.self
+          )
+          let rhsRest = UnicodeStorage<[OtherCodeUnits.Iterator.Element], OtherEncoding>(
+            rhs.codeUnits.suffix(from: rhsIdx).map { $0 }, OtherEncoding.self
+          )
           // Fall back to decoding and comparing decoded scalars
           return lhsRest.scalars.lexicographicCompare(rhsRest.scalars) {
             lhsScalar, rhsScalar in
@@ -682,10 +687,13 @@ where
         case .result(let res):
           return res
         case .moreProcessingRequired(let lhsIdx, let rhsIdx):
-          let lhsRest = UnicodeStorage(
-            lhs.codeUnits.suffix(from: lhsIdx), Encoding.self)
-          let rhsRest = UnicodeStorage<OtherCodeUnits, OtherEncoding>(
-            rhs.codeUnits.suffix(from: rhsIdx), OtherEncoding.self)
+          // FIXME: avoid the copy into array once I get constraints right...
+          let lhsRest = UnicodeStorage<[CodeUnits.Iterator.Element], Encoding>(
+            lhs.codeUnits.suffix(from: lhsIdx).map { $0 }, Encoding.self
+          )
+          let rhsRest = UnicodeStorage<[OtherCodeUnits.Iterator.Element], OtherEncoding>(
+            rhs.codeUnits.suffix(from: rhsIdx).map { $0 }, OtherEncoding.self
+          )
           // TODO: instead, use normalized scalar view
           return lhsRest.characters.lexicographicCompare(rhsRest.characters) {
             lhsChar, rhsChar in
