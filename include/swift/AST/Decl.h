@@ -1213,7 +1213,7 @@ public:
                                   SourceLoc LAngleLoc,
                                   ArrayRef<GenericTypeParamDecl *> Params,
                                   SourceLoc WhereLoc,
-                                  MutableArrayRef<RequirementRepr> Requirements,
+                                  ArrayRef<RequirementRepr> Requirements,
                                   SourceLoc RAngleLoc);
 
   MutableArrayRef<GenericTypeParamDecl *> getParams() {

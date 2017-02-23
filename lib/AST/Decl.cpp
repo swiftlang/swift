@@ -496,7 +496,7 @@ GenericParamList::create(const ASTContext &Context,
                          SourceLoc LAngleLoc,
                          ArrayRef<GenericTypeParamDecl *> Params,
                          SourceLoc WhereLoc,
-                         MutableArrayRef<RequirementRepr> Requirements,
+                         ArrayRef<RequirementRepr> Requirements,
                          SourceLoc RAngleLoc) {
   unsigned Size = totalSizeToAlloc<GenericTypeParamDecl *>(Params.size());
   void *Mem = Context.Allocate(Size, alignof(GenericParamList));
