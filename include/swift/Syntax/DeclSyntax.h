@@ -221,14 +221,14 @@ public:
   withGenericParameterClause(GenericParameterClauseSyntax NewGenericParams)
   const;
 
-  /// Return the where clayse of the struct declaration.
+  /// Return the where clause of the struct declaration.
   GenericWhereClauseSyntax getGenericWhereClause() const;
 
   /// Return a StructDeclSyntax with the given generic where clause.
   StructDeclSyntax
   withWhereClause(GenericWhereClauseSyntax NewWhereClause) const;
 
-  /// Return the left brace '{' token of the struct declartion.
+  /// Return the left brace '{' token of the struct declaration.
   RC<TokenSyntax> getLeftBraceToken() const;
 
   /// Return a StructDeclSyntax with the given left brace '{' token.
@@ -240,7 +240,7 @@ public:
   /// Return a StructDeclSyntax with the given new members.
   StructDeclSyntax withMembers(DeclMembersSyntax NewMembers) const;
 
-  /// Return the right brace '}' token of the struct declartion.
+  /// Return the right brace '}' token of the struct declaration.
   RC<TokenSyntax> getRightBraceToken() const;
 
   /// Return a StructDeclSyntax with the given right brace '}' token.

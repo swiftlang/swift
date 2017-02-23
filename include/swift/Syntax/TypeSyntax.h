@@ -662,7 +662,7 @@ public:
 };
 
 #pragma mark -
-#pragma mark implicity-unwrapped-optional-type Data
+#pragma mark implicitly-unwrapped-optional-type Data
 
 class ImplicitlyUnwrappedOptionalTypeSyntaxData final : public TypeSyntaxData {
   friend struct SyntaxFactory;
@@ -683,7 +683,7 @@ public:
 };
 
 #pragma mark -
-#pragma mark implicity-unwrapped-optional-type API
+#pragma mark implicitly-unwrapped-optional-type API
 
 /// implicitly-unwrapped-optional-type -> type '!'
 class ImplicitlyUnwrappedOptionalTypeSyntax final : public TypeSyntax {
@@ -728,8 +728,6 @@ public:
 class ArrayTypeSyntaxData final : public TypeSyntaxData {
   friend class SyntaxData;
   friend struct SyntaxFactory;
-
-  RC<TypeSyntaxData> CachedElemenType;
 
   ArrayTypeSyntaxData(RC<RawSyntax> Raw,
                       const SyntaxData *Parent = nullptr,

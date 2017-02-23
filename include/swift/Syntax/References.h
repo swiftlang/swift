@@ -24,6 +24,6 @@ template <typename Inner>
 using RC = llvm::IntrusiveRefCntPtr<Inner>;
 
 } // end namespace syntax
-} // end namespae swift
+} // end namespace swift
 
 #endif // SWIFT_SYNTAX_REFERENCES_H

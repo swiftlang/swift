@@ -330,7 +330,7 @@ void OpaqueStorageAllocation::replaceFunctionArgs() {
 ///
 /// TODO: It might be faster to generate args directly from
 /// SILFunctionConventions without drilling through the result SILType. But one
-/// way or annother, we need to map result types into this context.
+/// way or another, we need to map result types into this context.
 unsigned
 OpaqueStorageAllocation::insertIndirectResultParameters(unsigned argIdx,
                                                         SILType resultType) {

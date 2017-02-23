@@ -138,7 +138,7 @@ private:
 
   /// The actual storage, described by \c storageKind.
   union {
-    /// The type representation descibing where the requirement came from.
+    /// The type representation describing where the requirement came from.
     const TypeRepr *typeRepr;
 
     /// Where a requirement came from.

@@ -227,7 +227,7 @@ function(_add_variant_c_compile_flags)
       endif()
     endif()
 
-    # MSVC/clang-cl don't support -fno-pic or -fms-compatability-version.
+    # MSVC/clang-cl don't support -fno-pic or -fms-compatibility-version.
     if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
       list(APPEND result -fno-pic)
       list(APPEND result "-fms-compatibility-version=1900")

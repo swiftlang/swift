@@ -71,7 +71,7 @@ points for this library:
 1. Represent Swift grammar and use naming conventions in accordance with The
    Swift Programming Language book as much as possible, so people know what to
    look for.
-1. Accomodate "bad syntax" - humans are imperfect and source code is constantly
+1. Accommodate "bad syntax" - humans are imperfect and source code is constantly
    in a state of flux in an editor. Unforunately, we still live in a
    character-centric world - the library shouldn't fall over on bad syntax just
    because someone is in the middle of typing `struct`.

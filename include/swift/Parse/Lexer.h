@@ -233,7 +233,7 @@ public:
       lexImpl();
   }
 
-  /// Lex a full token includig leading and trailing trivia.
+  /// Lex a full token including leading and trailing trivia.
   syntax::RC<syntax::TokenSyntax> fullLex();
 
   bool isKeepingComments() const {

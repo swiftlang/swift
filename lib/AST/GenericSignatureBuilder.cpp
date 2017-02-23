@@ -574,7 +574,7 @@ public:
   // FIXME: this probably shouldn't exist, the potential archetype modelling of
   // generic typealiases is fundamentally broken (aka they're not modelled at
   // all), but some things with them mostly work, so we just maintain that,
-  // despite this causing crashes and weird behaviour.
+  // despite this causing crashes and weird behavior.
   static ResolvedType forConcreteTypeFromGenericTypeAlias(Type t) {
     return ResolvedType(t);
   }
