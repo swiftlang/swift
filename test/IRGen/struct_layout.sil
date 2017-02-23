@@ -15,10 +15,10 @@ import Swift
 
 
 // 32: %T4main14Rdar15410780_AV = type <{ i2048, %Ts4Int8V }>
-// 32: %T4main14Rdar15410780_BV = type <{ %GSqV4main14Rdar15410780_A_ }>
-// 32: %GSqV4main14Rdar15410780_A_ = type <{ [257 x i8], [1 x i8] }>
-// 32: %T4main14Rdar15410780_CV = type <{ %GSqSS_ }>
-// 32: %GSqSS_ = type <{ [12 x i8], [1 x i8] }>
+// 32: %T4main14Rdar15410780_BV = type <{ %T4main14Rdar15410780_AVSg }>
+// 32: %T4main14Rdar15410780_AVSg = type <{ [257 x i8], [1 x i8] }>
+// 32: %T4main14Rdar15410780_CV = type <{ %TSSSg }>
+// 32: %TSSSg = type <{ [12 x i8], [1 x i8] }>
 
 // 32: @_T04main14Rdar15410780_AVWV = hidden constant {{.*}} (i32 257
 // 32: @_T04main14Rdar15410780_BVWV = hidden constant {{.*}} (i32 258
