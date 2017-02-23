@@ -1042,26 +1042,26 @@ static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
   // "Inst" is an Upcast instruction.  Check to see if it is used by an apply
   // that came from a call to super.init.
   for (auto UI : Inst->getUses()) {
-    auto *inst = UI->getUser();
+    auto *User = UI->getUser();
     // If this used by another upcast instruction, recursively handle it, we may
     // have a multiple upcast chain.
-    if (auto *UCIU = dyn_cast<UpcastInst>(inst))
+    if (auto *UCIU = dyn_cast<UpcastInst>(User))
       if (auto *subAI = isSuperInitUse(UCIU))
         return subAI;
 
     // The call to super.init has to either be an apply or a try_apply.
-    if (!isa<FullApplySite>(inst))
+    if (!isa<FullApplySite>(User))
       continue;
 
-    auto *LocExpr = inst->getLoc().getAsASTNode<ApplyExpr>();
+    auto *LocExpr = User->getLoc().getAsASTNode<ApplyExpr>();
     if (!LocExpr) {
       // If we're reading a .sil file, treat a call to "superinit" as a
       // super.init call as a hack to allow us to write testcases.
-      auto *AI = dyn_cast<ApplyInst>(inst);
-      if (AI && inst->getLoc().isSILFile())
+      auto *AI = dyn_cast<ApplyInst>(User);
+      if (AI && User->getLoc().isSILFile())
         if (auto *Fn = AI->getReferencedFunction())
           if (Fn->getName() == "superinit")
-            return inst;
+            return User;
       continue;
     }
 
@@ -1076,7 +1076,7 @@ static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
       continue;
 
     if (LocExpr->getArg()->isSuperExpr())
-      return inst;
+      return User;
 
     // Instead of super_ref_expr, we can also get this for inherited delegating
     // initializers:
@@ -1087,7 +1087,7 @@ static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
       if (auto *DRE = dyn_cast<DeclRefExpr>(DTB->getSubExpr()))
         if (DRE->getDecl()->isImplicit() &&
             DRE->getDecl()->getName().str() == "self")
-          return inst;
+          return User;
   }
 
   return nullptr;
