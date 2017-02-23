@@ -6101,7 +6101,7 @@ public:
     // it is in the same module, update the vtable.
     if (auto *baseDecl = dyn_cast<ClassDecl>(base->getDeclContext())) {
       if (baseDecl->hasKnownSwiftImplementation() && 
-          !base->isDynamic() &&
+          !base->isDynamic() && !isKnownObjC &&
           override->getDeclContext()->isExtensionContext()) {
         // For compatibility, only generate a warning in Swift 3
         TC.diagnose(override, (TC.Context.isSwiftVersion3()
