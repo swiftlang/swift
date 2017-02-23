@@ -23,7 +23,7 @@ func goo(x: SubCls) {
 // CHECK1: (SubCls) -> () -> ()
 // CHECK1:      OVERRIDES BEGIN
 // CHECK1-NEXT: c:objc(cs)Cls(im)meth
-// CHECK1-NEXT: s:FP16cursor_overrides4Prot4methFT_T_
+// CHECK1-NEXT: s:16cursor_overrides4ProtP4methyyF
 // CHECK1-NEXT: c:objc(cs)S1(im)meth
 // CHECK1-NEXT: c:objc(cs)B1(im)meth
 // CHECK1-NEXT: c:objc(pl)P1(im)meth

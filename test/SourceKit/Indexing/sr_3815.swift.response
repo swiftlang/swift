@@ -13,14 +13,14 @@
     {
       key.kind: source.lang.swift.decl.protocol,
       key.name: "P",
-      key.usr: "s:P7sr_38151P",
+      key.usr: "s:7sr_38151PP",
       key.line: 4,
       key.column: 10,
       key.entities: [
         {
           key.kind: source.lang.swift.decl.typealias,
           key.name: "Index",
-          key.usr: "s:P7sr_38151P5Index",
+          key.usr: "s:7sr_38151PP5Index",
           key.line: 5,
           key.column: 13,
           key.entities: [
@@ -36,7 +36,7 @@
         {
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "f()",
-          key.usr: "s:FP7sr_38151P1fFT_T_",
+          key.usr: "s:7sr_38151PP1fyyF",
           key.line: 6,
           key.column: 8
         }
@@ -45,14 +45,14 @@
     {
       key.kind: source.lang.swift.decl.struct,
       key.name: "S",
-      key.usr: "s:V7sr_38151S",
+      key.usr: "s:7sr_38151SV",
       key.line: 9,
       key.column: 8,
       key.related: [
         {
           key.kind: source.lang.swift.ref.protocol,
           key.name: "P",
-          key.usr: "s:P7sr_38151P",
+          key.usr: "s:7sr_38151PP",
           key.line: 9,
           key.column: 12
         }
@@ -61,14 +61,14 @@
         {
           key.kind: source.lang.swift.ref.protocol,
           key.name: "P",
-          key.usr: "s:P7sr_38151P",
+          key.usr: "s:7sr_38151PP",
           key.line: 9,
           key.column: 12
         },
         {
           key.kind: source.lang.swift.decl.typealias,
           key.name: "Index",
-          key.usr: "s:V7sr_38151S5Index",
+          key.usr: "s:7sr_38151SV5Index",
           key.line: 10,
           key.column: 13,
           key.entities: [
@@ -84,14 +84,14 @@
         {
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "f()",
-          key.usr: "s:FV7sr_38151S1fFT_T_",
+          key.usr: "s:7sr_38151SV1fyyF",
           key.line: 12,
           key.column: 8,
           key.related: [
             {
               key.kind: source.lang.swift.ref.function.method.instance,
               key.name: "f()",
-              key.usr: "s:FP7sr_38151P1fFT_T_"
+              key.usr: "s:7sr_38151PP1fyyF"
             }
           ]
         }

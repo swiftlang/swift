@@ -13,19 +13,19 @@
     {
       key.kind: source.lang.swift.decl.var.global,
       key.name: "v",
-      key.usr: "s:v4main1vGSqCSo8NSObject_",
+      key.usr: "s:4main1vSo8NSObjectCSgv",
       key.line: 7,
       key.column: 5,
       key.entities: [
         {
           key.kind: source.lang.swift.decl.function.accessor.getter,
-          key.usr: "s:F4maing1vGSqCSo8NSObject_",
+          key.usr: "s:4main1vSo8NSObjectCSgfg",
           key.line: 7,
           key.column: 5
         },
         {
           key.kind: source.lang.swift.decl.function.accessor.setter,
-          key.usr: "s:F4mains1vGSqCSo8NSObject_",
+          key.usr: "s:4main1vSo8NSObjectCSgfs",
           key.line: 7,
           key.column: 5
         }
