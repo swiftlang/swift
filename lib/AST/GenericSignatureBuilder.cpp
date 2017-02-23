@@ -1916,32 +1916,35 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
   // Make sure the concrete type fulfills the requirements on the archetype.
   // FIXME: Move later...
   DenseMap<ProtocolDecl *, ProtocolConformanceRef> conformances;
-  if (!Concrete->is<ArchetypeType>()) {
-    CanType depTy = rep->getDependentType({ }, /*allowUnresolved=*/true)
-                      ->getCanonicalType();
-    for (auto &conforms : rep->getConformsTo()) {
-      auto protocol = conforms.first;
-      auto conformance =
-        getLookupConformanceFn()(depTy, Concrete,
-                                 protocol->getDeclaredInterfaceType()
-                                   ->castTo<ProtocolType>());
-      if (!conformance) {
-        Diags.diagnose(Source->getLoc(),
-                       diag::requires_generic_param_same_type_does_not_conform,
-                       Concrete, protocol->getName());
-        return true;
-      }
-
-      conformances.insert({protocol, *conformance});
-
-      // Update the requirement source now that we know it's concrete.
-      // FIXME: Bad concrete source info.
-      auto concreteSource = Source->viaConcrete(*this,
-                                                conformance->getConcrete());
-      updateRequirementSource(conforms.second, concreteSource);
+  CanType depTy = rep->getDependentType({ }, /*allowUnresolved=*/true)
+                    ->getCanonicalType();
+  for (auto &conforms : rep->getConformsTo()) {
+    auto protocol = conforms.first;
+    auto conformance =
+      getLookupConformanceFn()(depTy, Concrete,
+                               protocol->getDeclaredInterfaceType()
+                                 ->castTo<ProtocolType>());
+    if (!conformance) {
+      Diags.diagnose(Source->getLoc(),
+                     diag::requires_generic_param_same_type_does_not_conform,
+                     Concrete, protocol->getName());
+      return true;
     }
+
+    conformances.insert({protocol, *conformance});
+
+    // Abstract conformances are acceptable for existential types.
+    assert(conformance->isConcrete() || Concrete->isExistentialType());
+
+    // Update the requirement source now that we know it's concrete.
+    // FIXME: Bad concrete source info.
+    auto concreteSource = Source->viaConcrete(*this,
+                                              conformance->isConcrete()
+                                                ? conformance->getConcrete()
+                                                : nullptr);
+    updateRequirementSource(conforms.second, concreteSource);
   }
-  
+
   // Record the requirement.
   rep->ConcreteType = Concrete;
 
