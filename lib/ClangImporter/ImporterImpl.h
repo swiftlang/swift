@@ -275,6 +275,7 @@ public:
 
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
+  llvm::SmallVector<const clang::Module*, 2> DeferredHeaderImports;
 
   const Version CurrentVersion;
 
@@ -820,6 +821,10 @@ public:
   /// \brief Constructs a Swift module for the given Clang module.
   ModuleDecl *finishLoadingClangModule(const clang::Module *clangModule,
                                        bool preferAdapter);
+
+  /// \brief Call finishLoadingClangModule on each deferred import collected
+  /// while scanning a bridging header or PCH.
+  void handleDeferredImports();
 
   /// \brief Retrieve the named Swift type, e.g., Int32.
   ///

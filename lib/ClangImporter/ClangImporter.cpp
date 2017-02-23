@@ -83,9 +83,7 @@ namespace {
     void handleImport(const clang::Module *imported) {
       if (!imported)
         return;
-      ModuleDecl *nativeImported = Impl.finishLoadingClangModule(imported,
-        /*preferAdapter=*/true);
-      Impl.ImportedHeaderExports.push_back({ /*filter=*/{}, nativeImported });
+      Impl.DeferredHeaderImports.push_back(imported);
     }
 
     void InclusionDirective(clang::SourceLocation HashLoc,
@@ -963,6 +961,9 @@ bool ClangImporter::Implementation::importHeader(
   // Add any defined macros to the bridging header lookup table.
   addMacrosToLookupTable(*BridgingHeaderLookupTable, getNameImporter());
 
+  // Finish loading any extra modules that were (transitively) imported.
+  handleDeferredImports();
+
   // Wrap all Clang imports under a Swift import decl.
   for (auto &Import : BridgeHeaderTopLevelImports) {
     if (auto *ClangImport = Import.dyn_cast<clang::ImportDecl*>()) {
@@ -1008,16 +1009,11 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
                                          bool trackParsedSymbols,
                                          bool implicitImport) {
   if (llvm::sys::path::extension(header).endswith(PCH_EXTENSION)) {
-    // We already imported this with -include-pch above, so we should have
-    // collected a bunch of PCH-encoded module imports that we need to
-    // replay to the HeaderImportCallbacks for processing.
     Impl.ImportedHeaderOwners.push_back(adapter);
-    clang::ASTReader &R = *Impl.Instance->getModuleManager();
-    HeaderImportCallbacks CB(*this, Impl);
-    for (auto ID : Impl.PCHImportedSubmodules) {
-      CB.handleImport(R.getSubmodule(ID));
-    }
-    Impl.PCHImportedSubmodules.clear();
+    // We already imported this with -include-pch above, so we should have
+    // collected a bunch of PCH-encoded module imports that we just need to
+    // replay in handleDeferredImports.
+    Impl.handleDeferredImports();
     return false;
   }
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
@@ -1037,7 +1033,6 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
     llvm::MemoryBuffer::getMemBufferCopy(
       importLine, Implementation::bridgingHeaderBufferName)
   };
-
   return Impl.importHeader(adapter, header, diagLoc, trackParsedSymbols,
                            std::move(sourceBuffer), implicitImport);
 }
@@ -1291,6 +1286,25 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
       result = adapter;
 
   return result;
+}
+
+// Run through the set of deferred imports -- either those referenced by
+// submodule ID from a bridging PCH, or those already loaded as clang::Modules
+// in response to an import directive in a bridging header -- and call
+// finishLoadingClangModule on each.
+void ClangImporter::Implementation::handleDeferredImports()
+{
+  clang::ASTReader &R = *Instance->getModuleManager();
+  for (clang::serialization::SubmoduleID ID : PCHImportedSubmodules) {
+    DeferredHeaderImports.push_back(R.getSubmodule(ID));
+  }
+  PCHImportedSubmodules.clear();
+  for (const clang::Module *M : DeferredHeaderImports) {
+    ModuleDecl *nativeImported =
+      finishLoadingClangModule(M, /*preferAdapter=*/true);
+    ImportedHeaderExports.push_back({ /*filter=*/{}, nativeImported });
+  }
+  DeferredHeaderImports.clear();
 }
 
 ModuleDecl *ClangImporter::getImportedHeaderModule() const {
