@@ -80,9 +80,6 @@ void TriviaPiece::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   case TriviaKind::Backtick:
     OS << "backtick " << Count;
     break;
-  case TriviaKind::Semicolon:
-    OS << "semicolon " << Count;
-    break;
   }
   OS << ')';
 }
@@ -100,7 +97,6 @@ void TriviaPiece::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
     break;
   case TriviaKind::Space:
   case TriviaKind::Backtick:
-  case TriviaKind::Semicolon:
   case TriviaKind::Tab:
   case TriviaKind::VerticalTab:
   case TriviaKind::Formfeed:
@@ -135,8 +131,6 @@ void TriviaPiece::print(llvm::raw_ostream &OS) const {
   case TriviaKind::Backtick:
     printRepeated(OS, '`', Count);
     break;
-  case TriviaKind::Semicolon:
-    printRepeated(OS, ';', Count);
   }
 }
 
