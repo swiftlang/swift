@@ -797,6 +797,13 @@ public:
         targetType));
   }
 
+  UnconditionalCheckedCastOpaqueInst *
+  createUnconditionalCheckedCastOpaque(SILLocation Loc, SILValue op,
+                                       SILType destTy) {
+    return insert(UnconditionalCheckedCastOpaqueInst::create(
+        getSILDebugLocation(Loc), op, destTy, F, OpenedArchetypes));
+  }
+
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,
                                      Atomicity atomicity) {
     assert(isParsing || F.hasUnqualifiedOwnership());
