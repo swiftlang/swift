@@ -166,6 +166,13 @@ public:
     return mangleTypeWithoutPrefix(type);
   }
 
+  std::string mangleForProtocolDescriptor(ProtocolType *Proto) {
+    beginMangling();
+    appendType(Proto->getCanonicalType());
+    appendOperator("D");
+    return finalize();
+  }
+
   std::string mangleTypeForReflection(Type Ty, ModuleDecl *Module,
                                       bool isSingleFieldOfBox);
 
