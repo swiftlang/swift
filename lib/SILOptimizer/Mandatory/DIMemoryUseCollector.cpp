@@ -497,6 +497,8 @@ namespace {
                                  unsigned BaseEltNo);
     void collectStructElementUses(StructElementAddrInst *SEAI,
                                   unsigned BaseEltNo);
+    void collectDelegatingClassInitSelfLoadUses(MarkUninitializedInst *MUI,
+                                                LoadInst *LI);
   };
 } // end anonymous namespace
 
@@ -1287,6 +1289,89 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
   }
 }
 
+void ElementUseCollector::collectDelegatingClassInitSelfLoadUses(
+    MarkUninitializedInst *MUI, LoadInst *LI) {
+
+  // If we have a load, then this is a use of the box.  Look at the uses of
+  // the load to find out more information.
+  for (auto UI : LI->getUses()) {
+    auto *User = UI->getUser();
+
+    // super_method always looks at the metatype for the class, not at any of
+    // its stored properties, so it doesn't have any DI requirements.
+    if (isa<SuperMethodInst>(User))
+      continue;
+
+    // We ignore retains of self.
+    if (isa<StrongRetainInst>(User))
+      continue;
+
+    // A release of a load from the self box in a class delegating
+    // initializer might be releasing an uninitialized self, which requires
+    // special processing.
+    if (isa<StrongReleaseInst>(User)) {
+      Releases.push_back(User);
+      continue;
+    }
+
+    if (auto *Method = dyn_cast<ClassMethodInst>(User)) {
+      // class_method that refers to an initializing constructor is a method
+      // lookup for delegation, which is ignored.
+      if (Method->getMember().kind == SILDeclRef::Kind::Initializer)
+        continue;
+
+      /// Returns true if \p Method used by an apply in a way that we know
+      /// will cause us to emit a better error.
+      if (shouldIgnoreClassMethodUseError(Method, LI))
+        continue;
+    }
+
+    // If this is an upcast instruction, it is a conversion of self to the
+    // base.  This is either part of a super.init sequence, or a general
+    // superclass access.  We special case super.init calls since they are
+    // part of the object lifecycle.
+    if (auto *UCI = dyn_cast<UpcastInst>(User)) {
+      if (auto *subAI = isSuperInitUse(UCI)) {
+        Uses.push_back(DIMemoryUse(subAI, DIUseKind::SuperInit, 0, 1));
+        recordFailableInitCall(subAI);
+        continue;
+      }
+    }
+
+    // We only track two kinds of uses for delegating initializers:
+    // calls to self.init, and "other", which we choose to model as escapes.
+    // This intentionally ignores all stores, which (if they got emitted as
+    // copyaddr or assigns) will eventually get rewritten as assignments
+    // (not initializations), which is the right thing to do.
+    DIUseKind Kind = DIUseKind::Escape;
+
+    // If this is an ApplyInst, check to see if this is part of a self.init
+    // call in a delegating initializer.
+    if (isa<FullApplySite>(User) && isSelfInitUse(User)) {
+      Kind = DIUseKind::SelfInit;
+      recordFailableInitCall(User);
+    }
+
+    // If this load's value is being stored back into the delegating
+    // mark_uninitialized buffer and it is a self init use, skip the
+    // use. This is to handle situations where due to usage of a metatype to
+    // allocate, we do not actually consume self.
+    if (auto *SI = dyn_cast<StoreInst>(User)) {
+      if (SI->getDest() == MUI && isSelfInitUse(User)) {
+        continue;
+      }
+    }
+
+    // A simple reference to "type(of:)" is always fine,
+    // even if self is uninitialized.
+    if (isa<ValueMetatypeInst>(User)) {
+      continue;
+    }
+
+    Uses.push_back(DIMemoryUse(User, Kind, 0, 1));
+  }
+}
+
 /// collectDelegatingClassInitSelfUses - Collect uses of the self argument in a
 /// delegating-constructor-for-a-class case.
 void ElementUseCollector::collectDelegatingClassInitSelfUses() {
@@ -1314,21 +1399,20 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
 
     // For class initializers, the assign into the self box may be
     // captured as SelfInit or SuperInit elsewhere.
-    if (TheMemory.isClassInitSelf() &&
-        isa<AssignInst>(User) && UI->getOperandNumber() == 1) {
+    if (TheMemory.isClassInitSelf() && isa<AssignInst>(User) &&
+        UI->getOperandNumber() == 1) {
       // If the source of the assignment is an application of a C
       // function, there is no metatype argument, so treat the
       // assignment to the self box as the initialization.
       if (auto apply = dyn_cast<ApplyInst>(cast<AssignInst>(User)->getSrc())) {
         if (auto fn = apply->getCalleeFunction()) {
-          if (fn->getRepresentation()
-                == SILFunctionTypeRepresentation::CFunctionPointer) {
+          if (fn->getRepresentation() ==
+              SILFunctionTypeRepresentation::CFunctionPointer) {
             Uses.push_back(DIMemoryUse(User, DIUseKind::SelfInit, 0, 1));
             continue;
           }
         }
       }
-
     }
 
     // Stores *to* the allocation are writes.  If the value being stored is a
@@ -1346,7 +1430,7 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
             continue;
           }
     }
-    
+
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
       if (isSelfInitUse(CAI)) {
         Uses.push_back(DIMemoryUse(User, DIUseKind::SelfInit, 0, 1));
@@ -1356,85 +1440,7 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
 
     // Loads of the box produce self, so collect uses from them.
     if (auto *LI = dyn_cast<LoadInst>(User)) {
-      
-      // If we have a load, then this is a use of the box.  Look at the uses of
-      // the load to find out more information.
-      for (auto UI : LI->getUses()) {
-        auto *User = UI->getUser();
-
-        // super_method always looks at the metatype for the class, not at any of
-        // its stored properties, so it doesn't have any DI requirements.
-        if (isa<SuperMethodInst>(User))
-          continue;
-
-        // We ignore retains of self.
-        if (isa<StrongRetainInst>(User))
-          continue;
-
-        // A release of a load from the self box in a class delegating
-        // initializer might be releasing an uninitialized self, which requires
-        // special processing.
-        if (isa<StrongReleaseInst>(User)) {
-          Releases.push_back(User);
-          continue;
-        }
-
-        if (auto *Method = dyn_cast<ClassMethodInst>(User)) {
-          // class_method that refers to an initializing constructor is a method
-          // lookup for delegation, which is ignored.
-          if (Method->getMember().kind == SILDeclRef::Kind::Initializer)
-            continue;
-
-          /// Returns true if \p Method used by an apply in a way that we know
-          /// will cause us to emit a better error.
-          if (shouldIgnoreClassMethodUseError(Method, LI))
-            continue;
-        }
-
-        // If this is an upcast instruction, it is a conversion of self to the
-        // base.  This is either part of a super.init sequence, or a general
-        // superclass access.  We special case super.init calls since they are
-        // part of the object lifecycle.
-        if (auto *UCI = dyn_cast<UpcastInst>(User)) {
-          if (auto *subAI = isSuperInitUse(UCI)) {
-            Uses.push_back(DIMemoryUse(subAI, DIUseKind::SuperInit, 0, 1));
-            recordFailableInitCall(subAI);
-            continue;
-          }
-        }
-
-        // We only track two kinds of uses for delegating initializers:
-        // calls to self.init, and "other", which we choose to model as escapes.
-        // This intentionally ignores all stores, which (if they got emitted as
-        // copyaddr or assigns) will eventually get rewritten as assignments
-        // (not initializations), which is the right thing to do.
-        DIUseKind Kind = DIUseKind::Escape;
-
-        // If this is an ApplyInst, check to see if this is part of a self.init
-        // call in a delegating initializer.
-        if (isa<FullApplySite>(User) && isSelfInitUse(User)) {
-          Kind = DIUseKind::SelfInit;
-          recordFailableInitCall(User);
-        }
-
-        // If this load's value is being stored back into the delegating
-        // mark_uninitialized buffer and it is a self init use, skip the
-        // use. This is to handle situations where due to usage of a metatype to
-        // allocate, we do not actually consume self.
-        if (auto *SI = dyn_cast<StoreInst>(User)) {
-          if (SI->getDest() == MUI && isSelfInitUse(User)) {
-            continue;
-          }
-        }
-
-        // A simple reference to "type(of:)" is always fine,
-        // even if self is uninitialized.
-        if (isa<ValueMetatypeInst>(User)) {
-          continue;
-        }
-
-        Uses.push_back(DIMemoryUse(User, Kind, 0, 1));
-      }
+      collectDelegatingClassInitSelfLoadUses(MUI, LI);
       continue;
     }
    
