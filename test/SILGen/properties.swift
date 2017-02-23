@@ -116,7 +116,7 @@ func physical_subclass_lvalue(_ r: RefSubclass, a: Int) {
   // CHECK: [[R_SUP:%[0-9]+]] = upcast [[ARG1_COPY]] : $RefSubclass to $Ref
   // CHECK: [[FN:%[0-9]+]] = class_method [[R_SUP]] : $Ref, #Ref.y!setter.1 : (Ref) -> (Int) -> (), $@convention(method) (Int, @guaranteed Ref) -> ()
   // CHECK: apply [[FN]]([[ARG2]], [[R_SUP]]) :
-  // CHECK: destroy_value [[R_SUP]]
+  // CHECK: destroy_value [[ARG1_COPY]]
   // CHECK: end_borrow [[BORROWED_ARG1]] from [[ARG1]]
   r.w = a
 
@@ -721,7 +721,7 @@ class DerivedProperty : BaseProperty {
 // CHECK:   [[BASEPTR:%[0-9]+]] = upcast [[SELF_COPY]] : $DerivedProperty to $BaseProperty
 // CHECK:   [[FN:%[0-9]+]] = function_ref @_T010properties12BasePropertyC1xSifg : $@convention(method) (@guaranteed BaseProperty) -> Int 
 // CHECK:   [[RESULT:%.*]] = apply [[FN]]([[BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int
-// CHECK:   destroy_value [[BASEPTR]]
+// CHECK:   destroy_value [[SELF_COPY]]
 // CHECK:   return [[RESULT]] : $Int
 // CHECK: } // end sil function '_T010properties15DerivedPropertyC24super_property_referenceSiyF'
 
@@ -1072,5 +1072,5 @@ public class DerivedClassWithPublicProperty : BaseClassWithInternalProperty {
 // CHECK-NEXT:    [[SUPER:%.*]] = upcast [[SELF_COPY]] : $DerivedClassWithPublicProperty to $BaseClassWithInternalProperty
 // CHECK-NEXT:    [[METHOD:%.*]] = super_method [[SELF_COPY]] : $DerivedClassWithPublicProperty, #BaseClassWithInternalProperty.x!getter.1 : (BaseClassWithInternalProperty) -> () -> (), $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]([[SUPER]]) : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
-// CHECK-NEXT:    destroy_value [[SUPER]] : $BaseClassWithInternalProperty
+// CHECK-NEXT:    destroy_value [[SELF_COPY]]
 // CHECK: } // end sil function '_T010properties30DerivedClassWithPublicPropertyC1xytfg'

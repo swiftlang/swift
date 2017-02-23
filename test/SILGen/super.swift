@@ -38,7 +38,7 @@ public class Child : Parent {
   // CHECK:         [[CASTED_SELF_COPY:%[0-9]+]] = upcast [[SELF_COPY]] : $Child to $Parent
   // CHECK:         [[SUPER_METHOD:%[0-9]+]] = function_ref @_T05super6ParentC8propertySSfg : $@convention(method) (@guaranteed Parent) -> @owned String
   // CHECK:         [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[CASTED_SELF_COPY]])
-  // CHECK:         destroy_value [[CASTED_SELF_COPY]]
+  // CHECK:         destroy_value [[SELF_COPY]]
   // CHECK:         return [[RESULT]]
   public override var property: String {
     return super.property
@@ -50,7 +50,7 @@ public class Child : Parent {
   // CHECK:         [[CASTED_SELF_COPY:%[0-9]+]] = upcast [[COPIED_SELF]] : $Child to $Parent
   // CHECK:         [[SUPER_METHOD:%[0-9]+]] = function_ref @_T05super6ParentC13finalPropertySSfg
   // CHECK:         [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[CASTED_SELF_COPY]])
-  // CHECK:         destroy_value [[CASTED_SELF_COPY]]
+  // CHECK:         destroy_value [[SELF_COPY]]
   // CHECK:         return [[RESULT]]
   public var otherProperty: String {
     return super.finalProperty

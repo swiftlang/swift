@@ -1911,24 +1911,6 @@ static SILValue emitRawApply(SILGenFunction &gen,
     gen.B.emitBlock(normalBB);
   }
 
-  // Given any guaranteed arguments that are not being passed at +0, insert the
-  // decrement here instead of at the end of scope. Guaranteed just means that
-  // we guarantee the lifetime of the object for the duration of the call.
-  // Be sure to use a CleanupLocation so that unreachable code diagnostics don't
-  // trigger.
-  for (auto i : indices(args)) {
-    if (!inputParams[i].isGuaranteed() || args[i].isPlusZeroRValueOrTrivial())
-      continue;
-
-    SILValue argValue = args[i].forward(gen);
-    SILType argType = argValue->getType();
-    CleanupLocation cleanupLoc = CleanupLocation::get(loc);
-    if (!argType.isAddress())
-      gen.getTypeLowering(argType).emitDestroyRValue(gen.B, cleanupLoc, argValue);
-    else
-      gen.getTypeLowering(argType).emitDestroyAddress(gen.B, cleanupLoc, argValue);
-  }
-
   return result;
 }
 
@@ -4193,8 +4175,8 @@ namespace {
     void convertToPlusOneFromPlusZero(SILGenFunction &gen) {
       assert(isArgPlusZeroOrTrivialRValue() && "Must have a plus zero or "
              "trivial rvalue as an argument.");
-      SILValue ArgSILValue = ArgValue.peekRValue().peekScalarValue();
-      SILType ArgTy = ArgSILValue->getType();
+      ManagedValue ArgMV = ArgValue.peekRValue().peekManagedValue();
+      SILType ArgTy = ArgMV.getType();
 
       // If we are trivial, there is no difference in between +1 and +0 since
       // a trivial object is not reference counted.
@@ -4203,15 +4185,13 @@ namespace {
 
       // Grab the SILLocation and the new managed value.
       SILLocation ArgLoc = ArgValue.getKnownRValueLocation();
-      ManagedValue ArgManagedValue;
-      if (ArgSILValue->getType().isAddress()) {
-        auto result = gen.emitTemporaryAllocation(ArgLoc,
-                                                  ArgSILValue->getType());
-        gen.B.createCopyAddr(ArgLoc, ArgSILValue, result,
-                             IsNotTake, IsInitialization);
-        ArgManagedValue = gen.emitManagedBufferWithCleanup(result);
+      ManagedValue CopiedArgMV;
+      if (ArgTy.isAddress()) {
+        SILValue result = gen.emitTemporaryAllocation(ArgLoc, ArgTy);
+        CopiedArgMV = gen.B.createFormalAccessCopyAddr(
+            ArgLoc, ArgMV, result, IsNotTake, IsInitialization);
       } else {
-        ArgManagedValue = gen.emitManagedRetain(ArgLoc, ArgSILValue);
+        CopiedArgMV = gen.B.createFormalAccessCopyValue(ArgLoc, ArgMV);
       }
 
       // Ok now we make our transformation. First set ArgValue to a used albeit
@@ -4219,8 +4199,8 @@ namespace {
       ArgValue = ArgumentSource();
 
       // Reassign ArgValue.
-      RValue NewRValue = RValue(gen, ArgLoc, ArgTy.getSwiftRValueType(),
-                                 ArgManagedValue);
+      RValue NewRValue =
+          RValue(gen, ArgLoc, ArgTy.getSwiftRValueType(), CopiedArgMV);
       ArgValue = ArgumentSource(ArgLoc, std::move(NewRValue));
     }
   };

@@ -39,9 +39,9 @@ class GY<T> : GX<[T]> { }
 // CHECK:   [[X_F:%[0-9]+]] = class_method [[Y_AS_X_COPY]] : $X, #X.f!1 : (X) -> () -> @dynamic_self X, $@convention(method) (@guaranteed X) -> @owned X
 // => SEMANTIC SIL TODO: This argument here needs to be borrowed.
 // CHECK:   [[X_RESULT:%[0-9]+]] = apply [[X_F]]([[Y_AS_X_COPY]]) : $@convention(method) (@guaranteed X) -> @owned X
-// CHECK:   destroy_value [[Y_AS_X_COPY]]
 // CHECK:   [[Y_RESULT:%[0-9]+]] = unchecked_ref_cast [[X_RESULT]] : $X to $Y
 // CHECK:   destroy_value [[Y_RESULT]] : $Y
+// CHECK:   destroy_value [[Y_COPY]]
 // CHECK:   end_borrow [[BORROWED_Y]] from [[Y]]
 // CHECK:   destroy_value [[Y]] : $Y
 func testDynamicSelfDispatch(y: Y) {
@@ -56,9 +56,9 @@ func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
   // CHECK:   [[GY_AS_GX_COPY:%[0-9]+]] = upcast [[GY_COPY]] : $GY<Int> to $GX<Array<Int>>
   // CHECK:   [[GX_F:%[0-9]+]] = class_method [[GY_AS_GX_COPY]] : $GX<Array<Int>>, #GX.f!1 : <T> (GX<T>) -> () -> @dynamic_self GX<T>, $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
   // CHECK:   [[GX_RESULT:%[0-9]+]] = apply [[GX_F]]<[Int]>([[GY_AS_GX_COPY]]) : $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
-  // CHECK:   destroy_value [[GY_AS_GX_COPY]]
   // CHECK:   [[GY_RESULT:%[0-9]+]] = unchecked_ref_cast [[GX_RESULT]] : $GX<Array<Int>> to $GY<Int>
   // CHECK:   destroy_value [[GY_RESULT]] : $GY<Int>
+  // CHECK:   destroy_value [[GY_COPY]]
   // CHECK:   end_borrow [[BORROWED_GY]] from [[GY]]
   // CHECK:   destroy_value [[GY]]
   gy.f()

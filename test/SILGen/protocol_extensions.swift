@@ -509,8 +509,8 @@ func testExistentials1(_ p1: P1, b: Bool, i: Int64) {
   // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]] :
   // CHECK: [[GETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE9subscriptSbs5Int64Vcfg
   // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[I]], [[POPENED_COPY]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Int64, @in_guaranteed τ_0_0) -> Bool
-  // CHECK: destroy_addr [[POPENED_COPY]]
   // CHECK: store{{.*}} : $*Bool
+  // CHECK: destroy_addr [[POPENED_COPY]]
   // CHECK: dealloc_stack [[POPENED_COPY]]
   var b2 = p1[i]
 

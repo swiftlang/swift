@@ -26,8 +26,8 @@ class D: C {}
 // CHECK:   [[BAR:%.*]] = load [copy] [[PAYLOAD_ADDR]]
 // CHECK:   [[METHOD:%.*]] = class_method [[BAR]] : $Bar, #Bar.bas!getter.1 : (Bar) -> () -> C!, $@convention(method) (@guaranteed Bar) ->
 // CHECK:   apply [[METHOD]]([[BAR]])
-// CHECK:   destroy_value [[BAR]]
 // CHECK:   unconditional_checked_cast {{%.*}} : $C to $D
+// CHECK:   destroy_value [[BAR]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 //
 // CHECK: [[TRAP]]:

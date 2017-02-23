@@ -36,8 +36,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
-  // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
-  // CHECK: destroy_value [[X2]]
+  // CHECK: destroy_addr [[X_TMP]]
   // -- call set x.clsid
   // CHECK: [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter.1
   // CHECK: apply [[SET_CLSID]]<T>([[UID]], [[PB]])
@@ -49,8 +48,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
-  // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
-  // CHECK: destroy_value [[X2]]
+  // CHECK: destroy_addr [[X_TMP]]
   // -- call nextCLSID from protocol ext
   // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_T025protocol_class_refinement3UIDPAAE9nextCLSIDSifs
   // CHECK: apply [[SET_NEXTCLSID]]<T>([[UID]], [[PB]])
@@ -63,8 +61,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
-  // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
-  // CHECK: destroy_value [[X2]]
+  // CHECK: destroy_addr [[X_TMP]]
   // -- call secondNextCLSID from class-constrained protocol ext
   // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @_T025protocol_class_refinement9ObjectUIDPAAE15secondNextCLSIDSifs
   // CHECK: apply [[SET_SECONDNEXT]]<T>([[UID]], [[X1]])
@@ -84,8 +81,7 @@ func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
-  // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
-  // CHECK: destroy_value [[X2]]
+  // CHECK: destroy_addr [[X_TMP]]
   // -- call set x.clsid
   // CHECK: [[SET_CLSID:%.*]] = witness_method $T, #UID.clsid!setter.1
   // CHECK: apply [[SET_CLSID]]<T>([[UID]], [[PB]])
@@ -97,8 +93,7 @@ func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int, Int) {
   // CHECK: store [[X]] to [init] [[X_TMP]]
   // CHECK: [[GET_UID:%.*]] = witness_method $T, #UID.uid!1
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
-  // CHECK: [[X2:%.*]] = load [take] [[X_TMP]]
-  // CHECK: destroy_value [[X2]]
+  // CHECK: destroy_addr [[X_TMP]]
   // -- call nextCLSID from protocol ext
   // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_T025protocol_class_refinement3UIDPAAE9nextCLSIDSifs
   // CHECK: apply [[SET_NEXTCLSID]]<T>([[UID]], [[PB]])

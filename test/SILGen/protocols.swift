@@ -390,6 +390,7 @@ func testExistentialPropertyRead<T: ExistentialProperty>(_ t: inout T) {
 // CHECK-NEXT: copy_addr [[OPEN]] to [initialization] [[T0]]
 // CHECK-NEXT: [[B_GETTER:%.*]] = witness_method $[[P_OPENED]], #PropertyWithGetterSetter.b!getter.1
 // CHECK-NEXT: apply [[B_GETTER]]<[[P_OPENED]]>([[T0]])
+// CHECK-NEXT: debug_value
 // CHECK-NEXT: destroy_addr [[T0]]
 // CHECK-NOT:  witness_method
 // CHECK:      return

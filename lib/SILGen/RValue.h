@@ -160,6 +160,12 @@ public:
     return values[0].getValue();
   }
 
+  ManagedValue peekManagedValue() const & {
+    assert(!isa<TupleType>(type) && "peekScalarValue of a tuple rvalue");
+    assert(values.size() == 1 && "exploded scalar value?!");
+    return values[0];
+  }
+
   /// Peek at the single ManagedValue backing this rvalue without consuming it
   /// and return true if the value is not at +1.
   bool peekIsPlusZeroRValueOrTrivial() const & {
