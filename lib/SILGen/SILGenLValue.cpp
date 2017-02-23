@@ -694,10 +694,11 @@ namespace {
              RValue &&value, ManagedValue base) && override {
       SILDeclRef setter = gen.getSetterDeclRef(decl, IsDirectAccessorUse);
 
+      FormalEvaluationScope scope(gen);
       // Pass in just the setter.
       auto args =
         std::move(*this).prepareAccessorArgs(gen, loc, base, setter);
-      
+
       return gen.emitSetAccessor(loc, setter, substitutions,
                                  std::move(args.base), IsSuper,
                                  IsDirectAccessorUse,
@@ -940,6 +941,8 @@ namespace {
                ManagedValue base, SGFContext c) && override {
       SILDeclRef getter = gen.getGetterDeclRef(decl, IsDirectAccessorUse);
 
+      FormalEvaluationScope scope(gen);
+
       auto args =
         std::move(*this).prepareAccessorArgs(gen, loc, base, getter);
       
@@ -1131,13 +1134,16 @@ namespace {
 
       SILDeclRef addressor = gen.getAddressorDeclRef(decl, accessKind, 
                                                      IsDirectAccessorUse);
-      auto args =
-        std::move(*this).prepareAccessorArgs(gen, loc, base, addressor);
-      auto result = gen.emitAddressorAccessor(loc, addressor, substitutions,
-                                              std::move(args.base), IsSuper,
-                                              IsDirectAccessorUse,
-                                              std::move(args.subscripts),
-                                              SubstFieldType);
+      std::pair<ManagedValue, ManagedValue> result;
+      {
+        FormalEvaluationScope scope(gen);
+
+        auto args =
+            std::move(*this).prepareAccessorArgs(gen, loc, base, addressor);
+        result = gen.emitAddressorAccessor(
+            loc, addressor, substitutions, std::move(args.base), IsSuper,
+            IsDirectAccessorUse, std::move(args.subscripts), SubstFieldType);
+      }
       switch (cast<FuncDecl>(addressor.getDecl())->getAddressorKind()) {
       case AddressorKind::NotAddressor:
         llvm_unreachable("not an addressor!");
@@ -2053,12 +2059,65 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
   // we can perform a +0 load of the address instead of materializing a +1
   // value.
   if (isPlusZeroOk && addrTL.getLoweredType() == rvalueTL.getLoweredType()) {
-    return ManagedValue::forUnmanaged(B.createLoadBorrow(loc, addr));
+    return B.createLoadBorrow(loc, ManagedValue::forUnmanaged(addr));
   }
 
   // Load the loadable value, and retain it if we aren't taking it.
   SILValue loadedV = emitSemanticLoad(loc, addr, addrTL, rvalueTL, isTake);
-  return emitManagedRValueWithCleanup(loadedV, rvalueTL);
+  return emitManagedRValueWithCleanup(loadedV);
+}
+
+/// Load an r-value out of the given address.
+///
+/// \param rvalueTL - the type lowering for the type-of-rvalue
+///   of the address
+/// \param isGuaranteedValid - true if the value in this address
+///   is guaranteed to be valid for the duration of the current
+///   evaluation (see SGFContext::AllowGuaranteedPlusZero)
+ManagedValue SILGenFunction::emitFormalAccessLoad(SILLocation loc,
+                                                  SILValue addr,
+                                                  const TypeLowering &rvalueTL,
+                                                  SGFContext C, IsTake_t isTake,
+                                                  bool isGuaranteedValid) {
+  // Get the lowering for the address type.  We can avoid a re-lookup
+  // in the very common case of this being equivalent to the r-value
+  // type.
+  auto &addrTL = (addr->getType() == rvalueTL.getLoweredType().getAddressType()
+                      ? rvalueTL
+                      : getTypeLowering(addr->getType()));
+
+  // Never do a +0 load together with a take.
+  bool isPlusZeroOk =
+      (isTake == IsNotTake && (isGuaranteedValid ? C.isGuaranteedPlusZeroOk()
+                                                 : C.isImmediatePlusZeroOk()));
+
+  if (rvalueTL.isAddressOnly()) {
+    // If the client is cool with a +0 rvalue, the decl has an address-only
+    // type, and there are no conversions, then we can return this as a +0
+    // address RValue.
+    if (isPlusZeroOk && rvalueTL.getLoweredType() == addrTL.getLoweredType())
+      return ManagedValue::forUnmanaged(addr);
+
+    // Copy the address-only value.
+    return B.formalAccessBufferForExpr(
+        loc, rvalueTL.getLoweredType(), rvalueTL, C,
+        [&](SILValue addressForCopy) {
+          emitSemanticLoadInto(loc, addr, addrTL, addressForCopy, rvalueTL,
+                               isTake, IsInitialization);
+        });
+  }
+
+  // Ok, this is something loadable.  If this is a non-take access at plus zero,
+  // we can perform a +0 load of the address instead of materializing a +1
+  // value.
+  if (isPlusZeroOk && addrTL.getLoweredType() == rvalueTL.getLoweredType()) {
+    return B.createFormalAccessLoadBorrow(loc,
+                                          ManagedValue::forUnmanaged(addr));
+  }
+
+  // Load the loadable value, and retain it if we aren't taking it.
+  SILValue loadedV = emitSemanticLoad(loc, addr, addrTL, rvalueTL, isTake);
+  return emitFormalAccessManagedRValueWithCleanup(loc, loadedV);
 }
 
 static void emitUnloweredStoreOfCopy(SILGenBuilder &B, SILLocation loc,
