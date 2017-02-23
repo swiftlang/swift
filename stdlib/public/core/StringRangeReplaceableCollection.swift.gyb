@@ -153,7 +153,7 @@ extension String : RangeReplaceableCollection, BidirectionalCollection {
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
   public subscript(bounds: Range<Index>) -> Substring {
-    return Substring(String(self._core), bounds)
+    return Substring(_base: String(self._core), bounds)
   }
 
   /// Accesses the text in the given range.
@@ -161,7 +161,7 @@ extension String : RangeReplaceableCollection, BidirectionalCollection {
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
   public subscript(bounds: ClosedRange<Index>) -> Substring {
-    return Substring(String(self._core), bounds)
+    return Substring(_base: String(self._core), bounds)
   }
 }
 
