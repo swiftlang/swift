@@ -2444,13 +2444,6 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
     }
   });
 
-  // Create anchors for all of the potential archetypes.
-  // FIXME: This is because we might be missing some from the equivalence
-  // classes. It is an egregious hack.
-  visitPotentialArchetypes([&](PotentialArchetype *archetype) {
-    (void)archetype->getArchetypeAnchor(*this);
-  });
-
   SmallPtrSet<PotentialArchetype *, 4> visited;
 
   // Check for generic parameters which have been made concrete or equated
