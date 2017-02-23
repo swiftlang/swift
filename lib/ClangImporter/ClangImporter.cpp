@@ -1096,7 +1096,6 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
       clang::FrontendInputFile(headerPath, clang::IK_ObjC));
   invocation->getFrontendOpts().OutputFile = outputPCHPath;
   invocation->getPreprocessorOpts().resetNonModularOptions();
-  invocation->getLangOpts()->NeededByPCHOrCompilationUsesPCH = true;
 
   clang::CompilerInstance emitInstance(
     Impl.Instance->getPCHContainerOperations());
