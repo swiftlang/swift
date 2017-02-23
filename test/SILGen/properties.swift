@@ -115,8 +115,10 @@ func physical_subclass_lvalue(_ r: RefSubclass, a: Int) {
   // CHECK: [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]] : $RefSubclass
   // CHECK: [[R_SUP:%[0-9]+]] = upcast [[ARG1_COPY]] : $RefSubclass to $Ref
   // CHECK: [[FN:%[0-9]+]] = class_method [[R_SUP]] : $Ref, #Ref.y!setter.1 : (Ref) -> (Int) -> (), $@convention(method) (Int, @guaranteed Ref) -> ()
-  // CHECK: apply [[FN]]([[ARG2]], [[R_SUP]]) :
-  // CHECK: destroy_value [[R_SUP]]
+  // CHECK: [[BORROWED_R_SUP:%.*]] = begin_borrow [[R_SUP]]
+  // CHECK: apply [[FN]]([[ARG2]], [[BORROWED_R_SUP]]) :
+  // CHECK: end_borrow [[BORROWED_R_SUP]] from [[R_SUP]]
+  // CHECK: destroy_value [[ARG1_COPY]]
   // CHECK: end_borrow [[BORROWED_ARG1]] from [[ARG1]]
   r.w = a
 
@@ -152,7 +154,9 @@ func physical_class_rvalue() -> Int {
   // CHECK: [[CLASS:%[0-9]+]] = apply [[FUNC]]()
 
   // CHECK: [[FN:%[0-9]+]] = class_method [[CLASS]] : $Ref, #Ref.y!getter.1
-  // CHECK: [[RET:%[0-9]+]] = apply [[FN]]([[CLASS]])
+  // CHECK: [[BORROWED_CLASS:%.*]] = begin_borrow [[CLASS]]
+  // CHECK: [[RET:%[0-9]+]] = apply [[FN]]([[BORROWED_CLASS]])
+  // CHECK: end_borrow [[BORROWED_CLASS]] from [[CLASS]]
   // CHECK: return [[RET]]
 }
 
@@ -162,7 +166,9 @@ func logical_struct_get() -> Int {
   // CHECK: [[GET_RVAL:%[0-9]+]] = function_ref @_T010properties13struct_rvalue{{[_0-9a-zA-Z]*}}F
   // CHECK: [[STRUCT:%[0-9]+]] = apply [[GET_RVAL]]()
   // CHECK: [[GET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV1z{{[_0-9a-zA-Z]*}}fg
-  // CHECK: [[VALUE:%[0-9]+]] = apply [[GET_METHOD]]([[STRUCT]])
+  // CHECK: [[BORROWED_STRUCT:%.*]] = begin_borrow [[STRUCT]]
+  // CHECK: [[VALUE:%[0-9]+]] = apply [[GET_METHOD]]([[BORROWED_STRUCT]])
+  // CHECK: end_borrow [[BORROWED_STRUCT]] from [[STRUCT]]
   // CHECK: return [[VALUE]]
 }
 
@@ -662,7 +668,9 @@ class rdar16151899Derived : rdar16151899Base {
         // CHECK:  [[BASEPTR:%[0-9]+]] = upcast {{.*}} : $rdar16151899Derived to $rdar16151899Base
         // CHECK: load{{.*}}Int
         // CHECK-NEXT: [[SETTER:%[0-9]+]] = class_method {{.*}} : $rdar16151899Base, #rdar16151899Base.x!setter.1 : (rdar16151899Base)
-        // CHECK-NEXT: apply [[SETTER]]({{.*}}, [[BASEPTR]]) 
+        // CHECK-NEXT: [[BORROWED_BASEPTR:%.*]] = begin_borrow [[BASEPTR]]
+        // CHECK-NEXT: apply [[SETTER]]({{.*}}, [[BORROWED_BASEPTR]])
+        // CHECK-NEXT: end_borrow [[BORROWED_BASEPTR]] from [[BASEPTR]]
     }
 }
 
@@ -719,9 +727,11 @@ class DerivedProperty : BaseProperty {
 // CHECK: bb0([[SELF:%.*]] : $DerivedProperty):
 // CHECK:   [[SELF_COPY:%[0-9]+]] = copy_value [[SELF]]
 // CHECK:   [[BASEPTR:%[0-9]+]] = upcast [[SELF_COPY]] : $DerivedProperty to $BaseProperty
-// CHECK:   [[FN:%[0-9]+]] = function_ref @_T010properties12BasePropertyC1xSifg : $@convention(method) (@guaranteed BaseProperty) -> Int 
-// CHECK:   [[RESULT:%.*]] = apply [[FN]]([[BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int
-// CHECK:   destroy_value [[BASEPTR]]
+// CHECK:   [[FN:%[0-9]+]] = function_ref @_T010properties12BasePropertyC1xSifg : $@convention(method) (@guaranteed BaseProperty) -> Int
+// CHECK:   [[BORROWED_BASEPTR:%.*]] = begin_borrow [[BASEPTR]]
+// CHECK:   [[RESULT:%.*]] = apply [[FN]]([[BORROWED_BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int
+// CHECK:   end_borrow [[BORROWED_BASEPTR]] from [[BASEPTR]]
+// CHECK:   destroy_value [[SELF_COPY]]
 // CHECK:   return [[RESULT]] : $Int
 // CHECK: } // end sil function '_T010properties15DerivedPropertyC24super_property_referenceSiyF'
 
@@ -1071,6 +1081,8 @@ public class DerivedClassWithPublicProperty : BaseClassWithInternalProperty {
 // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]] : $DerivedClassWithPublicProperty
 // CHECK-NEXT:    [[SUPER:%.*]] = upcast [[SELF_COPY]] : $DerivedClassWithPublicProperty to $BaseClassWithInternalProperty
 // CHECK-NEXT:    [[METHOD:%.*]] = super_method [[SELF_COPY]] : $DerivedClassWithPublicProperty, #BaseClassWithInternalProperty.x!getter.1 : (BaseClassWithInternalProperty) -> () -> (), $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
-// CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]([[SUPER]]) : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
-// CHECK-NEXT:    destroy_value [[SUPER]] : $BaseClassWithInternalProperty
+// CHECK-NEXT:    [[BORROWED_SUPER:%.*]] = begin_borrow [[SUPER]]
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]([[BORROWED_SUPER]]) : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
+// CHECK-NEXT:    end_borrow [[BORROWED_SUPER]] from [[SUPER]]
+// CHECK-NEXT:    destroy_value [[SELF_COPY]]
 // CHECK: } // end sil function '_T010properties30DerivedClassWithPublicPropertyC1xytfg'

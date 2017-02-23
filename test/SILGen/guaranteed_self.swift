@@ -513,7 +513,9 @@ class LetFieldClass {
   // CHECK: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : (LetFieldClass) -> () -> Kraken, $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
   // CHECK-NEXT: [[KRAKEN:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
   // CHECK-NEXT: [[KRAKEN_METH:%.*]] = class_method [[KRAKEN]]
-  // CHECK-NEXT: apply [[KRAKEN_METH]]([[KRAKEN]])
+  // CHECK-NEXT: [[BORROWED_KRAKEN:%.*]] = begin_borrow [[KRAKEN]]
+  // CHECK-NEXT: apply [[KRAKEN_METH]]([[BORROWED_KRAKEN]])
+  // CHECK-NEXT: end_borrow [[BORROWED_KRAKEN]] from [[KRAKEN]]
   // CHECK-NEXT: destroy_value [[KRAKEN]]
   // CHECK-NEXT: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : (LetFieldClass) -> () -> Kraken, $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
   // CHECK-NEXT: [[KRAKEN:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
