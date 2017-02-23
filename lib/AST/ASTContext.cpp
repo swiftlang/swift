@@ -3970,6 +3970,7 @@ bool ASTContext::isTypeBridgedInExternalModule(
           nominal == getDictionaryDecl() ||
           nominal == getSetDecl() ||
           nominal == getStringDecl() ||
+          nominal == getSubstringDecl() ||
           nominal == getErrorDecl() ||
           nominal == getAnyHashableDecl() ||
           // Foundation's overlay depends on the CoreGraphics overlay, but
