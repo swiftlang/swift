@@ -28,12 +28,12 @@ public struct Substring : RangeReplaceableCollection, BidirectionalCollection {
     _slice = RangeReplaceableBidirectionalSlice()
   }
 
-  internal init(_ base: String, _ bounds: Range<Index>) {
+  public init(_base base: String, _ bounds: Range<Index>) {
     _slice = RangeReplaceableBidirectionalSlice(base: base, bounds: bounds)
   }
 
-  internal init(_ base: String, _ bounds: ClosedRange<Index>) {
-    self.init(base, base._makeHalfOpen(bounds))
+  internal init(_base base: String, _ bounds: ClosedRange<Index>) {
+    self.init(_base: base, base._makeHalfOpen(bounds))
   }
 
   public var startIndex: Index { return _slice.startIndex }
@@ -84,7 +84,8 @@ public struct Substring : RangeReplaceableCollection, BidirectionalCollection {
 
   public subscript(bounds: Range<Index>) -> Substring {
     let subSlice = _slice[bounds]
-    return Substring(_slice._base, subSlice.startIndex ..< subSlice.endIndex)
+    return Substring(_base: _slice._base,
+      subSlice.startIndex ..< subSlice.endIndex)
   }
 
   public mutating func replaceSubrange<C>(
@@ -133,7 +134,7 @@ extension Substring : CustomDebugStringConvertible {
 
 extension Substring : LosslessStringConvertible {
   public init?(_ description: String) {
-    self.init(description, description.startIndex ..< description.endIndex)
+    self.init(_base: description, description.startIndex ..< description.endIndex)
   }
 }
 
@@ -190,7 +191,7 @@ extension Substring {
     }
     set {
       let base = String(describing: newValue)
-      self = Substring(base, base.startIndex ..< base.endIndex)
+      self = Substring(_base: base, base.startIndex ..< base.endIndex)
     }
   }
 % end
