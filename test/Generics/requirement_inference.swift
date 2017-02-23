@@ -230,3 +230,20 @@ struct X11<T: P12, U: P12> where T.B == U.B.A {
 	// CHECK: Canonical generic signature: <τ_0_0, τ_0_1, τ_1_0 where τ_0_0 : P12, τ_0_1 == X10, τ_0_0.B == X10>
 	func upperSameTypeConstraint<V>(_: V) where U == X10 { }
 }
+
+#if _runtime(_ObjC)
+// rdar://problem/30610428
+@objc protocol P14 { }
+
+class X12<S: AnyObject> {
+  func bar<V>(v: V) where S == P14 {
+  }
+}
+
+@objc protocol P15: P14 { }
+
+class X13<S: P14> {
+  func bar<V>(v: V) where S == P15 {
+  }
+}
+#endif
