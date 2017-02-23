@@ -207,6 +207,10 @@ public:
                           EnumElementDecl *decl, SILType type);
 
   ManagedValue createSemanticLoadBorrow(SILLocation loc, ManagedValue addr);
+
+  ManagedValue formalAccessBufferForExpr(
+      SILLocation loc, SILType ty, const TypeLowering &lowering,
+      SGFContext context, std::function<void(SILValue)> rvalueEmitter);
 };
 
 } // namespace Lowering

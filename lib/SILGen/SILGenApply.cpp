@@ -639,10 +639,11 @@ public:
 /// the original had a cleanup.
 static ManagedValue maybeEnterCleanupForTransformed(SILGenFunction &gen,
                                                     ManagedValue orig,
-                                                    SILValue result) {
+                                                    SILValue result,
+                                                    SILLocation loc) {
   if (orig.hasCleanup()) {
     orig.forwardCleanup(gen);
-    return gen.emitManagedBufferWithCleanup(result);
+    return gen.emitFormalAccessManagedBufferWithCleanup(loc, result);
   } else {
     return ManagedValue::forUnmanaged(result);
   }
@@ -763,7 +764,7 @@ private:
                                   StoreOwnershipQualifier::Init);
 
     // If we had a cleanup, create a cleanup at the new address.
-    return maybeEnterCleanupForTransformed(gen, ref, temp);
+    return maybeEnterCleanupForTransformed(gen, ref, temp, selfLoc);
   }
 };
 
@@ -2750,7 +2751,8 @@ namespace {
       assert(destAddr->getType() == loweredSubstParamType.getAddressType());
 
       auto &destTL = SharedInfo->getBaseTypeLowering();
-      Cleanup = gen.enterDormantTemporaryCleanup(destAddr, destTL);
+      Cleanup =
+          gen.enterDormantFormalAccessTemporaryCleanup(destAddr, loc, destTL);
 
       TemporaryInitialization init(destAddr, Cleanup);
       std::move(arg).forwardInto(gen, SharedInfo->getBaseAbstractionPattern(),
@@ -4337,6 +4339,7 @@ namespace {
       AbstractionPattern origFormalType(callee.getOrigFormalType());
       CanFunctionType formalType = callee.getSubstFormalType();
 
+      // Get the callee type information.
       if (specializedEmitter || isPartiallyAppliedSuperMethod(uncurryLevel)) {
         // We want to emit the arguments as fully-substituted values
         // because that's what the specialized emitters expect.
@@ -5134,6 +5137,11 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
 
 namespace {
 
+/// A builder class that creates the base argument for accessors.
+///
+/// *NOTE* All cleanups created inside of this builder on base arguments must be
+/// formal access to ensure that we do not extend the lifetime of a guaranteed
+/// base after the accessor is evaluated.
 struct AccessorBaseArgPreparer final {
   SILGenFunction &SGF;
   SILLocation loc;
@@ -5200,9 +5208,9 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
       // The load can only be a take if the base is a +1 rvalue.
       auto shouldTake = IsTake_t(base.hasCleanup());
 
-      base = SGF.emitLoad(loc, base.forward(SGF),
-                          SGF.getTypeLowering(baseLoweredType), SGFContext(),
-                          shouldTake);
+      base = SGF.emitFormalAccessLoad(loc, base.forward(SGF),
+                                      SGF.getTypeLowering(baseLoweredType),
+                                      SGFContext(), shouldTake);
       return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
     }
 
@@ -5239,7 +5247,7 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
 
   // We need to produce the value at +1 if it's going to be consumed.
   if (selfParam.isConsumed() && !base.hasCleanup()) {
-    base = base.copyUnmanaged(SGF, loc);
+    base = base.formalAccessCopyUnmanaged(SGF, loc);
   }
 
   // If the parameter is indirect, we need to drop the value into
