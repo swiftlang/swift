@@ -9,7 +9,7 @@ class A {
 // CHECK:   [[PB:%.*]] = project_box [[SELF_BOX]]
 // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*A
 // CHECK:   store [[SELF_PARAM]] to [init] [[SELF]] : $*A
-// CHECK:   [[SELFP:%[0-9]+]] = load_borrow [[SELF]] : $*A
+// CHECK:   [[SELFP:%[0-9]+]] = load [take] [[SELF]] : $*A
 // CHECK:   [[INIT:%[0-9]+]] = class_method [[SELFP]] : $A, #A.init!initializer.1 : (A.Type) -> (X) -> A, $@convention(method) (X, @owned A) -> @owned A
 // CHECK:   [[X_INIT:%[0-9]+]] = function_ref @_T020complete_object_init1XV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin X.Type) -> X
 // CHECK:   [[X_META:%[0-9]+]] = metatype $@thin X.Type

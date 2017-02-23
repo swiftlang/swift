@@ -402,3 +402,59 @@ ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v,
   assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
   return gen.emitManagedRValueWithCleanup(result, lowering);
 }
+
+ManagedValue SILGenBuilder::createLoadCopy(SILLocation loc, ManagedValue v) {
+  auto &lowering = getFunction().getTypeLowering(v.getType());
+  return createLoadCopy(loc, v, lowering);
+}
+
+ManagedValue SILGenBuilder::createLoadCopy(SILLocation loc, ManagedValue v,
+                                           const TypeLowering &lowering) {
+  assert(lowering.getLoweredType().getAddressType() == v.getType());
+  SILValue result =
+      lowering.emitLoadOfCopy(*this, loc, v.forward(gen), IsNotTake);
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(result);
+  assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
+  return gen.emitManagedRValueWithCleanup(result, lowering);
+}
+
+ManagedValue SILGenBuilder::createFunctionArgument(SILType type,
+                                                   ValueDecl *decl) {
+  SILFunction &F = getFunction();
+
+  SILFunctionArgument *arg = F.begin()->createFunctionArgument(type, decl);
+  if (arg->getType().isObject()) {
+    if (arg->getOwnershipKind().isTrivialOr(ValueOwnershipKind::Owned))
+      return gen.emitManagedRValueWithCleanup(arg);
+    return ManagedValue::forBorrowedRValue(arg);
+  }
+
+  return gen.emitManagedBufferWithCleanup(arg);
+}
+
+ManagedValue
+SILGenBuilder::createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
+                                       MarkUninitializedInst::Kind muKind) {
+  // We either have an owned or trivial value.
+  SILValue value =
+      SILBuilder::createMarkUninitialized(decl, operand.forward(gen), muKind);
+  assert(value->getType().isObject() && "Expected only objects here");
+
+  // If we have a trivial value, just return without a cleanup.
+  if (operand.getOwnershipKind() != ValueOwnershipKind::Owned) {
+    return ManagedValue::forUnmanaged(value);
+  }
+
+  // Otherwise, recreate the cleanup.
+  return gen.emitManagedRValueWithCleanup(value);
+}
+
+ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
+                                       EnumElementDecl *decl, SILType type) {
+  SILValue result =
+      SILBuilder::createEnum(loc, payload.forward(gen), decl, type);
+  if (result.getOwnershipKind() != ValueOwnershipKind::Owned)
+    return ManagedValue::forUnmanaged(result);
+  return gen.emitManagedRValueWithCleanup(result);
+}

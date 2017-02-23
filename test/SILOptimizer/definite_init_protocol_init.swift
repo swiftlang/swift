@@ -26,11 +26,13 @@ class TrivialClass : TriviallyConstructible {
   required init(lower: Int) {}
 
   // CHECK-LABEL: sil hidden @_T0023definite_init_protocol_B012TrivialClassCACSi5upper_tcfc
-  // CHECK:     bb0(%0 : $Int, %1 : $TrivialClass):
+  // CHECK:     bb0(%0 : $Int, [[OLD_SELF:%.*]] : $TrivialClass):
   // CHECK-NEXT:  [[SELF_BOX:%.*]] = alloc_stack $TrivialClass
-  // CHECK:       store %1 to [[SELF_BOX]]
+  // CHECK-NEXT:  debug_value
+  // CHECK-NEXT:  store [[OLD_SELF]] to [[SELF_BOX]]
   // CHECK-NEXT:  [[METATYPE:%.*]] = value_metatype $@thick TrivialClass.Type, %1
-  // CHECK:       [[FN:%.*]] = function_ref @_T0023definite_init_protocol_B022TriviallyConstructiblePAAExSi6middle_tcfC
+  // CHECK-NEXT:  // function_ref
+  // CHECK-NEXT:  [[FN:%.*]] = function_ref @_T0023definite_init_protocol_B022TriviallyConstructiblePAAExSi6middle_tcfC
   // CHECK-NEXT:  [[RESULT:%.*]] = alloc_stack $TrivialClass
   // CHECK-NEXT:  apply [[FN]]<TrivialClass>([[RESULT]], %0, [[METATYPE]])
   // CHECK-NEXT:  [[NEW_SELF:%.*]] = load [[RESULT]]

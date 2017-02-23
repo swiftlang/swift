@@ -8,10 +8,12 @@ class Foo {
 
 class Bar: Foo {
   // CHECK-LABEL: sil hidden @_T022super_init_refcounting3BarC{{[_0-9a-zA-Z]*}}fc
+  // CHECK: bb0([[INPUT_SELF:%.*]] : $Bar):
   // CHECK:         [[SELF_VAR:%.*]] = alloc_box ${ var Bar }
   // CHECK:         [[PB:%.*]] = project_box [[SELF_VAR]]
   // CHECK:         [[SELF_MUI:%.*]] =  mark_uninitialized [derivedself] [[PB]]
-  // CHECK:         [[ORIG_SELF:%.*]] = load_borrow [[SELF_MUI]]
+  // CHECK:         store [[INPUT_SELF]] to [init] [[SELF_MUI]]
+  // CHECK:         [[ORIG_SELF:%.*]] = load [take] [[SELF_MUI]]
   // CHECK-NOT:     copy_value [[ORIG_SELF]]
   // CHECK:         [[ORIG_SELF_UP:%.*]] = upcast [[ORIG_SELF]]
   // CHECK-NOT:     copy_value [[ORIG_SELF_UP]]
@@ -29,7 +31,7 @@ extension Foo {
   // CHECK:         [[SELF_VAR:%.*]] = alloc_box ${ var Foo }
   // CHECK:         [[PB:%.*]] = project_box [[SELF_VAR]]
   // CHECK:         [[SELF_MUI:%.*]] =  mark_uninitialized [delegatingself] [[PB]]
-  // CHECK:         [[ORIG_SELF:%.*]] = load_borrow [[SELF_MUI]]
+  // CHECK:         [[ORIG_SELF:%.*]] = load [take] [[SELF_MUI]]
   // CHECK-NOT:     copy_value [[ORIG_SELF]]
   // CHECK:         [[SUPER_INIT:%.*]] = class_method
   // CHECK:         [[NEW_SELF:%.*]] = apply [[SUPER_INIT]]([[ORIG_SELF]])
@@ -79,12 +81,14 @@ class Good: Foo {
   // CHECK:         [[SELF_OBJ:%.*]] = load_borrow [[SELF]]
   // CHECK:         [[X_ADDR:%.*]] = ref_element_addr [[SELF_OBJ]] : $Good, #Good.x
   // CHECK:         assign {{.*}} to [[X_ADDR]] : $*Int
-  // CHECK:         [[SELF_OBJ:%.*]] = load_borrow [[SELF]] : $*Good
+  // CHECK:         [[SELF_OBJ:%.*]] = load [take] [[SELF]] : $*Good
   // CHECK:         [[SUPER_OBJ:%.*]] = upcast [[SELF_OBJ]] : $Good to $Foo
   // CHECK:         [[SUPER_INIT:%.*]] = function_ref @_T022super_init_refcounting3FooCACSicfc : $@convention(method) (Int, @owned Foo) -> @owned Foo
-  // CHECK:         [[SELF_OBJ:%.*]] = load_borrow [[SELF]]
-  // CHECK:         [[X_ADDR:%.*]] = ref_element_addr [[SELF_OBJ]] : $Good, #Good.x
+  // CHECK:         [[BORROWED_SUPER:%.*]] = begin_borrow [[SUPER_OBJ]]
+  // CHECK:         [[DOWNCAST_BORROWED_SUPER:%.*]] = unchecked_ref_cast [[BORROWED_SUPER]] : $Foo to $Good
+  // CHECK:         [[X_ADDR:%.*]] = ref_element_addr [[DOWNCAST_BORROWED_SUPER]] : $Good, #Good.x
   // CHECK:         [[X:%.*]] = load [trivial] [[X_ADDR]] : $*Int
+  // CHECK:         end_borrow [[BORROWED_SUPER]] from [[SUPER_OBJ]]
   // CHECK:         apply [[SUPER_INIT]]([[X]], [[SUPER_OBJ]])
   override init() {
     x = 10
