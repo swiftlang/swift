@@ -51,13 +51,6 @@ where
     }
     if (Self.self == UTF16.self) {
       // All BMP scalars, that is anything not in a surrogate range.
-      //
-      // For efficiency and simplicity, currently implemented as a threshold.
-      // But in theory, we could include scalars above surrogate ranges. But
-      // that might be murkey for private use areas and might be more likely to
-      // be affected by churn in future Unicode versions.
-      //
-      // TODO: cost/benefit investigation of more complex check here...
       return codeUnit < 0xD800 || codeUnit > 0xDFFF
     }
 
@@ -76,7 +69,7 @@ extension UnicodeEncoding
 where
   EncodedScalar.Iterator.Element : UnsignedInteger
 {
-  // Whether the given code unit is a normalization-sequence-starter code unit.
+  // Whether the given code unit is a starter code unit.
   // This function is meant as a quick check, involving very few operations, to
   // check for large and common ranges of starter code units.
   //
@@ -122,12 +115,15 @@ where
 // We are still deciding on the most desirable normal form, but it might end up
 // being NFC or maybe FCC. For now, I'm calling this "TODO-normal-form" aka
 // "NFT" for normal form T[ODO]. When we decide, we replace all NFT with real
-// normal form.
+// normal form. Correctness assumptions are conservavite, which is assume some
+// kind of composed-like form. We could hit more fast-paths more often if we
+// settled on a decomposed form instead.
 //
 
-// For now, sort order semantics are: the unicode scalar value order when in
-// NFT. This may be refined more in the future as I learn more
-// about Unicode.
+//
+// Proposed sort order semantics for String in Swift 4: Lexicographic order of a
+// string's normalized unicode scalar values.
+//
 
 // Mocked-up extra bits of info we might want from Unicode/UnicodeStorage
 extension Unicode {
@@ -149,10 +145,10 @@ extension Unicode {
 //  1) bitwise comparison: compare bits; roughly equivalent to C's memcmp.
 //
 //  2) zero-extend and compare: zero extend the smaller code unit and then
-//  compare bits. Done using a lazy zero-extending view over the smaller-
-//  bitwidth string.
+//  compare bits. Considered distinct for now from bitwise as it may differ
+//  in simd vectorization capability.
 //
-//  3) scalar value comparison: compare the unicode scalar values, and compare
+//  3) scalar value comparison: decode into unicode scalar values, and compare
 //  those. This is a decode-and-then-bit-compare. Implemented through a
 //  transcoded view targeting (valid?) UTF32.
 //
@@ -160,48 +156,17 @@ extension Unicode {
 //  values. Currently implemented as grapheme-based comparison (requiring
 //  grapheme break logic which currently uses libICU), but that does more work
 //  than strictly necessary. Need to make a normalized view, then we can just
-//  compare across that. Fast path: so long as the next CUs begin a new
-//  grapheme, can compare non-normalized: scalars as above and corresponding
-//  fast-paths from above.
+//
+//  Note on #4: Currently, this ends up shuttling through Character, and no
+//  normalization is actually ever performed even for the scalar view. Thus
+//  comparison is broken as it will have to use Swift 3 ordering semantics for
+//  Character, which are a bastardization of UCA and ASCII-code-order.
 //
 
-
 //
-// TODO: notion of mutually-bitwise-comparable encodings, wherein strings in
-// these encodings can be ordered through bitwise comparison alone. I need a
-// better name, as this notion needs to be paired with NFT. This
-// happens when the encodings are the same, or when they have the same bitsize
-// and each of their contents are mutually-trivially-decodable.
+// When they apply: please refer to draft spreadsheet with the decision matrix...
 //
 
-//  TODO: notion of a equivalence-class-break, or a code unit that is definitely
-// part of a different ...comparison unit?... than the one preceeding it. All
-// grapheme breaks are equivalence-class-breaks, but some additional unicode
-// scalars are as well...
-//
-//
-//
-// When they apply:
-//
-//  #1 can be used on entire strings when all of the following are satisfied:
-//    * Both strings are in NFT
-//    * Both strings have trivially-decodable code units
-//
-//  #2 can be used on entire strings when all of the following are satisfied:
-//    * Both strings are in NFT
-//    * Both strings have trivially-decodable code units
-//
-//  #3 can be used on entire strings when all of the following are satisfied:
-//    * Both strings are in NFT
-//
-//  #4 is used for all the rest.
-//
-//  Note that this is a property of comparing two particular strings in two
-//  particular encodings. The faster methods can situationally be used for
-//  comparing segments of strings when some conditions are satisfied.
-//
-//
-//
 // Fast paths
 //
 // #1 needs no fast paths, it *is* the fastest path.
@@ -213,28 +178,8 @@ extension Unicode {
 //
 // #4 can do bitwise/zero-extension compare whenever both compared code units
 // are trivially-decodable AND the following code units are definitely
-// normalization-sequence-starters.
+// starter code units.
 //
-
-
-//
-// For the slow path, ideally we would have a normalized-scalar-view that we can
-// iterate over to compare. Ideally, this would be done without needing to call
-// out to ICU, but I don't know if we'd need full grapheme-break detection.
-// Regardless, we'd need significant portions of the UCD bundled with the stdlib
-// to avoid ICU.
-//
-// I mock up this functionality using Character and then stable-sorting
-// constintuent scalars, but this is not necessarily producing a C normal form.
-// I perform composition yet...
-//
-
-//
-// String sort order in Swift, absent any locale, is the sort order of the
-// string's sequence of NFT unicode scalar values, where normalization-sequences
-// must be finished before moving on to the next unicode scalar value.
-//
-
 
 //
 // Sort order is preserved with consistent use of indices. For example:
@@ -254,13 +199,11 @@ extension Unicode {
 //
 // This does expose a chance of user error if the user determines the scalar
 // index of divergence, then tries to advance grapheme indices to that point to
-// resume comparison. In that case, the graphme index would advance past the
-// point of divergence. This would be a misuse of our indices and comparison
-// semantics, and I can't think of a good way to address it. Note that it would
-// also apply even at canonical-combining-sequence boundaries that were not also
-// grapheme boundaries.
-//
-// That is, the lexicographic invariant is preserved.
+// resume comparison. In that case, the graphme index may advance past the point
+// of divergence if divergence occurrs within a grapheme. This would be a misuse
+// of our indices and comparison semantics, and I can't think of a good way to
+// address it. Note that it would also apply even at canonical-combining-
+// sequence boundaries that were not also grapheme boundaries.
 //
 // TODO: given that lexicographic ordering is monoidal, figure out the fancy
 // term for this property.
@@ -293,52 +236,17 @@ extension UnicodeStorage {
   }
 }
 
-// TODO: This currently asserts in irgen::emitStructMetadata, need to
-// investigate and file a JIRA.
-//
-// extension UnicodeStorage
-// where CodeUnits.Iterator.Element: UnsignedInteger {
-//   struct ZextView : BidirectionalCollection {
-
-//     let codeUnits: CodeUnits
-
-//     init(_ codeUnits: CodeUnits) {
-//       self.codeUnits = codeUnits
-//     }
-
-//     public var startIndex: CodeUnits.Index {
-//       return codeUnits.startIndex
-//     }
-//     public var endIndex: CodeUnits.Index {
-//       return codeUnits.endIndex
-//     }
-//     public subscript(i: CodeUnits.Index) -> UInt32 {
-//       return numericCast(codeUnits[i])
-//     }
-//     public func index(after i: CodeUnits.Index) -> CodeUnits.Index {
-//       return codeUnits.index(after: i)
-//     }
-//     public func index(before i: CodeUnits.Index) -> CodeUnits.Index {
-//       return codeUnits.index(before: i)
-//     }
-//     typealias SubSequence = BidirectionalSlice<ZextView>
-//   }
-
-//   var zextCodeUnits : ZextView { return ZextView(codeUnits) }
-
-// }
-
 // TODO: replace with eventual comparison order
 enum SortOrder { case before, same, after }
 
 enum StringComparisonStrategy {
   case bits
-  // TODO: worth refactoring to have associated values
+  // TODO: worth refactoring to have associated values?
   case bitsWithSurrogatesGreater
   case zextBits
   case zextBitsWithSurrogatesGreater
   case unicodeScalarValues
-  case normalizedUnicodeScalarValues
+  case normalizeThenCompareUnicodeScalarValues
 }
 
 func _determineComparisonStrategy<
@@ -358,7 +266,7 @@ where
 {
   // Without normalization, all bets are off
   guard lhs.isNFT() && rhs.isNFT() else {
-    return .normalizedUnicodeScalarValues
+    return .normalizeThenCompareUnicodeScalarValues
   }
 
   // Same encodings usually mean bitwise comparison except for UTF16 outside of
@@ -702,7 +610,7 @@ where
           }
       }
 
-    case .normalizedUnicodeScalarValues:
+    case .normalizeThenCompareUnicodeScalarValues:
       // First, get as far as we can with fast paths
       let partialResult = _partialFastCompare(
         lhs, rhs, preNormalized: false
