@@ -52,6 +52,11 @@ static const StringRef SupportedConditionalCompilationEndianness[] = {
   "big"
 };
 
+static const StringRef SupportedConditionalCompilationRuntimes[] = {
+  "_ObjC",
+  "_Native",
+};
+
 template <size_t N>
 bool contains(const StringRef (&Array)[N], const StringRef &V,
               std::vector<StringRef> &suggestions) {
@@ -75,36 +80,31 @@ bool contains(const StringRef (&Array)[N], const StringRef &V,
   return false;
 }
 
-bool LangOptions::checkPlatformConditionOS(
-  StringRef &OSName, std::vector<StringRef> &suggestions) {
-  if (OSName == "macOS")
-    OSName = "OSX";
-  return contains(SupportedConditionalCompilationOSs,
-                  OSName,
-                  suggestions);
-}
-
-bool
-LangOptions::isPlatformConditionArchSupported(
-  StringRef ArchName, std::vector<StringRef> &suggestions) {
-  return contains(SupportedConditionalCompilationArches,
-                  ArchName,
-                  suggestions);
-}
-
-bool
-LangOptions::isPlatformConditionEndiannessSupported(
-  StringRef Endianness, std::vector<StringRef> &suggestions) {
-  return contains(SupportedConditionalCompilationEndianness,
-                  Endianness,
-                  suggestions);
+bool LangOptions::
+checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
+                                std::vector<StringRef> &suggestions) {
+  switch (Kind) {
+  case PlatformConditionKind::OS:
+    return contains(SupportedConditionalCompilationOSs, Value,
+                    suggestions);
+  case PlatformConditionKind::Arch:
+    return contains(SupportedConditionalCompilationArches, Value,
+                    suggestions);
+  case PlatformConditionKind::Endianness:
+    return contains(SupportedConditionalCompilationEndianness, Value,
+                    suggestions);
+  case PlatformConditionKind::Runtime:
+    return contains(SupportedConditionalCompilationRuntimes, Value,
+                    suggestions);
+  }
+  llvm_unreachable("Unhandled enum value");
 }
 
 StringRef
-LangOptions::getPlatformConditionValue(StringRef Name) const {
+LangOptions::getPlatformConditionValue(PlatformConditionKind Kind) const {
   // Last one wins.
   for (auto &Opt : reversed(PlatformConditionValues)) {
-    if (Opt.first == Name)
+    if (Opt.first == Kind)
       return Opt.second;
   }
   return StringRef();
@@ -141,23 +141,23 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
 
   // Set the "os" platform condition.
   if (Target.isMacOSX())
-    addPlatformConditionValue("os", "OSX");
+    addPlatformConditionValue(PlatformConditionKind::OS, "OSX");
   else if (triple.isTvOS())
-    addPlatformConditionValue("os", "tvOS");
+    addPlatformConditionValue(PlatformConditionKind::OS, "tvOS");
   else if (triple.isWatchOS())
-    addPlatformConditionValue("os", "watchOS");
+    addPlatformConditionValue(PlatformConditionKind::OS, "watchOS");
   else if (triple.isiOS())
-    addPlatformConditionValue("os", "iOS");
+    addPlatformConditionValue(PlatformConditionKind::OS, "iOS");
   else if (triple.isAndroid())
-    addPlatformConditionValue("os", "Android");
+    addPlatformConditionValue(PlatformConditionKind::OS, "Android");
   else if (triple.isOSLinux())
-    addPlatformConditionValue("os", "Linux");
+    addPlatformConditionValue(PlatformConditionKind::OS, "Linux");
   else if (triple.isOSFreeBSD())
-    addPlatformConditionValue("os", "FreeBSD");
+    addPlatformConditionValue(PlatformConditionKind::OS, "FreeBSD");
   else if (triple.isOSWindows())
-    addPlatformConditionValue("os", "Windows");
+    addPlatformConditionValue(PlatformConditionKind::OS, "Windows");
   else if (triple.isPS4())
-    addPlatformConditionValue("os", "PS4");
+    addPlatformConditionValue(PlatformConditionKind::OS, "PS4");
   else
     UnsupportedOS = true;
 
@@ -167,25 +167,25 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   switch (Target.getArch()) {
   case llvm::Triple::ArchType::arm:
   case llvm::Triple::ArchType::thumb:
-    addPlatformConditionValue("arch", "arm");
+    addPlatformConditionValue(PlatformConditionKind::Arch, "arm");
     break;
   case llvm::Triple::ArchType::aarch64:
-    addPlatformConditionValue("arch", "arm64");
+    addPlatformConditionValue(PlatformConditionKind::Arch, "arm64");
     break;
   case llvm::Triple::ArchType::ppc64:
-    addPlatformConditionValue("arch", "powerpc64");
+    addPlatformConditionValue(PlatformConditionKind::Arch, "powerpc64");
     break;
   case llvm::Triple::ArchType::ppc64le:
-    addPlatformConditionValue("arch", "powerpc64le");
+    addPlatformConditionValue(PlatformConditionKind::Arch, "powerpc64le");
     break;
   case llvm::Triple::ArchType::x86:
-    addPlatformConditionValue("arch", "i386");
+    addPlatformConditionValue(PlatformConditionKind::Arch, "i386");
     break;
   case llvm::Triple::ArchType::x86_64:
-    addPlatformConditionValue("arch", "x86_64");
+    addPlatformConditionValue(PlatformConditionKind::Arch, "x86_64");
     break;
   case llvm::Triple::ArchType::systemz:
-    addPlatformConditionValue("arch", "s390x");
+    addPlatformConditionValue(PlatformConditionKind::Arch, "s390x");
     break;
   default:
     UnsupportedArch = true;
@@ -198,25 +198,25 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   switch (Target.getArch()) {
   case llvm::Triple::ArchType::arm:
   case llvm::Triple::ArchType::thumb:
-    addPlatformConditionValue("_endian", "little");
+    addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
     break;
   case llvm::Triple::ArchType::aarch64:
-    addPlatformConditionValue("_endian", "little");
+    addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
     break;
   case llvm::Triple::ArchType::ppc64:
-    addPlatformConditionValue("_endian", "big");
+    addPlatformConditionValue(PlatformConditionKind::Endianness, "big");
     break;
   case llvm::Triple::ArchType::ppc64le:
-    addPlatformConditionValue("_endian", "little");
+    addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
     break;
   case llvm::Triple::ArchType::x86:
-    addPlatformConditionValue("_endian", "little");
+    addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
     break;
   case llvm::Triple::ArchType::x86_64:
-    addPlatformConditionValue("_endian", "little");
+    addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
     break;
   case llvm::Triple::ArchType::systemz:
-    addPlatformConditionValue("_endian", "big");
+    addPlatformConditionValue(PlatformConditionKind::Endianness, "big");
     break;
   default:
     llvm_unreachable("undefined architecture endianness");
@@ -224,9 +224,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
 
   // Set the "runtime" platform condition.
   if (EnableObjCInterop)
-    addPlatformConditionValue("_runtime", "_ObjC");
+    addPlatformConditionValue(PlatformConditionKind::Runtime, "_ObjC");
   else
-    addPlatformConditionValue("_runtime", "_Native");
+    addPlatformConditionValue(PlatformConditionKind::Runtime, "_Native");
 
   // If you add anything to this list, change the default size of
   // PlatformConditionValues to not require an extra allocation
