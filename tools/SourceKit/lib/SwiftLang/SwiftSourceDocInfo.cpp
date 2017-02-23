@@ -724,8 +724,6 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
 
   DelayedStringRetriever OverUSRsStream(SS);
 
-  SmallVector<std::pair<unsigned, unsigned>, 4> OverUSROffs;
-
   ide::walkOverriddenDecls(VD,
     [&](llvm::PointerUnion<const ValueDecl*, const clang::NamedDecl*> D) {
       OverUSRsStream.startPiece();
