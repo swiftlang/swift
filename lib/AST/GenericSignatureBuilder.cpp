@@ -1934,10 +1934,15 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
 
       conformances.insert({protocol, *conformance});
 
+      // Abstract conformances are acceptable for existential types.
+      assert(conformance->isConcrete() || Concrete->isExistentialType());
+
       // Update the requirement source now that we know it's concrete.
       // FIXME: Bad concrete source info.
       auto concreteSource = Source->viaConcrete(*this,
-                                                conformance->getConcrete());
+                                                conformance->isConcrete()
+                                                  ? conformance->getConcrete()
+                                                  : nullptr);
       updateRequirementSource(conforms.second, concreteSource);
     }
   }
