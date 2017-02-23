@@ -31,6 +31,8 @@
 namespace swift {
 namespace syntax {
 
+#pragma mark declaration Data
+
 class DeclSyntaxData : public SyntaxData {
 protected:
   DeclSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
@@ -40,6 +42,8 @@ public:
   static bool classof(const SyntaxData *S) { return S->isDecl(); }
 };
 
+#pragma mark declaration API
+
 class DeclSyntax : public Syntax {
   friend class Syntax;
   using DataType = DeclSyntaxData;
@@ -48,6 +52,39 @@ protected:
 
 public:
   static bool classof(const SyntaxData *S) { return S->isDecl(); }
+};
+
+#pragma mark - unknown-declaration Data
+
+class UnknownDeclSyntaxData : public DeclSyntaxData {
+  UnknownDeclSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
+                        CursorIndex IndexInParent = 0);
+public:
+  static RC<UnknownDeclSyntaxData> make(RC<RawSyntax> Raw,
+                                        const SyntaxData *Parent = nullptr,
+                                        CursorIndex IndexInParent = 0);
+
+  static bool classof(const SyntaxData *S) {
+    return S->getKind() == SyntaxKind::UnknownDecl;
+  }
+};
+
+#pragma mark - unknown-declaration API
+
+class UnknownDeclSyntax : public DeclSyntax {
+  friend class SyntaxData;
+  friend class UnknownStmtSyntaxData;
+  friend class LegacyASTTransformer;
+
+  using DataType = UnknownDeclSyntaxData;
+
+  UnknownDeclSyntax(const RC<SyntaxData> Root,
+                    const UnknownDeclSyntaxData *Data);
+
+public:
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::UnknownDecl;
+  }
 };
 
 #pragma mark declaration-members Data
@@ -85,11 +122,7 @@ class DeclMembersSyntax final : public Syntax {
   DeclMembersSyntax(RC<SyntaxData> Root,
                     const DeclMembersSyntaxData *Data);
 public:
-  static DeclMembersSyntax make(const RC<SyntaxData> Root,
-                                const DeclMembersSyntaxData *Data);
-  static DeclMembersSyntax makeBlank();
-
-  static bool classof(const SyntaxData *S) {
+  static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::DeclMembers;
   }
 };
@@ -213,8 +246,8 @@ public:
   /// Return a StructDeclSyntax with the given right brace '}' token.
   StructDeclSyntax withRightBrace(RC<TokenSyntax> NewRightBrace) const;
 
-  static bool classof(const SyntaxData *Data) {
-    return Data->getKind() == SyntaxKind::StructDecl;
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::StructDecl;
   }
 };
 

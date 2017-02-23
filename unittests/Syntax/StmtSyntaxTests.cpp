@@ -1,3 +1,4 @@
+#include "swift/Syntax/ExprSyntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/StmtSyntax.h"
 #include "llvm/ADT/SmallString.h"
@@ -201,6 +202,72 @@ TEST(StmtSyntaxTests, ContinueStmtMakeAPIs) {
     llvm::raw_svector_ostream OS(Scratch);
     SyntaxFactory::makeBlankContinueStmtSyntax().print(OS);
     ASSERT_EQ(OS.str().str(), "");
+  }
+}
+
+#pragma mark - return-statement
+
+TEST(StmtSyntaxTests, ReturnStmtMakeAPIs) {
+  auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
+  auto Minus = SyntaxFactory::makePrefixOpereator("-", {});
+  auto OneDigits = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
+  auto MinusOne = SyntaxFactory::makeIntegerLiteralExpr(Minus, OneDigits);
+
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    SyntaxFactory::makeBlankReturnStmt().print(OS);
+    ASSERT_EQ(OS.str().str(), "");
+  }
+
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    SyntaxFactory::makeReturnStmt(ReturnKW, MinusOne).print(OS);
+    ASSERT_EQ(OS.str().str(), "return -1");
+  }
+}
+
+TEST(StmtSyntaxTests, ReturnStmtGetAPIs) {
+  auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
+  auto Minus = SyntaxFactory::makePrefixOpereator("-", {});
+  auto OneDigits = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
+  auto MinusOne = SyntaxFactory::makeIntegerLiteralExpr(Minus, OneDigits);
+  auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, MinusOne);
+
+  ASSERT_EQ(ReturnKW, Return.getReturnKeyword());
+  auto GottenExpression = Return.getExpression().getValue();
+  auto GottenExpression2 = Return.getExpression().getValue();
+  ASSERT_TRUE(GottenExpression.hasSameIdentityAs(GottenExpression2));
+}
+
+TEST(StmtSyntaxTests, ReturnStmtWithAPIs) {
+  auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
+  auto Minus = SyntaxFactory::makePrefixOpereator("-", {});
+  auto OneDigits = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
+  auto MinusOne = SyntaxFactory::makeIntegerLiteralExpr(Minus, OneDigits);
+
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    SyntaxFactory::makeBlankReturnStmt().withReturnKeyword(ReturnKW).print(OS);
+    ASSERT_EQ(OS.str().str(), "return ");
+  }
+
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    SyntaxFactory::makeBlankReturnStmt().withExpression(MinusOne).print(OS);
+    ASSERT_EQ(OS.str().str(), "-1");
+  }
+
+  {
+    llvm::SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    SyntaxFactory::makeBlankReturnStmt()
+      .withReturnKeyword(ReturnKW)
+      .withExpression(MinusOne).print(OS);
+    ASSERT_EQ(OS.str().str(), "return -1");
   }
 }
 

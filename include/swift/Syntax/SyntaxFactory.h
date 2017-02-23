@@ -38,6 +38,9 @@ namespace syntax {
 
 #define SYNTAX(Id, Parent) class Id##Syntax;
 #include "swift/Syntax/SyntaxKinds.def"
+class DeclSyntax;
+class ExprSyntax;
+class StmtSyntax;
 class UnknownSyntax;
 struct TokenSyntax;
 
@@ -98,7 +101,7 @@ struct SyntaxFactory {
   /// and destination label marked as missing.
   static BreakStmtSyntax makeBlankBreakStmtSyntax();
 
-  /// Make a continue statement with the give `continue` keyword and
+  /// Make a continue statement with the given `continue` keyword and
   /// destination label.
   static ContinueStmtSyntax
   makeContinueStmt(RC<TokenSyntax> ContinueKeyword, RC<TokenSyntax> Label);
@@ -106,6 +109,25 @@ struct SyntaxFactory {
   /// Make a continue statement with the `continue` keyword
   /// and destination label marked as missing.
   static ContinueStmtSyntax makeBlankContinueStmtSyntax();
+
+  /// Make a return statement with the given `return` keyword and returned
+  /// expression.
+  static ReturnStmtSyntax
+  makeReturnStmt(RC<TokenSyntax> ReturnKeyword, ExprSyntax ReturnedExpression);
+
+  /// Make a return statement with the `return` keyword and return expression
+  /// marked as missing.
+  static ReturnStmtSyntax makeBlankReturnStmt();
+
+#pragma mark - Expressions
+
+  /// Make an integer literal with the given '+'/'-' sign and string of digits.
+  static IntegerLiteralExprSyntax
+  makeIntegerLiteralExpr(RC<TokenSyntax> Sign, RC<TokenSyntax> Digits);
+
+  /// Make an integer literal with the sign and string of digits marked
+  /// as missing.
+  static IntegerLiteralExprSyntax makeBlankIntegerLiteralExpr();
 
 #pragma mark - Tokens
 
@@ -128,6 +150,11 @@ struct SyntaxFactory {
   /// trailing trivia.
   static RC<TokenSyntax> makeContinueKeyword(const Trivia &LeadingTrivia,
                                              const Trivia &TrailingTrivia);
+
+  /// Make a 'return' keyword with the specified leading and
+  /// trailing trivia.
+  static RC<TokenSyntax> makeReturnKeyword(const Trivia &LeadingTrivia,
+                                           const Trivia &TrailingTrivia);
 
   /// Make a left angle '<' token with the specified leading and
   /// trailing trivia.
@@ -234,6 +261,20 @@ struct SyntaxFactory {
   /// Make the terminal identifier token `Protocol`
   static RC<TokenSyntax> makeProtocolToken(const Trivia &LeadingTrivia,
                                            const Trivia &TrailingTrivia);
+
+  /// Make a token representing the digits of an integer literal.
+  ///
+  /// Note: This is not a stand-in for the expression, which can contain
+  /// a minus sign.
+  static RC<TokenSyntax> makeIntegerLiteralToken(OwnedString Digits,
+                                                 const Trivia &LeadingTrivia,
+                                                 const Trivia &TrailingTrivia);
+
+#pragma mark - Operators
+
+  /// Make a prefix operator with the given text.
+  static RC<TokenSyntax> makePrefixOpereator(OwnedString Name,
+                                             const Trivia &LeadingTrivia);
 
 #pragma mark - Types
 

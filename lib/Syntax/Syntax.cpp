@@ -51,6 +51,10 @@ bool Syntax::isStmt() const {
   return Data->isStmt();
 }
 
+bool Syntax::isExpr() const {
+  return Data->isExpr();
+}
+
 #pragma mark - unknown-syntax API
 
 UnknownSyntax::UnknownSyntax(const RC<SyntaxData> Root,
