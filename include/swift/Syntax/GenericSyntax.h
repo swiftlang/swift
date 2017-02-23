@@ -30,16 +30,19 @@ class TypeSyntaxData;
 class TypeIdentifierSyntax;
 class TypeIdentifierSyntaxData;
 
-#pragma mark -
-#pragma mark conformance-requirement Data
+#pragma mark - conformance-requirement Data
 
 class ConformanceRequirementSyntaxData final : public SyntaxData {
   friend class SyntaxData;
   RC<TypeIdentifierSyntaxData> CachedConformingTypeIdentifier;
   RC<TypeSyntaxData> InheritedType;
 
-  ConformanceRequirementSyntaxData(RC<RawSyntax> Raw);
-  static RC<ConformanceRequirementSyntaxData> make(RC<RawSyntax> Raw);
+  ConformanceRequirementSyntaxData(RC<RawSyntax> Raw,
+                                   const SyntaxData *Parent = nullptr,
+                                   CursorIndex IndexInParent = 0);
+  static RC<ConformanceRequirementSyntaxData>
+  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
+       CursorIndex IndexInParent = 0);
   static RC<ConformanceRequirementSyntaxData> makeBlank();
 public:
   static bool classof(const SyntaxData *S) {
@@ -47,11 +50,13 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark conformance-requirement API
+#pragma mark - conformance-requirement API
 
 /// conformance-requirement -> type-identifier : type-identifier
 class ConformanceRequirementSyntax final : public Syntax {
+
+  friend class ConformanceRequirementSyntaxData;
+
   enum Cursor : CursorIndex {
     LeftTypeIdentifier,
     Colon,
@@ -61,21 +66,11 @@ class ConformanceRequirementSyntax final : public Syntax {
   ConformanceRequirementSyntax(RC<SyntaxData> Root,
                                ConformanceRequirementSyntaxData *Data);
 
-  static ConformanceRequirementSyntax make(RC<RawSyntax> Raw);
+  static ConformanceRequirementSyntax make(RC<RawSyntax> Raw,
+                                           const SyntaxData *Parent = nullptr,
+                                           CursorIndex IndexInParent = 0);
 
   static ConformanceRequirementSyntax makeBlank();
-
-  // TODO: in make
-//  ConformanceRequirementSyntax(RC<RawSyntax> Raw)
-//      : Syntax(Raw, Parent) {
-//    assert(Raw->Kind == SyntaxKind::ConformanceRequirement);
-//    assert(Raw->Layout.size() == 3);
-//    syntax_assert_child_kind(Raw, Cursor::LeftTypeIdentifier,
-//                             SyntaxKind::TypeIdentifier);
-//    syntax_assert_child_token_text(Raw, Cursor::Colon, tok::colon, ":");
-//    syntax_assert_child_kind(Raw, Cursor::RightTypeIdentifier,
-//                             SyntaxKind::TypeIdentifier);
-//  }
 
 public:
   /// Return the conforming "left-hand" type identifier in the
@@ -106,8 +101,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark same-type-requirement Data
+#pragma mark - same-type-requirement Data
 
 class SameTypeRequirementSyntaxData final : public SyntaxData {
   friend struct SyntaxFactory;
@@ -130,12 +124,12 @@ static bool classof(const SyntaxData *S) {
 }
 };
 
-#pragma mark -
-#pragma mark same-type-requirement API
+#pragma mark -same-type-requirement API
 
 /// same-type-requirement -> type-identifier == type
 class SameTypeRequirementSyntax final : public Syntax {
   friend struct SyntaxFactory;
+  friend class SameTypeRequirementSyntaxData;
 
   enum Cursor : CursorIndex {
     LeftTypeIdentifier,
@@ -145,18 +139,6 @@ class SameTypeRequirementSyntax final : public Syntax {
 
   SameTypeRequirementSyntax(RC<SyntaxData> Root,
                             const SameTypeRequirementSyntaxData *Data);
-
-  // TODO: move to cpp: make
-//  SameTypeRequirementSyntax(RC<RawSyntax> Raw)
-//      : Syntax(Raw, Parent) {
-//    assert(Raw->Kind == SyntaxKind::SameTypeRequirement);
-//    assert(Raw->Layout.size() == 3);
-//    syntax_assert_child_kind(Raw, Cursor::LeftTypeIdentifier,
-//                             SyntaxKind::TypeIdentifier);
-//    syntax_assert_child_token_text(Raw, Cursor::EqualityToken,
-//                                   tok::oper_binary_spaced, "==");
-//    assert(Raw->getChild(Cursor::RightType)->isType());
-//  }
 
 public:
 
@@ -208,8 +190,7 @@ public:
     }
   };
 
-#pragma mark -
-#pragma mark generic-parameter API
+#pragma mark - generic-parameter API
 
 /// generic-parameter -> type-name
 ///                    | type-name : type-identifier
@@ -260,14 +241,17 @@ public:
 };
 
 
-#pragma mark -
-#pragma mark generic-parameter-list Data (TODO)
+#pragma mark - generic-parameter-list Data
 
 class GenericParameterListSyntaxData final : public SyntaxData {
   friend class SyntaxData;
 
-  GenericParameterListSyntaxData(RC<RawSyntax> Raw);
-  static RC<GenericParameterListSyntaxData> make(RC<RawSyntax> Raw);
+  GenericParameterListSyntaxData(RC<RawSyntax> Raw,
+                                 const SyntaxData *Parent = nullptr,
+                                 CursorIndex IndexInParent = 0);
+  static RC<GenericParameterListSyntaxData>
+  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
+       CursorIndex IndexInParent = 0);
   static RC<GenericParameterListSyntaxData> makeBlank();
 
 public:
@@ -276,8 +260,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark generic-parameter-list API (TODO)
+#pragma mark - generic-parameter-list API
 
 /// generic-parameter-list -> generic-parameter
 ///                         | generic-parameter ',' generic-parameter-list
@@ -309,12 +292,12 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark generic-parameter-clause API
+#pragma mark - generic-parameter-clause API
 
 /// generic-parameter-clause -> '<' generic-argument-list '>'
 class GenericParameterClauseSyntax final : public Syntax {
   friend struct SyntaxFactory;
+  friend class GenericParameterClauseSyntaxData;
   friend class GenericParameterClauseBuilder;
   enum class Cursor : CursorIndex {
     LeftAngleBracketToken,
@@ -324,19 +307,6 @@ class GenericParameterClauseSyntax final : public Syntax {
 
   GenericParameterClauseSyntax(RC<SyntaxData> Root,
                                const GenericParameterClauseSyntaxData *Data);
-
-  // TODO: move to cpp make
-//  GenericParameterClauseSyntax(RC<RawSyntax> Raw)
-//      : Syntax(Raw) {
-//    assert(Raw->Kind == SyntaxKind::GenericParameterClause);
-//    assert(Raw->Layout.size() == 3);
-//    syntax_assert_child_token_text(Raw, Cursor::LeftAngleBracketToken,
-//                                   tok::l_angle, "<");
-//    syntax_assert_child_kind(Raw, Cursor::GenericParameterList,
-//                             SyntaxKind::GenericParameterList);
-//    syntax_assert_child_token_text(Raw, Cursor::RightAngleBracketToken,
-//                                   tok::r_angle, ">");
-//  }
 
 public:
   /// Return the left angle bracket '<' token on the generic parameter clause.
@@ -367,8 +337,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark generic-parameter-clause Builder
+#pragma mark - generic-parameter-clause Builder
 
 class GenericParameterClauseBuilder {
   RC<TokenSyntax> LeftAngleToken;
@@ -391,16 +360,16 @@ public:
   GenericParameterClauseSyntax build() const;
 };
 
-#pragma mark -
-#pragma mark generic-argument API
-
-#pragma mark -
-#pragma mark generic-argument-list Data
+#pragma mark - generic-argument-list Data
 
 class GenericArgumentListSyntaxData final : public SyntaxData {
   friend class SyntaxData;
-  GenericArgumentListSyntaxData(RC<RawSyntax> Raw);
-  static RC<GenericArgumentListSyntaxData> make(RC<RawSyntax> Raw);
+  GenericArgumentListSyntaxData(RC<RawSyntax> Raw,
+                                const SyntaxData *Parent = nullptr,
+                                CursorIndex IndexInParent = 0);
+  static RC<GenericArgumentListSyntaxData>
+  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
+       CursorIndex IndexInParent = 0);
   static RC<GenericArgumentListSyntaxData> makeBlank();
 public:
   static bool classof(const SyntaxData *S) {
@@ -408,8 +377,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark generic-argument-list API
+#pragma mark - generic-argument-list API
 
 /// generic-argument-list -> generic-argument
 ///                        | generic-argument ',' generic-argument-list
@@ -437,8 +405,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark generic-argument-list Data
+#pragma mark - generic-argument-clause Data
 
 class GenericArgumentClauseSyntaxData final : public SyntaxData {
   friend class SyntaxData;
@@ -460,8 +427,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark generic-argument-clause API
+#pragma mark - generic-argument-clause API
 
 /// generic-argument-clause -> '<' generic-argument-list '>'
 class GenericArgumentClauseSyntax : public Syntax {
@@ -480,18 +446,6 @@ class GenericArgumentClauseSyntax : public Syntax {
   GenericArgumentClauseSyntax(RC<SyntaxData> Root,
                               const GenericArgumentClauseSyntaxData *Data);
 
-  // TODO: move to cpp make
-//  GenericArgumentClauseSyntax(RC<RawSyntax> Raw)
-//      : Syntax(Raw) {
-//    assert(Raw->Kind == SyntaxKind::GenericArgumentClause);
-//    assert(Raw->Layout.size() == 3);
-//    syntax_assert_child_token_text(Raw, Cursor::LeftAngleBracketToken,
-//                                   tok::l_angle, "<");
-//    syntax_assert_child_kind(Raw, Cursor::GenericArgumentList,
-//                             SyntaxKind::GenericArgumentList);
-//    syntax_assert_child_token_text(Raw, Cursor::RightAngleBracketToken,
-//                                   tok::r_angle, ">");
-//  }
 public:
   /// Return the left angle bracket '<' token on the generic argument clause.
   RC<TokenSyntax> getLeftAngleBracket() const;
@@ -522,8 +476,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark generic-argument-clause Builder
+#pragma mark - generic-argument-clause Builder
 
 class GenericArgumentClauseBuilder {
   RC<TokenSyntax> LeftAngleToken;
@@ -545,13 +498,16 @@ public:
   GenericArgumentClauseSyntax build() const;
 };
 
-#pragma mark -
-#pragma mark generic-requirement-list Data
+#pragma mark - generic-requirement-list Data
 
 class GenericRequirementListSyntaxData final : public SyntaxData {
   friend class SyntaxData;
-  GenericRequirementListSyntaxData(RC<RawSyntax> Raw);
-  static RC<GenericRequirementListSyntaxData> make(RC<RawSyntax> Raw);
+  GenericRequirementListSyntaxData(RC<RawSyntax> Raw,
+                                   const SyntaxData *Parent = nullptr,
+                                   CursorIndex IndexInParent = 0);
+  static RC<GenericRequirementListSyntaxData>
+  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
+       CursorIndex IndexInParent = 0);
   static RC<GenericRequirementListSyntaxData> makeBlank();
 public:
   static bool classof(const SyntaxData *S) {
@@ -559,8 +515,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark generic-requirement-list API
+#pragma mark - generic-requirement-list API
 
 /// requirement-list -> requirement | requirement ',' requirement-list
 ///
@@ -584,8 +539,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark generic-where-clause Data
+#pragma mark - generic-where-clause Data
 
 class GenericWhereClauseSyntaxData final : public SyntaxData {
   friend class SyntaxData;
@@ -607,12 +561,12 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark generic-where-clause API
+#pragma mark - generic-where-clause API
 
 /// generic-where-clause -> 'where' requirement-list
 class GenericWhereClauseSyntax final : public Syntax {
   friend struct SyntaxFactory;
+  friend class GenericWhereClauseSyntaxData;
   enum class Cursor : CursorIndex {
     WhereToken,
     RequirementList,
@@ -620,17 +574,6 @@ class GenericWhereClauseSyntax final : public Syntax {
 
   GenericWhereClauseSyntax(RC<SyntaxData> Root,
                            const GenericWhereClauseSyntaxData *Data);
-
-  // TODO: move to cpp make
-//  GenericWhereClauseSyntax(RC<RawSyntax> Raw)
-//      : Syntax(Raw) {
-//    assert(Raw->Kind == SyntaxKind::GenericWhereClause);
-//    assert(Raw->Layout.size() == 2);
-//    syntax_assert_child_token_text(Raw, Cursor::WhereToken, tok::kw_where,
-//                                   "where");
-//    syntax_assert_child_kind(Raw, Cursor::RequirementList,
-//                             SyntaxKind::GenericRequirementList);
-//  }
 
 public:
   /// Return the 'where' keyword in the generic where clause.

@@ -318,7 +318,7 @@ TEST(TypeSyntaxTests, MetatypeTypeMakeAPIs) {
   }
 }
 
-TEST(TypeSyntaxTest, MetatypeTypeWithAPIs) {
+TEST(TypeSyntaxTests, MetatypeTypeWithAPIs) {
   auto Int = SyntaxFactory::makeTypeIdentifier("T", {}, {});
   auto Dot = SyntaxFactory::makeDotToken({}, {});
   auto Type = SyntaxFactory::makeTypeToken({}, {});
@@ -355,7 +355,7 @@ TEST(TypeSyntaxTest, MetatypeTypeWithAPIs) {
 #endif
 }
 
-TEST(TypeSyntaxTest, ArrayTypeWithAPIs) {
+TEST(TypeSyntaxTests, ArrayTypeWithAPIs) {
   {
     SmallString<16> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
@@ -371,7 +371,7 @@ TEST(TypeSyntaxTest, ArrayTypeWithAPIs) {
   }
 }
 
-TEST(TypeSyntaxTest, ArrayTypeMakeAPIs) {
+TEST(TypeSyntaxTests, ArrayTypeMakeAPIs) {
   {
     SmallString<16> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
@@ -384,7 +384,7 @@ TEST(TypeSyntaxTest, ArrayTypeMakeAPIs) {
   }
 }
 
-TEST(TypeSyntaxTest, DictionaryTypeWithAPIs) {
+TEST(TypeSyntaxTests, DictionaryTypeWithAPIs) {
   {
     SmallString<16> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
@@ -407,7 +407,7 @@ TEST(TypeSyntaxTest, DictionaryTypeWithAPIs) {
   }
 }
 
-TEST(TypeSyntaxTest, DictionaryTypeMakeAPIs) {
+TEST(TypeSyntaxTests, DictionaryTypeMakeAPIs) {
   {
     SmallString<16> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
@@ -424,7 +424,7 @@ TEST(TypeSyntaxTest, DictionaryTypeMakeAPIs) {
   }
 }
 
-TEST(TypeSyntaxTest, FunctionTypeMakeAPIs) {
+TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
   auto Comma = SyntaxFactory::makeCommaToken({}, { Trivia::spaces(1) });
   auto LeftParen = SyntaxFactory::makeLeftParenToken({}, {});
   auto RightParen = SyntaxFactory::makeRightParenToken({},
@@ -500,7 +500,7 @@ TEST(TypeSyntaxTest, FunctionTypeMakeAPIs) {
 
 }
 
-TEST(TypeSyntaxTest, FunctionTypeWithAPIs) {
+TEST(TypeSyntaxTests, FunctionTypeWithAPIs) {
   auto Comma = SyntaxFactory::makeCommaToken({}, { Trivia::spaces(1) });
   auto LeftParen = SyntaxFactory::makeLeftParenToken({}, {});
   auto RightParen = SyntaxFactory::makeRightParenToken({},
@@ -564,7 +564,7 @@ TEST(TypeSyntaxTest, FunctionTypeWithAPIs) {
   }
 }
 
-TEST(TypeSyntaxTest, FunctionTypeBuilderAPIs) {
+TEST(TypeSyntaxTests, FunctionTypeBuilderAPIs) {
   auto Comma = SyntaxFactory::makeCommaToken({}, { Trivia::spaces(1) });
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
   auto LeftParen = SyntaxFactory::makeLeftParenToken({}, {});
