@@ -330,8 +330,9 @@ namespace {
              "base for ref element component must be an object");
       assert(base.getType().hasReferenceSemantics() &&
              "base for ref element component must be a reference type");
-      // Borrow the ref element addr.
-      base = base.borrow(gen, loc);
+      // Borrow the ref element addr using formal access. If we need the ref
+      // element addr, we will load it in this expression.
+      base = base.formalAccessBorrow(gen, loc);
       auto Res = gen.B.createRefElementAddr(loc, base.getUnmanagedValue(),
                                             Field, SubstFieldType);
       return ManagedValue::forLValue(Res);
@@ -1453,7 +1454,8 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
     // Decide if we can evaluate this expression at +0 for the rest of the
     // lvalue.
     SGFContext Ctx;
-    
+    ManagedValue rv;
+
     // Calls through opaque protocols can be done with +0 rvalues.  This allows
     // us to avoid materializing copies of existentials.
     if (gen.SGM.Types.isIndirectPlusZeroSelfParameter(e->getType()))
@@ -1466,9 +1468,22 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
       // this handles the case in initializers where there is actually a stack
       // allocation for it as well.
       if (isa<ParamDecl>(DRE->getDecl()) &&
-          DRE->getDecl()->getName().str() == "self" &&
+          DRE->getDecl()->getName() == gen.getASTContext().Id_self &&
           DRE->getDecl()->isImplicit()) {
         Ctx = SGFContext::AllowGuaranteedPlusZero;
+        if (gen.SelfInitDelegationState != SILGenFunction::NormalSelf) {
+          // This needs to be inlined since there is a Formal EvaluatioN Scope
+          // in emitRValueForDecl that causing any borrow for this LValue to be
+          // popped too soon.
+          auto *vd = cast<ParamDecl>(DRE->getDecl());
+          ManagedValue selfLValue = gen.emitLValueForDecl(
+              DRE, vd, DRE->getType()->getCanonicalType(), AccessKind::Read,
+              DRE->getAccessSemantics());
+          rv = gen.emitRValueForSelfInDelegationInit(
+                      e, DRE->getType()->getCanonicalType(),
+                      selfLValue.getLValueAddress(), Ctx)
+                   .getScalarValue();
+        }
       } else if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
         // All let values are guaranteed to be held alive across their lifetime,
         // and won't change once initialized.  Any loaded value is good for the
@@ -1477,8 +1492,9 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
           Ctx = SGFContext::AllowGuaranteedPlusZero;
       }
     }
-    
-    ManagedValue rv = gen.emitRValueAsSingleValue(e, Ctx);
+
+    if (!rv)
+      rv = gen.emitRValueAsSingleValue(e, Ctx);
     CanType formalType = getSubstFormalRValueType(e);
     auto typeData = getValueTypeData(formalType, rv.getValue());
     LValue lv;

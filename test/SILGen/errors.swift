@@ -506,7 +506,7 @@ class BaseThrowingInit : HasThrowingInit {
 // CHECK-NEXT: [[T1:%.*]] = ref_element_addr [[T0]] : $BaseThrowingInit, #BaseThrowingInit.subField
 // CHECK-NEXT: assign %1 to [[T1]]
 //   Super delegation.
-// CHECK-NEXT: [[T0:%.*]] = load_borrow [[MARKED_BOX]]
+// CHECK-NEXT: [[T0:%.*]] = load [take] [[MARKED_BOX]]
 // CHECK-NEXT: [[T2:%.*]] = upcast [[T0]] : $BaseThrowingInit to $HasThrowingInit
 // CHECK: [[T3:%[0-9]+]] = function_ref @_TFC6errors15HasThrowingInitcfzT5valueSi_S0_ : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error Error)
 // CHECK-NEXT: apply [[T3]](%0, [[T2]])

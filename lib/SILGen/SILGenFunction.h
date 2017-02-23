@@ -16,6 +16,7 @@
 #include "FormalEvaluation.h"
 #include "Initialization.h"
 #include "JumpDest.h"
+#include "RValue.h"
 #include "SILGen.h"
 #include "SILGenBuilder.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -367,15 +368,58 @@ public:
   enum SelfInitDelegationStates {
     // 'self' is a normal variable.
     NormalSelf,
-    
-    // 'self' needs to be consumed next time it is referenced.
-    WillConsumeSelf,
-    
-    // 'self' has been consumed.
-    DidConsumeSelf,
+
+    /// 'self' needs to be shared borrowed next time self is used.
+    ///
+    /// At this point we do not know if:
+    ///
+    /// 1. 'self' is used at all. In such a case, the borrow scope for self will
+    ///     end before the delegating init call and we will overwrite the value
+    ///     in
+    ///     the self box.
+    ///
+    /// 2. If there is a consuming self use, will self be borrowed in an
+    ///    exclusive manner or a shared manner. If we need to perform an
+    ///    exclusive borrow, we will transition to WillExclusiveBorrowSelf in
+    ///    SILGenApply.
+    WillSharedBorrowSelf,
+
+    /// 'self' needs to be exclusively borrowed next time self is used.
+    ///
+    /// We only advance to this state in SILGenApply when we know that we are
+    /// going to be passing self to a delegating initializer that will consume
+    /// it. We will always evaluate self before any other uses of self in the
+    /// self.init call, so we know that we will never move from
+    /// WillExclusiveBorrowSelf to WillSharedBorrowSelf.
+    ///
+    /// Once we are in this point, all other uses of self must be borrows until
+    /// we use self in the delegating init call. All of the borrow scopes /must/
+    /// end before the delegating init call.
+    WillExclusiveBorrowSelf,
+
+    /// 'self' was shared borrowed to compute the self argument of the
+    /// delegating init call.
+    ///
+    /// This means that the delegating init uses a metatype or the like as its
+    /// self argument instead of 'self'. Thus we are able to perform a shared
+    /// borrow of self to compute that value and end the shared borrow scope
+    /// before the delegating initializer apply.
+    DidSharedBorrowSelf,
+
+    // 'self' was exclusively borrowed for the delegating init call. All further
+    // uses of self until the actual delegating init must be done via shared
+    // borrows that end strictly before the delegating init call.
+    DidExclusiveBorrowSelf,
   };
   SelfInitDelegationStates SelfInitDelegationState = NormalSelf;
-  
+  ManagedValue InitDelegationSelf;
+  SILValue InitDelegationSelfBox;
+  Optional<SILLocation> InitDelegationLoc;
+  ManagedValue SuperInitDelegationSelf;
+
+  RValue emitRValueForSelfInDelegationInit(SILLocation loc, CanType refType,
+                                           SILValue result, SGFContext C);
+
   /// The metatype argument to an allocating constructor, if we're emitting one.
   SILValue AllocatorMetatype;
 
@@ -973,6 +1017,10 @@ public:
 
   CleanupHandle enterDeallocateUninitializedArrayCleanup(SILValue array);
   void emitUninitializedArrayDeallocation(SILLocation loc, SILValue array);
+
+  CleanupHandle enterDelegateInitSelfWritebackCleanup(SILLocation loc,
+                                                      SILValue address,
+                                                      SILValue newValue);
 
   SILValue emitConversionToSemanticRValue(SILLocation loc, SILValue value,
                                           const TypeLowering &valueTL);

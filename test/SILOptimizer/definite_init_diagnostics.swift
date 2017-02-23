@@ -1246,3 +1246,13 @@ enum SR1469_Enum3 {
   } // expected-error {{return from enum initializer method without storing to 'self'}}
 }
 
+class BadFooSuper {
+  init() {}
+  init(_ x: BadFooSuper) {}
+}
+
+class BadFooSubclass: BadFooSuper {
+  override init() {
+    super.init(self) // expected-error {{'self' used before super.init call}}
+  }
+}
