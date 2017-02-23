@@ -700,3 +700,22 @@ func test_against_reemission(x: Bar) {
     let b = a
   }
 }
+
+class C    {}
+class D: C {}
+func f(_: D) -> Bool { return true }
+
+// CHECK-LABEL: sil hidden @{{.*}}test_multiple_patterns_value_semantics
+func test_multiple_patterns_value_semantics(_ y: C) {
+  switch y {
+    // CHECK:   checked_cast_br {{%.*}} : $C to $D, [[AS_D:bb[0-9]+]], [[NOT_AS_D:bb[0-9]+]]
+    // CHECK: [[AS_D]]({{.*}}):
+    // CHECK:   cond_br {{%.*}}, [[F_TRUE:bb[0-9]+]], [[F_FALSE:bb[0-9]+]]
+    // CHECK: [[F_TRUE]]:
+    // CHECK:   [[BINDING:%.*]] = copy_value [[ORIG:%.*]] :
+    // CHECK:   destroy_value [[ORIG]]
+    // CHECK:   br {{bb[0-9]+}}([[BINDING]]
+    case let x as D where f(x), let x as D: break
+    default: break
+  }
+}
