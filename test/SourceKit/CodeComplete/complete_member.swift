@@ -52,7 +52,7 @@ func testOverrideUSR() {
 // CHECK-OPTIONAL-NEXT:       key.typename: "Double",
 // CHECK-OPTIONAL-NEXT:       key.context: source.codecompletion.context.thisclass,
 // CHECK-OPTIONAL-NEXT:       key.num_bytes_to_erase: 1,
-// CHECK-OPTIONAL-NEXT:       key.associated_usrs: "s:FP15complete_member11FooProtocol16fooInstanceFunc1FSiSd",
+// CHECK-OPTIONAL-NEXT:       key.associated_usrs: "s:15complete_member11FooProtocolP16fooInstanceFunc1SdSiF",
 // CHECK-OPTIONAL-NEXT:       key.modulename: "complete_member"
 // CHECK-OPTIONAL-NEXT:     },
 
@@ -73,6 +73,6 @@ func testOverrideUSR() {
 // CHECK-OVERRIDE_USR-NEXT:     key.typename: "Void",
 // CHECK-OVERRIDE_USR-NEXT:     key.context: source.codecompletion.context.thisclass,
 // CHECK-OVERRIDE_USR-NEXT:     key.num_bytes_to_erase: 0,
-// CHECK-OVERRIDE_USR-NEXT:     key.associated_usrs: "s:FC15complete_member7Derived3fooFT_T_ s:FC15complete_member4Base3fooFT_T_",
+// CHECK-OVERRIDE_USR-NEXT:     key.associated_usrs: "s:15complete_member7DerivedC3fooyyF s:15complete_member4BaseC3fooyyF",
 // CHECK-OVERRIDE_USR-NEXT:     key.modulename: "complete_member"
 // CHECK-OVERRIDE_USR-NEXT: }

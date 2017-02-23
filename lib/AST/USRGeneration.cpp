@@ -210,31 +210,10 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
   if (isa<ParamDecl>(VD) && isa<DestructorDecl>(VD->getDeclContext()))
     return true;
 
-  std::string Old = getUSRSpacePrefix().str();
-  Mangler Mangler;
-
-  Mangler.bindGenericParameters(VD->getDeclContext());
-
-  if (auto Ctor = dyn_cast<ConstructorDecl>(VD)) {
-    Mangler.mangleConstructorEntity(Ctor, /*isAllocating=*/false,
-                                    /*uncurryingLevel=*/0);
-  } else if (auto Dtor = dyn_cast<DestructorDecl>(VD)) {
-    Mangler.mangleDestructorEntity(Dtor, /*isDeallocating=*/false);
-  } else if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    Mangler.mangleNominalType(NTD);
-  } else if (isa<TypeAliasDecl>(VD) || isa<AssociatedTypeDecl>(VD)) {
-    Mangler.mangleContextOf(VD);
-    Mangler.mangleDeclName(VD);
-  } else {
-    Mangler.mangleEntity(VD, /*uncurryingLevel=*/0);
-  }
-
-  Old += Mangler.finalize();
-
   NewMangling::ASTMangler NewMangler;
-  std::string New = NewMangler.mangleDeclAsUSR(VD, getUSRSpacePrefix());
+  std::string Mangled = NewMangler.mangleDeclAsUSR(VD, getUSRSpacePrefix());
 
-  OS << NewMangling::selectMangling(Old, New);
+  OS << Mangled;
 
   return false;
 }
@@ -260,16 +239,11 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
     return printObjCUSRForAccessor(SD, AccKind, OS);
   }
 
-  std::string Old = getUSRSpacePrefix().str();
-  Mangler Mangler;
-  Mangler.mangleAccessorEntity(AccKind, AddressorKind::NotAddressor, SD);
-  Old += Mangler.finalize();
-
   NewMangling::ASTMangler NewMangler;
-  std::string New = NewMangler.mangleAccessorEntityAsUSR(AccKind,
+  std::string Mangled = NewMangler.mangleAccessorEntityAsUSR(AccKind,
                           AddressorKind::NotAddressor, SD, getUSRSpacePrefix());
 
-  OS << NewMangling::selectMangling(Old, New);
+  OS << Mangled;
 
   return false;
 }

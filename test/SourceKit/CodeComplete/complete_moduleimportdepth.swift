@@ -18,7 +18,7 @@ func test() {
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:   key.moduleimportdepth: 1,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
-// CHECK:   key.associated_usrs: "s:Fs3absuRxs12SignedNumberrFxx",
+// CHECK:   key.associated_usrs: "s:s3absxxs12SignedNumberRzlF",
 // CHECK-NEXT:   key.modulename: "Swift"
 // CHECK-NEXT: },
 

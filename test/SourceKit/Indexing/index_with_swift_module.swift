@@ -24,7 +24,7 @@ func foo(a: TwoInts) {
 
 // CHECK:      key.kind: source.lang.swift.ref.class
 // CHECK-NEXT: key.name: "TwoInts"
-// CHECK-NEXT: key.usr: "s:C11test_module7TwoInts"
+// CHECK-NEXT: key.usr: "s:11test_module7TwoIntsC"
 
 // RUN: %sourcekitd-test -req=index %S/Inputs/Swift.swiftmodule | %FileCheck %s -check-prefix=CHECK-SWIFT1
 // CHECK-SWIFT1-DAG: key.groupname: "Bool"
