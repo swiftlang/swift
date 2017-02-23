@@ -71,7 +71,7 @@
       key.typename: "",
       key.context: source.codecompletion.context.superclass,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:FC17complete_override4Base1fFT5getMeSi1bSd_T_",
+      key.associated_usrs: "s:17complete_override4BaseC1fySi5getMe_Sd1btF",
       key.modulename: "complete_override"
     },
     {
@@ -136,7 +136,7 @@
       key.typename: "",
       key.context: source.codecompletion.context.superclass,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:FC17complete_override4BasecFT_S0_",
+      key.associated_usrs: "s:17complete_override4BaseCACycfc",
       key.modulename: "complete_override"
     },
     {
