@@ -264,7 +264,7 @@ public:
                                               GenericSignatureBuilder &builder,
                                               ProtocolDecl *protocol);
 
-  /// Retrieve an requirement source for nested type name matches.
+  /// Retrieve a requirement source for nested type name matches.
   static const RequirementSource *forNestedTypeNameMatch(
                                               GenericSignatureBuilder &builder);
 
