@@ -32,6 +32,7 @@ config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
 config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
 
 config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
+config.lldb_build_root = "@LLDB_BUILD_DIR@"
 
 if "@SWIFT_ASAN_BUILD@" == "TRUE":
     config.available_features.add("asan")
