@@ -1285,9 +1285,7 @@ private:
     return TypeCounter++;
   }
 
-  void incrementScopeCounter() {
-    CountScopes++;
-  }
+  void incrementScopeCounter();
 
 public:
   /// \brief Introduces a new solver scope, which any changes to the
