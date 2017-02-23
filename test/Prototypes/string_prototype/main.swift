@@ -190,6 +190,15 @@ testSuite.test("SwiftCanonicalString") {
   expectEqual(sncFrom16to8, sncFrom8to16)
 }
 
+testSuite.test("literals") {
+  let ascii: String = "abcdef"
+  expectEqual(ascii.characters.count,6)
+  expectTrue(ascii.characters.elementsEqual(("abcdef" as Swift.String).characters))
+  let unicode: String = "abcdef🦊"
+  expectEqual(unicode.characters.count,7)
+  expectTrue(unicode.characters.elementsEqual(("abcdef🦊" as Swift.String).characters))
+}
+
 
 // Test that all trivially-decodable code units are in fact trivially-
 // decodable.

@@ -319,3 +319,107 @@ extension String : BidirectionalCollection {
     return characters.index(after: idx)
   }
 }
+
+// TODO: reconsider these protocols
+extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
+  @effects(readonly)
+  public // @testable
+  init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
+    // self = String._fromWellFormedCodeUnitSequence(
+    //   UTF32.self, input: CollectionOfOne(UInt32(value)))
+    fatalError("Proto String._ExpressibleByBuiltinUnicodeScalarLiteral.init")
+  }
+}
+
+extension String : ExpressibleByUnicodeScalarLiteral {
+  /// Creates an instance initialized to the given Unicode scalar value.
+  ///
+  /// Do not call this initializer directly. It may be used by the compiler when
+  /// you initialize a string using a string literal that contains a single
+  /// Unicode scalar value.
+  public init(unicodeScalarLiteral value: String) {
+    // self = value
+    fatalError("Proto String.ExpressibleByUnicodeScalarLiteral.init")
+  }
+}
+
+extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
+  @effects(readonly)
+  // @_semantics("string.makeUTF8")
+  public init(
+    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
+    utf8CodeUnitCount: Builtin.Word,
+    isASCII: Builtin.Int1) {
+    // self = String._fromWellFormedCodeUnitSequence(
+    //   UTF8.self,
+    //   input: UnsafeBufferPointer(
+    //     start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
+    //     count: Int(utf8CodeUnitCount)))
+    fatalError("Proto String._ExpressibleByBuiltinExtendedGraphemeClusterLiteral.init")
+  }
+}
+
+extension String : ExpressibleByExtendedGraphemeClusterLiteral {
+  /// Creates an instance initialized to the given extended grapheme cluster
+  /// literal.
+  ///
+  /// Do not call this initializer directly. It may be used by the compiler when
+  /// you initialize a string using a string literal containing a single
+  /// extended grapheme cluster.
+  public init(extendedGraphemeClusterLiteral value: String) {
+    // self = value
+    fatalError("Proto String.ExpressibleByExtendedGraphemeClusterLiteral.init")
+  }
+}
+
+extension String : _ExpressibleByBuiltinUTF16StringLiteral {
+  @effects(readonly)
+  @_semantics("string.makeUTF16")
+  public init(
+    _builtinUTF16StringLiteral start: Builtin.RawPointer,
+    utf16CodeUnitCount: Builtin.Word
+  ) {
+    // TODO: constant literal support instead of copying
+    // TODO: guarantee compiler provides properly canonicalized literals
+    self = String(SwiftCanonicalString(
+      codeUnits: UnsafeBufferPointer(start: UnsafePointer<UInt16>(start), 
+                                     count: Int(utf16CodeUnitCount)),
+      encodedWith: UTF16.self
+    ))
+  }
+}
+
+extension String : _ExpressibleByBuiltinStringLiteral {
+  @effects(readonly)
+  @_semantics("string.makeUTF8")
+  public init(
+    _builtinStringLiteral start: Builtin.RawPointer,
+    utf8CodeUnitCount: Builtin.Word,
+    isASCII: Builtin.Int1) {
+    if Bool(isASCII) {
+      // TODO: replace this with Latin1 version when ready
+      self = String(SwiftCanonicalString(
+        codeUnits: UnsafeBufferPointer(start: UnsafePointer<UInt8>(start), 
+                                       count: Int(utf8CodeUnitCount)),
+        encodedWith: UTF8.self
+      ))
+    } else {
+      // TODO: does this ever happen today? Need to consider where to insert compiler-native Latin1 support
+      fatalError("Non-ASCII proto-string _ExpressibleByBuiltinStringLiteral")
+      // Swift 3 string code:
+  //     self = String._fromWellFormedCodeUnitSequence(
+  //       UTF8.self,
+  //       input: UnsafeBufferPointer(
+  //         start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
+  //         count: Int(utf8CodeUnitCount)))
+    }
+  }
+}
+
+extension String : ExpressibleByStringLiteral {
+  public init(stringLiteral value: String) {
+    // TODO: is this ever called if the _ version is available?
+    fatalError("ExpressibleByStringLiteral")
+    // self = value
+  }
+}
