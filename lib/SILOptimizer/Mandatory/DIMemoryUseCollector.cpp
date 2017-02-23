@@ -1035,13 +1035,27 @@ void ElementUseCollector::collectClassSelfUses() {
   }
 }
 
+static void
+collectBorrowedSuperUses(UpcastInst *Inst,
+                         llvm::SmallVectorImpl<UpcastInst *> &UpcastUsers) {
+  for (auto *Use : Inst->getUses()) {
+    if (auto *URCI = dyn_cast<UncheckedRefCastInst>(Use->getUser())) {
+      for (auto *InnerUse : URCI->getUses()) {
+        if (auto *InnerUpcastUser = dyn_cast<UpcastInst>(InnerUse->getUser())) {
+          UpcastUsers.push_back(InnerUpcastUser);
+        }
+      }
+    }
+  }
+}
+
 /// isSuperInitUse - If this "upcast" is part of a call to super.init, return
 /// the Apply instruction for the call, otherwise return null.
 static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
 
   // "Inst" is an Upcast instruction.  Check to see if it is used by an apply
   // that came from a call to super.init.
-  for (auto UI : Inst->getUses()) {
+  for (auto *UI : Inst->getUses()) {
     auto *User = UI->getUser();
     // If this used by another upcast instruction, recursively handle it, we may
     // have a multiple upcast chain.
@@ -1263,6 +1277,17 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
         Uses.push_back(DIMemoryUse(AI, DIUseKind::SuperInit,
                                    0, TheMemory.NumElements));
         recordFailableInitCall(AI);
+
+        // Now that we know that we have a super.init site, check if our upcast
+        // has any borrow users. These used to be represented by a separate
+        // load, but now with sil ownership, they are represented as borrows
+        // from the same upcast as the super init user upcast.
+        llvm::SmallVector<UpcastInst *, 4> ExtraUpcasts;
+        collectBorrowedSuperUses(UCI, ExtraUpcasts);
+        for (auto *Upcast : ExtraUpcasts) {
+          Uses.push_back(
+              DIMemoryUse(Upcast, DIUseKind::Load, 0, TheMemory.NumElements));
+        }
         continue;
       }
 
@@ -1334,6 +1359,17 @@ void ElementUseCollector::collectDelegatingClassInitSelfLoadUses(
       if (auto *subAI = isSuperInitUse(UCI)) {
         Uses.push_back(DIMemoryUse(subAI, DIUseKind::SuperInit, 0, 1));
         recordFailableInitCall(subAI);
+
+        // Now that we know that we have a super.init site, check if our upcast
+        // has any borrow users. These used to be represented by a separate
+        // load, but now with sil ownership, they are represented as borrows
+        // from the same upcast as the super init user upcast.
+        llvm::SmallVector<UpcastInst *, 4> ExtraUpcasts;
+        collectBorrowedSuperUses(UCI, ExtraUpcasts);
+        for (auto *Upcast : ExtraUpcasts) {
+          Uses.push_back(
+              DIMemoryUse(Upcast, DIUseKind::Escape, 0, TheMemory.NumElements));
+        }
         continue;
       }
     }
