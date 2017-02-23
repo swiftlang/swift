@@ -18,11 +18,14 @@
 #include "ConstraintSystem.h"
 #include "ConstraintGraph.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace constraints;
+
+#define DEBUG_TYPE "ConstraintSystem"
 
 ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc,
                                    ConstraintSystemOptions options)
@@ -35,6 +38,11 @@ ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc,
 
 ConstraintSystem::~ConstraintSystem() {
   delete &CG;
+}
+
+void ConstraintSystem::incrementScopeCounter() {
+  SWIFT_FUNC_STAT;
+  CountScopes++;
 }
 
 bool ConstraintSystem::hasFreeTypeVariables() {
