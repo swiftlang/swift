@@ -2821,7 +2821,7 @@ namespace {
     /// The number of bytes remaining.
     size_t Remaining;
   };
-}
+} // end anonymous namespace
 
 // A statically-allocated pool.  It's zero-initialized, so this
 // doesn't cost us anything in binary size.
