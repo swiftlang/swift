@@ -1,4 +1,4 @@
-//===--- GenericSyntax.cpp - Swift Generic Syntax Implementation *- C++ -*-===//
+//===--- GenericSyntax.cpp - Swift Generic Syntax Implementation ----------===//
 //
 // This source file is part of the Swift.org open source project
 //

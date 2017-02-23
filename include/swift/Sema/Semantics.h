@@ -1,4 +1,4 @@
-//===--- Semantics.h - Swift Container for Semantic Info ----*- C++ -*-===//
+//===--- Semantics.h - Swift Container for Semantic Info --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

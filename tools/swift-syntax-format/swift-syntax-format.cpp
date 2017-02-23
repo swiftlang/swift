@@ -1,4 +1,4 @@
-//===--- swift-syntax-test.cpp - Reflection Syntax testing application ----===//
+//===--- swift-syntax-format.cpp - Reflection Syntax testing application --===//
 //
 // This source file is part of the Swift.org open source project
 //

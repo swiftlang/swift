@@ -1,4 +1,4 @@
-//===--- ExprSyntax.h - Swift Expression Syntax Interface --------*- C++ -*-===//
+//===--- ExprSyntax.h - Swift Expression Syntax Interface -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
