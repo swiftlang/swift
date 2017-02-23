@@ -23,87 +23,105 @@
 
 using namespace swift;
 
-ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
-  StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
-                                  StructureMarkerKind::IfConfig);
-
-  SmallVector<IfConfigClause<Decl *>, 4> Clauses;
+/// Parse and populate a list of #if/#elseif/#else/#endif clauses.
+/// Delegate callback function to parse elements in the blocks.
+template <typename ElemTy, unsigned N>
+static ParserStatus parseIfConfig(
+    Parser &P, SmallVectorImpl<IfConfigClause<ElemTy>> &Clauses,
+    SourceLoc &EndLoc, bool HadMissingEnd,
+    llvm::function_ref<void(SmallVectorImpl<ElemTy> &, bool)> parseElements) {
+  Parser::StructureMarkerRAII ParsingDecl(
+      P, P.Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
 
   bool foundActive = false;
   ConditionalCompilationExprState ConfigState;
   while (1) {
-    bool isElse = Tok.is(tok::pound_else);
-    SourceLoc ClauseLoc = consumeToken();
+    bool isElse = P.Tok.is(tok::pound_else);
+    SourceLoc ClauseLoc = P.consumeToken();
     Expr *Condition = nullptr;
 
+    // Parse and evaluate the directive.
     if (isElse) {
       ConfigState.setConditionActive(!foundActive);
     } else {
-      // Evaluate the condition.
-      llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
-      ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
-                                                    /*isBasic*/true,
-                                                    /*isForDirective*/true);
+      llvm::SaveAndRestore<bool> S(P.InPoundIfEnvironment, true);
+      ParserResult<Expr> Result = P.parseExprSequence(diag::expected_expr,
+                                                      /*isBasic*/true,
+                                                      /*isForDirective*/true);
       if (Result.isNull())
         return makeParserError();
 
       Condition = Result.get();
 
       // Evaluate the condition, to validate it.
-      ConfigState = classifyConditionalCompilationExpr(Condition, Context,
-                                                       Diags);
+      ConfigState = P.classifyConditionalCompilationExpr(Condition, P.Context,
+                                                         P.Diags);
       if (foundActive)
         ConfigState.setConditionActive(false);
     }
 
     foundActive |= ConfigState.isConditionActive();
 
-    if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof)) {
-      diagnose(Tok.getLoc(),
-               diag::extra_tokens_conditional_compilation_directive);
+    if (!P.Tok.isAtStartOfLine() && P.Tok.isNot(tok::eof)) {
+      P.diagnose(P.Tok.getLoc(),
+                 diag::extra_tokens_conditional_compilation_directive);
     }
 
-    Optional<Scope> scope;
-    if (!ConfigState.isConditionActive())
-      scope.emplace(this, getScopeInfo().getCurrentScope()->getKind(),
-                    /*inactiveConfigBlock=*/true);
-
-    SmallVector<Decl*, 8> Decls;
+    // Parse elements
+    SmallVector<ElemTy, N> Elements;
     if (ConfigState.shouldParse()) {
-      ParserStatus Status;
-      bool PreviousHadSemi = true;
-      while (Tok.isNot(tok::pound_else, tok::pound_endif, tok::pound_elseif,
-                       tok::eof)) {
-        if (Tok.is(tok::r_brace)) {
-          diagnose(Tok.getLoc(),
-                   diag::unexpected_rbrace_in_conditional_compilation_block);
-          // If we see '}', following declarations don't look like belong to
-          // the current decl context; skip them.
-          skipUntilConditionalBlockClose();
-          break;
-        }
-        Status |= parseDeclItem(PreviousHadSemi, Flags,
-                                [&](Decl *D) {Decls.push_back(D);});
-      }
+      parseElements(Elements, ConfigState.isConditionActive());
     } else {
-      DiagnosticTransaction DT(Diags);
-      skipUntilConditionalBlockClose();
+      DiagnosticTransaction DT(P.Diags);
+      P.skipUntilConditionalBlockClose();
       DT.abort();
     }
 
-    Clauses.push_back(IfConfigClause<Decl *>(ClauseLoc, Condition,
-                                             Context.AllocateCopy(Decls),
+    Clauses.push_back(IfConfigClause<ElemTy>(ClauseLoc, Condition,
+                                             P.Context.AllocateCopy(Elements),
                                              ConfigState.isConditionActive()));
 
-    if (Tok.isNot(tok::pound_elseif) && Tok.isNot(tok::pound_else))
+    if (P.Tok.isNot(tok::pound_elseif, tok::pound_else))
       break;
 
     if (isElse)
-      diagnose(Tok, diag::expected_close_after_else_directive);
+      P.diagnose(P.Tok, diag::expected_close_after_else_directive);
   }
 
+  HadMissingEnd = P.parseEndIfDirective(EndLoc);
+  return makeParserSuccess();
+}
+
+ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
+  SmallVector<IfConfigClause<Decl *>, 4> Clauses;
   SourceLoc EndLoc;
-  bool HadMissingEnd = parseEndIfDirective(EndLoc);
+  bool HadMissingEnd = false;
+  auto Status = parseIfConfig<Decl *, 8>(
+      *this, Clauses, EndLoc, HadMissingEnd,
+      [&](SmallVectorImpl<Decl *> &Decls, bool IsActive) {
+    Optional<Scope> scope;
+    if (!IsActive)
+      scope.emplace(this, getScopeInfo().getCurrentScope()->getKind(),
+                    /*inactiveConfigBlock=*/true);
+
+    ParserStatus Status;
+    bool PreviousHadSemi = true;
+    while (Tok.isNot(tok::pound_else, tok::pound_endif, tok::pound_elseif,
+                      tok::eof)) {
+      if (Tok.is(tok::r_brace)) {
+        diagnose(Tok.getLoc(),
+                  diag::unexpected_rbrace_in_conditional_compilation_block);
+        // If we see '}', following declarations don't look like belong to
+        // the current decl context; skip them.
+        skipUntilConditionalBlockClose();
+        break;
+      }
+      Status |= parseDeclItem(PreviousHadSemi, Flags,
+                              [&](Decl *D) {Decls.push_back(D);});
+    }
+  });
+  if (Status.isError())
+    return makeParserErrorResult<IfConfigDecl>();
 
   IfConfigDecl *ICD = new (Context) IfConfigDecl(CurDeclContext,
                                                  Context.AllocateCopy(Clauses),
@@ -112,69 +130,18 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 }
 
 ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
-  StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
-                                  StructureMarkerKind::IfConfig);
   SmallVector<IfConfigClause<ASTNode>, 4> Clauses;
-
-  bool foundActive = false;
-  ConditionalCompilationExprState ConfigState;
-  while (1) {
-    bool isElse = Tok.is(tok::pound_else);
-    SourceLoc ClauseLoc = consumeToken();
-    Expr *Condition = nullptr;
-
-    if (isElse) {
-      ConfigState.setConditionActive(!foundActive);
-    } else {
-      // Evaluate the condition.
-      llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
-      ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
-                                                    /*basic*/true,
-                                                    /*isForDirective*/true);
-      if (Result.isNull())
-        return makeParserError();
-
-      Condition = Result.get();
-
-      // Evaluate the condition, to validate it.
-      ConfigState = classifyConditionalCompilationExpr(Condition, Context,
-                                                       Diags);
-      if (foundActive)
-        ConfigState.setConditionActive(false);
-    }
-
-    foundActive |= ConfigState.isConditionActive();
-
-    if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof)) {
-      diagnose(Tok.getLoc(),
-               diag::extra_tokens_conditional_compilation_directive);
-    }
-
-    SmallVector<ASTNode, 16> Elements;
-    if (ConfigState.shouldParse()) {
-      parseBraceItems(Elements, Kind,
-                      ConfigState.isConditionActive()
-                        ? BraceItemListKind::ActiveConditionalBlock
-                        : BraceItemListKind::InactiveConditionalBlock);
-    } else {
-      DiagnosticTransaction DT(Diags);
-      skipUntilConditionalBlockClose();
-      DT.abort();
-    }
-
-    Clauses.push_back(IfConfigClause<ASTNode>(ClauseLoc, Condition,
-                                              Context.AllocateCopy(Elements),
-                                              ConfigState.isConditionActive()));
-
-    if (Tok.isNot(tok::pound_elseif) && Tok.isNot(tok::pound_else))
-      break;
-
-    if (isElse)
-      diagnose(Tok, diag::expected_close_after_else_directive);
-  }
-
   SourceLoc EndLoc;
-  bool HadMissingEnd = parseEndIfDirective(EndLoc);
+  bool HadMissingEnd = false;
+  auto Status = parseIfConfig<ASTNode, 16>(
+      *this, Clauses, EndLoc, HadMissingEnd,
+      [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
+    parseBraceItems(Elements, Kind, IsActive
+                      ? BraceItemListKind::ActiveConditionalBlock
+                      : BraceItemListKind::InactiveConditionalBlock);
+  });
+  if (Status.isError())
+    return makeParserErrorResult<Stmt>();
 
   auto *ICS = new (Context) IfConfigStmt(Context.AllocateCopy(Clauses),
                                          EndLoc, HadMissingEnd);
