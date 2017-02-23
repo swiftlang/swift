@@ -412,7 +412,9 @@ getSubstitutionMap(SubstitutionList subs) const {
       continue;
     }
 
-    assert(contextTy->hasError());
+    // FIXME: getAllDependentTypes() includes generic type parameters that
+    // have been made concrete.
+    assert(contextTy->hasError() || depTy->is<GenericTypeParamType>());
   }
 
   assert(subs.empty() && "did not use all substitutions?!");
