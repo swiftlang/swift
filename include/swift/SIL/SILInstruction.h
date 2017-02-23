@@ -2836,6 +2836,26 @@ public:
   }
 };
 
+/// Perform an unconditional checked cast that aborts if the cast fails.
+/// The result of the checked cast is left in the destination.
+class UnconditionalCheckedCastOpaqueInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          ValueKind::UnconditionalCheckedCastOpaqueInst,
+          UnconditionalCheckedCastOpaqueInst, ConversionInst, true> {
+  friend SILBuilder;
+
+  UnconditionalCheckedCastOpaqueInst(SILDebugLocation DebugLoc,
+                                     SILValue Operand,
+                                     ArrayRef<SILValue> TypeDependentOperands,
+                                     SILType DestTy)
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Operand, TypeDependentOperands, DestTy) {}
+
+  static UnconditionalCheckedCastOpaqueInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy,
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+};
+
 /// StructInst - Represents a constructed loadable struct.
 class StructInst : public SILInstruction {
   friend SILBuilder;

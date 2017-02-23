@@ -56,7 +56,7 @@ namespace {
       SGFContext ctx;
 
       std::unique_ptr<TemporaryInitialization> temporary;
-      if (isOperandIndirect()) {
+      if (isOperandIndirect() && SGF.silConv.useLoweredAddresses()) {
         temporary = SGF.emitTemporary(Loc, origSourceTL);
         ctx = SGFContext(temporary.get());
       }
@@ -64,7 +64,7 @@ namespace {
       auto result = SGF.emitRValueAsOrig(operand, mostGeneral,
                                          origSourceTL, ctx);
 
-      if (isOperandIndirect()) {
+      if (isOperandIndirect() && SGF.silConv.useLoweredAddresses()) {
         // Force the result into the temporary if it's not already there.
         if (!result.isInContext()) {
           result.forwardInto(SGF, Loc, temporary->getAddress());
@@ -87,7 +87,8 @@ namespace {
 
       // If we're using checked_cast_addr, take the operand (which
       // should be an address) and build into the destination buffer.
-      if (Strategy == CastStrategy::Address) {
+      if (Strategy == CastStrategy::Address &&
+          SGF.silConv.useLoweredAddresses()) {
         SILValue resultBuffer =
           createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
         SGF.B.createUnconditionalCheckedCastAddr(Loc,
@@ -99,9 +100,15 @@ namespace {
                                              abstraction, origTargetTL, ctx));
       }
 
-      SILValue resultScalar =
-        SGF.B.createUnconditionalCheckedCast(Loc, operand.forward(SGF),
-                                             origTargetTL.getLoweredType());
+      SILValue resultScalar;
+      if (Strategy == CastStrategy::Address) {
+        resultScalar = SGF.B.createUnconditionalCheckedCastOpaque(
+            Loc, operand.forward(SGF), origTargetTL.getLoweredType());
+      } else {
+        resultScalar = SGF.B.createUnconditionalCheckedCast(
+            Loc, operand.forward(SGF), origTargetTL.getLoweredType());
+      }
+
       return RValue(SGF, Loc, TargetType,
                     finishFromResultScalar(hasAbstraction, resultScalar,
                                            CastConsumptionKind::TakeAlways,

@@ -244,3 +244,23 @@ func s150___________anyArg(_: Any) {}
 func s160_______callAnyArg() {
   s150___________anyArg(42)
 }
+
+// Tests unconditional_checked_cast for opaque values
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s170____force_convertxylF : $@convention(thin) <T> () -> @out T {
+// CHECK: bb0:
+// CHECK-NOT: alloc_stack
+// CHECK:   [[INT_TYPE:%.*]] = metatype $@thin Int.Type
+// CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.Int2048, 42
+// CHECK:   [[INT_ARG:%.*]] = apply %{{.*}}([[INT_LIT]], [[INT_TYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK:   [[INT_CAST:%.*]] = unconditional_checked_cast_opaque [[INT_ARG]] : $Int to $T
+// CHECK:   [[CAST_BORROW:%.*]] = begin_borrow [[INT_CAST]] : $T
+// CHECK:   [[RETURN_VAL:%.*]] = copy_value [[CAST_BORROW]] : $T
+// CHECK:   end_borrow [[CAST_BORROW]] from [[INT_CAST]] : $T, $T
+// CHECK:   destroy_value [[INT_CAST]] : $T
+// CHECK:   return [[RETURN_VAL]] : $T
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s170____force_convertxylF'
+func s170____force_convert<T>() -> T {
+  let x : T = 42 as! T
+  return x
+}

@@ -4429,7 +4429,7 @@ Checked Conversions
 
 Some user-level cast operations can fail and thus require runtime checking.
 
-The `unconditional_checked_cast_addr`_ and `unconditional_checked_cast`_
+The `unconditional_checked_cast_addr`_, `unconditional_checked_cast_opaque`_ and `unconditional_checked_cast`_
 instructions performs an unconditional checked cast; it is a runtime failure
 if the cast fails. The `checked_cast_addr_br`_ and `checked_cast_br`_
 terminator instruction performs a conditional checked cast; it branches to one
@@ -4466,6 +4466,20 @@ unconditional_checked_cast_addr
   // %1 will be of type $*B
 
 Performs a checked indirect conversion, causing a runtime failure if the
+conversion fails.
+
+unconditional_checked_cast_opaque
+`````````````````````````````````
+::
+
+  sil-instruction ::= 'unconditional_checked_cast_opaque' sil-operand 'to' sil-type
+
+  %1 = unconditional_checked_cast_opaque %0 : $A to $B
+  // $A must be not be an address
+  // $B must be an opaque value
+  // %1 will be of type $B
+
+Performs a checked conversion, causing a runtime failure if the
 conversion fails.
 
 Runtime Failures
