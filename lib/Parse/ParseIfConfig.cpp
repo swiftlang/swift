@@ -27,7 +27,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
   StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                   StructureMarkerKind::IfConfig);
 
-  SmallVector<IfConfigDeclClause, 4> Clauses;
+  SmallVector<IfConfigClause<Decl *>, 4> Clauses;
 
   bool foundActive = false;
   ConditionalCompilationExprState ConfigState;
@@ -91,9 +91,9 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
       DT.abort();
     }
 
-    Clauses.push_back(IfConfigDeclClause(ClauseLoc, Condition,
-                                         Context.AllocateCopy(Decls),
-                                         ConfigState.isConditionActive()));
+    Clauses.push_back(IfConfigClause<Decl *>(ClauseLoc, Condition,
+                                             Context.AllocateCopy(Decls),
+                                             ConfigState.isConditionActive()));
 
     if (Tok.isNot(tok::pound_elseif) && Tok.isNot(tok::pound_else))
       break;
@@ -114,7 +114,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
   StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                   StructureMarkerKind::IfConfig);
-  SmallVector<IfConfigStmtClause, 4> Clauses;
+  SmallVector<IfConfigClause<ASTNode>, 4> Clauses;
 
   bool foundActive = false;
   ConditionalCompilationExprState ConfigState;
@@ -162,9 +162,9 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
       DT.abort();
     }
 
-    Clauses.push_back(IfConfigStmtClause(ClauseLoc, Condition,
-                                         Context.AllocateCopy(Elements),
-                                         ConfigState.isConditionActive()));
+    Clauses.push_back(IfConfigClause<ASTNode>(ClauseLoc, Condition,
+                                              Context.AllocateCopy(Elements),
+                                              ConfigState.isConditionActive()));
 
     if (Tok.isNot(tok::pound_elseif) && Tok.isNot(tok::pound_else))
       break;

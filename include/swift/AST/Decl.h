@@ -24,6 +24,7 @@
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericParamKey.h"
+#include "swift/AST/IfConfigClause.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeAlignments.h"
@@ -2012,28 +2013,6 @@ public:
   }
 };
 
-/// This represents one part of a #if block.  If the condition field is
-/// non-null, then this represents a #if or a #elseif, otherwise it represents
-/// an #else block.
-struct IfConfigDeclClause {
-  /// The location of the #if, #elseif, or #else keyword.
-  SourceLoc Loc;
-  
-  /// The condition guarding this #if or #elseif block.  If this is null, this
-  /// is a #else clause.
-  Expr *Cond;
-
-  ArrayRef<Decl*> Members;
-
-  /// True if this is the active clause of the #if block.
-  bool isActive;
-
-  IfConfigDeclClause(SourceLoc Loc, Expr *Cond, ArrayRef<Decl*> Members,
-                     bool isActive)
-    : Loc(Loc), Cond(Cond), Members(Members), isActive(isActive) {}
-};
-  
-  
 /// IfConfigDecl - This class represents the declaration-side representation of
 /// #if/#else/#endif blocks. Active and inactive block members are stored
 /// separately, with the intention being that active members will be handed
@@ -2041,21 +2020,21 @@ struct IfConfigDeclClause {
 class IfConfigDecl : public Decl {
   /// An array of clauses controlling each of the #if/#elseif/#else conditions.
   /// The array is ASTContext allocated.
-  ArrayRef<IfConfigDeclClause> Clauses;
+  ArrayRef<IfConfigClause<Decl *>> Clauses;
   SourceLoc EndLoc;
 public:
   
-  IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigDeclClause> Clauses,
+  IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigClause<Decl *>> Clauses,
                SourceLoc EndLoc, bool HadMissingEnd)
     : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses), EndLoc(EndLoc)
   {
     IfConfigDeclBits.HadMissingEnd = HadMissingEnd;
   }
 
-  ArrayRef<IfConfigDeclClause> getClauses() const { return Clauses; }
+  ArrayRef<IfConfigClause<Decl *>> getClauses() const { return Clauses; }
 
   /// Return the active clause, or null if there is no active one.
-  const IfConfigDeclClause *getActiveClause() const {
+  const IfConfigClause<Decl *> *getActiveClause() const {
     for (auto &Clause : Clauses)
       if (Clause.isActive) return &Clause;
     return nullptr;
@@ -2063,7 +2042,7 @@ public:
 
   const ArrayRef<Decl*> getActiveMembers() const {
     if (auto *Clause = getActiveClause())
-      return Clause->Members;
+      return Clause->Elements;
     return {};
   }
   

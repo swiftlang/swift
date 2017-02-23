@@ -1005,7 +1005,7 @@ namespace {
           OS << "#else:\n";
         }
 
-        for (auto D : Clause.Members) {
+        for (auto D : Clause.Elements) {
           OS << '\n';
           printRec(D);
         }
