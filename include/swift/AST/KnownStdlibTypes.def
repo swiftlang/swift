@@ -43,6 +43,7 @@ KNOWN_STDLIB_TYPE_DECL(Float,  NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(Double, NominalTypeDecl, 0)
 
 KNOWN_STDLIB_TYPE_DECL(String, NominalTypeDecl, 0)
+KNOWN_STDLIB_TYPE_DECL(Substring, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(Array, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(Set, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(Sequence, NominalTypeDecl, 1)
