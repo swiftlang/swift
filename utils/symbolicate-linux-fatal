@@ -139,7 +139,11 @@ def main():
     instack = False
     stackidx = 0
     stack = []
-    for line in args.log:
+
+    while True:
+        line = args.log.readline()
+        if not line:
+            break
         if instack and line.startswith(str(stackidx)):
             stack.append(line)
             stackidx = stackidx + 1
