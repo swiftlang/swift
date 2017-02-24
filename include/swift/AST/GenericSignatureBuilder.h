@@ -620,6 +620,14 @@ public:
   bool diagnoseRemainingRenames(SourceLoc loc,
                                 ArrayRef<GenericTypeParamType *> genericParams);
 
+private:
+  /// Check for redundant concrete type constraints within the equivalence
+  /// class of the given potential archetype.
+  void checkRedundantConcreteTypeConstraints(
+                            ArrayRef<GenericTypeParamType *> genericParams,
+                            PotentialArchetype *pa);
+
+public:
   /// \brief Resolve the given type to the potential archetype it names.
   ///
   /// This routine will synthesize nested types as required to refer to a
