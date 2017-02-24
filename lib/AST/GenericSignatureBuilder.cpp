@@ -343,6 +343,7 @@ int RequirementSource::compare(const RequirementSource *other) const {
 
 void RequirementSource::dump() const {
   dump(llvm::errs(), nullptr, 0);
+  llvm::errs() << "\n";
 }
 
 /// Dump the constraint source.
@@ -351,7 +352,6 @@ void RequirementSource::dump(llvm::raw_ostream &out, SourceManager *srcMgr,
   // FIXME: Implement for real, so we actually dump the structure.
   out.indent(indent);
   print(out, srcMgr);
-  out.flush();
 }
 
 void RequirementSource::print() const {
