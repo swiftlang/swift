@@ -47,6 +47,9 @@
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
 #endif
+
+#include "WeakReference.h"
+
 #include <cstring>
 #include <type_traits>
 

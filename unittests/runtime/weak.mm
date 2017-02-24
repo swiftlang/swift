@@ -14,9 +14,16 @@
 #include <objc/runtime.h>
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Metadata.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
+
+// A fake definition of Swift runtime's WeakReference.
+// This has the proper size and alignment which is all we need.
+namespace swift {
+class WeakReference { void *value __attribute__((unused)); };
+}
 
 // Declare some Objective-C stuff.
 extern "C" void objc_release(id);

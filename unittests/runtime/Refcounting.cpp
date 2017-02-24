@@ -153,6 +153,46 @@ TEST(RefcountingTest, unowned_retain_release_n) {
   EXPECT_EQ(1u, value);
 }
 
+TEST(RefcountingTest, isUniquelyReferenced) {
+  size_t value = 0;
+  auto object = allocTestObject(&value, 1);
+  EXPECT_EQ(0u, value);
+  EXPECT_TRUE(swift_isUniquelyReferenced_nonNull_native(object));
+
+  swift_retain(object);
+  EXPECT_FALSE(swift_isUniquelyReferenced_nonNull_native(object));
+
+  swift_release(object);
+  EXPECT_TRUE(swift_isUniquelyReferenced_nonNull_native(object));
+
+  swift_release(object);
+  EXPECT_EQ(1u, value);
+}
+
+TEST(RefcountingTest, isUniquelyReferencedOrPinned) {
+  size_t value = 0;
+  auto object = allocTestObject(&value, 1);
+  EXPECT_EQ(0u, value);
+  // RC 1, unpinned
+  EXPECT_TRUE(swift_isUniquelyReferencedOrPinned_nonNull_native(object));
+
+  swift_retain(object);
+  // RC big, unpinned
+  EXPECT_FALSE(swift_isUniquelyReferencedOrPinned_nonNull_native(object));
+
+  auto pinResult = swift_tryPin(object);
+  // RC big, pinned
+  EXPECT_TRUE(swift_isUniquelyReferencedOrPinned_nonNull_native(object));
+
+  swift_release(object);
+  // RC 1, pinned
+  EXPECT_TRUE(swift_isUniquelyReferencedOrPinned_nonNull_native(object));
+
+  swift_unpin(object);
+  swift_release(object);
+  EXPECT_EQ(1u, value);
+}
+
 /////////////////////////////////////////
 // Non-atomic reference counting tests //
 /////////////////////////////////////////
@@ -245,4 +285,3 @@ TEST(RefcountingTest, nonatomic_unknown_retain_release_n) {
   EXPECT_EQ(0u, value);
   EXPECT_EQ(1u, swift_retainCount(object));
 }
-

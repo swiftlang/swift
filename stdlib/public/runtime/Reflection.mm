@@ -20,6 +20,7 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Portability.h"
 #include "Private.h"
+#include "WeakReference.h"
 #include "llvm/Support/Compiler.h"
 #include <cassert>
 #include <cstdio>

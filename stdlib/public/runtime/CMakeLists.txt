@@ -53,6 +53,7 @@ set(swift_runtime_sources
     Once.cpp
     Portability.cpp
     ProtocolConformance.cpp
+    RefCount.cpp
     RuntimeEntrySymbols.cpp)
 
 # Acknowledge that the following sources are known.
