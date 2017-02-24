@@ -339,10 +339,10 @@ ${orderingExplanation}
   @_inlineable
   public func sorted(
     by areInIncreasingOrder:
-      (${IElement}, ${IElement}) -> Bool
-  ) -> [Iterator.Element] {
+      (${IElement}, ${IElement}) throws -> Bool
+  ) rethrows -> [Iterator.Element] {
     var result = ContiguousArray(self)
-    result.sort(by: areInIncreasingOrder)
+    try result.sort(by: areInIncreasingOrder)
     return Array(result)
   }
 }
@@ -398,6 +398,9 @@ extension MutableCollection where Self : RandomAccessCollection {
   /// Sorts the collection in place, using the given predicate as the
   /// comparison between elements.
   ///
+  /// This method can take throwing closure. If closure throws error while sorting,
+  /// order of elements may change. No elements will be lost.
+  ///
   /// When you want to sort a collection of elements that doesn't conform to
   /// the `Comparable` protocol, pass a closure to this method that returns
   /// `true` when the first element passed should be ordered before the
@@ -452,19 +455,19 @@ ${orderingExplanation}
   @_inlineable
   public mutating func sort(
     by areInIncreasingOrder:
-      (${IElement}, ${IElement}) -> Bool
-  ) {
+      (${IElement}, ${IElement}) throws -> Bool
+  ) rethrows {
 
     let didSortUnsafeBuffer: Void? =
-      _withUnsafeMutableBufferPointerIfSupported {
+      try _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Void in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, count: count)
-      bufferPointer.sort(by: areInIncreasingOrder)
+      try bufferPointer.sort(by: areInIncreasingOrder)
       return ()
     }
     if didSortUnsafeBuffer == nil {
-      _introSort(
+      try _introSort(
         &self,
         subRange: startIndex..<endIndex,
         by: areInIncreasingOrder)

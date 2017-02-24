@@ -13,7 +13,7 @@
 %{
 def cmp(a, b, p):
   if p:
-    return "areInIncreasingOrder(" + a + ", " + b + ")"
+    return "(try areInIncreasingOrder(" + a + ", " + b + "))"
   else:
     return "(" + a + " < " + b + ")"
 
@@ -24,14 +24,23 @@ def cmp(a, b, p):
 // need such a predicate.
 % preds = [True, False]
 % for p in preds:
+%{
+if p:
+  rethrows_ = "rethrows"
+  try_ = "try"
+else:
+  rethrows_ = ""
+  try_ = ""
+}%
 
 @_inlineable
 @_versioned
 func _insertionSort<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
-  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
-) where
+  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) throws -> Bool" if p else ""}
+) ${rethrows_} 
+  where
   C : MutableCollection & BidirectionalCollection
   ${"" if p else ", C.Iterator.Element : Comparable"} {
 
@@ -55,10 +64,23 @@ func _insertionSort<C>(
       repeat {
         let predecessor: C.Iterator.Element = elements[elements.index(before: i)]
 
-        // if x doesn't belong before y, we've found its position
+        % if p:
+        // If clouser throws the error, We catch the error put the element at right
+        // place and rethrow the error.
+        do {
+          // if x doesn't belong before y, we've found its position
+          if !${cmp("x", "predecessor", p)} {
+            break
+          }
+        } catch {
+          elements[i] = x
+          throw error
+        }
+        % else:
         if !${cmp("x", "predecessor", p)} {
           break
         }
+        % end
 
         // Move y forward
         elements[i] = predecessor
@@ -87,8 +109,8 @@ public // @testable
 func _sort3<C>(
   _ elements: inout C,
   _ a: C.Index, _ b: C.Index, _ c: C.Index
-  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
-)
+  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) throws -> Bool" if p else ""}
+) ${rethrows_}
   where
   C : MutableCollection & RandomAccessCollection
   ${"" if p else ", C.Iterator.Element : Comparable"}
@@ -159,8 +181,8 @@ func _sort3<C>(
 func _partition<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
-  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
-) -> C.Index
+  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) throws -> Bool" if p else ""}
+) ${rethrows_} -> C.Index
   where
   C : MutableCollection & RandomAccessCollection
   ${"" if p else ", C.Iterator.Element : Comparable"}
@@ -172,7 +194,7 @@ func _partition<C>(
   // as the pivot for the partition.
   let half = numericCast(elements.distance(from: lo, to: hi)) as UInt / 2
   let mid = elements.index(lo, offsetBy: numericCast(half))
-  _sort3(&elements, lo, mid, hi
+  ${try_} _sort3(&elements, lo, mid, hi
     ${", by: areInIncreasingOrder" if p else ""})
   let pivot = elements[mid]
 
@@ -210,8 +232,9 @@ public // @testable
 func _introSort<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
-  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
-) where
+  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) throws -> Bool" if p else ""}
+) ${rethrows_} 
+  where
   C : MutableCollection & RandomAccessCollection
   ${"" if p else ", C.Iterator.Element : Comparable"} {
 
@@ -223,7 +246,7 @@ func _introSort<C>(
   // Set max recursion depth to 2*floor(log(N)), as suggested in the introsort
   // paper: http://www.cs.rpi.edu/~musser/gp/introsort.ps
   let depthLimit = 2 * _floorLog2(Int64(count))
-  _introSortImpl(
+  ${try_} _introSortImpl(
     &elements,
     subRange: range,
     ${"by: areInIncreasingOrder," if p else ""}
@@ -235,22 +258,23 @@ func _introSort<C>(
 func _introSortImpl<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
-  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""},
+  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) throws -> Bool" if p else ""},
   depthLimit: Int
-) where
+) ${rethrows_}
+  where
   C : MutableCollection & RandomAccessCollection
   ${"" if p else ", C.Iterator.Element : Comparable"} {
 
   // Insertion sort is better at handling smaller regions.
   if elements.distance(from: range.lowerBound, to: range.upperBound) < 20 {
-    _insertionSort(
+    ${try_} _insertionSort(
       &elements,
       subRange: range
       ${", by: areInIncreasingOrder" if p else ""})
     return
   }
   if depthLimit == 0 {
-    _heapSort(
+    ${try_} _heapSort(
       &elements,
       subRange: range
       ${", by: areInIncreasingOrder" if p else ""})
@@ -260,16 +284,16 @@ func _introSortImpl<C>(
   // Partition and sort.
   // We don't check the depthLimit variable for underflow because this variable
   // is always greater than zero (see check above).
-  let partIdx: C.Index = _partition(
+  let partIdx: C.Index = ${try_} _partition(
     &elements,
     subRange: range
     ${", by: areInIncreasingOrder" if p else ""})
-  _introSortImpl(
+  ${try_} _introSortImpl(
     &elements,
     subRange: range.lowerBound..<partIdx,
     ${"by: areInIncreasingOrder, " if p else ""}
     depthLimit: depthLimit &- 1)
-  _introSortImpl(
+  ${try_} _introSortImpl(
     &elements,
     subRange: partIdx..<range.upperBound,
     ${"by: areInIncreasingOrder, " if p else ""}
@@ -282,8 +306,9 @@ func _siftDown<C>(
   _ elements: inout C,
   index: C.Index,
   subRange range: Range<C.Index>
-  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
-) where
+  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) throws -> Bool" if p else ""}
+) ${rethrows_}
+  where
   C : MutableCollection & RandomAccessCollection
   ${"" if p else ", C.Iterator.Element : Comparable"} {
 
@@ -310,7 +335,7 @@ func _siftDown<C>(
   // down.
   if largest != index {
     swap(&elements[index], &elements[largest])
-    _siftDown(
+    ${try_} _siftDown(
       &elements,
       index: largest,
       subRange: range
@@ -323,8 +348,9 @@ func _siftDown<C>(
 func _heapify<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
-  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
-) where
+  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) throws -> Bool" if p else ""}
+) ${rethrows_}
+  where
   C : MutableCollection & RandomAccessCollection
   ${"" if p else ", C.Iterator.Element : Comparable"} {
   // Here we build a heap starting from the lowest nodes and moving to the root.
@@ -341,7 +367,7 @@ func _heapify<C>(
 
   while node != root {
     elements.formIndex(before: &node)
-    _siftDown(
+    ${try_} _siftDown(
       &elements,
       index: node,
       subRange: range
@@ -354,20 +380,21 @@ func _heapify<C>(
 func _heapSort<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
-  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
-) where
+  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) throws -> Bool" if p else ""}
+) ${rethrows_} 
+  where
   C : MutableCollection & RandomAccessCollection
   ${"" if p else ", C.Iterator.Element : Comparable"} {
   var hi = range.upperBound
   let lo = range.lowerBound
-  _heapify(
+  ${try_} _heapify(
     &elements,
     subRange: range
     ${", by: areInIncreasingOrder" if p else ""})
   elements.formIndex(before: &hi)
   while hi != lo {
     swap(&elements[lo], &elements[hi])
-    _siftDown(
+    ${try_} _siftDown(
       &elements,
       index: lo,
       subRange: lo..<hi
