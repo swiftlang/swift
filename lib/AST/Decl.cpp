@@ -2469,7 +2469,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
       return false;
 
     // Resolve this initializer, if needed.
-    if (!ctor->hasInterfaceType())
+    if (resolver && !ctor->hasInterfaceType())
       resolver->resolveDeclSignature(ctor);
 
     // Ignore any stub implementations.
