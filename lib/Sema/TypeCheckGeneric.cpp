@@ -128,6 +128,42 @@ void GenericTypeToArchetypeResolver::recordParamType(ParamDecl *decl, Type type)
         GenericEnv, type));
 }
 
+Type ProtocolRequirementTypeResolver::resolveGenericTypeParamType(
+    GenericTypeParamType *gp) {
+  assert(gp->getDepth() == 0 && gp->getIndex() == 0 &&
+         "found non-Self-shaped GTPT when resolving protocol requirement");
+  return gp;
+}
+
+Type ProtocolRequirementTypeResolver::resolveDependentMemberType(
+    Type baseTy, DeclContext *DC, SourceRange baseRange,
+    ComponentIdentTypeRepr *ref) {
+  return DependentMemberType::get(baseTy, ref->getIdentifier());
+}
+
+Type ProtocolRequirementTypeResolver::resolveSelfAssociatedType(
+    Type selfTy, AssociatedTypeDecl *assocType) {
+  return assocType->getDeclaredInterfaceType();
+}
+
+Type ProtocolRequirementTypeResolver::resolveTypeOfContext(DeclContext *dc) {
+  return dc->getSelfInterfaceType();
+}
+
+Type ProtocolRequirementTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
+  return decl->getDeclaredInterfaceType();
+}
+
+bool ProtocolRequirementTypeResolver::areSameType(Type type1, Type type2) {
+  return type1->isEqual(type2);
+}
+
+void ProtocolRequirementTypeResolver::recordParamType(ParamDecl *decl,
+                                                      Type type) {
+  llvm_unreachable(
+      "recording a param type of a protocol requirement doesn't make sense");
+}
+
 Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
                                               GenericTypeParamType *gp) {
   assert(gp->getDecl() && "Missing generic parameter declaration");

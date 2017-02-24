@@ -144,8 +144,34 @@ public:
 
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
-  virtual Type resolveDependentMemberType(Type baseTy,
-                                          DeclContext *DC,
+  virtual Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
+                                          SourceRange baseRange,
+                                          ComponentIdentTypeRepr *ref);
+
+  virtual Type resolveSelfAssociatedType(Type selfTy,
+                                         AssociatedTypeDecl *assocType);
+
+  virtual Type resolveTypeOfContext(DeclContext *dc);
+
+  virtual Type resolveTypeOfDecl(TypeDecl *decl);
+
+  virtual bool areSameType(Type type1, Type type2);
+
+  virtual void recordParamType(ParamDecl *decl, Type ty);
+};
+
+/// Generic type resolver that only handles what can appear in a protocol
+/// definition, i.e. Self, and Self.A.B.C dependent types.
+///
+/// This should only be used when resolving/validating where clauses in
+/// protocols.
+class ProtocolRequirementTypeResolver : public GenericTypeResolver {
+public:
+  explicit ProtocolRequirementTypeResolver() {}
+
+  virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
+
+  virtual Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
                                           SourceRange baseRange,
                                           ComponentIdentTypeRepr *ref);
 
