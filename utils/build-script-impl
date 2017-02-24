@@ -1210,41 +1210,6 @@ LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 PLAYGROUNDLOGGER_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundLogger"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundSupport"
 
-if [[ ! -d ${CMARK_SOURCE_DIR} ]]; then
-    echo "Couldn't find cmark source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_LLBUILD}" && ! -d ${LLBUILD_SOURCE_DIR} ]]; then
-    echo "Couldn't find llbuild source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_SWIFTPM}" && ! -d ${SWIFTPM_SOURCE_DIR} ]]; then
-    echo "Couldn't find swiftpm source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_XCTEST}" && ! -d ${XCTEST_SOURCE_DIR} ]]; then
-    echo "Couldn't find XCTest source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_FOUNDATION}" && ! -d ${FOUNDATION_SOURCE_DIR} ]]; then
-    echo "Couldn't find Foundation source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_LIBDISPATCH}" && ! -d ${LIBDISPATCH_SOURCE_DIR} ]]; then
-    echo "Couldn't find libdispatch source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_LIBICU}" && ! -d ${LIBICU_SOURCE_DIR} ]]; then
-    echo "Couldn't find libicu source directory."
-    exit 1
-fi
-
 if [[ ! "${SKIP_BUILD_PLAYGROUNDLOGGER}" && ! -d ${PLAYGROUNDLOGGER_SOURCE_DIR} ]]; then
     echo "Couldn't find PlaygroundLogger source directory."
     exit 1

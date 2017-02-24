@@ -14,4 +14,10 @@ from . import product
 
 
 class LibDispatch(product.Product):
-    pass
+    @classmethod
+    def product_source_name(cls):
+        """product_source_name() -> str
+
+        The name of the source code directory of this product.
+        """
+        return "swift-corelibs-libdispatch"
