@@ -379,6 +379,9 @@ public:
 
   /// Describes an equivalence class of potential archetypes.
   struct EquivalenceClass {
+    /// Concrete type to which this equivalence class is equal.
+    Type concreteType;
+
     /// The members of the equivalence class.
     TinyPtrVector<PotentialArchetype *> members;
 
@@ -1006,17 +1009,18 @@ public:
   /// True if the potential archetype has been bound by a concrete type
   /// constraint.
   bool isConcreteType() const {
-    if (getRepresentative() != this)
-      return getRepresentative()->isConcreteType();
+    if (auto equivClass = getEquivalenceClassIfPresent())
+      return static_cast<bool>(equivClass->concreteType);
 
-    return static_cast<bool>(ConcreteType);
+    return false;
   }
   
   /// Get the concrete type this potential archetype is constrained to.
   Type getConcreteType() const {
-    if (getRepresentative() != this)
-      return getRepresentative()->getConcreteType();
-    return ConcreteType;
+    if (auto equivClass = getEquivalenceClassIfPresent())
+      return equivClass->concreteType;
+
+    return Type();
   }
 
   void setIsRecursive() { IsRecursive = true; }

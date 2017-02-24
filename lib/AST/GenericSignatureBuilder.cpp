@@ -1822,7 +1822,8 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   // Merge any concrete constraints.
   Type concrete1 = T1->getConcreteType();
   Type concrete2 = T2->getConcreteType();
-  
+
+  // FIXME: This seems early.
   if (concrete1 && concrete2) {
     bool mismatch = addSameTypeRequirement(
         concrete1, concrete2, Source, [&](Type type1, Type type2) {
@@ -1834,10 +1835,6 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
         });
 
     if (mismatch) return true;
-  } else if (concrete2) {
-    assert(!T1->ConcreteType
-           && "already formed archetype for concrete-constrained parameter");
-    T1->ConcreteType = concrete2;
   }
 
   // Don't mark requirements as redundant if they come from one of our
@@ -1872,6 +1869,10 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
 
   // Make T1 the representative of T2, merging the equivalence classes.
   T2->representativeOrEquivClass = T1;
+
+  // Same-type-to-concrete requirement.
+  if (equivClass2 && equivClass2->concreteType && !equivClass->concreteType)
+    equivClass->concreteType = equivClass2->concreteType;
 
   // Superclass requirements.
   if (T2->Superclass) {
@@ -1929,9 +1930,6 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
 
     // If this is a better source, record it.
     updateRequirementSource(T->ConcreteTypeSource, Source);
-
-    if (!rep->ConcreteType)
-      rep->ConcreteType = Concrete;
 
     return false;
   }
@@ -1991,7 +1989,9 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
   }
 
   // Record the requirement.
-  rep->ConcreteType = Concrete;
+  auto equivClass = rep->getOrCreateEquivalenceClass();
+  if (!equivClass->concreteType)
+    equivClass->concreteType = Concrete;
 
   // Make sure the concrete type fulfills the superclass requirement
   // of the archetype.
