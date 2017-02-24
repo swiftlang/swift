@@ -496,7 +496,7 @@ GenericParamList::create(const ASTContext &Context,
                          SourceLoc LAngleLoc,
                          ArrayRef<GenericTypeParamDecl *> Params,
                          SourceLoc WhereLoc,
-                         MutableArrayRef<RequirementRepr> Requirements,
+                         ArrayRef<RequirementRepr> Requirements,
                          SourceLoc RAngleLoc) {
   unsigned Size = totalSizeToAlloc<GenericTypeParamDecl *>(Params.size());
   void *Mem = Context.Allocate(Size, alignof(GenericParamList));
@@ -504,6 +504,66 @@ GenericParamList::create(const ASTContext &Context,
                                     WhereLoc,
                                     Context.AllocateCopy(Requirements),
                                     RAngleLoc);
+}
+
+GenericParamList *
+GenericParamList::clone(DeclContext *dc) const {
+  auto &ctx = dc->getASTContext();
+  SmallVector<GenericTypeParamDecl *, 2> params;
+  for (auto param : getParams()) {
+    auto *newParam = new (ctx) GenericTypeParamDecl(
+      dc, param->getName(), param->getNameLoc(),
+      GenericTypeParamDecl::InvalidDepth,
+      param->getIndex());
+    params.push_back(newParam);
+
+    SmallVector<TypeLoc, 2> inherited;
+    for (auto loc : param->getInherited())
+      inherited.push_back(loc.clone(ctx));
+    newParam->setInherited(ctx.AllocateCopy(inherited));
+  }
+
+  SmallVector<RequirementRepr, 2> requirements;
+  for (auto reqt : getRequirements()) {
+    switch (reqt.getKind()) {
+    case RequirementReprKind::TypeConstraint: {
+      auto first = reqt.getSubjectLoc();
+      auto second = reqt.getConstraintLoc();
+      reqt = RequirementRepr::getTypeConstraint(
+          first.clone(ctx),
+          reqt.getColonLoc(),
+          second.clone(ctx));
+      break;
+    }
+    case RequirementReprKind::SameType: {
+      auto first = reqt.getFirstTypeLoc();
+      auto second = reqt.getSecondTypeLoc();
+      reqt = RequirementRepr::getSameType(
+          first.clone(ctx),
+          reqt.getEqualLoc(),
+          second.clone(ctx));
+      break;
+    }
+    case RequirementReprKind::LayoutConstraint: {
+      auto first = reqt.getSubjectLoc();
+      auto layout = reqt.getLayoutConstraintLoc();
+      reqt = RequirementRepr::getLayoutConstraint(
+          first.clone(ctx),
+          reqt.getColonLoc(),
+          layout);
+      break;
+    }
+    }
+
+    requirements.push_back(reqt);
+  }
+
+  return GenericParamList::create(ctx,
+                                  getLAngleLoc(),
+                                  params,
+                                  getWhereLoc(),
+                                  requirements,
+                                  getRAngleLoc());
 }
 
 void GenericParamList::addTrailingWhereClause(
@@ -3812,7 +3872,7 @@ ParamDecl::ParamDecl(ParamDecl *PD)
     DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()),
     IsTypeLocImplicit(PD->IsTypeLocImplicit),
     defaultArgumentKind(PD->defaultArgumentKind) {
-  typeLoc = PD->getTypeLoc();
+  typeLoc = PD->getTypeLoc().clone(PD->getASTContext());
   if (PD->hasInterfaceType())
     setInterfaceType(PD->getInterfaceType());
 }
