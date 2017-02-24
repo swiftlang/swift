@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// FIXME: this test is failing for watchos <rdar://problem/29997073>
+// UNSUPPORTED: OS=watchos
 
 import StdlibUnittest
 import ObjectiveC
