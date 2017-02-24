@@ -81,6 +81,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_T0SiIxd_SiIxr_TR : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[REABSTRACTOR]]([[RESULT]])
+// CHECK-NEXT: destroy_addr [[TEMP]]
 // CHECK-NEXT: store [[T1]] to [init] [[RESULT_ADDR]]
 // CHECK-NEXT: [[RESULT_PTR:%.*]] = address_to_pointer [[RESULT_ADDR]] : $*@callee_owned () -> @out Int to $Builtin.RawPointer
 // CHECK-NEXT: function_ref
@@ -88,7 +89,6 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[T1:%.*]] = thin_function_to_pointer [[T0]]
 // CHECK-NEXT: [[CALLBACK:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[T1]]
 // CHECK-NEXT: [[T0:%.*]] = tuple ([[RESULT_PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<Builtin.RawPointer>)
-// CHECK-NEXT: destroy_addr [[TEMP]]
 // CHECK-NEXT: dealloc_stack [[TEMP]]
 // CHECK-NEXT: return [[T0]]
 
@@ -150,13 +150,13 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[VALUE:%.*]] = load [copy] [[OUT]] : $*@callee_owned () -> Int
 // CHECK:      [[REABSTRACTOR:%.*]] = function_ref @_T0SiIxd_SiIxr_TR : $@convention(thin) (@owned @callee_owned () -> Int) -> @out Int
 // CHECK-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]])
+// CHECK-NEXT: destroy_addr [[OUT]] : $*@callee_owned () -> Int
 // CHECK-NEXT: store [[NEWVALUE]] to [init] [[RESULT_ADDR]] : $*@callee_owned () -> @out Int
 // CHECK-NEXT: [[ADDR:%.*]] = address_to_pointer [[RESULT_ADDR]] : $*@callee_owned () -> @out Int to $Builtin.RawPointer
 // CHECK:      [[CALLBACK_FN:%.*]] = function_ref @_T017materializeForSet7DerivedCAA12AbstractableAaaDP14staticFunction6ResultQzycfmZytfU_TW : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout @thick Derived.Type, @thick Derived.Type.Type) -> ()
 // CHECK-NEXT: [[CALLBACK_ADDR:%.*]] = thin_function_to_pointer [[CALLBACK_FN]] : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout @thick Derived.Type, @thick Derived.Type.Type) -> () to $Builtin.RawPointer
 // CHECK-NEXT: [[CALLBACK:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[CALLBACK_ADDR]] : $Builtin.RawPointer
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ([[ADDR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<Builtin.RawPointer>)
-// CHECK-NEXT: destroy_addr [[OUT]] : $*@callee_owned () -> Int
 // CHECK-NEXT: dealloc_stack [[OUT]] : $*@callee_owned () -> Int
 // CHECK-NEXT: return [[RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
 

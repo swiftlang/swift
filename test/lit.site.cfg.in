@@ -34,6 +34,7 @@ config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
 config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
 
 config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
+config.lldb_build_root = "@LLDB_BUILD_DIR@"
 
 if "@SWIFT_ASAN_BUILD@" == "TRUE":
     config.available_features.add("asan")
@@ -78,13 +79,6 @@ if "@CMAKE_GENERATOR@" == "Xcode":
       os.path.pathsep.join((xcode_bin_dir, config.environment['PATH']))
 
 config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
-
-if "@LLDB_ENABLE@" == "TRUE":
-    config.available_features.add('lldb')
-    for root, dirs, files in os.walk("@LLDB_BUILD_DIR@"):
-        if root.endswith("site-packages"):
-            config.substitutions.append(('%lldb-python-path', root))
-            break
 
 # Let the main config do the real work.
 if config.test_exec_root is None:

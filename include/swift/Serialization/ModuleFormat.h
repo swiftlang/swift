@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 318; // Last change: SIL open_exist. access kind
+const uint16_t VERSION_MINOR = 320; // Last change: inherited protocols
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -831,8 +831,7 @@ namespace decls_block {
     BCFixed<1>,             // objc?
     GenericEnvironmentIDField, // generic environment
     AccessibilityKindField, // accessibility
-    BCVBR<4>,               // number of protocols
-    BCArray<DeclIDField>    // protocols and inherited types
+    BCArray<DeclIDField>    // inherited types
     // Trailed by the generic parameters (if any), the members record, and
     // the default witness table record
   >;
@@ -976,6 +975,7 @@ namespace decls_block {
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     StorageKindField,   // StorageKind
+    GenericEnvironmentIDField, // generic environment
     TypeIDField, // interface type
     DeclIDField, // getter
     DeclIDField, // setter
@@ -988,7 +988,9 @@ namespace decls_block {
     AccessibilityKindField, // accessibility
     AccessibilityKindField, // setter accessibility, if applicable
     BCArray<IdentifierIDField> // name components
-    // The indices pattern trails the record.
+    // Trailed by:
+    // - generic parameters, if any
+    // - the indices pattern
   >;
 
   using ExtensionLayout = BCRecordLayout<

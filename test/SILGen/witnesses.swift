@@ -362,7 +362,7 @@ struct IUOFailableModel : NonFailableRefinement, IUOFailableRequirement {
   // CHECK:   [[META:%[0-9]+]] = metatype $@thin IUOFailableModel.Type
   // CHECK:   [[INIT:%[0-9]+]] = function_ref @_T09witnesses16IUOFailableModelV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Int, @thin IUOFailableModel.Type) -> Optional<IUOFailableModel>
   // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[FOO]], [[META]]) : $@convention(method) (Int, @thin IUOFailableModel.Type) -> Optional<IUOFailableModel>
-  // CHECK:   [[RESULT:%[0-9]+]] = unchecked_enum_data [[IUO_RESULT]]
+  // CHECK: bb2([[RESULT:%.*]] : $IUOFailableModel):
   // CHECK:   store [[RESULT]] to [trivial] [[SELF]] : $*IUOFailableModel
   // CHECK:   return
   init!(foo: Int) { return nil }
@@ -399,8 +399,17 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
 
 final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassRequirement {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_T09witnesses21IUOFailableClassModelCAA011NonFailableC10Refinement{{[_0-9a-zA-Z]*}}fCTW
-  // CHECK: unchecked_enum_data
-  // CHECK: return [[RESULT:%[0-9]+]] : $IUOFailableClassModel
+  // CHECK: bb0({{.*}}):
+  // CHECK:   [[FUNC:%.*]] = function_ref @_T09witnesses21IUOFailableClassModelCSQyACGSi3foo_tcfC : $@convention(method) (Int, @thick IUOFailableClassModel.Type) -> @owned Optional<IUOFailableClassModel>
+  // CHECK:   [[VALUE:%.*]] = apply [[FUNC]]({{.*}})
+  // CHECK:   switch_enum [[VALUE]] : $Optional<IUOFailableClassModel>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NONEBB:bb[0-9]+]]
+  //
+  // CHECK: [[NONEBB]]:
+  // CHECK:   unreachable
+  //
+  // CHECK: [[SOMEBB]]([[RESULT:%.*]] : $IUOFailableClassModel)
+  // CHECK: return [[RESULT]] : $IUOFailableClassModel
+  // CHECK: } // end sil function '_T09witnesses21IUOFailableClassModelCAA011NonFailableC10Refinement{{[_0-9a-zA-Z]*}}fCTW'
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_T09witnesses21IUOFailableClassModelCAA0bC11Requirement{{[_0-9a-zA-Z]*}}fCTW
   init!(foo: Int) {}

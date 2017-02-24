@@ -2280,6 +2280,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     }
 
     auto aliasDecl = new (TC.Context) TypeAliasDecl(SourceLoc(),
+                                                    SourceLoc(),
                                                     assocType->getName(),
                                                     SourceLoc(),
                                                     /*genericparams*/nullptr, 
@@ -3489,7 +3490,7 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
     if (!protos1.insert(p).second)
       return;
 
-    for (auto parent : p->getInheritedProtocols(&TC))
+    for (auto parent : p->getInheritedProtocols())
       insertProtocol(parent);
   };
   
@@ -3526,7 +3527,7 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
       return;
 
     protos2AreSubsetOf1 &= protos1.erase(p);
-    for (auto parent : p->getInheritedProtocols(&TC))
+    for (auto parent : p->getInheritedProtocols())
       removeProtocol(parent);
   };
 
@@ -4324,7 +4325,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
     return;
   }
 
-  if (!TC.isRequirement(requirement))
+  if (!requirement->isProtocolRequirement())
     return;
 
   // Resolve all associated types before trying to resolve this witness.
@@ -4489,7 +4490,7 @@ void ConformanceChecker::checkConformance() {
       continue;
 
     // Type aliases don't have requirements themselves.
-    if (!TC.isRequirement(requirement))
+    if (!requirement->isProtocolRequirement())
       continue;
 
     /// Local function to finalize the witness.
@@ -4848,7 +4849,7 @@ checkConformsToProtocol(TypeChecker &TC,
   }
 
   // Check that T conforms to all inherited protocols.
-  for (auto InheritedProto : Proto->getInheritedProtocols(&TC)) {
+  for (auto InheritedProto : Proto->getInheritedProtocols()) {
     auto InheritedConformance =
       TC.conformsToProtocol(T, InheritedProto, DC,
                             ConformanceCheckFlags::Used,
@@ -5514,7 +5515,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
       auto proto = conformance->getProtocol();
       for (auto member : proto->getMembers()) {
         auto req = dyn_cast<ValueDecl>(member);
-        if (!req) continue;
+        if (!req || !req->isProtocolRequirement()) continue;
 
         // If the requirement is unsatisfied, we might want to warn
         // about near misses; record it.
@@ -5966,17 +5967,6 @@ void DefaultWitnessChecker::recordWitness(
                                         storage);
 }
 
-// Not all protocol members are requirements.
-bool TypeChecker::isRequirement(const ValueDecl *requirement) {
-  if (auto *FD = dyn_cast<FuncDecl>(requirement))
-    if (FD->isAccessor())
-      return false;
-  if (isa<TypeAliasDecl>(requirement) ||
-      isa<NominalTypeDecl>(requirement))
-    return false;
-  return true;
-}
-
 void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
   DefaultWitnessChecker checker(*this, proto);
 
@@ -5991,7 +5981,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     if (isa<TypeDecl>(valueDecl))
       continue;
 
-    if (!isRequirement(valueDecl))
+    if (!valueDecl->isProtocolRequirement())
       continue;
 
     checker.resolveWitnessViaLookup(valueDecl);
@@ -6058,4 +6048,17 @@ void TypeChecker::recordKnownWitness(NormalProtocolConformance *conformance,
 
   conformance->setWitness(req,
                           match.getWitness(Context, std::move(reqEnvironment)));
+}
+
+Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
+                                 ProtocolConformanceRef conformance,
+                                 Identifier name,
+                                 Diag<> brokenProtocolDiag) {
+  Type ty = ProtocolConformanceRef::getTypeWitnessByName(type, conformance,
+                                                         name, this);
+  if (!ty &&
+      !(conformance.isConcrete() && conformance.getConcrete()->isInvalid()))
+    diagnose(protocol->getLoc(), brokenProtocolDiag);
+
+  return ty;
 }

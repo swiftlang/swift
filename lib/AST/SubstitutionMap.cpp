@@ -142,7 +142,7 @@ Optional<T> SubstitutionMap::forEachConformance(
     }
 
     // Search inherited conformances.
-    for (auto inherited : proto->getInheritedProtocols(nullptr)) {
+    for (auto inherited : proto->getInheritedProtocols()) {
       if (auto found = searchInConformance(conformance.getInherited(inherited),
                                            associatedTypeName,
                                            visited))
@@ -226,20 +226,26 @@ SubstitutionMap
 SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
                                           Type selfType,
                                           ProtocolConformanceRef conformance) {
-#ifndef NDEBUG
   auto protocolSelfType = protocol->getSelfInterfaceType();
-#endif
 
   return protocol->getGenericSignature()->getSubstitutionMap(
     [&](SubstitutableType *type) -> Type {
-      assert(type->isEqual(protocolSelfType));
-      return selfType;
+      if (type->isEqual(protocolSelfType))
+        return selfType;
+
+      // This will need to change if we ever support protocols
+      // inside generic types.
+      return Type();
     },
     [&](CanType origType, Type replacementType, ProtocolType *protoType)
-      -> ProtocolConformanceRef {
-      assert(origType->isEqual(protocolSelfType) &&
-             protoType->getDecl() == protocol);
-      return conformance;
+      -> Optional<ProtocolConformanceRef> {
+      if (origType->isEqual(protocolSelfType) &&
+          protoType->getDecl() == protocol)
+        return conformance;
+
+      // This will need to change if we ever support protocols
+      // inside generic types.
+      return None;
     });
 }
 

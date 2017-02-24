@@ -10,7 +10,7 @@ import Swift
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[OBJCCLASS:%objc_class]] = type
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
-// CHECK: [[C_CLASS:%C5class1C]] = type
+// CHECK: [[C_CLASS:%T5class1CC]] = type
 // CHECK: [[OBJCOBJ:%objc_object]] = type
 
 class C {}
@@ -88,7 +88,7 @@ entry(%c : $C):
   return %r : $Builtin.UnknownObject
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %C5class1C* @alloc_ref_dynamic(%swift.type*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc %T5class1CC* @alloc_ref_dynamic(%swift.type*)
 sil @alloc_ref_dynamic : $@convention(thin) (@thick C.Type) -> @owned C {
 bb0(%0 : $@thick C.Type):
   // CHECK:   [[META_PTR:%[0-9]+]] = bitcast %swift.type* %0 to i8*
@@ -105,10 +105,10 @@ bb0(%0 : $@thick C.Type):
   return %1 : $C
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %C5class1C* @autorelease(%C5class1C*) {{.*}} {
-// CHECK:         %1 = bitcast %C5class1C* %0 to %objc_object*
+// CHECK-LABEL: define{{( protected)?}} swiftcc %T5class1CC* @autorelease(%T5class1CC*) {{.*}} {
+// CHECK:         %1 = bitcast %T5class1CC* %0 to %objc_object*
 // CHECK:         call %objc_object* @objc_autorelease(%objc_object* %1)
-// CHECK:         ret %C5class1C* %0
+// CHECK:         ret %T5class1CC* %0
 sil @autorelease : $@convention(thin) (@owned C) -> C {
 entry(%c : $C):
   autorelease_value %c : $C
@@ -163,7 +163,7 @@ entry(%x : $ClassConstrainedGenericField<ClassConstraintConformance>):
   %b = load %a : $*ClassConstraintConformance
   return %b : $ClassConstraintConformance
 }
-// CHECK-LABEL: define{{( protected)?}} swiftcc %C5class26ClassConstraintConformance* @fixed_class_generic_field(%GC5class28ClassConstrainedGenericFieldCS_26ClassConstraintConformance_*)
-// CHECK:         [[FIELD_ADDR_GENERIC:%.*]] = getelementptr inbounds %GC5class28ClassConstrainedGenericFieldCS_26ClassConstraintConformance_, %GC5class28ClassConstrainedGenericFieldCS_26ClassConstraintConformance_* %0, i32 0, i32 1
-// CHECK:         load %C5class26ClassConstraintConformance*, %C5class26ClassConstraintConformance** [[FIELD_ADDR_GENERIC]]
+// CHECK-LABEL: define{{( protected)?}} swiftcc %T5class26ClassConstraintConformanceC* @fixed_class_generic_field(%T5class28ClassConstrainedGenericFieldCyAA0B21ConstraintConformanceCG*)
+// CHECK:         [[FIELD_ADDR_GENERIC:%.*]] = getelementptr inbounds %T5class28ClassConstrainedGenericFieldCyAA0B21ConstraintConformanceCG, %T5class28ClassConstrainedGenericFieldCyAA0B21ConstraintConformanceCG* %0, i32 0, i32 1
+// CHECK:         load %T5class26ClassConstraintConformanceC*, %T5class26ClassConstraintConformanceC** [[FIELD_ADDR_GENERIC]]
 

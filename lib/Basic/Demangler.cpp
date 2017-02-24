@@ -1184,6 +1184,53 @@ NodePointer Demangler::demangleFunctionSpecialization() {
   }
   if (!nextIf('n'))
     Spec = addChild(Spec, demangleFuncSpecParam(Node::IndexType(~0)));
+
+  if (!Spec)
+    return nullptr;
+
+  // Add the required parameters in reverse order.
+  for (size_t Idx = 0, Num = Spec->getNumChildren(); Idx < Num; ++Idx) {
+    NodePointer Param = Spec->getChild(Num - Idx - 1);
+    if (Param->getKind() != Node::Kind::FunctionSignatureSpecializationParam)
+      continue;
+
+    if (Param->getNumChildren() == 0)
+      continue;
+    NodePointer KindNd = Param->getFirstChild();
+    assert(KindNd->getKind() ==
+             Node::Kind::FunctionSignatureSpecializationParamKind);
+    auto ParamKind = (FunctionSigSpecializationParamKind)KindNd->getIndex();
+    switch (ParamKind) {
+      case FunctionSigSpecializationParamKind::ConstantPropFunction:
+      case FunctionSigSpecializationParamKind::ConstantPropGlobal:
+      case FunctionSigSpecializationParamKind::ConstantPropString:
+      case FunctionSigSpecializationParamKind::ClosureProp: {
+        std::vector<NodePointer> Types;
+        while (NodePointer Ty = popNode(Node::Kind::Type)) {
+          assert(ParamKind == FunctionSigSpecializationParamKind::ClosureProp);
+          Types.push_back(Ty);
+        }
+        NodePointer Name = popNode(Node::Kind::Identifier);
+        if (!Name)
+          return nullptr;
+        StringRef Text = Name->getText();
+        if (ParamKind ==
+              FunctionSigSpecializationParamKind::ConstantPropString &&
+            Text.size() > 0 && Text[0] == '_') {
+          // A '_' escapes a leading digit or '_' of a string constant.
+          Text = Text.drop_front(1);
+        }
+        addChild(Param, NodeFactory::create(
+          Node::Kind::FunctionSignatureSpecializationParamPayload, Text));
+        while (NodePointer Ty = pop_back_val(Types)) {
+          Param = addChild(Param, Ty);
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
   return Spec;
 }
 
@@ -1193,26 +1240,24 @@ NodePointer Demangler::demangleFuncSpecParam(Node::IndexType ParamIdx) {
   switch (nextChar()) {
     case 'n':
       return Param;
-    case 'c': {
-      std::vector<NodePointer> Types;
-      while (NodePointer Ty = popNode(Node::Kind::Type)) {
-        Types.push_back(Ty);
-      }
-      Param = addFuncSpecParamIdentifier(Param,
-            swift::Demangle::FunctionSigSpecializationParamKind::ClosureProp);
-      while (NodePointer Ty = pop_back_val(Types)) {
-        Param = addChild(Param, Ty);
-      }
-      return Param;
-    }
+    case 'c':
+      // Consumes an identifier and multiple type parameters.
+      // The parameters will be added later.
+      return addChild(Param, NodeFactory::create(
+        Node::Kind::FunctionSignatureSpecializationParamKind,
+        unsigned(FunctionSigSpecializationParamKind::ClosureProp)));
     case 'p': {
       switch (nextChar()) {
         case 'f':
-          return addFuncSpecParamIdentifier(Param,
-                    FunctionSigSpecializationParamKind::ConstantPropFunction);
+          // Consumes an identifier parameter, which will be added later.
+          return addChild(Param, NodeFactory::create(
+            Node::Kind::FunctionSignatureSpecializationParamKind,
+            unsigned(FunctionSigSpecializationParamKind::ConstantPropFunction)));
         case 'g':
-          return addFuncSpecParamIdentifier(Param,
-                      FunctionSigSpecializationParamKind::ConstantPropGlobal);
+          // Consumes an identifier parameter, which will be added later.
+          return addChild(Param, NodeFactory::create(
+            Node::Kind::FunctionSignatureSpecializationParamKind,
+            unsigned(FunctionSigSpecializationParamKind::ConstantPropGlobal)));
         case 'i':
           return addFuncSpecParamNumber(Param,
                     FunctionSigSpecializationParamKind::ConstantPropInteger);
@@ -1220,6 +1265,8 @@ NodePointer Demangler::demangleFuncSpecParam(Node::IndexType ParamIdx) {
           return addFuncSpecParamNumber(Param,
                       FunctionSigSpecializationParamKind::ConstantPropFloat);
         case 's': {
+          // Consumes an identifier parameter (the string constant),
+          // which will be added later.
           StringRef Encoding;
           switch (nextChar()) {
             case 'b': Encoding = "u8"; break;
@@ -1227,23 +1274,13 @@ NodePointer Demangler::demangleFuncSpecParam(Node::IndexType ParamIdx) {
             case 'c': Encoding = "objc"; break;
             default: return nullptr;
           }
-          NodePointer Str = popNode(Node::Kind::Identifier);
-          if (!Str)
-            return nullptr;
-          StringRef Text = Str->getText();
-          if (Text.size() > 0 && Text[0] == '_')
-            Text = Text.drop_front(1);
-
-          Param->addChild(NodeFactory::create(
+          addChild(Param, NodeFactory::create(
                   Node::Kind::FunctionSignatureSpecializationParamKind,
                   unsigned(swift::Demangle::FunctionSigSpecializationParamKind::
                            ConstantPropString)));
-          Param->addChild(NodeFactory::create(
-                  Node::Kind::FunctionSignatureSpecializationParamPayload,
-                  Encoding));
           return addChild(Param, NodeFactory::create(
                   Node::Kind::FunctionSignatureSpecializationParamPayload,
-                  Text));
+                  Encoding));
         }
         default:
           return nullptr;
@@ -1281,22 +1318,6 @@ NodePointer Demangler::demangleFuncSpecParam(Node::IndexType ParamIdx) {
     default:
       return nullptr;
   }
-}
-
-NodePointer Demangler::addFuncSpecParamIdentifier(NodePointer Param,
-                                    FunctionSigSpecializationParamKind Kind,
-                                    StringRef FirstParam) {
-  NodePointer Name = popNode(Node::Kind::Identifier);
-  if (!Name)
-    return nullptr;
-  Param->addChild(NodeFactory::create(
-        Node::Kind::FunctionSignatureSpecializationParamKind, unsigned(Kind)));
-  if (!FirstParam.empty()) {
-    Param->addChild(NodeFactory::create(
-          Node::Kind::FunctionSignatureSpecializationParamPayload, FirstParam));
-  }
-  return addChild(Param, NodeFactory::create(
-     Node::Kind::FunctionSignatureSpecializationParamPayload, Name->getText()));
 }
 
 NodePointer Demangler::addFuncSpecParamNumber(NodePointer Param,

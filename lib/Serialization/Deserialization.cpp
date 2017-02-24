@@ -992,8 +992,7 @@ void ModuleFile::readGenericRequirements(
 }
 
 void ModuleFile::configureGenericEnvironment(
-             llvm::PointerUnion3<GenericTypeDecl *, ExtensionDecl *,
-                                 AbstractFunctionDecl *> genericDecl,
+             GenericContext *genericDecl,
              serialization::GenericEnvironmentID envID) {
   if (envID == 0) return;
 
@@ -1002,33 +1001,15 @@ void ModuleFile::configureGenericEnvironment(
   // If we just have a generic signature, set up lazy generic environment
   // creation.
   if (auto genericSig = sigOrEnv.dyn_cast<GenericSignature *>()) {
-    if (auto type = genericDecl.dyn_cast<GenericTypeDecl *>()) {
-      type->setLazyGenericEnvironment(this, genericSig, envID);
-      DelayedGenericEnvironments.push_back(type);
-    } else if (auto func = genericDecl.dyn_cast<AbstractFunctionDecl *>()) {
-      func->setLazyGenericEnvironment(this, genericSig, envID);
-      DelayedGenericEnvironments.push_back(func);
-    } else {
-      auto ext = genericDecl.get<ExtensionDecl *>();
-      ext->setLazyGenericEnvironment(this, genericSig, envID);
-      DelayedGenericEnvironments.push_back(ext);
-    }
-
+    genericDecl->setLazyGenericEnvironment(this, genericSig, envID);
+    DelayedGenericEnvironments.push_back(genericDecl);
     return;
   }
 
   // If we have a full generic environment, it's because it happened to be
   // deserialized already. Record it directly.
   if (auto genericEnv = sigOrEnv.dyn_cast<GenericEnvironment *>()) {
-    if (auto type = genericDecl.dyn_cast<GenericTypeDecl *>()) {
-      type->setGenericEnvironment(genericEnv);
-    } else if (auto func = genericDecl.dyn_cast<AbstractFunctionDecl *>()) {
-      func->setGenericEnvironment(genericEnv);
-    } else {
-      auto ext = genericDecl.get<ExtensionDecl *>();
-      ext->setGenericEnvironment(genericEnv);
-    }
-
+    genericDecl->setGenericEnvironment(genericEnv);
     return;
   }
 }
@@ -2496,7 +2477,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto alias = createDecl<TypeAliasDecl>(SourceLoc(), getIdentifier(nameID),
+    auto alias = createDecl<TypeAliasDecl>(SourceLoc(), SourceLoc(),
+                                           getIdentifier(nameID),
                                            SourceLoc(), genericParams, DC);
     declOrOffset = alias;
 
@@ -3018,14 +3000,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isImplicit, isClassBounded, isObjC;
     GenericEnvironmentID genericEnvID;
     uint8_t rawAccessLevel;
-    unsigned numProtocols;
-    ArrayRef<uint64_t> rawProtocolAndInheritedIDs;
+    ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
                                             genericEnvID, rawAccessLevel,
-                                            numProtocols,
-                                            rawProtocolAndInheritedIDs);
+                                            rawInheritedIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3048,14 +3028,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     assert(genericParams && "protocol with no generic parameters?");
     proto->setGenericParams(genericParams);
 
-    auto protocols = ctx.Allocate<ProtocolDecl *>(numProtocols);
-    for_each(protocols, rawProtocolAndInheritedIDs.slice(0, numProtocols),
-             [this](ProtocolDecl *&p, uint64_t rawID) {
-               p = cast<ProtocolDecl>(getDecl(rawID));
-             });
-    proto->setInheritedProtocols(protocols);
-
-    handleInherited(proto, rawProtocolAndInheritedIDs.slice(numProtocols));
+    handleInherited(proto, rawInheritedIDs);
 
     configureGenericEnvironment(proto, genericEnvID);
 
@@ -3369,6 +3342,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::SUBSCRIPT_DECL: {
     DeclContextID contextID;
     bool isImplicit, isObjC;
+    GenericEnvironmentID genericEnvID;
     TypeID interfaceTypeID;
     DeclID getterID, setterID, materializeForSetID;
     DeclID addressorID, mutableAddressorID, willSetID, didSetID;
@@ -3379,6 +3353,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID,
                                              isImplicit, isObjC, rawStorageKind,
+                                             genericEnvID,
                                              interfaceTypeID,
                                              getterID, setterID,
                                              materializeForSetID,
@@ -3387,7 +3362,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                              overriddenID, rawAccessLevel,
                                              rawSetterAccessLevel,
                                              argNameIDs);
-    auto DC = getDeclContext(contextID);
+    auto parent = getDeclContext(contextID);
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
+    auto *genericParams = maybeReadGenericParams(parent);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -3398,8 +3377,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     DeclName name(ctx, ctx.Id_subscript, argNames);
     auto subscript = createDecl<SubscriptDecl>(name, SourceLoc(), nullptr,
-                                               SourceLoc(), TypeLoc(), DC);
+                                               SourceLoc(), TypeLoc(),
+                                               parent, genericParams);
     declOrOffset = subscript;
+
+    configureGenericEnvironment(subscript, genericEnvID);
 
     subscript->setIndices(readParameterList());
 
@@ -4440,7 +4422,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   }
 }
 
-GenericEnvironment *ModuleFile::loadGenericEnvironment(const Decl *decl,
+GenericEnvironment *ModuleFile::loadGenericEnvironment(const DeclContext *decl,
                                                        uint64_t contextData) {
   return getGenericEnvironment(contextData);
 }

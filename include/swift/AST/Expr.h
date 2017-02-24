@@ -840,6 +840,14 @@ public:
       return DigitsLoc;
   }
 
+  SourceLoc getMinusLoc() const {
+    return MinusLoc;
+  }
+
+  SourceLoc getDigitsLoc() const {
+    return DigitsLoc;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_NumberLiteralExpr
       && E->getKind() <= ExprKind::Last_NumberLiteralExpr;
@@ -1135,7 +1143,7 @@ public:
   /// The kind of object literal.
   enum LiteralKind : unsigned {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) Name,
-#include "swift/Parse/Tokens.def"    
+#include "swift/Syntax/TokenKinds.def"
   };
 
 private:

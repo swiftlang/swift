@@ -917,6 +917,8 @@ bool swift::isLegalUpcast(SILType FromTy, SILType ToTy) {
 
 /// Check if we can pass/convert all arguments of the original apply
 /// as required by the found devirtualized method.
+/// FIXME: This method was introduced as a workaround. We need to
+/// revisit it and check if it is still needed.
 static bool
 canPassOrConvertAllArguments(ApplySite AI,
                              CanSILFunctionType SubstCalleeCanType) {
@@ -1008,10 +1010,7 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   return SAI;
 }
 
-/// In the cases where we can statically determine the function that
-/// we'll call to, replace an apply of a witness_method with an apply
-/// of a function_ref, returning the new apply.
-DevirtualizationResult swift::tryDevirtualizeWitnessMethod(ApplySite AI) {
+static bool canDevirtualizeWitnessMethod(ApplySite AI) {
   SILFunction *F;
   SILWitnessTable *WT;
 
@@ -1022,14 +1021,53 @@ DevirtualizationResult swift::tryDevirtualizeWitnessMethod(ApplySite AI) {
                                                 WMI->getMember());
 
   if (!F)
-    return std::make_pair(nullptr, FullApplySite());
+    return false;
 
   if (AI.getFunction()->isFragile()) {
     // function_ref inside fragile function cannot reference a private or
     // hidden symbol.
     if (!F->hasValidLinkageForFragileRef())
-      return std::make_pair(nullptr, FullApplySite());
+      return false;
   }
+
+  // Collect all the required substitutions.
+  //
+  // The complete set of substitutions may be different, e.g. because the found
+  // witness thunk F may have been created by a specialization pass and have
+  // additional generic parameters.
+  SmallVector<Substitution, 4> NewSubs;
+
+  getWitnessMethodSubstitutions(AI, F, WMI->getConformance(), NewSubs);
+
+  // Figure out the exact bound type of the function to be called by
+  // applying all substitutions.
+  auto &Module = AI.getModule();
+  auto CalleeCanType = F->getLoweredFunctionType();
+  auto SubstCalleeCanType = CalleeCanType->substGenericArgs(Module, NewSubs);
+
+  // Bail if some of the arguments cannot be converted into
+  // types required by the found devirtualized method.
+  if (!canPassOrConvertAllArguments(AI, SubstCalleeCanType))
+    return false;
+
+  return true;
+}
+
+/// In the cases where we can statically determine the function that
+/// we'll call to, replace an apply of a witness_method with an apply
+/// of a function_ref, returning the new apply.
+DevirtualizationResult swift::tryDevirtualizeWitnessMethod(ApplySite AI) {
+  if (!canDevirtualizeWitnessMethod(AI))
+    return std::make_pair(nullptr, FullApplySite());
+
+  SILFunction *F;
+  SILWitnessTable *WT;
+
+  auto *WMI = cast<WitnessMethodInst>(AI.getCallee());
+
+  std::tie(F, WT) =
+    AI.getModule().lookUpFunctionInWitnessTable(WMI->getConformance(),
+                                                WMI->getMember());
 
   auto Result = devirtualizeWitnessMethod(AI, F, WMI->getConformance());
   return std::make_pair(Result.getInstruction(), Result);
@@ -1042,7 +1080,7 @@ DevirtualizationResult swift::tryDevirtualizeWitnessMethod(ApplySite AI) {
 /// Attempt to devirtualize the given apply if possible, and return a
 /// new instruction in that case, or nullptr otherwise.
 DevirtualizationResult
-swift::tryDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) {
+swift::tryDevirtualizeApply(ApplySite AI, ClassHierarchyAnalysis *CHA) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize: " << *AI.getInstruction());
 
   // Devirtualize apply instructions that call witness_method instructions:
@@ -1052,6 +1090,77 @@ swift::tryDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) {
   //
   if (isa<WitnessMethodInst>(AI.getCallee()))
     return tryDevirtualizeWitnessMethod(AI);
+
+  // TODO: check if we can also de-virtualize partial applies of class methods.
+  FullApplySite FAS = FullApplySite::isa(AI.getInstruction());
+  if (!FAS)
+    return std::make_pair(nullptr, ApplySite());
+
+  /// Optimize a class_method and alloc_ref pair into a direct function
+  /// reference:
+  ///
+  /// \code
+  /// %XX = alloc_ref $Foo
+  /// %YY = class_method %XX : $Foo, #Foo.get!1 : $@convention(method)...
+  /// \endcode
+  ///
+  ///  or
+  ///
+  /// %XX = metatype $...
+  /// %YY = class_method %XX : ...
+  ///
+  ///  into
+  ///
+  /// %YY = function_ref @...
+  if (auto *CMI = dyn_cast<ClassMethodInst>(FAS.getCallee())) {
+    auto &M = FAS.getModule();
+    auto Instance = stripUpCasts(CMI->getOperand());
+    auto ClassType = Instance->getType();
+    if (ClassType.is<MetatypeType>())
+      ClassType = ClassType.getMetatypeInstanceType(M);
+
+    auto *CD = ClassType.getClassOrBoundGenericClass();
+
+    if (isEffectivelyFinalMethod(FAS, ClassType, CD, CHA))
+      return tryDevirtualizeClassMethod(FAS, Instance);
+
+    // Try to check if the exact dynamic type of the instance is statically
+    // known.
+    if (auto Instance = getInstanceWithExactDynamicType(CMI->getOperand(),
+                                                        CMI->getModule(),
+                                                        CHA))
+      return tryDevirtualizeClassMethod(FAS, Instance);
+
+    if (auto ExactTy = getExactDynamicType(CMI->getOperand(), CMI->getModule(),
+                                           CHA)) {
+      if (ExactTy == CMI->getOperand()->getType())
+        return tryDevirtualizeClassMethod(FAS, CMI->getOperand());
+    }
+  }
+
+  if (isa<SuperMethodInst>(FAS.getCallee())) {
+    if (FAS.hasSelfArgument()) {
+      return tryDevirtualizeClassMethod(FAS, FAS.getSelfArgument());
+    }
+
+    // It is an invocation of a class method.
+    // Last operand is the metatype that should be used for dispatching.
+    return tryDevirtualizeClassMethod(FAS, FAS.getArguments().back());
+  }
+
+  return std::make_pair(nullptr, ApplySite());
+}
+
+bool swift::canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) {
+  DEBUG(llvm::dbgs() << "    Trying to devirtualize: " << *AI.getInstruction());
+
+  // Devirtualize apply instructions that call witness_method instructions:
+  //
+  //   %8 = witness_method $Optional<UInt16>, #LogicValue.boolValue!getter.1
+  //   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
+  //
+  if (isa<WitnessMethodInst>(AI.getCallee()))
+    return canDevirtualizeWitnessMethod(AI);
 
   /// Optimize a class_method and alloc_ref pair into a direct function
   /// reference:
@@ -1079,31 +1188,31 @@ swift::tryDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) {
     auto *CD = ClassType.getClassOrBoundGenericClass();
 
     if (isEffectivelyFinalMethod(AI, ClassType, CD, CHA))
-      return tryDevirtualizeClassMethod(AI, Instance);
+      return canDevirtualizeClassMethod(AI, Instance->getType());
 
     // Try to check if the exact dynamic type of the instance is statically
     // known.
     if (auto Instance = getInstanceWithExactDynamicType(CMI->getOperand(),
                                                         CMI->getModule(),
                                                         CHA))
-      return tryDevirtualizeClassMethod(AI, Instance);
+      return canDevirtualizeClassMethod(AI, Instance->getType());
 
     if (auto ExactTy = getExactDynamicType(CMI->getOperand(), CMI->getModule(),
                                            CHA)) {
       if (ExactTy == CMI->getOperand()->getType())
-        return tryDevirtualizeClassMethod(AI, CMI->getOperand());
+        return canDevirtualizeClassMethod(AI, CMI->getOperand()->getType());
     }
   }
 
   if (isa<SuperMethodInst>(AI.getCallee())) {
     if (AI.hasSelfArgument()) {
-      return tryDevirtualizeClassMethod(AI, AI.getSelfArgument());
+      return canDevirtualizeClassMethod(AI, AI.getSelfArgument()->getType());
     }
 
     // It is an invocation of a class method.
     // Last operand is the metatype that should be used for dispatching.
-    return tryDevirtualizeClassMethod(AI, AI.getArguments().back());
+    return canDevirtualizeClassMethod(AI, AI.getArguments().back()->getType());
   }
 
-  return std::make_pair(nullptr, FullApplySite());
+  return false;
 }

@@ -9,13 +9,13 @@ func Close(_ fn: () -> Int64) { fn() }
 typealias MyFloat = Float
 
 // CHECK: define hidden {{.*}}void @_TF5inout13modifyFooHeap
-// CHECK: %[[ALLOCA:.*]] = alloca %Vs5Int64*
+// CHECK: %[[ALLOCA:.*]] = alloca %Ts5Int64V*
 // CHECK: call void @llvm.dbg.declare(metadata
 // CHECK-SAME:                        %[[ALLOCA]], metadata ![[A:[0-9]+]]
 
 // Closure with promoted capture.
 // PROMO-CHECK: define {{.*}}@_TFF5inout13modifyFooHeapFTRVs5Int64Sf_T_U_FT_S0_
-// PROMO-CHECK: call void @llvm.dbg.declare(metadata %Vs5Int64** %
+// PROMO-CHECK: call void @llvm.dbg.declare(metadata %Ts5Int64V** %
 // PROMO-CHECK-SAME:   metadata ![[A1:[0-9]+]], metadata ![[EMPTY_EXPR:[0-9]+]])
 
 // PROMO-CHECK-DAG: ![[EMPTY_EXPR]] = !DIExpression()
@@ -39,7 +39,7 @@ func modifyFooHeap(_ a: inout Int64,
 
 // Inout reference type.
 // FOO-CHECK: define {{.*}}@_TF5inout9modifyFooFTRVs5Int64Sf_T_
-// FOO-CHECK: call void @llvm.dbg.declare(metadata %Vs5Int64** %
+// FOO-CHECK: call void @llvm.dbg.declare(metadata %Ts5Int64V** %
 // FOO-CHECK-SAME:          metadata ![[U:[0-9]+]], metadata ![[EMPTY_EXPR:.*]])
 // FOO-CHECK: ![[EMPTY_EXPR]] = !DIExpression()
 func modifyFoo(_ u: inout Int64,

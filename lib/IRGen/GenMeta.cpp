@@ -5641,19 +5641,18 @@ namespace {
       // Include the _Tt prefix. Since Swift protocol descriptors are laid
       // out to look like ObjC Protocol* objects, the name has to clearly be
       // a Swift mangled name.
-      SmallString<32> mangling;
-      mangling += "_Tt";
-      
-      auto name = LinkEntity::forTypeMangling(
-        Protocol->getDeclaredType()->getCanonicalType());
-      name.mangle(mangling);
-      auto global = IGM.getAddrOfGlobalString(mangling);
+
+      IRGenMangler mangler;
+      std::string Name =
+        mangler.mangleForProtocolDescriptor(Protocol->getDeclaredType());
+
+      auto global = IGM.getAddrOfGlobalString(Name);
       addWord(global);
     }
     
     void addInherited() {
       // If there are no inherited protocols, produce null.
-      auto inherited = Protocol->getInheritedProtocols(nullptr);
+      auto inherited = Protocol->getInheritedProtocols();
       if (inherited.empty()) {
         addWord(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
         return;

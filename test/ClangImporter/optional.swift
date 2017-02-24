@@ -14,8 +14,10 @@ class A {
 // CHECK-LABEL:    sil hidden [thunk] @_T08optional1AC3fooSSSgyFTo : $@convention(objc_method) (A) -> @autoreleased Optional<NSString>
 // CHECK:    bb0([[SELF:%.*]] : $A):
 // CHECK:      [[SELF_COPY:%.*]] = copy_value [[SELF]]
+// CHECK:      [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
 // CHECK:      [[T0:%.*]] = function_ref @_T08optional1AC3fooSSSgyF
-// CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[SELF_COPY]])
+// CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[BORROWED_SELF_COPY]])
+// CHECK-NEXT: end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
 // CHECK-NEXT: destroy_value [[SELF_COPY]]
 // CHECK:      [[T2:%.*]] = select_enum [[T1]]
 // CHECK-NEXT: cond_br [[T2]]
@@ -56,8 +58,10 @@ class A {
 // CHECK-NEXT: br
 //   Continuation.
 // CHECK:      bb3([[T0:%.*]] : $Optional<String>):
+// CHECK:      [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
 // CHECK:      [[T1:%.*]] = function_ref @_T08optional1AC3barySSSg1x_tF
-// CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[SELF_COPY]])
+// CHECK-NEXT: [[T2:%.*]] = apply [[T1]]([[T0]], [[BORROWED_SELF_COPY]])
+// CHECK-NEXT: end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
 // CHECK-NEXT: destroy_value [[SELF_COPY]]
 // CHECK-NEXT: return [[T2]] : $()
 }

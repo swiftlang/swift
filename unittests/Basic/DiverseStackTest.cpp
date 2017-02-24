@@ -51,7 +51,8 @@ struct ThreeByteType : ParentType {
 
 struct RandomValueGenerator {
   std::mt19937 gen;
-  std::uniform_int_distribution<uint8_t> randomEightBitValueGenerator;
+  std::uniform_int_distribution<int> randomEightBitValueGenerator{
+      0, std::numeric_limits<uint8_t>::max()};
   std::uniform_int_distribution<uint16_t> randomSixteenBitValueGenerator;
 
   // Randomly generated bits. This is frozen to ensure that the test doesn't

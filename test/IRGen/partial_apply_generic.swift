@@ -37,8 +37,8 @@ var x = seq ~> split
 // Indirect return
 //
 
-// CHECK-LABEL: define internal swiftcc { i8*, %swift.refcounted* } @_T021partial_apply_generic5split{{[_0-9a-zA-Z]*}}FTA(%V21partial_apply_generic5Spoon* noalias nocapture, %swift.refcounted* swiftself)
-// CHECK:         [[REABSTRACT:%.*]] = bitcast %V21partial_apply_generic5Spoon* %0 to %swift.opaque*
+// CHECK-LABEL: define internal swiftcc { i8*, %swift.refcounted* } @_T021partial_apply_generic5split{{[_0-9a-zA-Z]*}}FTA(%T21partial_apply_generic5SpoonV* noalias nocapture, %swift.refcounted* swiftself)
+// CHECK:         [[REABSTRACT:%.*]] = bitcast %T21partial_apply_generic5SpoonV* %0 to %swift.opaque*
 // CHECK:         tail call swiftcc { i8*, %swift.refcounted* } @_T021partial_apply_generic5split{{[_0-9a-zA-Z]*}}F(%swift.opaque* noalias nocapture [[REABSTRACT]],
 
 struct HugeStruct { var a, b, c, d: Int }

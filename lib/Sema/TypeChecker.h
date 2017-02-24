@@ -1087,9 +1087,6 @@ public:
   /// Introduce the accessors for a 'lazy' variable.
   void introduceLazyVarAccessors(VarDecl *var) override;
 
-  // Not all protocol members are requirements.
-  bool isRequirement(const ValueDecl *requirement);
-
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);
 
@@ -1101,6 +1098,9 @@ public:
   /// Perform semantic checks on the given generic parameter list.
   void prepareGenericParamList(GenericParamList *genericParams,
                                DeclContext *dc);
+
+  /// Revert the dependent types within the given generic parameter list.
+  void revertGenericParamList(GenericParamList *genericParams);
 
   /// Configure the interface type of a function declaration.
   void configureInterfaceType(AbstractFunctionDecl *func,
@@ -1116,8 +1116,26 @@ public:
   /// parameters.
   void revertGenericFuncSignature(AbstractFunctionDecl *func);
 
-  /// Revert the dependent types within the given generic parameter list.
-  void revertGenericParamList(GenericParamList *genericParams);
+  /// Check the generic parameters in the given generic parameter list (and its
+  /// parent generic parameter lists) according to the given resolver.
+  void checkGenericParamList(GenericSignatureBuilder *builder,
+                             GenericParamList *genericParams,
+                             GenericSignature *parentSig,
+                             GenericTypeResolver *resolver);
+
+  /// Validate the signature of a generic subscript.
+  ///
+  /// \param subscript The generic subscript.
+  GenericSignature *validateGenericSubscriptSignature(SubscriptDecl *subscript);
+
+  /// Revert the signature of a generic function to its pre-type-checked state,
+  /// so that it can be type checked again when we have resolved its generic
+  /// parameters.
+  void revertGenericSubscriptSignature(SubscriptDecl *subscript);
+
+  /// Configure the interface type of a subscript declaration.
+  void configureInterfaceType(SubscriptDecl *subscript,
+                              GenericSignature *sig);
 
   /// Construct a new generic environment for the given declaration context.
   ///
@@ -1167,13 +1185,6 @@ public:
   /// \param nominal The generic type.
   void validateGenericTypeSignature(GenericTypeDecl *nominal);
 
-  /// Check the generic parameters in the given generic parameter list (and its
-  /// parent generic parameter lists) according to the given resolver.
-  void checkGenericParamList(GenericSignatureBuilder *builder,
-                             GenericParamList *genericParams,
-                             GenericSignature *parentSig,
-                             GenericTypeResolver *resolver);
-
   /// Check the given set of generic arguments against the requirements in a
   /// generic signature.
   ///
@@ -1221,7 +1232,7 @@ public:
                               GenericTypeResolver *resolver = nullptr);
 
   /// Retrieve the set of inherited protocols for this protocol type.
-  ArrayRef<ProtocolDecl *> getDirectConformsTo(ProtocolDecl *proto);
+  llvm::TinyPtrVector<ProtocolDecl *> getDirectConformsTo(ProtocolDecl *proto);
 
   /// \brief Add any implicitly-defined constructors required for the given
   /// struct or class.

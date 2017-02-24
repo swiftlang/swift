@@ -55,15 +55,6 @@ class Zang: Foo {
   // CHECK:             function_ref @_T010super_init3FooCACycfc
 }
 
-class Bad: Foo {
-  // Invalid code, but it's not diagnosed till DI. We at least shouldn't
-  // crash on it.
-  @inline(never)
-  override init() {
-    super.init(self)
-  }
-}
-
 class Good: Foo {
   let x: Int
 

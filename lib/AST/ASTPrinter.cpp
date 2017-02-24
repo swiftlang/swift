@@ -581,17 +581,35 @@ ASTPrinter &ASTPrinter::operator<<(DeclName name) {
   return *this;
 }
 
-ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
-  StringRef name;
+llvm::raw_ostream &swift::
+operator<<(llvm::raw_ostream &OS, tok keyword) {
   switch (keyword) {
-
-#define KEYWORD(KW) case tok::kw_##KW: name = #KW; break;
-#define POUND_KEYWORD(KW) case tok::pound_##KW: name = "#"#KW; break;
-#include "swift/Parse/Tokens.def"
+#define KEYWORD(KW) case tok::kw_##KW: OS << #KW; break;
+#define POUND_KEYWORD(KW) case tok::pound_##KW: OS << "#"#KW; break;
+#define PUNCTUATOR(PUN, TEXT) case tok::PUN: OS << TEXT; break;
+#include "swift/Syntax/TokenKinds.def"
   default:
-    llvm_unreachable("unexpected keyword kind");
+    llvm_unreachable("unexpected keyword or punctuator kind");
   }
-  printer.printKeyword(name);
+  return OS;
+}
+
+uint8_t swift::getKeywordLen(tok keyword) {
+  switch (keyword) {
+#define KEYWORD(KW) case tok::kw_##KW: return StringRef(#KW).size();
+#define POUND_KEYWORD(KW) case tok::pound_##KW: return StringRef("#"#KW).size();
+#define PUNCTUATOR(PUN, TEXT) case tok::PUN: return StringRef(TEXT).size();
+#include "swift/Syntax/TokenKinds.def"
+  default:
+    llvm_unreachable("unexpected keyword or punctuator kind");
+  }
+}
+
+ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
+  SmallString<16> Buffer;
+  llvm::raw_svector_ostream OS(Buffer);
+  OS << keyword;
+  printer.printKeyword(Buffer.str());
   return printer;
 }
 
@@ -628,7 +646,7 @@ void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
   bool IsKeyword = llvm::StringSwitch<bool>(Name.str())
 #define KEYWORD(KW) \
       .Case(#KW, true)
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
       .Default(false);
 
   if (IsKeyword)
@@ -1306,7 +1324,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
   }
 
   if (printRequirements) {
-    // Print the requirements.
     bool isFirstReq = true;
     for (const auto &req : requirements) {
       auto first = req.getFirstType();
@@ -1341,6 +1358,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         Printer << ", ";
       }
 
+      Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
       if (second) {
         Requirement substReq(req.getKind(), first, second);
         printRequirement(substReq);
@@ -1348,6 +1366,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         Requirement substReq(req.getKind(), first, req.getLayoutConstraint());
         printRequirement(substReq);
       }
+      Printer.printStructurePost(PrintStructureKind::GenericRequirement);
     }
   }
 

@@ -114,8 +114,8 @@ bb0(%0 : $Builtin.Word, %1 : $@thick T.Type):
 // CHECK-NEXT: [[ALIGNED:%[0-9]+]] = and i64 [[ALIGN_TMP]], -4
 // CHECK-NEXT: [[TOTAL_SIZE:%[0-9]+]] = add i64 [[ALIGNED]], 12
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* %0, i64 [[TOTAL_SIZE]], i64 {{.*}})
-// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %{{.*TestClass}}*
-// CHECK-NEXT:  ret %{{.*TestClass}}* [[O2]]
+// CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %{{.*TestClassC}}*
+// CHECK-NEXT:  ret %{{.*TestClassC}}* [[O2]]
 sil @alloc_dynamic : $@convention(thin) (@thick TestClass.Type) -> @owned TestClass {
 bb0(%0 : $@thick TestClass.Type):
   %c = integer_literal $Builtin.Word, 3
@@ -135,7 +135,7 @@ bb0(%0 : $TestClass):
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @project_tail_int
 // CHECK: [[S:%[0-9]+]] = getelementptr inbounds i8, i8* %{{[0-9]+}}, i64 20
-// CHECK: bitcast i8* [[S]] to %Vs5Int32*
+// CHECK: bitcast i8* [[S]] to %Ts5Int32V*
 // CHECK: ret
 sil @project_tail_int : $@convention(thin) (TestClass, Int32) -> () {
 bb0(%0 : $TestClass, %1 : $Int32):
@@ -180,13 +180,13 @@ bb0(%0 : $TestClass, %1 : $@thick T.Type):
 }
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @project_tail_index_byte_to_int
-// CHECK:      [[S1:%[0-9]+]] = bitcast i8* %0 to %Vs4Int8*
-// CHECK-NEXT: [[S2:%[0-9]+]] = getelementptr inbounds %Vs4Int8, %Vs4Int8* [[S1]], i64 2
-// CHECK-NEXT: [[S3:%[0-9]+]] = ptrtoint %Vs4Int8* [[S2]] to i64
+// CHECK:      [[S1:%[0-9]+]] = bitcast i8* %0 to %Ts4Int8V*
+// CHECK-NEXT: [[S2:%[0-9]+]] = getelementptr inbounds %Ts4Int8V, %Ts4Int8V* [[S1]], i64 2
+// CHECK-NEXT: [[S3:%[0-9]+]] = ptrtoint %Ts4Int8V* [[S2]] to i64
 // CHECK-NEXT: [[S4:%[0-9]+]] = add nuw i64 [[S3]], 3
 // CHECK-NEXT: [[S5:%[0-9]+]] = and i64 [[S4]], -4
-// CHECK-NEXT: [[S6:%[0-9]+]] = inttoptr i64 [[S5]] to %Vs4Int8*
-// CHECK-NEXT: [[S7:%[0-9]+]] = bitcast %Vs4Int8* [[S6]] to %Vs5Int32*
+// CHECK-NEXT: [[S6:%[0-9]+]] = inttoptr i64 [[S5]] to %Ts4Int8V*
+// CHECK-NEXT: [[S7:%[0-9]+]] = bitcast %Ts4Int8V* [[S6]] to %Ts5Int32V*
 // CHECK: ret
 sil @project_tail_index_byte_to_int : $@convention(thin) (Builtin.RawPointer, Int32) -> () {
 bb0(%0 : $Builtin.RawPointer, %1 : $Int32):

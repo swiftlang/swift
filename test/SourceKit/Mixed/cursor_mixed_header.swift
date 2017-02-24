@@ -14,4 +14,4 @@ func test(_ b : BaseInHead) {
 // CHECK: doIt(_:)
 // CHECK: c:objc(cs)BaseInHead(im)doIt:
 // CHECK: (BaseInHead) -> (Int32) -> ()
-// CHECK: <Declaration>func doIt(_ arg: <Type usr="s:Vs5Int32">Int32</Type>)</Declaration>
+// CHECK: <Declaration>func doIt(_ arg: <Type usr="s:s5Int32V">Int32</Type>)</Declaration>

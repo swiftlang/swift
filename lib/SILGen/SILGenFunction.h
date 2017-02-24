@@ -16,6 +16,7 @@
 #include "FormalEvaluation.h"
 #include "Initialization.h"
 #include "JumpDest.h"
+#include "RValue.h"
 #include "SILGen.h"
 #include "SILGenBuilder.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -104,7 +105,16 @@ public:
   Initialization *getEmitInto() const {
     return state.getPointer();
   }
-  
+
+  /// If we have an emit into, return the address of the emit into. Otherwise,
+  /// return an empty SILValue.
+  SILValue getAddressForInPlaceInitialization() const {
+    if (auto *init = getEmitInto()) {
+      return init->getAddressForInPlaceInitialization();
+    }
+    return SILValue();
+  }
+
   /// Return true if a ManagedValue producer is allowed to return at
   /// +0, given that it cannot guarantee that the value will be valid
   /// until the end of the current evaluation.
@@ -358,15 +368,58 @@ public:
   enum SelfInitDelegationStates {
     // 'self' is a normal variable.
     NormalSelf,
-    
-    // 'self' needs to be consumed next time it is referenced.
-    WillConsumeSelf,
-    
-    // 'self' has been consumed.
-    DidConsumeSelf,
+
+    /// 'self' needs to be shared borrowed next time self is used.
+    ///
+    /// At this point we do not know if:
+    ///
+    /// 1. 'self' is used at all. In such a case, the borrow scope for self will
+    ///     end before the delegating init call and we will overwrite the value
+    ///     in
+    ///     the self box.
+    ///
+    /// 2. If there is a consuming self use, will self be borrowed in an
+    ///    exclusive manner or a shared manner. If we need to perform an
+    ///    exclusive borrow, we will transition to WillExclusiveBorrowSelf in
+    ///    SILGenApply.
+    WillSharedBorrowSelf,
+
+    /// 'self' needs to be exclusively borrowed next time self is used.
+    ///
+    /// We only advance to this state in SILGenApply when we know that we are
+    /// going to be passing self to a delegating initializer that will consume
+    /// it. We will always evaluate self before any other uses of self in the
+    /// self.init call, so we know that we will never move from
+    /// WillExclusiveBorrowSelf to WillSharedBorrowSelf.
+    ///
+    /// Once we are in this point, all other uses of self must be borrows until
+    /// we use self in the delegating init call. All of the borrow scopes /must/
+    /// end before the delegating init call.
+    WillExclusiveBorrowSelf,
+
+    /// 'self' was shared borrowed to compute the self argument of the
+    /// delegating init call.
+    ///
+    /// This means that the delegating init uses a metatype or the like as its
+    /// self argument instead of 'self'. Thus we are able to perform a shared
+    /// borrow of self to compute that value and end the shared borrow scope
+    /// before the delegating initializer apply.
+    DidSharedBorrowSelf,
+
+    // 'self' was exclusively borrowed for the delegating init call. All further
+    // uses of self until the actual delegating init must be done via shared
+    // borrows that end strictly before the delegating init call.
+    DidExclusiveBorrowSelf,
   };
   SelfInitDelegationStates SelfInitDelegationState = NormalSelf;
-  
+  ManagedValue InitDelegationSelf;
+  SILValue InitDelegationSelfBox;
+  Optional<SILLocation> InitDelegationLoc;
+  ManagedValue SuperInitDelegationSelf;
+
+  RValue emitRValueForSelfInDelegationInit(SILLocation loc, CanType refType,
+                                           SILValue result, SGFContext C);
+
   /// The metatype argument to an allocating constructor, if we're emitting one.
   SILValue AllocatorMetatype;
 
@@ -398,6 +451,7 @@ public:
   }
   
   SILFunction &getFunction() { return F; }
+  SILModule &getModule() { return F.getModule(); }
   SILGenBuilder &getBuilder() { return B; }
   
   const TypeLowering &getTypeLowering(AbstractionPattern orig, Type subst) {
@@ -774,8 +828,10 @@ public:
   SILValue emitDoesOptionalHaveValue(SILLocation loc, SILValue addrOrValue);
 
   /// \brief Emit a switch_enum to call the library intrinsic
-  /// _diagnoseUnexpectedNilOptional if the optional has no value.
-  void emitPreconditionOptionalHasValue(SILLocation loc, SILValue addr);
+  /// _diagnoseUnexpectedNilOptional if the optional has no value. Return the
+  /// MangedValue resulting from the success case.
+  ManagedValue emitPreconditionOptionalHasValue(SILLocation loc,
+                                                ManagedValue optional);
 
   /// \brief Emit a call to the library intrinsic _getOptionalValue
   /// given the address of the optional, which checks that an optional contains
@@ -962,6 +1018,10 @@ public:
   CleanupHandle enterDeallocateUninitializedArrayCleanup(SILValue array);
   void emitUninitializedArrayDeallocation(SILLocation loc, SILValue array);
 
+  CleanupHandle enterDelegateInitSelfWritebackCleanup(SILLocation loc,
+                                                      SILValue address,
+                                                      SILValue newValue);
+
   SILValue emitConversionToSemanticRValue(SILLocation loc, SILValue value,
                                           const TypeLowering &valueTL);
 
@@ -1127,6 +1187,11 @@ public:
   ManagedValue emitManagedBufferWithCleanup(SILValue addr,
                                             const TypeLowering &lowering);
 
+  ManagedValue emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
+                                                        SILValue value);
+  ManagedValue emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
+                                                        SILValue addr);
+
   void emitSemanticLoadInto(SILLocation loc, SILValue src,
                             const TypeLowering &srcLowering,
                             SILValue dest,
@@ -1150,7 +1215,12 @@ public:
                         const TypeLowering &rvalueTL,
                         SGFContext C, IsTake_t isTake,
                         bool isGuaranteedValid = false);
-  
+
+  ManagedValue emitFormalAccessLoad(SILLocation loc, SILValue addr,
+                                    const TypeLowering &rvalueTL, SGFContext C,
+                                    IsTake_t isTake,
+                                    bool isGuaranteedValid = false);
+
   void emitAssignToLValue(SILLocation loc, RValue &&src,
                           LValue &&dest);
   void emitAssignLValueToLValue(SILLocation loc,
@@ -1533,6 +1603,14 @@ public:
   std::unique_ptr<TemporaryInitialization>
   emitTemporary(SILLocation loc, const TypeLowering &tempTL);
 
+  /// Emit the allocation for a local temporary, provides an
+  /// Initialization that can be used to initialize it, and registers
+  /// cleanups in the current active formal evaluation scope.
+  ///
+  /// The initialization is guaranteed to be a single buffer.
+  std::unique_ptr<TemporaryInitialization>
+  emitFormalAccessTemporary(SILLocation loc, const TypeLowering &tempTL);
+
   /// Provides an Initialization that can be used to initialize an already-
   /// allocated temporary, and registers cleanups in the active scope.
   ///
@@ -1544,6 +1622,12 @@ public:
   /// given address.
   CleanupHandle enterDormantTemporaryCleanup(SILValue temp,
                                              const TypeLowering &tempTL);
+
+  /// Enter a currently-dormant cleanup to destroy the value in the
+  /// given address.
+  CleanupHandle
+  enterDormantFormalAccessTemporaryCleanup(SILValue temp, SILLocation loc,
+                                           const TypeLowering &tempTL);
 
   /// Destroy and deallocate an initialized local variable.
   void destroyLocalVariable(SILLocation L, VarDecl *D);

@@ -10,7 +10,7 @@ func function() {
     let b = B()
 
   // Ensure that the local b and its weak copy are distinct local variables.
-  // CHECK: call void @llvm.dbg.{{.*}}(metadata %C11WeakCapture1B*
+  // CHECK: call void @llvm.dbg.{{.*}}(metadata %T11WeakCapture1BC*
   // CHECK-SAME:                       metadata [[B:.*]], metadata
   // CHECK: call void @llvm.dbg.{{.*}}(metadata %swift.weak*
   // CHECK-NOT:                        metadata [[B]]

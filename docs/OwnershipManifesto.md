@@ -92,7 +92,7 @@ the ownership system from an implementation detail to a more
 visible aspect of the language.  They are also somewhat
 inseparable, for reasons we'll explain, although of course they
 can be prioritized differently.  For these reasons, we will
-talk about them as a cohensive feature called "ownership".
+talk about them as a cohesive feature called "ownership".
 
 ### A bit more detail
 
@@ -118,7 +118,7 @@ arbitrary function will use its arguments; it just falls
 back on a default rule for whether to pass ownership of
 the value.  When that default rule is wrong, the program
 will end up making extra copies at runtime.  So one simple
-thing we can do is allow programs to be more explicit at
+thing we can do is to allow programs to be more explicit at
 certain points about whether they need ownership or not.
 
 That closely dovetails with the desire to support non-copyable
@@ -311,7 +311,7 @@ A *variable* is the semantics concept of a unique place in
 memory that stores a value.  It's not necessarily mutable, at least
 as we're using it in this document.  Variables are usually created for
 storage declarations, but they can also be created dynamically in
-raw memory, e.g. using UnsafeRawPointer.  A variable always has a
+raw memory, e.g. using `UnsafeRawPointer`.  A variable always has a
 specific type.  It also has a *lifetime*, i.e. a point in the language
 semantics where it comes into existence and a point (or several)
 where it is destroyed.
@@ -725,7 +725,7 @@ use static enforcement for some class instance properties.
 
 Undefined enforcement means that conflicts are not detected
 either statically or dynamically, and instead simply have
-undefined behavior.  This is not a desireable mechanism
+undefined behavior.  This is not a desirable mechanism
 for ordinary code given Swift's "safe by default" design,
 but it's the only real choice for things like unsafe pointers.
 
@@ -747,7 +747,7 @@ not to escape.  The following principles apply:
 - If a closure `C` potentially escapes, then for any variable
   `V` captured by `C`, all accesses to `V` potentially executed
   after a potential escape (including the accesses within `C`
-  itself) must use dynamic enforcement unless all such acesses
+  itself) must use dynamic enforcement unless all such accesses
   are reads.
 
 - If a closure `C` does not escape a function, then its
@@ -797,7 +797,7 @@ additional semantic concerns.
 A shared value can be used in the scope that binds it
 just like an ordinary parameter or `let` binding.
 If the shared value is used in a place that requires
-ownership, Swift will simply implicitly copy the value —
+ownership, Swift will simply implicitly copy the value --
 again, just like an ordinary parameter or `let` binding.
 
 #### Limitations of shared values
@@ -819,7 +819,7 @@ born from a trio of concerns:
 - We have to scope this proposal to something that can
   conceivably be implemented in the coming months.  We expect this
   proposal to yield major benefits to the language and its
-  implementaton, but it is already quite broad and aggressive.
+  implementation, but it is already quite broad and aggressive.
   First-class ephemerals would add enough complexity to the
   implementation and design that they are clearly out of scope.
   Furthermore, the remaining language-design questions are
@@ -861,7 +861,7 @@ born from a trio of concerns:
   lexical and maintains the ability to run arbitrary code
   at the end of an access.  Imagine what it would take to
   implement a loop that added these temporary mutable
-  references to an array — each iteration of the loop would
+  references to an array -- each iteration of the loop would
   have to be able to queue up arbitrary code to run as a clean-up
   when the function was finished with the array.  This would
   hardly be a low-cost abstraction!  A more Rust-like
@@ -1078,7 +1078,7 @@ A non-mutating iteration simply visits each of the elements
 in the collection, leaving it intact and unmodified.  We have
 no reason to copy the elements; the iteration variable can
 simply be bound to a shared value.  This is a `nonmutating`
-operaton on `Collection`.
+operation on `Collection`.
 
 This can be explicitly requested by declaring the iteration
 variable `shared`:
@@ -1285,7 +1285,7 @@ value is returned.  This is useful for several reasons:
   reference, that storage is normally accessed for the duration
   of the call.  The programmer can suppress this and force the
   copy to complete before the call by calling `copy` on the
-  storage reference before 
+  storage reference before.
 
 - It is necessary for types that have suppressed implicit
   copies.  See the section below on non-copyable types.
@@ -1402,7 +1402,7 @@ default.
 
 The logical solution is to maintain the default assumption
 that all types are copyable, and then allow select contexts
-to turn that assumption off.  We will cause these contexts
+to turn that assumption off.  We will call these contexts
 `moveonly` contexts.  All contexts lexically nested within
 a `moveonly` context are also implicitly `moveonly`.
 

@@ -144,7 +144,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   s2.w = s.w
 
 // CHECK:         [[RESULT_ADDR:%.*]] = struct_element_addr %1 : $*MySize, #MySize.h
-// CHECK:         [[RESULT:%.*]] = load_borrow [[RESULT_ADDR]] : $*Int
+// CHECK:         [[RESULT:%.*]] = load [trivial] [[RESULT_ADDR]] : $*Int
   _ = s.h
 
 // CHECK:         [[BORROWED_CLOSURE:%.*]] = begin_borrow %2

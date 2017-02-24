@@ -237,16 +237,24 @@ public:
   }
   
   /// Emit a copy of this value with independent ownership.
-  ManagedValue copy(SILGenFunction &gen, SILLocation l);
-  
+  ManagedValue copy(SILGenFunction &gen, SILLocation loc);
+
+  /// Emit a copy of this value with independent ownership into the current
+  /// formal evaluation scope.
+  ManagedValue formalAccessCopy(SILGenFunction &gen, SILLocation loc);
+
   /// Store a copy of this value with independent ownership into the given
   /// uninitialized address.
-  void copyInto(SILGenFunction &gen, SILValue dest, SILLocation L);
-  
+  void copyInto(SILGenFunction &gen, SILValue dest, SILLocation loc);
+
   /// This is the same operation as 'copy', but works on +0 values that don't
   /// have cleanups.  It returns a +1 value with one.
   ManagedValue copyUnmanaged(SILGenFunction &gen, SILLocation loc);
-  
+
+  /// This is the same operation as 'formalAccessCopy', but works on +0 values
+  /// that don't have cleanups.  It returns a +1 value with one.
+  ManagedValue formalAccessCopyUnmanaged(SILGenFunction &gen, SILLocation loc);
+
   bool hasCleanup() const { return cleanup.isValid(); }
   CleanupHandle getCleanup() const { return cleanup; }
 
@@ -258,8 +266,7 @@ public:
   ManagedValue borrow(SILGenFunction &gen, SILLocation loc) const;
 
   /// Return a formally evaluated "borrowed" version of this value.
-  ManagedValue formalEvaluationBorrow(SILGenFunction &gen,
-                                      SILLocation loc) const;
+  ManagedValue formalAccessBorrow(SILGenFunction &gen, SILLocation loc) const;
 
   ManagedValue unmanagedBorrow() const {
     return isLValue() ? *this : ManagedValue::forUnmanaged(getValue());

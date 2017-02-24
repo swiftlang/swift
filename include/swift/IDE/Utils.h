@@ -143,7 +143,15 @@ class XMLEscapingPrinter : public StreamPrinter {
   void printXML(StringRef Text);
 };
 
+enum class SemaTokenKind {
+  Invalid,
+  ValueRef,
+  ModuleRef,
+  StmtStart,
+};
+
 struct SemaToken {
+  SemaTokenKind Kind = SemaTokenKind::Invalid;
   ValueDecl *ValueD = nullptr;
   TypeDecl *CtorTyRef = nullptr;
   ExtensionDecl *ExtTyRef = nullptr;
@@ -154,17 +162,20 @@ struct SemaToken {
   Type Ty;
   DeclContext *DC = nullptr;
   Type ContainerType;
+  Stmt *TrailingStmt = nullptr;
 
   SemaToken() = default;
   SemaToken(ValueDecl *ValueD, TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
             SourceLoc Loc, bool IsRef, Type Ty, Type ContainerType) :
-            ValueD(ValueD), CtorTyRef(CtorTyRef), ExtTyRef(ExtTyRef), Loc(Loc),
-            IsRef(IsRef), Ty(Ty), DC(ValueD->getDeclContext()),
-            ContainerType(ContainerType) {}
-  SemaToken(ModuleEntity Mod, SourceLoc Loc) : Mod(Mod), Loc(Loc) { }
-
-  bool isValid() const { return ValueD != nullptr || Mod; }
-  bool isInvalid() const { return !isValid(); }
+            Kind(SemaTokenKind::ValueRef), ValueD(ValueD), CtorTyRef(CtorTyRef),
+            ExtTyRef(ExtTyRef), Loc(Loc), IsRef(IsRef), Ty(Ty),
+            DC(ValueD->getDeclContext()), ContainerType(ContainerType) {}
+  SemaToken(ModuleEntity Mod, SourceLoc Loc) : Kind(SemaTokenKind::ModuleRef),
+                                               Mod(Mod), Loc(Loc) { }
+  SemaToken(Stmt *TrailingStmt) : Kind(SemaTokenKind::StmtStart),
+                                  TrailingStmt(TrailingStmt) {}
+  bool isValid() const { return !isInvalid(); }
+  bool isInvalid() const { return Kind == SemaTokenKind::Invalid; }
 };
 
 class SemaLocResolver : public SourceEntityWalker {
@@ -196,6 +207,7 @@ private:
   bool tryResolve(ValueDecl *D, TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
                   SourceLoc Loc, bool IsRef, Type Ty = Type());
   bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
+  bool tryResolve(Stmt *St);
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override;
 };
@@ -235,6 +247,7 @@ struct ResolvedRangeInfo {
   Type Ty;
   StringRef Content;
   bool HasSingleEntry;
+  bool ThrowingUnhandledError;
   OrphanKind Orphan;
 
   // The topmost ast nodes contained in the given range.
@@ -244,20 +257,20 @@ struct ResolvedRangeInfo {
   DeclContext* RangeContext;
   ResolvedRangeInfo(RangeKind Kind, Type Ty, StringRef Content,
                     DeclContext* RangeContext,
-                    bool HasSingleEntry,
-                    OrphanKind Orphan,
-                    ArrayRef<ASTNode> ContainedNodes,
+                    bool HasSingleEntry, bool ThrowingUnhandledError,
+                    OrphanKind Orphan, ArrayRef<ASTNode> ContainedNodes,
                     ArrayRef<DeclaredDecl> DeclaredDecls,
                     ArrayRef<ReferencedDecl> ReferencedDecls): Kind(Kind),
                       Ty(Ty), Content(Content), HasSingleEntry(HasSingleEntry),
-                      Orphan(Orphan),
-                      ContainedNodes(ContainedNodes),
+                      ThrowingUnhandledError(ThrowingUnhandledError),
+                      Orphan(Orphan), ContainedNodes(ContainedNodes),
                       DeclaredDecls(DeclaredDecls),
                       ReferencedDecls(ReferencedDecls),
                       RangeContext(RangeContext) {}
   ResolvedRangeInfo() :
   ResolvedRangeInfo(RangeKind::Invalid, Type(), StringRef(), nullptr,
-                    /*Single entry*/true, OrphanKind::None, {}, {}, {}) {}
+                    /*Single entry*/true, /*unhandled error*/false,
+                    OrphanKind::None, {}, {}, {}) {}
   void print(llvm::raw_ostream &OS);
 };
 

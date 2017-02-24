@@ -51,7 +51,7 @@ struct SomeWeak {
 
 // CHECK-LABEL: define linkonce_odr hidden void @_T021array_value_witnesses8SomeWeakVwXx
 // CHECK:         (%swift.opaque* [[ARRAY_PTR:%.*]], [[WORD:i[0-9]+]] [[COUNT:%.*]], %swift.type* %SomeWeak) {{.*}} {
-// CHECK:         [[BEGIN:%.*]] = bitcast %swift.opaque* [[ARRAY_PTR]] to [[SOMEWEAK:%V21array_value_witnesses8SomeWeak]]*
+// CHECK:         [[BEGIN:%.*]] = bitcast %swift.opaque* [[ARRAY_PTR]] to [[SOMEWEAK:%T21array_value_witnesses8SomeWeakV]]*
 // CHECK:         br label %iter
 // CHECK:       iter:
 // CHECK:         [[I:%.*]] = phi [[WORD]] [ [[COUNT]], %entry ], [ [[DEC:%.*]], %loop ]

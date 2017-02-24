@@ -17,6 +17,10 @@ Func Array.append(contentsOf:) has been removed
 Func ArraySlice.append(contentsOf:) has been removed
 Func ContiguousArray.append(contentsOf:) has been removed
 
+/* Unnecessary overload -- no functional change */
+Func Dictionary.removeValue(forKey:) has been removed
+Func Dictionary.updateValue(_:forKey:) has been removed
+
 /* FIXME: Bogus */
 Var Dictionary.endIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
 Var Dictionary.startIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index

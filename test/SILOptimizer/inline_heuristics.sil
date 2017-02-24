@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -debug-only=sil-inliner 2>%t/log | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-inline-generics=true -debug-only=sil-inliner 2>%t/log | %FileCheck %s
 // RUN: %FileCheck %s --check-prefix=CHECK-LOG <%t/log
 // REQUIRES: asserts
 
@@ -345,3 +345,61 @@ bb3(%7 : $Int32):
   return %7 : $Int32
 }
 
+// Tests of the generics inlining.
+
+// CHECK-LABEL: sil @testSpecializationAfterGenericInlining
+// CHECK-NOT: apply
+// CHECK: function_ref @action
+// CHECK: apply
+// CHECK-NOT: apply
+// CHECK: return
+// CHECK: end sil function 'testSpecializationAfterGenericInlining' 
+
+// Check that the inlining heuristic takes into account the possibility
+// of performing a generic specialization after inlining.
+// CHECK-LOG-LABEL: Inline into caller: testSpecializationAfterGenericInlining 
+// CHECK-LOG-NEXT: decision {{.*}}, b=320, {{.*}} checkSpecializationAfterGenericInlining
+
+sil hidden [noinline] @action : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $*T):
+  destroy_addr %0 : $*T
+  %3 = tuple ()
+  return %3 : $()
+} // end sil function 'action'
+
+// checkSpecializationAfterGenericInlining<A, B> (A, B) -> ()
+sil hidden @checkSpecializationAfterGenericInlining : $@convention(thin) <T, U> (@in T, @in U) -> () {
+bb0(%0 : $*T, %1 : $*U):
+  // function_ref action<A> (A) -> ()
+  %4 = function_ref @action : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  %5 = alloc_stack $T
+  copy_addr %0 to [initialization] %5 : $*T
+  %7 = apply %4<T>(%5) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %5 : $*T
+  destroy_addr %1 : $*U
+  destroy_addr %0 : $*T
+  %11 = tuple ()
+  return %11 : $()
+} // end sil function 'checkSpecializationAfterGenericInlining'
+
+sil @testSpecializationAfterGenericInlining : $@convention(thin) <U> (@in U) -> () {
+bb0(%0 : $*U):
+  // function_ref checkSpecializationAfterGenericInlining<A, B> (A, B) -> ()
+  %2 = function_ref @checkSpecializationAfterGenericInlining : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
+  %3 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %5 = alloc_stack $Int64
+  store %4 to %5 : $*Int64
+  %7 = alloc_stack $U
+  copy_addr %0 to [initialization] %7 : $*U
+  %9 = apply %2<Int64, U>(%5, %7) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
+  dealloc_stack %7 : $*U
+  dealloc_stack %5 : $*Int64
+  destroy_addr %0 : $*U
+  %13 = tuple ()
+  return %13 : $()
+} // end sil function 'testSpecializationAfterGenericInlining'
+
+// TODO:
+// Check that the inlining heuristic takes into account the possibility
+// of performing a devirtualization after inlining.

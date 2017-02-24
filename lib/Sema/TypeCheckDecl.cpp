@@ -524,11 +524,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   }
 
   if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-    // FIXME: If we already set the inherited protocols, bail out. We'd rather
-    // not have to check this.
-    if (proto->isInheritedProtocolsValid())
-      return;
-
     // Check for circular inheritance.
     // FIXME: The diagnostics here should be improved.
     bool diagnosedCircularity = false;
@@ -546,8 +541,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 
       ++i;
     }
-
-    proto->setInheritedProtocols(Context.AllocateCopy(allProtocols));
   }
   // Set the superclass.
   else if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
@@ -560,7 +553,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 }
 
 /// Retrieve the set of protocols the given protocol inherits.
-static ArrayRef<ProtocolDecl *>
+static llvm::TinyPtrVector<ProtocolDecl *>
 getInheritedForCycleCheck(TypeChecker &tc,
                           ProtocolDecl *proto,
                           ProtocolDecl **scratch) {
@@ -598,7 +591,6 @@ static ArrayRef<EnumDecl *> getInheritedForCycleCheck(TypeChecker &tc,
 //
 // FIXME: Just remove the problematic inheritance?
 static void breakInheritanceCycle(ProtocolDecl *proto) {
-  proto->clearInheritedProtocols();
 }
 
 /// Break the inheritance cycle for a class by removing its superclass.
@@ -2946,7 +2938,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   // we have those.
   //
   // TODO: Handle non-protocol requirements ('class', base class, etc.)
-  for (auto refinedProto : behaviorProto->getInheritedProtocols(&TC)) {
+  for (auto refinedProto : behaviorProto->getInheritedProtocols()) {
     // A behavior in non-type or static context is never going to be able to
     // satisfy Self constraints (until we give structural types that ability).
     // Give a tailored error message for this case.
@@ -3887,29 +3879,47 @@ public:
     assert(dc->isTypeContext() &&
            "Decl parsing must prevent subscripts outside of types!");
 
-    TC.checkDeclAttributesEarly(SD);
-    TC.computeAccessibility(SD);
+    if (auto gp = SD->getGenericParams()) {
+      // Write up generic parameters and check the generic parameter list.
+      gp->setOuterParameters(dc->getGenericParamsOfContext());
 
-    GenericTypeToArchetypeResolver resolver(dc);
+      auto *sig = TC.validateGenericSubscriptSignature(SD);
+      auto *env = sig->createGenericEnvironment(*SD->getModuleContext());
+      SD->setGenericEnvironment(env);
 
-    bool isInvalid = TC.validateType(SD->getElementTypeLoc(), dc,
+      // Revert the types within the signature so it can be type-checked with
+      // archetypes below.
+      TC.revertGenericSubscriptSignature(SD);
+    } else if (dc->getGenericSignatureOfContext()) {
+      (void)TC.validateGenericSubscriptSignature(SD);
+
+      // Revert all of the types within the signature of the subscript.
+      TC.revertGenericSubscriptSignature(SD);
+
+      SD->setGenericEnvironment(
+          SD->getDeclContext()->getGenericEnvironmentOfContext());
+    }
+
+    // Type check the subscript parameters.
+    GenericTypeToArchetypeResolver resolver(SD);
+
+    bool isInvalid = TC.validateType(SD->getElementTypeLoc(), SD,
                                      TypeResolutionOptions(),
                                      &resolver);
-    isInvalid |= TC.typeCheckParameterList(SD->getIndices(), dc,
+    isInvalid |= TC.typeCheckParameterList(SD->getIndices(), SD,
                                            TypeResolutionOptions(),
                                            resolver);
 
-    if (isInvalid) {
+    if (isInvalid || SD->isInvalid()) {
       SD->setInterfaceType(ErrorType::get(TC.Context));
       SD->setInvalid();
     } else {
-      auto indicesIfaceTy = SD->getIndices()->getInterfaceType(TC.Context);
-
-      auto elementTy = SD->getElementTypeLoc().getType();
-      auto elementIfaceTy = dc->mapTypeOutOfContext(elementTy);
-
-      SD->setInterfaceType(FunctionType::get(indicesIfaceTy, elementIfaceTy));
+      if (!SD->getGenericSignatureOfContext())
+        TC.configureInterfaceType(SD, SD->getGenericSignature());
     }
+
+    TC.checkDeclAttributesEarly(SD);
+    TC.computeAccessibility(SD);
 
     validateAttributes(TC, SD);
 
@@ -4359,7 +4369,7 @@ public:
         if (auto *tracker = SF->getReferencedNameTracker()) {
           bool isNonPrivate =
               (PD->getFormalAccess() > Accessibility::FilePrivate);
-          for (auto *parentProto : PD->getInheritedProtocols(nullptr))
+          for (auto *parentProto : PD->getInheritedProtocols())
             tracker->addUsedMember({parentProto, Identifier()}, isNonPrivate);
         }
       }
@@ -4812,35 +4822,12 @@ public:
       gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
 
       auto *sig = TC.validateGenericFuncSignature(FD);
-
-      // Create a fresh generic signature builder.
-      GenericSignatureBuilder builder(
-                             FD->getASTContext(),
-                             LookUpConformanceInModule(FD->getModuleContext()));
-      auto *parentSig = FD->getDeclContext()->getGenericSignatureOfContext();
-      TC.checkGenericParamList(&builder, gp, parentSig, nullptr);
-
-      // Infer requirements from parameter patterns.
-      for (auto pattern : FD->getParameterLists()) {
-        builder.inferRequirements(pattern, gp);
-      }
-
-      // Infer requirements from the result type.
-      if (!FD->getBodyResultTypeLoc().isNull()) {
-        unsigned depth = gp->getDepth();
-        builder.inferRequirements(FD->getBodyResultTypeLoc(),
-                                  /*minDepth=*/depth,
-                                  /*maxDepth=*/depth);
-      }
+      auto *env = sig->createGenericEnvironment(*FD->getModuleContext());
+      FD->setGenericEnvironment(env);
 
       // Revert the types within the signature so it can be type-checked with
       // archetypes below.
       TC.revertGenericFuncSignature(FD);
-
-      // Assign archetypes.
-      builder.finalize(FD->getLoc(), sig->getGenericParams());
-      auto *env = sig->createGenericEnvironment(*FD->getModuleContext());
-      FD->setGenericEnvironment(env);
     } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
       (void)TC.validateGenericFuncSignature(FD);
       // Revert all of the types within the signature of the function.
@@ -5021,11 +5008,15 @@ public:
       auto parentFunc = cast<FuncDecl>(parentDecl);
       if (func->isStatic() != parentFunc->isStatic())
         return false;
-      if (!!func->getGenericParams() != !!parentFunc->getGenericParams())
+      if (func->isGeneric() != parentFunc->isGeneric())
         return false;
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
       auto parentVar = cast<VarDecl>(parentDecl);
       if (var->isStatic() != parentVar->isStatic())
+        return false;
+    } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+      auto parentSubscript = cast<SubscriptDecl>(parentDecl);
+      if (subscript->isGeneric() != parentSubscript->isGeneric())
         return false;
     }
 
@@ -5396,9 +5387,17 @@ public:
     // Figure out the type of the declaration that we're using for comparisons.
     auto declTy = decl->getInterfaceType()->getUnlabeledType(TC.Context);
     if (method) {
+      // For methods, strip off the 'Self' type.
       declTy = declTy->castTo<AnyFunctionType>()->getResult();
       adjustFunctionTypeForOverride(declTy);
+    } if (subscript) {
+      // For subscripts, we don't have a 'Self' type, but turn it
+      // into a monomorphic function type.
+      auto funcTy = declTy->castTo<AnyFunctionType>();
+      declTy = FunctionType::get(funcTy->getInput(),
+                                 funcTy->getResult());
     } else {
+      // For properties, strip off ownership.
       declTy = declTy->getReferenceStorageReferent();
     }
 
@@ -5503,14 +5502,21 @@ public:
         }
 
         // Check whether the types are identical.
-        // FIXME: It's wrong to use the uncurried types here for methods.
         auto parentDeclTy = owningTy->adjustSuperclassMemberDeclType(
             parentDecl, decl, parentDecl->getInterfaceType(), &TC);
         parentDeclTy = parentDeclTy->getUnlabeledType(TC.Context);
         if (method) {
+          // For methods, strip off the 'Self' type.
           parentDeclTy = parentDeclTy->castTo<AnyFunctionType>()->getResult();
           adjustFunctionTypeForOverride(parentDeclTy);
+        } else if (subscript) {
+          // For subscripts, we don't have a 'Self' type, but turn it
+          // into a monomorphic function type.
+          auto parentFuncTy = parentDeclTy->castTo<AnyFunctionType>();
+          parentDeclTy = FunctionType::get(parentFuncTy->getInput(),
+                                           parentFuncTy->getResult());
         } else {
+          // For properties, strip off ownership.
           parentDeclTy = parentDeclTy->getReferenceStorageReferent();
         }
 
@@ -6129,7 +6135,7 @@ public:
     // it is in the same module, update the vtable.
     if (auto *baseDecl = dyn_cast<ClassDecl>(base->getDeclContext())) {
       if (baseDecl->hasKnownSwiftImplementation() && 
-          !base->isDynamic() &&
+          !base->isDynamic() && !isKnownObjC &&
           override->getDeclContext()->isExtensionContext()) {
         // For compatibility, only generate a warning in Swift 3
         TC.diagnose(override, (TC.Context.isSwiftVersion3()
@@ -6458,24 +6464,12 @@ public:
       gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
 
       auto *sig = TC.validateGenericFuncSignature(CD);
-
-      GenericSignatureBuilder builder(
-                             CD->getASTContext(),
-                             LookUpConformanceInModule(CD->getModuleContext()));
-      auto *parentSig = CD->getDeclContext()->getGenericSignatureOfContext();
-      TC.checkGenericParamList(&builder, gp, parentSig, nullptr);
-
-      // Infer requirements from the parameters of the constructor.
-      builder.inferRequirements(CD->getParameterList(1), gp);
+      auto *env = sig->createGenericEnvironment(*CD->getModuleContext());
+      CD->setGenericEnvironment(env);
 
       // Revert the types within the signature so it can be type-checked with
       // archetypes below.
       TC.revertGenericFuncSignature(CD);
-
-      // Assign archetypes.
-      builder.finalize(CD->getLoc(), sig->getGenericParams());
-      auto *env = sig->createGenericEnvironment(*CD->getModuleContext());
-      CD->setGenericEnvironment(env);
     } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
       (void)TC.validateGenericFuncSignature(CD);
 
@@ -7075,12 +7069,14 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     validateAttributes(*this, D);
 
+    proto->computeRequirementSignature();
+
     // If the protocol is @objc, it may only refine other @objc protocols.
     // FIXME: Revisit this restriction.
     if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
       Optional<ObjCReason> isObjC = ObjCReason::ImplicitlyObjC;
 
-      for (auto inherited : proto->getInheritedProtocols(nullptr)) {
+      for (auto inherited : proto->getInheritedProtocols()) {
         if (!inherited->isObjC()) {
           diagnose(proto->getLoc(),
                    diag::objc_protocol_inherits_non_objc_protocol,
@@ -7093,8 +7089,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
       markAsObjC(*this, proto, isObjC);
     }
-
-    proto->computeRequirementSignature();
 
     ValidatedTypes.insert(proto);
     break;
@@ -7525,10 +7519,10 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   assert(extendedType->is<NominalType>());
 }
 
-ArrayRef<ProtocolDecl *>
+llvm::TinyPtrVector<ProtocolDecl *>
 TypeChecker::getDirectConformsTo(ProtocolDecl *proto) {
   resolveInheritedProtocols(proto);
-  return proto->getInheritedProtocols(nullptr);
+  return proto->getInheritedProtocols();
 }
 
 /// Build a default initializer string for the given pattern.

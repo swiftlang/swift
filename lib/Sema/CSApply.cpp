@@ -1365,7 +1365,8 @@ namespace {
 
     /// \brief Build a new reference to another constructor.
     Expr *buildOtherConstructorRef(Type openedFullType,
-                                   ConstructorDecl *ctor, DeclNameLoc loc,
+                                   ConstructorDecl *ctor, Expr *base,
+                                   DeclNameLoc loc,
                                    ConstraintLocatorBuilder locator,
                                    bool implicit) {
       auto &tc = cs.getTypeChecker();
@@ -1402,8 +1403,21 @@ namespace {
                                    resultFnTy->getExtInfo());
 
       // Build the constructor reference.
-      return cs.cacheType(
+      Expr *ctorRef = cs.cacheType(
           new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit, resultTy));
+
+      // Wrap in covariant `Self` return if needed.
+      if (selfTy->hasReferenceSemantics()) {
+        auto covariantTy = resultTy
+          ->replaceCovariantResultType(base->getType()
+                                           ->getLValueOrInOutObjectType(),
+                                       ctor->getNumParameterLists());
+        if (!covariantTy->isEqual(resultTy))
+          ctorRef = cs.cacheType(
+               new (ctx) CovariantFunctionConversionExpr(ctorRef, covariantTy));
+      }
+
+      return ctorRef;
     }
 
     /// Bridge the given value (which is an error type) to NSError.
@@ -2458,7 +2472,7 @@ namespace {
       }
 
       // Build a partial application of the delegated initializer.
-      Expr *ctorRef = buildOtherConstructorRef(openedType, ctor, nameLoc,
+      Expr *ctorRef = buildOtherConstructorRef(openedType, ctor, base, nameLoc,
                                                ctorLocator, implicit);
       auto *call = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef, dotLoc,
                                                               base);
@@ -6307,6 +6321,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         auto arg = apply->getArg();
         if (auto tuple = dyn_cast<TupleExpr>(arg))
           arg = tuple->getElements()[0];
+        arg = cs.coerceToRValue(arg);
         auto replacement = new (tc.Context)
           DynamicTypeExpr(apply->getFn()->getLoc(),
                           apply->getArg()->getStartLoc(),

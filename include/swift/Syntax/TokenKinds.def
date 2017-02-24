@@ -1,4 +1,4 @@
-//===--- Tokens.def - Swift Tokenizer Metaprogramming -----------*- C++ -*-===//
+//===--- TokenKinds.def - Swift Tokenizer Metaprogramming -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -157,6 +157,8 @@ PUNCTUATOR(l_brace,       "{")
 PUNCTUATOR(r_brace,       "}")
 PUNCTUATOR(l_square,      "[")
 PUNCTUATOR(r_square,      "]")
+PUNCTUATOR(l_angle,       "<")
+PUNCTUATOR(r_angle,       ">")
 
 PUNCTUATOR(period,        ".")
 PUNCTUATOR(period_prefix, ".")

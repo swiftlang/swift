@@ -22,7 +22,7 @@ entry(%b : $Builtin.BridgeObject):
 }
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc %swift.bridge* @convert_to_bridge_object
-// CHECK:         [[REFBITS:%.*]] = ptrtoint [[C:%C13bridge_object1C\*]] %0 to i64
+// CHECK:         [[REFBITS:%.*]] = ptrtoint [[C:%T13bridge_object1CC\*]] %0 to i64
 // CHECK:         [[OR:%.*]] = or i64 [[REFBITS]], %1
 // CHECK:         inttoptr i64 [[OR]] to [[BRIDGE]]
 sil @convert_to_bridge_object : $(C, Builtin.Word) -> Builtin.BridgeObject {
@@ -56,11 +56,11 @@ entry(%b : $Builtin.BridgeObject):
   return %t : $(ObjC, Builtin.Word)
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %C13bridge_object1C* @convert_from_native_bridge_object
+// CHECK-LABEL: define{{( protected)?}} swiftcc %T13bridge_object1CC* @convert_from_native_bridge_object
 // CHECK:         [[BOBITS:%.*]] = ptrtoint %swift.bridge* %0 to i64
 // CHECK:         [[MASKED_BITS:%.*]] = and i64 [[BOBITS]], 72057594037927928
-// CHECK:         [[RESULT:%.*]] = inttoptr i64 [[MASKED_BITS]] to [[C:%C13bridge_object1C\*]]
-// CHECK:         ret %C13bridge_object1C* [[RESULT]]
+// CHECK:         [[RESULT:%.*]] = inttoptr i64 [[MASKED_BITS]] to [[C:%T13bridge_object1CC\*]]
+// CHECK:         ret %T13bridge_object1CC* [[RESULT]]
 sil @convert_from_native_bridge_object : $Builtin.BridgeObject -> C {
 entry(%b : $Builtin.BridgeObject):
   %c = bridge_object_to_ref %b : $Builtin.BridgeObject to $C

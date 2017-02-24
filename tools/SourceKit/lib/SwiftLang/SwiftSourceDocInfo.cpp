@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SourceEntityWalker.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -27,7 +28,6 @@
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/XMLUtils.h"
-#include "swift/PrintAsObjC/PrintAsObjC.h"
 #include "swift/Sema/IDETypeChecking.h"
 
 #include "clang/AST/ASTContext.h"
@@ -715,7 +715,17 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   }
   unsigned GroupEnd = SS.size();
 
+  unsigned LocalizationBegin = SS.size();
+  {
+    llvm::raw_svector_ostream OS(SS);
+    ide::getLocalizationKey(VD, OS);
+  }
+  unsigned LocalizationEnd = SS.size();
+
   DelayedStringRetriever OverUSRsStream(SS);
+
+  SmallVector<std::pair<unsigned, unsigned>, 4> OverUSROffs;
+
   ide::walkOverriddenDecls(VD,
     [&](llvm::PointerUnion<const ValueDecl*, const clang::NamedDecl*> D) {
       OverUSRsStream.startPiece();
@@ -798,6 +808,8 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   StringRef FullyAnnotatedDecl =
       StringRef(SS.begin() + FullDeclBegin, FullDeclEnd - FullDeclBegin);
   StringRef GroupName = StringRef(SS.begin() + GroupBegin, GroupEnd - GroupBegin);
+  StringRef LocalizationKey = StringRef(SS.begin() + LocalizationBegin,
+                                        LocalizationEnd - LocalizationBegin);
 
   llvm::Optional<std::pair<unsigned, unsigned>> DeclarationLoc;
   StringRef Filename;
@@ -837,6 +849,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   Info.OverrideUSRs = OverUSRs;
   Info.AnnotatedRelatedDeclarations = AnnotatedRelatedDecls;
   Info.GroupName = GroupName;
+  Info.LocalizationKey = LocalizationKey;
   Info.IsSystem = IsSystem;
   Info.TypeInterface = StringRef();
   Receiver(Info);
@@ -882,7 +895,8 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
   case NameKind::Swift: {
     NameTranslatingInfo Result;
     auto &Ctx = VD->getDeclContext()->getASTContext();
-    auto ResultPair = getObjCNameForSwiftDecl(VD, getSwiftDeclName(Ctx, Info));
+    auto ResultPair = swift::objc_translation::getObjCNameForSwiftDecl(VD,
+      getSwiftDeclName(Ctx, Info));
     Identifier Name = ResultPair.first;
     if (!Name.empty()) {
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::ObjC);
@@ -1061,10 +1075,12 @@ static void resolveCursor(SwiftLangSupport &Lang,
       CompilerInvocation CompInvok;
       ASTInvok->applyTo(CompInvok);
 
-      if (SemaTok.Mod) {
+      switch (SemaTok.Kind) {
+      case SemaTokenKind::ModuleRef:
         passCursorInfoForModule(SemaTok.Mod, Lang.getIFaceGenContexts(),
                                 CompInvok, Receiver);
-      } else {
+        return;
+      case SemaTokenKind::ValueRef: {
         ValueDecl *VD = SemaTok.CtorTyRef ? SemaTok.CtorTyRef : SemaTok.ValueD;
         bool Failed = passCursorInfoForDecl(VD, MainModule,
                                             SemaTok.ContainerType,
@@ -1081,6 +1097,15 @@ static void resolveCursor(SwiftLangSupport &Lang,
             Receiver({});
           }
         }
+        return;
+      }
+      case SemaTokenKind::StmtStart: {
+        Receiver({});
+        return;
+      }
+      case SemaTokenKind::Invalid: {
+        llvm_unreachable("bad sema token kind");
+      }
       }
     }
 
@@ -1155,9 +1180,11 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
       CompilerInvocation CompInvok;
       ASTInvok->applyTo(CompInvok);
 
-      if (SemaTok.Mod) {
+      switch(SemaTok.Kind) {
+      case SemaTokenKind::ModuleRef:
+        return;
 
-      } else {
+      case SemaTokenKind::ValueRef: {
         bool Failed = passNameInfoForDecl(SemaTok.ValueD, Input, Receiver);
         if (Failed) {
           if (!getPreviousASTSnaps().empty()) {
@@ -1168,6 +1195,14 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
             Receiver({});
           }
         }
+        return;
+      }
+      case SemaTokenKind::StmtStart: {
+        Receiver({});
+        return;
+      }
+      case SemaTokenKind::Invalid:
+        llvm_unreachable("bad sema token kind.");
       }
     }
 

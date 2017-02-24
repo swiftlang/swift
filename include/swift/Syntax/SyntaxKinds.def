@@ -1,0 +1,104 @@
+//===--- SyntaxKinds.def - Swift Syntax Node Metaprogramming -------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#define DECL(Id, Parent) SYNTAX(Id##Decl, Parent)
+#define STMT(Id, Parent) SYNTAX(Id##Stmt, Parent)
+#define EXPR(Id, Parent) SYNTAX(Id##Expr, Parent)
+#define PATTERN(Id, Parent) SYNTAX(Id##Pattern, Parent)
+
+//#include "swift/AST/DeclNodes.def"
+//#include "swift/AST/StmtNodes.def"
+//#include "swift/AST/ExprNodes.def"
+//#include "swift/AST/PatternNodes.def"
+
+#ifndef ABSTRACT_SYNTAX
+#define ABSTRACT_SYNTAX(Id, Parent)
+#endif
+
+#ifndef SYNTAX_RANGE
+#define SYNTAX_RANGE(Id, First, Last)
+#endif
+
+#ifndef MISSING_SYNTAX
+#define MISSING_SYNTAX(Id, Parent)
+#endif
+
+SYNTAX(Unknown, Syntax)
+
+// Decls
+ABSTRACT_SYNTAX(DeclSyntax, Syntax)
+  MISSING_SYNTAX(MissingDecl, DeclSyntax)
+  SYNTAX(UnknownDecl, DeclSyntax)
+  SYNTAX(StructDecl, DeclSyntax)
+  SYNTAX(TypeAliasDecl, DeclSyntax)
+
+SYNTAX_RANGE(Decl, MissingDecl, TypeAliasDecl)
+
+SYNTAX(DeclMembers, Syntax)
+SYNTAX(GenericParameter, Syntax)
+SYNTAX(GenericParameterClause, Syntax)
+SYNTAX(GenericParameterList, Syntax)
+
+SYNTAX(GenericWhereClause, Syntax)
+SYNTAX(GenericRequirementList, Syntax)
+SYNTAX(GenericArgumentClause, Syntax)
+SYNTAX(GenericArgumentList, Syntax)
+SYNTAX(ConformanceRequirement, Syntax)
+SYNTAX(SameTypeRequirement, Syntax)
+SYNTAX(TypeArgumentList, Syntax)
+
+// Types
+ABSTRACT_SYNTAX(TypeSyntax, Syntax)
+  MISSING_SYNTAX(MissingType, TypeSyntax)
+  SYNTAX(MetatypeType, TypeSyntax)
+  SYNTAX(TypeIdentifier, TypeSyntax)
+  SYNTAX(TupleType, TypeSyntax)
+  SYNTAX(OptionalType, TypeSyntax)
+  SYNTAX(ImplicitlyUnwrappedOptionalType, TypeSyntax)
+  SYNTAX(ArrayType, TypeSyntax)
+  SYNTAX(DictionaryType, TypeSyntax)
+  SYNTAX(FunctionType, TypeSyntax)
+SYNTAX_RANGE(Type, MissingType, FunctionType)
+
+// Statements
+SYNTAX(StmtList, Syntax)
+
+ABSTRACT_SYNTAX(StmtSyntax, Syntax)
+  SYNTAX(UnknownStmt, StmtSyntax)
+  SYNTAX(CodeBlockStmt, StmtSyntax)
+  SYNTAX(FallthroughStmt, StmtSyntax)
+  SYNTAX(BreakStmt, StmtSyntax)
+  SYNTAX(ContinueStmt, StmtSyntax)
+  SYNTAX(ReturnStmt, StmtSyntax)
+SYNTAX_RANGE(Stmt, UnknownStmt, ReturnStmt)
+
+// Expressions
+ABSTRACT_SYNTAX(ExprSyntax, Syntax)
+  MISSING_SYNTAX(MissingExpr, ExprSyntax)
+  SYNTAX(UnknownExpr, ExprSyntax)
+  SYNTAX(IntegerLiteralExpr, ExprSyntax)
+SYNTAX_RANGE(Expr, MissingExpr, IntegerLiteralExpr)
+
+SYNTAX(BalancedTokens, Syntax)
+SYNTAX(TypeAttribute, Syntax)
+SYNTAX(TypeAttributes, Syntax)
+SYNTAX(TupleTypeElement, Syntax)
+SYNTAX(FunctionTypeArgument, Syntax)
+
+#undef ABSTRACT_SYNTAX
+#undef DECL
+#undef STMT
+#undef EXPR
+#undef PATTERN
+#undef SYNTAX
+#undef MISSING_SYNTAX
+#undef SYNTAX_RANGE

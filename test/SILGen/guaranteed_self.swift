@@ -305,7 +305,9 @@ class C: Fooable, Barrable {
   // CHECK-LABEL: sil hidden [thunk] @_T015guaranteed_self1CC3foo{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (Int, C) -> () {
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
-  // CHECK:         apply {{.*}}({{.*}}, [[SELF_COPY]])
+  // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
+  // CHECK:         apply {{.*}}({{.*}}, [[BORROWED_SELF_COPY]])
+  // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK:         destroy_value [[SELF_COPY]]
   // CHECK-NOT:     destroy_value [[SELF_COPY]]
   // CHECK-NOT:     destroy_value [[SELF]]
@@ -323,7 +325,9 @@ class C: Fooable, Barrable {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_T015guaranteed_self1CC5prop1SifgTo : $@convention(objc_method) (C) -> Int
   // CHECK:       bb0([[SELF:%.*]] : $C):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
-  // CHECK:         apply {{.*}}([[SELF_COPY]])
+  // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
+  // CHECK:         apply {{.*}}([[BORROWED_SELF_COPY]])
+  // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK:         destroy_value [[SELF_COPY]]
   // CHECK-NOT:     destroy_value [[SELF]]
   // CHECK-NOT:     destroy_value [[SELF_COPY]]
@@ -331,7 +335,9 @@ class C: Fooable, Barrable {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_T015guaranteed_self1CC5prop1SifsTo : $@convention(objc_method) (Int, C) -> ()
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
-  // CHECK:         apply {{.*}} [[SELF_COPY]]
+  // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
+  // CHECK:         apply {{.*}} [[BORROWED_SELF_COPY]]
+  // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK:         destroy_value [[SELF_COPY]]
   // CHECK-NOT:     destroy_value [[SELF_COPY]]
   // CHECK-NOT:     destroy_value [[SELF]]
@@ -364,7 +370,7 @@ class D: C {
   // CHECK-NEXT:    [[SELF_ADDR:%.*]] = mark_uninitialized [derivedself] [[PB]]
   // CHECK-NEXT:    store [[SELF]] to [init] [[SELF_ADDR]]
   // CHECK-NOT:     [[SELF_ADDR]]
-  // CHECK:         [[SELF1:%.*]] = load_borrow [[SELF_ADDR]]
+  // CHECK:         [[SELF1:%.*]] = load [take] [[SELF_ADDR]]
   // CHECK-NEXT:    [[SUPER1:%.*]] = upcast [[SELF1]]
   // CHECK-NOT:     [[SELF_ADDR]]
   // CHECK:         [[SUPER2:%.*]] = apply {{.*}}([[SUPER1]])
@@ -475,6 +481,7 @@ class LetFieldClass {
   // CHECK-NEXT: [[KRAKEN:%.*]] = load_borrow [[KRAKEN_ADDR]]
   // CHECK-NEXT: [[KRAKEN_METH:%.*]] = class_method [[KRAKEN]]
   // CHECK-NEXT: apply [[KRAKEN_METH]]([[KRAKEN]])
+  // CHECK-NEXT: end_borrow [[KRAKEN]] from [[KRAKEN_ADDR]]
   // CHECK-NEXT: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
   // CHECK-NEXT: [[KRAKEN:%.*]] = load [copy] [[KRAKEN_ADDR]]
   // CHECK: [[DESTROY_SHIP_FUN:%.*]] = function_ref @_T015guaranteed_self11destroyShipyAA6KrakenCF : $@convention(thin) (@owned Kraken) -> ()

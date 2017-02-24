@@ -27,14 +27,6 @@ namespace swift {
   /// Returns true on error.
   bool printAsObjC(raw_ostream &out, ModuleDecl *M, StringRef bridgingHeader,
                    Accessibility minRequiredAccess);
-
-  /// Get the name for a value decl D if D is exported to ObjC, PreferredName is
-  /// specified to perform what-if analysis, shadowing D's original name during
-  /// computation.
-  ///
-  /// Returns a pair of Identifier and ObjCSelector, only one of which is valid.
-  std::pair<Identifier, ObjCSelector> getObjCNameForSwiftDecl(const ValueDecl *VD,
-    DeclName PreferredName);
 }
 
 #endif

@@ -205,9 +205,9 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[T1:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Val
   // CHECK: [[VAL_REF_VAL_PROP_MAT:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
   // CHECK: end_borrow [[VAL_REF_BORROWED]] from [[VAL_REF]]
-  // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
-  // CHECK: [[LD:%[0-9]+]] = load [copy] [[VAL_REF_VAL_PROP_MAT]]
   // -- val.ref.val_prop.z_tuple
+  // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
+  // CHECK: [[LD:%[0-9]+]] = load_borrow [[VAL_REF_VAL_PROP_MAT]]
   // CHECK: [[GET_Z_TUPLE_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV7z_tupleSi_Sitfg
   // CHECK: [[A0:%.*]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 0
   // CHECK: [[A1:%.*]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 1
@@ -216,6 +216,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[T1:%.*]] = tuple_extract [[V_R_VP_Z_TUPLE]] : {{.*}}, 1
   // CHECK: store [[T0]] to [trivial] [[A0]]
   // CHECK: store [[T1]] to [trivial] [[A1]]
+  // CHECK: end_borrow [[LD]] from [[VAL_REF_VAL_PROP_MAT]]
   // -- write to val.ref.val_prop.z_tuple.1
   // CHECK: [[V_R_VP_Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[V_R_VP_Z_TUPLE_MAT]] : {{.*}}, 1
   // CHECK: assign [[Z1]] to [[V_R_VP_Z_TUPLE_1]]
@@ -252,7 +253,7 @@ func tuple_in_logical_struct_set(_ value: inout Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.z_tuple.1 = z1
   // CHECK: [[Z_TUPLE_MATERIALIZED:%[0-9]+]] = alloc_stack $(Int, Int)
-  // CHECK: [[VAL1:%[0-9]+]] = load [copy] [[VAL]]
+  // CHECK: [[VAL1:%[0-9]+]] = load_borrow [[VAL]]
   // CHECK: [[Z_GET_METHOD:%[0-9]+]] = function_ref @_T010properties3ValV7z_tupleSi_Sitfg
   // CHECK: [[A0:%.*]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 0
   // CHECK: [[A1:%.*]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
@@ -261,6 +262,7 @@ func tuple_in_logical_struct_set(_ value: inout Val, z1: Int) {
   // CHECK: [[T1:%.*]] = tuple_extract [[Z_TUPLE]] : {{.*}}, 1
   // CHECK: store [[T0]] to [trivial] [[A0]]
   // CHECK: store [[T1]] to [trivial] [[A1]]
+  // CHECK: end_borrow [[VAL1]] from [[VAL]]
   // CHECK: [[Z_TUPLE_1:%[0-9]+]] = tuple_element_addr [[Z_TUPLE_MATERIALIZED]] : {{.*}}, 1
   // CHECK: assign [[Z1]] to [[Z_TUPLE_1]]
   // CHECK: [[Z_TUPLE_MODIFIED:%[0-9]+]] = load [trivial] [[Z_TUPLE_MATERIALIZED]]

@@ -12,11 +12,27 @@ sil @XXX_ctor : $@convention(method) (@owned XXX) -> @owned XXX
 
 // CHECK: target datalayout
 
-// No @owned or @out parameters -- function is read only at LLVM level
+// No @owned or @out parameters -- function is not read only at LLVM level,
+// because Swift level read only attribute is not automatically mapped
+// to the LLVM read only attribute, unless IRGen can prove by analyzing
+// the function body that this function is really read only.
 
-// CHECK: ; Function Attrs: readonly
-// CHECK-NEXT: define{{( protected)?}} swiftcc void @function_foo(
+// CHECK-NOT: ; Function Attrs: readonly
+// CHECK: define{{( protected)?}} swiftcc void @function_foo(
 sil [readonly] @function_foo : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// No @owned or @out parameters -- function is not read only at LLVM level,
+// because Swift level read none attribute is not automatically mapped
+// to the LLVM read only attribute, unless IRGen can prove by analyzing
+// the function body that this function is really read only or read none.
+
+// CHECK-NOT: ; Function Attrs: readonly
+// CHECK: define{{( protected)?}} swiftcc void @function_foo2(
+sil [readnone] @function_foo2 : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = tuple ()
   return %1 : $()

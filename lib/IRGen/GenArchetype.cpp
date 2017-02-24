@@ -106,7 +106,7 @@ findConformanceDeclaration(ArrayRef<ProtocolDecl*> conformsTo,
 
     // Recurse into implied protocols.
     if (auto result =
-          findConformanceDeclaration(source->getInheritedProtocols(nullptr),
+          findConformanceDeclaration(source->getInheritedProtocols(),
                                      associatedType, target)) {
       return result;
     }

@@ -732,19 +732,34 @@ public:
     copy.push_back(alloca.getAddress());
   }
 
+  /// Determine whether a generic variable has been inlined.
+  static bool isInlinedGeneric(VarDecl *VarDecl, const SILDebugScope *DS) {
+    if (!DS->InlinedCallSite)
+      return false;
+    if (VarDecl->hasType())
+      return VarDecl->getType()->hasArchetype();
+    return VarDecl->getInterfaceType()->hasTypeParameter();
+  }
+
   /// Emit debug info for a function argument or a local variable.
   template <typename StorageType>
   void emitDebugVariableDeclaration(StorageType Storage,
                                     DebugTypeInfo Ty,
                                     SILType SILTy,
                                     const SILDebugScope *DS,
-                                    ValueDecl *VarDecl,
+                                    VarDecl *VarDecl,
                                     StringRef Name,
                                     unsigned ArgNo = 0,
                                     IndirectionKind Indirection = DirectValue) {
     // Force all archetypes referenced by the type to be bound by this point.
     // TODO: just make sure that we have a path to them that the debug info
     //       can follow.
+
+    // FIXME: The debug info type of all inlined instances of a variable must be
+    // the same as the type of the abstract variable.
+    if (isInlinedGeneric(VarDecl, DS))
+      return;
+
     auto runtimeTy = getRuntimeReifiedType(IGM,
                                            Ty.getType()->getCanonicalType());
     if (!IGM.IRGen.Opts.Optimize && runtimeTy->hasArchetype())
@@ -868,6 +883,7 @@ public:
   void visitOpenExistentialRefInst(OpenExistentialRefInst *i);
   void visitOpenExistentialOpaqueInst(OpenExistentialOpaqueInst *i);
   void visitInitExistentialAddrInst(InitExistentialAddrInst *i);
+  void visitInitExistentialOpaqueInst(InitExistentialOpaqueInst *i);
   void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *i);
   void visitInitExistentialRefInst(InitExistentialRefInst *i);
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *i);
@@ -949,6 +965,8 @@ public:
   void visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *i);
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *i);
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *i);
+  void visitUnconditionalCheckedCastOpaqueInst(
+      UnconditionalCheckedCastOpaqueInst *i);
   void visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *i);
   void visitObjCExistentialMetatypeToObjectInst(
                                         ObjCExistentialMetatypeToObjectInst *i);
@@ -3771,6 +3789,10 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
         CurSILFn->getDeclContext(), Decl,
         i->getBoxType()->getFieldType(IGM.getSILModule(), 0).getSwiftType(),
           type, /*Unwrap=*/false);
+
+    if (isInlinedGeneric(Decl, i->getDebugScope()))
+      return;
+
     IGM.DebugInfo->emitVariableDeclaration(
         Builder,
         emitShadowCopy(boxWithAddr.getAddress(), i->getDebugScope(), Name, 0),
@@ -4256,6 +4278,11 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
                   i->getConsumptionKind(), CheckedCastMode::Unconditional);
 }
 
+void IRGenSILFunction::visitUnconditionalCheckedCastOpaqueInst(
+    swift::UnconditionalCheckedCastOpaqueInst *i) {
+  llvm_unreachable("unsupported instruction during IRGen");
+}
+
 void IRGenSILFunction::visitCheckedCastBranchInst(
                                               swift::CheckedCastBranchInst *i) {
   SILType destTy = i->getCastType();
@@ -4446,6 +4473,11 @@ void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrIn
   Address address =
     srcTI.allocateBuffer(*this, buffer, i->getLoweredConcreteType());  
   setLoweredAddress(i, address);
+}
+
+void IRGenSILFunction::visitInitExistentialOpaqueInst(
+    swift::InitExistentialOpaqueInst *i) {
+  llvm_unreachable("unsupported instruction during IRGen");
 }
 
 void IRGenSILFunction::visitInitExistentialMetatypeInst(

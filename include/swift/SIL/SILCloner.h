@@ -1149,10 +1149,20 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
                                                          SrcValue, SrcType,
                                                          DestValue, TargetType));
 }
-  
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitRetainValueInst(RetainValueInst *Inst) {
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitUnconditionalCheckedCastOpaqueInst(
+    UnconditionalCheckedCastOpaqueInst *Inst) {
+  SILLocation OpLoc = getOpLocation(Inst->getLoc());
+  SILValue OpValue = getOpValue(Inst->getOperand());
+  SILType OpType = getOpType(Inst->getType());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst, getBuilder().createUnconditionalCheckedCastOpaque(
+                          OpLoc, OpValue, OpType));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitRetainValueInst(RetainValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
     getBuilder().createRetainValue(getOpLocation(Inst->getLoc()),
@@ -1581,6 +1591,20 @@ SILCloner<ImplClass>::visitInitExistentialAddrInst(InitExistentialAddrInst *Inst
                                    getOpASTType(origFormalType),
                                    getOpType(Inst->getLoweredConcreteType()),
                                        conformances));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitInitExistentialOpaqueInst(
+    InitExistentialOpaqueInst *Inst) {
+  CanType origFormalType = Inst->getFormalConcreteType();
+  auto conformances =
+      getOpConformances(origFormalType, Inst->getConformances());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+                getBuilder().createInitExistentialOpaque(
+                    getOpLocation(Inst->getLoc()), getOpType(Inst->getType()),
+                    getOpASTType(origFormalType),
+                    getOpValue(Inst->getOperand()), conformances));
 }
 
 template<typename ImplClass>

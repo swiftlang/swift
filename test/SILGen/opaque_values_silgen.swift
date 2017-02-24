@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sorted-sil -Xllvm -new-mangling-for-tests -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
+// UNSUPPORTED: resilient_stdlib
+// REQUIRES: talk_later_today
+
 protocol Foo {
   func foo()
 }
@@ -193,5 +196,72 @@ func s120______returnValue<T>(_ x: T) -> T {
 // CHECK:   return [[OPTIONAL_ARG]] : $Optional<T>
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s130_____________wrapxSgxlF'
 func s130_____________wrap<T>(_ x: T) -> T? {
+  return x
+}
+
+// Tests For-each statements
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s140______forEachStmtyyF : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[PROJ_BOX_ARG:%.*]] = project_box %{{.*}} : ${ var IndexingIterator<CountableRange<Int>> }
+// CHECK:   [[APPLY_ARG1:%.*]] = apply
+// CHECK-NOT: alloc_stack $Int
+// CHECK-NOT: store [[APPLY_ARG1]] to [trivial]
+// CHECK-NOT: alloc_stack $CountableRange<Int>
+// CHECK-NOT: dealloc_stack
+// CHECK:   [[APPLY_ARG2:%.*]] = apply %{{.*}}<CountableRange<Int>>
+// CHECK:   store [[APPLY_ARG2]] to [trivial] [[PROJ_BOX_ARG]]
+// CHECK:   br bb1
+// CHECK: bb1:
+// CHECK-NOT: alloc_stack $Optional<Int>
+// CHECK:   [[APPLY_ARG3:%.*]] = apply %{{.*}}<CountableRange<Int>>
+// CHECK-NOT: dealloc_stack
+// CHECK:   [[ENUM_ARG:%.*]] = select_enum [[APPLY_ARG3]] : $Optional<Int>
+// CHECK:   cond_br [[ENUM_ARG]], bb3, bb2
+// CHECK: bb2:
+// CHECK:   return %{{.*}} : $()
+// CHECK: bb3:
+// CHECK:   unchecked_enum_data [[APPLY_ARG3]]
+// CHECK:   br bb1
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s140______forEachStmtyyF'
+func s140______forEachStmt() {
+  for _ in 1..<42 {
+  }
+}
+
+func s150___________anyArg(_: Any) {}
+
+// Tests init of opaque existentials
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s160_______callAnyArgyyF : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[INT_TYPE:%.*]] = metatype $@thin Int.Type
+// CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.Int2048, 42
+// CHECK:   [[INT_ARG:%.*]] = apply %{{.*}}([[INT_LIT]], [[INT_TYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK:   [[INIT_OPAQUE:%.*]] = init_existential_opaque [[INT_ARG]] : $Int, $Int, $Any
+// CHECK:   apply %{{.*}}([[INIT_OPAQUE]]) : $@convention(thin) (@in Any) -> ()
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s160_______callAnyArgyyF'
+func s160_______callAnyArg() {
+  s150___________anyArg(42)
+}
+
+// Tests unconditional_checked_cast for opaque values
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s170____force_convertxylF : $@convention(thin) <T> () -> @out T {
+// CHECK: bb0:
+// CHECK-NOT: alloc_stack
+// CHECK:   [[INT_TYPE:%.*]] = metatype $@thin Int.Type
+// CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.Int2048, 42
+// CHECK:   [[INT_ARG:%.*]] = apply %{{.*}}([[INT_LIT]], [[INT_TYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK:   [[INT_CAST:%.*]] = unconditional_checked_cast_opaque [[INT_ARG]] : $Int to $T
+// CHECK:   [[CAST_BORROW:%.*]] = begin_borrow [[INT_CAST]] : $T
+// CHECK:   [[RETURN_VAL:%.*]] = copy_value [[CAST_BORROW]] : $T
+// CHECK:   end_borrow [[CAST_BORROW]] from [[INT_CAST]] : $T, $T
+// CHECK:   destroy_value [[INT_CAST]] : $T
+// CHECK:   return [[RETURN_VAL]] : $T
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s170____force_convertxylF'
+func s170____force_convert<T>() -> T {
+  let x : T = 42 as! T
   return x
 }

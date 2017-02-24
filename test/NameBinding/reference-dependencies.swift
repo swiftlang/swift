@@ -40,27 +40,27 @@
 // CHECK-NEXT: "~~~~~"
 
 // CHECK-LABEL: {{^provides-nominal:$}}
-// CHECK-NEXT: "V4main10IntWrapper"
-// CHECK-NEXT: "VV4main10IntWrapper16InnerForNoReason"
-// CHECK-NEXT: "C4main8Subclass"
-// CHECK-NEXT: "VE4mainSb11InnerToBool"
-// CHECK: "V4main9Sentinel1"
-// CHECK-NEXT: "V4main9Sentinel2"
+// CHECK-NEXT: "4main10IntWrapperV"
+// CHECK-NEXT: "4main10IntWrapperV16InnerForNoReasonV"
+// CHECK-NEXT: "4main8SubclassC"
+// CHECK-NEXT: "Sb4mainE11InnerToBoolV"
+// CHECK: "4main9Sentinel1V"
+// CHECK-NEXT: "4main9Sentinel2V"
 
 // CHECK-LABEL: {{^provides-member:$}}
-// CHECK-NEXT: - ["V4main10IntWrapper", ""]
-// CHECK-NEXT: - ["VV4main10IntWrapper16InnerForNoReason", ""]
-// CHECK-NEXT: - ["C4main8Subclass", ""]
-// CHECK-NEXT: - ["Ps25ExpressibleByArrayLiteral", ""]
+// CHECK-NEXT: - ["4main10IntWrapperV", ""]
+// CHECK-NEXT: - ["4main10IntWrapperV16InnerForNoReasonV", ""]
+// CHECK-NEXT: - ["4main8SubclassC", ""]
+// CHECK-NEXT: - ["s25ExpressibleByArrayLiteralP", ""]
 // CHECK-NEXT: - ["Sb", ""]
-// CHECK-NEXT: - ["VE4mainSb11InnerToBool", ""]
-// CHECK: - ["V4main9Sentinel1", ""]
-// CHECK-NEXT: - ["V4main9Sentinel2", ""]
-// CHECK: - ["Ps25ExpressibleByArrayLiteral", "useless"]
-// CHECK-NEXT: - ["Ps25ExpressibleByArrayLiteral", "useless2"]
+// CHECK-NEXT: - ["Sb4mainE11InnerToBoolV", ""]
+// CHECK: - ["4main9Sentinel1V", ""]
+// CHECK-NEXT: - ["4main9Sentinel2V", ""]
+// CHECK: - ["s25ExpressibleByArrayLiteralP", "useless"]
+// CHECK-NEXT: - ["s25ExpressibleByArrayLiteralP", "useless2"]
 // CHECK-NEXT: - ["Sb", "InnerToBool"]
-// CHECK-NEXT: - ["{{.*[0-9]}}FourTildeImpl", "~~~~"]
-// CHECK-NEXT: - ["{{.*[0-9]}}FiveTildeImpl", "~~~~~"]
+// CHECK-NEXT: - ["{{.*[0-9]}}FourTildeImplV", "~~~~"]
+// CHECK-NEXT: - ["{{.*[0-9]}}FiveTildeImplV", "~~~~~"]
 
 // CHECK-LABEL: {{^depends-top-level:$}}
 
@@ -401,79 +401,79 @@ struct Sentinel2 {}
 
 
 // CHECK-LABEL: {{^depends-member:$}}
-// CHECK-DAG: - ["V4main10IntWrapper", "Int"]
-// CHECK-DAG: - ["V4main10IntWrapper", "deinit"]
-// CHECK-DAG: - ["Ps10Comparable", ""]
-// CHECK-DAG: - ["C4main18ClassFromOtherFile", ""]
+// CHECK-DAG: - ["4main10IntWrapperV", "Int"]
+// CHECK-DAG: - ["4main10IntWrapperV", "deinit"]
+// CHECK-DAG: - ["s10ComparableP", ""]
+// CHECK-DAG: - ["4main18ClassFromOtherFileC", ""]
 // CHECK-DAG: - !private ["Si", "max"]
-// CHECK-DAG: - ["Ps25ExpressibleByFloatLiteral", ""]
-// CHECK-DAG: - !private ["Ps33ExpressibleByUnicodeScalarLiteral", ""]
-// CHECK-DAG: - !private ["Ps10Strideable", "Stride"]
+// CHECK-DAG: - ["s25ExpressibleByFloatLiteralP", ""]
+// CHECK-DAG: - !private ["s33ExpressibleByUnicodeScalarLiteralP", ""]
+// CHECK-DAG: - !private ["s10StrideableP", "Stride"]
 // CHECK-DAG: - !private ["Sa", "reduce"]
 // CHECK-DAG: - !private ["Sb", "_getBuiltinLogicValue"]
 // CHECK-DAG: - ["Sb", "InnerToBool"]
-// CHECK-DAG: - !private ["V4main17OtherFileIntArray", "deinit"]
-// CHECK-DAG: - !private ["V4main18OtherFileOuterType", "InnerType"]
-// CHECK-DAG: - !private ["VV4main18OtherFileOuterType9InnerType", "init"]
-// CHECK-DAG: - !private ["VV4main18OtherFileOuterType9InnerType", "sharedConstant"]
-// CHECK-DAG: - !private ["VV4main26OtherFileSecretTypeWrapper10SecretType", "constant"]
-// CHECK-DAG: - !private ["V4main25OtherFileProtoImplementor", "deinit"]
-// CHECK-DAG: - !private ["V4main26OtherFileProtoImplementor2", "deinit"]
-// CHECK-DAG: - !private ["Vs13EmptyIterator", "init"]
-// CHECK-DAG: - ["O4main13OtherFileEnum", "Value"]
-// CHECK-DAG: - !private ["V4main20OtherFileEnumWrapper", "Enum"]
+// CHECK-DAG: - !private ["4main17OtherFileIntArrayV", "deinit"]
+// CHECK-DAG: - !private ["4main18OtherFileOuterTypeV", "InnerType"]
+// CHECK-DAG: - !private ["4main18OtherFileOuterTypeV05InnerE0V", "init"]
+// CHECK-DAG: - !private ["4main18OtherFileOuterTypeV05InnerE0V", "sharedConstant"]
+// CHECK-DAG: - !private ["4main26OtherFileSecretTypeWrapperV0dE0V", "constant"]
+// CHECK-DAG: - !private ["4main25OtherFileProtoImplementorV", "deinit"]
+// CHECK-DAG: - !private ["4main26OtherFileProtoImplementor2V", "deinit"]
+// CHECK-DAG: - !private ["s13EmptyIteratorV", "init"]
+// CHECK-DAG: - ["4main13OtherFileEnumO", "Value"]
+// CHECK-DAG: - !private ["4main20OtherFileEnumWrapperV", "Enum"]
 
-// CHECK-DAG: - ["V4main14TopLevelStruct", "ValueType"]
-// CHECK-DAG: - ["V4main15TopLevelStruct2", "ValueType"]
-// CHECK-DAG: - ["V4main15TopLevelStruct3", "ValueType"]
-// CHECK-DAG: - ["V4main15TopLevelStruct4", "ValueType"]
-// CHECK-DAG: - ["V4main15TopLevelStruct5", "ValueType"]
-// CHECK-DAG: - !private ["V4main21PrivateTopLevelStruct", "ValueType"]
-// CHECK-DAG: - !private ["V4main22PrivateTopLevelStruct2", "ValueType"]
-// CHECK-DAG: - !private ["V4main22PrivateTopLevelStruct3", "ValueType"]
-// CHECK-DAG: - !private ["V4main22PrivateTopLevelStruct4", "ValueType"]
+// CHECK-DAG: - ["4main14TopLevelStructV", "ValueType"]
+// CHECK-DAG: - ["4main15TopLevelStruct2V", "ValueType"]
+// CHECK-DAG: - ["4main15TopLevelStruct3V", "ValueType"]
+// CHECK-DAG: - ["4main15TopLevelStruct4V", "ValueType"]
+// CHECK-DAG: - ["4main15TopLevelStruct5V", "ValueType"]
+// CHECK-DAG: - !private ["4main21PrivateTopLevelStructV", "ValueType"]
+// CHECK-DAG: - !private ["4main22PrivateTopLevelStruct2V", "ValueType"]
+// CHECK-DAG: - !private ["4main22PrivateTopLevelStruct3V", "ValueType"]
+// CHECK-DAG: - !private ["4main22PrivateTopLevelStruct4V", "ValueType"]
 
-// CHECK-DAG: - ["P4main14TopLevelProto1", ""]
-// CHECK-DAG: - ["P4main14TopLevelProto2", ""]
-// CHECK-DAG: - !private ["P4main13PrivateProto1", ""]
-// CHECK-DAG: - !private ["P4main13PrivateProto2", ""]
-// CHECK-DAG: - !private ["P4main13PrivateProto3", ""]
+// CHECK-DAG: - ["4main14TopLevelProto1P", ""]
+// CHECK-DAG: - ["4main14TopLevelProto2P", ""]
+// CHECK-DAG: - !private ["4main13PrivateProto1P", ""]
+// CHECK-DAG: - !private ["4main13PrivateProto2P", ""]
+// CHECK-DAG: - !private ["4main13PrivateProto3P", ""]
 
 // CHECK-LABEL: {{^depends-nominal:$}}
 // We're checking order here to make sure the names are sorted.
 // CHECK: - !private "Sa"
 // CHECK: - "Sb"
-// CHECK: - "C4main18ClassFromOtherFile"
-// CHECK: - "Ps10Comparable"
-// CHECK: - !private "Vs13EmptyIterator"
-// CHECK: - "Ps25ExpressibleByFloatLiteral"
-// CHECK: - !private "Ps33ExpressibleByUnicodeScalarLiteral"
-// CHECK: - !private "VV4main18OtherFileOuterType9InnerType"
+// CHECK: - "4main18ClassFromOtherFileC"
+// CHECK: - "s10ComparableP"
+// CHECK: - !private "s13EmptyIteratorV"
+// CHECK: - "s25ExpressibleByFloatLiteralP"
+// CHECK: - !private "s33ExpressibleByUnicodeScalarLiteralP"
+// CHECK: - !private "4main18OtherFileOuterTypeV05InnerE0V"
 // CHECK: - !private "Si"
-// CHECK: - "V4main10IntWrapper"
-// CHECK: - "O4main13OtherFileEnum"
-// CHECK: - !private "V4main20OtherFileEnumWrapper"
-// CHECK: - !private "V4main17OtherFileIntArray"
-// CHECK: - !private "V4main18OtherFileOuterType"
-// CHECK: - !private "V4main25OtherFileProtoImplementor"
-// CHECK: - !private "V4main26OtherFileProtoImplementor2"
-// CHECK: - !private "P4main13PrivateProto1"
-// CHECK: - !private "P4main13PrivateProto2"
-// CHECK: - !private "P4main13PrivateProto3"
-// CHECK: - !private "V4main21PrivateTopLevelStruct"
-// CHECK: - !private "V4main22PrivateTopLevelStruct2"
-// CHECK: - !private "V4main22PrivateTopLevelStruct3"
-// CHECK: - !private "V4main22PrivateTopLevelStruct4"
-// CHECK: - !private "VV4main26OtherFileSecretTypeWrapper10SecretType"
-// CHECK: - !private "Ps10Strideable"
-// CHECK: - "V4main23TopLevelForMemberLookup"
-// CHECK: - "P4main14TopLevelProto1"
-// CHECK: - "P4main14TopLevelProto2"
-// CHECK: - "V4main14TopLevelStruct"
-// CHECK: - "V4main15TopLevelStruct2"
-// CHECK: - "V4main15TopLevelStruct3"
-// CHECK: - "V4main15TopLevelStruct4"
-// CHECK: - "V4main15TopLevelStruct5"
+// CHECK: - "4main10IntWrapperV"
+// CHECK: - "4main13OtherFileEnumO"
+// CHECK: - !private "4main20OtherFileEnumWrapperV"
+// CHECK: - !private "4main17OtherFileIntArrayV"
+// CHECK: - !private "4main18OtherFileOuterTypeV"
+// CHECK: - !private "4main25OtherFileProtoImplementorV"
+// CHECK: - !private "4main26OtherFileProtoImplementor2V"
+// CHECK: - !private "4main13PrivateProto1P"
+// CHECK: - !private "4main13PrivateProto2P"
+// CHECK: - !private "4main13PrivateProto3P"
+// CHECK: - !private "4main21PrivateTopLevelStructV"
+// CHECK: - !private "4main22PrivateTopLevelStruct2V"
+// CHECK: - !private "4main22PrivateTopLevelStruct3V"
+// CHECK: - !private "4main22PrivateTopLevelStruct4V"
+// CHECK: - !private "4main26OtherFileSecretTypeWrapperV0dE0V"
+// CHECK: - !private "s10StrideableP"
+// CHECK: - "4main23TopLevelForMemberLookupV"
+// CHECK: - "4main14TopLevelProto1P"
+// CHECK: - "4main14TopLevelProto2P"
+// CHECK: - "4main14TopLevelStructV"
+// CHECK: - "4main15TopLevelStruct2V"
+// CHECK: - "4main15TopLevelStruct3V"
+// CHECK: - "4main15TopLevelStruct4V"
+// CHECK: - "4main15TopLevelStruct5V"
 
 // String is not used anywhere in this file, though a string literal is.
 // NEGATIVE-NOT: "String"
@@ -487,6 +487,6 @@ struct Sentinel2 {}
 
 // OtherFileSecretTypeWrapper is never used directly in this file.
 // NEGATIVE-NOT: "OtherFileSecretTypeWrapper"
-// NEGATIVE-NOT: "V4main26OtherFileSecretTypeWrapper"
+// NEGATIVE-NOT: "4main26OtherFileSecretTypeWrapperV"
 
 let eof: () = ()

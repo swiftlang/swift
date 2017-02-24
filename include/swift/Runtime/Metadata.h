@@ -2424,7 +2424,7 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
   }
 
   static constexpr StoredPointer
-  OffsetToNumProtocols = sizeof(TargetMetadata<Runtime>) + sizeof(Flags);
+  OffsetToNumProtocols = sizeof(TargetMetadata<Runtime>) + sizeof(ExistentialTypeFlags);
 
 };
 using ExistentialTypeMetadata

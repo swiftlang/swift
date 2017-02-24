@@ -32,9 +32,8 @@ func f8<T : GA<A>>(_: T) where T : GA<B> {} // expected-error{{generic parameter
 func f9<T : GA<A>>(_: T) where T : GB<A> {}
 func f10<T : GB<A>>(_: T) where T : GA<A> {}
 
-// FIXME: Extra diagnostics because we're re-building the archetype builder.
-func f11<T : GA<T>>(_: T) { } // expected-error 2{{superclass constraint 'T' : 'GA<T>' is recursive}}
-func f12<T : GA<U>, U : GB<T>>(_: T, _: U) { } // expected-error 2{{superclass constraint 'U' : 'GB<T>' is recursive}} // expected-error 2{{superclass constraint 'T' : 'GA<U>' is recursive}}
+func f11<T : GA<T>>(_: T) { } // expected-error{{superclass constraint 'T' : 'GA<T>' is recursive}}
+func f12<T : GA<U>, U : GB<T>>(_: T, _: U) { } // expected-error{{superclass constraint 'U' : 'GB<T>' is recursive}} // expected-error{{superclass constraint 'T' : 'GA<U>' is recursive}}
 func f13<T : U, U : GA<T>>(_: T, _: U) { } // expected-error{{inheritance from non-protocol, non-class type 'U'}}
 
 // rdar://problem/24730536
@@ -87,3 +86,19 @@ class C2 : C, P4 { }
 // CHECK-NEXT: τ_0_0 : P4 [Explicit @ {{.*}}:46 -> Superclass (C2: P4)]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C2>
 func superclassConformance3<T>(t: T) where T : C, T : P4, T : C2 {}
+
+protocol P5: A { } // expected-error{{non-class type 'P5' cannot inherit from class 'A'}}
+
+protocol P6: A, Other { } // expected-error{{protocol 'P6' cannot be a subclass of both 'A' and 'Other'}}
+// expected-error@-1{{non-class type 'P6' cannot inherit from class 'A'}}
+// expected-error@-2{{non-class type 'P6' cannot inherit from class 'Other'}}
+
+func takeA(_: A) { }
+func takeP5<T: P5>(_ t: T) {
+	takeA(t) // okay
+}
+
+protocol P7 { // expected-error{{'Self.Assoc' cannot be a subclass of both 'A' and 'Other'}}
+	associatedtype Assoc: A, Other 
+	// FIXME: expected-error@-1{{multiple inheritance from classes 'A' and 'Other'}}
+}

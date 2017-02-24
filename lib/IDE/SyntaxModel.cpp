@@ -96,7 +96,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 
       switch(Tok.getKind()) {
 #define KEYWORD(X) case tok::kw_##X:
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
 #undef KEYWORD
         Kind = SyntaxNodeKind::Keyword;
         // Some keywords can be used as an argument labels. If this one can and
@@ -120,14 +120,14 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 #define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg) \
       case tok::pound_##Name:
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
         LiteralStartLoc = Loc;
         continue;
 
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto)
 #define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg)
 #define POUND_KEYWORD(Name) case tok::pound_##Name:
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
         Kind = SyntaxNodeKind::Keyword;
         break;
       case tok::identifier:

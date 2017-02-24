@@ -53,7 +53,7 @@ public:
     }
     llvm_unreachable("Not reachable, all cases handled");
   }
-  
+
   ExprRetTy visit(Expr *E, Args... AA) {
     switch (E->getKind()) {
 

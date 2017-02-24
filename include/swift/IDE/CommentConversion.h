@@ -29,6 +29,10 @@ namespace ide {
 /// \returns true if the declaration has a documentation comment.
 bool getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS);
 
+/// If the declaration has a documentation comment and a localization key,
+/// print it into the given output stream and return true. Else, return false.
+bool getLocalizationKey(const Decl *D, raw_ostream &OS);
+
 /// Converts the given comment to Doxygen.
 void getDocumentationCommentAsDoxygen(const DocComment *DC, raw_ostream &OS);
 

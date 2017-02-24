@@ -16,7 +16,7 @@ sil_vtable C {}
 
 sil @_TFC11enum_32_bit1CD : $@convention(thin) (@owned C) -> ()
 
-// CHECK-LABEL: %O11enum_32_bit3Foo = type <{ [4 x i8] }>
+// CHECK-LABEL: %T11enum_32_bit3FooO = type <{ [4 x i8] }>
 enum Foo {
   case A(C)
   case B
@@ -24,13 +24,13 @@ enum Foo {
 
 @objc protocol ClassExistential {}
 
-// CHECK-LABEL: %O11enum_32_bit3Bar = type <{ [4 x i8] }>
+// CHECK-LABEL: %T11enum_32_bit3BarO = type <{ [4 x i8] }>
 enum Bar {
   case A(ClassExistential)
   case B
 }
 
-// CHECK-LABEL: %O11enum_32_bit3Bas = type <{ [4 x i8] }>
+// CHECK-LABEL: %T11enum_32_bit3BasO = type <{ [4 x i8] }>
 enum Bas {
   case A(ClassExistential)
   case B(C)

@@ -193,6 +193,7 @@ static bool isOwnershipForwardingValueKind(ValueKind K) {
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
   case ValueKind::UnconditionalCheckedCastInst:
+  case ValueKind::UnconditionalCheckedCastOpaqueInst:
   case ValueKind::TupleExtractInst:
   case ValueKind::StructExtractInst:
   case ValueKind::UncheckedEnumDataInst:
@@ -395,6 +396,7 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, IndexRawPointer)
 CONSTANT_OWNERSHIP_INST(Trivial, false, InitBlockStorageHeader)
 CONSTANT_OWNERSHIP_INST(Trivial, false, InitEnumDataAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, false, InitExistentialAddr)
+CONSTANT_OWNERSHIP_INST(Trivial, false, InitExistentialOpaque)
 CONSTANT_OWNERSHIP_INST(Trivial, false, InitExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, false, InjectEnumAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, false, IsNonnull)
@@ -562,6 +564,7 @@ FORWARD_ANY_OWNERSHIP_INST(ConvertFunction)
 FORWARD_ANY_OWNERSHIP_INST(RefToBridgeObject)
 FORWARD_ANY_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
+FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCastOpaque)
 FORWARD_ANY_OWNERSHIP_INST(MarkUninitialized)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 #undef FORWARD_ANY_OWNERSHIP_INST

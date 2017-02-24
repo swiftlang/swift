@@ -157,7 +157,7 @@ protocol ProtocolWithInheritance4 : FooClass, FooProtocol {} // expected-error {
 // NO-TYREPR: {{^}}protocol ProtocolWithInheritance4 : <<error type>>, FooProtocol {{{$}}
 // TYREPR: {{^}}protocol ProtocolWithInheritance4 : FooClass, FooProtocol {{{$}}
 
-protocol ProtocolWithInheritance5 : FooClass, BarClass {} // expected-error {{non-class type 'ProtocolWithInheritance5' cannot inherit from class 'FooClass'}} expected-error {{non-class type 'ProtocolWithInheritance5' cannot inherit from class 'BarClass'}}
+protocol ProtocolWithInheritance5 : FooClass, BarClass {} // expected-error {{non-class type 'ProtocolWithInheritance5' cannot inherit from class 'FooClass'}} expected-error {{non-class type 'ProtocolWithInheritance5' cannot inherit from class 'BarClass'}} expected-error{{protocol 'ProtocolWithInheritance5' cannot be a subclass of both 'FooClass' and 'BarClass'}}
 // NO-TYREPR: {{^}}protocol ProtocolWithInheritance5 : <<error type>>, <<error type>> {{{$}}
 // TYREPR: {{^}}protocol ProtocolWithInheritance5 : FooClass, BarClass {{{$}}
 
