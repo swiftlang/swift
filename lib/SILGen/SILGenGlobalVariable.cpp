@@ -201,8 +201,11 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
                                             unsigned pbdEntry) {
   // Generic and dynamic static properties require lazy initialization, which
   // isn't implemented yet.
-  if (pd->isStatic())
-    assert(!pd->getDeclContext()->isGenericContext());
+  if (pd->isStatic()) {
+    assert(!pd->getDeclContext()->isGenericContext()
+           || pd->getDeclContext()->getGenericSignatureOfContext()
+                ->areAllParamsConcrete());
+  }
 
   // Emit the lazy initialization token for the initialization expression.
   auto counter = anonymousSymbolCounter++;
@@ -248,7 +251,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
     NewMangling::ASTMangler NewMangler;
     std::string New = NewMangler.mangleGlobalInit(varDecl, counter, true);
     onceFuncBuffer = NewMangling::selectMangling(Old, New);
-}
+  }
 
   SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncBuffer, pd,
                                                     pbdEntry);

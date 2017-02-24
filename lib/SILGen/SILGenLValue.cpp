@@ -1735,11 +1735,6 @@ void LValue::addMemberVarComponent(SILGenFunction &gen, SILLocation loc,
   // FIXME: This has to be dynamically looked up for classes, and
   // dynamically instantiated for generics.
   if (strategy == AccessStrategy::Storage && var->isStatic()) {
-    auto baseMeta = baseFormalType->castTo<MetatypeType>()->getInstanceType();
-    (void)baseMeta;
-    assert(!baseMeta->is<BoundGenericType>() &&
-           "generic static stored properties not implemented");
-
     // FIXME: this implicitly drops the earlier components, but maybe
     // we ought to evaluate them for side-effects even during the
     // formal access?

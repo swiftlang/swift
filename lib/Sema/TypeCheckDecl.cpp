@@ -3701,7 +3701,8 @@ public:
 
         // Stored type variables in a generic context need to logically
         // occur once per instantiation, which we don't yet handle.
-        } else if (DC->isGenericContext()) {
+        } else if (DC->isGenericContext()
+               && !DC->getGenericSignatureOfContext()->areAllParamsConcrete()) {
           unimplementedStatic(GenericTypes);
         } else if (DC->getAsClassOrClassExtensionContext()) {
           auto StaticSpelling = PBD->getStaticSpelling();
