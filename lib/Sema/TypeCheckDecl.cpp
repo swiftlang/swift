@@ -4340,8 +4340,27 @@ public:
     TC.checkDeclAttributesEarly(PD);
     TC.computeAccessibility(PD);
 
-    if (!IsSecondPass)
+    if (!IsSecondPass) {
       checkUnsupportedNestedType(PD);
+
+      for (auto member : PD->getMembers()) {
+        if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+          if (auto whereClause = assocType->getTrailingWhereClause()) {
+            DeclContext *lookupDC = assocType->getDeclContext();
+
+            ProtocolRequirementTypeResolver resolver;
+            TypeResolutionOptions options;
+
+            for (auto &req : whereClause->getRequirements()) {
+              if (!TC.validateRequirement(whereClause->getWhereLoc(), req,
+                                          lookupDC, options, &resolver))
+                // FIXME handle error?
+                continue;
+            }
+          }
+        }
+      }
+    }
 
     if (IsSecondPass) {
       checkAccessibility(TC, PD);

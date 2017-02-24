@@ -334,70 +334,73 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
   // Add the requirements clause to the builder, validating the types in
   // the requirements clause along the way.
   for (auto &req : genericParams->getRequirements()) {
-    if (req.isInvalid())
+    if (validateRequirement(genericParams->getWhereLoc(), req, lookupDC,
+                            options, resolver))
       continue;
 
-    switch (req.getKind()) {
-    case RequirementReprKind::TypeConstraint: {
-      // Validate the types.
-      if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
-        req.setInvalid();
-        continue;
-      }
-
-      if (validateType(req.getConstraintLoc(), lookupDC, options,
-                       resolver)) {
-        req.setInvalid();
-        continue;
-      }
-
-      // FIXME: Feels too early to perform this check.
-      if (!req.getConstraint()->isExistentialType() &&
-          !req.getConstraint()->getClassOrBoundGenericClass()) {
-        diagnose(genericParams->getWhereLoc(),
-                 diag::requires_conformance_nonprotocol,
-                 req.getSubjectLoc(), req.getConstraintLoc());
-        req.getConstraintLoc().setInvalidType(Context);
-        req.setInvalid();
-        continue;
-      }
-
-      break;
-    }
-
-    case RequirementReprKind::LayoutConstraint: {
-      // Validate the types.
-      if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
-        req.setInvalid();
-        continue;
-      }
-
-      if (req.getLayoutConstraintLoc().isNull()) {
-        req.setInvalid();
-        continue;
-      }
-
-      break;
-    }
-
-    case RequirementReprKind::SameType:
-      if (validateType(req.getFirstTypeLoc(), lookupDC, options,
-                       resolver)) {
-        req.setInvalid();
-        continue;
-      }
-
-      if (validateType(req.getSecondTypeLoc(), lookupDC, options,
-                       resolver)) {
-        req.setInvalid();
-        continue;
-      }
-      
-      break;
-    }
-    
     if (builder && builder->addRequirement(&req))
       req.setInvalid();
+  }
+}
+
+bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
+                                      DeclContext *lookupDC,
+                                      TypeResolutionOptions options,
+                                      GenericTypeResolver *resolver) {
+  if (req.isInvalid())
+    return true;
+
+  switch (req.getKind()) {
+  case RequirementReprKind::TypeConstraint: {
+    // Validate the types.
+    if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
+      req.setInvalid();
+      return true;
+    }
+
+    if (validateType(req.getConstraintLoc(), lookupDC, options, resolver)) {
+      req.setInvalid();
+      return true;
+    }
+
+    // FIXME: Feels too early to perform this check.
+    if (!req.getConstraint()->isExistentialType() &&
+        !req.getConstraint()->getClassOrBoundGenericClass()) {
+      diagnose(whereLoc, diag::requires_conformance_nonprotocol,
+               req.getSubjectLoc(), req.getConstraintLoc());
+      req.getConstraintLoc().setInvalidType(Context);
+      req.setInvalid();
+      return true;
+    }
+    return false;
+  }
+
+  case RequirementReprKind::LayoutConstraint: {
+    // Validate the types.
+    if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
+      req.setInvalid();
+      return true;
+    }
+
+    if (req.getLayoutConstraintLoc().isNull()) {
+      req.setInvalid();
+      return true;
+    }
+    return false;
+  }
+
+  case RequirementReprKind::SameType: {
+    if (validateType(req.getFirstTypeLoc(), lookupDC, options, resolver)) {
+      req.setInvalid();
+      return true;
+    }
+
+    if (validateType(req.getSecondTypeLoc(), lookupDC, options, resolver)) {
+      req.setInvalid();
+      return true;
+    }
+    return false;
+  }
   }
 }
 

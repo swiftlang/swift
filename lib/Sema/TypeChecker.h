@@ -1193,6 +1193,11 @@ public:
   /// \param nominal The generic type.
   void validateGenericTypeSignature(GenericTypeDecl *nominal);
 
+  bool validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
+                           DeclContext *lookupDC,
+                           TypeResolutionOptions options = None,
+                           GenericTypeResolver *resolver = nullptr);
+
   /// Check the given set of generic arguments against the requirements in a
   /// generic signature.
   ///
