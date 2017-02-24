@@ -20,6 +20,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -3240,7 +3241,7 @@ TypeSubstitutionMap TypeBase::getContextSubstitutions(const DeclContext *dc) {
 }
 
 SubstitutionMap TypeBase::getContextSubstitutionMap(
-  ModuleDecl *module, const DeclContext *dc) {
+    ModuleDecl *module, const DeclContext *dc) {
   auto *genericSig = dc->getGenericSignatureOfContext();
   if (genericSig == nullptr)
     return SubstitutionMap();
@@ -3249,7 +3250,9 @@ SubstitutionMap TypeBase::getContextSubstitutionMap(
       LookUpConformanceInModule(module));
 }
 
-TypeSubstitutionMap TypeBase::getMemberSubstitutions(const ValueDecl *member) {
+TypeSubstitutionMap TypeBase::getMemberSubstitutions(
+    const ValueDecl *member,
+    GenericEnvironment *genericEnv) {
   auto *memberDC = member->getDeclContext();
 
   TypeSubstitutionMap substitutions;
@@ -3262,14 +3265,18 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const ValueDecl *member) {
   // We need this since code completion and diagnostics want to be able
   // to call getTypeOfMember() with functions and nested types.
   if (isa<AbstractFunctionDecl>(member) ||
-      isa<GenericTypeDecl>(member)) {
+      isa<GenericTypeDecl>(member) ||
+      isa<SubscriptDecl>(member)) {
     auto *innerDC = member->getInnermostDeclContext();
     if (innerDC->isInnermostContextGeneric()) {
       auto *sig = innerDC->getGenericSignatureOfContext();
       for (auto param : sig->getInnermostGenericParams()) {
         auto *genericParam = param->getCanonicalType()
             ->castTo<GenericTypeParamType>();
-        substitutions[genericParam] = param;
+        substitutions[genericParam] =
+          (genericEnv
+           ? genericEnv->mapTypeIntoContext(param)
+           : param);
       }
     }
   }
@@ -3278,13 +3285,15 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const ValueDecl *member) {
 }
 
 SubstitutionMap TypeBase::getMemberSubstitutionMap(
-  ModuleDecl *module, const ValueDecl *member) {
+    ModuleDecl *module, const ValueDecl *member,
+    GenericEnvironment *genericEnv) {
   auto *genericSig = member->getInnermostDeclContext()
       ->getGenericSignatureOfContext();
   if (genericSig == nullptr)
     return SubstitutionMap();
+  auto subs = getMemberSubstitutions(member, genericEnv);
   return genericSig->getSubstitutionMap(
-      QueryTypeSubstitutionMap{getMemberSubstitutions(member)},
+      QueryTypeSubstitutionMap{subs},
       LookUpConformanceInModule(module));
 }
 
