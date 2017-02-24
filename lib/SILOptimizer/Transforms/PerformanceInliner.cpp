@@ -398,24 +398,6 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
 
         SmallVector<Substitution, 32> NewSubs;
         SubstitutionMap SubstMap;
-        GenericSignature *GenSig = nullptr;
-
-        if (auto FRI = dyn_cast<FunctionRefInst>(def)) {
-          auto Callee = FRI->getReferencedFunction();
-          if (Callee) {
-            GenSig = Callee->getLoweredFunctionType()->getGenericSignature();
-          }
-        } else if (auto CMI = dyn_cast<ClassMethodInst>(def)) {
-          GenSig = CMI->getType()
-                       .getSwiftRValueType()
-                       ->castTo<SILFunctionType>()
-                       ->getGenericSignature();
-        } else if (auto WMI = dyn_cast<WitnessMethodInst>(def)) {
-          GenSig = WMI->getType()
-                       .getSwiftRValueType()
-                       ->castTo<SILFunctionType>()
-                       ->getGenericSignature();
-        }
 
         // It is a generic call inside the callee. Check if after inlining
         // it will be possible to perform a generic specialization or
