@@ -19,6 +19,8 @@ import platform
 import sys
 import time
 
+import android.adb.commands # noqa (E402 module level import not at top of file)
+
 # FIXME: Instead of modifying the system path in order to enable imports from
 #        other directories, all Python modules related to the build script
 #        should be moved to the `swift_build_support` module. Remove "noqa"
@@ -49,9 +51,6 @@ import swift_build_support.targets    # noqa (E402)
 from swift_build_support.targets import StdlibDeploymentTarget  # noqa (E402)
 from swift_build_support.cmake import CMake  # noqa (E402)
 import swift_build_support.workspace    # noqa (E402)
-
-sys.path.append(os.path.join(os.path.dirname(__file__), 'android'))
-import adb.commands  # noqa (E402)
 
 
 build_script_impl = os.path.join(
@@ -1922,8 +1921,8 @@ iterations with -O",
         "--android-deploy-device-path",
         help="Path on an Android device to which built Swift stdlib products "
              "will be deployed. If running host tests, specify the '{}' "
-             "directory.".format(adb.commands.DEVICE_TEMP_DIR),
-        default=adb.commands.DEVICE_TEMP_DIR,
+             "directory.".format(android.adb.commands.DEVICE_TEMP_DIR),
+        default=android.adb.commands.DEVICE_TEMP_DIR,
         metavar="PATH")
 
     parser.add_argument(
