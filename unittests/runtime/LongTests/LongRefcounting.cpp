@@ -62,7 +62,8 @@ static SWIFT_CC(swift) void deinitTestObject(SWIFT_CONTEXT HeapObject *_object) 
     // URC load crashes
     // URC increment OK
     // URC decrement OK
-    ASSERT_DEATH(swift_unownedCheck(object), "swift_abortRetainUnowned");
+    ASSERT_DEATH(swift_unownedCheck(object),
+                 "attempted to read an unowned reference");
     swift_unownedRetain(object);
     swift_unownedRetain(object);
     swift_unownedRelease(object);
@@ -136,8 +137,9 @@ static void releaseALot(TestObject *object, size_t &deallocated,
   }
 }
 
-// 32-3 bits of extra retain count, plus 1 for the implicit retain
-const uint64_t maxRC = 1ULL << (32 - 3);
+// Maximum legal retain count.
+// 32-2 bits of extra retain count, plus 1 for the implicit retain.
+const uint64_t maxRC = 1ULL << (32 - 2);
 
 TEST(LongRefcountingTest, retain_max) {
   size_t deallocated = 0;
@@ -159,7 +161,8 @@ TEST(LongRefcountingTest, retain_overflow_DeathTest) {
   // RC is 1. Retain to maxRC, then retain again and verify overflow error.
   retainALot<true>(object, deallocated, maxRC - 1);
   EXPECT_EQ(0u, deallocated);
-  ASSERT_DEATH(swift_retain(object), "swift_abortRetainOverflow");
+  ASSERT_DEATH(swift_retain(object),
+               "object was retained too many times");
 }
 
 TEST(LongRefcountingTest, nonatomic_retain_max) {
@@ -182,7 +185,8 @@ TEST(LongRefcountingTest, nonatomic_retain_overflow_DeathTest) {
   // RC is 1. Retain to maxRC, then retain again and verify overflow error.
   retainALot<false>(object, deallocated, maxRC - 1);
   EXPECT_EQ(0u, deallocated);
-  ASSERT_DEATH(swift_nonatomic_retain(object), "swift_abortRetainOverflow");
+  ASSERT_DEATH(swift_nonatomic_retain(object),
+               "object was retained too many times");
 }
 
 
@@ -305,7 +309,8 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_no_side_DeathTest) {
   // URC load crashes
   // URC increment can't happen
   // URC decrement OK
-  ASSERT_DEATH(swift_unownedCheck(object), "swift_abortRetainUnowned");
+  ASSERT_DEATH(swift_unownedCheck(object),
+               "attempted to read an unowned reference");
   swift_unownedRelease(object);
   EXPECT_ALLOCATED(object);
 
@@ -513,7 +518,8 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_with_side_DeathTest)
   // URC load crashes
   // URC increment can't happen
   // URC decrement OK
-  ASSERT_DEATH(swift_unownedCheck(object), "swift_abortRetainUnowned");
+  ASSERT_DEATH(swift_unownedCheck(object),
+               "attempted to read an unowned reference");
   swift_unownedRelease(object);
   EXPECT_ALLOCATED(object);
   EXPECT_ALLOCATED(side);
@@ -752,7 +758,8 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_freed_with_side_Deat
   // URC load crashes
   // URC increment can't happen
   // URC decrement OK
-  ASSERT_DEATH(swift_unownedCheck(object), "swift_abortRetainUnowned");
+  ASSERT_DEATH(swift_unownedCheck(object),
+               "attempted to read an unowned reference");
   swift_unownedRelease(object);
   EXPECT_ALLOCATED(object);
   EXPECT_ALLOCATED(side);
