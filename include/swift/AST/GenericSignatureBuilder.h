@@ -736,13 +736,15 @@ class GenericSignatureBuilder::PotentialArchetype {
   llvm::MapVector<Identifier, llvm::TinyPtrVector<PotentialArchetype *>>
     NestedTypes;
 
-  /// The concrete type to which a this potential archetype has been
+  /// The concrete types to which this potential archetype has been
   /// constrained.
-  Type ConcreteType;
+  ///
+  /// This vector runs parallel to ConcreteTypeSources.
+  llvm::TinyPtrVector<Type> concreteTypes;
 
-  /// The source of the concrete type requirement, if one was written
-  /// on this potential archetype.
-  const RequirementSource *ConcreteTypeSource = nullptr;
+  /// The source of the concrete type requirements that were written on
+  /// this potential archetype.
+  llvm::TinyPtrVector<const RequirementSource *> concreteTypeSources;
 
   /// Whether this is an unresolved nested type.
   unsigned isUnresolvedNestedType : 1;
@@ -971,15 +973,21 @@ public:
                             SameTypeConstraints.end());
   }
 
-  /// Retrieve the concrete type source as written on this potential archetype.
-  const RequirementSource *getConcreteTypeSourceAsWritten() const {
-    return ConcreteTypeSource;
+  /// Retrieve the concrete types as written on this potential archetype.
+  const llvm::TinyPtrVector<Type>& getConcreteTypesAsWritten() const {
+    return concreteTypes;
+  }
+
+  /// Retrieve the concrete type sources as written on this potential archetype.
+  ArrayRef<const RequirementSource *> getConcreteTypeSourcesAsWritten() const {
+    return concreteTypeSources;
   }
 
   /// Find a source of the same-type constraint that maps this potential
   /// archetype to a concrete type somewhere in the equivalence class of this
-  /// type.
-  const RequirementSource *findAnyConcreteTypeSourceAsWritten() const;
+  /// type along with the concrete type that was written there.
+  Optional<std::pair<Type, const RequirementSource *>>
+  findAnyConcreteTypeSourceAsWritten() const;
 
   /// \brief Retrieve (or create) a nested type with the given name.
   PotentialArchetype *getNestedType(Identifier Name,
