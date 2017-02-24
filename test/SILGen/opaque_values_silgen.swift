@@ -264,3 +264,29 @@ func s170____force_convert<T>() -> T {
   let x : T = 42 as! T
   return x
 }
+
+// Tests supporting function for s190___return_foo_var - cast and return of protocol
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s180_______return_fooAA3Foo_pyF : $@convention(thin) () -> @out Foo {
+// CHECK: bb0:
+// CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.Int2048, 42
+// CHECK:   [[INT_ARG:%.*]] = apply %{{.*}}([[INT_LIT]], [[INT_TYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK:   [[INT_CAST:%.*]] = unconditional_checked_cast_opaque [[INT_ARG]] : $Int to $Foo
+// CHECK:   return [[INT_CAST]] : $Foo
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s180_______return_fooAA3Foo_pyF'
+func s180_______return_foo() -> Foo {
+  return 42 as! Foo
+}
+var foo_var : Foo = s180_______return_foo()
+
+// Tests return of global variables by doing a load of copy
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s190___return_foo_varAA3Foo_pyF : $@convention(thin) () -> @out Foo {
+// CHECK: bb0:
+// CHECK:   [[GLOBAL:%.*]] = global_addr {{.*}} : $*Foo
+// CHECK:   [[LOAD_GLOBAL:%.*]] = load [copy] [[GLOBAL]] : $*Foo
+// CHECK:   return [[LOAD_GLOBAL]] : $Foo
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s190___return_foo_varAA3Foo_pyF'
+func s190___return_foo_var() -> Foo {
+  return foo_var
+}

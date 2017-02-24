@@ -61,6 +61,7 @@ function write_linkfile {
     cat >$OUTPUTFILE <<EOF
 -ldl
 -lpthread
+-latomic
 -lswiftCore
 -latomic
 -lswiftImageInspectionShared

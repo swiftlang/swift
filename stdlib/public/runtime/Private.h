@@ -42,9 +42,6 @@ namespace swift {
                                     const ProtocolDescriptor *theProtocol);
 #endif
 
-  extern "C" LLVM_LIBRARY_VISIBILITY LLVM_ATTRIBUTE_NORETURN
-  void _swift_abortRetainUnowned(const void *object);
-
   /// Is the given value a valid alignment mask?
   static inline bool isAlignmentMask(size_t mask) {
     // mask          == xyz01111...
@@ -126,6 +123,23 @@ namespace swift {
 
   LLVM_LIBRARY_VISIBILITY
   bool usesNativeSwiftReferenceCounting(const ClassMetadata *theClass);
+
+  static inline
+  bool objectUsesNativeSwiftReferenceCounting(const void *object) {
+    assert(!isObjCTaggedPointerOrNull(object));
+#if SWIFT_HAS_OPAQUE_ISAS
+    // Fast path for opaque ISAs.  We don't want to call
+    // _swift_getClassOfAllocated as that will call object_getClass.
+    // Instead we can look at the bits in the ISA and tell if its a
+    // non-pointer opaque ISA which means it is definitely an ObjC
+    // object and doesn't use native swift reference counting.
+    if (_swift_isNonPointerIsaObjCClass(object))
+      return false;
+    return usesNativeSwiftReferenceCounting(_swift_getClassOfAllocatedFromPointer(object));
+#else
+    return usesNativeSwiftReferenceCounting(_swift_getClassOfAllocated(object));
+#endif
+  }
 
   /// Get the superclass pointer value used for Swift root classes.
   /// Note that this function may return a nullptr on non-objc platforms,

@@ -272,3 +272,25 @@ swift_deletedMethodError() {
   swift::fatalError(/* flags = */ 0,
                     "fatal error: call of deleted method\n");
 }
+
+
+// Crash due to a retain count overflow.
+// FIXME: can't pass the object's address from InlineRefCounts without hacks
+void swift::swift_abortRetainOverflow() {
+  swift::fatalError(FatalErrorFlags::ReportBacktrace,
+                    "fatal error: object was retained too many times");
+}
+
+// Crash due to retain of a dead unowned reference.
+// FIXME: can't pass the object's address from InlineRefCounts without hacks
+void swift::swift_abortRetainUnowned(const void *object) {
+  if (object) {
+    swift::fatalError(FatalErrorFlags::ReportBacktrace,
+                      "fatal error: attempted to read an unowned reference but "
+                      "object %p was already deallocated", object);
+  } else {
+    swift::fatalError(FatalErrorFlags::ReportBacktrace,
+                      "fatal error: attempted to read an unowned reference but "
+                      "the object was already deallocated");
+  }
+}

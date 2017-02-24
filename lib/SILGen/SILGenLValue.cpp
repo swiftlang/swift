@@ -2039,7 +2039,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
                        (isGuaranteedValid ? C.isGuaranteedPlusZeroOk()
                                           : C.isImmediatePlusZeroOk()));
 
-  if (rvalueTL.isAddressOnly()) {
+  if (rvalueTL.isAddressOnly() && silConv.useLoweredAddresses()) {
     // If the client is cool with a +0 rvalue, the decl has an address-only
     // type, and there are no conversions, then we can return this as a +0
     // address RValue.
@@ -2296,7 +2296,7 @@ SILValue SILGenFunction::emitSemanticLoad(SILLocation loc,
                                           const TypeLowering &rvalueTL,
                                           IsTake_t isTake) {
   assert(srcTL.getLoweredType().getAddressType() == src->getType());
-  assert(rvalueTL.isLoadable());
+  assert(rvalueTL.isLoadable() || !silConv.useLoweredAddresses());
 
   // Easy case: the types match.
   if (srcTL.getLoweredType() == rvalueTL.getLoweredType()) {

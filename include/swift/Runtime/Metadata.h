@@ -136,7 +136,7 @@ using TargetFarRelativeIndirectablePointer
   = typename Runtime::template FarRelativeIndirectablePointer<Pointee,Nullable>;
 
 struct HeapObject;
-struct WeakReference;
+class WeakReference;
   
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
@@ -1831,17 +1831,6 @@ struct TargetObjCClassWrapperMetadata : public TargetMetadata<Runtime> {
 };
 using ObjCClassWrapperMetadata
   = TargetObjCClassWrapperMetadata<InProcess>;
-
-// FIXME: Workaround for rdar://problem/18889711. 'Consume' does not require
-// a barrier on ARM64, but LLVM doesn't know that. Although 'relaxed'
-// is formally UB by C++11 language rules, we should be OK because neither
-// the processor model nor the optimizer can realistically reorder our uses
-// of 'consume'.
-#if __arm64__ || __arm__
-#  define SWIFT_MEMORY_ORDER_CONSUME (std::memory_order_relaxed)
-#else
-#  define SWIFT_MEMORY_ORDER_CONSUME (std::memory_order_consume)
-#endif
 
 /// The structure of metadata for foreign types where the source
 /// language doesn't provide any sort of more interesting metadata for

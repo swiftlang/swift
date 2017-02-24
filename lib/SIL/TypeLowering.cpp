@@ -1118,20 +1118,10 @@ namespace {
 
     // --- Same as NonTrivialLoadableTypeLowering
 
-    SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
-                            SILValue addr, IsTake_t isTake) const override {
-      llvm_unreachable("load copy");
-    }
-
     void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
                          SILValue newValue, SILValue addr,
                          IsInitialization_t isInit) const override {
       llvm_unreachable("store copy");
-    }
-
-    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
-                      LoadOwnershipQualifier qual) const override {
-      llvm_unreachable("store");
     }
 
     // --- Same as LeafLoadableTypeLowering.

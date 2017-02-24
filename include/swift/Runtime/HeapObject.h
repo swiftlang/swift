@@ -219,18 +219,6 @@ SWIFT_RUNTIME_EXPORT
 void (*SWIFT_CC(RegisterPreservingCC) _swift_nonatomic_retain_n)(HeapObject *object,
                                                        uint32_t n);
 
-static inline void _swift_retain_inlined(HeapObject *object) {
-  if (object) {
-    object->refCount.increment();
-  }
-}
-
-static inline void _swift_nonatomic_retain_inlined(HeapObject *object) {
-  if (object) {
-    object->refCount.incrementNonAtomic();
-  }
-}
-
 /// Atomically increments the reference count of an object, unless it has
 /// already been destroyed. Returns nil if the object is dead.
 SWIFT_RT_ENTRY_VISIBILITY
@@ -512,22 +500,22 @@ struct UnownedReference {
   HeapObject *Value;
 };
 
-/// Increment the weak/unowned retain count.
+/// Increment the unowned retain count.
 SWIFT_RT_ENTRY_VISIBILITY
 void swift_unownedRetain(HeapObject *value)
     SWIFT_CC(RegisterPreservingCC);
 
-/// Decrement the weak/unowned retain count.
+/// Decrement the unowned retain count.
 SWIFT_RT_ENTRY_VISIBILITY
 void swift_unownedRelease(HeapObject *value)
     SWIFT_CC(RegisterPreservingCC);
 
-/// Increment the weak/unowned retain count by n.
+/// Increment the unowned retain count by n.
 SWIFT_RT_ENTRY_VISIBILITY
 void swift_unownedRetain_n(HeapObject *value, int n)
     SWIFT_CC(RegisterPreservingCC);
 
-/// Decrement the weak/unowned retain count by n.
+/// Decrement the unowned retain count by n.
 SWIFT_RT_ENTRY_VISIBILITY
 void swift_unownedRelease_n(HeapObject *value, int n)
     SWIFT_CC(RegisterPreservingCC);
@@ -540,7 +528,7 @@ void swift_unownedRetainStrong(HeapObject *value)
 
 /// Increment the strong retain count of an object which may have been
 /// deallocated, aborting if it has been deallocated, and decrement its
-/// weak/unowned reference count.
+/// unowned reference count.
 SWIFT_RT_ENTRY_VISIBILITY
 void swift_unownedRetainStrongAndRelease(HeapObject *value)
     SWIFT_CC(RegisterPreservingCC);
@@ -614,16 +602,8 @@ static inline void swift_unownedTakeAssign(UnownedReference *dest,
 /****************************** WEAK REFERENCES ******************************/
 /*****************************************************************************/
 
-/// A weak reference value object.  This is ABI.
-struct WeakReference {
-  uintptr_t Value;
-};
-
-/// Return true if this is a native weak reference
-///
-/// \param ref - never null
-/// \return true if ref is a native weak reference
-bool isNativeSwiftWeakReference(WeakReference *ref);
+// Defined in Runtime/WeakReference.h
+class WeakReference;
 
 /// Initialize a weak reference.
 ///
