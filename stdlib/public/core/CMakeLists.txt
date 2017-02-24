@@ -63,7 +63,7 @@ set(SWIFTLIB_ESSENTIAL
   # if we do so, the compiler crashes.
   AnyHashable.swift
   # END WORKAROUND
-  HashedCollectionsAnyHashableExtensions.swift.gyb
+  HashedCollectionsAnyHashableExtensions.swift
   Hashing.swift
   HeapBuffer.swift
   ICU.swift

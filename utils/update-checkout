@@ -50,7 +50,7 @@ def find_rev_by_timestamp(timestamp, repo_name, refspec):
                  '--before=' + timestamp]
     # Prefer the most-recent change _made by swift-ci_ before the timestamp,
     # falling back to most-recent in general if there is none by swift-ci.
-    rev = shell.capture(base_args + [ '--author', 'swift-ci', refspec]).strip()
+    rev = shell.capture(base_args + ['--author', 'swift-ci', refspec]).strip()
     if rev:
         return rev
     rev = shell.capture(base_args + [refspec]).strip()
@@ -183,6 +183,7 @@ def get_timestamp_to_match(args):
                      dry_run=False, echo=False):
         return shell.capture(["git", "log", "-1", "--format=%cI"],
                              echo=False).strip()
+
 
 def update_all_repositories(args, config, scheme_name, cross_repos_pr):
     scheme_map = None

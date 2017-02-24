@@ -13,21 +13,21 @@
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "B",
-      key.usr: "s:C12implicit_vis1B",
+      key.usr: "s:12implicit_vis1BC",
       key.line: 1,
       key.column: 7,
       key.entities: [
         {
           key.kind: source.lang.swift.decl.var.instance,
           key.name: "a",
-          key.usr: "s:vC12implicit_vis1B1aCS_1A",
+          key.usr: "s:12implicit_vis1BC1aAA1ACv",
           key.line: 2,
           key.column: 6
         },
         {
           key.kind: source.lang.swift.ref.class,
           key.name: "A",
-          key.usr: "s:C12implicit_vis1A",
+          key.usr: "s:12implicit_vis1AC",
           key.line: 2,
           key.column: 9
         }

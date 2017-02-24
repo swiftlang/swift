@@ -2089,6 +2089,15 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
       constraintComponent[constraint] = components[i];
   }
 
+  // Add the orphaned components to the mapping from constraints to components.
+  unsigned firstOrphanedConstraint =
+    numComponents - CG.getOrphanedConstraints().size();
+  {
+    unsigned component = firstOrphanedConstraint;
+    for (auto constraint : CG.getOrphanedConstraints())
+      constraintComponent[constraint] = component++;
+  }
+
   // Sort the constraints into buckets based on component number.
   std::unique_ptr<ConstraintList[]> constraintBuckets(
                                       new ConstraintList[numComponents]);
@@ -2098,6 +2107,9 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     constraintBuckets[constraintComponent[constraint]].push_back(constraint);
   }
 
+  // Remove all of the orphaned constraints; we'll introduce them as needed.
+  auto allOrphanedConstraints = CG.takeOrphanedConstraints();
+
   // Function object that returns all constraints placed into buckets
   // back to the list of constraints.
   auto returnAllConstraints = [&] {
@@ -2106,6 +2118,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
       InactiveConstraints.splice(InactiveConstraints.end(), 
                                  constraintBuckets[component]);
     }
+    CG.setOrphanedConstraints(std::move(allOrphanedConstraints));
   };
 
   // Compute the partial solutions produced for each connected component.
@@ -2118,24 +2131,30 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     ++solverState->NumComponentsSplit;
 
     // Collect the constraints for this component.
-    InactiveConstraints.splice(InactiveConstraints.end(), 
+    InactiveConstraints.splice(InactiveConstraints.end(),
                                constraintBuckets[component]);
 
-    // Collect the type variables that are not part of a different
-    // component; this includes type variables that are part of the
-    // component as well as already-resolved type variables.
-    // FIXME: The latter could be avoided if we had already
-    // substituted all of those other type variables through.
-    llvm::SmallVector<TypeVariableType *, 16> allTypeVariables 
+    llvm::SmallVector<TypeVariableType *, 16> allTypeVariables
       = std::move(TypeVariables);
-    for (auto typeVar : allTypeVariables) {
-      auto known = typeVarComponent.find(typeVar);
-      if (known != typeVarComponent.end() && known->second != component)
-        continue;
 
-      TypeVariables.push_back(typeVar);
+    Constraint *orphaned = nullptr;
+    if (component < firstOrphanedConstraint) {
+      // Collect the type variables that are not part of a different
+      // component; this includes type variables that are part of the
+      // component as well as already-resolved type variables.
+      for (auto typeVar : allTypeVariables) {
+        auto known = typeVarComponent.find(typeVar);
+        if (known != typeVarComponent.end() && known->second != component)
+          continue;
+
+        TypeVariables.push_back(typeVar);
+      }
+    } else {
+      // Get the orphaned constraint.
+      orphaned = allOrphanedConstraints[component - firstOrphanedConstraint];
     }
-    
+    CG.setOrphanedConstraint(orphaned);
+
     // Solve for this component. If it fails, we're done.
     bool failed;
     if (TC.getLangOpts().DebugConstraintSolver) {

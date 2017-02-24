@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Syntax/SyntaxData.h"
+#include "swift/Syntax/DeclSyntax.h"
+#include "swift/Syntax/ExprSyntax.h"
+#include "swift/Syntax/GenericSyntax.h"
 #include "swift/Syntax/TypeSyntax.h"
 #include "swift/Syntax/StmtSyntax.h"
 
@@ -25,6 +27,24 @@ RC<SyntaxData> SyntaxData::make(RC<RawSyntax> Raw,
   };
 }
 
+RC<SyntaxData> SyntaxData::makeDataFromRaw(RC<RawSyntax> Raw,
+                                           const SyntaxData *Parent,
+                                           CursorIndex IndexInParent) {
+  switch (Raw->Kind) {
+#define SYNTAX(Id, ParentType) \
+  case SyntaxKind::Id: \
+    return Id##SyntaxData::make(Raw, Parent, IndexInParent);
+
+#define MISSING_SYNTAX(Id, ParentType) \
+  case SyntaxKind::Id: \
+    return ParentType##Data::make(Raw, Parent, IndexInParent);
+
+#include "swift/Syntax/SyntaxKinds.def"
+  case SyntaxKind::Token:
+    llvm_unreachable("Can't make a SyntaxData from a Token!");
+  }
+}
+
 bool SyntaxData::isType() const {
   return Raw->isType();
 }
@@ -37,15 +57,21 @@ bool SyntaxData::isDecl() const {
   return Raw->isDecl();
 }
 
+bool SyntaxData::isExpr() const {
+  return Raw->isExpr();
+}
+
 void SyntaxData::dump(llvm::raw_ostream &OS) const {
   Raw->dump(OS, 0);
 }
 
 #pragma mark - unknown-syntax Data
 
-RC<UnknownSyntaxData> UnknownSyntaxData::make(RC<RawSyntax> Raw) {
+RC<UnknownSyntaxData> UnknownSyntaxData::make(RC<RawSyntax> Raw,
+                                              const SyntaxData *Parent,
+                                              CursorIndex IndexInParent) {
   return RC<UnknownSyntaxData> {
-    new UnknownSyntaxData(Raw)
+    new UnknownSyntaxData { Raw, Parent, IndexInParent }
   };
 }
 

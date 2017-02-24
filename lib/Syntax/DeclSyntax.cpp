@@ -31,6 +31,32 @@ DeclSyntaxData::DeclSyntaxData(RC<RawSyntax> Raw,
 DeclSyntax::DeclSyntax(const RC<SyntaxData> Root, const DeclSyntaxData *Data)
   : Syntax(Root, Data) {}
 
+#pragma mark - unknown-statement Data
+
+UnknownDeclSyntaxData::UnknownDeclSyntaxData(RC<RawSyntax> Raw,
+                                             const SyntaxData *Parent,
+                                             CursorIndex IndexInParent)
+  : DeclSyntaxData(Raw, Parent, IndexInParent) {
+  assert(Raw->Kind == SyntaxKind::UnknownStmt);
+}
+
+RC<UnknownDeclSyntaxData>
+UnknownDeclSyntaxData::make(RC<RawSyntax> Raw,
+                            const SyntaxData *Parent,
+                            CursorIndex IndexInParent) {
+  return RC<UnknownDeclSyntaxData> {
+    new UnknownDeclSyntaxData {
+      Raw, Parent, IndexInParent
+    }
+  };
+}
+
+#pragma mark - unknown-statement API
+
+UnknownDeclSyntax::UnknownDeclSyntax(const RC<SyntaxData> Root,
+                                     const UnknownDeclSyntaxData *Data)
+  : DeclSyntax(Root, Data) {}
+
 #pragma mark - declaration-members Data
 
 DeclMembersSyntaxData::DeclMembersSyntaxData(RC<RawSyntax> Raw,

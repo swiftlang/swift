@@ -266,7 +266,7 @@ entry:
 }
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @dynamic_inject
-// CHECK:         ([[EITHER_OR:%O26enum_dynamic_multi_payload8EitherOr.*]]* noalias nocapture sret, %swift.type* %T)
+// CHECK:         ([[EITHER_OR:%T26enum_dynamic_multi_payload8EitherOrO.*]]* noalias nocapture sret, %swift.type* %T)
 sil @dynamic_inject : $@convention(thin) <T> () -> @out EitherOr<T, Builtin.Int64> {
 entry(%e : $*EitherOr<T, Builtin.Int64>):
   // CHECK: call void @swift_storeEnumTagMultiPayload(%swift.opaque* {{%.*}}, %swift.type* [[TYPE:%.*]], i32 0)
@@ -369,7 +369,7 @@ entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
 }
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @dynamic_value_semantics2
-// CHECK:         ([[EITHER_OR:%O26enum_dynamic_multi_payload8EitherOr.*]]* noalias nocapture sret, [[EITHER_OR]]* noalias nocapture, %swift.type* %T)
+// CHECK:         ([[EITHER_OR:%T26enum_dynamic_multi_payload8EitherOrO.*]]* noalias nocapture sret, [[EITHER_OR]]* noalias nocapture, %swift.type* %T)
 sil @dynamic_value_semantics2 : $@convention(thin) <T> (@in EitherOr<T, C>) -> @out EitherOr<T, C> {
 entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK:        [[TAG:%.*]] = call i32 @swift_getEnumCaseMultiPayload

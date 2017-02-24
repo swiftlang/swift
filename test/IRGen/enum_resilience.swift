@@ -9,28 +9,28 @@ import resilient_struct
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 
-// CHECK: %C15enum_resilience5Class = type <{ %swift.refcounted }>
-// CHECK: %V15enum_resilience9Reference = type <{ %C15enum_resilience5Class* }>
+// CHECK: %T15enum_resilience5ClassC = type <{ %swift.refcounted }>
+// CHECK: %T15enum_resilience9ReferenceV = type <{ %T15enum_resilience5ClassC* }>
 
 // Public fixed layout struct contains a public resilient struct,
 // cannot use spare bits
 
-// CHECK: %O15enum_resilience6Either = type <{ [[REFERENCE_TYPE:\[(4|8) x i8\]]], [1 x i8] }>
+// CHECK: %T15enum_resilience6EitherO = type <{ [[REFERENCE_TYPE:\[(4|8) x i8\]]], [1 x i8] }>
 
 // Public resilient struct contains a public resilient struct,
 // can use spare bits
 
-// CHECK: %O15enum_resilience15ResilientEither = type <{ [[REFERENCE_TYPE]] }>
+// CHECK: %T15enum_resilience15ResilientEitherO = type <{ [[REFERENCE_TYPE]] }>
 
 // Internal fixed layout struct contains a public resilient struct,
 // can use spare bits
 
-// CHECK: %O15enum_resilience14InternalEither = type <{ [[REFERENCE_TYPE]] }>
+// CHECK: %T15enum_resilience14InternalEitherO = type <{ [[REFERENCE_TYPE]] }>
 
 // Public fixed layout struct contains a fixed layout struct,
 // can use spare bits
 
-// CHECK: %O15enum_resilience10EitherFast = type <{ [[REFERENCE_TYPE]] }>
+// CHECK: %T15enum_resilience10EitherFastO = type <{ [[REFERENCE_TYPE]] }>
 
 public class Class {}
 
@@ -205,13 +205,13 @@ public func reabstraction<T>(_ f: (Medium) -> T) {}
 public func resilientEnumPartialApply(_ f: (Medium) -> Int) {
 
 // CHECK:     [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject
-// CHECK:     call swiftcc void @_TF15enum_resilience13reabstractionurFFO14resilient_enum6MediumxT_(i8* bitcast (void (%Si*, %swift.opaque*, %swift.refcounted*)* @_TPA__TTRXFo_iO14resilient_enum6Medium_dSi_XFo_iS0__iSi_ to i8*), %swift.refcounted* [[CONTEXT:%.*]], %swift.type* @_TMSi)
+// CHECK:     call swiftcc void @_TF15enum_resilience13reabstractionurFFO14resilient_enum6MediumxT_(i8* bitcast (void (%TSi*, %swift.opaque*, %swift.refcounted*)* @_TPA__TTRXFo_iO14resilient_enum6Medium_dSi_XFo_iS0__iSi_ to i8*), %swift.refcounted* [[CONTEXT:%.*]], %swift.type* @_TMSi)
   reabstraction(f)
 
 // CHECK:     ret void
 }
 
-// CHECK-LABEL: define internal swiftcc void @_TPA__TTRXFo_iO14resilient_enum6Medium_dSi_XFo_iS0__iSi_(%Si* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.refcounted* swiftself)
+// CHECK-LABEL: define internal swiftcc void @_TPA__TTRXFo_iO14resilient_enum6Medium_dSi_XFo_iS0__iSi_(%TSi* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.refcounted* swiftself)
 
 
 // Enums with resilient payloads from a different resilience domain

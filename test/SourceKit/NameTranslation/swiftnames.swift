@@ -47,6 +47,10 @@ func takeError(_ e : CustomError) {
 @objc(C2ObjC)
 class C2 {}
 
+@objc open class /*MyClass*/MyClass: NSObject {
+  @objc open func /*MyClass_foo*/foo(/*MyClass_foo_p1*/bar: Int, /*MyClass_foo_p2*/baz: Int) {}
+}
+
 // REQUIRES: objc_interop
 // RUN: %sourcekitd-test -req=translate -swift-name "foo(a:b:c:)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK1 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "foo(a1:b1:c1:)" -pos=11:11 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK2 %s
@@ -68,6 +72,7 @@ class C2 {}
 // RUN: %sourcekitd-test -req=translate -swift-name "a2" -pos=41:10 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK14 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "A2" -pos=41:10 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK14 %s
 // RUN: %sourcekitd-test -req=translate -swift-name "C3" -pos=48:8 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK15 %s
+// RUN: %sourcekitd-test -req=translate -swift-name "bar(_:other:)" -pos=51:36 %s -- -F %S/Inputs/mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK16 %s
 
 // CHECK-NONE: <empty name translation info>
 // CHECK1: fooWithA:b:c:
@@ -86,3 +91,4 @@ class C2 {}
 // CHECK13: CommonFixA2
 // CHECK14: CustomErrorA2
 // CHECK15: C2ObjC
+// CHECK16: bar:other:

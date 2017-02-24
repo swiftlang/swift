@@ -25,47 +25,47 @@
 // DEPENDS-MEMBER-LABEL: {{^depends-member:$}}
 // DEPENDS-MEMBER-NEGATIVE-LABEL: {{^depends-member:$}}
 
-// PROVIDES-NOMINAL-DAG: 4Base"
+// PROVIDES-NOMINAL-DAG: 4BaseC"
 class Base {
-  // PROVIDES-MEMBER-DAG: - ["{{.+}}4Base", ""]
-  // PROVIDES-MEMBER-NEGATIVE-NOT: - ["{{.+}}4Base", "{{.+}}"]
+  // PROVIDES-MEMBER-DAG: - ["{{.+}}4BaseC", ""]
+  // PROVIDES-MEMBER-NEGATIVE-NOT: - ["{{.+}}4BaseC", "{{.+}}"]
   func foo() {}
 }
   
-// PROVIDES-NOMINAL-DAG: 3Sub"
-// DEPENDS-NOMINAL-DAG: 9OtherBase"
+// PROVIDES-NOMINAL-DAG: 3SubC"
+// DEPENDS-NOMINAL-DAG: 9OtherBaseC"
 class Sub : OtherBase {
-  // PROVIDES-MEMBER-DAG: - ["{{.+}}3Sub", ""]
-  // PROVIDES-MEMBER-NEGATIVE-NOT: - ["{{.+}}3Sub", "{{.+}}"]
-  // DEPENDS-MEMBER-DAG: - ["{{.+}}9OtherBase", ""]
-  // DEPENDS-MEMBER-DAG: - ["{{.+}}9OtherBase", "foo"]
-  // DEPENDS-MEMBER-DAG: - ["{{.+}}9OtherBase", "init"]
+  // PROVIDES-MEMBER-DAG: - ["{{.+}}3SubC", ""]
+  // PROVIDES-MEMBER-NEGATIVE-NOT: - ["{{.+}}3SubC", "{{.+}}"]
+  // DEPENDS-MEMBER-DAG: - ["{{.+}}9OtherBaseC", ""]
+  // DEPENDS-MEMBER-DAG: - ["{{.+}}9OtherBaseC", "foo"]
+  // DEPENDS-MEMBER-DAG: - ["{{.+}}9OtherBaseC", "init"]
   func foo() {}
 }
 
-// PROVIDES-NOMINAL-DAG: 9SomeProto"
-// PROVIDES-MEMBER-DAG: - ["{{.+}}9SomeProto", ""]
+// PROVIDES-NOMINAL-DAG: 9SomeProtoP"
+// PROVIDES-MEMBER-DAG: - ["{{.+}}9SomeProtoP", ""]
 protocol SomeProto {}
 
-// PROVIDES-NOMINAL-DAG: 10OtherClass"
-// PROVIDES-MEMBER-DAG: - ["{{.+}}10OtherClass", ""]
-// DEPENDS-NOMINAL-DAG: 10OtherClass"
-// DEPENDS-NOMINAL-DAG: 9SomeProto"
-// DEPENDS-MEMBER-DAG: - ["{{.+}}9SomeProto", ""]
-// DEPENDS-MEMBER-DAG: - ["{{.+}}10OtherClass", "deinit"]
+// PROVIDES-NOMINAL-DAG: 10OtherClassC"
+// PROVIDES-MEMBER-DAG: - ["{{.+}}10OtherClassC", ""]
+// DEPENDS-NOMINAL-DAG: 10OtherClassC"
+// DEPENDS-NOMINAL-DAG: 9SomeProtoP"
+// DEPENDS-MEMBER-DAG: - ["{{.+}}9SomeProtoP", ""]
+// DEPENDS-MEMBER-DAG: - ["{{.+}}10OtherClassC", "deinit"]
 extension OtherClass : SomeProto {}
 
-// PROVIDES-NOMINAL-NEGATIVE-NOT: 11OtherStruct"{{$}}
-// DEPENDS-NOMINAL-DAG: 11OtherStruct"
+// PROVIDES-NOMINAL-NEGATIVE-NOT: 11OtherStructV"{{$}}
+// DEPENDS-NOMINAL-DAG: 11OtherStructV"
 extension OtherStruct {
-  // PROVIDES-MEMBER-DAG: - ["{{.+}}11OtherStruct", ""]
-  // PROVIDES-MEMBER-DAG: - ["{{.+}}11OtherStruct", "foo"]
-  // PROVIDES-MEMBER-DAG: - ["{{.+}}11OtherStruct", "bar"]
+  // PROVIDES-MEMBER-DAG: - ["{{.+}}11OtherStructV", ""]
+  // PROVIDES-MEMBER-DAG: - ["{{.+}}11OtherStructV", "foo"]
+  // PROVIDES-MEMBER-DAG: - ["{{.+}}11OtherStructV", "bar"]
   // PROVIDES-MEMBER-NEGATIVE-NOT: "baz"
-  // DEPENDS-MEMBER-DAG: - ["{{.+}}11OtherStruct", "foo"]
-  // DEPENDS-MEMBER-DAG: - ["{{.+}}11OtherStruct", "bar"]
-  // DEPENDS-MEMBER-DAG: - !private ["{{.+}}11OtherStruct", "baz"]
-  // DEPENDS-MEMBER-NEGATIVE-NOT: - ["{{.+}}11OtherStruct", ""]
+  // DEPENDS-MEMBER-DAG: - ["{{.+}}11OtherStructV", "foo"]
+  // DEPENDS-MEMBER-DAG: - ["{{.+}}11OtherStructV", "bar"]
+  // DEPENDS-MEMBER-DAG: - !private ["{{.+}}11OtherStructV", "baz"]
+  // DEPENDS-MEMBER-NEGATIVE-NOT: - ["{{.+}}11OtherStructV", ""]
   func foo() {}
   var bar: () { return () }
   private func baz() {}

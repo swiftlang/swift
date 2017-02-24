@@ -895,11 +895,7 @@ option(SWIFT_HAVE_LIBXML
 cmake_push_check_state()
 list(APPEND CMAKE_REQUIRED_LIBRARIES "edit")
 check_symbol_exists(el_wgets "histedit.h" HAVE_EL_WGETS)
-check_symbol_exists(wcslcat wchar.h HAVE_WCSLCAT)
-# FIXME: UNICODE_LIBEDIT shouldn't need BSD's wcslcat function,
-#        rewrite the usages in terms of wcsncat to get the REPL
-#        building on linux.
-if(HAVE_EL_WGETS AND HAVE_WCSLCAT)
+if(HAVE_EL_WGETS)
   set(HAVE_UNICODE_LIBEDIT 1)
 endif()
 cmake_pop_check_state()

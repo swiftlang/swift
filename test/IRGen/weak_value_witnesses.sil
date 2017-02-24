@@ -26,12 +26,12 @@ struct Gen<T> {
 }
 
 // CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_T020weak_value_witnesses8JustWeakVwTK(
-// CHECK:      [[DEST:%.*]] = bitcast [24 x i8]* %dest to %V20weak_value_witnesses8JustWeak*
-// CHECK-NEXT: [[SRC:%.*]] = bitcast [24 x i8]* %src to %V20weak_value_witnesses8JustWeak*
-// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds %V20weak_value_witnesses8JustWeak, %V20weak_value_witnesses8JustWeak* [[DEST]], i32 0, i32 0
-// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds %V20weak_value_witnesses8JustWeak, %V20weak_value_witnesses8JustWeak* [[SRC]], i32 0, i32 0
+// CHECK:      [[DEST:%.*]] = bitcast [24 x i8]* %dest to %T20weak_value_witnesses8JustWeakV*
+// CHECK-NEXT: [[SRC:%.*]] = bitcast [24 x i8]* %src to %T20weak_value_witnesses8JustWeakV*
+// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds %T20weak_value_witnesses8JustWeakV, %T20weak_value_witnesses8JustWeakV* [[DEST]], i32 0, i32 0
+// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds %T20weak_value_witnesses8JustWeakV, %T20weak_value_witnesses8JustWeakV* [[SRC]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_weakTakeInit(%swift.weak* [[DEST_X]], %swift.weak* [[SRC_X]])
-// CHECK-NEXT: [[T0:%.*]] = bitcast %V20weak_value_witnesses8JustWeak* [[DEST]] to %swift.opaque*
+// CHECK-NEXT: [[T0:%.*]] = bitcast %T20weak_value_witnesses8JustWeakV* [[DEST]] to %swift.opaque*
 // CHECK-NEXT: ret %swift.opaque* [[T0]]
 
 // The default memcpy-ing witness is good enough for NoWeak.
@@ -44,16 +44,16 @@ struct Gen<T> {
 // CHECK:         call void @swift_weakTakeInit
 
 // CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_T020weak_value_witnesses8SomeWeakVwTK(
-// CHECK:      [[DEST:%.*]] = bitcast [24 x i8]* %dest to %V20weak_value_witnesses8SomeWeak*
-// CHECK-NEXT: [[SRC:%.*]] = bitcast [24 x i8]* %src to %V20weak_value_witnesses8SomeWeak*
-// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds %V20weak_value_witnesses8SomeWeak, %V20weak_value_witnesses8SomeWeak* [[DEST]], i32 0, i32 0
-// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds %V20weak_value_witnesses8SomeWeak, %V20weak_value_witnesses8SomeWeak* [[SRC]], i32 0, i32 0
-// CHECK-NEXT: [[T0:%.*]] = load %C20weak_value_witnesses1C*, %C20weak_value_witnesses1C** [[SRC_X]], align 8
-// CHECK-NEXT: store %C20weak_value_witnesses1C* [[T0]], %C20weak_value_witnesses1C** [[DEST_X]], align 8
-// CHECK-NEXT: [[DEST_Y:%.*]] = getelementptr inbounds %V20weak_value_witnesses8SomeWeak, %V20weak_value_witnesses8SomeWeak* [[DEST]], i32 0, i32 1
-// CHECK-NEXT: [[SRC_Y:%.*]] = getelementptr inbounds %V20weak_value_witnesses8SomeWeak, %V20weak_value_witnesses8SomeWeak* [[SRC]], i32 0, i32 1
+// CHECK:      [[DEST:%.*]] = bitcast [24 x i8]* %dest to %T20weak_value_witnesses8SomeWeakV*
+// CHECK-NEXT: [[SRC:%.*]] = bitcast [24 x i8]* %src to %T20weak_value_witnesses8SomeWeakV*
+// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds %T20weak_value_witnesses8SomeWeakV, %T20weak_value_witnesses8SomeWeakV* [[DEST]], i32 0, i32 0
+// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds %T20weak_value_witnesses8SomeWeakV, %T20weak_value_witnesses8SomeWeakV* [[SRC]], i32 0, i32 0
+// CHECK-NEXT: [[T0:%.*]] = load %T20weak_value_witnesses1CC*, %T20weak_value_witnesses1CC** [[SRC_X]], align 8
+// CHECK-NEXT: store %T20weak_value_witnesses1CC* [[T0]], %T20weak_value_witnesses1CC** [[DEST_X]], align 8
+// CHECK-NEXT: [[DEST_Y:%.*]] = getelementptr inbounds %T20weak_value_witnesses8SomeWeakV, %T20weak_value_witnesses8SomeWeakV* [[DEST]], i32 0, i32 1
+// CHECK-NEXT: [[SRC_Y:%.*]] = getelementptr inbounds %T20weak_value_witnesses8SomeWeakV, %T20weak_value_witnesses8SomeWeakV* [[SRC]], i32 0, i32 1
 // CHECK-NEXT: call void @swift_weakTakeInit(%swift.weak* [[DEST_Y]], %swift.weak* [[SRC_Y]])
-// CHECK-NEXT: [[T0:%.*]] = bitcast %V20weak_value_witnesses8SomeWeak* [[DEST]] to %swift.opaque*
+// CHECK-NEXT: [[T0:%.*]] = bitcast %T20weak_value_witnesses8SomeWeakV* [[DEST]] to %swift.opaque*
 // CHECK-NEXT: ret %swift.opaque* [[T0]]
 
 // Generic types must be taken using their value witness.

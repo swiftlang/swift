@@ -797,6 +797,13 @@ public:
         targetType));
   }
 
+  UnconditionalCheckedCastOpaqueInst *
+  createUnconditionalCheckedCastOpaque(SILLocation Loc, SILValue op,
+                                       SILType destTy) {
+    return insert(UnconditionalCheckedCastOpaqueInst::create(
+        getSILDebugLocation(Loc), op, destTy, F, OpenedArchetypes));
+  }
+
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,
                                      Atomicity atomicity) {
     assert(isParsing || F.hasUnqualifiedOwnership());
@@ -1133,6 +1140,15 @@ public:
     return insert(InitExistentialAddrInst::create(
         getSILDebugLocation(Loc), Existential, FormalConcreteType,
         LoweredConcreteType, Conformances, &F, OpenedArchetypes));
+  }
+
+  InitExistentialOpaqueInst *
+  createInitExistentialOpaque(SILLocation Loc, SILType ExistentialType,
+                              CanType FormalConcreteType, SILValue Concrete,
+                              ArrayRef<ProtocolConformanceRef> Conformances) {
+    return insert(InitExistentialOpaqueInst::create(
+        getSILDebugLocation(Loc), ExistentialType, FormalConcreteType, Concrete,
+        Conformances, &F, OpenedArchetypes));
   }
 
   InitExistentialMetatypeInst *

@@ -470,7 +470,7 @@ struct LetPropertyStruct {
 // CHECK:  [[ABOX:%[0-9]+]] = alloc_box ${ var LetPropertyStruct }
 // CHECK:  [[A:%[0-9]+]] = project_box [[ABOX]]
 // CHECK:   store %0 to [trivial] [[A]] : $*LetPropertyStruct
-// CHECK:   [[STRUCT:%[0-9]+]] = load_borrow [[A]] : $*LetPropertyStruct
+// CHECK:   [[STRUCT:%[0-9]+]] = load [trivial] [[A]] : $*LetPropertyStruct
 // CHECK:   [[PROP:%[0-9]+]] = struct_extract [[STRUCT]] : $LetPropertyStruct, #LetPropertyStruct.lp
 // CHECK:   destroy_value [[ABOX]] : ${ var LetPropertyStruct }
 // CHECK:   return [[PROP]] : $Int

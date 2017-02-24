@@ -1337,10 +1337,10 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   // last parameter that fits into a register as swiftself.
   // We should get this optimization back using the @convention(closure) whose
   // box argument should just be swift self.
-  if (false &&
+  if (/* DISABLES CODE */ (false) &&
       !origType->isPolymorphic() &&
-      hasSingleSwiftRefcountedContext == Yes
-      && outType->getCalleeConvention() == *singleRefcountedConvention) {
+      hasSingleSwiftRefcountedContext == Yes &&
+      outType->getCalleeConvention() == *singleRefcountedConvention) {
     assert(args.size() == 1);
     fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
     out.add(fnPtr);

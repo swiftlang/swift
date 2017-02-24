@@ -284,12 +284,6 @@ extension AnyHashable : CustomReflectable {
   }
 }
 
-extension Hashable {
-  public func _toAnyHashable() -> AnyHashable {
-    return AnyHashable(self)
-  }
-}
-
 /// Returns a default (non-custom) representation of `self`
 /// as `AnyHashable`.
 ///

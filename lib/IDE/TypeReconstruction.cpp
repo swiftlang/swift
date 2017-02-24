@@ -2139,11 +2139,7 @@ Decl *ide::getDeclFromUSR(ASTContext &context, StringRef USR,
   // This relies on USR generation being very close to symbol mangling; if we
   // need to support entities with customized USRs (e.g. extensions), we will
   // need to do something smarter here.
-#ifdef USE_NEW_MANGLING
   mangledName.replace(0, 2, MANGLING_PREFIX_STR);
-#else
-  mangledName.replace(0, 2, "_T");
-#endif
 
   return getDeclFromMangledSymbolName(context, mangledName, error);
 }

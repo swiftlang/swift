@@ -3879,32 +3879,47 @@ public:
     assert(dc->isTypeContext() &&
            "Decl parsing must prevent subscripts outside of types!");
 
-    // Inherit the generic signature and environment from the outer context.
-    SD->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+    if (auto gp = SD->getGenericParams()) {
+      // Write up generic parameters and check the generic parameter list.
+      gp->setOuterParameters(dc->getGenericParamsOfContext());
 
-    TC.checkDeclAttributesEarly(SD);
-    TC.computeAccessibility(SD);
+      auto *sig = TC.validateGenericSubscriptSignature(SD);
+      auto *env = sig->createGenericEnvironment(*SD->getModuleContext());
+      SD->setGenericEnvironment(env);
 
-    GenericTypeToArchetypeResolver resolver(dc);
+      // Revert the types within the signature so it can be type-checked with
+      // archetypes below.
+      TC.revertGenericSubscriptSignature(SD);
+    } else if (dc->getGenericSignatureOfContext()) {
+      (void)TC.validateGenericSubscriptSignature(SD);
 
-    bool isInvalid = TC.validateType(SD->getElementTypeLoc(), dc,
+      // Revert all of the types within the signature of the subscript.
+      TC.revertGenericSubscriptSignature(SD);
+
+      SD->setGenericEnvironment(
+          SD->getDeclContext()->getGenericEnvironmentOfContext());
+    }
+
+    // Type check the subscript parameters.
+    GenericTypeToArchetypeResolver resolver(SD);
+
+    bool isInvalid = TC.validateType(SD->getElementTypeLoc(), SD,
                                      TypeResolutionOptions(),
                                      &resolver);
-    isInvalid |= TC.typeCheckParameterList(SD->getIndices(), dc,
+    isInvalid |= TC.typeCheckParameterList(SD->getIndices(), SD,
                                            TypeResolutionOptions(),
                                            resolver);
 
-    if (isInvalid) {
+    if (isInvalid || SD->isInvalid()) {
       SD->setInterfaceType(ErrorType::get(TC.Context));
       SD->setInvalid();
     } else {
-      auto indicesIfaceTy = SD->getIndices()->getInterfaceType(TC.Context);
-
-      auto elementTy = SD->getElementTypeLoc().getType();
-      auto elementIfaceTy = dc->mapTypeOutOfContext(elementTy);
-
-      SD->setInterfaceType(FunctionType::get(indicesIfaceTy, elementIfaceTy));
+      if (!SD->getGenericSignatureOfContext())
+        TC.configureInterfaceType(SD, SD->getGenericSignature());
     }
+
+    TC.checkDeclAttributesEarly(SD);
+    TC.computeAccessibility(SD);
 
     validateAttributes(TC, SD);
 
@@ -4993,11 +5008,15 @@ public:
       auto parentFunc = cast<FuncDecl>(parentDecl);
       if (func->isStatic() != parentFunc->isStatic())
         return false;
-      if (!!func->getGenericParams() != !!parentFunc->getGenericParams())
+      if (func->isGeneric() != parentFunc->isGeneric())
         return false;
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
       auto parentVar = cast<VarDecl>(parentDecl);
       if (var->isStatic() != parentVar->isStatic())
+        return false;
+    } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+      auto parentSubscript = cast<SubscriptDecl>(parentDecl);
+      if (subscript->isGeneric() != parentSubscript->isGeneric())
         return false;
     }
 
@@ -5368,9 +5387,17 @@ public:
     // Figure out the type of the declaration that we're using for comparisons.
     auto declTy = decl->getInterfaceType()->getUnlabeledType(TC.Context);
     if (method) {
+      // For methods, strip off the 'Self' type.
       declTy = declTy->castTo<AnyFunctionType>()->getResult();
       adjustFunctionTypeForOverride(declTy);
+    } if (subscript) {
+      // For subscripts, we don't have a 'Self' type, but turn it
+      // into a monomorphic function type.
+      auto funcTy = declTy->castTo<AnyFunctionType>();
+      declTy = FunctionType::get(funcTy->getInput(),
+                                 funcTy->getResult());
     } else {
+      // For properties, strip off ownership.
       declTy = declTy->getReferenceStorageReferent();
     }
 
@@ -5475,14 +5502,21 @@ public:
         }
 
         // Check whether the types are identical.
-        // FIXME: It's wrong to use the uncurried types here for methods.
         auto parentDeclTy = owningTy->adjustSuperclassMemberDeclType(
             parentDecl, decl, parentDecl->getInterfaceType(), &TC);
         parentDeclTy = parentDeclTy->getUnlabeledType(TC.Context);
         if (method) {
+          // For methods, strip off the 'Self' type.
           parentDeclTy = parentDeclTy->castTo<AnyFunctionType>()->getResult();
           adjustFunctionTypeForOverride(parentDeclTy);
+        } else if (subscript) {
+          // For subscripts, we don't have a 'Self' type, but turn it
+          // into a monomorphic function type.
+          auto parentFuncTy = parentDeclTy->castTo<AnyFunctionType>();
+          parentDeclTy = FunctionType::get(parentFuncTy->getInput(),
+                                           parentFuncTy->getResult());
         } else {
+          // For properties, strip off ownership.
           parentDeclTy = parentDeclTy->getReferenceStorageReferent();
         }
 
@@ -6101,7 +6135,7 @@ public:
     // it is in the same module, update the vtable.
     if (auto *baseDecl = dyn_cast<ClassDecl>(base->getDeclContext())) {
       if (baseDecl->hasKnownSwiftImplementation() && 
-          !base->isDynamic() &&
+          !base->isDynamic() && !isKnownObjC &&
           override->getDeclContext()->isExtensionContext()) {
         // For compatibility, only generate a warning in Swift 3
         TC.diagnose(override, (TC.Context.isSwiftVersion3()

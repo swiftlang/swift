@@ -13,14 +13,14 @@
     {
       key.kind: source.lang.swift.decl.protocol,
       key.name: "P",
-      key.usr: "s:P13rdar_216028981P",
+      key.usr: "s:13rdar_216028981PP",
       key.line: 4,
       key.column: 10
     },
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "C",
-      key.usr: "s:C13rdar_216028981C",
+      key.usr: "s:13rdar_216028981CC",
       key.line: 5,
       key.column: 7
     }

@@ -12,6 +12,7 @@
 
 #include "swift/Syntax/Format.h"
 #include "swift/Syntax/DeclSyntax.h"
+#include "swift/Syntax/ExprSyntax.h"
 
 using namespace swift;
 using namespace swift::syntax;

@@ -4,8 +4,8 @@ import Builtin
 
 protocol P {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @join_init_existential_copy_addr(%P27fixed_size_buffer_peepholes1P_* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.P)
-// CHECK:         [[BUFFER:%.*]] = getelementptr inbounds %P27fixed_size_buffer_peepholes1P_, %P27fixed_size_buffer_peepholes1P_* %0, i32 0, i32 0
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @join_init_existential_copy_addr(%T27fixed_size_buffer_peepholes1PP* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.P)
+// CHECK:         [[BUFFER:%.*]] = getelementptr inbounds %T27fixed_size_buffer_peepholes1PP, %T27fixed_size_buffer_peepholes1PP* %0, i32 0, i32 0
 // CHECK:         call %swift.opaque* %initializeBufferWithTake([[BUFFER_TYPE:\[.* x i8\]]]* [[BUFFER]], %swift.opaque* %1
 sil @join_init_existential_copy_addr : $@convention(thin) <T: P> (@in T) -> @out P {
 entry(%p : $*P, %x: $*T):
@@ -15,7 +15,7 @@ entry(%p : $*P, %x: $*T):
 }
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @dont_crash(
-// CHECK:  [[TYPE_ADDR:%.*]] = getelementptr inbounds %P27fixed_size_buffer_peepholes1P_, %P27fixed_size_buffer_peepholes1P_* %0, i32 0, i32 1
+// CHECK:  [[TYPE_ADDR:%.*]] = getelementptr inbounds %T27fixed_size_buffer_peepholes1PP, %T27fixed_size_buffer_peepholes1PP* %0, i32 0, i32 1
 // CHECK:  [[TYPE:%.*]] = load %swift.type*, %swift.type** [[TYPE_ADDR]]
 // CHECK:  [[PTR:%.*]] = bitcast %swift.type* [[TYPE]] to i8***
 // CHECK:  [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[PTR]], {{(i64|i32)}} -1

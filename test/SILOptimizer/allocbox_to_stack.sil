@@ -10,6 +10,8 @@ struct Bool {
   var _value: Builtin.Int1
 }
 
+protocol Error {}
+
 // CHECK-LABEL: sil @simple_promotion
 sil @simple_promotion : $(Int) -> Int {
 bb0(%0 : $Int):
@@ -690,4 +692,56 @@ bb0(%0 : $*T):
   destroy_addr %0 : $*T
   %3 = tuple ()
   return %3 : $()
+}
+
+class ThrowBaseClass {
+  required init() throws
+  init(noFail: ())
+}
+
+class ThrowDerivedClass : ThrowBaseClass {
+  //final init(failBeforeFullInitialization: Int) throws
+}
+
+sil @throwing_unwrap : $@convention(thin) (Int) -> (Int, @error Error)
+sil @fake_throwing_init : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error)
+
+sil hidden @try_apply_during_chaining_init : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error) {
+// %0                                             // users: %11, %5
+// %1                                             // user: %7
+bb0(%0 : $Int, %1 : $ThrowDerivedClass):
+  %2 = alloc_box ${ var ThrowDerivedClass }, let, name "self"
+  %3 = project_box %2 : ${ var ThrowDerivedClass }, 0
+  %4 = mark_uninitialized [delegatingself] %3 : $*ThrowDerivedClass
+  store %1 to %4 : $*ThrowDerivedClass
+  %8 = load %4 : $*ThrowDerivedClass
+  %9 = function_ref @fake_throwing_init : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error)
+  %10 = function_ref @throwing_unwrap : $@convention(thin) (Int) -> (Int, @error Error)
+  try_apply %10(%0) : $@convention(thin) (Int) -> (Int, @error Error), normal bb1, error bb3
+
+// %12                                            // user: %13
+bb1(%12 : $Int):                                  // Preds: bb0
+  try_apply %9(%12, %8) : $@convention(method) (Int, @owned ThrowDerivedClass) -> (@owned ThrowDerivedClass, @error Error), normal bb2, error bb4
+
+// %14                                            // user: %15
+bb2(%14 : $ThrowDerivedClass):                    // Preds: bb1
+  store %14 to %4 : $*ThrowDerivedClass
+  %16 = load %4 : $*ThrowDerivedClass
+  strong_retain %16 : $ThrowDerivedClass
+  strong_release %2 : ${ var ThrowDerivedClass }
+  return %16 : $ThrowDerivedClass
+
+// %20                                            // user: %22
+bb3(%20 : $Error):                                // Preds: bb0
+  strong_release %8 : $ThrowDerivedClass
+  br bb5(%20 : $Error)
+
+// %23                                            // user: %24
+bb4(%23 : $Error):                                // Preds: bb1
+  br bb5(%23 : $Error)
+
+// %25                                            // user: %27
+bb5(%25 : $Error):                                // Preds: bb4 bb3
+  strong_release %2 : ${ var ThrowDerivedClass }
+  throw %25 : $Error
 }

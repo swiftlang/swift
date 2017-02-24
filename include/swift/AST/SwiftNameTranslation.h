@@ -14,6 +14,7 @@
 #define SWIFT_NAME_TRANSLATION_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/AST/AttrKind.h"
 
 namespace swift {
   class ValueDecl;
@@ -43,6 +44,11 @@ namespace objc_translation {
   /// Returns a pair of Identifier and ObjCSelector, only one of which is valid.
   std::pair<Identifier, ObjCSelector>
   getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName = DeclName());
+
+  /// Returns true if the given value decl D is visible to ObjC of its
+  /// own accord (i.e. without considering its context)
+  bool isVisibleToObjC(const ValueDecl *VD, Accessibility minRequiredAccess,
+                       bool checkParent = true);
 
 } // end namespace objc_translation
 } // end namespace swift

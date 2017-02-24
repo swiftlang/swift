@@ -639,10 +639,11 @@ public:
 /// the original had a cleanup.
 static ManagedValue maybeEnterCleanupForTransformed(SILGenFunction &gen,
                                                     ManagedValue orig,
-                                                    SILValue result) {
+                                                    SILValue result,
+                                                    SILLocation loc) {
   if (orig.hasCleanup()) {
     orig.forwardCleanup(gen);
-    return gen.emitManagedBufferWithCleanup(result);
+    return gen.emitFormalAccessManagedBufferWithCleanup(loc, result);
   } else {
     return ManagedValue::forUnmanaged(result);
   }
@@ -763,7 +764,7 @@ private:
                                   StoreOwnershipQualifier::Init);
 
     // If we had a cleanup, create a cleanup at the new address.
-    return maybeEnterCleanupForTransformed(gen, ref, temp);
+    return maybeEnterCleanupForTransformed(gen, ref, temp, selfLoc);
   }
 };
 
@@ -1282,7 +1283,7 @@ public:
   void applySuper(ApplyExpr *apply) {
     // Load the 'super' argument.
     Expr *arg = apply->getArg();
-    ManagedValue super = SGF.emitRValueAsSingleValue(arg);
+    ManagedValue super;
 
     // The callee for a super call has to be either a method or constructor.
     Expr *fn = apply->getFn();
@@ -1296,6 +1297,27 @@ public:
 
       if (ctorRef->getDeclRef().isSpecialized())
         substitutions = ctorRef->getDeclRef().getSubstitutions();
+
+      assert(SGF.SelfInitDelegationState ==
+             SILGenFunction::WillSharedBorrowSelf);
+      SGF.SelfInitDelegationState = SILGenFunction::WillExclusiveBorrowSelf;
+      super = SGF.emitRValueAsSingleValue(arg);
+      assert(SGF.SelfInitDelegationState ==
+             SILGenFunction::DidExclusiveBorrowSelf);
+
+      // Check if super is not the same as our base type. This means that we
+      // performed an upcast. Set SuperInitDelegationState to super.
+      if (super.getValue() != SGF.InitDelegationSelf.getValue()) {
+        assert(super.getCleanup() == SGF.InitDelegationSelf.getCleanup());
+        SILValue underlyingSelf = SGF.InitDelegationSelf.forward(SGF);
+        SGF.InitDelegationSelf = ManagedValue::forUnmanaged(underlyingSelf);
+        CleanupHandle newWriteback = SGF.enterDelegateInitSelfWritebackCleanup(
+            SGF.InitDelegationLoc.getValue(), SGF.InitDelegationSelfBox,
+            super.getValue());
+        SGF.SuperInitDelegationSelf =
+            ManagedValue(super.getValue(), newWriteback);
+        super = SGF.SuperInitDelegationSelf;
+      }
     } else if (auto *declRef = dyn_cast<DeclRefExpr>(fn)) {
       assert(isa<FuncDecl>(declRef->getDecl()) && "non-function super call?!");
       constant = SILDeclRef(declRef->getDecl(),
@@ -1305,8 +1327,10 @@ public:
 
       if (declRef->getDeclRef().isSpecialized())
         substitutions = declRef->getDeclRef().getSubstitutions();
-    } else
+      super = SGF.emitRValueAsSingleValue(arg);
+    } else {
       llvm_unreachable("invalid super callee");
+    }
 
     CanType superFormalType = arg->getType()->getCanonicalType();
     setSelfParam(ArgumentSource(arg, RValue(SGF, apply, superFormalType, super)),
@@ -1432,14 +1456,14 @@ public:
 
       // If the initializer is a C function imported as a member,
       // there is no 'self' parameter. Mark it undef.
-      if (ctorRef->getDecl()->isImportAsMember())
+      if (ctorRef->getDecl()->isImportAsMember()) {
         self = SGF.emitUndef(expr, selfFormalType);
-      else if (SGF.AllocatorMetatype)
+      } else if (SGF.AllocatorMetatype) {
         self = emitCorrespondingSelfValue(
-                 ManagedValue::forUnmanaged(SGF.AllocatorMetatype),
-                 arg);
-      else
+            ManagedValue::forUnmanaged(SGF.AllocatorMetatype), arg);
+      } else {
         self = ManagedValue::forUnmanaged(SGF.emitMetatypeOfValue(expr, arg));
+      }
     } else {
       // If we're in a protocol extension initializer, we haven't allocated
       // "self" yet at this point. Do so. Use alloc_ref_dynamic since we should
@@ -1455,7 +1479,12 @@ public:
         // Perform any adjustments needed to 'self'.
         self = emitCorrespondingSelfValue(self, arg);
       } else {
+        assert(SGF.SelfInitDelegationState ==
+               SILGenFunction::WillSharedBorrowSelf);
+        SGF.SelfInitDelegationState = SILGenFunction::WillExclusiveBorrowSelf;
         self = SGF.emitRValueAsSingleValue(arg);
+        assert(SGF.SelfInitDelegationState ==
+               SILGenFunction::DidExclusiveBorrowSelf);
       }
     }
 
@@ -2722,7 +2751,8 @@ namespace {
       assert(destAddr->getType() == loweredSubstParamType.getAddressType());
 
       auto &destTL = SharedInfo->getBaseTypeLowering();
-      Cleanup = gen.enterDormantTemporaryCleanup(destAddr, destTL);
+      Cleanup =
+          gen.enterDormantFormalAccessTemporaryCleanup(destAddr, loc, destTL);
 
       TemporaryInitialization init(destAddr, Cleanup);
       std::move(arg).forwardInto(gen, SharedInfo->getBaseAbstractionPattern(),
@@ -3207,6 +3237,11 @@ namespace {
         }
       } else {
         value = std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
+      }
+
+      if (param.isConsumed() &&
+          value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
+        value = value.copyUnmanaged(SGF, arg.getLocation());
       }
       Args.push_back(value);
     }
@@ -4304,6 +4339,7 @@ namespace {
       AbstractionPattern origFormalType(callee.getOrigFormalType());
       CanFunctionType formalType = callee.getSubstFormalType();
 
+      // Get the callee type information.
       if (specializedEmitter || isPartiallyAppliedSuperMethod(uncurryLevel)) {
         // We want to emit the arguments as fully-substituted values
         // because that's what the specialized emitters expect.
@@ -5101,6 +5137,11 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
 
 namespace {
 
+/// A builder class that creates the base argument for accessors.
+///
+/// *NOTE* All cleanups created inside of this builder on base arguments must be
+/// formal access to ensure that we do not extend the lifetime of a guaranteed
+/// base after the accessor is evaluated.
 struct AccessorBaseArgPreparer final {
   SILGenFunction &SGF;
   SILLocation loc;
@@ -5167,9 +5208,9 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
       // The load can only be a take if the base is a +1 rvalue.
       auto shouldTake = IsTake_t(base.hasCleanup());
 
-      base = SGF.emitLoad(loc, base.forward(SGF),
-                          SGF.getTypeLowering(baseLoweredType), SGFContext(),
-                          shouldTake);
+      base = SGF.emitFormalAccessLoad(loc, base.forward(SGF),
+                                      SGF.getTypeLowering(baseLoweredType),
+                                      SGFContext(), shouldTake);
       return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
     }
 
@@ -5206,7 +5247,7 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
 
   // We need to produce the value at +1 if it's going to be consumed.
   if (selfParam.isConsumed() && !base.hasCleanup()) {
-    base = base.copyUnmanaged(SGF, loc);
+    base = base.formalAccessCopyUnmanaged(SGF, loc);
   }
 
   // If the parameter is indirect, we need to drop the value into

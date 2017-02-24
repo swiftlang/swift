@@ -188,19 +188,8 @@ public:
     os << "@end\n\n";
   }
   
-  bool shouldInclude(const ValueDecl *VD, bool checkParent = true) {
-    if (!(VD->isObjC() || VD->getAttrs().hasAttribute<CDeclAttr>()))
-      return false;
-    if (VD->getFormalAccess() >= minRequiredAccess) {
-      return true;
-    } else if (checkParent) {
-      if (auto ctor = dyn_cast<ConstructorDecl>(VD)) {
-        // Check if we're overriding an initializer that is visible to obj-c
-        if (auto parent = ctor->getOverriddenDecl())
-          return shouldInclude(parent, false);
-      }
-    }
-    return false;
+  bool shouldInclude(const ValueDecl *VD) {
+    return isVisibleToObjC(VD, minRequiredAccess);
   }
 
 private:

@@ -650,7 +650,7 @@ OptionalTypeSyntax::withQuestionToken(RC<TokenSyntax> NewQuestionToken) const {
   return Data->replaceSelf<OptionalTypeSyntax>(NewRaw);
 }
 
-#pragma mark - implicity-unwrapped-optional-type Data
+#pragma mark - implicitly-unwrapped-optional-type Data
 
 ImplicitlyUnwrappedOptionalTypeSyntaxData::
 ImplicitlyUnwrappedOptionalTypeSyntaxData(RC<RawSyntax> Raw,
@@ -685,7 +685,7 @@ ImplicitlyUnwrappedOptionalTypeSyntaxData::makeBlank() {
     SourcePresence::Present));
 }
 
-#pragma mark - implicity-unwrapped-optional-type API
+#pragma mark - implicitly-unwrapped-optional-type API
 
 ImplicitlyUnwrappedOptionalTypeSyntax::
 ImplicitlyUnwrappedOptionalTypeSyntax(RC<SyntaxData> Root,

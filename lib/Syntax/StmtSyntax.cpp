@@ -11,13 +11,42 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/ExprSyntax.h"
 #include "swift/Syntax/StmtSyntax.h"
 
 using namespace swift;
 using namespace swift::syntax;
 
+#pragma mark - statement API
+
 StmtSyntax::StmtSyntax(const RC<SyntaxData> Root, const StmtSyntaxData *Data)
   : Syntax(Root, Data) {}
+
+#pragma mark - unknown-statement Data
+
+UnknownStmtSyntaxData::UnknownStmtSyntaxData(RC<RawSyntax> Raw,
+                                             const SyntaxData *Parent,
+                                             CursorIndex IndexInParent)
+  : StmtSyntaxData(Raw, Parent, IndexInParent) {
+  assert(Raw->Kind == SyntaxKind::UnknownStmt);
+}
+
+RC<UnknownStmtSyntaxData>
+UnknownStmtSyntaxData::make(RC<RawSyntax> Raw,
+                            const SyntaxData *Parent,
+                            CursorIndex IndexInParent) {
+  return RC<UnknownStmtSyntaxData> {
+    new UnknownStmtSyntaxData {
+      Raw, Parent, IndexInParent
+    }
+  };
+}
+
+#pragma mark - unknown-statement API
+
+UnknownStmtSyntax::UnknownStmtSyntax(const RC<SyntaxData> Root,
+                                     const UnknownStmtSyntaxData *Data)
+  : StmtSyntax(Root, Data) {}
 
 #pragma mark fallthrough-statement Data
 
@@ -82,8 +111,10 @@ withFallthroughKeyword(RC<TokenSyntax> NewFallthroughKeyword) const {
 }
 
 
-CodeBlockStmtSyntaxData::CodeBlockStmtSyntaxData(RC<RawSyntax> Raw)
-  : StmtSyntaxData(Raw) {
+CodeBlockStmtSyntaxData::CodeBlockStmtSyntaxData(RC<RawSyntax> Raw,
+                                                 const SyntaxData *Parent,
+                                                 CursorIndex IndexInParent)
+  : StmtSyntaxData(Raw, Parent, IndexInParent) {
     assert(Raw->Kind == SyntaxKind::CodeBlockStmt);
     syntax_assert_child_token_text(Raw, CodeBlockStmtSyntax::Cursor::LeftBrace,
                                    tok::l_brace, "{");
@@ -94,9 +125,10 @@ CodeBlockStmtSyntaxData::CodeBlockStmtSyntaxData(RC<RawSyntax> Raw)
 }
 
 RC<CodeBlockStmtSyntaxData>
-CodeBlockStmtSyntaxData::make(RC<RawSyntax> Raw) {
+CodeBlockStmtSyntaxData::make(RC<RawSyntax> Raw, const SyntaxData *Parent,
+                              CursorIndex IndexInParent) {
   return RC<CodeBlockStmtSyntaxData> {
-    new CodeBlockStmtSyntaxData { Raw }
+    new CodeBlockStmtSyntaxData { Raw, Parent, IndexInParent }
   };
 }
 
@@ -220,7 +252,7 @@ RC<ContinueStmtSyntaxData> ContinueStmtSyntaxData::makeBlank() {
 
 ContinueStmtSyntax::ContinueStmtSyntax(const RC<SyntaxData> Root,
                                  ContinueStmtSyntaxData *Data)
-: StmtSyntax(Root, Data) {}
+  : StmtSyntax(Root, Data) {}
 
 ContinueStmtSyntax ContinueStmtSyntax::make(RC<RawSyntax> Raw,
                                       const SyntaxData *Parent,
@@ -254,6 +286,92 @@ ContinueStmtSyntax::withLabel(RC<TokenSyntax> NewLabel) const {
   assert(NewLabel->getTokenKind() == tok::identifier);
   return Data->replaceChild<ContinueStmtSyntax>(NewLabel, Cursor::Label);
 }
+
+#pragma mark - return-statement Data
+
+ReturnStmtSyntaxData::ReturnStmtSyntaxData(RC<RawSyntax> Raw,
+                                           const SyntaxData *Parent,
+                                           CursorIndex IndexInParent)
+  : StmtSyntaxData(Raw, Parent, IndexInParent) {
+  assert(Raw->Layout.size() == 2);
+  syntax_assert_child_token_text(Raw,
+                                 ReturnStmtSyntax::Cursor::ReturnKeyword,
+                                 tok::kw_return, "return");
+  assert(Raw->getChild(ReturnStmtSyntax::Cursor::Expression)->isExpr());
+}
+
+RC<ReturnStmtSyntaxData>
+ReturnStmtSyntaxData::make(RC<RawSyntax> Raw, const SyntaxData *Parent,
+                             CursorIndex IndexInParent) {
+  return RC<ReturnStmtSyntaxData> {
+    new ReturnStmtSyntaxData {
+      Raw, Parent, IndexInParent
+    }
+  };
+}
+
+RC<ReturnStmtSyntaxData> ReturnStmtSyntaxData::makeBlank() {
+  return make(RawSyntax::make(SyntaxKind::ReturnStmt,
+                              {
+                                TokenSyntax::missingToken(tok::kw_return,
+                                                          "return"),
+                                RawSyntax::missing(SyntaxKind::MissingExpr),
+                              },
+                              SourcePresence::Present));
+}
+
+#pragma mark - return-statement API
+
+ReturnStmtSyntax::ReturnStmtSyntax(const RC<SyntaxData> Root,
+                                   const ReturnStmtSyntaxData *Data)
+  : StmtSyntax(Root, Data) {}
+
+ReturnStmtSyntax ReturnStmtSyntax::make(RC<RawSyntax> Raw,
+                                        const SyntaxData *Parent,
+                                        CursorIndex IndexInParent) {
+  auto Data = ReturnStmtSyntaxData::make(Raw, Parent, IndexInParent);
+  return { Data, Data.get() };
+}
+
+ReturnStmtSyntax ReturnStmtSyntax::makeBlank() {
+  auto Data = ReturnStmtSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
+RC<TokenSyntax> ReturnStmtSyntax::getReturnKeyword() const {
+  return cast<TokenSyntax>(getRaw()->getChild(Cursor::ReturnKeyword));
+}
+
+ReturnStmtSyntax ReturnStmtSyntax::
+withReturnKeyword(RC<TokenSyntax> NewReturnKeyword) const {
+  syntax_assert_token_is(NewReturnKeyword, tok::kw_return, "return");
+  return Data->replaceChild<ReturnStmtSyntax>(NewReturnKeyword,
+                                              Cursor::ReturnKeyword);
+}
+
+Optional<ExprSyntax> ReturnStmtSyntax::getExpression() const {
+  auto RawExpression = getRaw()->getChild(Cursor::Expression);
+  if (RawExpression->isMissing()) {
+    return llvm::None;
+  }
+
+  auto *MyData = getUnsafeData<ReturnStmtSyntax>();
+
+  auto &ChildPtr = *reinterpret_cast<std::atomic<uintptr_t>*>(
+    &MyData->CachedExpression);
+
+  SyntaxData::realizeSyntaxNode<ExprSyntax>(ChildPtr, RawExpression, MyData,
+                                            cursorIndex(Cursor::Expression));
+
+  return ExprSyntax { Root, MyData->CachedExpression.get() };
+}
+
+ReturnStmtSyntax
+ReturnStmtSyntax::withExpression(ExprSyntax NewExpression) const {
+  return Data->replaceChild<ReturnStmtSyntax>(NewExpression.getRaw(),
+                                              Cursor::Expression);
+}
+
 
 #pragma mark code-block API
 

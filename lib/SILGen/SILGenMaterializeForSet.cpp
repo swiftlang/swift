@@ -154,7 +154,7 @@ private:
     CanType witnessIfaceType =
       WitnessStorage->getInterfaceType()->getCanonicalType();
     if (isa<SubscriptDecl>(WitnessStorage))
-      witnessIfaceType = cast<FunctionType>(witnessIfaceType).getResult();
+      witnessIfaceType = cast<AnyFunctionType>(witnessIfaceType).getResult();
     SubstStorageType = getSubstWitnessInterfaceType(
                                 witnessIfaceType.getReferenceStorageReferent());
 

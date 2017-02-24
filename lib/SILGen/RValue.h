@@ -24,12 +24,13 @@
 #define SWIFT_LOWERING_RVALUE_H
 
 #include "ManagedValue.h"
-#include "SILGenFunction.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 namespace Lowering {
-  class Initialization;
+
+class Initialization;
+class SILGenFunction;
 
 /// An "exploded" SIL rvalue, in which tuple values are recursively
 /// destructured. (In SILGen we don't try to explode structs, because doing so

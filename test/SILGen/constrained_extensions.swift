@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-ir -O %s
 
 extension Array where Element == Int {
-  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlESayxGyt1x_tcfC : $@convention(method) (@thin Array<Int>.Type) -> @owned Array<Int>
+  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlESaySiGyt1x_tcfC : $@convention(method) (@thin Array<Int>.Type) -> @owned Array<Int>
   public init(x: ()) {
     self.init()
   }
@@ -21,12 +21,12 @@ extension Array where Element == Int {
     }
   }
 
-  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE14instanceMethodxyF : $@convention(method) (@guaranteed Array<Int>) -> Int
+  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE14instanceMethodSiyF : $@convention(method) (@guaranteed Array<Int>) -> Int
   public func instanceMethod() -> Element {
     return instanceProperty
   }
 
-  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE14instanceMethodxx1e_tF : $@convention(method) (Int, @guaranteed Array<Int>) -> Int
+  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE14instanceMethodSiSi1e_tF : $@convention(method) (Int, @guaranteed Array<Int>) -> Int
   public func instanceMethod(e: Element) -> Element {
     return e
   }
@@ -36,13 +36,13 @@ extension Array where Element == Int {
     return Array(x: ()).instanceProperty
   }
 
-  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE12staticMethodxyFZ : $@convention(method) (@thin Array<Int>.Type) -> Int
+  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE12staticMethodSiyFZ : $@convention(method) (@thin Array<Int>.Type) -> Int
   public static func staticMethod() -> Element {
     return staticProperty
   }
 
-  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE12staticMethodxxSg1e_tFZfA_ : $@convention(thin) () -> Optional<Int>
-  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE12staticMethodxxSg1e_tFZ : $@convention(method) (Optional<Int>, @thin Array<Int>.Type) -> Int
+  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE12staticMethodSiSiSg1e_tFZfA_ : $@convention(thin) () -> Optional<Int>
+  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE12staticMethodSiSiSg1e_tFZ : $@convention(method) (Optional<Int>, @thin Array<Int>.Type) -> Int
   public static func staticMethod(e: Element? = nil) -> Element {
     return e!
   }
@@ -63,7 +63,7 @@ extension Array where Element == Int {
 }
 
 extension Dictionary where Key == Int {
-  // CHECK-LABEL: sil @_T0s10DictionaryV22constrained_extensionsSiRszr0_lEAByxq_Gyt1x_tcfC : $@convention(method) <Key, Value where Key == Int> (@thin Dictionary<Int, Value>.Type) -> @owned Dictionary<Int, Value> {
+  // CHECK-LABEL: sil @_T0s10DictionaryV22constrained_extensionsSiRszr0_lEABySiq_Gyt1x_tcfC : $@convention(method) <Key, Value where Key == Int> (@thin Dictionary<Int, Value>.Type) -> @owned Dictionary<Int, Value> {
   public init(x: ()) {
     self.init()
   }
@@ -91,7 +91,7 @@ extension Dictionary where Key == Int {
     return v
   }
 
-  // CHECK-LABEL: sil @_T0s10DictionaryV22constrained_extensionsSiRszr0_lE12staticMethodxyFZ : $@convention(method) <Key, Value where Key == Int> (@thin Dictionary<Int, Value>.Type) -> Int
+  // CHECK-LABEL: sil @_T0s10DictionaryV22constrained_extensionsSiRszr0_lE12staticMethodSiyFZ : $@convention(method) <Key, Value where Key == Int> (@thin Dictionary<Int, Value>.Type) -> Int
   public static func staticMethod() -> Key {
     return staticProperty
   }
@@ -101,9 +101,9 @@ extension Dictionary where Key == Int {
     return 0
   }
 
-  // CHECK-LABEL: sil @_T0s10DictionaryV22constrained_extensionsSiRszr0_lE12staticMethodq_xSg1k_q_Sg1vtFZfA_ : $@convention(thin) <Key, Value where Key == Int> () -> Optional<Int>
-  // CHECK-LABEL: sil @_T0s10DictionaryV22constrained_extensionsSiRszr0_lE12staticMethodq_xSg1k_q_Sg1vtFZfA0_ : $@convention(thin) <Key, Value where Key == Int> () -> @out Optional<Value>
-  // CHECK-LABEL: sil @_T0s10DictionaryV22constrained_extensionsSiRszr0_lE12staticMethodq_xSg1k_q_Sg1vtFZ : $@convention(method) <Key, Value where Key == Int> (Optional<Int>, @in Optional<Value>, @thin Dictionary<Int, Value>.Type) -> @out Value
+  // CHECK-LABEL: sil @_T0s10DictionaryV22constrained_extensionsSiRszr0_lE12staticMethodq_SiSg1k_q_Sg1vtFZfA_ : $@convention(thin) <Key, Value where Key == Int> () -> Optional<Int>
+  // CHECK-LABEL: sil @_T0s10DictionaryV22constrained_extensionsSiRszr0_lE12staticMethodq_SiSg1k_q_Sg1vtFZfA0_ : $@convention(thin) <Key, Value where Key == Int> () -> @out Optional<Value>
+  // CHECK-LABEL: sil @_T0s10DictionaryV22constrained_extensionsSiRszr0_lE12staticMethodq_SiSg1k_q_Sg1vtFZ : $@convention(method) <Key, Value where Key == Int> (Optional<Int>, @in Optional<Value>, @thin Dictionary<Int, Value>.Type) -> @out Value
   public static func staticMethod(k: Key? = nil, v: Value? = nil) -> Value {
     return v!
   }

@@ -12,7 +12,7 @@ import objc_protocols_Bas
 // -- Protocol "Frungible" inherits only objc protocols and should have no
 //    out-of-line inherited witnesses in its witness table.
 // CHECK: [[ZIM_FRUNGIBLE_WITNESS:@_T014objc_protocols3ZimCAA9FrungibleAAWP]] = hidden constant [1 x i8*] [
-// CHECK:    i8* bitcast (void (%C14objc_protocols3Zim*, %swift.type*, i8**)* @_T014objc_protocols3ZimCAA9FrungibleAaaDP6frungeyyFTW to i8*)
+// CHECK:    i8* bitcast (void (%T14objc_protocols3ZimC*, %swift.type*, i8**)* @_T014objc_protocols3ZimCAA9FrungibleAaaDP6frungeyyFTW to i8*)
 // CHECK: ]
 
 protocol Ansible {
@@ -114,6 +114,12 @@ extension Zang : Frungible {
 // CHECK:   ]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
+@objc protocol BaseProtocol { }
+protocol InheritingProtocol : BaseProtocol { }
+// -- Make sure that base protocol conformance is registered
+// CHECK: @_PROTOCOLS__TtC14objc_protocols17ImplementingClass {{.*}} @_PROTOCOL__TtP14objc_protocols12BaseProtocol_
+class ImplementingClass : InheritingProtocol { }
+
 // -- Force generation of witness for Zim.
 // CHECK: define hidden swiftcc { %objc_object*, i8** } @_T014objc_protocols22mixed_heritage_erasure{{[_0-9a-zA-Z]*}}F
 func mixed_heritage_erasure(_ x: Zim) -> Frungible {
@@ -144,10 +150,10 @@ func objc_protocol(_ x: NSRuncing) {
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OBJTYPE]]*, i8*)*)([[OBJTYPE]]* {{%.*}}, i8* [[SELECTOR]])
 }
 
-// CHECK: define hidden swiftcc %objc_object* @_T014objc_protocols0A8_erasure{{[_0-9a-zA-Z]*}}F(%CSo7NSSpoon*) {{.*}} {
+// CHECK: define hidden swiftcc %objc_object* @_T014objc_protocols0A8_erasure{{[_0-9a-zA-Z]*}}F(%TSo7NSSpoonC*) {{.*}} {
 func objc_erasure(_ x: NSSpoon) -> NSRuncing {
   return x
-  // CHECK: [[RES:%.*]] = bitcast %CSo7NSSpoon* {{%.*}} to %objc_object*
+  // CHECK: [[RES:%.*]] = bitcast %TSo7NSSpoonC* {{%.*}} to %objc_object*
   // CHECK: ret %objc_object* [[RES]]
 }
 

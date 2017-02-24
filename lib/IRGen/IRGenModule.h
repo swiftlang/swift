@@ -974,8 +974,6 @@ public:
 
   Address getAddrOfObjCISAMask();
 
-  StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);
- 
   /// Retrieve the generic environment for the current generic context.
   ///
   /// Fails if there is no generic context.

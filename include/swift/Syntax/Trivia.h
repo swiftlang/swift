@@ -5,8 +5,8 @@
 // Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -120,12 +120,9 @@ enum class TriviaKind {
 
   /// A backtick '`' character, used to escape identifiers.
   Backtick,
-
-  /// A semicolon ';' character, used for delimiting statements.
-  Semicolon
 };
 
-/// A contiguous stretch of a single kind of trivia. The constiuent part of
+/// A contiguous stretch of a single kind of trivia. The constituent part of
 /// a `Trivia` collection.
 ///
 /// For example, four spaces would be represented by
@@ -187,11 +184,6 @@ struct TriviaPiece {
     return TriviaPiece {TriviaKind::Backtick, 1, OwnedString{}};
   }
 
-  /// Return a piece of trivia for some number of semicolons in a row.
-  static TriviaPiece semicolon(unsigned Count) {
-    return TriviaPiece {TriviaKind::Semicolon, Count, OwnedString{}};
-  }
-
   void accumulateAbsolutePosition(AbsolutePosition &Pos) const;
 
   /// Print a debug representation of this trivia piece to the provided output
@@ -200,6 +192,16 @@ struct TriviaPiece {
 
   /// Print this piece of trivia to the provided output stream.
   void print(llvm::raw_ostream &OS) const;
+
+  bool operator==(const TriviaPiece &Other) const {
+    return Kind == Other.Kind &&
+           Count == Other.Count &&
+           Text.str().compare(Other.Text.str()) == 0;
+  }
+
+  bool operator!=(const TriviaPiece &Other) const {
+    return !(*this == Other);
+  }
 };
 
 using TriviaList = std::deque<TriviaPiece>;
@@ -233,6 +235,7 @@ struct Trivia {
   ///
   /// Precondition: !empty()
   const TriviaPiece &front() const {
+    assert(!empty());
     return Pieces.front();
   }
 
@@ -240,6 +243,7 @@ struct Trivia {
   ///
   /// Precondition: !empty()
   const TriviaPiece &back() const  {
+    assert(!empty());
     return Pieces.back();
   }
 
@@ -247,6 +251,7 @@ struct Trivia {
   ///
   /// Precondition: !empty()
   void pop_back() {
+    assert(!empty());
     Pieces.pop_back();
   }
 
@@ -283,41 +288,74 @@ struct Trivia {
     return find(Kind) != end();
   }
 
+  bool operator==(const Trivia &Other) const {
+    if (Pieces.size() != Other.size()) {
+      return false;
+    }
+
+    for (size_t i = 0; i < Pieces.size(); ++i) {
+      if (Pieces[i] != Other.Pieces[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  bool operator!=(const Trivia &Other) const {
+    return !(*this == Other);
+  }
+
   /// Return a collection of trivia of some number of space characters in a row.
   static Trivia spaces(unsigned Count) {
+    if (Count == 0) {
+      return {};
+    }
     return {{ TriviaPiece {TriviaKind::Space, Count, OwnedString{}} }};
   }
 
   /// Return a collection of trivia of some number of tab characters in a row.
   static Trivia tabs(unsigned Count) {
+    if (Count == 0) {
+      return {};
+    }
     return {{ TriviaPiece {TriviaKind::Tab, Count, OwnedString{}} }};
   }
 
   /// Return a collection of trivia of some number of newline characters
   // in a row.
   static Trivia newlines(unsigned Count) {
+    if (Count == 0) {
+      return {};
+    }
     return {{ TriviaPiece {TriviaKind::Newline, Count, OwnedString{}} }};
   }
 
   /// Return a collection of trivia with a single line of ('//')
   // developer comment.
   static Trivia lineComment(const OwnedString Text) {
+    assert(Text.str().startswith("//"));
     return {{ TriviaPiece {TriviaKind::LineComment, 1, Text} }};
   }
 
   /// Return a collection of trivia with a block comment ('/* ... */')
   static Trivia blockComment(const OwnedString Text) {
+    assert(Text.str().startswith("/*"));
+    assert(Text.str().endswith("*/"));
     return {{ TriviaPiece {TriviaKind::BlockComment, 1, Text} }};
   }
 
   /// Return a collection of trivia with a single line of ('///') doc comment.
   static Trivia docLineComment(const OwnedString Text) {
+    assert(Text.str().startswith("///"));
     return {{ TriviaPiece {TriviaKind::DocLineComment, 1, Text} }};
   }
 
   /// Return a collection of trivia with a documentation block
   // comment ('/** ... */')
   static Trivia docBlockComment(const OwnedString Text) {
+    assert(Text.str().startswith("/**"));
+    assert(Text.str().endswith("*/"));
     return {{ TriviaPiece {TriviaKind::DocBlockComment, 1, Text} }};
   }
 
@@ -325,11 +363,6 @@ struct Trivia {
   /// an identifier.
   static Trivia backtick() {
     return {{ TriviaPiece {TriviaKind::Backtick, 1, OwnedString{}} }};
-  }
-
-  /// Return a piece of trivia for some number of semicolons in a row.
-  static Trivia semicolon() {
-    return {{ TriviaPiece {TriviaKind::Semicolon, 1, OwnedString{}} }};
   }
 };
 }

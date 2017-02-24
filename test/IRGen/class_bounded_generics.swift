@@ -55,9 +55,9 @@ class ClassProtocolFieldClass {
   }
 }
 
-// CHECK: %C22class_bounded_generics22ClassGenericFieldClass = type <{ %swift.refcounted, %Si, %objc_object*, %Si }>
-// CHECK: %V22class_bounded_generics23ClassGenericFieldStruct = type <{ %Si, %objc_object*, %Si }>
-// CHECK: %V22class_bounded_generics24ClassProtocolFieldStruct = type <{ %Si, %P22class_bounded_generics10ClassBound_, %Si }>
+// CHECK: %T22class_bounded_generics017ClassGenericFieldD0C = type <{ %swift.refcounted, %TSi, %objc_object*, %TSi }>
+// CHECK: %T22class_bounded_generics23ClassGenericFieldStructV = type <{ %TSi, %objc_object*, %TSi }>
+// CHECK: %T22class_bounded_generics24ClassProtocolFieldStructV = type <{ %TSi, %T22class_bounded_generics10ClassBoundP, %TSi }>
 
 // CHECK-LABEL: define hidden swiftcc %objc_object* @_T022class_bounded_generics0a1_B10_archetype{{[_0-9a-zA-Z]*}}F(%objc_object*, %swift.type* %T, i8** %T.ClassBound)
 func class_bounded_archetype<T : ClassBound>(_ x: T) -> T {
@@ -67,19 +67,19 @@ func class_bounded_archetype<T : ClassBound>(_ x: T) -> T {
 class SomeClass {}
 class SomeSubclass : SomeClass {}
 
-// CHECK-LABEL: define hidden swiftcc %C22class_bounded_generics9SomeClass* @_T022class_bounded_generics011superclass_B10_archetype{{[_0-9a-zA-Z]*}}F(%C22class_bounded_generics9SomeClass*, %swift.type* %T)
+// CHECK-LABEL: define hidden swiftcc %T22class_bounded_generics9SomeClassC* @_T022class_bounded_generics011superclass_B10_archetype{{[_0-9a-zA-Z]*}}F(%T22class_bounded_generics9SomeClassC*, %swift.type* %T)
 func superclass_bounded_archetype<T : SomeClass>(_ x: T) -> T {
   return x
 }
 
-// CHECK-LABEL: define hidden swiftcc { %C22class_bounded_generics9SomeClass*, %C22class_bounded_generics12SomeSubclass* } @_T022class_bounded_generics011superclass_B15_archetype_call{{[_0-9a-zA-Z]*}}F(%C22class_bounded_generics9SomeClass*, %C22class_bounded_generics12SomeSubclass*)
+// CHECK-LABEL: define hidden swiftcc { %T22class_bounded_generics9SomeClassC*, %T22class_bounded_generics12SomeSubclassC* } @_T022class_bounded_generics011superclass_B15_archetype_call{{[_0-9a-zA-Z]*}}F(%T22class_bounded_generics9SomeClassC*, %T22class_bounded_generics12SomeSubclassC*)
 func superclass_bounded_archetype_call(_ x: SomeClass, y: SomeSubclass) -> (SomeClass, SomeSubclass) {
   return (superclass_bounded_archetype(x),
           superclass_bounded_archetype(y));
-  // CHECK: [[SOMECLASS_RESULT:%.*]] = call swiftcc %C22class_bounded_generics9SomeClass* @_T022class_bounded_generics011superclass_B10_archetype{{[_0-9a-zA-Z]*}}F(%C22class_bounded_generics9SomeClass* {{%.*}}, {{.*}})
-  // CHECK: [[SOMESUPERCLASS_IN:%.*]] = bitcast %C22class_bounded_generics12SomeSubclass* {{%.*}} to %C22class_bounded_generics9SomeClass*
-  // CHECK: [[SOMESUPERCLASS_RESULT:%.*]] = call swiftcc %C22class_bounded_generics9SomeClass* @_T022class_bounded_generics011superclass_B10_archetype{{[_0-9a-zA-Z]*}}F(%C22class_bounded_generics9SomeClass* [[SOMESUPERCLASS_IN]], {{.*}})
-  // CHECK: bitcast %C22class_bounded_generics9SomeClass* [[SOMESUPERCLASS_RESULT]] to %C22class_bounded_generics12SomeSubclass*
+  // CHECK: [[SOMECLASS_RESULT:%.*]] = call swiftcc %T22class_bounded_generics9SomeClassC* @_T022class_bounded_generics011superclass_B10_archetype{{[_0-9a-zA-Z]*}}F(%T22class_bounded_generics9SomeClassC* {{%.*}}, {{.*}})
+  // CHECK: [[SOMESUPERCLASS_IN:%.*]] = bitcast %T22class_bounded_generics12SomeSubclassC* {{%.*}} to %T22class_bounded_generics9SomeClassC*
+  // CHECK: [[SOMESUPERCLASS_RESULT:%.*]] = call swiftcc %T22class_bounded_generics9SomeClassC* @_T022class_bounded_generics011superclass_B10_archetype{{[_0-9a-zA-Z]*}}F(%T22class_bounded_generics9SomeClassC* [[SOMESUPERCLASS_IN]], {{.*}})
+  // CHECK: bitcast %T22class_bounded_generics9SomeClassC* [[SOMESUPERCLASS_RESULT]] to %T22class_bounded_generics12SomeSubclassC*
 }
 
 // CHECK-LABEL: define hidden swiftcc void @_T022class_bounded_generics0a1_B17_archetype_method{{[_0-9a-zA-Z]*}}F(%objc_object*, %objc_object*, %swift.type* %T, i8** %T.ClassBoundBinary)
@@ -110,13 +110,13 @@ class ConcreteClass : ClassBoundBinary, NotClassBound {
   func notClassBoundBinaryMethod(_ x: ConcreteClass) {}
 }
 
-// CHECK-LABEL: define hidden swiftcc %C22class_bounded_generics13ConcreteClass* @_T022class_bounded_generics05call_a1_B10_archetype{{[_0-9a-zA-Z]*}}F(%C22class_bounded_generics13ConcreteClass*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc %T22class_bounded_generics13ConcreteClassC* @_T022class_bounded_generics05call_a1_B10_archetype{{[_0-9a-zA-Z]*}}F(%T22class_bounded_generics13ConcreteClassC*) {{.*}} {
 func call_class_bounded_archetype(_ x: ConcreteClass) -> ConcreteClass {
   return class_bounded_archetype(x)
-  // CHECK: [[IN:%.*]] = bitcast %C22class_bounded_generics13ConcreteClass* {{%.*}} to %objc_object*
+  // CHECK: [[IN:%.*]] = bitcast %T22class_bounded_generics13ConcreteClassC* {{%.*}} to %objc_object*
   // CHECK: [[OUT_ORIG:%.*]] = call swiftcc %objc_object* @_T022class_bounded_generics0a1_B10_archetype{{[_0-9a-zA-Z]*}}F(%objc_object* [[IN]], {{.*}})
-  // CHECK: [[OUT:%.*]] = bitcast %objc_object* [[OUT_ORIG]] to %C22class_bounded_generics13ConcreteClass*
-  // CHECK: ret %C22class_bounded_generics13ConcreteClass* [[OUT]]
+  // CHECK: [[OUT:%.*]] = bitcast %objc_object* [[OUT_ORIG]] to %T22class_bounded_generics13ConcreteClassC*
+  // CHECK: ret %T22class_bounded_generics13ConcreteClassC* [[OUT]]
 }
 
 // CHECK: define hidden swiftcc void @_T022class_bounded_generics04not_a1_B10_archetype{{[_0-9a-zA-Z]*}}F(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.NotClassBound)
@@ -141,10 +141,10 @@ func class_and_not_class_bounded_archetype_methods
 }
 */
 
-// CHECK-LABEL: define hidden swiftcc { %objc_object*, i8** } @_T022class_bounded_generics0a1_B8_erasure{{[_0-9a-zA-Z]*}}F(%C22class_bounded_generics13ConcreteClass*) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc { %objc_object*, i8** } @_T022class_bounded_generics0a1_B8_erasure{{[_0-9a-zA-Z]*}}F(%T22class_bounded_generics13ConcreteClassC*) {{.*}} {
 func class_bounded_erasure(_ x: ConcreteClass) -> ClassBound {
   return x
-  // CHECK: [[INSTANCE_OPAQUE:%.*]] = bitcast %C22class_bounded_generics13ConcreteClass* [[INSTANCE:%.*]] to %objc_object*
+  // CHECK: [[INSTANCE_OPAQUE:%.*]] = bitcast %T22class_bounded_generics13ConcreteClassC* [[INSTANCE:%.*]] to %objc_object*
   // CHECK: [[T0:%.*]] = insertvalue { %objc_object*, i8** } undef, %objc_object* [[INSTANCE_OPAQUE]], 0
   // CHECK: [[T1:%.*]] = insertvalue { %objc_object*, i8** } [[T0]], i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @_T022class_bounded_generics13ConcreteClassCAA0E5BoundAAWP, i32 0, i32 0), 1
   // CHECK: ret { %objc_object*, i8** } [[T1]]
@@ -159,26 +159,26 @@ func class_bounded_protocol_method(_ x: ClassBound) {
   // CHECK: call swiftcc void [[WITNESS_FN]](%objc_object* swiftself %0, %swift.type* [[METADATA]], i8** [[WITNESS_TABLE]])
 }
 
-// CHECK-LABEL: define hidden swiftcc %C22class_bounded_generics13ConcreteClass* @_T022class_bounded_generics0a1_B15_archetype_cast{{[_0-9a-zA-Z]*}}F(%objc_object*, %swift.type* %T, i8** %T.ClassBound)
+// CHECK-LABEL: define hidden swiftcc %T22class_bounded_generics13ConcreteClassC* @_T022class_bounded_generics0a1_B15_archetype_cast{{[_0-9a-zA-Z]*}}F(%objc_object*, %swift.type* %T, i8** %T.ClassBound)
 func class_bounded_archetype_cast<T : ClassBound>(_ x: T) -> ConcreteClass {
   return x as! ConcreteClass
   // CHECK: [[IN_PTR:%.*]] = bitcast %objc_object* {{%.*}} to i8*
   // CHECK: [[T0:%.*]] = call %swift.type* @_T022class_bounded_generics13ConcreteClassCMa()
   // CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
   // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[IN_PTR]], i8* [[T1]])
-  // CHECK: [[OUT:%.*]] = bitcast i8* [[OUT_PTR]] to %C22class_bounded_generics13ConcreteClass*
-  // CHECK: ret %C22class_bounded_generics13ConcreteClass* [[OUT]]
+  // CHECK: [[OUT:%.*]] = bitcast i8* [[OUT_PTR]] to %T22class_bounded_generics13ConcreteClassC*
+  // CHECK: ret %T22class_bounded_generics13ConcreteClassC* [[OUT]]
 }
 
-// CHECK-LABEL: define hidden swiftcc %C22class_bounded_generics13ConcreteClass* @_T022class_bounded_generics0a1_B14_protocol_cast{{[_0-9a-zA-Z]*}}F(%objc_object*, i8**)
+// CHECK-LABEL: define hidden swiftcc %T22class_bounded_generics13ConcreteClassC* @_T022class_bounded_generics0a1_B14_protocol_cast{{[_0-9a-zA-Z]*}}F(%objc_object*, i8**)
 func class_bounded_protocol_cast(_ x: ClassBound) -> ConcreteClass {
   return x as! ConcreteClass
   // CHECK: [[IN_PTR:%.*]] = bitcast %objc_object* {{%.*}} to i8*
   // CHECK: [[T0:%.*]] = call %swift.type* @_T022class_bounded_generics13ConcreteClassCMa()
   // CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
   // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[IN_PTR]], i8* [[T1]])
-  // CHECK: [[OUT:%.*]] = bitcast i8* [[OUT_PTR]] to %C22class_bounded_generics13ConcreteClass*
-  // CHECK: ret %C22class_bounded_generics13ConcreteClass* [[OUT]]
+  // CHECK: [[OUT:%.*]] = bitcast i8* [[OUT_PTR]] to %T22class_bounded_generics13ConcreteClassC*
+  // CHECK: ret %T22class_bounded_generics13ConcreteClassC* [[OUT]]
 }
 
 // CHECK-LABEL: define hidden swiftcc { %objc_object*, i8** } @_T022class_bounded_generics0a1_B22_protocol_conversion_{{.*}}(%objc_object*, i8**, i8**) {{.*}} {
@@ -225,16 +225,16 @@ func class_protocol_field_struct_fields
   return (x.x, x.y, x.z)
 }
 
-// CHECK-LABEL: define hidden swiftcc { i64, %objc_object*, i64 } @_T022class_bounded_generics0a15_generic_field_A7_fields{{[_0-9a-zA-Z]*}}F(%C22class_bounded_generics22ClassGenericFieldClass*)
+// CHECK-LABEL: define hidden swiftcc { i64, %objc_object*, i64 } @_T022class_bounded_generics0a15_generic_field_A7_fields{{[_0-9a-zA-Z]*}}F(%T22class_bounded_generics017ClassGenericFieldD0C*)
 func class_generic_field_class_fields<T : ClassBound>
 (_ x:ClassGenericFieldClass<T>) -> (Int, T, Int) {
   return (x.x, x.y, x.z)
-  // CHECK: getelementptr inbounds %C22class_bounded_generics22ClassGenericFieldClass, %C22class_bounded_generics22ClassGenericFieldClass* %0, i32 0, i32 1
-  // CHECK: getelementptr inbounds %C22class_bounded_generics22ClassGenericFieldClass, %C22class_bounded_generics22ClassGenericFieldClass* %0, i32 0, i32 2
-  // CHECK: getelementptr inbounds %C22class_bounded_generics22ClassGenericFieldClass, %C22class_bounded_generics22ClassGenericFieldClass* %0, i32 0, i32 3
+  // CHECK: getelementptr inbounds %T22class_bounded_generics017ClassGenericFieldD0C, %T22class_bounded_generics017ClassGenericFieldD0C* %0, i32 0, i32 1
+  // CHECK: getelementptr inbounds %T22class_bounded_generics017ClassGenericFieldD0C, %T22class_bounded_generics017ClassGenericFieldD0C* %0, i32 0, i32 2
+  // CHECK: getelementptr inbounds %T22class_bounded_generics017ClassGenericFieldD0C, %T22class_bounded_generics017ClassGenericFieldD0C* %0, i32 0, i32 3
 }
 
-// CHECK-LABEL: define hidden swiftcc { i64, %objc_object*, i8**, i64 } @_T022class_bounded_generics0a16_protocol_field_A7_fields{{[_0-9a-zA-Z]*}}F(%C22class_bounded_generics23ClassProtocolFieldClass*)
+// CHECK-LABEL: define hidden swiftcc { i64, %objc_object*, i8**, i64 } @_T022class_bounded_generics0a16_protocol_field_A7_fields{{[_0-9a-zA-Z]*}}F(%T22class_bounded_generics018ClassProtocolFieldD0C*)
 func class_protocol_field_class_fields(_ x: ClassProtocolFieldClass)
 -> (Int, ClassBound, Int) {
   return (x.x, x.y, x.z)
@@ -249,7 +249,7 @@ class SomeSwiftClass {
 
 // T must have a Swift layout, so we can load this metatype with a direct access.
 // CHECK-LABEL: define hidden swiftcc void @_T022class_bounded_generics0a1_B9_metatype{{[_0-9a-zA-Z]*}}F
-// CHECK:      [[T0:%.*]] = getelementptr inbounds %C22class_bounded_generics14SomeSwiftClass, %C22class_bounded_generics14SomeSwiftClass* {{%.*}}, i32 0, i32 0, i32 0
+// CHECK:      [[T0:%.*]] = getelementptr inbounds %T22class_bounded_generics14SomeSwiftClassC, %T22class_bounded_generics14SomeSwiftClassC* {{%.*}}, i32 0, i32 0, i32 0
 // CHECK-NEXT: [[T1:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
 // CHECK-NEXT: [[T2:%.*]] = bitcast %swift.type* [[T1]] to void (%swift.type*)**
 // CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[T2]], i64 10

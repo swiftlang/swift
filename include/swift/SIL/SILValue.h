@@ -117,6 +117,10 @@ struct ValueOwnershipKind {
   operator innerty() const { return Value; }
 
   Optional<ValueOwnershipKind> merge(ValueOwnershipKind RHS) const;
+
+  bool isTrivialOr(ValueOwnershipKind Kind) const {
+    return Value == Trivial || Value == Kind;
+  }
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, ValueOwnershipKind Kind);

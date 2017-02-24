@@ -306,10 +306,27 @@ class SelfCapturedInInit : Base {
   var foo : () -> SelfCapturedInInit
 
   // CHECK-LABEL: sil hidden @_TFC8closures18SelfCapturedInInitc{{.*}} : $@convention(method) (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit {
-  // CHECK:         [[VAL:%.*]] = load_borrow {{%.*}} : $*SelfCapturedInInit
-  // CHECK:         [[VAL:%.*]] = load_borrow {{%.*}} : $*SelfCapturedInInit
-  // CHECK:         [[VAL:%.*]] = load [copy] {{%.*}} : $*SelfCapturedInInit
-  // CHECK:         partial_apply {{%.*}}([[VAL]]) : $@convention(thin) (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit
+  // CHECK: bb0([[SELF:%.*]] : $SelfCapturedInInit):
+  //
+  // First create our initial value for self.
+  // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var SelfCapturedInInit }, let, name "self"
+  // CHECK:   [[PB_SELF_BOX:%.*]] = project_box [[SELF_BOX]]
+  // CHECK:   [[UNINIT_SELF:%.*]] = mark_uninitialized [derivedself] [[PB_SELF_BOX]]
+  // CHECK:   store [[SELF]] to [init] [[UNINIT_SELF]]
+  //
+  // Then perform the super init sequence.
+  // CHECK:   [[TAKEN_SELF:%.*]] = load [take] [[UNINIT_SELF]]
+  // CHECK:   [[UPCAST_TAKEN_SELF:%.*]] = upcast [[TAKEN_SELF]]
+  // CHECK:   [[NEW_SELF:%.*]] = apply {{.*}}([[UPCAST_TAKEN_SELF]]) : $@convention(method) (@owned Base) -> @owned Base
+  // CHECK:   [[DOWNCAST_NEW_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF]] : $Base to $SelfCapturedInInit
+  // CHECK:   store [[DOWNCAST_NEW_SELF]] to [init] [[UNINIT_SELF]]
+  //
+  // Finally put self in the closure.
+  // CHECK:   [[BORROWED_SELF:%.*]] = load_borrow [[UNINIT_SELF]]
+  // CHECK:   [[COPIED_SELF:%.*]] = load [copy] [[UNINIT_SELF]]
+  // CHECK:   [[FOO_VALUE:%.*]] = partial_apply {{%.*}}([[COPIED_SELF]]) : $@convention(thin) (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit
+  // CHECK:   [[FOO_LOCATION:%.*]] = ref_element_addr [[BORROWED_SELF]]
+  // CHECK:   assign [[FOO_VALUE]] to [[FOO_LOCATION]]
   override init() {
     super.init()
     foo = { self }

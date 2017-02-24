@@ -44,6 +44,7 @@
 #include "ScalarTypeInfo.h"
 #include "WeakTypeInfo.h"
 #include "NativeConventionSchema.h"
+#include "IRGenMangler.h"
 
 using namespace swift;
 using namespace irgen;
@@ -1536,9 +1537,9 @@ llvm::StructType *IRGenModule::createNominalType(CanType type) {
     type = type.getNominalOrBoundGenericNominal()->getDeclaredType()
                                                  ->getCanonicalType();
 
-  llvm::SmallString<32> typeName;
-  LinkEntity::forTypeMangling(type).mangle(typeName);
-  return llvm::StructType::create(getLLVMContext(), typeName.str());
+  IRGenMangler Mangler;
+  std::string typeName = Mangler.mangleTypeForLLVMTypeName(type);
+  return llvm::StructType::create(getLLVMContext(), StringRef(typeName));
 }
 
 /// createNominalType - Create a new nominal LLVM type for the given
@@ -1548,20 +1549,9 @@ llvm::StructType *IRGenModule::createNominalType(CanType type) {
 /// distinguish different cases.
 llvm::StructType *
 IRGenModule::createNominalType(ProtocolCompositionType *type) {
-  llvm::SmallString<32> typeName;
-
-  SmallVector<ProtocolDecl *, 4> protocols;
-  type->getAnyExistentialTypeProtocols(protocols);
-  
-  if (protocols.empty()) {
-    typeName.append("Any");
-  } else {
-    for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
-      if (i) typeName.push_back('&');
-      LinkEntity::forNonFunction(protocols[i]).mangle(typeName);
-    }
-  }
-  return llvm::StructType::create(getLLVMContext(), typeName.str());
+  IRGenMangler Mangler;
+  std::string typeName = Mangler.mangleProtocolForLLVMTypeName(type);
+  return llvm::StructType::create(getLLVMContext(), StringRef(typeName));
 }
 
 /// Compute the explosion schema for the given type.
