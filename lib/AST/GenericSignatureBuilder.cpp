@@ -1548,19 +1548,19 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
     Visited.erase(Proto);
   };
 
+  auto concreteSelf = T->getDependentType({}, /*allowUnresolved=*/true);
+  auto protocolSubMap = SubstitutionMap::getProtocolSubstitutions(
+      Proto, concreteSelf, ProtocolConformanceRef(Proto));
+
   // Use the requirement signature to avoid rewalking the entire protocol.  This
   // cannot compute the requirement signature directly, because that may be
   // infinitely recursive: this code is also used to construct it.
   if (Proto->isRequirementSignatureComputed()) {
     auto reqSig = Proto->getRequirementSignature();
 
-    auto concreteSelf = T->getDependentType({}, /*allowUnresolved=*/true);
-    auto subMap = SubstitutionMap::getProtocolSubstitutions(
-        Proto, concreteSelf, ProtocolConformanceRef(Proto));
-
     auto innerSource = Source->viaAbstractProtocolRequirement(*this, Proto);
     for (auto rawReq : reqSig->getRequirements()) {
-      auto req = rawReq.subst(subMap);
+      auto req = rawReq.subst(protocolSubMap);
       assert(req && "substituting Self in requirement shouldn't fail");
       if (addRequirement(*req, innerSource, Visited))
         return true;
@@ -1585,6 +1585,12 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
       if (AssocPA != T) {
         if (addInheritedRequirements(AssocType, AssocPA, Source, Visited))
           return true;
+      }
+      if (auto WhereClause = AssocType->getTrailingWhereClause()) {
+        auto innerSource = Source->viaAbstractProtocolRequirement(*this, Proto);
+        for (auto &req : WhereClause->getRequirements()) {
+          addRequirement(&req, innerSource, &protocolSubMap);
+        }
       }
     } else if (auto TypeAlias = dyn_cast<TypeAliasDecl>(Member)) {
         // FIXME: this should check that the typealias is makes sense (e.g. has
@@ -2149,13 +2155,23 @@ bool GenericSignatureBuilder::addInheritedRequirements(
   });
 }
 
-bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req) {
-  auto source = RequirementSource::forExplicit(*this, Req);
+bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
+                                             const RequirementSource *source,
+                                             const SubstitutionMap *subMap) {
+  if (!source)
+    source = RequirementSource::forExplicit(*this, Req);
+
+  auto subst = [&](Type t) {
+    if (subMap)
+      return t.subst(*subMap);
+
+    return t;
+  };
 
   switch (Req->getKind()) {
   case RequirementReprKind::LayoutConstraint: {
     // FIXME: Need to do something here.
-    PotentialArchetype *PA = resolveArchetype(Req->getSubject());
+    PotentialArchetype *PA = resolveArchetype(subst(Req->getSubject()));
     if (!PA) {
       // FIXME: Poor location information.
       // FIXME: Delay diagnostic until after type validation?
@@ -2171,7 +2187,7 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req) {
   }
 
   case RequirementReprKind::TypeConstraint: {
-    PotentialArchetype *PA = resolveArchetype(Req->getSubject());
+    PotentialArchetype *PA = resolveArchetype(subst(Req->getSubject()));
     if (!PA) {
       // FIXME: Poor location information.
       // FIXME: Delay diagnostic until after type validation?
@@ -2211,8 +2227,8 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req) {
     }
 
     return addRequirement(Requirement(RequirementKind::SameType,
-                                      Req->getFirstType(),
-                                      Req->getSecondType()),
+                                      subst(Req->getFirstType()),
+                                      subst(Req->getSecondType())),
                           source);
   }
 
