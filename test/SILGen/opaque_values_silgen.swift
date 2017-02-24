@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sorted-sil -Xllvm -new-mangling-for-tests -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 // UNSUPPORTED: resilient_stdlib
-// REQUIRES: talk_later_today
 
 protocol Foo {
   func foo()
