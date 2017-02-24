@@ -75,7 +75,7 @@ func test4<T: Barrable>(_ t: T) -> Y where T.Bar == Y {
 
 func fail3<T: Barrable>(_ t: T) -> X
   where T.Bar == X { // expected-error {{'X' does not conform to required protocol 'Fooable'}}
-  return t.bar // expected-error{{cannot convert return expression of type 'T.Bar' to return type 'X'}}
+  return t.bar
 }
 
 func test5<T: Barrable>(_ t: T) -> X where T.Bar.Foo == X {

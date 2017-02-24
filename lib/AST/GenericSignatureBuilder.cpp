@@ -1911,50 +1911,36 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
        PotentialArchetype *T,
        Type Concrete,
        const RequirementSource *Source) {
-  auto rep = T->getRepresentative();
+  // Record the concrete type and its source.
+  if (!T->ConcreteType) {
+    // FIXME: Always record this.
+    T->ConcreteType = Concrete;
+    T->ConcreteTypeSource = Source;
+  }
 
-  // If there is an existing source on this potential archetype, make sure
-  // we have the same type.
-  // FIXME: Delay until finalize().
-  if (auto existingSource = T->ConcreteTypeSource) {
+  // If we've already been bound to a type, match that type.
+  if (auto oldConcrete = T->getConcreteType()) {
     bool mismatch = addSameTypeRequirement(
-        T->ConcreteType, Concrete, Source, [&](Type type1, Type type2) {
+        oldConcrete, Concrete, Source, [&](Type type1, Type type2) {
           Diags.diagnose(Source->getLoc(),
                          diag::requires_same_type_conflict,
                          T->isGenericParam(),
                          T->getDependentType(/*FIXME: */{ }, true), type1,
                          type2);
+
         });
 
     if (mismatch) return true;
 
-    // If this is a better source, record it.
-    updateRequirementSource(T->ConcreteTypeSource, Source);
-
+    // Nothing more to do; the types matched.
     return false;
   }
 
-  // If we've already been bound to a type, match that type.
-  if (T != rep) {
-    if (auto oldConcrete = rep->getConcreteType()) {
-      bool mismatch = addSameTypeRequirement(
-          oldConcrete, Concrete, Source, [&](Type type1, Type type2) {
-            Diags.diagnose(Source->getLoc(),
-                           diag::requires_same_type_conflict,
-                           T->isGenericParam(),
-                           T->getDependentType(/*FIXME: */{ }, true), type1,
-                           type2);
-
-          });
-
-      if (mismatch) return true;
-      return false;
-    }
-  }
-
-  // Record the concrete type and its source.
-  T->ConcreteType = Concrete;
-  T->ConcreteTypeSource = Source;
+  // Record the requirement.
+  auto rep = T->getRepresentative();
+  auto equivClass = rep->getOrCreateEquivalenceClass();
+  if (!equivClass->concreteType)
+    equivClass->concreteType = Concrete;
 
   // Make sure the concrete type fulfills the requirements on the archetype.
   // FIXME: Move later...
@@ -1987,11 +1973,6 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
                                                 : nullptr);
     updateRequirementSource(conforms.second, concreteSource);
   }
-
-  // Record the requirement.
-  auto equivClass = rep->getOrCreateEquivalenceClass();
-  if (!equivClass->concreteType)
-    equivClass->concreteType = Concrete;
 
   // Make sure the concrete type fulfills the superclass requirement
   // of the archetype.
