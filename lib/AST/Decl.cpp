@@ -622,6 +622,20 @@ GenericSignature *GenericContext::getGenericSignature() const {
   if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
     return genericSig;
 
+  // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
+  // it.
+  if (auto PD = dyn_cast<ProtocolDecl>(this)) {
+    auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
+    auto req =
+        Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
+    GenericTypeParamType *params[] = {self};
+    Requirement reqs[] = {req};
+
+    auto &ctx = getASTContext();
+    return GenericSignature::get(ctx.AllocateCopy(params),
+                                 ctx.AllocateCopy(reqs));
+  }
+
   return nullptr;
 }
 
