@@ -6974,11 +6974,26 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Check the default definition, if there is one.
     TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
-    if (!defaultDefinition.isNull() &&
-        validateType(defaultDefinition, assocType->getDeclContext())) {
-      defaultDefinition.setInvalidType(Context);
-    }
+    if (!defaultDefinition.isNull()) {
+      if (validateType(defaultDefinition, assocType->getDeclContext())) {
+        defaultDefinition.setInvalidType(Context);
+      } else {
+        // associatedtype X = X is invalid
+        auto mentionsItself =
+            defaultDefinition.getType().findIf([&](Type type) {
+              if (auto DMT = type->getAs<ArchetypeType>()) {
+                return DMT->getAssocType() == assocType;
+              }
+              return false;
+            });
 
+        if (mentionsItself) {
+          diagnose(defaultDefinition.getLoc(), diag::recursive_type_reference,
+                   assocType->getDescriptiveKind(), assocType->getName());
+          diagnose(assocType, diag::type_declared_here);
+        }
+      }
+    }
     // Finally, set the interface type.
     if (!assocType->hasInterfaceType())
       assocType->computeType();
