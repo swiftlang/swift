@@ -5752,13 +5752,13 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     }
   };
 
+  auto dc = env->getOwningDeclContext();
   RequirementsListener genericReqListener;
-  auto result =
-    TC.checkGenericArguments(env->getOwningDeclContext(), argExpr->getLoc(),
-                             AFD->getLoc(), AFD->getInterfaceType(),
-                             env->getGenericSignature(), substitutions, nullptr,
-                             ConformanceCheckFlags::SuppressDependencyTracking,
-                             &genericReqListener);
+  auto result = TC.checkGenericArguments(
+      dc, argExpr->getLoc(), AFD->getLoc(), AFD->getInterfaceType(),
+      env->getGenericSignature(), QueryTypeSubstitutionMap{substitutions},
+      LookUpConformanceInModule{dc->getParentModule()}, nullptr,
+      ConformanceCheckFlags::SuppressDependencyTracking, &genericReqListener);
 
   return !result.second;
 }

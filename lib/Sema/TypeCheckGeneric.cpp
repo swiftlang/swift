@@ -1128,34 +1128,29 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
 
 std::pair<bool, bool> TypeChecker::checkGenericArguments(
     DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
-    GenericSignature *genericSig, const TypeSubstitutionMap &substitutions,
+    GenericSignature *genericSig, TypeSubstitutionFn substitutions,
+    LookupConformanceFn conformances,
     UnsatisfiedDependency *unsatisfiedDependency,
     ConformanceCheckOptions conformanceOptions,
     GenericRequirementsCheckListener *listener) {
-  // Check each of the requirements.
-  ModuleDecl *module = dc->getParentModule();
-  for (const auto &req : genericSig->getRequirements()) {
-    Type firstType = req.getFirstType().subst(
-        QueryTypeSubstitutionMap{substitutions},
-        LookUpConformanceInModule(module));
-    if (firstType.isNull()) {
+  for (const auto &rawReq : genericSig->getRequirements()) {
+    auto req = rawReq.subst(substitutions, conformances);
+    if (!req) {
       // Another requirement will fail later; just continue.
       continue;
     }
 
-    Type secondType;
-    if (req.getKind() != RequirementKind::Layout)
-      secondType = req.getSecondType();
-    if (secondType) {
-      secondType = secondType.subst(QueryTypeSubstitutionMap{substitutions},
-                                    LookUpConformanceInModule(module));
-      if (secondType.isNull()) {
-        // Another requirement will fail later; just continue.
+    auto kind = req->getKind();
+    Type rawFirstType = rawReq.getFirstType();
+    Type firstType = req->getFirstType();
+    Type rawSecondType, secondType;
+    if (kind != RequirementKind::Layout) {
+      rawSecondType = rawReq.getSecondType();
+      secondType = req->getSecondType().subst(substitutions, conformances);
+      if (!secondType)
         continue;
-      }
     }
 
-    auto kind = req.getKind();
     if (listener && !listener->shouldCheck(kind, firstType, secondType))
       continue;
 
@@ -1196,10 +1191,10 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
         diagnose(loc, diag::type_does_not_inherit, owner, firstType,
                  secondType);
 
-        diagnose(noteLoc, diag::type_does_not_inherit_requirement,
-                 req.getFirstType(), req.getSecondType(),
+        diagnose(noteLoc, diag::type_does_not_inherit_requirement, rawFirstType,
+                 rawSecondType,
                  genericSig->gatherGenericParamBindingsText(
-                     {req.getFirstType(), req.getSecondType()}, substitutions));
+                     {rawFirstType, rawSecondType}, substitutions));
 
         return std::make_pair(false, false);
       }
@@ -1210,10 +1205,10 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
         // FIXME: Better location info for both diagnostics.
         diagnose(loc, diag::types_not_equal, owner, firstType, secondType);
 
-        diagnose(noteLoc, diag::types_not_equal_requirement, req.getFirstType(),
-                 req.getSecondType(),
+        diagnose(noteLoc, diag::types_not_equal_requirement, rawFirstType,
+                 rawSecondType,
                  genericSig->gatherGenericParamBindingsText(
-                     {req.getFirstType(), req.getSecondType()}, substitutions));
+                     {rawFirstType, rawSecondType}, substitutions));
 
         return std::make_pair(false, false);
       }

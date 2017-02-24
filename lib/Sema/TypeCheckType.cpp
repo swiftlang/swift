@@ -676,9 +676,11 @@ Type TypeChecker::applyUnboundGenericArguments(
     assert(genericSig != nullptr);
     auto substitutions = BGT->getContextSubstitutions(BGT->getDecl());
 
-    auto result = checkGenericArguments(
-        dc, loc, noteLoc, UGT, genericSig,
-        substitutions, unsatisfiedDependency);
+    auto result =
+        checkGenericArguments(dc, loc, noteLoc, UGT, genericSig,
+                              QueryTypeSubstitutionMap{substitutions},
+                              LookUpConformanceInModule{dc->getParentModule()},
+                              unsatisfiedDependency);
 
     // Unsatisfied dependency case.
     if (result.first)
