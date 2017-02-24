@@ -902,6 +902,7 @@ static void concretizeNestedTypeFromConcreteParent(
        builder.getASTContext().Diags.diagnose(
                               source->getLoc(),
                               diag::requires_same_type_conflict,
+                              nestedPA->isGenericParam(),
                               nestedPA->getDependentType(/*FIXME: */{ }, true),
                               type1, type2);
      });
@@ -1795,6 +1796,7 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
         concrete1, concrete2, Source, [&](Type type1, Type type2) {
           Diags.diagnose(Source->getLoc(),
                          diag::requires_same_type_conflict,
+                         T1->isGenericParam(),
                          T1->getDependentType(/*FIXME: */{ }, true), type1,
                          type2);
         });
@@ -1851,6 +1853,7 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
                                  [&](Type type1, Type type2) {
             Diags.diagnose(Source->getLoc(),
                            diag::requires_same_type_conflict,
+                           T1Nested->isGenericParam(),
                            T1Nested->getDependentType(/*FIXME: */{ }, true),
                            type1, type2);
             }))
@@ -1875,6 +1878,7 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
         T->ConcreteType, Concrete, Source, [&](Type type1, Type type2) {
           Diags.diagnose(Source->getLoc(),
                          diag::requires_same_type_conflict,
+                         T->isGenericParam(),
                          T->getDependentType(/*FIXME: */{ }, true), type1,
                          type2);
         });
@@ -1890,15 +1894,14 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
     return false;
   }
 
-  // If we've already been bound to a type, we're either done, or we have a
-  // problem.
-  // FIXME: Move, to finalize().
+  // If we've already been bound to a type, match that type.
   if (T != rep) {
     if (auto oldConcrete = rep->getConcreteType()) {
       bool mismatch = addSameTypeRequirement(
           oldConcrete, Concrete, Source, [&](Type type1, Type type2) {
             Diags.diagnose(Source->getLoc(),
                            diag::requires_same_type_conflict,
+                           T->isGenericParam(),
                            T->getDependentType(/*FIXME: */{ }, true), type1,
                            type2);
 
@@ -2505,12 +2508,13 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
     return false;
   };
 
-  // Check for recursive same-type bindings and superclass constraints.
+  // Check for recursive or conflicting same-type bindings and superclass
+  // constraints.
   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
     if (archetype != archetype->getRepresentative()) return;
 
-    // Check for recursive same-type bindings.
     if (archetype->isConcreteType()) {
+      // Check for recursive same-type bindings.
       if (isRecursiveConcreteType(archetype, /*isSuperclass=*/false)) {
         if (auto source = archetype->findAnyConcreteTypeSourceAsWritten()) {
           Diags.diagnose(source->getLoc(),
@@ -2521,6 +2525,8 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
         }
 
         archetype->RecursiveConcreteType = true;
+      } else {
+        checkRedundantConcreteTypeConstraints(genericParams, archetype);
       }
     }
 
@@ -2647,6 +2653,129 @@ bool GenericSignatureBuilder::diagnoseRemainingRenames(
   }
 
   return invalid;
+}
+
+namespace {
+  /// Describes a concrete constraint on a potential archetype.
+  struct ConcreteConstraint {
+    PotentialArchetype *archetype;
+    Type concreteType;
+    const RequirementSource *source;
+
+    friend bool operator<(const ConcreteConstraint &lhs,
+                          const ConcreteConstraint &rhs) {
+      auto lhsPA = lhs.archetype;
+      auto rhsPA = rhs.archetype;
+      if (int result = compareDependentTypes(&lhsPA, &rhsPA))
+        return result < 0;
+
+      if (int result = lhs.source->compare(rhs.source))
+        return result < 0;
+
+      return false;
+    }
+
+    friend bool operator==(const ConcreteConstraint &lhs,
+                           const ConcreteConstraint &rhs) {
+      return lhs.archetype == rhs.archetype &&
+             lhs.concreteType->isEqual(rhs.concreteType) &&
+             lhs.source == rhs.source;
+    }
+  };
+}
+
+void GenericSignatureBuilder::checkRedundantConcreteTypeConstraints(
+                                 ArrayRef<GenericTypeParamType *> genericParams,
+                                 PotentialArchetype *representative) {
+  Type concreteType = representative->getConcreteType();
+  assert(concreteType && "No concrete type to check");
+
+  Optional<ConcreteConstraint> representativeConstraint;
+
+  // Gather the concrete constraints within this equivalence class.
+  SmallVector<ConcreteConstraint, 4> concreteConstraints;
+  for (auto pa : representative->getEquivalenceClass()) {
+    auto source = pa->getConcreteTypeSourceAsWritten();
+    if (!source) continue;
+
+    // Save this constraint.
+    auto constraint = ConcreteConstraint{pa, pa->ConcreteType, source};
+    concreteConstraints.push_back(constraint);
+
+    // Check whether this constraint is better than the best we've seen so far
+    // at being the representative constraint against which others will be
+    // compared.
+    if (!representativeConstraint) {
+      representativeConstraint = constraint;
+      continue;
+    }
+
+    // We prefer derived constraints to non-derived constraints.
+    bool thisIsDerived = source->isDerivedRequirement();
+    bool representativeIsDerived =
+      representativeConstraint->source->isDerivedRequirement();
+    if (thisIsDerived != representativeIsDerived) {
+      if (thisIsDerived)
+        representativeConstraint = constraint;
+
+      continue;
+    }
+
+    // We prefer constraints with locations to constraints without locations.
+    bool thisHasValidSourceLoc = source->getLoc().isValid();
+    bool representativeHasValidSourceLoc =
+      representativeConstraint->source->getLoc().isValid();
+    if (thisHasValidSourceLoc != representativeHasValidSourceLoc) {
+      if (thisHasValidSourceLoc)
+        representativeConstraint = constraint;
+
+      continue;
+    }
+
+    // Otherwise, order via the constraint itself.
+    if (constraint < *representativeConstraint)
+      representativeConstraint = constraint;
+  }
+
+  // Sort the concrete constraints, so we get deterministic ordering of
+  // diagnostics.
+  llvm::array_pod_sort(concreteConstraints.begin(), concreteConstraints.end());
+
+  // Local function to provide a note desribing the representative constraint.
+  auto noteRepresentativeConstraint = [&] {
+    if (representativeConstraint->source->getLoc().isInvalid()) return;
+
+    Diags.diagnose(representativeConstraint->source->getLoc(),
+                   diag::redundancy_here,
+                   representativeConstraint->source->isDerivedRequirement(),
+                   representativeConstraint->archetype->
+                     getDependentType(genericParams, /*allowUnresolved=*/true),
+                   representativeConstraint->concreteType);
+  };
+
+  // Go through the concrete constraints looking for redundancies.
+  for (const auto &constraint : concreteConstraints) {
+    // Leave the representative alone.
+    if (constraint == *representativeConstraint) continue;
+
+    // Note: this is conservative. There might be redundant constraints that
+    // don't get diagnosed here.
+    if (!concreteType->isEqual(constraint.concreteType)) continue;
+
+    // If this requirement is not derived (but has a useful location),
+    // complain that it is redundant.
+    if (!constraint.source->isDerivedRequirement() &&
+        constraint.source->getLoc().isValid()) {
+      Diags.diagnose(constraint.source->getLoc(),
+                     diag::redundant_same_type_to_concrete,
+                     constraint.archetype->getDependentType(
+                                                  /*FIXME:*/{ },
+                                                  /*allowUnresolved=*/true),
+                     constraint.concreteType);
+
+      noteRepresentativeConstraint();
+    }
+  }
 }
 
 template<typename F>
