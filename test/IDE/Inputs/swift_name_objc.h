@@ -61,9 +61,6 @@ SWIFT_NAME(SomeProtocol)
 -(instancetype)initWithTitle:(const char *)title delegate:(id)delegate cancelButtonTitle:(const char *)cancelButtonTitle destructiveButtonTitle:(const char *)destructiveButtonTitle otherButtonTitles:(const char *)otherButtonTitles, ...;
 @end
 
-@interface NSError : NSObject
-@end
-
 @interface NSErrorImports : NSObject
 - (nullable NSObject *)methodAndReturnError:(NSError **)error;
 - (BOOL)methodWithFloat:(float)value error:(NSError **)error;
