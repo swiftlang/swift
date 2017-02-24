@@ -2738,17 +2738,51 @@ void ClangImporter::Implementation::lookupValue(
       }
     }
 
-    // If we have a declaration and nothing matched so far, try the Swift 2
-    // name.
+    // If we have a declaration and nothing matched so far, try the names used
+    // in other versions of Swift.
     if (!anyMatching) {
       if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
-        if (auto swift2Decl = cast_or_null<ValueDecl>(importDeclReal(
-                clangDecl->getMostRecentDecl(), ImportNameVersion::Swift2))) {
-          if (swift2Decl->getFullName().matchesRef(name) &&
-              swift2Decl->getDeclContext()->isModuleScopeContext()) {
-            consumer.foundDecl(swift2Decl,
+        const clang::NamedDecl *recentClangDecl =
+            clangDecl->getMostRecentDecl();
+        auto tryImport = [&](ImportNameVersion nameVersion) -> bool {
+          // Check to see if the name and context match what we expect.
+          ImportedName newName = importFullName(recentClangDecl, nameVersion);
+          if (!newName.getDeclName().matchesRef(name))
+            return false;
+
+          const clang::DeclContext *clangDC =
+              newName.getEffectiveContext().getAsDeclContext();
+          if (!clangDC || !clangDC->isFileContext())
+            return false;
+
+          // Then try to import the decl under the alternate name.
+          auto alternateNamedDecl =
+              cast_or_null<ValueDecl>(importDeclReal(recentClangDecl,
+                                                     nameVersion));
+          if (!alternateNamedDecl)
+            return false;
+          assert(alternateNamedDecl->getFullName().matchesRef(name) &&
+                 "importFullName behaved differently from importDecl");
+          if (alternateNamedDecl->getDeclContext()->isModuleScopeContext()) {
+            consumer.foundDecl(alternateNamedDecl,
                                DeclVisibilityKind::VisibleAtTopLevel);
+            return true;
           }
+          return false;
+        };
+
+        // Try importing previous versions of the decl first...
+        ImportNameVersion nameVersion = CurrentVersion;
+        while (!anyMatching && nameVersion != ImportNameVersion::Raw) {
+          --nameVersion;
+          anyMatching = tryImport(nameVersion);
+        }
+        // ...then move on to newer versions if none of the old versions
+        // matched.
+        nameVersion = CurrentVersion;
+        while (!anyMatching && nameVersion != ImportNameVersion::LAST_VERSION) {
+          ++nameVersion;
+          anyMatching = tryImport(nameVersion);
         }
       }
     }

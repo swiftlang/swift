@@ -135,8 +135,8 @@ _ = 1 as __PrivInt
 
 #if !IRGEN
 func testRawNames() {
-  let _ = Foo.__fooWithOneArg(0) // expected-error {{'__fooWithOneArg' is unavailable: use object construction 'Foo(__oneArg:)'}}
-  let _ = Foo.__foo // expected-error{{'__foo' is unavailable: use object construction 'Foo(__:)'}}
+  let _ = Foo.__fooWithOneArg(0) // expected-error {{'__fooWithOneArg' has been replaced by 'init(__oneArg:)'}}
+  let _ = Foo.__foo // expected-error{{'__foo' has been replaced by 'init(__:)'}}
 }
 #endif
 

@@ -50,7 +50,7 @@ func testNonInstanceTypeFactoryMethod(_ s: String) {
 }
 
 func testUseOfFactoryMethod(_ queen: Bee) {
-  _ = Hive.hiveWithQueen(queen) // expected-error{{'hiveWithQueen' is unavailable: use object construction 'Hive(queen:)'}}
+  _ = Hive.hiveWithQueen(queen) // expected-error{{'hiveWithQueen' has been replaced by 'init(queen:)'}} {{11-25=}} {{26-26=queen: }}
 }
 
 func testNonsplittableFactoryMethod() {
