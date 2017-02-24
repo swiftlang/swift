@@ -2137,8 +2137,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
       }
     } else {
       // Get the orphaned constraint.
-      assert(InactiveConstraints.size() == 1 && "supposed to be an orphan!");
-      orphaned = &InactiveConstraints.front();
+      orphaned = allOrphanedConstraints[component - firstOrphanedConstraint];
     }
     CG.setOrphanedConstraint(orphaned);
 
