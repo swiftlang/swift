@@ -213,6 +213,16 @@ extension String : Unicode {
     }
   }
 
+  // TODO: this properly
+  var unicodeScalars: LazyMapBidirectionalCollection<ValidUTF32View, UnicodeScalar> {
+    switch contents {
+    case .canonical(let str):
+      return str.utf32.lazy.map { UnicodeScalar($0)! }
+    default:
+      fatalError("TODO")
+    }
+  }
+
   typealias ExtendedASCII = SwiftCanonicalString.ExtendedASCII
   var extendedASCII: ExtendedASCII {
     switch contents {
@@ -224,6 +234,7 @@ extension String : Unicode {
   }
 
   typealias Characters = SwiftCanonicalString.Characters
+  // TODO: deprecate now String is a collection of Characters
   var characters: Characters {
     switch contents {
     case .canonical(let str):
@@ -404,7 +415,8 @@ extension String : _ExpressibleByBuiltinStringLiteral {
         encodedWith: UTF8.self
       ))
     } else {
-      // TODO: does this ever happen today? Need to consider where to insert compiler-native Latin1 support
+      // TODO: Does this ever happen today? 
+      //       Need to consider where to insert compiler-native Latin1 support
       fatalError("Non-ASCII proto-string _ExpressibleByBuiltinStringLiteral")
       // Swift 3 string code:
   //     self = String._fromWellFormedCodeUnitSequence(
@@ -423,3 +435,25 @@ extension String : ExpressibleByStringLiteral {
     // self = value
   }
 }
+
+extension String : CustomStringConvertible {
+  // TODO: once this replaces Swift.String this needs to revert
+  // back to the trivial implementation of returnning self
+  public var description: Swift.String {
+    return Swift.String(self)
+  }
+}
+
+extension String : CustomDebugStringConvertible {
+  public var debugDescription: Swift.String {
+    var result = "\""
+    for us in self.unicodeScalars {
+      result += us.escaped(asASCII: false)
+    }
+    result += "\""
+    return result
+  }
+}
+
+
+

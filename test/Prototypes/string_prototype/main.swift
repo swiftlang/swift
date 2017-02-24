@@ -197,8 +197,24 @@ testSuite.test("literals") {
   let unicode: String = "abcdef🦊"
   expectEqual(unicode.characters.count,7)
   expectTrue(unicode.characters.elementsEqual(("abcdef🦊" as Swift.String).characters))
+
+  // TODO: Fix Character so it can handle this kind of grapheme fully
+  // let couple: String = "12👩‍❤️‍👩"
+  // print(couple)
+  // print(couple.count)
+  // fatalError()
+  
 }
 
+testSuite.test("printing") {
+  let s: String = "a \"string\" with \"quotes\""
+  expectEqual(s.description, "a \"string\" with \"quotes\"")
+  expectEqual(s.debugDescription, "a \"string\" with \"quotes\"".debugDescription)
+}
+
+testSuite.text("character") {
+  
+}
 
 // Test that all trivially-decodable code units are in fact trivially-
 // decodable.
