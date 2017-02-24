@@ -547,6 +547,10 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
       (ModuleName == STDLIB_NAME || ModuleName == SWIFT_ONONE_SUPPORT))
     return false;
 
+  // Do not inline into thunks.
+  if (AI.getFunction()->isThunk())
+    return false;
+
   // Always inline generic functions which are marked as
   // AlwaysInline or transparent.
   if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent())
