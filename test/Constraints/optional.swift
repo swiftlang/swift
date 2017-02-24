@@ -178,3 +178,21 @@ func testAnyObjectImplicitForce(lhs: AnyObject?!, rhs: AnyObject?) {
 
   takeAnyObjects(lhs, rhs)
 }
+
+// SR-4056
+protocol P1 { }
+
+class C1: P1 { }
+
+protocol P2 {
+    var prop: C1? { get }
+}
+
+class C2 {
+    var p1: P1?
+    var p2: P2?
+
+    var computed: P1? {
+        return p1 ?? p2?.prop
+    }
+}
