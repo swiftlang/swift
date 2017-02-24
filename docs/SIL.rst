@@ -3867,7 +3867,7 @@ container referenced by ``%0``. The protocol conformances associated
 with this existential container are associated directly with the
 archetype ``$*@opened P``. This pointer can be used with any operation
 on archetypes, such as ``witness_method`` assuming this operation obeys the
-access contraint: The returned address can either allow ``mutable_access`` or
+access constraint: The returned address can either allow ``mutable_access`` or
 ``immutable_access``. Users of the returned address may only consume
 (e.g ``destroy_addr`` or ``copy_addr [take]``) or mutate the value at the
 address if they have ``mutable_access``.

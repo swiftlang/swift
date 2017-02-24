@@ -51,7 +51,7 @@ func requirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, T.C == T.B.X {}
 func concreteRequirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, S<T.C> == T.B.X {}
 
 
-// Incompatable concrete typealias types are flagged as such
+// Incompatible concrete typealias types are flagged as such
 protocol P3 {
     typealias T = Int // expected-error{{typealias 'T' requires types 'Int' and 'Float' to be the same}}
 }
