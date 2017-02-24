@@ -1124,7 +1124,7 @@ iteration variable `inout`:
 ```
 
 The sequence operand must be a storage reference expression.
-The storage will be accessed for the duraton of the loop,
+The storage will be accessed for the duration of the loop,
 which (as above) will prevent any other overlapping accesses
 to the collection.  (But this rule does not apply if the
 collection type defines the operation as a non-mutating

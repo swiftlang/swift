@@ -251,7 +251,7 @@ namespace {
 
     bool claimError() {
       auto Ret = CanUseError;
-      assert(CanUseError && "Mulitple error parameters?!");
+      assert(CanUseError && "Multiple error parameters?!");
       CanUseError = false;
       return Ret;
     }
@@ -2450,7 +2450,7 @@ Explosion NativeConventionSchema::mapFromNative(IRGenModule &IGM,
                                          ? coercionTy
                                          : overlappedCoercionTy;
 
-  // Allocate a temporary for the coersion.
+  // Allocate a temporary for the coercion.
   Address temporary;
   Size tempSize;
   std::tie(temporary, tempSize) = allocateForCoercion(
@@ -2580,7 +2580,7 @@ Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
                                          ? coercionTy
                                          : overlappedCoercionTy;
 
-  // Allocate a temporary for the coersion.
+  // Allocate a temporary for the coercion.
   Address temporary;
   Size tempSize;
   std::tie(temporary, tempSize) = allocateForCoercion(
@@ -2647,7 +2647,7 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result,
     return;
   }
 
-  // In the native case no coersion is needed.
+  // In the native case no coercion is needed.
   if (isSwiftCCReturn) {
     auto &nativeSchema =
         IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGM);

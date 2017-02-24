@@ -267,7 +267,7 @@ public:
   /// fallthrough statement.
   RC<TokenSyntax> getFallthroughKeyword() const;
 
-  /// Return a new FallthroughtStmtSyntax with the given fallthrough
+  /// Return a new FallthroughStmtSyntax with the given fallthrough
   /// keyword.
   FallthroughStmtSyntax
   withFallthroughKeyword(RC<TokenSyntax> NewFallthroughKeyword) const;

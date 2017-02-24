@@ -122,7 +122,7 @@ enum class TriviaKind {
   Backtick,
 };
 
-/// A contiguous stretch of a single kind of trivia. The constiuent part of
+/// A contiguous stretch of a single kind of trivia. The constituent part of
 /// a `Trivia` collection.
 ///
 /// For example, four spaces would be represented by

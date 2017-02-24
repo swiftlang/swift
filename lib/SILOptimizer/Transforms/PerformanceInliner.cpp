@@ -179,7 +179,7 @@ static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
   SILFunction *Callee = AI.getReferencedFunction();
   auto Subs = AI.getSubstitutions();
 
-  // Bail if there are no open existnetials in the list of substitutions.
+  // Bail if there are no open existentials in the list of substitutions.
   bool HasNoOpenedExistentials = true;
   for (auto Sub : Subs) {
     if (Sub.getReplacement()->hasOpenedExistential()) {
@@ -303,7 +303,7 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
     return nullptr;
   }
 
-  // IRGen cannot handle partial_applies containing opened_extistentials
+  // IRGen cannot handle partial_applies containing opened_existentials
   // in its substitutions list.
   if (calleeHasPartialApplyWithOpenedExistentials(AI)) {
     return nullptr;
