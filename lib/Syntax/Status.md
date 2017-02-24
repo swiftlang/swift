@@ -72,6 +72,16 @@ Include the following in each entry:
 - octal-literal
   - `IntegerLiteralExprSyntax`
 
+- function-call-argument
+  - `FunctionCallArgumentSyntax`
+
+- function-call-argument-list
+  - `FunctionCallArgumentListSyntax`
+
+- function-call-expression
+- function-call-argument-clause
+  - `FunctionCallExprSyntax`
+
 ### Types
 
 - type
@@ -239,10 +249,6 @@ Include the following in each entry:
 - for-in-statement
 - forced-value-expression
 - function-body
-- function-call-argument
-- function-call-argument-clause
-- function-call-argument-list
-- function-call-expression
 - function-declaration
 - function-result
 - function-signature
