@@ -27,6 +27,7 @@
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/ManglingMacros.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Basic/Demangler.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
@@ -1118,7 +1119,7 @@ static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
     if (!isSwiftPrefixed(MangledName))
       return std::string(); // Not a mangled name
 
-    std::string Result = swift::demangle_wrappers::demangleSymbolAsString(
+    std::string Result = swift::Demangle::demangleSymbolAsString(
         MangledName, DemangleOptions);
 
     if (Result == MangledName)
