@@ -608,10 +608,18 @@ class BuildScriptInvocation(object):
         # Compute any product specific cmake arguments.
         for product_class in self.compute_product_classes():
             product_name = product_class.product_name()
+            product_source_name = product_class.product_source_name()
+            source_dir = self.workspace.source_dir(product_source_name)
+
+            if not os.path.exists(source_dir):
+                diagnostics.fatal(
+                    "can't find source directory for %s "
+                    "(tried %s)" % (product_name, source_dir))
+
             product = product_class(
                 args=args,
                 toolchain=self.toolchain,
-                source_dir=self.workspace.source_dir(product_name),
+                source_dir=source_dir,
                 # FIXME: This is incorrect since it always assumes the host
                 # target I think?
                 build_dir=self.workspace.build_dir(
