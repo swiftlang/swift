@@ -879,8 +879,14 @@ namespace {
             rawPointerTy, ValueOwnershipKind::Trivial);
 
         // Cast the callback to the correct polymorphic function type.
+        SILFunctionTypeRepresentation rep;
+        if (isa<ProtocolDecl>(decl->getDeclContext()))
+          rep = SILFunctionTypeRepresentation::WitnessMethod;
+        else
+          rep = SILFunctionTypeRepresentation::Method;
+
         auto origCallbackFnType = gen.SGM.Types.getMaterializeForSetCallbackType(
-            decl, materialized.genericSig, materialized.origSelfType);
+          decl, materialized.genericSig, materialized.origSelfType, rep);
         auto origCallbackType = SILType::getPrimitiveObjectType(origCallbackFnType);
         callback = gen.B.createPointerToThinFunction(loc, callback, origCallbackType);
 
