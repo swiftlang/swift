@@ -60,6 +60,10 @@ decomposeInheritedClauseDecl(
         }
       }
     }
+
+    if (!isa<EnumDecl>(typeDecl)) {
+      options |= TR_NonEnumInheritanceClauseOuterLayer;
+    }
   } else {
     auto ext = decl.get<ExtensionDecl *>();
     inheritanceClause = ext->getInherited();
