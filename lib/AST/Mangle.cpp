@@ -181,7 +181,7 @@ namespace {
       return visit(P->getSubPattern());
     }
     VarDecl *visitAnyPattern(AnyPattern *P) {
-      return nullptr;
+      return P->getSingleVar();
     }
 
     // Refutable patterns shouldn't ever come up.
