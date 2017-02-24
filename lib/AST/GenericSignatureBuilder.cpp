@@ -40,6 +40,8 @@ using llvm::DenseMap;
 
 namespace {
   typedef GenericSignatureBuilder::PotentialArchetype PotentialArchetype;
+  typedef GenericSignatureBuilder::EquivalenceClass EquivalenceClass;
+
 } // end anonymous namespace
 
 struct GenericSignatureBuilder::Implementation {
@@ -440,6 +442,8 @@ GenericSignatureBuilder::PotentialArchetype::~PotentialArchetype() {
         delete pa;
     }
   }
+
+  delete representativeOrEquivClass.dyn_cast<EquivalenceClass *>();
 }
 
 std::string GenericSignatureBuilder::PotentialArchetype::getDebugName() const {
@@ -508,7 +512,7 @@ PotentialArchetype::findAnyConcreteTypeSourceAsWritten() const {
   if (!rep->isConcreteType()) return nullptr;
 
   // Otherwise, go look for the source.
-  for (auto pa : rep->getEquivalenceClass()) {
+  for (auto pa : rep->getEquivalenceClassMembers()) {
     if (pa->ConcreteTypeSource &&
         pa->ConcreteTypeSource->getLoc().isValid())
       return pa->ConcreteTypeSource;
@@ -585,7 +589,8 @@ public:
 
   static ResolvedType forNewTypeAlias(PotentialArchetype *pa) {
     assert(pa->getParent() && pa->getTypeAliasDecl() &&
-           pa->ConcreteType.isNull() && pa->getEquivalenceClass().size() == 1 &&
+           pa->ConcreteType.isNull() &&
+           pa->getEquivalenceClassMembers().size() == 1 &&
            "not a new typealias");
     return ResolvedType(pa);
   }
@@ -702,22 +707,44 @@ bool GenericSignatureBuilder::PotentialArchetype::addConformance(
   return true;
 }
 
-auto GenericSignatureBuilder::PotentialArchetype::getRepresentative() const
-                                             -> PotentialArchetype *{
+auto PotentialArchetype::getOrCreateEquivalenceClass() const -> EquivalenceClass * {
+  // The equivalence class is stored on the representative.
+  auto representative = getRepresentative();
+  if (representative != this)
+    return representative->getOrCreateEquivalenceClass();
+
+  // If we already have an equivalence class, return it.
+  if (auto equivClass = getEquivalenceClassIfPresent())
+    return equivClass;
+
+  // Create a new equivalence class.
+  auto equivClass =
+    new EquivalenceClass(const_cast<PotentialArchetype *>(this));
+  representativeOrEquivClass = equivClass;
+  return equivClass;
+}
+
+auto PotentialArchetype::getRepresentative() const -> PotentialArchetype * {
+  auto representative =
+    representativeOrEquivClass.dyn_cast<PotentialArchetype *>();
+  if (!representative)
+    return const_cast<PotentialArchetype *>(this);
+
   // Find the representative.
-  PotentialArchetype *Result = Representative;
-  while (Result != Result->Representative)
-    Result = Result->Representative;
+  PotentialArchetype *result = representative;
+  while (auto nextRepresentative =
+           result->representativeOrEquivClass.dyn_cast<PotentialArchetype *>())
+    result = nextRepresentative;
 
   // Perform (full) path compression.
-  const PotentialArchetype *FixUp = this;
-  while (FixUp != FixUp->Representative) {
-    const PotentialArchetype *Next = FixUp->Representative;
-    FixUp->Representative = Result;
-    FixUp = Next;
+  const PotentialArchetype *fixUp = this;
+  while (auto nextRepresentative =
+           fixUp->representativeOrEquivClass.dyn_cast<PotentialArchetype *>()) {
+    fixUp->representativeOrEquivClass = nextRepresentative;
+    fixUp = nextRepresentative;
   }
 
-  return Result;
+  return result;
 }
 
 /// Canonical ordering for dependent types in generic signatures.
@@ -848,14 +875,14 @@ auto GenericSignatureBuilder::PotentialArchetype::getArchetypeAnchor(
   // Find the best archetype within this equivalence class.
   PotentialArchetype *rep = getRepresentative();
   auto anchor = rep;
-  for (auto pa : rep->getEquivalenceClass()) {
+  for (auto pa : rep->getEquivalenceClassMembers()) {
     if (compareDependentTypes(&pa, &anchor) < 0)
       anchor = pa;
   }
 
 #ifndef NDEBUG
   // Make sure that we did, in fact, get one that is better than all others.
-  for (auto pa : anchor->getEquivalenceClass()) {
+  for (auto pa : anchor->getEquivalenceClassMembers()) {
     assert((pa == anchor || compareDependentTypes(&anchor, &pa) < 0) &&
            compareDependentTypes(&pa, &anchor) >= 0 &&
            "archetype anchor isn't a total order");
@@ -1038,7 +1065,7 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
   // We know something concrete about the parent PA, so we need to propagate
   // that information to this new archetype.
   if (isConcreteType()) {
-    for (auto equivT : rep->EquivalenceClass) {
+    for (auto equivT : rep->getEquivalenceClassMembers()) {
       concretizeNestedTypeFromConcreteParent(
           equivT, sameNestedTypeSource, nestedPA, builder,
           [&](ProtocolDecl *proto) -> ProtocolConformanceRef {
@@ -1346,14 +1373,14 @@ void GenericSignatureBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
     }
   }
 
-  if (Representative != this) {
+  if (getRepresentative() != this) {
     Out << " [represented by " << getRepresentative()->getDebugName() << "]";
   }
 
-  if (EquivalenceClass.size() > 1) {
+  if (getEquivalenceClassMembers().size() > 1) {
     Out << " [equivalence class ";
     bool isFirst = true;
-    for (auto equiv : EquivalenceClass) {
+    for (auto equiv : getEquivalenceClassMembers()) {
       if (equiv == this) continue;
 
       if (isFirst) isFirst = false;
@@ -1372,6 +1399,11 @@ void GenericSignatureBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
       nested->dump(Out, SrcMgr, Indent + 2);
     }
   }
+}
+
+#pragma mark Equivalence classes
+EquivalenceClass::EquivalenceClass(PotentialArchetype *representative) {
+  members.push_back(representative);
 }
 
 GenericSignatureBuilder::GenericSignatureBuilder(
@@ -1443,7 +1475,7 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
 
   // We're assuming that an equivalence class with a type alias representative
   // doesn't have a "true" (i.e. associated type) potential archetype.
-  assert(llvm::all_of(rep->getEquivalenceClass(),
+  assert(llvm::all_of(rep->getEquivalenceClassMembers(),
                       [&](PotentialArchetype *pa) {
                         return pa->getParent() && pa->getTypeAliasDecl();
                       }) &&
@@ -1826,10 +1858,20 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   if (T1->getParent() == nullptr)
     updateExistingSource = false;
 
+  // Merge the equivalence classes.
+  auto equivClass = T1->getOrCreateEquivalenceClass();
+  auto equivClass2Members = T2->getEquivalenceClassMembers();
+  for (auto equiv : equivClass2Members)
+    equivClass->members.push_back(equiv);
+
+  // Grab the old equivalence class, if present. We'll delete it at the end.
+  auto equivClass2 = T2->getEquivalenceClassIfPresent();
+  SWIFT_DEFER {
+    delete equivClass2;
+  };
+
   // Make T1 the representative of T2, merging the equivalence classes.
-  T2->Representative = T1;
-  for (auto equiv : T2->EquivalenceClass)
-    T1->EquivalenceClass.push_back(equiv);
+  T2->representativeOrEquivClass = T1;
 
   // Superclass requirements.
   if (T2->Superclass) {
@@ -1845,7 +1887,7 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
 
   // Recursively merge the associated types of T2 into T1.
   auto sameNestedTypeSource = RequirementSource::forNestedTypeNameMatch(*this);
-  for (auto equivT2 : T2->EquivalenceClass) {
+  for (auto equivT2 : equivClass2Members) {
     for (auto T2Nested : equivT2->NestedTypes) {
       auto T1Nested = T1->getNestedType(T2Nested.first, *this);
       if (addSameTypeRequirement(T1Nested, T2Nested.second.front(),
@@ -1971,7 +2013,7 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
 
   // Eagerly resolve any existing nested types to their concrete forms (others
   // will be "concretized" as they are constructed, in getNestedType).
-  for (auto equivT : rep->EquivalenceClass) {
+  for (auto equivT : rep->getEquivalenceClassMembers()) {
     for (auto nested : equivT->getNestedTypes()) {
       concretizeNestedTypeFromConcreteParent(
           equivT, Source, nested.second.front(), *this,
@@ -2576,7 +2618,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
 
       // Don't allow two generic parameters to be equivalent, because then we
       // don't actually have two parameters.
-      for (auto other : rep->getEquivalenceClass()) {
+      for (auto other : rep->getEquivalenceClassMembers()) {
         // If it isn't a generic parameter, skip it.
         if (other == pa || other->getParent() != nullptr) continue;
 
@@ -2694,7 +2736,7 @@ void GenericSignatureBuilder::checkRedundantConcreteTypeConstraints(
 
   // Gather the concrete constraints within this equivalence class.
   SmallVector<ConcreteConstraint, 4> concreteConstraints;
-  for (auto pa : representative->getEquivalenceClass()) {
+  for (auto pa : representative->getEquivalenceClassMembers()) {
     auto source = pa->getConcreteTypeSourceAsWritten();
     if (!source) continue;
 
@@ -2901,7 +2943,7 @@ static SmallVector<SameTypeComponent, 2> getSameTypeComponents(
                                                      PotentialArchetype *rep) {
   SmallPtrSet<PotentialArchetype *, 8> visited;
   SmallVector<SameTypeComponent, 2> components;
-  for (auto pa : rep->getEquivalenceClass()) {
+  for (auto pa : rep->getEquivalenceClassMembers()) {
     // If we've already seen this potential archetype, there's nothing else to
     // do.
     if (visited.count(pa) != 0) continue;
