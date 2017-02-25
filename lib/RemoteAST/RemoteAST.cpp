@@ -123,7 +123,8 @@ public:
   }
 
   NominalTypeDecl *createNominalTypeDecl(StringRef mangledName) {
-    auto node = Demangle::demangleTypeAsNode(mangledName);
+    Demangle::Demangler Dem;
+    Demangle::NodePointer node = Dem.demangleType(mangledName);
     if (!node) return nullptr;
 
     return createNominalTypeDecl(node);

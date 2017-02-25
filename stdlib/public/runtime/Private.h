@@ -170,7 +170,8 @@ namespace swift {
   const Metadata *
   _searchConformancesByMangledTypeName(const llvm::StringRef typeName);
 
-  Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type);
+  Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type,
+                                                      Demangle::Demangler &Dem);
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when
