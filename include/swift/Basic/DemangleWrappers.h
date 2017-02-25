@@ -34,7 +34,7 @@ class NodeDumper {
   NodePointer Root;
 
 public:
-  NodeDumper(NodePointer Root): Root(std::move(Root)) {}
+  NodeDumper(NodePointer Root): Root(Root) {}
   void dump() const;
   void print(llvm::raw_ostream &Out) const;
 };

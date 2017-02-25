@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/MathExtras.h"
-#include "swift/Basic/Demangle.h"
+#include "swift/Basic/Demangler.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Lazy.h"
@@ -1446,16 +1446,14 @@ static inline ClassROData *getROData(ClassMetadata *theClass) {
 
 static void _swift_initGenericClassObjCName(ClassMetadata *theClass) {
   // Use the remangler to generate a mangled name from the type metadata.
-  auto demangling = _swift_buildDemanglingForMetadata(theClass);
+  Demangle::Demangler Dem;
+  auto demangling = _swift_buildDemanglingForMetadata(theClass, Dem);
 
   // Remangle that into a new type mangling string.
-  auto typeNode
-    = Demangle::NodeFactory::create(Demangle::Node::Kind::TypeMangling);
-  typeNode->addChild(demangling);
-  auto globalNode
-    = Demangle::NodeFactory::create(Demangle::Node::Kind::Global);
-  globalNode->addChild(typeNode);
-
+  auto typeNode = Dem.createNode(Demangle::Node::Kind::TypeMangling);
+  typeNode->addChild(demangling, Dem);
+  auto globalNode = Dem.createNode(Demangle::Node::Kind::Global);
+  globalNode->addChild(typeNode, Dem);
 
   auto string = Demangle::mangleNode(globalNode);
 
