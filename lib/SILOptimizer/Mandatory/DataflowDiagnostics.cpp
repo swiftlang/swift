@@ -79,23 +79,26 @@ removedHandledEnumElements(Pattern *P,
 static void diagnoseMissingCases(ASTContext &Context,
                                  const SwitchStmt *SwitchS) {
   SourceLoc EndLoc = SwitchS->getEndLoc();
-  StringRef PlaceHolder = "<#Code#>";
+  StringRef Placeholder = "<#Code#>";
   SmallString<32> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
 
   auto DefaultDiag = [&]() {
-    OS << tok::kw_default << ": " << PlaceHolder << "\n";
+    OS << tok::kw_default << ": " << Placeholder << "\n";
     Context.Diags.diagnose(EndLoc, diag::non_exhaustive_switch).
       fixItInsert(EndLoc, Buffer.str());
   };
   // To find the subject enum decl for this switch statement.
   EnumDecl *SubjectED = nullptr;
   if (auto SubjectTy = SwitchS->getSubjectExpr()->getType()) {
-    SubjectED = SubjectTy->getAnyNominal()->getAsEnumOrEnumExtensionContext();
+    if (auto *ND = SubjectTy->getAnyNominal()) {
+      SubjectED = ND->getAsEnumOrEnumExtensionContext();
+    }
   }
 
-  // The switch is not about an enum decl, add "default:" instead.
-  if (!SubjectED) {
+  // The switch is not about an enum decl or about an Optional decl,
+  // add "default:" instead.
+  if (!SubjectED || SubjectED == Context.getOptionalDecl()) {
     DefaultDiag();
     return;
   }
@@ -129,7 +132,7 @@ static void diagnoseMissingCases(ASTContext &Context,
   std::for_each(SortedElements.begin(), SortedElements.end(),
                 [&](EnumElementDecl *EE) {
     OS << tok::kw_case << " ." << EE->getNameStr() << ": " <<
-      PlaceHolder << "\n";
+      Placeholder << "\n";
   });
   Context.Diags.diagnose(EndLoc, diag::non_exhaustive_switch).
     fixItInsert(EndLoc, Buffer.str());
