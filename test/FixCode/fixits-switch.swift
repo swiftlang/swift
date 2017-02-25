@@ -55,3 +55,11 @@ func foo6(_ e : E2) -> Int {
     return x + y
   }
 }
+
+func foo7(_ e : E2) -> Int {
+  switch e {
+  case .e2(1): return 0
+  case .e1: return 0
+  case .e3: return 0
+  }
+}

@@ -98,7 +98,7 @@ static void diagnoseMissingCases(ASTContext &Context,
 
   // The switch is not about an enum decl or about an Optional decl,
   // add "default:" instead.
-  if (!SubjectED || SubjectED == Context.getOptionalDecl()) {
+  if (!SubjectED) {
     DefaultDiag();
     return;
   }
@@ -117,7 +117,12 @@ static void diagnoseMissingCases(ASTContext &Context,
     }
   }
 
-  assert(!UnhandledElements.empty());
+  // No unhandled cases, so we are not sure the exact case to add, fall back to
+  // default instead.
+  if (UnhandledElements.empty()) {
+    DefaultDiag();
+    return;
+  }
 
   // Sort the missing elements to a vector because set does not guarantee orders.
   SmallVector<EnumElementDecl*, 4> SortedElements;
