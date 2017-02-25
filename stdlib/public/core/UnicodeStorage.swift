@@ -420,12 +420,23 @@ extension UnicodeStorage {
       // _debugLog("subscript: i=\(i)")
       let j = index(after: i)
       // _debugLog("subscript: j=\(j)")
-      let scalars = UnicodeStorage<CodeUnits.SubSequence, Encoding>(
-        storage.codeUnits[i..<j], Encoding.self
-      ).scalars
-      // _debugLog("scalars: \(Array(scalars))")
-      return Character(scalars.lazy.map { UnicodeScalar($0) })
-    }    
+      
+      let charSlice = storage.codeUnits[i..<j]
+      let utf8 = UnicodeStorage<CodeUnits.SubSequence,Encoding>.TranscodedView(
+        charSlice, from: Encoding.self, to: UTF8.self)
+        
+      if let small = Character(_smallUtf8: utf8) {
+        return small
+      }
+      else {
+        // FIXME: there is undoubtley a less ridiculous way to do this
+        let scalars = UnicodeStorage<CodeUnits.SubSequence, Encoding>(
+          charSlice, Encoding.self
+        ).scalars.lazy.map(UnicodeScalar.init)
+        let string = Swift.String(Swift.String.UnicodeScalarView(scalars))
+        return Character(_largeRepresentationString: string)
+      }
+    }     
 
     public func index(after i: Index) -> Index {
       // FIXME: there is always a grapheme break between two scalars that are both

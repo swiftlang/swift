@@ -196,14 +196,7 @@ testSuite.test("literals") {
   expectTrue(ascii.characters.elementsEqual(("abcdef" as Swift.String).characters))
   let unicode: String = "abcdef🦊"
   expectEqual(unicode.characters.count,7)
-  expectTrue(unicode.characters.elementsEqual(("abcdef🦊" as Swift.String).characters))
-
-  // TODO: Fix Character so it can handle this kind of grapheme fully
-  // let couple: String = "12👩‍❤️‍👩"
-  // print(couple)
-  // print(couple.count)
-  // fatalError()
-  
+  expectTrue(unicode.characters.elementsEqual(("abcdef🦊" as Swift.String).characters))  
 }
 
 testSuite.test("printing") {
@@ -212,8 +205,21 @@ testSuite.test("printing") {
   expectEqual(s.debugDescription, "a \"string\" with \"quotes\"".debugDescription)
 }
 
-testSuite.text("character") {
-  
+testSuite.test("character") {
+  let s1: String = "Héllo, 🌍!"
+  var s2: Swift.String = ""
+  for c in s1 {
+    s2.append(c)
+  }
+  // expectTrue(s1.elementsEqual(s2.characters))
+  expectEqual(s1.count, 9)
+
+  // emoji with skin tone should be 1 character (are 2 in Swift 3)
+  let skinTone: String = "✌🏾"
+  expectEqual(skinTone.count, 1)
+
+  let couple: String = "abc👩‍❤️‍👩def"
+  expectEqual(couple.count, 7)
 }
 
 // Test that all trivially-decodable code units are in fact trivially-

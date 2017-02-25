@@ -207,6 +207,25 @@ public struct Character :
       self = Character(_largeRepresentationString: s)
     }
   }
+  
+  // TODO: make one init responsible for both small and large
+  // TODO: this only handles 7-code-unit characters for now
+  internal init?<S: Sequence>(_smallUtf8: S) where S.Iterator.Element == UTF8.CodeUnit {
+    // TODO: would it be faster to get length via underestimatedCount,
+    //       even though that might take two transcoding passes?
+    //       (given anything with count > 1 would be non-ASCII by definition)
+    var u: UInt64 = ~0
+    var n: UInt64 = 0
+    var mask: UInt64 = 0xff
+    for u8 in _smallUtf8 {
+      guard n < 7 else { return nil }
+      u &= ~mask
+      u |= UInt64(u8) << (n * 8)
+      n += 1
+      mask <<= 8
+    }
+    _representation = .small(Builtin.trunc_Int64_Int63(u._value))
+  }
 
   /// Creates a Character from a String that is already known to require the
   /// large representation.
@@ -239,11 +258,6 @@ public struct Character :
   }
 
   internal struct _SmallUTF8 : RandomAccessCollection {
-    typealias Indices = CountableRange<Int>
-    
-    var indices: CountableRange<Int> {
-      return startIndex..<endIndex
-    }
 
     init(_ u8: UInt64) {
       let utf8Count = Character._smallSize(u8)
@@ -251,7 +265,7 @@ public struct Character :
       self.count = UInt16(utf8Count)
       self.data = u8
     }
-
+    
     /// The position of the first element in a non-empty collection.
     ///
     /// In an empty collection, `startIndex == endIndex`.
@@ -460,14 +474,14 @@ extension Character : Comparable {
 }
 
 extension Character {
-  public init<S: Sequence>(_ scalars: S) where S.Iterator.Element == UnicodeScalar {
-    // FIXME: Horribly inefficient, but the stuff to make it fast is private.
-    // FIXME: Also, constructing "👩‍❤️‍👩" is foiled by precondition checks
-    let string = String(String.UnicodeScalarView(scalars))
-    // TBD: failable initializer, precondition, or neither?
-    assert(string.characters.count == 1)
-    self = string.first!
-  } 
+  // public init<S: Sequence>(_ scalars: S) where S.Iterator.Element == UnicodeScalar {
+  //   // FIXME: Horribly inefficient, but the stuff to make it fast is private.
+  //   // FIXME: Also, constructing "👩‍❤️‍👩" is foiled by precondition checks
+  //   let string = String(String.UnicodeScalarView(scalars))
+  //   // TBD: failable initializer, precondition, or neither?
+  //   assert(string.characters.count == 1)
+  //   self = string.first!
+  // }
   
   // FIXME: Horribly inefficient, but the stuff to make it fast is private.
   // TBD: set or get-only?
