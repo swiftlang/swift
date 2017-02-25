@@ -1139,23 +1139,30 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
   // non-NSError superclass constraint. Casts to archetypes thus must always be
   // indirect.
   if (auto archetype = targetType->getAs<ArchetypeType>()) {
-    auto super = archetype->getSuperclass();
-    if (super.isNull())
-      return false;
-
     // Only ever permit this if the source type is a reference type.
     if (!objectType.isAnyClassReferenceType())
       return false;
+    
+    if (M.getASTContext().LangOpts.EnableObjCInterop) {
+      auto super = archetype->getSuperclass();
+      if (super.isNull())
+        return false;
 
-    // A base class constraint that isn't NSError rules out the archetype being
-    // bound to NSError.
-    if (auto nserror = M.Types.getNSErrorType())
-      return !super->isEqual(nserror);
-    // If NSError wasn't loaded, any base class constraint must not be NSError.
-    return true;
+      // A base class constraint that isn't NSError rules out the archetype being
+      // bound to NSError.
+        if (auto nserror = M.Types.getNSErrorType())
+          return !super->isEqual(nserror);
+      // If NSError wasn't loaded, any base class constraint must not be NSError.
+      return true;
+    } else {
+      // If ObjC bridging isn't enabled, we can do a scalar cast from any
+      // reference type to any class-constrained archetype.
+      return archetype->requiresClass();
+    }
   }
   
-  if (targetType == M.Types.getNSErrorType()) {
+  if (M.getASTContext().LangOpts.EnableObjCInterop
+      && targetType == M.Types.getNSErrorType()) {
     // If we statically know the source is an NSError subclass, then the cast
     // can go through the scalar path (and it's trivially true so can be
     // killed).

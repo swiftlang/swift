@@ -3365,16 +3365,18 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // We can conditionally cast from NSError to an Error-conforming
   // type.  This is handled in the runtime, so it doesn't need a special cast
   // kind.
-  if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
-    if (conformsToProtocol(toType, errorTypeProto, dc,
-                           (ConformanceCheckFlags::InExpression|
-                            ConformanceCheckFlags::Used)))
-      if (auto NSErrorTy = getNSErrorType(dc))
-        if (isSubtypeOf(fromType, NSErrorTy, dc)
-            // Don't mask "always true" warnings if NSError is cast to
-            // Error itself.
-            && !isSubtypeOf(fromType, toType, dc))
-          return CheckedCastKind::ValueCast;
+  if (Context.LangOpts.EnableObjCInterop) {
+    if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
+      if (conformsToProtocol(toType, errorTypeProto, dc,
+                             (ConformanceCheckFlags::InExpression|
+                              ConformanceCheckFlags::Used)))
+        if (auto NSErrorTy = getNSErrorType(dc))
+          if (isSubtypeOf(fromType, NSErrorTy, dc)
+              // Don't mask "always true" warnings if NSError is cast to
+              // Error itself.
+              && !isSubtypeOf(fromType, toType, dc))
+            return CheckedCastKind::ValueCast;
+    }
   }
 
   // The runtime doesn't support casts to CF types and always lets them succeed.

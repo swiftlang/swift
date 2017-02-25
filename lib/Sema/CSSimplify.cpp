@@ -3351,6 +3351,10 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
                                              Type type2,
                                              TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator) {
+  // There's no bridging without ObjC interop.
+  if (!TC.Context.LangOpts.EnableObjCInterop)
+    return SolutionKind::Error;
+  
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   /// Form an unresolved result.
