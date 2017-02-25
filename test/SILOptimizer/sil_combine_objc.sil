@@ -151,3 +151,39 @@ bb0(%0 : $C):
   return %4 : $Int
 }
 
+@objc(XX) protocol XX {
+}
+
+class XXImpl : XX {
+  @objc deinit
+  init()
+}
+
+// CHECK-LABEL: sil @remove_release_objc_metatype_to_object
+// CHECK-NOT: strong_release {{%[0-9]+}} : $AnyObject
+sil @remove_release_objc_metatype_to_object : $@convention(thin) () -> () {
+bb0:
+  %0 = metatype $@thick XXImpl.Type                // user: %1
+  %1 = thick_to_objc_metatype %0 : $@thick XXImpl.Type to $@objc_metatype XXImpl.Type // user: %2
+  %2 = objc_metatype_to_object %1 : $@objc_metatype XXImpl.Type to $AnyObject // users: %3, %4
+  debug_value %2 : $AnyObject  // id: %3
+  strong_release %2 : $AnyObject                  // id: %4
+  %5 = tuple ()                                   // user: %6
+  return %5 : $()                                 // id: %6
+}
+
+// CHECK-LABEL: sil @remove_release_objc_existential_metatype_to_object
+// CHECK-NOT: strong_release {{%[0-9]+}} : $AnyObject
+sil @remove_release_objc_existential_metatype_to_object: $@convention(thin) (@owned XX) -> () {
+bb0(%0 : $XX):
+  debug_value %0 : $XX                   // id: %1
+  %2 = existential_metatype $@thick XX.Type, %0 : $XX // user: %3
+  %3 = thick_to_objc_metatype %2 : $@thick XX.Type to $@objc_metatype XX.Type // user: %4
+  %4 = objc_existential_metatype_to_object %3 : $@objc_metatype XX.Type to $AnyObject // users: %5, %6
+  debug_value %4 : $AnyObject, let, name "obj1" // id: %5
+  strong_release %4 : $AnyObject                  // id: %6
+  strong_release %0 : $XX                         // id: %7
+  %8 = tuple ()                                   // user: %9
+  return %8 : $()                                 // id: %9
+}
+
