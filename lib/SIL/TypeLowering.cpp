@@ -1105,11 +1105,6 @@ namespace {
       llvm_unreachable("destroy address");
     }
 
-    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
-                           SILValue value) const override {
-      llvm_unreachable("destroy value");
-    }
-
     void emitCopyInto(SILBuilder &B, SILLocation loc,
                       SILValue src, SILValue dest, IsTake_t isTake,
                       IsInitialization_t isInit) const override {

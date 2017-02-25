@@ -1645,6 +1645,15 @@ SILCloner<ImplClass>::visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *
                                          getOpValue(Inst->getOperand())));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitDeinitExistentialOpaqueInst(
+    DeinitExistentialOpaqueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createDeinitExistentialOpaque(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitCopyBlockInst(CopyBlockInst *Inst) {

@@ -3743,6 +3743,7 @@ container may use one of several representations:
   
   * `init_existential_opaque`_
   * `open_existential_opaque`_
+  * `deinit_existential_opaque`_
 
 - **Class existential containers**: If a protocol type is constrained by one or
   more class protocols, then the existential container for that type is
@@ -3846,6 +3847,22 @@ Undoes the partial initialization performed by
 existential containers that have been partially initialized by
 ``init_existential_addr`` but haven't had their contained value initialized.
 A fully initialized existential must be destroyed with ``destroy_addr``.
+
+deinit_existential_opaque
+`````````````````````````
+::
+
+  sil-instruction ::= 'deinit_existential_opaque' sil-operand
+
+  deinit_existential_opaque %0 : $P
+  // %0 must be of a $P opaque type for non-class protocol or protocol
+  // composition type P
+
+Undoes the partial initialization performed by
+``init_existential_opaque``.  ``deinit_existential_opaque`` is only valid for
+existential containers that have been partially initialized by
+``init_existential_opaque`` but haven't had their contained value initialized.
+A fully initialized existential must be destroyed with ``destroy_value``.
 
 open_existential_addr
 `````````````````````

@@ -3724,6 +3724,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     ResultVal = B.createDeinitExistentialAddr(InstLoc, Val);
     break;
   }
+  case ValueKind::DeinitExistentialOpaqueInst: {
+    if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createDeinitExistentialOpaque(InstLoc, Val);
+    break;
+  }
   case ValueKind::InitExistentialAddrInst: {
     CanType Ty;
     SourceLoc TyLoc;
