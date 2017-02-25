@@ -2500,10 +2500,6 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
     Status.setIsParseError();
   }
 
-  // Reject an empty 'switch'.
-  if (!DiagnosedNotCoveredStmt && cases.empty())
-    diagnose(rBraceLoc, diag::empty_switch_stmt);
-
   return makeParserResult(
       Status, SwitchStmt::create(LabelInfo, SwitchLoc, SubjectExpr.get(),
                                  lBraceLoc, cases, rBraceLoc, Context));
