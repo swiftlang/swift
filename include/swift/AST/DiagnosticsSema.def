@@ -2689,6 +2689,8 @@ ERROR(trailing_closure_requires_parens,none,
       "trailing closure requires parentheses for disambiguation in this"
       " context", ())
 
+ERROR(empty_switch_stmt,none,
+"'switch' statement body must have at least one 'case' or 'default' block",())
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------
