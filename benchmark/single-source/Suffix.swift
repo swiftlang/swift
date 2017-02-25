@@ -69,3 +69,17 @@ public func run_SuffixAnySequence(_ N: Int) {
   }
 }
 
+@inline(never)
+public func run_SuffixArray(_ N: Int) {
+  let s = Array(0 ..< sequenceCount)
+  for _ in 1...20*N {
+    for _ in 1...reps {
+      var result = 0
+      for element in s.suffix(suffixCount) {
+        result += element
+      }
+      CheckResults(result == sumCount, 
+        "IncorrectResults in SuffixArray: \(result) != \(sumCount)")
+    }
+  }
+}
