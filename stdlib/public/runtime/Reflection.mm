@@ -233,6 +233,8 @@ const char *swift_OpaqueSummary(const Metadata *T) {
     case MetadataKind::ErrorObject:
       return "(ErrorType Object)";
   }
+
+  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
