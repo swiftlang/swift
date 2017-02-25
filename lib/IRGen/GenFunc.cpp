@@ -555,6 +555,7 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
       
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::Method:
+  case SILFunctionType::Representation::WitnessMethod:
   case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::CFunctionPointer:
   case SILFunctionType::Representation::Closure:
@@ -575,19 +576,6 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
                                 IGM.getPointerAlignment(),
                                 std::move(spareBits),
                                 IsNotPOD);
-  }
-  // Witness method values carry a reference to their originating witness table
-  // as context.
-  case SILFunctionType::Representation::WitnessMethod: {
-    SpareBitVector spareBits;
-    spareBits.append(IGM.getFunctionPointerSpareBits());
-    spareBits.append(IGM.getWitnessTablePtrSpareBits());
-    return FuncTypeInfo::create(CanSILFunctionType(T),
-                                IGM.WitnessFunctionPairTy,
-                                IGM.getPointerSize() * 2,
-                                IGM.getPointerAlignment(),
-                                std::move(spareBits),
-                                IsPOD);
   }
   }
   llvm_unreachable("bad function type representation");

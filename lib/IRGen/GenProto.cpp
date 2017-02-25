@@ -2747,7 +2747,6 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   
   // Build the value.
   out.add(witness);
-  out.add(wtable);
 }
 
 llvm::FunctionType *IRGenModule::getAssociatedTypeMetadataAccessFunctionTy() {

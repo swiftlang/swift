@@ -36,11 +36,9 @@ entry(%x : $() -> ()):
   return %x : $() -> ()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, i8** } @thin_witness_value(i8*, i8**) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @thin_witness_value(i8*) {{.*}} {
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[T0:%.*]] = insertvalue { i8*, i8** } undef, i8* %0, 0
-// CHECK-NEXT:    [[T1:%.*]] = insertvalue { i8*, i8** } [[T0]], i8** %1, 1
-// CHECK-NEXT:    ret { i8*, i8** } [[T1]]
+// CHECK-NEXT:    ret i8* %0
 // CHECK-NEXT:  }
 sil @thin_witness_value : $@convention(thin) (@convention(witness_method) () -> ()) -> @convention(witness_method) () -> () {
 entry(%x : $@convention(witness_method) () -> ()):
