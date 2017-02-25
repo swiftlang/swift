@@ -130,7 +130,7 @@ void GenericTypeToArchetypeResolver::recordParamType(ParamDecl *decl, Type type)
 
 Type ProtocolRequirementTypeResolver::resolveGenericTypeParamType(
     GenericTypeParamType *gp) {
-  assert(gp->getDepth() == 0 && gp->getIndex() == 0 &&
+  assert(gp->isEqual(Proto->getSelfInterfaceType()) &&
          "found non-Self-shaped GTPT when resolving protocol requirement");
   return gp;
 }
@@ -143,6 +143,7 @@ Type ProtocolRequirementTypeResolver::resolveDependentMemberType(
 
 Type ProtocolRequirementTypeResolver::resolveSelfAssociatedType(
     Type selfTy, AssociatedTypeDecl *assocType) {
+  assert(selfTy->isEqual(Proto->getSelfInterfaceType()));
   return assocType->getDeclaredInterfaceType();
 }
 

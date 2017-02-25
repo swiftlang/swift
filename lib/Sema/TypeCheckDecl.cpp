@@ -4348,7 +4348,7 @@ public:
           if (auto whereClause = assocType->getTrailingWhereClause()) {
             DeclContext *lookupDC = assocType->getDeclContext();
 
-            ProtocolRequirementTypeResolver resolver;
+            ProtocolRequirementTypeResolver resolver(PD);
             TypeResolutionOptions options;
 
             for (auto &req : whereClause->getRequirements()) {

@@ -166,8 +166,11 @@ public:
 /// This should only be used when resolving/validating where clauses in
 /// protocols.
 class ProtocolRequirementTypeResolver : public GenericTypeResolver {
+  ProtocolDecl *Proto;
+
 public:
-  explicit ProtocolRequirementTypeResolver() {}
+  explicit ProtocolRequirementTypeResolver(ProtocolDecl *proto)
+      : Proto(proto) {}
 
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
