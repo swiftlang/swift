@@ -1271,15 +1271,6 @@ public:
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
   ParserResult<CaseStmt> parseStmtCase();
 
-  /// Classify the condition of an #if directive according to whether it can
-  /// be evaluated statically.  The first member of the pair indicates whether
-  /// parsing of the condition body should occur, the second contains the result
-  /// of evaluating the conditional expression.
-  static ConditionalCompilationExprState
-  classifyConditionalCompilationExpr(Expr *condition,
-                                     ASTContext &context,
-                                     DiagnosticEngine &diags);
-
   //===--------------------------------------------------------------------===//
   // Generics Parsing
 

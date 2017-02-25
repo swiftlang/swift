@@ -1042,12 +1042,16 @@ namespace {
       for (auto &Clause : ICD->getClauses()) {
         if (Clause.Cond) {
           PrintWithColorRAII(OS, ParenthesisColor) << '(';
-          OS << "#if:\n";
+          OS << "#if:";
+          if (Clause.isActive) OS << " active";
+          OS << "\n";
           printRec(Clause.Cond);
         } else {
           OS << '\n';
           PrintWithColorRAII(OS, ParenthesisColor) << '(';
-          OS << "#else:\n";
+          OS << "#else:";
+          if (Clause.isActive) OS << " active";
+          OS << "\n";
         }
 
         for (auto D : Clause.Elements) {
@@ -1416,10 +1420,15 @@ public:
       OS.indent(Indent);
       if (Clause.Cond) {
         PrintWithColorRAII(OS, ParenthesisColor) << '(';
-        PrintWithColorRAII(OS, StmtColor) << "#if:\n";
+        PrintWithColorRAII(OS, StmtColor) << "#if:";
+        if (Clause.isActive)
+          PrintWithColorRAII(OS, DeclModifierColor) << " active";
+        OS << '\n';
         printRec(Clause.Cond);
       } else {
         PrintWithColorRAII(OS, StmtColor) << "#else";
+        if (Clause.isActive)
+          PrintWithColorRAII(OS, DeclModifierColor) << " active";
       }
 
       OS << '\n';

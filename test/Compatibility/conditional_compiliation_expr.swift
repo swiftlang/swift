@@ -21,6 +21,7 @@ undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'
 
 // ---------------------------------------------------------------------------
 // SR-3663: The precedence and associativity of '||' and '&&'.
+// See test/Parse/ConditionalCompilation/sequence.swift for Swift 4 behavior.
 
 #if false || true && false
 undefinedIf() // expected-error {{use of unresolved identifier 'undefinedIf'}}
@@ -40,13 +41,15 @@ undefinedIf() // expected-error {{use of unresolved identifier 'undefinedIf'}}
 undefinedElse()
 #endif
 
-// Accepted in Swift3.
+// Accepted in Swift3. *source breaking*
 #if false || true && try! Swift
-undefinedIf() // expected-error {{use of unresolved identifier 'undefinedIf'}} 
+// expected-error @-1 {{invalid conditional compilation expression}}
+undefinedIf()
 #endif
 
 // ---------------------------------------------------------------------------
 // SR-4032: "skip parsing" in non-active branch for version checks.
+// See test/Parse/ConditionalCompilation/sequence_version.swift for Swift 4 behavior.
 
 #if !swift(>=2.2)
 // There should be no error here.
@@ -99,7 +102,8 @@ foo bar baz // expected-error 2 {{consecutive statements}}
 // ---------------------------------------------------------------------------
 // SR-4031: Compound name in compilation condition
 
-#if BAR(_:)
-#elseif os(x:)(macOS)
-#elseif os(Linux(foo:bar:))
+// Accepted in Swift3. *source breaking*
+#if BAR(_:) // expected-error {{invalid conditional compilation expression}}
+#elseif os(x:)(macOS) // expected-error {{unexpected platform condition (expected 'os', 'arch', or 'swift')}}
+#elseif os(Linux(foo:bar:)) // expected-error {{unexpected platform condition argument: expected identifier}}
 #endif

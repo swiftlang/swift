@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTVisitor.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
@@ -24,6 +25,496 @@
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
+
+namespace {
+
+/// Get PlatformConditionKind from platform condition name.
+static
+Optional<PlatformConditionKind> getPlatformConditionKind(StringRef Name) {
+  return llvm::StringSwitch<llvm::Optional<PlatformConditionKind>>(Name)
+    .Case("os", PlatformConditionKind::OS)
+    .Case("arch", PlatformConditionKind::Arch)
+    .Case("_endian", PlatformConditionKind::Endianness)
+    .Case("_runtime", PlatformConditionKind::Runtime)
+    .Default(None);
+}
+
+/// Extract source text of the expression.
+static StringRef extractExprSource(SourceManager &SM, Expr *E) {
+  CharSourceRange Range =
+    Lexer::getCharSourceRangeFromSourceRange(SM, E->getSourceRange());
+  return SM.extractText(Range);
+}
+
+/// Get the identifier string of the UnresolvedDeclRefExpr.
+/// Returns \c true if failed.
+static bool getNameStr(Expr *E, StringRef &Name, DeclRefKind Kind) {
+  auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(E);
+  if (!UDRE ||
+      !UDRE->hasName() ||
+      UDRE->getRefKind() != Kind ||
+      UDRE->getName().isCompoundName())
+    return true;
+  Name = UDRE->getName().getBaseName().str();
+  return false;
+}
+
+/// The condition validator.
+class ValidateIfConfigCondition :
+  public ExprVisitor<ValidateIfConfigCondition, Expr*> {
+  ASTContext &Ctx;
+  DiagnosticEngine &D;
+
+  bool HasError;
+
+  Expr *diagnoseUnsupportedExpr(Expr *E) {
+    D.diagnose(E->getLoc(),
+               diag::unsupported_conditional_compilation_expression_type);
+    return nullptr;
+  }
+
+  // Support '||' and '&&' operator. The procedence of '&&' is higher than '||'.
+  // Invalid operator and the next operand are diagnosed and removed from AST.
+  Expr *foldSequence(Expr *LHS, ArrayRef<Expr*> &S, bool isRecurse = false) {
+    assert(!S.empty() && ((S.size() & 1) == 0));
+
+    auto getNextOperator = [&](StringRef &Name) -> bool {
+      assert(!S.empty() && ((S.size() & 1) == 0));
+      while (getNameStr(S[0], Name, DeclRefKind::BinaryOperator) ||
+            (Name != "||" && Name != "&&")) {
+        auto DiagID = isa<UnresolvedDeclRefExpr>(S[0])
+          ? diag::unsupported_conditional_compilation_binary_expression
+          : diag::unsupported_conditional_compilation_expression_type;
+        D.diagnose(S[0]->getLoc(), DiagID);
+        HasError |= true;
+        // Consume invalid operator and the immediate RHS.
+        S = S.slice(2);
+        if (S.empty())
+          return true;
+      }
+      return false;
+    };
+
+    // Extract out the first operator name.
+    StringRef OpName;
+    if (getNextOperator(OpName))
+      // If failed, it's not a sequence anymore.
+      return LHS;
+    Expr *Op = S[0];
+  
+    // We will definitely be consuming at least one operator.
+    // Pull out the prospective RHS and slice off the first two elements.
+    Expr *RHS = validate(S[1]);
+    S = S.slice(2);
+
+    // Pull out the next binary operator.
+    while (true) {
+      StringRef NextOpName;
+      bool IsEnd = S.empty() || getNextOperator(NextOpName);
+      if (!IsEnd && OpName == "||" && NextOpName == "&&") {
+        RHS = foldSequence(RHS, S, /*isRecurse*/true);
+        continue;
+      }
+
+      // Apply the operator with left-associativity by folding the first two
+      // operands.
+      TupleExpr *Arg = TupleExpr::create(Ctx, SourceLoc(), { LHS, RHS },
+                                         { }, { }, SourceLoc(),
+                                         /*HasTrailingClosure=*/false,
+                                         /*Implicit=*/true);
+      LHS = new (Ctx) BinaryExpr(Op, Arg, /*implicit*/false);
+
+      // If we don't have the next operator, we're done.
+      if (IsEnd)
+        break;
+      if (isRecurse && OpName == "&&" && NextOpName == "||")
+        break;
+
+      OpName = NextOpName;
+      Op = S[0];
+      RHS = validate(S[1]);
+      S = S.slice(2);
+    }
+
+    return LHS;
+  }
+
+  // In Swift3 mode, leave sequence as a sequence because it has strange
+  // evaluation rule. See 'EvaluateIfConfigCondition::visitSequenceExpr'.
+  Expr *validateSequence(ArrayRef<Expr *> &S) {
+    assert(Ctx.isSwiftVersion3());
+
+    SmallVector<Expr *, 3> Filtered;
+    Filtered.push_back(validate(S[0]));
+    S = S.slice(1);
+
+    while (!S.empty()) {
+      StringRef OpName;
+      if (getNameStr(S[0], OpName, DeclRefKind::BinaryOperator) ||
+            (OpName != "||" && OpName != "&&")) {
+        // Warning and ignore in Swift3 mode.
+        D.diagnose(
+            S[0]->getLoc(),
+            diag::swift3_unsupported_conditional_compilation_expression_type)
+          .highlight({ S[0]->getLoc(), S[1]->getEndLoc() });
+      } else {
+        Filtered.push_back(S[0]);
+        Filtered.push_back(validate(S[1]));
+      }
+      S = S.slice(2);
+    }
+
+    assert((Filtered.size() & 1) == 1);
+    if (Filtered.size() == 1)
+      return Filtered[0];
+    return SequenceExpr::create(Ctx, Filtered);
+  }
+
+public:
+  ValidateIfConfigCondition(ASTContext &Ctx, DiagnosticEngine &D)
+    : Ctx(Ctx), D(D), HasError(false) {}
+
+  // Explicit configuration flag.
+  Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
+    StringRef FlagName;
+    if (getNameStr(E, FlagName, DeclRefKind::Ordinary))
+      return diagnoseUnsupportedExpr(E);
+    return E;
+  }
+
+  // 'true' or 'false' constant.
+  Expr *visitBooleanLiteralExpr(BooleanLiteralExpr *E) {
+    return E;
+  }
+
+  // '0' and '1' are warned, but we accept it.
+  Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+    if (E->isNegative() ||
+        (E->getDigitsText() != "0" && E->getDigitsText() != "1")) {
+      return diagnoseUnsupportedExpr(E);
+    }
+    // "#if 0" isn't valid, but it is common, so recognize it and handle it
+    // with a fixit.
+    StringRef replacement = E->getDigitsText() == "0" ? "false" :"true";
+    D.diagnose(E->getLoc(), diag::unsupported_conditional_compilation_integer,
+               E->getDigitsText(), replacement)
+      .fixItReplace(E->getLoc(), replacement);
+    return E;
+  }
+
+  // Platform conditions.
+  Expr *visitCallExpr(CallExpr *E) {
+    StringRef KindName;
+    if (getNameStr(E->getFn(), KindName, DeclRefKind::Ordinary)) {
+      D.diagnose(E->getLoc(), diag::unsupported_platform_condition_expression);
+      return nullptr;
+    }
+
+    auto *ArgP = dyn_cast<ParenExpr>(E->getArg());
+    if (!ArgP) {
+      D.diagnose(E->getLoc(), diag::platform_condition_expected_one_argument);
+      return nullptr;
+    }
+    Expr *Arg = ArgP->getSubExpr();
+
+    // '_compiler_version' '(' string-literal ')'
+    if (KindName == "_compiler_version") {
+      auto SLE = dyn_cast<StringLiteralExpr>(Arg);
+      if (!SLE) {
+        D.diagnose(Arg->getLoc(),
+                   diag::unsupported_platform_condition_argument,
+                   "string literal");
+        return nullptr;
+      }
+
+      auto ValStr = SLE->getValue();
+      if (ValStr.empty()) {
+        D.diagnose(SLE->getLoc(), diag::empty_version_string);
+        return nullptr;
+      }
+
+      auto Val = version::Version::parseCompilerVersionString(
+          SLE->getValue(), SLE->getLoc(), &D);
+      if(!Val.hasValue())
+        return nullptr;
+      return E;
+    }
+
+    // 'swift' '(' '>=' float-literal ( '.' integer-literal )* ')'
+    if (KindName == "swift") {
+      auto PUE = dyn_cast<PrefixUnaryExpr>(Arg);
+      StringRef PrefixName;
+      if (!PUE ||
+          getNameStr(PUE->getFn(), PrefixName, DeclRefKind::PrefixOperator) ||
+          PrefixName != ">=") {
+        D.diagnose(Arg->getLoc(),
+                   diag::unsupported_platform_condition_argument,
+                   "a unary comparison, such as '>=2.2'");
+        return nullptr;
+      }
+      auto versionString = extractExprSource(Ctx.SourceMgr, PUE->getArg());
+      auto Val = version::Version::parseVersionString(
+          versionString, PUE->getArg()->getStartLoc(), &D);
+      if(!Val.hasValue())
+        return nullptr;
+      return E;
+    }
+
+    // ( 'os' | 'arch' | '_endian' | '_runtime' ) '(' identifier ')''
+    auto Kind = getPlatformConditionKind(KindName);
+    if (!Kind.hasValue()) {
+      D.diagnose(E->getLoc(), diag::unsupported_platform_condition_expression);
+      return nullptr;
+    }
+
+    StringRef ArgStr;
+    if (getNameStr(Arg, ArgStr, DeclRefKind::Ordinary)) {
+      D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+                 "identifier");
+      return nullptr;
+    }
+
+    // FIXME: Perform the replacement macOS -> OSX elsewhere.
+    if (Kind == PlatformConditionKind::OS && ArgStr == "macOS") {
+      ArgStr = "OSX";
+      ArgP->setSubExpr(
+          new (Ctx) UnresolvedDeclRefExpr(Ctx.getIdentifier(ArgStr),
+                                          DeclRefKind::Ordinary,
+                                          DeclNameLoc(Arg->getLoc())));
+    }
+
+    std::vector<StringRef> suggestions;
+    if (!LangOptions::checkPlatformConditionSupported(*Kind, ArgStr,
+                                                      suggestions)) {
+      if (Kind == PlatformConditionKind::Runtime) {
+        // Error for _runtime()
+        D.diagnose(Arg->getLoc(),
+                   diag::unsupported_platform_runtime_condition_argument);
+        return nullptr;
+      }
+      StringRef DiagName;
+      switch (*Kind) {
+      case PlatformConditionKind::OS:
+        DiagName = "operating system"; break;
+      case PlatformConditionKind::Arch:
+        DiagName = "architecture"; break;
+      case PlatformConditionKind::Endianness:
+        DiagName = "endianness"; break;
+      case PlatformConditionKind::Runtime:
+        llvm_unreachable("handled above");
+      }
+      auto Loc = Arg->getLoc();
+      D.diagnose(Loc, diag::unknown_platform_condition_argument,
+                 DiagName, KindName);
+      for (auto suggestion : suggestions)
+        D.diagnose(Loc, diag::note_typo_candidate, suggestion)
+          .fixItReplace(Arg->getSourceRange(), suggestion);
+      return nullptr;
+    }
+
+    return E;
+  }
+
+  // Grouped condition. e.g. '(FLAG)'
+  Expr *visitParenExpr(ParenExpr *E) {
+    E->setSubExpr(validate(E->getSubExpr()));
+    return E;
+  }
+
+  // Prefix '!'. Other prefix operators are rejected.
+  Expr *visitPrefixUnaryExpr(PrefixUnaryExpr *E) {
+    StringRef OpName;
+    if (getNameStr(E->getFn(), OpName, DeclRefKind::PrefixOperator) ||
+        OpName != "!") {
+      D.diagnose(E->getLoc(),
+                 diag::unsupported_conditional_compilation_unary_expression);
+      return nullptr;
+    }
+    E->setArg(validate(E->getArg()));
+    return E;
+  }
+
+  // Fold sequence expression for non-Swift3 mode.
+  Expr *visitSequenceExpr(SequenceExpr *E) {
+    ArrayRef<Expr*> Elts = E->getElements();
+    Expr *foldedExpr;
+    if (Ctx.isSwiftVersion3()) {
+      foldedExpr = validateSequence(Elts);
+    } else {
+      auto LHS = validate(Elts[0]);
+      Elts = Elts.slice(1);
+      foldedExpr = foldSequence(LHS, Elts);
+    }
+    assert(Elts.empty());
+    return foldedExpr;
+  }
+
+  // Other expression types are unsupported.
+  Expr *visitExpr(Expr *E) {
+    return diagnoseUnsupportedExpr(E);
+  }
+
+  Expr *validate(Expr *E) {
+    if (auto E2 = visit(E))
+      return E2;
+    HasError |= true;
+    return E;
+  }
+
+  bool hasError() const {
+    return HasError;
+  }
+};
+
+/// Validate and modify the condition expression.
+/// Returns \c true if the condition contains any error.
+static bool validateIfConfigCondition(Expr *&condition,
+                                      ASTContext &Context,
+                                      DiagnosticEngine &D) {
+  ValidateIfConfigCondition Validator(Context, D);
+  condition = Validator.validate(condition);
+  return Validator.hasError();
+}
+
+/// The condition evaluator.
+/// The condition must be validated with validateIfConfigCondition().
+class EvaluateIfConfigCondition :
+  public ExprVisitor<EvaluateIfConfigCondition, bool> {
+  ASTContext &Ctx;
+
+public:
+  EvaluateIfConfigCondition(ASTContext &Ctx) : Ctx(Ctx) {}
+
+  bool visitBooleanLiteralExpr(BooleanLiteralExpr *E) {
+    return E->getValue();
+  }
+
+  bool visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
+    return E->getDigitsText() != "0";
+  }
+
+  bool visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
+    StringRef Name;
+    getNameStr(E, Name, DeclRefKind::Ordinary);
+    return Ctx.LangOpts.isCustomConditionalCompilationFlagSet(Name);
+  }
+
+  bool visitCallExpr(CallExpr *E) {
+    StringRef KindName;
+    getNameStr(E->getFn(), KindName, DeclRefKind::Ordinary);
+    auto *Arg = cast<ParenExpr>(E->getArg())->getSubExpr();
+
+    if (KindName == "_compiler_version") {
+      auto Str = cast<StringLiteralExpr>(Arg)->getValue();
+      auto Val = version::Version::parseCompilerVersionString(
+          Str, SourceLoc(), nullptr).getValue();
+      auto thisVersion = version::Version::getCurrentCompilerVersion();
+      return thisVersion >= Val;
+    } else if (KindName == "swift") {
+      auto PUE = cast<PrefixUnaryExpr>(Arg);
+      auto Str = extractExprSource(Ctx.SourceMgr, PUE->getArg());
+      auto Val = version::Version::parseVersionString(
+          Str, SourceLoc(), nullptr).getValue();
+      auto thisVersion = Ctx.LangOpts.EffectiveLanguageVersion;
+      return thisVersion >= Val;
+    }
+
+    StringRef Val;
+    getNameStr(Arg, Val, DeclRefKind::Ordinary);
+    auto Kind = getPlatformConditionKind(KindName).getValue();
+    auto Target = Ctx.LangOpts.getPlatformConditionValue(Kind);
+    return Target == Val;
+  }
+
+  bool visitPrefixUnaryExpr(PrefixUnaryExpr *E) {
+    return !visit(E->getArg());
+  }
+
+  bool visitParenExpr(ParenExpr *E) {
+    return visit(E->getSubExpr());
+  }
+
+  bool visitBinaryExpr(BinaryExpr *E) {
+    assert(!Ctx.isSwiftVersion3() && "BinaryExpr in Swift3 mode");
+    StringRef OpName;
+    getNameStr(E->getFn(), OpName, DeclRefKind::BinaryOperator);
+    auto Args = E->getArg()->getElements();
+    if (OpName == "||") return visit(Args[0]) || visit(Args[1]);
+    if (OpName == "&&") return visit(Args[0]) && visit(Args[1]);
+    llvm_unreachable("unsupported binary operator");
+  }
+
+  bool visitSequenceExpr(SequenceExpr *E) {
+    assert(Ctx.isSwiftVersion3() && "SequenceExpr in non-Swift3 mode");
+    ArrayRef<Expr *> Elems = E->getElements();
+    auto Result = visit(Elems[0]);
+    Elems = Elems.slice(1);
+    while (!Elems.empty()) {
+      StringRef OpName;
+      getNameStr(Elems[0], OpName, DeclRefKind::BinaryOperator);
+
+      if (OpName == "||") {
+        Result = Result || visit(Elems[1]);
+        if (Result)
+          // Note that this is the Swift3 behavior.
+          // e.g. 'false || true && false' evaluates to 'true'.
+          return true;
+      } else if (OpName == "&&") {
+        Result = Result && visit(Elems[1]);
+        if (!Result)
+          // Ditto.
+          // e.g. 'false && true || true' evaluates to 'false'.
+          return false;
+      } else {
+        llvm_unreachable("must be removed in validation phase");
+      }
+      Elems = Elems.slice(2);
+    }
+    return Result;
+  }
+
+  bool visitExpr(Expr *E) { llvm_unreachable("Unvalidated condition?"); }
+};
+
+/// Evaluate the condition.
+/// \c true if success, \c false if failed.
+static bool evaluateIfConfigCondition(Expr *Condition, ASTContext &Context) {
+  return EvaluateIfConfigCondition(Context).visit(Condition);
+}
+
+/// Version condition checker.
+class IsVersionIfConfigCondition :
+  public ExprVisitor<IsVersionIfConfigCondition, bool> {
+
+public:
+  IsVersionIfConfigCondition() {}
+
+  bool visitBinaryExpr(BinaryExpr *E) {
+    StringRef OpName;
+    getNameStr(E->getFn(), OpName, DeclRefKind::BinaryOperator);
+    auto Args = E->getArg()->getElements();
+    if (OpName == "||") return visit(Args[0]) && visit(Args[1]);
+    if (OpName == "&&") return visit(Args[0]) || visit(Args[1]);
+    llvm_unreachable("unsupported binary operator");
+  }
+
+  bool visitCallExpr(CallExpr *E) {
+    StringRef KindName;
+    getNameStr(E->getFn(), KindName, DeclRefKind::Ordinary);
+    return KindName == "_compiler_version" || KindName == "swift";
+  }
+
+  bool visitPrefixUnaryExpr(PrefixUnaryExpr *E) { return visit(E->getArg()); }
+  bool visitParenExpr(ParenExpr *E) { return visit(E->getSubExpr()); }
+  bool visitExpr(Expr *E) { return false; }
+};
+
+/// Returns \c true if the condition is a version check.
+static bool isVersionIfConfigCondition(Expr *Condition) {
+  return IsVersionIfConfigCondition().visit(Condition);
+}
+
+} // end anonymous namespace
 
 /// Parse and populate a list of #if/#elseif/#else/#endif clauses.
 /// Delegate callback function to parse elements in the blocks.
@@ -36,15 +527,16 @@ static ParserStatus parseIfConfig(
       P, P.Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
 
   bool foundActive = false;
-  ConditionalCompilationExprState ConfigState;
+  bool isVersionCondition = false;
   while (1) {
     bool isElse = P.Tok.is(tok::pound_else);
     SourceLoc ClauseLoc = P.consumeToken();
     Expr *Condition = nullptr;
+    bool isActive = false;
 
     // Parse and evaluate the directive.
     if (isElse) {
-      ConfigState.setConditionActive(!foundActive);
+      isActive = !foundActive;
     } else {
       llvm::SaveAndRestore<bool> S(P.InPoundIfEnvironment, true);
       ParserResult<Expr> Result = P.parseExprSequence(diag::expected_expr,
@@ -52,17 +544,19 @@ static ParserStatus parseIfConfig(
                                                       /*isForDirective*/true);
       if (Result.isNull())
         return makeParserError();
-
       Condition = Result.get();
-
-      // Evaluate the condition, to validate it.
-      ConfigState = P.classifyConditionalCompilationExpr(Condition, P.Context,
-                                                         P.Diags);
-      if (foundActive)
-        ConfigState.setConditionActive(false);
+      if (validateIfConfigCondition(Condition, P.Context, P.Diags)) {
+        // Error in the condition;
+        isActive = false;
+        isVersionCondition = false;
+      } else if (!foundActive) {
+        // Evaludate the condition only if we haven't found any active one.
+        isActive = evaluateIfConfigCondition(Condition, P.Context);
+        isVersionCondition = isVersionIfConfigCondition(Condition);
+      }
     }
 
-    foundActive |= ConfigState.isConditionActive();
+    foundActive |= isActive;
 
     if (!P.Tok.isAtStartOfLine() && P.Tok.isNot(tok::eof)) {
       P.diagnose(P.Tok.getLoc(),
@@ -71,8 +565,8 @@ static ParserStatus parseIfConfig(
 
     // Parse elements
     SmallVector<ElemTy, N> Elements;
-    if (ConfigState.shouldParse()) {
-      parseElements(Elements, ConfigState.isConditionActive());
+    if (isActive || !isVersionCondition) {
+      parseElements(Elements, isActive);
     } else {
       DiagnosticTransaction DT(P.Diags);
       P.skipUntilConditionalBlockClose();
@@ -81,7 +575,7 @@ static ParserStatus parseIfConfig(
 
     Clauses.push_back(IfConfigClause<ElemTy>(ClauseLoc, Condition,
                                              P.Context.AllocateCopy(Elements),
-                                             ConfigState.isConditionActive()));
+                                             isActive));
 
     if (P.Tok.isNot(tok::pound_elseif, tok::pound_else))
       break;
@@ -94,6 +588,7 @@ static ParserStatus parseIfConfig(
   return makeParserSuccess();
 }
 
+/// Parse #if ... #endif in declarations position.
 ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
   SmallVector<IfConfigClause<Decl *>, 4> Clauses;
   SourceLoc EndLoc;
@@ -131,6 +626,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
   return makeParserResult(ICD);
 }
 
+/// Parse #if ... #endif in statements position.
 ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
   SmallVector<IfConfigClause<ASTNode>, 4> Clauses;
   SourceLoc EndLoc;
@@ -148,280 +644,4 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
   auto *ICS = new (Context) IfConfigStmt(Context.AllocateCopy(Clauses),
                                          EndLoc, HadMissingEnd);
   return makeParserResult(ICS);
-}
-
-// Evaluate a subset of expression types suitable for build configuration
-// conditional expressions.  The accepted expression types are:
-//  - The magic constants "true" and "false".
-//  - Named decl ref expressions ("FOO")
-//  - Parenthesized expressions ("(FOO)")
-//  - Binary "&&" or "||" operations applied to other build configuration
-//    conditional expressions
-//  - Unary "!" expressions applied to other build configuration conditional
-//    expressions
-//  - Single-argument call expressions, where the function being invoked is a
-//    supported target configuration (currently "os", "arch", and
-//    "_compiler_version"), and whose argument is a named decl ref expression
-ConditionalCompilationExprState
-Parser::classifyConditionalCompilationExpr(Expr *condition,
-                                           ASTContext &Context,
-                                           DiagnosticEngine &D) {
-  assert(condition && "Cannot classify a NULL condition expression!");
-
-  // Evaluate a ParenExpr.
-  if (auto *PE = dyn_cast<ParenExpr>(condition))
-    return classifyConditionalCompilationExpr(PE->getSubExpr(), Context, D);
-
-  // Evaluate a "&&" or "||" expression.
-  if (auto *SE = dyn_cast<SequenceExpr>(condition)) {
-    // Check for '&&' or '||' as the expression type.
-    if (SE->getNumElements() < 3) {
-      D.diagnose(SE->getLoc(),
-                 diag::unsupported_conditional_compilation_binary_expression);
-      return ConditionalCompilationExprState::error();
-    }
-    // Before type checking, chains of binary expressions will not be fully
-    // parsed, so associativity has not yet been encoded in the subtree.
-    auto elements = SE->getElements();
-    auto numElements = SE->getNumElements();
-    size_t iOperator = 1;
-    size_t iOperand = 2;
-
-    auto result = classifyConditionalCompilationExpr(elements[0], Context, D);
-
-    while (iOperand < numElements) {
-
-      if (auto *UDREOp = dyn_cast<UnresolvedDeclRefExpr>(elements[iOperator])) {
-        auto name = UDREOp->getName().getBaseName().str();
-
-        if (name.equals("||") || name.equals("&&")) {
-          auto rhs = classifyConditionalCompilationExpr(elements[iOperand],
-                                                        Context, D);
-
-          if (name.equals("||")) {
-            result = result || rhs;
-            if (result.isConditionActive())
-              break;
-          }
-
-          if (name.equals("&&")) {
-            result = result && rhs;
-            if (!result.isConditionActive())
-              break;
-          }
-        } else {
-          D.diagnose(
-              SE->getLoc(),
-              diag::unsupported_conditional_compilation_binary_expression);
-          return ConditionalCompilationExprState::error();
-        }
-      } else {
-        // Swift3 didn't have this branch. the operator and the RHS are
-        // silently ignored.
-        if (!Context.isSwiftVersion3()) {
-          D.diagnose(
-              elements[iOperator]->getLoc(),
-              diag::unsupported_conditional_compilation_expression_type);
-          return ConditionalCompilationExprState::error();
-        } else {
-          SourceRange ignoredRange(elements[iOperator]->getLoc(),
-                                   elements[iOperand]->getEndLoc());
-          D.diagnose(
-              elements[iOperator]->getLoc(),
-              diag::swift3_unsupported_conditional_compilation_expression_type)
-            .highlight(ignoredRange);
-        }
-      }
-
-      iOperator += 2;
-      iOperand += 2;
-    }
-
-    return result;
-  }
-
-  // Evaluate a named reference expression.
-  if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(condition)) {
-    auto name = UDRE->getName().getBaseName().str();
-    return {Context.LangOpts.isCustomConditionalCompilationFlagSet(name),
-      ConditionalCompilationExprKind::DeclRef};
-  }
-
-  // Evaluate a Boolean literal.
-  if (auto *boolLit = dyn_cast<BooleanLiteralExpr>(condition)) {
-    return {boolLit->getValue(), ConditionalCompilationExprKind::Boolean};
-  }
-
-  // Evaluate a negation (unary "!") expression.
-  if (auto *PUE = dyn_cast<PrefixUnaryExpr>(condition)) {
-    // If the PUE is not a negation expression, return false
-    auto name =
-    cast<UnresolvedDeclRefExpr>(PUE->getFn())->getName().getBaseName().str();
-    if (name != "!") {
-      D.diagnose(PUE->getLoc(),
-                 diag::unsupported_conditional_compilation_unary_expression);
-      return ConditionalCompilationExprState::error();
-    }
-
-    return !classifyConditionalCompilationExpr(PUE->getArg(), Context, D);
-  }
-
-  // Evaluate a target config call expression.
-  if (auto *CE = dyn_cast<CallExpr>(condition)) {
-    // look up target config, and compare value
-    auto fnNameExpr = dyn_cast<UnresolvedDeclRefExpr>(CE->getFn());
-
-    // Get the arg, which should be in a paren expression.
-    if (!fnNameExpr) {
-      D.diagnose(CE->getLoc(), diag::unsupported_platform_condition_expression);
-      return ConditionalCompilationExprState::error();
-    }
-
-    auto fnName = fnNameExpr->getName().getBaseName().str();
-
-    auto *PE = dyn_cast<ParenExpr>(CE->getArg());
-    if (!PE) {
-      auto diag = D.diagnose(CE->getLoc(),
-                             diag::platform_condition_expected_one_argument);
-      return ConditionalCompilationExprState::error();
-    }
-
-    if (!fnName.equals("arch") && !fnName.equals("os") &&
-        !fnName.equals("_endian") &&
-        !fnName.equals("_runtime") &&
-        !fnName.equals("swift") &&
-        !fnName.equals("_compiler_version")) {
-      D.diagnose(CE->getLoc(), diag::unsupported_platform_condition_expression);
-      return ConditionalCompilationExprState::error();
-    }
-
-    if (fnName.equals("_compiler_version")) {
-      if (auto SLE = dyn_cast<StringLiteralExpr>(PE->getSubExpr())) {
-        if (SLE->getValue().empty()) {
-          D.diagnose(CE->getLoc(), diag::empty_version_string);
-          return ConditionalCompilationExprState::error();
-        }
-        auto versionRequirement =
-        version::Version::parseCompilerVersionString(SLE->getValue(),
-                                                     SLE->getLoc(),
-                                                     &D);
-        auto thisVersion = version::Version::getCurrentCompilerVersion();
-        auto VersionNewEnough = thisVersion >= versionRequirement;
-        return {VersionNewEnough,
-          ConditionalCompilationExprKind::CompilerVersion};
-      } else {
-        D.diagnose(CE->getLoc(), diag::unsupported_platform_condition_argument,
-                 "string literal");
-        return ConditionalCompilationExprState::error();
-      }
-    } else if (fnName.equals("swift")) {
-      auto PUE = dyn_cast<PrefixUnaryExpr>(PE->getSubExpr());
-      if (!PUE) {
-        D.diagnose(PE->getSubExpr()->getLoc(),
-                   diag::unsupported_platform_condition_argument,
-                   "a unary comparison, such as '>=2.2'");
-        return ConditionalCompilationExprState::error();
-      }
-
-      auto prefix = dyn_cast<UnresolvedDeclRefExpr>(PUE->getFn());
-      auto versionArg = PUE->getArg();
-      auto versionStartLoc = versionArg->getStartLoc();
-      auto endLoc = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                               versionArg->getSourceRange().End);
-      CharSourceRange versionCharRange(Context.SourceMgr, versionStartLoc,
-                                       endLoc);
-      auto versionString = Context.SourceMgr.extractText(versionCharRange);
-
-      auto versionRequirement =
-        version::Version::parseVersionString(versionString,
-                                             versionStartLoc,
-                                             &D);
-
-      if (!versionRequirement.hasValue())
-        return ConditionalCompilationExprState::error();
-
-      auto thisVersion = Context.LangOpts.EffectiveLanguageVersion;
-
-      if (!prefix->getName().getBaseName().str().equals(">=")) {
-        D.diagnose(PUE->getFn()->getLoc(),
-                   diag::unexpected_version_comparison_operator)
-          .fixItReplace(PUE->getFn()->getLoc(), ">=");
-        return ConditionalCompilationExprState::error();
-      }
-
-      auto VersionNewEnough = thisVersion >= versionRequirement.getValue();
-      return {VersionNewEnough,
-        ConditionalCompilationExprKind::LanguageVersion};
-    } else {
-      if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(PE->getSubExpr())) {
-        // The sub expression should be an UnresolvedDeclRefExpr (we won't
-        // tolerate extra parens).
-        auto argumentIdent = UDRE->getName().getBaseName();
-        auto argument = argumentIdent.str();
-        PlatformConditionKind Kind =
-          llvm::StringSwitch<PlatformConditionKind>(fnName)
-          .Case("os", PlatformConditionKind::OS)
-          .Case("arch", PlatformConditionKind::Arch)
-          .Case("_endian", PlatformConditionKind::Endianness)
-          .Case("_runtime", PlatformConditionKind::Runtime);
-
-        // FIXME: Perform the replacement macOS -> OSX elsewhere.
-        if (Kind == PlatformConditionKind::OS && argument == "macOS")
-          argument = "OSX";
-
-        std::vector<StringRef> suggestions;
-        if (!LangOptions::checkPlatformConditionSupported(Kind, argument,
-                                                          suggestions)) {
-          if (Kind == PlatformConditionKind::Runtime) {
-            // Error for _runtime()
-            D.diagnose(UDRE->getLoc(),
-                       diag::unsupported_platform_runtime_condition_argument);
-            return ConditionalCompilationExprState::error();
-          }
-          StringRef DiagName;
-          switch (Kind) {
-          case PlatformConditionKind::OS:
-            DiagName = "operating system"; break;
-          case PlatformConditionKind::Arch:
-            DiagName = "architecture"; break;
-          case PlatformConditionKind::Endianness:
-            DiagName = "endianness"; break;
-          case PlatformConditionKind::Runtime:
-            llvm_unreachable("handled above");
-          }
-          D.diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
-                     DiagName, fnName);
-          for (const StringRef &suggestion : suggestions) {
-            D.diagnose(UDRE->getLoc(), diag::note_typo_candidate, suggestion)
-              .fixItReplace(UDRE->getSourceRange(), suggestion);
-          }
-        }
-
-        auto target = Context.LangOpts.getPlatformConditionValue(Kind);
-        return {target == argument, ConditionalCompilationExprKind::DeclRef};
-      } else {
-        D.diagnose(CE->getLoc(), diag::unsupported_platform_condition_argument,
-                   "identifier");
-        return ConditionalCompilationExprState::error();
-      }
-    }
-  }
-
-  // "#if 0" isn't valid, but it is common, so recognize it and handle it
-  // with a fixit elegantly.
-  if (auto *IL = dyn_cast<IntegerLiteralExpr>(condition))
-    if (IL->getDigitsText() == "0" || IL->getDigitsText() == "1") {
-      StringRef replacement = IL->getDigitsText() == "0" ? "false" :"true";
-      D.diagnose(IL->getLoc(), diag::unsupported_conditional_compilation_integer,
-                 IL->getDigitsText(), replacement)
-       .fixItReplace(IL->getLoc(), replacement);
-      return {IL->getDigitsText() == "1",
-        ConditionalCompilationExprKind::Integer};
-    }
-
-
-  // If we've gotten here, it's an unsupported expression type.
-  D.diagnose(condition->getLoc(),
-             diag::unsupported_conditional_compilation_expression_type);
-  return ConditionalCompilationExprState::error();
 }
