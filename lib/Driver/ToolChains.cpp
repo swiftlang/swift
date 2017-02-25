@@ -1046,19 +1046,19 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
   addInputsOfType(Arguments, context.InputActions, types::TY_Object);
 
-  if (context.OI.DebugInfoKind > IRGenDebugInfoKind::LineTables) {
-    size_t argCount = Arguments.size();
-    if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile)
-      addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile);
-    else
-      addPrimaryInputsOfType(Arguments, context.Inputs,
-                             types::TY_SwiftModuleFile);
-
-    if (Arguments.size() > argCount) {
+  size_t argCount = Arguments.size();
+  if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile)
+    addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile);
+  else
+    addPrimaryInputsOfType(Arguments, context.Inputs,
+                           types::TY_SwiftModuleFile);
+  
+  addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile);
+  
+  if (Arguments.size() > argCount) {
       assert(argCount + 1 == Arguments.size() &&
              "multiple swiftmodules found for -g");
-      Arguments.insert(Arguments.end() - 1, "-add_ast_path");
-    }
+    Arguments.insert(Arguments.end() - 1, "-add_ast_path");
   }
 
   switch (job.getKind()) {
@@ -1440,6 +1440,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   }
   addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
   addInputsOfType(Arguments, context.InputActions, types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile);
 
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);

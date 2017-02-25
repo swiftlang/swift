@@ -6,12 +6,13 @@
 // RUN: touch %t/empty.swift
 
 // ERROR: error: unexpected input file: {{.*}}empty
+// ONLY-MODULES-WARNING: warning: all inputs are swiftmodules
 
 // COMPILE: 0: input
 // COMPILE: 1: compile, {0}, object
 
 // RUN: %swiftc_driver -driver-print-actions %t/empty 2>&1 | %FileCheck -check-prefix=LINK-%target-object-format %s
-// RUN: not %swiftc_driver -driver-print-actions %t/empty.swiftmodule 2>&1 | %FileCheck -check-prefix=ERROR %s
+// RUN: %swiftc_driver -driver-print-actions %t/empty.swiftmodule 2>&1 | %FileCheck -check-prefix=ONLY-MODULES-WARNING %s
 // RUN: %swiftc_driver -driver-print-actions %t/empty.o 2>&1 | %FileCheck -check-prefix=LINK-%target-object-format %s
 // RUN: not %swiftc_driver -driver-print-actions %t/empty.h 2>&1 | %FileCheck -check-prefix=ERROR %s
 // RUN: %swiftc_driver -driver-print-actions %t/empty.swift 2>&1 | %FileCheck -check-prefix=COMPILE %s
@@ -33,7 +34,7 @@
 // MODULE: 1: merge-module, {0}, swiftmodule
 
 // RUN: not %swiftc_driver -driver-print-actions -typecheck %t/empty 2>&1 | %FileCheck -check-prefix=ERROR %s
-// RUN: not %swiftc_driver -driver-print-actions -typecheck %t/empty.swiftmodule 2>&1 | %FileCheck -check-prefix=ERROR %s
+// RUN: %swiftc_driver -driver-print-actions -typecheck %t/empty.swiftmodule 2>&1 | %FileCheck -check-prefix=ONLY-MODULES-WARNING %s
 // RUN: not %swiftc_driver -driver-print-actions -typecheck %t/empty.o 2>&1 | %FileCheck -check-prefix=ERROR %s
 // RUN: not %swiftc_driver -driver-print-actions -typecheck %t/empty.h 2>&1 | %FileCheck -check-prefix=ERROR %s
 // RUN: %swiftc_driver -driver-print-actions %t/empty.swift 2>&1 | %FileCheck -check-prefix=COMPILE %s

@@ -75,6 +75,8 @@ ERROR(error_no_input_files,none,
 ERROR(error_unexpected_input_file,none,
       "unexpected input file: %0", (StringRef))
 
+WARNING(warning_only_swiftmodule_inputs,none, "all inputs are swiftmodules", ())
+
 ERROR(error_unknown_target,none,
       "unknown target '%0'", (StringRef))
 

@@ -899,6 +899,13 @@ void Driver::buildInputs(const ToolChain &TC,
 
     // FIXME: add -x support (or equivalent)
   }
+  
+  for (InputPair input : Inputs)
+    if (input.first != types::TY_SwiftModuleFile)
+      return;
+  if (Inputs.size() > 0) {
+    Diags.diagnose(SourceLoc(), diag::warning_only_swiftmodule_inputs);
+  }
 }
 
 static bool maybeBuildingExecutable(const OutputInfo &OI,
@@ -1341,14 +1348,8 @@ void Driver::buildActions(const ToolChain &TC,
       }
       case types::TY_SwiftModuleFile:
       case types::TY_SwiftModuleDocFile:
-        // Module inputs are okay if generating a module.
-        if (OI.ShouldGenerateModule) {
-          AllModuleInputs.push_back(Current.release());
-          break;
-        }
-        Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
-                       InputArg->getValue());
-        continue;
+        AllModuleInputs.push_back(Current.release());
+        break;
       case types::TY_AutolinkFile:
       case types::TY_Object:
         // Object inputs are only okay if linking.
@@ -1515,6 +1516,11 @@ void Driver::buildActions(const ToolChain &TC,
       } else
         Actions.push_back(MergeModuleAction.release());
     }
+    else
+      for (auto *Input : AllModuleInputs)
+        if (Input->getType() == types::TY_SwiftModuleFile)
+          LinkAction->addInput(Input);
+    
     Actions.push_back(LinkAction);
     if (TC.getTriple().isOSDarwin() &&
         OI.DebugInfoKind > IRGenDebugInfoKind::None) {
