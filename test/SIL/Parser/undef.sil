@@ -242,14 +242,6 @@ bb0:
   bridge_object_to_word undef : $Builtin.BridgeObject to $Builtin.Word
   // CHECK: thin_to_thick_function undef : $@convention(thin) () -> () to $() -> ()
   thin_to_thick_function undef : $@convention(thin) () -> () to $() -> ()
-  // CHECK: thick_to_objc_metatype undef : $@thick C.Type to $@objc_metatype C.Type
-  thick_to_objc_metatype undef : $@thick C.Type to $@objc_metatype C.Type
-  // CHECK: objc_to_thick_metatype undef : $@objc_metatype C.Type to $@thick C.Type
-  objc_to_thick_metatype undef : $@objc_metatype C.Type to $@thick C.Type
-  // CHECK: objc_metatype_to_object undef : $@objc_metatype C.Type to $AnyObject
-  objc_metatype_to_object undef : $@objc_metatype C.Type to $AnyObject
-  // CHECK: objc_existential_metatype_to_object undef : $@objc_metatype P.Type to $AnyObject
-  objc_existential_metatype_to_object undef : $@objc_metatype P.Type to $AnyObject
   // CHECK: is_nonnull undef : $C
   is_nonnull undef : $C
 

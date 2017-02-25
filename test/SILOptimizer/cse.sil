@@ -720,104 +720,6 @@ bb2:
   %33 = return %32 : $()
 }
 
-// CHECK-LABEL: sil @cse_value_metatype
-// CHECK: value_metatype $@objc_metatype
-// CHECK: objc_metatype_to_object
-// CHECK-NOT: value_metatype $@objc_metatype
-// CHECK: strong_release
-// CHECK: return
-sil @cse_value_metatype : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned (AnyObject, AnyObject) {
-bb0(%0 : $T):
-  %2 = value_metatype $@objc_metatype T.Type, %0 : $T
-  %4 = objc_metatype_to_object %2 : $@objc_metatype T.Type to $AnyObject
-  %5 = value_metatype $@objc_metatype T.Type, %0 : $T
-  %7 = objc_metatype_to_object %5 : $@objc_metatype T.Type to $AnyObject
-  strong_release %0 : $T
-  %9 = tuple (%4: $AnyObject, %7: $AnyObject)
-  return %9 : $(AnyObject, AnyObject)
-}
-
-
-@objc(XX) protocol XX {
-}
-
-// CHECK-LABEL: sil @cse_existential_metatype
-// CHECK: existential_metatype $@objc_metatype
-// CHECK: objc_existential_metatype_to_object
-// CHECK-NOT: existential_metatype $@objc_metatype
-// CHECK: strong_release
-// CHECK: return
-sil @cse_existential_metatype : $@convention(thin) (@owned XX) -> @owned (AnyObject, AnyObject) {
-bb0(%0 : $XX):
-  %2 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
-  %4 = objc_existential_metatype_to_object %2 : $@objc_metatype XX.Type to $AnyObject
-  %5 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
-  %6 = objc_existential_metatype_to_object %5 : $@objc_metatype XX.Type to $AnyObject
-  strong_release %0 : $XX
-  %7 = tuple (%4: $AnyObject, %6: $AnyObject)
-  return %7 : $(AnyObject, AnyObject)
-}
-
-// CHECK-LABEL: sil @nocse_existential_metatype_addr
-// CHECK: store
-// CHECK: existential_metatype $@thick Any.Type
-// CHECK: store
-// CHECK: existential_metatype $@thick Any.Type
-// CHECK: return
-sil @nocse_existential_metatype_addr : $@convention(thin) (@owned B, @owned B) -> (@thick Any.Type, @thick Any.Type) {
-bb0(%0 : $B, %1 : $B):
-  %2 = alloc_stack $Any
-  %3 = init_existential_addr %2 : $*Any, $B
-  store %0 to %3 : $*B
-  %5 = existential_metatype $@thick Any.Type, %2 : $*Any
-  store %1 to %3 : $*B
-  %7 = existential_metatype $@thick Any.Type, %2 : $*Any
-  strong_release %1 : $B
-  strong_release %0 : $B
-  %99 = tuple (%5 : $@thick Any.Type, %7 : $@thick Any.Type)
-  dealloc_stack %2 : $*Any
-  return %99 : $(@thick Any.Type, @thick Any.Type)
-}
-
-
-// CHECK-LABEL: sil @cse_objc_metatype_to_object
-// CHECK: value_metatype $@objc_metatype
-// CHECK: objc_metatype_to_object
-// CHECK-NOT: value_metatype $@objc_metatype
-// CHECK-NOT: objc_metatype_to_object
-// CHECK: strong_release
-// CHECK: return
-sil @cse_objc_metatype_to_object : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned (AnyObject, AnyObject) {
-bb0(%0 : $T):
-  %2 = value_metatype $@objc_metatype T.Type, %0 : $T
-  %4 = objc_metatype_to_object %2 : $@objc_metatype T.Type to $AnyObject
-  %5 = value_metatype $@objc_metatype T.Type, %0 : $T
-  %7 = objc_metatype_to_object %5 : $@objc_metatype T.Type to $AnyObject
-  strong_release %0 : $T
-  %9 = tuple (%4: $AnyObject, %7: $AnyObject)
-  return %9 : $(AnyObject, AnyObject)
-}
-
-
-// CHECK-LABEL: sil @cse_objc_existential_metatype_to_object
-// CHECK: existential_metatype $@objc_metatype
-// CHECK: objc_existential_metatype_to_object
-// CHECK-NOT: existential_metatype $@objc_metatype
-// CHECK-NOT: objc_existential_metatype_to_object
-// CHECK: strong_release
-// CHECK: return
-sil @cse_objc_existential_metatype_to_object : $@convention(thin) (@owned XX) -> @owned (AnyObject, AnyObject) {
-bb0(%0 : $XX):
-  %2 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
-  %4 = objc_existential_metatype_to_object %2 : $@objc_metatype XX.Type to $AnyObject
-  %5 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
-  %6 = objc_existential_metatype_to_object %5 : $@objc_metatype XX.Type to $AnyObject
-  strong_release %0 : $XX
-  %7 = tuple (%4: $AnyObject, %6: $AnyObject)
-  return %7 : $(AnyObject, AnyObject)
-}
-
-
 // CHECK-LABEL: sil @cse_raw_pointer_to_ref
 // CHECK: raw_pointer_to_ref
 // CHECK-NOT: raw_pointer_to_ref
@@ -935,24 +837,6 @@ bb0(%0 : $Enum1):
   %2 = select_enum %0 : $Enum1, case #Enum1.Case1!enumelt: %t, case #Enum1.Case2!enumelt: %f : $Builtin.Int1
   %3 = tuple (%1: $Builtin.Int1, %2: $Builtin.Int1)
   return %3: $(Builtin.Int1, Builtin.Int1)
-}
-
-
-@objc
-class XXX {
-}
-
-// CHECK-LABEL: sil @cse_objc_to_thick_metatype
-// CHECK: objc_to_thick_metatype
-// CHECK-NOT: objc_to_thick_metatype
-// CHECK: tuple
-// CHECK: return
-sil @cse_objc_to_thick_metatype : $@convention(thin) (@objc_metatype XXX.Type) -> (@thick XXX.Type, @thick XXX.Type) {
-bb0(%0 : $@objc_metatype XXX.Type):
-  %1 = objc_to_thick_metatype %0 : $@objc_metatype XXX.Type to $@thick XXX.Type
-  %2 = objc_to_thick_metatype %0 : $@objc_metatype XXX.Type to $@thick XXX.Type
-  %3 = tuple (%1: $@thick XXX.Type, %2: $@thick XXX.Type)
-  return %3: $(@thick XXX.Type, @thick XXX.Type)
 }
 
 // CHECK-LABEL: sil @cse_bridge_object_to_ref
