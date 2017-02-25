@@ -49,12 +49,12 @@
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "A",
-      key.usr: "s:C1A1A",
+      key.usr: "s:1AAAC",
       key.entities: [
         {
           key.kind: source.lang.swift.decl.var.instance,
           key.name: "x",
-          key.usr: "s:vC1A1A1xC1B1B"
+          key.usr: "s:1AAAC1x1BADCv"
         }
       ]
     }

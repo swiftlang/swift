@@ -83,7 +83,7 @@ void TokenSyntax::dumpKind(llvm::raw_ostream &OS) const {
     OS << "dollarident";
     break;
   case tok::integer_literal:
-    OS << "interger_literal";
+    OS << "integer_literal";
     break;
   case tok::floating_literal:
     OS << "floating_literal";

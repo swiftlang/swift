@@ -12,7 +12,7 @@ class C {
   required init()
 }
 
-// CHECK: [[C:%C6vtable1C]] = type <{ %swift.refcounted }>
+// CHECK: [[C:%T6vtable1CC]] = type <{ %swift.refcounted }>
 
 sil @_TFC6vtable1CCfMS0_FT_S0_ : $@convention(method) (@thick C.Type) -> @owned C
 sil @_TFC6vtable1CcfMS0_FT_S0_ : $@convention(method) (@owned C) -> @owned C

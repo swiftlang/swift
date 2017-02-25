@@ -97,17 +97,18 @@ function(_add_variant_c_compile_link_flags)
     ""
     ${ARGN})
 
-  set(result
-    ${${CFLAGS_RESULT_VAR_NAME}}
-    "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}")
+  set(result ${${CFLAGS_RESULT_VAR_NAME}})
+
+  # MSVC and clang-cl dont't understand -target.
+  if (NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+     list(APPEND result "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}")
+  endif()
 
   is_darwin_based_sdk("${CFLAGS_SDK}" IS_DARWIN)
   if(IS_DARWIN)
     list(APPEND result "-isysroot" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
-  else()
-    if(NOT "${SWIFT_SDK_${CFLAGS_SDK}_PATH}" STREQUAL "/")
-      list(APPEND result "--sysroot=${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
-    endif()
+  elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${SWIFT_SDK_${CFLAGS_SDK}_PATH}" STREQUAL "/")
+    list(APPEND result "--sysroot=${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
@@ -181,9 +182,13 @@ function(_add_variant_c_compile_flags)
   if(optimized OR CFLAGS_FORCE_BUILD_OPTIMIZED)
     list(APPEND result "-O2")
 
-    # Add -momit-leaf-frame-pointer on x86.
-    if("${CFLAGS_ARCH}" STREQUAL "i386" OR "${CFLAGS_ARCH}" STREQUAL "x86_64")
-      list(APPEND result "-momit-leaf-frame-pointer")
+    # Omit leaf frame pointers on x86.
+    if("${CFLAGS_ARCH}" STREQUAL "i386" OR "${CFLAGS_ARCH}" STREQUAL "i686")
+      if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+        list(APPEND result "-momit-leaf-frame-pointer")
+      else()
+        list(APPEND result "/Oy")
+      endif()
     endif()
   else()
     if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
@@ -223,7 +228,7 @@ function(_add_variant_c_compile_flags)
       endif()
     endif()
 
-    # MSVC/clang-cl don't support -fno-pic or -fms-compatability-version.
+    # MSVC/clang-cl don't support -fno-pic or -fms-compatibility-version.
     if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
       list(APPEND result -fno-pic)
       list(APPEND result "-fms-compatibility-version=1900")

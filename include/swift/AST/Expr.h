@@ -840,6 +840,14 @@ public:
       return DigitsLoc;
   }
 
+  SourceLoc getMinusLoc() const {
+    return MinusLoc;
+  }
+
+  SourceLoc getDigitsLoc() const {
+    return DigitsLoc;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_NumberLiteralExpr
       && E->getKind() <= ExprKind::Last_NumberLiteralExpr;

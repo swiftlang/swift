@@ -9,12 +9,12 @@ import gizmo
 
 // CHECK: [[CLASS:%objc_class]] = type
 // CHECK: [[TYPE:%swift.type]] = type
-// CHECK: [[HOOZIT:%C10objc_super6Hoozit]] = type
-// CHECK: [[PARTIAL_APPLY_CLASS:%C10objc_super12PartialApply]] = type
+// CHECK: [[HOOZIT:%T10objc_super6HoozitC]] = type
+// CHECK: [[PARTIAL_APPLY_CLASS:%T10objc_super12PartialApplyC]] = type
 // CHECK: [[SUPER:%objc_super]] = type
 // CHECK: [[OBJC:%objc_object]] = type
-// CHECK: [[GIZMO:%CSo5Gizmo]] = type
-// CHECK: [[NSRECT:%VSC6NSRect]] = type
+// CHECK: [[GIZMO:%TSo5GizmoC]] = type
+// CHECK: [[NSRECT:%TSC6NSRectV]] = type
 
 class Hoozit : Gizmo {
   // CHECK: define hidden swiftcc void @_T010objc_super6HoozitC4frobyyF([[HOOZIT]]* swiftself) {{.*}} {
@@ -37,7 +37,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden swiftcc { double, double, double, double } @_T010objc_super6HoozitC5frameSC6NSRectVyF(%C10objc_super6Hoozit* swiftself) {{.*}} {
+  // CHECK: define hidden swiftcc { double, double, double, double } @_T010objc_super6HoozitC5frameSC6NSRectVyF(%T10objc_super6HoozitC* swiftself) {{.*}} {
   override func frame() -> NSRect {
     // CHECK: [[T0:%.*]] = call [[TYPE]]* @_T010objc_super6HoozitCMa()
     // CHECK: [[T1:%.*]] = bitcast [[TYPE]]* [[T0]] to [[CLASS]]*
@@ -48,7 +48,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden swiftcc [[HOOZIT]]* @_T010objc_super6HoozitCACSi1x_tcfc(i64, %C10objc_super6Hoozit* swiftself) {{.*}} {
+  // CHECK: define hidden swiftcc [[HOOZIT]]* @_T010objc_super6HoozitCACSi1x_tcfc(i64, %T10objc_super6HoozitC* swiftself) {{.*}} {
   init(x:Int) {
     // CHECK: load i8*, i8** @"\01L_selector(init)"
     // CHECK: call [[OPAQUE:.*]]* bitcast (void ()* @objc_msgSendSuper2 to [[OPAQUE:.*]]* (%objc_super*, i8*)*)([[SUPER]]* {{.*}}, i8* {{.*}})
@@ -58,7 +58,7 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden swiftcc [[HOOZIT]]* @_T010objc_super6HoozitCACSi1y_tcfc(i64, %C10objc_super6Hoozit* swiftself) {{.*}} {
+  // CHECK: define hidden swiftcc [[HOOZIT]]* @_T010objc_super6HoozitCACSi1y_tcfc(i64, %T10objc_super6HoozitC* swiftself) {{.*}} {
   init(y:Int) {
     // CHECK: load i8*, i8** @"\01L_selector(initWithBellsOn:)"
     // CHECK: call [[OPAQUE:.*]]* bitcast (void ()* @objc_msgSendSuper2 to [[OPAQUE:.*]]* (%objc_super*, i8*, i64)*)([[SUPER]]* {{.*}}, i8* {{.*}}, i64 {{.*}})

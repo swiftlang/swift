@@ -15,6 +15,7 @@ add_swift_unittest(SwiftBasicTests
   FileSystemTest.cpp
   ImmutablePointerSetTest.cpp
   OptionSetTest.cpp
+  OwnedStringTest.cpp
   PointerIntEnumTest.cpp
   PrefixMapTest.cpp
   RangeTest.cpp

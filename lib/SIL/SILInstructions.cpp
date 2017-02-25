@@ -1533,6 +1533,26 @@ InitExistentialAddrInst *InitExistentialAddrInst::create(
                                                 Conformances);
 }
 
+InitExistentialOpaqueInst *InitExistentialOpaqueInst::create(
+    SILDebugLocation Loc, SILType ExistentialType, CanType ConcreteType,
+    SILValue Instance, ArrayRef<ProtocolConformanceRef> Conformances,
+    SILFunction *F, SILOpenedArchetypesState &OpenedArchetypes) {
+  SILModule &Mod = F->getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, *F,
+                               ConcreteType);
+  unsigned size =
+      totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+
+  void *Buffer = Mod.allocateInst(size, alignof(InitExistentialRefInst));
+  for (ProtocolConformanceRef C : Conformances)
+    declareWitnessTable(Mod, C);
+
+  return ::new (Buffer)
+      InitExistentialOpaqueInst(Loc, ExistentialType, ConcreteType, Instance,
+                                TypeDependentOperands, Conformances);
+}
+
 InitExistentialRefInst *
 InitExistentialRefInst::create(SILDebugLocation Loc, SILType ExistentialType,
                                CanType ConcreteType, SILValue Instance,
@@ -1750,6 +1770,21 @@ UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
   void *Buffer = Mod.allocateInst(size, alignof(UnconditionalCheckedCastInst));
   return ::new (Buffer) UnconditionalCheckedCastInst(DebugLoc, Operand,
                                                      TypeDependentOperands, DestTy);
+}
+
+UnconditionalCheckedCastOpaqueInst *UnconditionalCheckedCastOpaqueInst::create(
+    SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy, SILFunction &F,
+    SILOpenedArchetypesState &OpenedArchetypes) {
+  SILModule &Mod = F.getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               DestTy.getSwiftRValueType());
+  unsigned size =
+      totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+  void *Buffer =
+      Mod.allocateInst(size, alignof(UnconditionalCheckedCastOpaqueInst));
+  return ::new (Buffer) UnconditionalCheckedCastOpaqueInst(
+      DebugLoc, Operand, TypeDependentOperands, DestTy);
 }
 
 CheckedCastBranchInst *CheckedCastBranchInst::create(

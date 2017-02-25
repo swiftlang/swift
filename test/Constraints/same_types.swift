@@ -63,7 +63,7 @@ func fail1<
 func fail2<
   T: Fooable, U: Fooable
 >(_ t: T, u: U) -> (X, Y)
-  where T.Foo == U.Foo, T.Foo == X, U.Foo == Y { // expected-error{{generic parameter 'T.Foo' cannot be equal to both 'X' and 'Y'}}
+  where T.Foo == U.Foo, T.Foo == X, U.Foo == Y { // expected-error{{generic parameter 'U.Foo' cannot be equal to both 'X' and 'Y'}}
   return (t.foo, u.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Y'}}
 }
 
@@ -73,7 +73,7 @@ func test4<T: Barrable>(_ t: T) -> Y where T.Bar == Y {
 
 func fail3<T: Barrable>(_ t: T) -> X
   where T.Bar == X { // expected-error {{'X' does not conform to required protocol 'Fooable'}}
-  return t.bar // expected-error{{cannot convert return expression of type 'T.Bar' to return type 'X'}}
+  return t.bar
 }
 
 func test5<T: Barrable>(_ t: T) -> X where T.Bar.Foo == X {

@@ -2183,14 +2183,8 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
         continue;
         for (auto var : Vars) {
           if (var->hasName() && var->getName() == expected->getName()) {
-            auto value = VarLocs[var].value;
-            
-            for (auto cmv : argArray) {
-              if (cmv.getValue() == value) {
-                value = B.emitCopyValueOperation(CurrentSILLoc, value);
-                break;
-              }
-            }
+            auto value = B.emitCopyValueOperation(CurrentSILLoc,
+                                                  VarLocs[var].value);
             args.push_back(value);
             break;
           }

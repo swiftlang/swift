@@ -56,7 +56,7 @@ public:
 #pragma mark balanced-tokens API
 
 /// balanced-tokens -> Any identifier, keyword, literal, or operator
-///                  | Any punctuation except (­, )­, [­, ]­, {­, or }­
+///                  | Any punctuation except (, ), [, ], {, or }
 class BalancedTokensSyntax final : public Syntax {
   friend struct SyntaxFactory;
   friend class SyntaxData;
@@ -229,16 +229,16 @@ public:
 #pragma mark -
 #pragma mark type-syntax API
 
-/// type -> array-type­
-///       | dictionary-type­
-///       | function-type­
-///       | type-identifier­
-///       | tuple-type­
-///       | optional-type­
-///       | implicitly-unwrapped-optional-type­
-///       | protocol-composition-type­
-///       | metatype-type­
-///       | 'Any­'
+/// type -> array-type
+///       | dictionary-type
+///       | function-type
+///       | type-identifier
+///       | tuple-type
+///       | optional-type
+///       | implicitly-unwrapped-optional-type
+///       | protocol-composition-type
+///       | metatype-type
+///       | 'Any'
 ///       | 'Self'
 class TypeSyntax : public Syntax {
   using DataType = TypeSyntaxData;
@@ -662,7 +662,7 @@ public:
 };
 
 #pragma mark -
-#pragma mark implicity-unwrapped-optional-type Data
+#pragma mark implicitly-unwrapped-optional-type Data
 
 class ImplicitlyUnwrappedOptionalTypeSyntaxData final : public TypeSyntaxData {
   friend struct SyntaxFactory;
@@ -683,7 +683,7 @@ public:
 };
 
 #pragma mark -
-#pragma mark implicity-unwrapped-optional-type API
+#pragma mark implicitly-unwrapped-optional-type API
 
 /// implicitly-unwrapped-optional-type -> type '!'
 class ImplicitlyUnwrappedOptionalTypeSyntax final : public TypeSyntax {
@@ -728,8 +728,6 @@ public:
 class ArrayTypeSyntaxData final : public TypeSyntaxData {
   friend class SyntaxData;
   friend struct SyntaxFactory;
-
-  RC<TypeSyntaxData> CachedElemenType;
 
   ArrayTypeSyntaxData(RC<RawSyntax> Raw,
                       const SyntaxData *Parent = nullptr,

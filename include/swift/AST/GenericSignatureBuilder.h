@@ -138,7 +138,7 @@ private:
 
   /// The actual storage, described by \c storageKind.
   union {
-    /// The type representation descibing where the requirement came from.
+    /// The type representation describing where the requirement came from.
     const TypeRepr *typeRepr;
 
     /// Where a requirement came from.
@@ -296,6 +296,11 @@ public:
   /// path.
   bool isDerivedRequirement() const;
 
+  /// Whether the requirement is derived via some concrete conformance, e.g.,
+  /// a concrete type's conformance to a protocol or a superclass's conformance
+  /// to a protocol.
+  bool isDerivedViaConcreteConformance() const;
+
   /// Retrieve a source location that corresponds to the requirement.
   SourceLoc getLoc() const;
 
@@ -366,6 +371,9 @@ public:
   /// type or some type derived from it.
   class PotentialArchetype;
 
+  using UnresolvedType = llvm::PointerUnion<PotentialArchetype *, Type>;
+  struct ResolvedType;
+
   using RequirementRHS =
       llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
 
@@ -419,6 +427,49 @@ private:
                                 llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
 
 public:
+  /// \brief Add a new same-type requirement between two fully resolved types
+  /// (output of \c GenericSignatureBuilder::resolve).
+  ///
+  /// If the types refer to two concrete types that are fundamentally
+  /// incompatible (e.g. \c Foo<Bar<T>> and \c Foo<Baz>), \c diagnoseMismatch is
+  /// called with the two types that don't match (\c Bar<T> and \c Baz for the
+  /// previous example).
+  bool
+  addSameTypeRequirement(ResolvedType paOrT1, ResolvedType paOrT2,
+                         const RequirementSource *Source,
+                         llvm::function_ref<void(Type, Type)> diagnoseMismatch);
+
+  /// \brief Add a new same-type requirement between two fully resolved types
+  /// (output of GenericSignatureBuilder::resolve).
+  ///
+  /// The two types must not be incompatible concrete types.
+  bool addSameTypeRequirement(ResolvedType paOrT1, ResolvedType paOrT2,
+                              const RequirementSource *Source);
+
+  /// \brief Add a new same-type requirement between two unresolved types.
+  ///
+  /// The types are resolved with \c GenericSignatureBuilder::resolve, and must
+  /// not be incompatible concrete types.
+  bool addSameTypeRequirement(UnresolvedType paOrT1, UnresolvedType paOrT2,
+                              const RequirementSource *Source);
+
+  /// \brief Add a new same-type requirement between two unresolved types.
+  ///
+  /// The types are resolved with \c GenericSignatureBuilder::resolve. \c
+  /// diagnoseMismatch is called if the two types refer to incompatible concrete
+  /// types.
+  bool
+  addSameTypeRequirement(UnresolvedType paOrT1, UnresolvedType paOrT2,
+                         const RequirementSource *Source,
+                         llvm::function_ref<void(Type, Type)> diagnoseMismatch);
+
+private:
+  /// \brief Add a new superclass requirement specifying that the given
+  /// potential archetype has the given type as an ancestor.
+  bool addSuperclassRequirement(PotentialArchetype *T,
+                                Type Superclass,
+                                const RequirementSource *Source);
+
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetypes are equivalent.
   bool addSameTypeRequirementBetweenArchetypes(PotentialArchetype *T1,
@@ -431,21 +482,14 @@ public:
                                         Type Concrete,
                                         const RequirementSource *Source);
 
-private:
-  /// \brief Add a new superclass requirement specifying that the given
-  /// potential archetype has the given type as an ancestor.
-  bool addSuperclassRequirement(PotentialArchetype *T, 
-                                Type Superclass,
-                                const RequirementSource *Source);
-
   /// \brief Add a new same-type requirement specifying that the given two
   /// types should be the same.
   ///
   /// \param diagnoseMismatch Callback invoked when the types in the same-type
   /// requirement mismatch.
-  bool addSameTypeRequirement(
-                        Type T1, Type T2, const RequirementSource *Source,
-                        llvm::function_ref<void(Type, Type)> diagnoseMismatch);
+  bool addSameTypeRequirementBetweenConcrete(
+      Type T1, Type T2, const RequirementSource *Source,
+      llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
   /// Add the requirements placed on the given type parameter
   /// to the given potential archetype.
@@ -587,6 +631,16 @@ public:
   /// For any type that cannot refer to an archetype, this routine returns null.
   PotentialArchetype *resolveArchetype(Type type);
 
+  /// \brief Resolve the given type as far as this Builder knows how.
+  ///
+  /// This returns either a non-typealias potential archetype or a Type, if \c
+  /// type is concrete.
+  // FIXME: the hackTypeFromGenericTypeAlias is just temporarily patching over
+  // problems with generic typealiases (see the comment on the ResolvedType
+  // function)
+  ResolvedType resolve(UnresolvedType type,
+                       bool hackTypeFromGenericTypeAlias = false);
+
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(),
@@ -663,7 +717,8 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// constrained.
   Type ConcreteType;
 
-  /// The source of the concrete type requirement.
+  /// The source of the concrete type requirement, if one was written
+  /// on this potential archetype.
   const RequirementSource *ConcreteTypeSource = nullptr;
 
   /// Whether this is an unresolved nested type.
@@ -887,14 +942,15 @@ public:
                             SameTypeConstraints.end());
   }
 
-  /// Retrieve the source of the same-type constraint that maps this potential
-  /// archetype to a concrete type.
-  const RequirementSource *getConcreteTypeSource() const {
-    if (Representative != this)
-      return Representative->getConcreteTypeSource();
-
+  /// Retrieve the concrete type source as written on this potential archetype.
+  const RequirementSource *getConcreteTypeSourceAsWritten() const {
     return ConcreteTypeSource;
   }
+
+  /// Find a source of the same-type constraint that maps this potential
+  /// archetype to a concrete type somewhere in the equivalence class of this
+  /// type.
+  const RequirementSource *findAnyConcreteTypeSourceAsWritten() const;
 
   /// \brief Retrieve (or create) a nested type with the given name.
   PotentialArchetype *getNestedType(Identifier Name,

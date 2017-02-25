@@ -1075,10 +1075,12 @@ static void resolveCursor(SwiftLangSupport &Lang,
       CompilerInvocation CompInvok;
       ASTInvok->applyTo(CompInvok);
 
-      if (SemaTok.Mod) {
+      switch (SemaTok.Kind) {
+      case SemaTokenKind::ModuleRef:
         passCursorInfoForModule(SemaTok.Mod, Lang.getIFaceGenContexts(),
                                 CompInvok, Receiver);
-      } else {
+        return;
+      case SemaTokenKind::ValueRef: {
         ValueDecl *VD = SemaTok.CtorTyRef ? SemaTok.CtorTyRef : SemaTok.ValueD;
         bool Failed = passCursorInfoForDecl(VD, MainModule,
                                             SemaTok.ContainerType,
@@ -1095,6 +1097,15 @@ static void resolveCursor(SwiftLangSupport &Lang,
             Receiver({});
           }
         }
+        return;
+      }
+      case SemaTokenKind::StmtStart: {
+        Receiver({});
+        return;
+      }
+      case SemaTokenKind::Invalid: {
+        llvm_unreachable("bad sema token kind");
+      }
       }
     }
 
@@ -1169,9 +1180,11 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
       CompilerInvocation CompInvok;
       ASTInvok->applyTo(CompInvok);
 
-      if (SemaTok.Mod) {
+      switch(SemaTok.Kind) {
+      case SemaTokenKind::ModuleRef:
+        return;
 
-      } else {
+      case SemaTokenKind::ValueRef: {
         bool Failed = passNameInfoForDecl(SemaTok.ValueD, Input, Receiver);
         if (Failed) {
           if (!getPreviousASTSnaps().empty()) {
@@ -1182,6 +1195,14 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
             Receiver({});
           }
         }
+        return;
+      }
+      case SemaTokenKind::StmtStart: {
+        Receiver({});
+        return;
+      }
+      case SemaTokenKind::Invalid:
+        llvm_unreachable("bad sema token kind.");
       }
     }
 

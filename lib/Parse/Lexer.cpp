@@ -737,8 +737,7 @@ syntax::RC<syntax::TokenSyntax> Lexer::fullLex() {
     TrailingTrivia.push_front(syntax::TriviaPiece::backtick());
   }
   auto Result = syntax::TokenSyntax::make(NextToken.getKind(),
-                                        OwnedString(NextToken.getText(),
-                                                    StringOwnership::Copied),
+                                        OwnedString(NextToken.getText()).copy(),
                                         syntax::SourcePresence::Present,
                                         {LeadingTrivia}, {TrailingTrivia});
   LeadingTrivia.clear();
@@ -1951,19 +1950,19 @@ Optional<syntax::TriviaPiece> Lexer::lexWhitespace(bool StopAtFirstNewline) {
       return syntax::TriviaPiece {
         syntax::TriviaKind::Newline,
         Length,
-        OwnedString(Start, Length, StringOwnership::Unowned),
+        OwnedString(Start, Length),
       };
     case ' ':
       return syntax::TriviaPiece {
         syntax::TriviaKind::Space,
         Length,
-        OwnedString(Start, Length, StringOwnership::Unowned),
+        OwnedString(Start, Length),
       };
     case '\t':
       return syntax::TriviaPiece {
         syntax::TriviaKind::Tab,
         Length,
-        OwnedString(Start, Length, StringOwnership::Unowned),
+        OwnedString(Start, Length),
       };
     default:
       return None;
@@ -1982,7 +1981,7 @@ Optional<syntax::TriviaPiece> Lexer::lexSingleLineComment(syntax::TriviaKind Kin
   return Optional<syntax::TriviaPiece>({
     Kind,
     Length,
-    OwnedString(Start, Length, StringOwnership::Unowned)
+    OwnedString(Start, Length)
   });
 }
 
@@ -1997,7 +1996,7 @@ Lexer::lexBlockComment(syntax::TriviaKind Kind) {
   return Optional<syntax::TriviaPiece>({
     Kind,
     Length,
-    OwnedString(Start, Length, StringOwnership::Unowned)
+    OwnedString(Start, Length)
   });
 }
 

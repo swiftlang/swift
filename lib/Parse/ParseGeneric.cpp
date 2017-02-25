@@ -94,10 +94,10 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     // We always create generic type parameters with a depth of zero.
     // Semantic analysis fills in the depth when it processes the generic
     // parameter list.
-    auto Param = new (Context) GenericTypeParamDecl(CurDeclContext, Name,
-                                                    NameLoc,
-                                                    /*Bogus depth=*/0xFFFF,
-                                                    GenericParams.size());
+    auto Param = new (Context) GenericTypeParamDecl(
+        CurDeclContext, Name, NameLoc,
+        GenericTypeParamDecl::InvalidDepth,
+        GenericParams.size());
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);

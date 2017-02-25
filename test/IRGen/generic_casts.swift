@@ -34,7 +34,7 @@ import gizmo
 // CHECK: define hidden swiftcc i64 @_TF13generic_casts8allToInt{{.*}}(%swift.opaque* noalias nocapture, %swift.type* %T)
 func allToInt<T>(_ x: T) -> Int {
   return x as! Int
-  // CHECK: [[INT_TEMP:%.*]] = alloca %Si,
+  // CHECK: [[INT_TEMP:%.*]] = alloca %TSi,
 	// CHECK: [[TYPE_ADDR:%.*]] = bitcast %swift.type* %T to i8***
   // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_ADDR]], i64 -1
   // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
@@ -44,19 +44,19 @@ func allToInt<T>(_ x: T) -> Int {
   // CHECK: [[T_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
   // CHECK: [[T_TMP:%.*]] = bitcast i8* [[T_ALLOCA]] to %swift.opaque*
   // CHECK: [[TEMP:%.*]] = call %swift.opaque* {{.*}}(%swift.opaque* [[T_TMP]], %swift.opaque* %0, %swift.type* %T)
-  // CHECK: [[T0:%.*]] = bitcast %Si* [[INT_TEMP]] to %swift.opaque*
+  // CHECK: [[T0:%.*]] = bitcast %TSi* [[INT_TEMP]] to %swift.opaque*
   // CHECK: call i1 @swift_rt_swift_dynamicCast(%swift.opaque* [[T0]], %swift.opaque* [[T_TMP]], %swift.type* %T, %swift.type* @_TMSi, i64 7)
-  // CHECK: [[T0:%.*]] = getelementptr inbounds %Si, %Si* [[INT_TEMP]], i32 0, i32 0
+  // CHECK: [[T0:%.*]] = getelementptr inbounds %TSi, %TSi* [[INT_TEMP]], i32 0, i32 0
   // CHECK: [[INT_RESULT:%.*]] = load i64, i64* [[T0]],
   // CHECK: ret i64 [[INT_RESULT]]
 }
 
 // CHECK: define hidden swiftcc void @_TF13generic_casts8intToAll{{.*}}(%swift.opaque* noalias nocapture sret, i64, %swift.type* %T) {{.*}} {
 func intToAll<T>(_ x: Int) -> T {
-  // CHECK: [[INT_TEMP:%.*]] = alloca %Si,
-  // CHECK: [[T0:%.*]] = getelementptr inbounds %Si, %Si* [[INT_TEMP]], i32 0, i32 0
+  // CHECK: [[INT_TEMP:%.*]] = alloca %TSi,
+  // CHECK: [[T0:%.*]] = getelementptr inbounds %TSi, %TSi* [[INT_TEMP]], i32 0, i32 0
   // CHECK: store i64 %1, i64* [[T0]],
-  // CHECK: [[T0:%.*]] = bitcast %Si* [[INT_TEMP]] to %swift.opaque*
+  // CHECK: [[T0:%.*]] = bitcast %TSi* [[INT_TEMP]] to %swift.opaque*
   // CHECK: call i1 @swift_rt_swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[T0]], %swift.type* @_TMSi, %swift.type* %T, i64 7)
   return x as! T
 }
@@ -77,7 +77,7 @@ func anyToInt(_ x: Any) -> Int {
 
 @objc class ObjCClass {}
 
-// CHECK: define hidden swiftcc %objc_object* @_TF13generic_casts9protoCast{{.*}}(%C13generic_casts9ObjCClass*) {{.*}} {
+// CHECK: define hidden swiftcc %objc_object* @_TF13generic_casts9protoCast{{.*}}(%T13generic_casts9ObjCClassC*) {{.*}} {
 func protoCast(_ x: ObjCClass) -> ObjCProto1 & NSRuncing {
   // CHECK: load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP13generic_casts10ObjCProto1_"
   // CHECK: load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing"
@@ -97,9 +97,9 @@ func protoCast(_ x: ObjCClass) -> ObjCProto1 & NSRuncing {
 // CHECK: define hidden swiftcc void @_TF13generic_casts33classExistentialToOpaqueArchetype{{.*}}(%swift.opaque* noalias nocapture sret, %objc_object*, %swift.type* %T)
 func classExistentialToOpaqueArchetype<T>(_ x: ObjCProto1) -> T {
   var x = x
-  // CHECK: [[X:%.*]] = alloca %P13generic_casts10ObjCProto1_
-  // CHECK: [[LOCAL:%.*]] = alloca %P13generic_casts10ObjCProto1_
-  // CHECK: [[LOCAL_OPAQUE:%.*]] = bitcast %P13generic_casts10ObjCProto1_* [[LOCAL]] to %swift.opaque*
+  // CHECK: [[X:%.*]] = alloca %T13generic_casts10ObjCProto1P
+  // CHECK: [[LOCAL:%.*]] = alloca %T13generic_casts10ObjCProto1P
+  // CHECK: [[LOCAL_OPAQUE:%.*]] = bitcast %T13generic_casts10ObjCProto1P* [[LOCAL]] to %swift.opaque*
   // CHECK: [[PROTO_TYPE:%.*]] = call %swift.type* @_TMaP13generic_casts10ObjCProto1_()
   // CHECK: call i1 @swift_rt_swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[LOCAL_OPAQUE]], %swift.type* [[PROTO_TYPE]], %swift.type* %T, i64 7)
   return x as! T
@@ -108,7 +108,7 @@ func classExistentialToOpaqueArchetype<T>(_ x: ObjCProto1) -> T {
 protocol P {}
 protocol Q {}
 
-// CHECK: define hidden swiftcc void @_TF13generic_casts19compositionToMemberFPS_1PS_1Q_PS0__{{.*}}(%P13generic_casts1P_* noalias nocapture sret, %"_TP13generic_casts1P&_TP13generic_casts1Q"* noalias nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK: define hidden swiftcc void @_TF13generic_casts19compositionToMemberFPS_1PS_1Q_PS0__{{.*}}(%T13generic_casts1PP* noalias nocapture sret, %T13generic_casts1P_AA1Qp* noalias nocapture dereferenceable({{.*}})) {{.*}} {
 func compositionToMember(_ a: P & Q) -> P {
   return a
 }

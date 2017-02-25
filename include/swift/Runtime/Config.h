@@ -17,8 +17,6 @@
 #ifndef SWIFT_RUNTIME_CONFIG_H
 #define SWIFT_RUNTIME_CONFIG_H
 
-#include "llvm/Support/Compiler.h"
-
 /// Does the current Swift platform support "unbridged" interoperation
 /// with Objective-C?  If so, the implementations of various types must
 /// implicitly handle Objective-C pointers.
@@ -35,10 +33,10 @@
 /// Does the current Swift platform use LLVM's intrinsic "swiftcall"
 /// calling convention for Swift functions?
 #ifndef SWIFT_USE_SWIFTCALL
-#ifdef __s390x__
+#if __has_attribute(swiftcall) || defined(__linux__)
 #define SWIFT_USE_SWIFTCALL 1
 #else
-#define SWIFT_USE_SWIFTCALL 1
+#define SWIFT_USE_SWIFTCALL 0
 #endif
 #endif
 

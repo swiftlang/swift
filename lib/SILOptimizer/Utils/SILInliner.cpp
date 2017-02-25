@@ -354,6 +354,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::IndexRawPointerInst:
     case ValueKind::InitEnumDataAddrInst:
     case ValueKind::InitExistentialAddrInst:
+    case ValueKind::InitExistentialOpaqueInst:
     case ValueKind::InitExistentialMetatypeInst:
     case ValueKind::InitExistentialRefInst:
     case ValueKind::InjectEnumAddrInst:
@@ -391,6 +392,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::UncheckedTakeEnumDataAddrInst:
     case ValueKind::UnconditionalCheckedCastInst:
     case ValueKind::UnconditionalCheckedCastAddrInst:
+    case ValueKind::UnconditionalCheckedCastOpaqueInst:
     case ValueKind::UnmanagedToRefInst:
     case ValueKind::UnownedReleaseInst:
     case ValueKind::UnownedRetainInst:

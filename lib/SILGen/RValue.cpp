@@ -17,11 +17,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Initialization.h"
 #include "RValue.h"
+#include "Initialization.h"
+#include "SILGenFunction.h"
+#include "swift/AST/CanTypeVisitor.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/AST/CanTypeVisitor.h"
 
 using namespace swift;
 using namespace Lowering;

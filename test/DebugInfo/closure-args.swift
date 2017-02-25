@@ -11,9 +11,9 @@ func main() -> Void
 
     var backward_ptr  =
     // CHECK: define linkonce_odr hidden {{.*}} i1 @_T04mainAAyyFSbSS_SStcfU_(
-    // CHECK: %[[RANDOM_STR_ADDR:.*]] = alloca %SS*, align {{(4|8)}}
-    // CHECK: store %SS* %{{.*}}, %SS** %[[RANDOM_STR_ADDR]], align {{(4|8)}}
-    // CHECK-NEXT: call void @llvm.dbg.declare(metadata %SS** %[[RANDOM_STR_ADDR]], metadata !{{.*}}, metadata !{{[0-9]+}}), !dbg
+    // CHECK: %[[RANDOM_STR_ADDR:.*]] = alloca %TSS*, align {{(4|8)}}
+    // CHECK: store %TSS* %{{.*}}, %TSS** %[[RANDOM_STR_ADDR]], align {{(4|8)}}
+    // CHECK-NEXT: call void @llvm.dbg.declare(metadata %TSS** %[[RANDOM_STR_ADDR]], metadata !{{.*}}, metadata !{{[0-9]+}}), !dbg
     // CHECK-DAG: !DILocalVariable(name: "lhs",{{.*}} line: [[@LINE+5]],
     // CHECK-DAG: !DILocalVariable(name: "rhs",{{.*}} line: [[@LINE+4]],
     // CHECK-DAG: !DILocalVariable(name: "random_string",{{.*}} line: 8,

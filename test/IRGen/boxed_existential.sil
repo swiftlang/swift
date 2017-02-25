@@ -43,7 +43,7 @@ entry(%x : $SomeError):
   // CHECK: [[BOX_PAIR:%.*]] = call { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* {{.*}} @_T017boxed_existential9SomeErrorVMf, {{.*}}, i8** {{%.*|@_T017boxed_existential9SomeErrorVs0D0AAWP}}, %swift.opaque* null, i1 false)
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 0
   // CHECK: [[OPAQUE_ADDR:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 1
-  // CHECK: [[ADDR:%.*]] = bitcast %swift.opaque* [[OPAQUE_ADDR]] to %V17boxed_existential9SomeError*
+  // CHECK: [[ADDR:%.*]] = bitcast %swift.opaque* [[OPAQUE_ADDR]] to %T17boxed_existential9SomeErrorV*
   %b = alloc_existential_box $Error, $SomeError
   %p = project_existential_box $SomeError in %b : $Error
   store %x to %p : $*SomeError

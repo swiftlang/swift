@@ -53,7 +53,7 @@ TEST(DeclSyntaxTests, TypealiasMakeAPIs) {
   }
 }
 
-TEST(DeclSyntaxTest, TypealiasWithAPIs) {
+TEST(DeclSyntaxTests, TypealiasWithAPIs) {
   auto Typealias =
     SyntaxFactory::makeTypealiasKeyword({}, { Trivia::spaces(1) });
   auto MyCollection = SyntaxFactory::makeIdentifier("MyCollection", {}, {});

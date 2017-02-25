@@ -22,10 +22,10 @@ bb0(%0 : $*S):
   return %2 : $@callee_owned (@in O) -> ()
 }
 
-// CHECK-LABEL: define internal swiftcc %GC23partial_apply_forwarder1DCS_1C_* @_TPA_unspecialized_uncurried(%swift.refcounted*
+// CHECK-LABEL: define internal swiftcc %T23partial_apply_forwarder1DCyAA1CCG* @_TPA_unspecialized_uncurried(%swift.refcounted*
 // CHECK: [[TYPE:%.*]] = call %swift.type* @_TMaC23partial_apply_forwarder1C()
-// CHECK: [[CAST:%.*]] = bitcast %swift.refcounted* %0 to %C23partial_apply_forwarder1E*
-// CHECK: [[CALL:%.*]] = call swiftcc %C23partial_apply_forwarder1D* @unspecialized_uncurried(%swift.type* [[TYPE]], i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @_TWPC23partial_apply_forwarder1CS_1PS_, i32 0, i32 0), %C23partial_apply_forwarder1E* swiftself [[CAST]])
+// CHECK: [[CAST:%.*]] = bitcast %swift.refcounted* %0 to %T23partial_apply_forwarder1EC*
+// CHECK: [[CALL:%.*]] = call swiftcc %T23partial_apply_forwarder1DC* @unspecialized_uncurried(%swift.type* [[TYPE]], i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @_TWPC23partial_apply_forwarder1CS_1PS_, i32 0, i32 0), %T23partial_apply_forwarder1EC* swiftself [[CAST]])
 
 sil hidden @specialized_curried : $@convention(thin) (@owned E) -> @owned @callee_owned () -> @owned D<C> {
 bb0(%0 : $E):

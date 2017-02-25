@@ -349,6 +349,12 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
     }
   }
 
+  // If the constraint doesn't reference any type variables, it's orphaned;
+  // track it as such.
+  if (referencedTypeVars.empty()) {
+    OrphanedConstraints.push_back(constraint);
+  }
+
   // Record the change, if there are active scopes.
   if (ActiveScope)
     Changes.push_back(Change::addedConstraint(constraint));
@@ -373,6 +379,16 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
 
       node.removeAdjacency(otherTypeVar);
     }
+  }
+
+  // If this is an orphaned constraint, remove it from the list.
+  if (referencedTypeVars.empty()) {
+    auto known = std::find(OrphanedConstraints.begin(),
+                           OrphanedConstraints.end(),
+                           constraint);
+    assert(known != OrphanedConstraints.end() && "missing orphaned constraint");
+    *known = OrphanedConstraints.back();
+    OrphanedConstraints.pop_back();
   }
 
   // Record the change, if there are active scopes.
@@ -578,9 +594,9 @@ unsigned ConstraintGraph::computeConnectedComponents(
     if (CS.getFixedType(TypeVariables[i]))
       continue;
 
-    // If we only care about a subset, and this type variable isn't in that
-    // subset, skip it.
-    if (!typeVarSubset.empty() && typeVarSubset.count(TypeVariables[i]) == 0)
+    // If this type variable isn't in the subset of type variables we care
+    // about, skip it.
+    if (typeVarSubset.count(TypeVariables[i]) == 0)
       continue;
 
     componentHasUnboundTypeVar[components[i]] = true;
@@ -611,7 +627,7 @@ unsigned ConstraintGraph::computeConnectedComponents(
   }
   components.erase(components.begin() + outIndex, components.end());
 
-  return numComponents;
+  return numComponents + getOrphanedConstraints().size();
 }
 
 
@@ -861,6 +877,7 @@ void ConstraintGraph::dump() {
 
 void ConstraintGraph::printConnectedComponents(llvm::raw_ostream &out) {
   SmallVector<TypeVariableType *, 16> typeVars;
+  typeVars.append(TypeVariables.begin(), TypeVariables.end());
   SmallVector<unsigned, 16> components;
   unsigned numComponents = computeConnectedComponents(typeVars, components);
   for (unsigned component = 0; component != numComponents; ++component) {

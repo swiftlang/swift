@@ -6321,6 +6321,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         auto arg = apply->getArg();
         if (auto tuple = dyn_cast<TupleExpr>(arg))
           arg = tuple->getElements()[0];
+        arg = cs.coerceToRValue(arg);
         auto replacement = new (tc.Context)
           DynamicTypeExpr(apply->getFn()->getLoc(),
                           apply->getArg()->getStartLoc(),

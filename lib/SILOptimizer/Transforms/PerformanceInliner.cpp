@@ -30,7 +30,7 @@ llvm::cl::opt<bool> PrintShortestPathInfo(
     llvm::cl::desc("Print shortest-path information for inlining"));
 
 llvm::cl::opt<bool> EnableSILInliningOfGenerics(
-  "sil-inline-generics", llvm::cl::init(false),
+  "sil-inline-generics", llvm::cl::init(true),
   llvm::cl::desc("Enable inlining of generics"));
 
 //===----------------------------------------------------------------------===//
@@ -179,7 +179,7 @@ static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
   SILFunction *Callee = AI.getReferencedFunction();
   auto Subs = AI.getSubstitutions();
 
-  // Bail if there are no open existnetials in the list of substitutions.
+  // Bail if there are no open existentials in the list of substitutions.
   bool HasNoOpenedExistentials = true;
   for (auto Sub : Subs) {
     if (Sub.getReplacement()->hasOpenedExistential()) {
@@ -298,7 +298,12 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
     return nullptr;
   }
 
-  // IRGen cannot handle partial_applies containing opened_extistentials
+  if (!EnableSILInliningOfGenerics && AI.hasSubstitutions()) {
+    // Inlining of generics is not allowed.
+    return nullptr;
+  }
+
+  // IRGen cannot handle partial_applies containing opened_existentials
   // in its substitutions list.
   if (calleeHasPartialApplyWithOpenedExistentials(AI)) {
     return nullptr;
@@ -321,6 +326,8 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
                                                  int &NumCallerBlocks) {
   SILFunction *Callee = AI.getReferencedFunction();
   bool IsGeneric = !AI.getSubstitutions().empty();
+
+  assert(EnableSILInliningOfGenerics || !IsGeneric);
 
   // Bail out if this generic call can be optimized by means of
   // the generic specialization, because we prefer generic specialization
@@ -381,8 +388,8 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
 
         auto Subs = FAI.getSubstitutions();
 
-        // Bail if it is not a generic call.
-        if (Subs.empty())
+        // Bail if it is not a generic call or inlining of generics is forbidden.
+        if (!EnableSILInliningOfGenerics || Subs.empty())
           continue;
 
         if (!isa<FunctionRefInst>(def) && !isa<ClassMethodInst>(def) &&
@@ -391,24 +398,6 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
 
         SmallVector<Substitution, 32> NewSubs;
         SubstitutionMap SubstMap;
-        GenericSignature *GenSig = nullptr;
-
-        if (auto FRI = dyn_cast<FunctionRefInst>(def)) {
-          auto Callee = FRI->getReferencedFunction();
-          if (Callee) {
-            GenSig = Callee->getLoweredFunctionType()->getGenericSignature();
-          }
-        } else if (auto CMI = dyn_cast<ClassMethodInst>(def)) {
-          GenSig = CMI->getType()
-                       .getSwiftRValueType()
-                       ->castTo<SILFunctionType>()
-                       ->getGenericSignature();
-        } else if (auto WMI = dyn_cast<WitnessMethodInst>(def)) {
-          GenSig = WMI->getType()
-                       .getSwiftRValueType()
-                       ->castTo<SILFunctionType>()
-                       ->getGenericSignature();
-        }
 
         // It is a generic call inside the callee. Check if after inlining
         // it will be possible to perform a generic specialization or
@@ -539,6 +528,9 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   assert(!AI.getSubstitutions().empty() &&
          "Expected a generic apply");
 
+  if (!EnableSILInliningOfGenerics)
+    return false;
+
   // If all substitutions are concrete, then there is no need to perform the
   // generic inlining. Let the generic specializer create a specialized
   // function and then decide if it is beneficial to inline it.
@@ -559,9 +551,6 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   // AlwaysInline or transparent.
   if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent())
     return true;
-
-  if (!EnableSILInliningOfGenerics)
-    return false;
 
   // It is not clear yet if this function should be decided or not.
   return None;

@@ -184,5 +184,5 @@ def host_toolchain(**kwargs):
     elif sys.startswith('CYGWIN'):
         return Cygwin()
     else:
-        raise NotImplementedError(
-            'toolchain() is not supported in this platform')
+        raise NotImplementedError('The platform "%s" does not have a defined '
+                                  'toolchain.' % sys)

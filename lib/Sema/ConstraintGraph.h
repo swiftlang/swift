@@ -237,17 +237,46 @@ public:
 
   /// Compute the connected components of the graph.
   ///
-  /// \param typeVars The type variables that occur within the
-  /// connected components. If a non-empty vector is passed in, the algorithm
-  /// will only consider type variables reachable from the initial set.
+  /// \param typeVars The type variables that should be included in the
+  /// set of connected components that are returned.
   ///
   /// \param components Receives the component numbers for each type variable
   /// in \c typeVars.
   ///
-  /// \returns the number of connected components in the graph.
+  /// \returns the number of connected components in the graph, which includes
+  /// one component for each of the constraints produced by
+  /// \c getOrphanedConstraints().
   unsigned computeConnectedComponents(
              SmallVectorImpl<TypeVariableType *> &typeVars,
              SmallVectorImpl<unsigned> &components);
+
+  /// Retrieve the set of "orphaned" constraints, which are known to the
+  /// constraint graph but have no type variables to anchor them.
+  ArrayRef<Constraint *> getOrphanedConstraints() const {
+    return OrphanedConstraints;
+  }
+
+  /// Replace the orphaned constraints with the constraints in the given list,
+  /// returning the old set of orphaned constraints.
+  SmallVector<Constraint *, 4> takeOrphanedConstraints() {
+    auto result = std::move(OrphanedConstraints);
+    OrphanedConstraints.clear();
+    return result;
+  }
+
+  /// Set the orphaned constraints.
+  void setOrphanedConstraints(SmallVector<Constraint *, 4> &&newConstraints) {
+    OrphanedConstraints = std::move(newConstraints);
+  }
+
+  /// Set the list of orphaned constraints to a single constraint.
+  ///
+  /// If \c orphaned is null, just clear out the list.
+  void setOrphanedConstraint(Constraint *orphaned) {
+    OrphanedConstraints.clear();
+    if (orphaned)
+      OrphanedConstraints.push_back(orphaned);
+  }
 
   /// Print the graph.
   void print(llvm::raw_ostream &out);
@@ -299,6 +328,9 @@ private:
 
   /// The type variables in this graph, in stable order.
   SmallVector<TypeVariableType *, 4> TypeVariables;
+
+  /// Constraints that are "orphaned" because they contain no type variables.
+  SmallVector<Constraint *, 4> OrphanedConstraints;
 
   /// The kind of change made to the graph.
   enum class ChangeKind {

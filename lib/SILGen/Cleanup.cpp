@@ -218,7 +218,7 @@ CleanupStateRestorationScope::pushCurrentCleanupState(CleanupHandle handle) {
   SavedStates.push_back({handle, oldState});
 }
 
-void CleanupStateRestorationScope::pop() {
+void CleanupStateRestorationScope::popImpl() {
   // Restore cleanup states in the opposite order in which we saved them.
   for (auto i = SavedStates.rbegin(), e = SavedStates.rend(); i != e; ++i) {
     CleanupHandle handle = i->first;
@@ -231,7 +231,11 @@ void CleanupStateRestorationScope::pop() {
            "changing state of dead cleanup");
     cleanup.setState(Cleanups.Gen, stateToRestore);
   }
+
+  SavedStates.clear();
 }
+
+void CleanupStateRestorationScope::pop() && { popImpl(); }
 
 llvm::raw_ostream &Lowering::operator<<(llvm::raw_ostream &os,
                                         CleanupState state) {

@@ -250,7 +250,11 @@ public:
   /// This is the same operation as 'copy', but works on +0 values that don't
   /// have cleanups.  It returns a +1 value with one.
   ManagedValue copyUnmanaged(SILGenFunction &gen, SILLocation loc);
-  
+
+  /// This is the same operation as 'formalAccessCopy', but works on +0 values
+  /// that don't have cleanups.  It returns a +1 value with one.
+  ManagedValue formalAccessCopyUnmanaged(SILGenFunction &gen, SILLocation loc);
+
   bool hasCleanup() const { return cleanup.isValid(); }
   CleanupHandle getCleanup() const { return cleanup; }
 

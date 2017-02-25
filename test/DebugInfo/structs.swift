@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s -emit-ir -g -o - | %FileCheck %s
 
 // Capture the pointer size from type Int
-// CHECK: %Si = type <{ i[[PTRSIZE:[0-9]+]] }>
+// CHECK: %TSi = type <{ i[[PTRSIZE:[0-9]+]] }>
 
 struct A {
   var fn : () -> ()

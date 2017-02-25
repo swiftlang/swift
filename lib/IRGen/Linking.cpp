@@ -99,12 +99,6 @@ std::string LinkEntity::mangleOld() const {
     mangler.mangleType(getType(), 0);
     return mangler.finalize();
 
-  //   global ::= 't' type
-  // Abstract type manglings just follow <type>.
-  case Kind::TypeMangling:
-    mangler.mangleType(getType(), 0);
-    return mangler.finalize();
-
   //   global ::= 'Ma' type               // type metadata access function
   case Kind::TypeMetadataAccessFunction:
     mangler.append("_TMa");
@@ -338,11 +332,6 @@ std::string LinkEntity::mangleNew() const {
       //   global ::= 'WV' type                       // value witness
     case Kind::ValueWitnessTable:
       return mangler.mangleValueWitnessTable(getType());
-
-      //   global ::= 't' type
-      // Abstract type manglings just follow <type>.
-    case Kind::TypeMangling:
-      return mangler.mangleTypeForMetadata(getType());
 
       //   global ::= 'Ma' type               // type metadata access function
     case Kind::TypeMetadataAccessFunction:

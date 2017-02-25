@@ -7,9 +7,9 @@
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[OBJC_CLASS:%objc_class]] = type {
 // CHECK: [[OPAQUE:%swift.opaque]] = type
-// CHECK: [[A:%C8subclass1A]] = type <{ [[REF:%swift.refcounted]], %Si, %Si }>
-// CHECK: [[INT:%Si]] = type <{ i64 }>
-// CHECK: [[B:%C8subclass1B]] = type <{ [[REF]], [[INT]], [[INT]], [[INT]] }>
+// CHECK: [[A:%T8subclass1AC]] = type <{ [[REF:%swift.refcounted]], %TSi, %TSi }>
+// CHECK: [[INT:%TSi]] = type <{ i64 }>
+// CHECK: [[B:%T8subclass1BC]] = type <{ [[REF]], [[INT]], [[INT]], [[INT]] }>
 
 // CHECK: @_DATA__TtC8subclass1A = private constant {{.*\* } }}{
 // CHECK: @_TMfC8subclass1A = internal global [[A_METADATA:<{.*i64 }>]] <{
@@ -57,7 +57,7 @@ class G<T> : A {
 // Ensure that downcasts to generic types instantiate generic metadata instead
 // of trying to reference global metadata. <rdar://problem/14265663>
 
-// CHECK: define hidden swiftcc %GC8subclass1GSi_* @_TF8subclass9a_to_gintF{{.*}}(%C8subclass1A*) {{.*}} {
+// CHECK: define hidden swiftcc %T8subclass1GCySiG* @_TF8subclass9a_to_gintF{{.*}}(%T8subclass1AC*) {{.*}} {
 func a_to_gint(a: A) -> G<Int> {
   // CHECK: call %swift.type* @_TMaGC8subclass1GSi_()
   // CHECK: call i8* @swift_dynamicCastClassUnconditional

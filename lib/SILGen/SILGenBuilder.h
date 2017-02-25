@@ -87,6 +87,11 @@ public:
                             SILType loweredConcreteType,
                             ArrayRef<ProtocolConformanceRef> conformances);
 
+  InitExistentialOpaqueInst *
+  createInitExistentialOpaque(SILLocation Loc, SILType ExistentialType,
+                              CanType FormalConcreteType, SILValue Concrete,
+                              ArrayRef<ProtocolConformanceRef> Conformances);
+
   InitExistentialMetatypeInst *
   createInitExistentialMetatype(SILLocation loc, SILValue metatype,
                                 SILType existentialType,
@@ -142,6 +147,10 @@ public:
                                             ManagedValue originalValue);
   ManagedValue createOwnedPHIArgument(SILType type);
 
+  using SILBuilder::createMarkUninitialized;
+  ManagedValue createMarkUninitialized(ValueDecl *decl, ManagedValue operand,
+                                       MarkUninitializedInst::Kind muKind);
+
   using SILBuilder::createAllocRef;
   ManagedValue createAllocRef(SILLocation loc, SILType refType, bool objc,
                               bool canAllocOnStack,
@@ -187,6 +196,21 @@ public:
   ManagedValue createLoadTake(SILLocation loc, ManagedValue addr);
   ManagedValue createLoadTake(SILLocation loc, ManagedValue addr,
                               const TypeLowering &lowering);
+  ManagedValue createLoadCopy(SILLocation Loc, ManagedValue Addr);
+  ManagedValue createLoadCopy(SILLocation Loc, ManagedValue Addr,
+                              const TypeLowering &Lowering);
+
+  ManagedValue createFunctionArgument(SILType type, ValueDecl *decl);
+
+  using SILBuilder::createEnum;
+  ManagedValue createEnum(SILLocation loc, ManagedValue payload,
+                          EnumElementDecl *decl, SILType type);
+
+  ManagedValue createSemanticLoadBorrow(SILLocation loc, ManagedValue addr);
+
+  ManagedValue formalAccessBufferForExpr(
+      SILLocation loc, SILType ty, const TypeLowering &lowering,
+      SGFContext context, std::function<void(SILValue)> rvalueEmitter);
 };
 
 } // namespace Lowering

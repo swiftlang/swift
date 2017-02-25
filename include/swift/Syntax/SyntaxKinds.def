@@ -36,11 +36,12 @@ SYNTAX(Unknown, Syntax)
 
 // Decls
 ABSTRACT_SYNTAX(DeclSyntax, Syntax)
-  MISSING_SYNTAX(MissingDecl, Decl)
+  MISSING_SYNTAX(MissingDecl, DeclSyntax)
+  SYNTAX(UnknownDecl, DeclSyntax)
   SYNTAX(StructDecl, DeclSyntax)
   SYNTAX(TypeAliasDecl, DeclSyntax)
 
-SYNTAX_RANGE(Decl, StructDecl, TypeAliasDecl)
+SYNTAX_RANGE(Decl, MissingDecl, TypeAliasDecl)
 
 SYNTAX(DeclMembers, Syntax)
 SYNTAX(GenericParameter, Syntax)
@@ -72,11 +73,20 @@ SYNTAX_RANGE(Type, MissingType, FunctionType)
 SYNTAX(StmtList, Syntax)
 
 ABSTRACT_SYNTAX(StmtSyntax, Syntax)
+  SYNTAX(UnknownStmt, StmtSyntax)
   SYNTAX(CodeBlockStmt, StmtSyntax)
   SYNTAX(FallthroughStmt, StmtSyntax)
   SYNTAX(BreakStmt, StmtSyntax)
   SYNTAX(ContinueStmt, StmtSyntax)
-SYNTAX_RANGE(Stmt, CodeBlockStmt, ContinueStmt)
+  SYNTAX(ReturnStmt, StmtSyntax)
+SYNTAX_RANGE(Stmt, UnknownStmt, ReturnStmt)
+
+// Expressions
+ABSTRACT_SYNTAX(ExprSyntax, Syntax)
+  MISSING_SYNTAX(MissingExpr, ExprSyntax)
+  SYNTAX(UnknownExpr, ExprSyntax)
+  SYNTAX(IntegerLiteralExpr, ExprSyntax)
+SYNTAX_RANGE(Expr, MissingExpr, IntegerLiteralExpr)
 
 SYNTAX(BalancedTokens, Syntax)
 SYNTAX(TypeAttribute, Syntax)

@@ -198,11 +198,11 @@ protected:
 
   void appendInitializerEntity(const VarDecl *var);
 
-  Type getDeclTypeForMangling(const ValueDecl *decl,
-                              ArrayRef<GenericTypeParamType *> &genericParams,
-                              unsigned &initialParamIndex,
-                              ArrayRef<Requirement> &requirements,
-                              SmallVectorImpl<Requirement> &requirementsBuf);
+  CanType getDeclTypeForMangling(const ValueDecl *decl,
+                                 ArrayRef<GenericTypeParamType *> &genericParams,
+                                 unsigned &initialParamIndex,
+                                 ArrayRef<Requirement> &requirements,
+                                 SmallVectorImpl<Requirement> &requirementsBuf);
 
   void appendDeclType(const ValueDecl *decl);
 

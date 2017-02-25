@@ -173,11 +173,11 @@ private:
   void mangleGenericSignatureParts(ArrayRef<GenericTypeParamType *> params,
                                    unsigned initialParamDepth,
                                    ArrayRef<Requirement> requirements);
-  Type getDeclTypeForMangling(const ValueDecl *decl,
-                              ArrayRef<GenericTypeParamType *> &genericParams,
-                              unsigned &initialParamIndex,
-                              ArrayRef<Requirement> &requirements,
-                              SmallVectorImpl<Requirement> &requirementsBuf);
+  CanType getDeclTypeForMangling(const ValueDecl *decl,
+                                 ArrayRef<GenericTypeParamType *> &genericParams,
+                                 unsigned &initialParamIndex,
+                                 ArrayRef<Requirement> &requirements,
+                                 SmallVectorImpl<Requirement> &requirementsBuf);
 
   void mangleGenericParamIndex(GenericTypeParamType *paramTy);
   void mangleAssociatedTypeName(DependentMemberType *dmt,

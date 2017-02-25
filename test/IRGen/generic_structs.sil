@@ -137,7 +137,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64, i64* [[METADATA]], i32 3
   // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[FIELD_OFFSET_VECTOR]], i32 2
   // CHECK: [[FIELD_OFFSET:%.*]] = load i64, i64* [[FIELD_OFFSET_ADDR]], align 8
-  // CHECK: [[BYTES:%.*]] = bitcast %V15generic_structs14ComplexDynamic* %0 to i8*
+  // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
   // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i64 [[FIELD_OFFSET]]
   // CHECK: bitcast i8* [[BYTE_OFFSET]] to %swift.opaque*
   %b = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.b
@@ -146,9 +146,9 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64, i64* [[METADATA]], i32 3
   // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[FIELD_OFFSET_VECTOR]], i32 3
   // CHECK: [[FIELD_OFFSET:%.*]] = load i64, i64* [[FIELD_OFFSET_ADDR]], align 8
-  // CHECK: [[BYTES:%.*]] = bitcast %V15generic_structs14ComplexDynamic* %0 to i8*
+  // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
   // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i64 [[FIELD_OFFSET]]
-  // CHECK: bitcast i8* [[BYTE_OFFSET]] to %V15generic_structs13SingleDynamic
+  // CHECK: bitcast i8* [[BYTE_OFFSET]] to %T15generic_structs13SingleDynamicV
   %5 = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.c
   %c = struct_element_addr %5 : $*SingleDynamic<B>, #SingleDynamic.x
 
@@ -156,9 +156,9 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64, i64* [[METADATA]], i32 3
   // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[FIELD_OFFSET_VECTOR]], i32 4
   // CHECK: [[FIELD_OFFSET:%.*]] = load i64, i64* [[FIELD_OFFSET_ADDR]], align 8
-  // CHECK: [[BYTES:%.*]] = bitcast %V15generic_structs14ComplexDynamic* %0 to i8*
+  // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
   // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i64 [[FIELD_OFFSET]]
-  // CHECK: bitcast i8* [[BYTE_OFFSET]] to %V15generic_structs7Chareth
+  // CHECK: bitcast i8* [[BYTE_OFFSET]] to %T15generic_structs7CharethV
   %d = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.d
   copy_addr %a to %1 : $*Byteful
   copy_addr %b to %2 : $*A

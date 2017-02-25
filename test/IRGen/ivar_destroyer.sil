@@ -23,9 +23,9 @@
 // \ CHECK:   i32 120,
 // \ CHECK:   i32 16,
 // \ CHECK:   <{ {{.*}} }>* @_TMnC14ivar_destroyer17NonTrivialDerived
-// \ CHECK:   void (%C14ivar_destroyer17NonTrivialDerived*)* @_TFC14ivar_destroyer17NonTrivialDerivedE,
+// \ CHECK:   void (%T14ivar_destroyer17NonTrivialDerivedC*)* @_TFC14ivar_destroyer17NonTrivialDerivedE,
 // \ CHECK:   i8* bitcast (void ()* @swift_deletedMethodError to i8*),
-// \ CHECK:   %C14ivar_destroyer17NonTrivialDerived* ([[TYPE]]*)* @alloc_NonTrivialDerived,
+// \ CHECK:   %T14ivar_destroyer17NonTrivialDerivedC* ([[TYPE]]*)* @alloc_NonTrivialDerived,
 // \ CHECK:   i64 16
 // \ CHECK: }>
 

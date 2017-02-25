@@ -10,7 +10,7 @@ struct T {
   @sil_stored var b: Builtin.Int32 { get set }
 }
 
-// CHECK: @global = hidden global %V4main1T <{ i1 false, [3 x i8] undef, i32 0 }>, align 4
+// CHECK: @global = hidden global %T4main1TV <{ i1 false, [3 x i8] undef, i32 0 }>, align 4
 sil_global hidden @global : $T, @globalinit : $@convention(thin) () -> ()
 
 sil private @globalinit : $@convention(thin) () -> () {

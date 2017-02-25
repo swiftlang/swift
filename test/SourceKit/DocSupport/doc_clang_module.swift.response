@@ -397,14 +397,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "RawRepresentable",
-    key.usr: "s:Ps16RawRepresentable",
+    key.usr: "s:s16RawRepresentableP",
     key.offset: 54,
     key.length: 16
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Equatable",
-    key.usr: "s:Ps9Equatable",
+    key.usr: "s:s9EquatableP",
     key.offset: 72,
     key.length: 9
   },
@@ -431,7 +431,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
-    key.usr: "s:Vs6UInt32",
+    key.usr: "s:s6UInt32V",
     key.offset: 106,
     key.length: 6
   },
@@ -463,7 +463,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
-    key.usr: "s:Vs6UInt32",
+    key.usr: "s:s6UInt32V",
     key.offset: 143,
     key.length: 6
   },
@@ -480,7 +480,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
-    key.usr: "s:Vs6UInt32",
+    key.usr: "s:s6UInt32V",
     key.offset: 170,
     key.length: 6
   },
@@ -519,14 +519,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "RawRepresentable",
-    key.usr: "s:Ps16RawRepresentable",
+    key.usr: "s:s16RawRepresentableP",
     key.offset: 229,
     key.length: 16
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Equatable",
-    key.usr: "s:Ps9Equatable",
+    key.usr: "s:s9EquatableP",
     key.offset: 247,
     key.length: 9
   },
@@ -553,7 +553,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
-    key.usr: "s:Vs6UInt32",
+    key.usr: "s:s6UInt32V",
     key.offset: 281,
     key.length: 6
   },
@@ -585,7 +585,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
-    key.usr: "s:Vs6UInt32",
+    key.usr: "s:s6UInt32V",
     key.offset: 318,
     key.length: 6
   },
@@ -602,7 +602,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
-    key.usr: "s:Vs6UInt32",
+    key.usr: "s:s6UInt32V",
     key.offset: 345,
     key.length: 6
   },
@@ -663,14 +663,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "RawRepresentable",
-    key.usr: "s:Ps16RawRepresentable",
+    key.usr: "s:s16RawRepresentableP",
     key.offset: 436,
     key.length: 16
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Equatable",
-    key.usr: "s:Ps9Equatable",
+    key.usr: "s:s9EquatableP",
     key.offset: 454,
     key.length: 9
   },
@@ -697,7 +697,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
-    key.usr: "s:Vs6UInt32",
+    key.usr: "s:s6UInt32V",
     key.offset: 488,
     key.length: 6
   },
@@ -729,7 +729,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
-    key.usr: "s:Vs6UInt32",
+    key.usr: "s:s6UInt32V",
     key.offset: 525,
     key.length: 6
   },
@@ -746,7 +746,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
-    key.usr: "s:Vs6UInt32",
+    key.usr: "s:s6UInt32V",
     key.offset: 552,
     key.length: 6
   },
@@ -854,7 +854,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "OptionSet",
-    key.usr: "s:Ps9OptionSet",
+    key.usr: "s:s9OptionSetP",
     key.offset: 764,
     key.length: 9
   },
@@ -1887,7 +1887,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Sequence",
-    key.usr: "s:Ps8Sequence",
+    key.usr: "s:s8SequenceP",
     key.offset: 2565,
     key.length: 8
   },
@@ -1901,7 +1901,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.typealias,
     key.name: "Element",
-    key.usr: "s:VSC17FooRuncingOptions7Element",
+    key.usr: "s:SC17FooRuncingOptionsV7Element",
     key.offset: 2593,
     key.length: 7
   },
@@ -2308,7 +2308,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3186,
     key.length: 5
   },
@@ -2362,7 +2362,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3238,
     key.length: 5
   },
@@ -2440,7 +2440,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3355,
     key.length: 5
   },
@@ -2494,7 +2494,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3407,
     key.length: 5
   },
@@ -2565,7 +2565,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3509,
     key.length: 5
   },
@@ -2619,7 +2619,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3561,
     key.length: 5
   },
@@ -2663,7 +2663,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3607,
     key.length: 5
   },
@@ -2680,7 +2680,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3628,
     key.length: 5
   },
@@ -2712,14 +2712,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3653,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3663,
     key.length: 5
   },
@@ -2746,14 +2746,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3702,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3712,
     key.length: 5
   },
@@ -2785,7 +2785,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3737,
     key.length: 5
   },
@@ -2858,14 +2858,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3795,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3807,
     key.length: 5
   },
@@ -2904,7 +2904,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3854,
     key.length: 5
   },
@@ -2943,7 +2943,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 3915,
     key.length: 5
   },
@@ -2960,7 +2960,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.enum,
     key.name: "Never",
-    key.usr: "s:Os5Never",
+    key.usr: "s:s5NeverO",
     key.offset: 3951,
     key.length: 5
   },
@@ -2977,7 +2977,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.enum,
     key.name: "Never",
-    key.usr: "s:Os5Never",
+    key.usr: "s:s5NeverO",
     key.offset: 3984,
     key.length: 5
   },
@@ -3059,14 +3059,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 4168,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 4178,
     key.length: 5
   },
@@ -3138,7 +3138,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 4388,
     key.length: 5
   },
@@ -3165,7 +3165,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 4429,
     key.length: 5
   },
@@ -3192,7 +3192,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 4470,
     key.length: 5
   },
@@ -3439,7 +3439,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 5011,
     key.length: 5
   },
@@ -3456,7 +3456,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 5040,
     key.length: 5
   },
@@ -3473,7 +3473,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 5069,
     key.length: 5
   },
@@ -3520,7 +3520,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 5144,
     key.length: 5
   },
@@ -3552,7 +3552,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 5183,
     key.length: 5
   },
@@ -3579,7 +3579,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 5199,
     key.length: 5
   },
@@ -3681,7 +3681,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 5449,
     key.length: 5
   },
@@ -3698,7 +3698,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 5472,
     key.length: 5
   },
@@ -3720,7 +3720,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 5503,
     key.length: 5
   },
@@ -3742,7 +3742,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 5534,
     key.length: 5
   },
@@ -3764,7 +3764,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
-    key.usr: "s:Vs6UInt32",
+    key.usr: "s:s6UInt32V",
     key.offset: 5565,
     key.length: 6
   },
@@ -3786,7 +3786,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt64",
-    key.usr: "s:Vs6UInt64",
+    key.usr: "s:s6UInt64V",
     key.offset: 5597,
     key.length: 6
   },
@@ -3852,7 +3852,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int8",
-    key.usr: "s:Vs4Int8",
+    key.usr: "s:s4Int8V",
     key.offset: 5707,
     key.length: 4
   },
@@ -3874,7 +3874,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 5737,
     key.length: 5
   },
@@ -3896,7 +3896,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int16",
-    key.usr: "s:Vs5Int16",
+    key.usr: "s:s5Int16V",
     key.offset: 5769,
     key.length: 5
   },
@@ -3940,7 +3940,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 5836,
     key.length: 5
   },
@@ -3962,7 +3962,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 5873,
     key.length: 5
   },
@@ -4014,7 +4014,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 5977,
     key.length: 5
   },
@@ -4051,7 +4051,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 6010,
     key.length: 5
   },
@@ -4213,7 +4213,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "AnyObject",
-    key.usr: "s:Ps9AnyObject",
+    key.usr: "c:objc(pl)AnyObject",
     key.offset: 6402,
     key.length: 9
   },
@@ -4235,7 +4235,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "AnyObject",
-    key.usr: "s:Ps9AnyObject",
+    key.usr: "c:objc(pl)AnyObject",
     key.offset: 6456,
     key.length: 9
   },
@@ -4302,7 +4302,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "AnyObject",
-    key.usr: "s:Ps9AnyObject",
+    key.usr: "c:objc(pl)AnyObject",
     key.offset: 6565,
     key.length: 9
   },
@@ -4319,7 +4319,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 6593,
     key.length: 5
   },
@@ -4443,7 +4443,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 6833,
     key.length: 5
   },
@@ -4719,14 +4719,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 7514,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int32",
-    key.usr: "s:Vs5Int32",
+    key.usr: "s:s5Int32V",
     key.offset: 7524,
     key.length: 5
   },
@@ -4743,14 +4743,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "RawRepresentable",
-    key.usr: "s:Ps16RawRepresentable",
+    key.usr: "s:s16RawRepresentableP",
     key.offset: 7551,
     key.length: 16
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Equatable",
-    key.usr: "s:Ps9Equatable",
+    key.usr: "s:s9EquatableP",
     key.offset: 7569,
     key.length: 9
   },
@@ -4777,7 +4777,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
-    key.usr: "s:Vs6UInt32",
+    key.usr: "s:s6UInt32V",
     key.offset: 7603,
     key.length: 6
   },
@@ -4809,7 +4809,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
-    key.usr: "s:Vs6UInt32",
+    key.usr: "s:s6UInt32V",
     key.offset: 7640,
     key.length: 6
   },
@@ -4826,7 +4826,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "UInt32",
-    key.usr: "s:Vs6UInt32",
+    key.usr: "s:s6UInt32V",
     key.offset: 7667,
     key.length: 6
   },
@@ -4905,27 +4905,27 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.doc.full_as_xml: "<Enum file=Foo.h line=\"16\" column=\"6\"><Name>FooEnum1</Name><USR>c:@E@FooEnum1</USR><Declaration>struct FooEnum1 : RawRepresentable, Equatable</Declaration><Abstract><Para> Aaa.  FooEnum1.  Bbb.</Para></Abstract></Enum>",
     key.offset: 36,
     key.length: 142,
-    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooEnum1</decl.name> : <ref.protocol usr=\"s:Ps16RawRepresentable\">RawRepresentable</ref.protocol>, <ref.protocol usr=\"s:Ps9Equatable\">Equatable</ref.protocol></decl.struct>",
+    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooEnum1</decl.name> : <ref.protocol usr=\"s:s16RawRepresentableP\">RawRepresentable</ref.protocol>, <ref.protocol usr=\"s:s9EquatableP\">Equatable</ref.protocol></decl.struct>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "RawRepresentable",
-        key.usr: "s:Ps16RawRepresentable"
+        key.usr: "s:s16RawRepresentableP"
       },
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "Equatable",
-        key.usr: "s:Ps9Equatable"
+        key.usr: "s:s9EquatableP"
       }
     ],
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(_:)",
-        key.usr: "s:FVSC8FooEnum1cFVs6UInt32S_",
+        key.usr: "s:SC8FooEnum1VABs6UInt32Vcfc",
         key.offset: 89,
         key.length: 24,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rawValue</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rawValue</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -4939,15 +4939,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(rawValue:)",
-        key.usr: "s:FVSC8FooEnum1cFT8rawValueVs6UInt32_S_",
+        key.usr: "s:SC8FooEnum1VABs6UInt32V8rawValue_tcfc",
         key.offset: 119,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
-            key.usr: "s:FPs16RawRepresentablecFT8rawValuewx8RawValue_GSqx_"
+            key.usr: "s:s16RawRepresentablePxSg0A5ValueQz03rawC0_tcfc"
           }
         ],
         key.entities: [
@@ -4963,15 +4963,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "rawValue",
-        key.usr: "s:vVSC8FooEnum18rawValueVs6UInt32",
+        key.usr: "s:SC8FooEnum1V8rawValues6UInt32Vv",
         key.offset: 156,
         key.length: 20,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
-            key.usr: "s:vPs16RawRepresentable8rawValuewx8RawValue"
+            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzv"
           }
         ]
       }
@@ -4992,27 +4992,27 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@E@FooEnum2",
     key.offset: 211,
     key.length: 142,
-    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooEnum2</decl.name> : <ref.protocol usr=\"s:Ps16RawRepresentable\">RawRepresentable</ref.protocol>, <ref.protocol usr=\"s:Ps9Equatable\">Equatable</ref.protocol></decl.struct>",
+    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooEnum2</decl.name> : <ref.protocol usr=\"s:s16RawRepresentableP\">RawRepresentable</ref.protocol>, <ref.protocol usr=\"s:s9EquatableP\">Equatable</ref.protocol></decl.struct>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "RawRepresentable",
-        key.usr: "s:Ps16RawRepresentable"
+        key.usr: "s:s16RawRepresentableP"
       },
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "Equatable",
-        key.usr: "s:Ps9Equatable"
+        key.usr: "s:s9EquatableP"
       }
     ],
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(_:)",
-        key.usr: "s:FVSC8FooEnum2cFVs6UInt32S_",
+        key.usr: "s:SC8FooEnum2VABs6UInt32Vcfc",
         key.offset: 264,
         key.length: 24,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rawValue</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rawValue</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -5026,15 +5026,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(rawValue:)",
-        key.usr: "s:FVSC8FooEnum2cFT8rawValueVs6UInt32_S_",
+        key.usr: "s:SC8FooEnum2VABs6UInt32V8rawValue_tcfc",
         key.offset: 294,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
-            key.usr: "s:FPs16RawRepresentablecFT8rawValuewx8RawValue_GSqx_"
+            key.usr: "s:s16RawRepresentablePxSg0A5ValueQz03rawC0_tcfc"
           }
         ],
         key.entities: [
@@ -5050,15 +5050,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "rawValue",
-        key.usr: "s:vVSC8FooEnum28rawValueVs6UInt32",
+        key.usr: "s:SC8FooEnum2V8rawValues6UInt32Vv",
         key.offset: 331,
         key.length: 20,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
-            key.usr: "s:vPs16RawRepresentable8rawValuewx8RawValue"
+            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzv"
           }
         ]
       }
@@ -5086,27 +5086,27 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@E@FooEnum3",
     key.offset: 418,
     key.length: 142,
-    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooEnum3</decl.name> : <ref.protocol usr=\"s:Ps16RawRepresentable\">RawRepresentable</ref.protocol>, <ref.protocol usr=\"s:Ps9Equatable\">Equatable</ref.protocol></decl.struct>",
+    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooEnum3</decl.name> : <ref.protocol usr=\"s:s16RawRepresentableP\">RawRepresentable</ref.protocol>, <ref.protocol usr=\"s:s9EquatableP\">Equatable</ref.protocol></decl.struct>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "RawRepresentable",
-        key.usr: "s:Ps16RawRepresentable"
+        key.usr: "s:s16RawRepresentableP"
       },
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "Equatable",
-        key.usr: "s:Ps9Equatable"
+        key.usr: "s:s9EquatableP"
       }
     ],
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(_:)",
-        key.usr: "s:FVSC8FooEnum3cFVs6UInt32S_",
+        key.usr: "s:SC8FooEnum3VABs6UInt32Vcfc",
         key.offset: 471,
         key.length: 24,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rawValue</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rawValue</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -5120,15 +5120,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(rawValue:)",
-        key.usr: "s:FVSC8FooEnum3cFT8rawValueVs6UInt32_S_",
+        key.usr: "s:SC8FooEnum3VABs6UInt32V8rawValue_tcfc",
         key.offset: 501,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
-            key.usr: "s:FPs16RawRepresentablecFT8rawValuewx8RawValue_GSqx_"
+            key.usr: "s:s16RawRepresentablePxSg0A5ValueQz03rawC0_tcfc"
           }
         ],
         key.entities: [
@@ -5144,15 +5144,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "rawValue",
-        key.usr: "s:vVSC8FooEnum38rawValueVs6UInt32",
+        key.usr: "s:SC8FooEnum3V8rawValues6UInt32Vv",
         key.offset: 538,
         key.length: 20,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
-            key.usr: "s:vPs16RawRepresentable8rawValuewx8RawValue"
+            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzv"
           }
         ]
       }
@@ -5223,19 +5223,19 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.doc.full_as_xml: "<Enum line=\"1\" column=\"1\"><Name>FooRuncingOptions</Name><USR>c:@E@FooRuncingOptions</USR><Declaration>struct FooRuncingOptions : OptionSet</Declaration><Abstract><Para> Aaa.  FooRuncingOptions.  Bbb.</Para></Abstract></Enum>",
     key.offset: 737,
     key.length: 883,
-    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooRuncingOptions</decl.name> : <ref.protocol usr=\"s:Ps9OptionSet\">OptionSet</ref.protocol></decl.struct>",
+    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooRuncingOptions</decl.name> : <ref.protocol usr=\"s:s9OptionSetP\">OptionSet</ref.protocol></decl.struct>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "OptionSet",
-        key.usr: "s:Ps9OptionSet"
+        key.usr: "s:s9OptionSetP"
       }
     ],
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(rawValue:)",
-        key.usr: "s:FVSC17FooRuncingOptionscFT8rawValueSi_S_",
+        key.usr: "s:SC17FooRuncingOptionsVABSi8rawValue_tcfc",
         key.offset: 781,
         key.length: 28,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
@@ -5243,17 +5243,17 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           {
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
-            key.usr: "s:FPs9OptionSetcFT8rawValuewx8RawValue_x"
+            key.usr: "s:s9OptionSetPx8RawValueQz03rawD0_tcfc"
           },
           {
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
-            key.usr: "s:FPs9OptionSetcFT8rawValuewx8RawValue_x"
+            key.usr: "s:s9OptionSetPx8RawValueQz03rawD0_tcfc"
           },
           {
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
-            key.usr: "s:FPs16RawRepresentablecFT8rawValuewx8RawValue_GSqx_"
+            key.usr: "s:s16RawRepresentablePxSg0A5ValueQz03rawC0_tcfc"
           }
         ],
         key.entities: [
@@ -5285,8 +5285,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "intersect(_:)",
-        key.usr: "s:FEsPs10SetAlgebra9intersectFxx::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra9intersectFxx",
+        key.usr: "s:s10SetAlgebraPsE9intersectxxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE9intersectxxF",
         key.offset: 926,
         key.length: 63,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>intersect</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -5310,8 +5310,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "exclusiveOr(_:)",
-        key.usr: "s:FEsPs10SetAlgebra11exclusiveOrFxx::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra11exclusiveOrFxx",
+        key.usr: "s:s10SetAlgebraPsE11exclusiveOrxxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE11exclusiveOrxxF",
         key.offset: 995,
         key.length: 65,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>exclusiveOr</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -5335,8 +5335,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "unionInPlace(_:)",
-        key.usr: "s:FEsPs10SetAlgebra12unionInPlaceFxT_::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra12unionInPlaceFxT_",
+        key.usr: "s:s10SetAlgebraPsE12unionInPlaceyxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE12unionInPlaceyxF",
         key.offset: 1066,
         key.length: 54,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>unionInPlace</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
@@ -5360,8 +5360,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "intersectInPlace(_:)",
-        key.usr: "s:FEsPs10SetAlgebra16intersectInPlaceFxT_::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra16intersectInPlaceFxT_",
+        key.usr: "s:s10SetAlgebraPsE16intersectInPlaceyxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE16intersectInPlaceyxF",
         key.offset: 1126,
         key.length: 58,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>intersectInPlace</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
@@ -5385,8 +5385,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "exclusiveOrInPlace(_:)",
-        key.usr: "s:FEsPs10SetAlgebra18exclusiveOrInPlaceFxT_::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra18exclusiveOrInPlaceFxT_",
+        key.usr: "s:s10SetAlgebraPsE18exclusiveOrInPlaceyxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE18exclusiveOrInPlaceyxF",
         key.offset: 1190,
         key.length: 60,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>exclusiveOrInPlace</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
@@ -5410,8 +5410,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "isSubsetOf(_:)",
-        key.usr: "s:FEsPs10SetAlgebra10isSubsetOfFxSb::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra10isSubsetOfFxSb",
+        key.usr: "s:s10SetAlgebraPsE10isSubsetOfSbxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE10isSubsetOfSbxF",
         key.offset: 1256,
         key.length: 51,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isSubsetOf</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -5435,8 +5435,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "isDisjointWith(_:)",
-        key.usr: "s:FEsPs10SetAlgebra14isDisjointWithFxSb::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra14isDisjointWithFxSb",
+        key.usr: "s:s10SetAlgebraPsE14isDisjointWithSbxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE14isDisjointWithSbxF",
         key.offset: 1313,
         key.length: 55,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isDisjointWith</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -5460,8 +5460,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "isSupersetOf(_:)",
-        key.usr: "s:FEsPs10SetAlgebra12isSupersetOfFxSb::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra12isSupersetOfFxSb",
+        key.usr: "s:s10SetAlgebraPsE12isSupersetOfSbxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE12isSupersetOfSbxF",
         key.offset: 1374,
         key.length: 53,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isSupersetOf</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -5485,8 +5485,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "subtractInPlace(_:)",
-        key.usr: "s:FEsPs10SetAlgebra15subtractInPlaceFxT_::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra15subtractInPlaceFxT_",
+        key.usr: "s:s10SetAlgebraPsE15subtractInPlaceyxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE15subtractInPlaceyxF",
         key.offset: 1433,
         key.length: 57,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>subtractInPlace</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
@@ -5510,8 +5510,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "isStrictSupersetOf(_:)",
-        key.usr: "s:FEsPs10SetAlgebra18isStrictSupersetOfFxSb::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra18isStrictSupersetOfFxSb",
+        key.usr: "s:s10SetAlgebraPsE18isStrictSupersetOfSbxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE18isStrictSupersetOfSbxF",
         key.offset: 1496,
         key.length: 59,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isStrictSupersetOf</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -5535,8 +5535,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "isStrictSubsetOf(_:)",
-        key.usr: "s:FEsPs10SetAlgebra16isStrictSubsetOfFxSb::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra16isStrictSubsetOfFxSb",
+        key.usr: "s:s10SetAlgebraPsE16isStrictSubsetOfSbxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE16isStrictSubsetOfSbxF",
         key.offset: 1561,
         key.length: 57,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isStrictSubsetOf</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -5573,9 +5573,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "union(_:)",
-        key.usr: "s:FEsPs9OptionSet5unionFxx::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs9OptionSet5unionFxx",
-        key.doc.full_as_xml: "<Function><Name>union(_:)</Name><USR>s:FEsPs9OptionSet5unionFxx</USR><Declaration>func union(_ other: Self) -&gt; Self</Declaration><Abstract><Para>Returns a new option set of the elements contained in this set, in the given set, or in both.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A new option set made up of the elements contained in this set, in <codeVoice>other</codeVoice>, or in both.</Para></ResultDiscussion><Discussion><Para>This example uses the <codeVoice>union(_:)</codeVoice> method to add two more shipping options to the default set.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let defaultShipping = ShippingOptions.standard]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let memberShipping = defaultShipping.union([.secondDay, .priority])]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(memberShipping.contains(.priority))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:s9OptionSetPsE5unionxxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPsE5unionxxF",
+        key.doc.full_as_xml: "<Function><Name>union(_:)</Name><USR>s:s9OptionSetPsE5unionxxF</USR><Declaration>func union(_ other: Self) -&gt; Self</Declaration><Abstract><Para>Returns a new option set of the elements contained in this set, in the given set, or in both.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A new option set made up of the elements contained in this set, in <codeVoice>other</codeVoice>, or in both.</Para></ResultDiscussion><Discussion><Para>This example uses the <codeVoice>union(_:)</codeVoice> method to add two more shipping options to the default set.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let defaultShipping = ShippingOptions.standard]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let memberShipping = defaultShipping.union([.secondDay, .priority])]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(memberShipping.contains(.priority))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 1657,
         key.length: 59,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>union</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -5592,9 +5592,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "intersection(_:)",
-        key.usr: "s:FEsPs9OptionSet12intersectionFxx::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs9OptionSet12intersectionFxx",
-        key.doc.full_as_xml: "<Function><Name>intersection(_:)</Name><USR>s:FEsPs9OptionSet12intersectionFxx</USR><Declaration>func intersection(_ other: Self) -&gt; Self</Declaration><Abstract><Para>Returns a new option set with only the elements contained in both this set and the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A new option set with only the elements contained in both this set and <codeVoice>other</codeVoice>.</Para></ResultDiscussion><Discussion><Para>This example uses the <codeVoice>intersection(_:)</codeVoice> method to limit the available shipping options to what can be used with a PO Box destination.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[// Can only ship standard or priority to PO Boxes]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let poboxShipping: ShippingOptions = [.standard, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let memberShipping: ShippingOptions =]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[        [.standard, .priority, .secondDay]]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let availableOptions = memberShipping.intersection(poboxShipping)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(availableOptions.contains(.priority))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(availableOptions.contains(.secondDay))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"false\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:s9OptionSetPsE12intersectionxxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPsE12intersectionxxF",
+        key.doc.full_as_xml: "<Function><Name>intersection(_:)</Name><USR>s:s9OptionSetPsE12intersectionxxF</USR><Declaration>func intersection(_ other: Self) -&gt; Self</Declaration><Abstract><Para>Returns a new option set with only the elements contained in both this set and the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A new option set with only the elements contained in both this set and <codeVoice>other</codeVoice>.</Para></ResultDiscussion><Discussion><Para>This example uses the <codeVoice>intersection(_:)</codeVoice> method to limit the available shipping options to what can be used with a PO Box destination.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[// Can only ship standard or priority to PO Boxes]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let poboxShipping: ShippingOptions = [.standard, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let memberShipping: ShippingOptions =]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[        [.standard, .priority, .secondDay]]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let availableOptions = memberShipping.intersection(poboxShipping)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(availableOptions.contains(.priority))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(availableOptions.contains(.secondDay))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"false\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 1722,
         key.length: 66,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>intersection</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -5611,9 +5611,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "symmetricDifference(_:)",
-        key.usr: "s:FEsPs9OptionSet19symmetricDifferenceFxx::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs9OptionSet19symmetricDifferenceFxx",
-        key.doc.full_as_xml: "<Function><Name>symmetricDifference(_:)</Name><USR>s:FEsPs9OptionSet19symmetricDifferenceFxx</USR><Declaration>func symmetricDifference(_ other: Self) -&gt; Self</Declaration><Abstract><Para>Returns a new option set with the elements contained in this set or in the given set, but not in both.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A new option set with only the elements contained in either this set or <codeVoice>other</codeVoice>, but not in both.</Para></ResultDiscussion></Function>",
+        key.usr: "s:s9OptionSetPsE19symmetricDifferencexxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPsE19symmetricDifferencexxF",
+        key.doc.full_as_xml: "<Function><Name>symmetricDifference(_:)</Name><USR>s:s9OptionSetPsE19symmetricDifferencexxF</USR><Declaration>func symmetricDifference(_ other: Self) -&gt; Self</Declaration><Abstract><Para>Returns a new option set with the elements contained in this set or in the given set, but not in both.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A new option set with only the elements contained in either this set or <codeVoice>other</codeVoice>, but not in both.</Para></ResultDiscussion></Function>",
         key.offset: 1794,
         key.length: 73,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>symmetricDifference</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -5648,9 +5648,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "contains(_:)",
-        key.usr: "s:FesRxs9OptionSetxzwx7ElementrS_8containsFxSb::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FesRxs9OptionSetxzwx7ElementrS_8containsFxSb",
-        key.doc.full_as_xml: "<Function><Name>contains(_:)</Name><USR>s:FesRxs9OptionSetxzwx7ElementrS_8containsFxSb</USR><Declaration>func contains(_ member: Self) -&gt; Bool</Declaration><Abstract><Para>Returns a Boolean value that indicates whether a given element is a member of the option set.</Para></Abstract><Parameters><Parameter><Name>member</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The element to look for in the option set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the option set contains <codeVoice>member</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>This example uses the <codeVoice>contains(_:)</codeVoice> method to check whether next-day shipping is in the <codeVoice>availableOptions</codeVoice> instance.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let availableOptions = ShippingOptions.express]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[if availableOptions.contains(.nextDay) {]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[    print(\"Next day shipping available\")]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[}]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"Next day shipping available\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:s9OptionSetPssAARz7ElementQzRszlE8containsSbxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPssAARz7ElementQzRszlE8containsSbxF",
+        key.doc.full_as_xml: "<Function><Name>contains(_:)</Name><USR>s:s9OptionSetPssAARz7ElementQzRszlE8containsSbxF</USR><Declaration>func contains(_ member: Self) -&gt; Bool</Declaration><Abstract><Para>Returns a Boolean value that indicates whether a given element is a member of the option set.</Para></Abstract><Parameters><Parameter><Name>member</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The element to look for in the option set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the option set contains <codeVoice>member</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>This example uses the <codeVoice>contains(_:)</codeVoice> method to check whether next-day shipping is in the <codeVoice>availableOptions</codeVoice> instance.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let availableOptions = ShippingOptions.express]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[if availableOptions.contains(.nextDay) {]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[    print(\"Next day shipping available\")]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[}]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"Next day shipping available\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 1906,
         key.length: 50,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>contains</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>member</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -5667,9 +5667,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "insert(_:)",
-        key.usr: "s:FesRxs9OptionSetxzwx7ElementrS_6insertFwx7ElementT8insertedSb17memberAfterInsertwxS1__::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FesRxs9OptionSetxzwx7ElementrS_6insertFwx7ElementT8insertedSb17memberAfterInsertwxS1__",
-        key.doc.full_as_xml: "<Function><Name>insert(_:)</Name><USR>s:FesRxs9OptionSetxzwx7ElementrS_6insertFwx7ElementT8insertedSb17memberAfterInsertwxS1__</USR><Declaration>mutating func insert(_ newMember: Self.Element) -&gt; (inserted: Bool, memberAfterInsert: Self.Element)</Declaration><Abstract><Para>Adds the given element to the option set if it is not already a member.</Para></Abstract><Parameters><Parameter><Name>newMember</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The element to insert.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>(true, newMember)</codeVoice> if <codeVoice>newMember</codeVoice> was not contained in <codeVoice>self</codeVoice>. Otherwise, returns <codeVoice>(false, oldMember)</codeVoice>, where <codeVoice>oldMember</codeVoice> is the member of the set equal to <codeVoice>newMember</codeVoice>.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>.secondDay</codeVoice> shipping option is added to the <codeVoice>freeOptions</codeVoice> option set if <codeVoice>purchasePrice</codeVoice> is greater than 50.0. For the <codeVoice>ShippingOptions</codeVoice> declaration, see the <codeVoice>OptionSet</codeVoice> protocol discussion.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let purchasePrice = 87.55]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[var freeOptions: ShippingOptions = [.standard, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[if purchasePrice > 50 {]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[    freeOptions.insert(.secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[}]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(freeOptions.contains(.secondDay))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:s9OptionSetPssAARz7ElementQzRszlE6insertSb8inserted_x17memberAfterInserttxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPssAARz7ElementQzRszlE6insertSb8inserted_x17memberAfterInserttxF",
+        key.doc.full_as_xml: "<Function><Name>insert(_:)</Name><USR>s:s9OptionSetPssAARz7ElementQzRszlE6insertSb8inserted_x17memberAfterInserttxF</USR><Declaration>mutating func insert(_ newMember: Self.Element) -&gt; (inserted: Bool, memberAfterInsert: Self.Element)</Declaration><Abstract><Para>Adds the given element to the option set if it is not already a member.</Para></Abstract><Parameters><Parameter><Name>newMember</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The element to insert.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>(true, newMember)</codeVoice> if <codeVoice>newMember</codeVoice> was not contained in <codeVoice>self</codeVoice>. Otherwise, returns <codeVoice>(false, oldMember)</codeVoice>, where <codeVoice>oldMember</codeVoice> is the member of the set equal to <codeVoice>newMember</codeVoice>.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>.secondDay</codeVoice> shipping option is added to the <codeVoice>freeOptions</codeVoice> option set if <codeVoice>purchasePrice</codeVoice> is greater than 50.0. For the <codeVoice>ShippingOptions</codeVoice> declaration, see the <codeVoice>OptionSet</codeVoice> protocol discussion.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let purchasePrice = 87.55]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[var freeOptions: ShippingOptions = [.standard, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[if purchasePrice > 50 {]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[    freeOptions.insert(.secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[}]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(freeOptions.contains(.secondDay))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 1962,
         key.length: 110,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@discardableResult</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>insert</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>newMember</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.argument_label>inserted</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>memberAfterInsert</tuple.element.argument_label>: <tuple.element.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.function.returntype></decl.function.method.instance>",
@@ -5686,9 +5686,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "remove(_:)",
-        key.usr: "s:FesRxs9OptionSetxzwx7ElementrS_6removeFwx7ElementGSqwxS1__::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FesRxs9OptionSetxzwx7ElementrS_6removeFwx7ElementGSqwxS1__",
-        key.doc.full_as_xml: "<Function><Name>remove(_:)</Name><USR>s:FesRxs9OptionSetxzwx7ElementrS_6removeFwx7ElementGSqwxS1__</USR><Declaration>mutating func remove(_ member: Self.Element) -&gt; Self.Element?</Declaration><Abstract><Para>Removes the given element and all elements subsumed by it.</Para></Abstract><Parameters><Parameter><Name>member</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The element of the set to remove.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>The intersection of <codeVoice>[member]</codeVoice> and the set, if the intersection was nonempty; otherwise, <codeVoice>nil</codeVoice>.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>.priority</codeVoice> shipping option is removed from the <codeVoice>options</codeVoice> option set. Attempting to remove the same shipping option a second time results in <codeVoice>nil</codeVoice>, because <codeVoice>options</codeVoice> no longer contains <codeVoice>.priority</codeVoice> as a member.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[var options: ShippingOptions = [.secondDay, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let priorityOption = options.remove(.priority)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(priorityOption == .priority)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(options.remove(.priority))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"nil\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing><Para>In the next example, the <codeVoice>.express</codeVoice> element is passed to <codeVoice>remove(_:)</codeVoice>. Although <codeVoice>.express</codeVoice> is not a member of <codeVoice>options</codeVoice>, <codeVoice>.express</codeVoice> subsumes the remaining <codeVoice>.secondDay</codeVoice> element of the option set. Therefore, <codeVoice>options</codeVoice> is emptied and the intersection between <codeVoice>.express</codeVoice> and <codeVoice>options</codeVoice> is returned.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let expressOption = options.remove(.express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(expressOption == .express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"false\"]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(expressOption == .secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:s9OptionSetPssAARz7ElementQzRszlE6removexSgxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPssAARz7ElementQzRszlE6removexSgxF",
+        key.doc.full_as_xml: "<Function><Name>remove(_:)</Name><USR>s:s9OptionSetPssAARz7ElementQzRszlE6removexSgxF</USR><Declaration>mutating func remove(_ member: Self.Element) -&gt; Self.Element?</Declaration><Abstract><Para>Removes the given element and all elements subsumed by it.</Para></Abstract><Parameters><Parameter><Name>member</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The element of the set to remove.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>The intersection of <codeVoice>[member]</codeVoice> and the set, if the intersection was nonempty; otherwise, <codeVoice>nil</codeVoice>.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>.priority</codeVoice> shipping option is removed from the <codeVoice>options</codeVoice> option set. Attempting to remove the same shipping option a second time results in <codeVoice>nil</codeVoice>, because <codeVoice>options</codeVoice> no longer contains <codeVoice>.priority</codeVoice> as a member.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[var options: ShippingOptions = [.secondDay, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let priorityOption = options.remove(.priority)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(priorityOption == .priority)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(options.remove(.priority))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"nil\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing><Para>In the next example, the <codeVoice>.express</codeVoice> element is passed to <codeVoice>remove(_:)</codeVoice>. Although <codeVoice>.express</codeVoice> is not a member of <codeVoice>options</codeVoice>, <codeVoice>.express</codeVoice> subsumes the remaining <codeVoice>.secondDay</codeVoice> element of the option set. Therefore, <codeVoice>options</codeVoice> is emptied and the intersection between <codeVoice>.express</codeVoice> and <codeVoice>options</codeVoice> is returned.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let expressOption = options.remove(.express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(expressOption == .express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"false\"]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(expressOption == .secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 2078,
         key.length: 71,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@discardableResult</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>remove</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>member</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>?</decl.function.returntype></decl.function.method.instance>",
@@ -5705,9 +5705,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "update(with:)",
-        key.usr: "s:FesRxs9OptionSetxzwx7ElementrS_6updateFT4withwx7Element_GSqwxS1__::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FesRxs9OptionSetxzwx7ElementrS_6updateFT4withwx7Element_GSqwxS1__",
-        key.doc.full_as_xml: "<Function><Name>update(with:)</Name><USR>s:FesRxs9OptionSetxzwx7ElementrS_6updateFT4withwx7Element_GSqwxS1__</USR><Declaration>mutating func update(with newMember: Self.Element) -&gt; Self.Element?</Declaration><Abstract><Para>Inserts the given element into the set.</Para></Abstract><ResultDiscussion><Para>The intersection of <codeVoice>[newMember]</codeVoice> and the set if the intersection was nonempty; otherwise, <codeVoice>nil</codeVoice>.</Para></ResultDiscussion><Discussion><Para>If <codeVoice>newMember</codeVoice> is not contained in the set but subsumes current members of the set, the subsumed members are returned.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[var options: ShippingOptions = [.secondDay, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let replaced = options.update(with: .express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(replaced == .secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:s9OptionSetPssAARz7ElementQzRszlE6updatexSgx4with_tF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPssAARz7ElementQzRszlE6updatexSgx4with_tF",
+        key.doc.full_as_xml: "<Function><Name>update(with:)</Name><USR>s:s9OptionSetPssAARz7ElementQzRszlE6updatexSgx4with_tF</USR><Declaration>mutating func update(with newMember: Self.Element) -&gt; Self.Element?</Declaration><Abstract><Para>Inserts the given element into the set.</Para></Abstract><ResultDiscussion><Para>The intersection of <codeVoice>[newMember]</codeVoice> and the set if the intersection was nonempty; otherwise, <codeVoice>nil</codeVoice>.</Para></ResultDiscussion><Discussion><Para>If <codeVoice>newMember</codeVoice> is not contained in the set but subsumes current members of the set, the subsumed members are returned.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[var options: ShippingOptions = [.secondDay, .priority]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let replaced = options.update(with: .express)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(replaced == .secondDay)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 2155,
         key.length: 77,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@discardableResult</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>update</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>with</decl.var.parameter.argument_label> <decl.var.parameter.name>newMember</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>?</decl.function.returntype></decl.function.method.instance>",
@@ -5742,9 +5742,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init()",
-        key.usr: "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_cFT_x::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_cFT_x",
-        key.doc.full_as_xml: "<Function><Name>init()</Name><USR>s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_cFT_x</USR><Declaration>convenience init()</Declaration><Abstract><Para>Creates an empty option set.</Para></Abstract><Discussion><Para>This initializer creates an option set with a raw value of zero.</Para></Discussion></Function>",
+        key.usr: "s:s9OptionSetPssAARzs17BitwiseOperations8RawValueRpzlExycfc::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPssAARzs17BitwiseOperations8RawValueRpzlExycfc",
+        key.doc.full_as_xml: "<Function><Name>init()</Name><USR>s:s9OptionSetPssAARzs17BitwiseOperations8RawValueRpzlExycfc</USR><Declaration>convenience init()</Declaration><Abstract><Para>Creates an empty option set.</Para></Abstract><Discussion><Para>This initializer creates an option set with a raw value of zero.</Para></Discussion></Function>",
         key.offset: 2271,
         key.length: 18,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>()</decl.function.constructor>"
@@ -5752,9 +5752,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "formUnion(_:)",
-        key.usr: "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_9formUnionFxT_::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_9formUnionFxT_",
-        key.doc.full_as_xml: "<Function><Name>formUnion(_:)</Name><USR>s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_9formUnionFxT_</USR><Declaration>mutating func formUnion(_ other: Self)</Declaration><Abstract><Para>Inserts the elements of another set into this option set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><Discussion><Para>This method is implemented as a <codeVoice>|</codeVoice> (bitwise OR) operation on the two sets’ raw values.</Para></Discussion></Function>",
+        key.usr: "s:s9OptionSetPssAARzs17BitwiseOperations8RawValueRpzlE9formUnionyxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPssAARzs17BitwiseOperations8RawValueRpzlE9formUnionyxF",
+        key.doc.full_as_xml: "<Function><Name>formUnion(_:)</Name><USR>s:s9OptionSetPssAARzs17BitwiseOperations8RawValueRpzlE9formUnionyxF</USR><Declaration>mutating func formUnion(_ other: Self)</Declaration><Abstract><Para>Inserts the elements of another set into this option set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><Discussion><Para>This method is implemented as a <codeVoice>|</codeVoice> (bitwise OR) operation on the two sets’ raw values.</Para></Discussion></Function>",
         key.offset: 2295,
         key.length: 51,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>formUnion</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
@@ -5771,9 +5771,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "formIntersection(_:)",
-        key.usr: "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_16formIntersectionFxT_::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_16formIntersectionFxT_",
-        key.doc.full_as_xml: "<Function><Name>formIntersection(_:)</Name><USR>s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_16formIntersectionFxT_</USR><Declaration>mutating func formIntersection(_ other: Self)</Declaration><Abstract><Para>Removes all elements of this option set that are not also present in the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><Discussion><Para>This method is implemented as a <codeVoice>&amp;</codeVoice> (bitwise AND) operation on the two sets’ raw values.</Para></Discussion></Function>",
+        key.usr: "s:s9OptionSetPssAARzs17BitwiseOperations8RawValueRpzlE16formIntersectionyxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPssAARzs17BitwiseOperations8RawValueRpzlE16formIntersectionyxF",
+        key.doc.full_as_xml: "<Function><Name>formIntersection(_:)</Name><USR>s:s9OptionSetPssAARzs17BitwiseOperations8RawValueRpzlE16formIntersectionyxF</USR><Declaration>mutating func formIntersection(_ other: Self)</Declaration><Abstract><Para>Removes all elements of this option set that are not also present in the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><Discussion><Para>This method is implemented as a <codeVoice>&amp;</codeVoice> (bitwise AND) operation on the two sets’ raw values.</Para></Discussion></Function>",
         key.offset: 2352,
         key.length: 58,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>formIntersection</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
@@ -5790,9 +5790,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "formSymmetricDifference(_:)",
-        key.usr: "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_23formSymmetricDifferenceFxT_::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_23formSymmetricDifferenceFxT_",
-        key.doc.full_as_xml: "<Function><Name>formSymmetricDifference(_:)</Name><USR>s:FesRxs9OptionSetwx8RawValues17BitwiseOperationsrS_23formSymmetricDifferenceFxT_</USR><Declaration>mutating func formSymmetricDifference(_ other: Self)</Declaration><Abstract><Para>Replaces this set with a new set containing all elements contained in either this set or the given set, but not in both.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><Discussion><Para>This method is implemented as a <codeVoice>^</codeVoice> (bitwise XOR) operation on the two sets’ raw values.</Para></Discussion></Function>",
+        key.usr: "s:s9OptionSetPssAARzs17BitwiseOperations8RawValueRpzlE23formSymmetricDifferenceyxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s9OptionSetPssAARzs17BitwiseOperations8RawValueRpzlE23formSymmetricDifferenceyxF",
+        key.doc.full_as_xml: "<Function><Name>formSymmetricDifference(_:)</Name><USR>s:s9OptionSetPssAARzs17BitwiseOperations8RawValueRpzlE23formSymmetricDifferenceyxF</USR><Declaration>mutating func formSymmetricDifference(_ other: Self)</Declaration><Abstract><Para>Replaces this set with a new set containing all elements contained in either this set or the given set, but not in both.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>An option set.</Para></Discussion></Parameter></Parameters><Discussion><Para>This method is implemented as a <codeVoice>^</codeVoice> (bitwise XOR) operation on the two sets’ raw values.</Para></Discussion></Function>",
         key.offset: 2416,
         key.length: 65,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>formSymmetricDifference</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
@@ -5822,8 +5822,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(_:)",
-        key.usr: "s:FEsPs10SetAlgebracuRd__s8Sequencewx7ElementzWd__8Iterator7Element_rFqd__x::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebracuRd__s8Sequencewx7ElementzWd__8Iterator7Element_rFqd__x",
+        key.usr: "s:s10SetAlgebraPsExqd__cs8SequenceRd__8Iterator_7ElementQYd__AERtzlufc::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsExqd__cs8SequenceRd__8Iterator_7ElementQYd__AERtzlufc",
         key.generic_params: [
           {
             key.name: "S"
@@ -5837,10 +5837,10 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.description: "Self.Element == S.Iterator.Element"
           }
         ],
-        key.doc.full_as_xml: "<Function><Name>init(_:)</Name><USR>s:FEsPs10SetAlgebracuRd__s8Sequencewx7ElementzWd__8Iterator7Element_rFqd__x</USR><Declaration>convenience init&lt;S&gt;(_ sequence: S) where S : Sequence, Self.Element == S.Iterator.Element</Declaration><Abstract><Para>Creates a new set from a finite sequence of items.</Para></Abstract><Parameters><Parameter><Name>sequence</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The elements to use as members of the new set.</Para></Discussion></Parameter></Parameters><Discussion><Para>Use this initializer to create a new set from an existing sequence, like an array or a range:</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let validIndices = Set(0..<7).subtracting([2, 4, 5])]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(validIndices)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"[6, 0, 1, 3]\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.doc.full_as_xml: "<Function><Name>init(_:)</Name><USR>s:s10SetAlgebraPsExqd__cs8SequenceRd__8Iterator_7ElementQYd__AERtzlufc</USR><Declaration>convenience init&lt;S&gt;(_ sequence: S) where S : Sequence, Self.Element == S.Iterator.Element</Declaration><Abstract><Para>Creates a new set from a finite sequence of items.</Para></Abstract><Parameters><Parameter><Name>sequence</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The elements to use as members of the new set.</Para></Discussion></Parameter></Parameters><Discussion><Para>Use this initializer to create a new set from an existing sequence, like an array or a range:</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let validIndices = Set(0..<7).subtracting([2, 4, 5])]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(validIndices)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"[6, 0, 1, 3]\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 2520,
         key.length: 102,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>&lt;S&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>sequence</decl.var.parameter.name>: <decl.var.parameter.type>S</decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>where</syntaxtype.keyword> S : <ref.protocol usr=\"s:Ps8Sequence\">Sequence</ref.protocol>, <ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>.<ref.typealias usr=\"s:VSC17FooRuncingOptions7Element\">Element</ref.typealias> == S.Iterator.Element</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>&lt;S&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>sequence</decl.var.parameter.name>: <decl.var.parameter.type>S</decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>S : <ref.protocol usr=\"s:s8SequenceP\">Sequence</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct>.<ref.typealias usr=\"s:SC17FooRuncingOptionsV7Element\">Element</ref.typealias> == S.Iterator.Element</decl.generic_type_requirement></decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -5854,9 +5854,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(arrayLiteral:)",
-        key.usr: "s:FEsPs10SetAlgebracFt12arrayLiteralGSawx7Element__x::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebracFt12arrayLiteralGSawx7Element__x",
-        key.doc.full_as_xml: "<Function><Name>init(arrayLiteral:)</Name><USR>s:FEsPs10SetAlgebracFt12arrayLiteralGSawx7Element__x</USR><Declaration>convenience init(arrayLiteral: Self.Element...)</Declaration><Abstract><Para>Creates a set containing the elements of the given array literal.</Para></Abstract><Parameters><Parameter><Name>arrayLiteral</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A list of elements of the new set.</Para></Discussion></Parameter></Parameters><Discussion><Para>Do not call this initializer directly. It is used by the compiler when you use an array literal. Instead, create a new set using an array literal as its value by enclosing a comma-separated list of values in square brackets. You can use an array literal anywhere a set is expected by the type context.</Para><Para>Here, a set of strings is created from an array literal holding only strings:</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let ingredients: Set = [\"cocoa beans\", \"sugar\", \"cocoa butter\", \"salt\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[if ingredients.isSuperset(of: [\"sugar\", \"salt\"]) {]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[    print(\"Whatever it is, it's bound to be delicious!\")]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[}]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"Whatever it is, it's bound to be delicious!\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:s10SetAlgebraPsExSay7ElementQzG12arrayLiteral_dtcfc::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsExSay7ElementQzG12arrayLiteral_dtcfc",
+        key.doc.full_as_xml: "<Function><Name>init(arrayLiteral:)</Name><USR>s:s10SetAlgebraPsExSay7ElementQzG12arrayLiteral_dtcfc</USR><Declaration>convenience init(arrayLiteral: Self.Element...)</Declaration><Abstract><Para>Creates a set containing the elements of the given array literal.</Para></Abstract><Parameters><Parameter><Name>arrayLiteral</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A list of elements of the new set.</Para></Discussion></Parameter></Parameters><Discussion><Para>Do not call this initializer directly. It is used by the compiler when you use an array literal. Instead, create a new set using an array literal as its value by enclosing a comma-separated list of values in square brackets. You can use an array literal anywhere a set is expected by the type context.</Para><Para>Here, a set of strings is created from an array literal holding only strings:</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let ingredients: Set = [\"cocoa beans\", \"sugar\", \"cocoa butter\", \"salt\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[if ingredients.isSuperset(of: [\"sugar\", \"salt\"]) {]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[    print(\"Whatever it is, it's bound to be delicious!\")]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[}]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"Whatever it is, it's bound to be delicious!\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 2628,
         key.length: 65,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>arrayLiteral</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type>...</decl.var.parameter>)</decl.function.constructor>",
@@ -5873,9 +5873,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "subtract(_:)",
-        key.usr: "s:FEsPs10SetAlgebra8subtractFxT_::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra8subtractFxT_",
-        key.doc.full_as_xml: "<Function><Name>subtract(_:)</Name><USR>s:FEsPs10SetAlgebra8subtractFxT_</USR><Declaration>mutating func subtract(_ other: Self)</Declaration><Abstract><Para>Removes the elements of the given set from this set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><Discussion><Para>In the following example, the elements of the <codeVoice>employees</codeVoice> set that are also members of the <codeVoice>neighbors</codeVoice> set are removed. In particular, the names <codeVoice>&quot;Bethany&quot;</codeVoice> and <codeVoice>&quot;Eric&quot;</codeVoice> are removed from <codeVoice>employees</codeVoice>.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[var employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let neighbors: Set = [\"Bethany\", \"Eric\", \"Forlani\", \"Greta\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[employees.subtract(neighbors)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(employees)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"[\"Diana\", \"Chris\", \"Alicia\"]\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:s10SetAlgebraPsE8subtractyxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE8subtractyxF",
+        key.doc.full_as_xml: "<Function><Name>subtract(_:)</Name><USR>s:s10SetAlgebraPsE8subtractyxF</USR><Declaration>mutating func subtract(_ other: Self)</Declaration><Abstract><Para>Removes the elements of the given set from this set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><Discussion><Para>In the following example, the elements of the <codeVoice>employees</codeVoice> set that are also members of the <codeVoice>neighbors</codeVoice> set are removed. In particular, the names <codeVoice>&quot;Bethany&quot;</codeVoice> and <codeVoice>&quot;Eric&quot;</codeVoice> are removed from <codeVoice>employees</codeVoice>.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[var employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let neighbors: Set = [\"Bethany\", \"Eric\", \"Forlani\", \"Greta\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[employees.subtract(neighbors)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(employees)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"[\"Diana\", \"Chris\", \"Alicia\"]\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 2699,
         key.length: 50,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>mutating</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>subtract</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
@@ -5892,9 +5892,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "isSubset(of:)",
-        key.usr: "s:FEsPs10SetAlgebra8isSubsetFT2ofx_Sb::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra8isSubsetFT2ofx_Sb",
-        key.doc.full_as_xml: "<Function><Name>isSubset(of:)</Name><USR>s:FEsPs10SetAlgebra8isSubsetFT2ofx_Sb</USR><Declaration>func isSubset(of other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns a Boolean value that indicates whether the set is a subset of another set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the set is a subset of <codeVoice>other</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>Set <emphasis>A</emphasis> is a subset of another set <emphasis>B</emphasis> if every member of <emphasis>A</emphasis> is also a member of <emphasis>B</emphasis>.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let attendees: Set = [\"Alicia\", \"Bethany\", \"Diana\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(attendees.isSubset(of: employees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:s10SetAlgebraPsE8isSubsetSbx2of_tF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE8isSubsetSbx2of_tF",
+        key.doc.full_as_xml: "<Function><Name>isSubset(of:)</Name><USR>s:s10SetAlgebraPsE8isSubsetSbx2of_tF</USR><Declaration>func isSubset(of other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns a Boolean value that indicates whether the set is a subset of another set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the set is a subset of <codeVoice>other</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>Set <emphasis>A</emphasis> is a subset of another set <emphasis>B</emphasis> if every member of <emphasis>A</emphasis> is also a member of <emphasis>B</emphasis>.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let attendees: Set = [\"Alicia\", \"Bethany\", \"Diana\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(attendees.isSubset(of: employees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 2755,
         key.length: 50,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isSubset</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>of</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -5911,9 +5911,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "isSuperset(of:)",
-        key.usr: "s:FEsPs10SetAlgebra10isSupersetFT2ofx_Sb::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra10isSupersetFT2ofx_Sb",
-        key.doc.full_as_xml: "<Function><Name>isSuperset(of:)</Name><USR>s:FEsPs10SetAlgebra10isSupersetFT2ofx_Sb</USR><Declaration>func isSuperset(of other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns a Boolean value that indicates whether the set is a superset of the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the set is a superset of <codeVoice>other</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>Set <emphasis>A</emphasis> is a superset of another set <emphasis>B</emphasis> if every member of <emphasis>B</emphasis> is also a member of <emphasis>A</emphasis>.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let attendees: Set = [\"Alicia\", \"Bethany\", \"Diana\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(employees.isSuperset(of: attendees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:s10SetAlgebraPsE10isSupersetSbx2of_tF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE10isSupersetSbx2of_tF",
+        key.doc.full_as_xml: "<Function><Name>isSuperset(of:)</Name><USR>s:s10SetAlgebraPsE10isSupersetSbx2of_tF</USR><Declaration>func isSuperset(of other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns a Boolean value that indicates whether the set is a superset of the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the set is a superset of <codeVoice>other</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>Set <emphasis>A</emphasis> is a superset of another set <emphasis>B</emphasis> if every member of <emphasis>B</emphasis> is also a member of <emphasis>A</emphasis>.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let attendees: Set = [\"Alicia\", \"Bethany\", \"Diana\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(employees.isSuperset(of: attendees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 2811,
         key.length: 52,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isSuperset</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>of</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -5930,9 +5930,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "isDisjoint(with:)",
-        key.usr: "s:FEsPs10SetAlgebra10isDisjointFT4withx_Sb::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra10isDisjointFT4withx_Sb",
-        key.doc.full_as_xml: "<Function><Name>isDisjoint(with:)</Name><USR>s:FEsPs10SetAlgebra10isDisjointFT4withx_Sb</USR><Declaration>func isDisjoint(with other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns a Boolean value that indicates whether the set has no members in common with the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the set has no elements in common with <codeVoice>other</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>employees</codeVoice> set is disjoint with the <codeVoice>visitors</codeVoice> set because no name appears in both sets.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let visitors: Set = [\"Marcia\", \"Nathaniel\", \"Olivia\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(employees.isDisjoint(with: visitors))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:s10SetAlgebraPsE10isDisjointSbx4with_tF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE10isDisjointSbx4with_tF",
+        key.doc.full_as_xml: "<Function><Name>isDisjoint(with:)</Name><USR>s:s10SetAlgebraPsE10isDisjointSbx4with_tF</USR><Declaration>func isDisjoint(with other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns a Boolean value that indicates whether the set has no members in common with the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the set has no elements in common with <codeVoice>other</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>employees</codeVoice> set is disjoint with the <codeVoice>visitors</codeVoice> set because no name appears in both sets.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let visitors: Set = [\"Marcia\", \"Nathaniel\", \"Olivia\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(employees.isDisjoint(with: visitors))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 2869,
         key.length: 54,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isDisjoint</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>with</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -5949,9 +5949,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "subtracting(_:)",
-        key.usr: "s:FEsPs10SetAlgebra11subtractingFxx::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra11subtractingFxx",
-        key.doc.full_as_xml: "<Function><Name>subtracting(_:)</Name><USR>s:FEsPs10SetAlgebra11subtractingFxx</USR><Declaration>func subtracting(_ other: Self) -&gt; Self</Declaration><Abstract><Para>Returns a new set containing the elements of this set that do not occur in the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A new set.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>nonNeighbors</codeVoice> set is made up of the elements of the <codeVoice>employees</codeVoice> set that are not elements of <codeVoice>neighbors</codeVoice>:</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let neighbors: Set = [\"Bethany\", \"Eric\", \"Forlani\", \"Greta\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let nonNeighbors = employees.subtract(neighbors)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(nonNeighbors)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"[\"Diana\", \"Chris\", \"Alicia\"]\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:s10SetAlgebraPsE11subtractingxxF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE11subtractingxxF",
+        key.doc.full_as_xml: "<Function><Name>subtracting(_:)</Name><USR>s:s10SetAlgebraPsE11subtractingxxF</USR><Declaration>func subtracting(_ other: Self) -&gt; Self</Declaration><Abstract><Para>Returns a new set containing the elements of this set that do not occur in the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>A new set.</Para></ResultDiscussion><Discussion><Para>In the following example, the <codeVoice>nonNeighbors</codeVoice> set is made up of the elements of the <codeVoice>employees</codeVoice> set that are not elements of <codeVoice>neighbors</codeVoice>:</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let neighbors: Set = [\"Bethany\", \"Eric\", \"Forlani\", \"Greta\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let nonNeighbors = employees.subtract(neighbors)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(nonNeighbors)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"[\"Diana\", \"Chris\", \"Alicia\"]\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 2929,
         key.length: 65,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>subtracting</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -5968,9 +5968,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "isEmpty",
-        key.usr: "s:vEsPs10SetAlgebra7isEmptySb::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:vEsPs10SetAlgebra7isEmptySb",
-        key.doc.full_as_xml: "<Other><Name>isEmpty</Name><USR>s:vEsPs10SetAlgebra7isEmptySb</USR><Declaration>var isEmpty: Bool { get }</Declaration><Abstract><Para>A Boolean value that indicates whether the set has no elements.</Para></Abstract></Other>",
+        key.usr: "s:s10SetAlgebraPsE7isEmptySbv::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE7isEmptySbv",
+        key.doc.full_as_xml: "<Other><Name>isEmpty</Name><USR>s:s10SetAlgebraPsE7isEmptySbv</USR><Declaration>var isEmpty: Bool { get }</Declaration><Abstract><Para>A Boolean value that indicates whether the set has no elements.</Para></Abstract></Other>",
         key.offset: 3000,
         key.length: 25,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>isEmpty</decl.name>: <decl.var.type><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>"
@@ -5978,9 +5978,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "isStrictSuperset(of:)",
-        key.usr: "s:FEsPs10SetAlgebra16isStrictSupersetFT2ofx_Sb::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra16isStrictSupersetFT2ofx_Sb",
-        key.doc.full_as_xml: "<Function><Name>isStrictSuperset(of:)</Name><USR>s:FEsPs10SetAlgebra16isStrictSupersetFT2ofx_Sb</USR><Declaration>func isStrictSuperset(of other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns a Boolean value that indicates whether this set is a strict superset of the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the set is a strict superset of <codeVoice>other</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>Set <emphasis>A</emphasis> is a strict superset of another set <emphasis>B</emphasis> if every member of <emphasis>B</emphasis> is also a member of <emphasis>A</emphasis> and <emphasis>A</emphasis> contains at least one element that is <emphasis>not</emphasis> a member of <emphasis>B</emphasis>.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let attendees: Set = [\"Alicia\", \"Bethany\", \"Diana\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(employees.isStrictSuperset(of: attendees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// A set is never a strict superset of itself:]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(employees.isStrictSuperset(of: employees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"false\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:s10SetAlgebraPsE16isStrictSupersetSbx2of_tF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE16isStrictSupersetSbx2of_tF",
+        key.doc.full_as_xml: "<Function><Name>isStrictSuperset(of:)</Name><USR>s:s10SetAlgebraPsE16isStrictSupersetSbx2of_tF</USR><Declaration>func isStrictSuperset(of other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns a Boolean value that indicates whether this set is a strict superset of the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the set is a strict superset of <codeVoice>other</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>Set <emphasis>A</emphasis> is a strict superset of another set <emphasis>B</emphasis> if every member of <emphasis>B</emphasis> is also a member of <emphasis>A</emphasis> and <emphasis>A</emphasis> contains at least one element that is <emphasis>not</emphasis> a member of <emphasis>B</emphasis>.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let attendees: Set = [\"Alicia\", \"Bethany\", \"Diana\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(employees.isStrictSuperset(of: attendees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// A set is never a strict superset of itself:]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(employees.isStrictSuperset(of: employees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"false\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 3031,
         key.length: 58,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isStrictSuperset</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>of</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -5997,9 +5997,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "isStrictSubset(of:)",
-        key.usr: "s:FEsPs10SetAlgebra14isStrictSubsetFT2ofx_Sb::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:FEsPs10SetAlgebra14isStrictSubsetFT2ofx_Sb",
-        key.doc.full_as_xml: "<Function><Name>isStrictSubset(of:)</Name><USR>s:FEsPs10SetAlgebra14isStrictSubsetFT2ofx_Sb</USR><Declaration>func isStrictSubset(of other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns a Boolean value that indicates whether this set is a strict subset of the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the set is a strict subset of <codeVoice>other</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>Set <emphasis>A</emphasis> is a strict subset of another set <emphasis>B</emphasis> if every member of <emphasis>A</emphasis> is also a member of <emphasis>B</emphasis> and <emphasis>B</emphasis> contains at least one element that is not a member of <emphasis>A</emphasis>.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let attendees: Set = [\"Alicia\", \"Bethany\", \"Diana\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(attendees.isStrictSubset(of: employees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// A set is never a strict subset of itself:]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(attendees.isStrictSubset(of: attendees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"false\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
+        key.usr: "s:s10SetAlgebraPsE14isStrictSubsetSbx2of_tF::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsE14isStrictSubsetSbx2of_tF",
+        key.doc.full_as_xml: "<Function><Name>isStrictSubset(of:)</Name><USR>s:s10SetAlgebraPsE14isStrictSubsetSbx2of_tF</USR><Declaration>func isStrictSubset(of other: Self) -&gt; Bool</Declaration><Abstract><Para>Returns a Boolean value that indicates whether this set is a strict subset of the given set.</Para></Abstract><Parameters><Parameter><Name>other</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A set of the same type as the current set.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para><codeVoice>true</codeVoice> if the set is a strict subset of <codeVoice>other</codeVoice>; otherwise, <codeVoice>false</codeVoice>.</Para></ResultDiscussion><Discussion><Para>Set <emphasis>A</emphasis> is a strict subset of another set <emphasis>B</emphasis> if every member of <emphasis>A</emphasis> is also a member of <emphasis>B</emphasis> and <emphasis>B</emphasis> contains at least one element that is not a member of <emphasis>A</emphasis>.</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let employees: Set = [\"Alicia\", \"Bethany\", \"Chris\", \"Diana\", \"Eric\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[let attendees: Set = [\"Alicia\", \"Bethany\", \"Diana\"]]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(attendees.isStrictSubset(of: employees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"true\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// A set is never a strict subset of itself:]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(attendees.isStrictSubset(of: attendees))]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"false\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>",
         key.offset: 3095,
         key.length: 56,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>isStrictSubset</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>of</decl.var.parameter.argument_label> <decl.var.parameter.name>other</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -6029,7 +6029,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:@S@FooStruct1@FI@x",
         key.offset: 3179,
         key.length: 12,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>x</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type></decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>x</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -6042,7 +6042,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init()",
-        key.usr: "s:FVSC10FooStruct1cFT_S_",
+        key.usr: "s:SC10FooStruct1VABycfc",
         key.offset: 3216,
         key.length: 6,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>()</decl.function.constructor>"
@@ -6050,10 +6050,10 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(x:y:)",
-        key.usr: "s:FVSC10FooStruct1cFT1xVs5Int321ySd_S_",
+        key.usr: "s:SC10FooStruct1VABs5Int32V1x_Sd1ytcfc",
         key.offset: 3228,
         key.length: 29,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -6084,17 +6084,17 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "Strideable",
-        key.usr: "s:Ps10Strideable"
+        key.usr: "s:s10StrideableP"
       },
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "Hashable",
-        key.usr: "s:Ps8Hashable"
+        key.usr: "s:s8HashableP"
       },
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "_Pointer",
-        key.usr: "s:Ps8_Pointer"
+        key.usr: "s:s8_PointerP"
       }
     ]
   },
@@ -6112,7 +6112,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:@S@FooStruct2@FI@x",
         key.offset: 3348,
         key.length: 12,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>x</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type></decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>x</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -6125,7 +6125,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init()",
-        key.usr: "s:FVSC10FooStruct2cFT_S_",
+        key.usr: "s:SC10FooStruct2VABycfc",
         key.offset: 3385,
         key.length: 6,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>()</decl.function.constructor>"
@@ -6133,10 +6133,10 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(x:y:)",
-        key.usr: "s:FVSC10FooStruct2cFT1xVs5Int321ySd_S_",
+        key.usr: "s:SC10FooStruct2VABs5Int32V1x_Sd1ytcfc",
         key.offset: 3397,
         key.length: 29,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -6178,7 +6178,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:@SA@FooStructTypedef2@FI@x",
         key.offset: 3502,
         key.length: 12,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>x</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type></decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>x</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -6191,7 +6191,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init()",
-        key.usr: "s:FVSC17FooStructTypedef2cFT_S_",
+        key.usr: "s:SC17FooStructTypedef2VABycfc",
         key.offset: 3539,
         key.length: 6,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>()</decl.function.constructor>"
@@ -6199,10 +6199,10 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(x:y:)",
-        key.usr: "s:FVSC17FooStructTypedef2cFT1xVs5Int321ySd_S_",
+        key.usr: "s:SC17FooStructTypedef2VABs5Int32V1x_Sd1ytcfc",
         key.offset: 3551,
         key.length: 29,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -6229,22 +6229,22 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.doc.full_as_xml: "<Typedef file=Foo.h line=\"60\" column=\"13\"><Name>FooTypedef1</Name><USR>c:Foo.h@T@FooTypedef1</USR><Declaration>typealias FooTypedef1 = Int32</Declaration><Abstract><Para> Aaa.  FooTypedef1.  Bbb.</Para></Abstract></Typedef>",
     key.offset: 3583,
     key.length: 29,
-    key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>FooTypedef1</decl.name> = <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.typealias>",
+    key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>FooTypedef1</decl.name> = <ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.typealias>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "SignedInteger",
-        key.usr: "s:Ps13SignedInteger"
+        key.usr: "s:s13SignedIntegerP"
       },
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "Comparable",
-        key.usr: "s:Ps10Comparable"
+        key.usr: "s:s10ComparableP"
       },
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "Equatable",
-        key.usr: "s:Ps9Equatable"
+        key.usr: "s:s9EquatableP"
       }
     ]
   },
@@ -6255,7 +6255,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.doc.full_as_xml: "<Variable file=Foo.h line=\"63\" column=\"12\"><Name>fooIntVar</Name><USR>c:@fooIntVar</USR><Declaration>var fooIntVar: Int32</Declaration><Abstract><Para> Aaa.  fooIntVar.  Bbb.</Para></Abstract></Variable>",
     key.offset: 3613,
     key.length: 20,
-    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooIntVar</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type></decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooIntVar</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type></decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.function.free,
@@ -6264,7 +6264,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.doc.full_as_xml: "<Function file=Foo.h line=\"66\" column=\"5\"><Name>fooFunc1</Name><USR>c:@F@fooFunc1</USR><Declaration>func fooFunc1(_ a: Int32) -> Int32</Declaration><Abstract><Para> Aaa.  fooFunc1.  Bbb.</Para></Abstract></Function>",
     key.offset: 3634,
     key.length: 34,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -6281,7 +6281,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooFunc1AnonymousParam",
     key.offset: 3669,
     key.length: 48,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFunc1AnonymousParam</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFunc1AnonymousParam</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -6297,7 +6297,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooFunc3",
     key.offset: 3718,
     key.length: 94,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFunc3</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sf\">Float</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>c</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>d</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sp\">UnsafeMutablePointer</ref.struct>&lt;<ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct>&gt;!</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFunc3</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sf\">Float</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>c</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sd\">Double</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>d</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sp\">UnsafeMutablePointer</ref.struct>&lt;<ref.struct usr=\"s:s5Int32V\">Int32</ref.struct>&gt;!</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -6335,7 +6335,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooFuncWithBlock",
     key.offset: 3813,
     key.length: 49,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFuncWithBlock</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>blk</decl.var.parameter.name>: <decl.var.parameter.type>((<ref.struct usr=\"s:Sf\">Float</ref.struct>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype>)!</decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFuncWithBlock</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>blk</decl.var.parameter.name>: <decl.var.parameter.type>((<ref.struct usr=\"s:Sf\">Float</ref.struct>) -&gt; <decl.function.returntype><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.function.returntype>)!</decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -6352,7 +6352,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooFuncWithFunctionPointer",
     key.offset: 3863,
     key.length: 60,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFuncWithFunctionPointer</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>fptr</decl.var.parameter.name>: <decl.var.parameter.type>((<ref.struct usr=\"s:Sf\">Float</ref.struct>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype>)!</decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFuncWithFunctionPointer</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>fptr</decl.var.parameter.name>: <decl.var.parameter.type>((<ref.struct usr=\"s:Sf\">Float</ref.struct>) -&gt; <decl.function.returntype><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.function.returntype>)!</decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -6369,7 +6369,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooFuncNoreturn1",
     key.offset: 3924,
     key.length: 32,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFuncNoreturn1</decl.name>() -&gt; <decl.function.returntype><ref.enum usr=\"s:Os5Never\">Never</ref.enum></decl.function.returntype></decl.function.free>"
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFuncNoreturn1</decl.name>() -&gt; <decl.function.returntype><ref.enum usr=\"s:s5NeverO\">Never</ref.enum></decl.function.returntype></decl.function.free>"
   },
   {
     key.kind: source.lang.swift.decl.function.free,
@@ -6377,7 +6377,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooFuncNoreturn2",
     key.offset: 3957,
     key.length: 32,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFuncNoreturn2</decl.name>() -&gt; <decl.function.returntype><ref.enum usr=\"s:Os5Never\">Never</ref.enum></decl.function.returntype></decl.function.free>"
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooFuncNoreturn2</decl.name>() -&gt; <decl.function.returntype><ref.enum usr=\"s:s5NeverO\">Never</ref.enum></decl.function.returntype></decl.function.free>"
   },
   {
     key.kind: source.lang.swift.decl.function.free,
@@ -6431,7 +6431,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.doc.full_as_xml: "<Function file=Foo.h line=\"118\" column=\"5\"><Name>redeclaredInMultipleModulesFunc1</Name><USR>c:@F@redeclaredInMultipleModulesFunc1</USR><Declaration>func redeclaredInMultipleModulesFunc1(_ a: Int32) -> Int32</Declaration><Abstract><Para> Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.</Para></Abstract></Function>",
     key.offset: 4125,
     key.length: 58,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>redeclaredInMultipleModulesFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>redeclaredInMultipleModulesFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -6492,7 +6492,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(pl)FooProtocolBase(py)fooProperty1",
         key.offset: 4370,
         key.length: 35,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooProperty1</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooProperty1</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -6500,7 +6500,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(pl)FooProtocolBase(py)fooProperty2",
         key.offset: 4411,
         key.length: 35,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooProperty2</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooProperty2</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -6508,7 +6508,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(pl)FooProtocolBase(py)fooProperty3",
         key.offset: 4452,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooProperty3</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooProperty3</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>"
       }
     ]
   },
@@ -6664,7 +6664,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassDerived(py)fooProperty1",
         key.offset: 4993,
         key.length: 23,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooProperty1</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooProperty1</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -6672,7 +6672,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassDerived(py)fooProperty2",
         key.offset: 5022,
         key.length: 23,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooProperty2</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooProperty2</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -6680,7 +6680,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassDerived(py)fooProperty3",
         key.offset: 5051,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooProperty3</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooProperty3</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
@@ -6696,7 +6696,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassDerived(im)fooInstanceFunc1:",
         key.offset: 5117,
         key.length: 33,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooInstanceFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooInstanceFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -6713,7 +6713,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassDerived(im)fooInstanceFunc2:withB:",
         key.offset: 5156,
         key.length: 49,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooInstanceFunc2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>withB</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooInstanceFunc2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>withB</decl.var.parameter.argument_label> <decl.var.parameter.name>b</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -6798,22 +6798,22 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@T@typedef_int_t",
     key.offset: 5423,
     key.length: 31,
-    key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>typedef_int_t</decl.name> = <ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.typealias>",
+    key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>typedef_int_t</decl.name> = <ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.typealias>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "SignedInteger",
-        key.usr: "s:Ps13SignedInteger"
+        key.usr: "s:s13SignedIntegerP"
       },
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "Comparable",
-        key.usr: "s:Ps10Comparable"
+        key.usr: "s:s10ComparableP"
       },
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "Equatable",
-        key.usr: "s:Ps9Equatable"
+        key.usr: "s:s9EquatableP"
       }
     ]
   },
@@ -6823,7 +6823,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@3720@macro@FOO_MACRO_1",
     key.offset: 5455,
     key.length: 30,
-    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_1</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_1</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -6831,7 +6831,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@3742@macro@FOO_MACRO_2",
     key.offset: 5486,
     key.length: 30,
-    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_2</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_2</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -6839,7 +6839,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@3764@macro@FOO_MACRO_3",
     key.offset: 5517,
     key.length: 30,
-    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_3</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_3</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -6847,7 +6847,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@3828@macro@FOO_MACRO_4",
     key.offset: 5548,
     key.length: 31,
-    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_4</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_4</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -6855,7 +6855,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@3860@macro@FOO_MACRO_5",
     key.offset: 5580,
     key.length: 31,
-    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_5</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs6UInt64\">UInt64</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_5</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt64V\">UInt64</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -6879,7 +6879,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@3984@macro@FOO_MACRO_8",
     key.offset: 5690,
     key.length: 29,
-    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_8</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs4Int8\">Int8</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_8</decl.name>: <decl.var.type><ref.struct usr=\"s:s4Int8V\">Int8</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -6887,7 +6887,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@4015@macro@FOO_MACRO_9",
     key.offset: 5720,
     key.length: 30,
-    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_9</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_9</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -6895,7 +6895,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@4045@macro@FOO_MACRO_10",
     key.offset: 5751,
     key.length: 31,
-    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_10</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int16\">Int16</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_10</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int16V\">Int16</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -6911,7 +6911,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@4477@macro@FOO_MACRO_REDEF_1",
     key.offset: 5813,
     key.length: 36,
-    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_REDEF_1</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_REDEF_1</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -6919,7 +6919,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:Foo.h@4534@macro@FOO_MACRO_REDEF_2",
     key.offset: 5850,
     key.length: 36,
-    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_REDEF_2</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FOO_MACRO_REDEF_2</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
   },
   {
     key.kind: source.lang.swift.decl.function.free,
@@ -6951,12 +6951,12 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:@S@_InternalStruct@FI@x",
         key.offset: 5970,
         key.length: 12,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>x</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type></decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>x</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init()",
-        key.usr: "s:FVSC15_InternalStructcFT_S_",
+        key.usr: "s:SC15_InternalStructVABycfc",
         key.offset: 5988,
         key.length: 6,
         key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>()</decl.function.constructor>"
@@ -6964,10 +6964,10 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(x:)",
-        key.usr: "s:FVSC15_InternalStructcFT1xVs5Int32_S_",
+        key.usr: "s:SC15_InternalStructVABs5Int32V1x_tcfc",
         key.offset: 6000,
         key.length: 16,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7092,7 +7092,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassPropertyOwnership(py)assignable",
         key.offset: 6370,
         key.length: 42,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>unowned(unsafe)</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>assignable</decl.name>: <decl.var.type><ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>!</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>unowned(unsafe)</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>assignable</decl.name>: <decl.var.type><ref.protocol usr=\"c:objc(pl)AnyObject\">AnyObject</ref.protocol>!</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -7100,7 +7100,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassPropertyOwnership(py)unsafeAssignable",
         key.offset: 6418,
         key.length: 48,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>unowned(unsafe)</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>unsafeAssignable</decl.name>: <decl.var.type><ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>!</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>unowned(unsafe)</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>unsafeAssignable</decl.name>: <decl.var.type><ref.protocol usr=\"c:objc(pl)AnyObject\">AnyObject</ref.protocol>!</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -7132,7 +7132,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassPropertyOwnership(py)weakRef",
         key.offset: 6547,
         key.length: 28,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>weak</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>weakRef</decl.name>: <decl.var.type><ref.protocol usr=\"s:Ps9AnyObject\">AnyObject</ref.protocol>!</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>weak</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>weakRef</decl.name>: <decl.var.type><ref.protocol usr=\"c:objc(pl)AnyObject\">AnyObject</ref.protocol>!</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
@@ -7140,7 +7140,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooClassPropertyOwnership(py)scalar",
         key.offset: 6581,
         key.length: 17,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>scalar</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>scalar</decl.name>: <decl.var.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
@@ -7217,7 +7217,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "c:objc(cs)FooUnavailableMembers(cm)unavailableMembersWithInt:",
         key.offset: 6808,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>!(<decl.var.parameter><decl.var.parameter.argument_label>int</decl.var.parameter.argument_label> <decl.var.parameter.name>i</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>!(<decl.var.parameter><decl.var.parameter.argument_label>int</decl.var.parameter.argument_label> <decl.var.parameter.name>i</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7541,7 +7541,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@F@fooSubFunc1",
     key.offset: 7492,
     key.length: 37,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooSubFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Vs5Int32\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooSubFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
@@ -7558,27 +7558,27 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@E@FooSubEnum1",
     key.offset: 7530,
     key.length: 145,
-    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooSubEnum1</decl.name> : <ref.protocol usr=\"s:Ps16RawRepresentable\">RawRepresentable</ref.protocol>, <ref.protocol usr=\"s:Ps9Equatable\">Equatable</ref.protocol></decl.struct>",
+    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooSubEnum1</decl.name> : <ref.protocol usr=\"s:s16RawRepresentableP\">RawRepresentable</ref.protocol>, <ref.protocol usr=\"s:s9EquatableP\">Equatable</ref.protocol></decl.struct>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "RawRepresentable",
-        key.usr: "s:Ps16RawRepresentable"
+        key.usr: "s:s16RawRepresentableP"
       },
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "Equatable",
-        key.usr: "s:Ps9Equatable"
+        key.usr: "s:s9EquatableP"
       }
     ],
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(_:)",
-        key.usr: "s:FVSC11FooSubEnum1cFVs6UInt32S_",
+        key.usr: "s:SC11FooSubEnum1VABs6UInt32Vcfc",
         key.offset: 7586,
         key.length: 24,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rawValue</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rawValue</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -7592,15 +7592,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(rawValue:)",
-        key.usr: "s:FVSC11FooSubEnum1cFT8rawValueVs6UInt32_S_",
+        key.usr: "s:SC11FooSubEnum1VABs6UInt32V8rawValue_tcfc",
         key.offset: 7616,
         key.length: 31,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
-            key.usr: "s:FPs16RawRepresentablecFT8rawValuewx8RawValue_GSqx_"
+            key.usr: "s:s16RawRepresentablePxSg0A5ValueQz03rawC0_tcfc"
           }
         ],
         key.entities: [
@@ -7616,15 +7616,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "rawValue",
-        key.usr: "s:vVSC11FooSubEnum18rawValueVs6UInt32",
+        key.usr: "s:SC11FooSubEnum1V8rawValues6UInt32Vv",
         key.offset: 7653,
         key.length: 20,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:Vs6UInt32\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>",
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
-            key.usr: "s:vPs16RawRepresentable8rawValuewx8RawValue"
+            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzv"
           }
         ]
       }

@@ -496,7 +496,7 @@ GenericParamList::create(const ASTContext &Context,
                          SourceLoc LAngleLoc,
                          ArrayRef<GenericTypeParamDecl *> Params,
                          SourceLoc WhereLoc,
-                         MutableArrayRef<RequirementRepr> Requirements,
+                         ArrayRef<RequirementRepr> Requirements,
                          SourceLoc RAngleLoc) {
   unsigned Size = totalSizeToAlloc<GenericTypeParamDecl *>(Params.size());
   void *Mem = Context.Allocate(Size, alignof(GenericParamList));
@@ -504,6 +504,66 @@ GenericParamList::create(const ASTContext &Context,
                                     WhereLoc,
                                     Context.AllocateCopy(Requirements),
                                     RAngleLoc);
+}
+
+GenericParamList *
+GenericParamList::clone(DeclContext *dc) const {
+  auto &ctx = dc->getASTContext();
+  SmallVector<GenericTypeParamDecl *, 2> params;
+  for (auto param : getParams()) {
+    auto *newParam = new (ctx) GenericTypeParamDecl(
+      dc, param->getName(), param->getNameLoc(),
+      GenericTypeParamDecl::InvalidDepth,
+      param->getIndex());
+    params.push_back(newParam);
+
+    SmallVector<TypeLoc, 2> inherited;
+    for (auto loc : param->getInherited())
+      inherited.push_back(loc.clone(ctx));
+    newParam->setInherited(ctx.AllocateCopy(inherited));
+  }
+
+  SmallVector<RequirementRepr, 2> requirements;
+  for (auto reqt : getRequirements()) {
+    switch (reqt.getKind()) {
+    case RequirementReprKind::TypeConstraint: {
+      auto first = reqt.getSubjectLoc();
+      auto second = reqt.getConstraintLoc();
+      reqt = RequirementRepr::getTypeConstraint(
+          first.clone(ctx),
+          reqt.getColonLoc(),
+          second.clone(ctx));
+      break;
+    }
+    case RequirementReprKind::SameType: {
+      auto first = reqt.getFirstTypeLoc();
+      auto second = reqt.getSecondTypeLoc();
+      reqt = RequirementRepr::getSameType(
+          first.clone(ctx),
+          reqt.getEqualLoc(),
+          second.clone(ctx));
+      break;
+    }
+    case RequirementReprKind::LayoutConstraint: {
+      auto first = reqt.getSubjectLoc();
+      auto layout = reqt.getLayoutConstraintLoc();
+      reqt = RequirementRepr::getLayoutConstraint(
+          first.clone(ctx),
+          reqt.getColonLoc(),
+          layout);
+      break;
+    }
+    }
+
+    requirements.push_back(reqt);
+  }
+
+  return GenericParamList::create(ctx,
+                                  getLAngleLoc(),
+                                  params,
+                                  getWhereLoc(),
+                                  requirements,
+                                  getRAngleLoc());
 }
 
 void GenericParamList::addTrailingWhereClause(
@@ -3375,14 +3435,31 @@ void AbstractStorageDecl::setInvalidBracesRange(SourceRange BracesRange) {
   GetSetInfo.setPointer(getSetInfo);
 }
 
+static Optional<ObjCSelector>
+getNameFromObjcAttribute(const ObjCAttr *attr, DeclName preferredName) {
+  if (!attr)
+    return None;
+  if (auto name = attr->getName()) {
+    if (attr->isNameImplicit()) {
+      // preferredName > implicit name, because implicit name is just cached
+      // actual name.
+      if (!preferredName)
+        return *name;
+    } else {
+      // explicit name > preferred name.
+      return *name;
+    }
+  }
+  return None;
+}
+
 ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
                LazyResolver *resolver, Identifier preferredName) const {
   // If the getter has an @objc attribute with a name, use that.
   if (auto getter = getGetter()) {
-    if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>()) {
-      if (auto name = objcAttr->getName())
+      if (auto name = getNameFromObjcAttribute(getter->getAttrs().
+          getAttribute<ObjCAttr>(), preferredName))
         return *name;
-    }
   }
 
   // Subscripts use a specific selector.
@@ -3414,9 +3491,8 @@ ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
   auto setter = getSetter();
   auto objcAttr = setter ? setter->getAttrs().getAttribute<ObjCAttr>()
                          : nullptr;
-  if (objcAttr) {
-    if (auto name = objcAttr->getName())
-      return *name;
+  if (auto name = getNameFromObjcAttribute(objcAttr, DeclName(preferredName))) {
+    return *name;
   }
 
   // Subscripts use a specific selector.
@@ -3445,7 +3521,7 @@ ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
   auto result = VarDecl::getDefaultObjCSetterSelector(ctx, Name);
 
   // Cache the result, so we don't perform string manipulation again.
-  if (objcAttr)
+  if (objcAttr && preferredName.empty())
     const_cast<ObjCAttr *>(objcAttr)->setName(result, /*implicit=*/true);
 
   return result;
@@ -3796,7 +3872,7 @@ ParamDecl::ParamDecl(ParamDecl *PD)
     DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()),
     IsTypeLocImplicit(PD->IsTypeLocImplicit),
     defaultArgumentKind(PD->defaultArgumentKind) {
-  typeLoc = PD->getTypeLoc();
+  typeLoc = PD->getTypeLoc().clone(PD->getASTContext());
   if (PD->hasInterfaceType())
     setInterfaceType(PD->getInterfaceType());
 }
@@ -4228,10 +4304,9 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
 ObjCSelector AbstractFunctionDecl::getObjCSelector(
                LazyResolver *resolver, DeclName preferredName) const {
   // If there is an @objc attribute with a name, use that name.
-  auto objc = getAttrs().getAttribute<ObjCAttr>();
-  if (objc) {
-    if (auto name = objc->getName())
-      return *name;
+  auto *objc = getAttrs().getAttribute<ObjCAttr>();
+  if (auto name = getNameFromObjcAttribute(objc, preferredName)) {
+    return *name;
   }
 
   auto &ctx = getASTContext();
@@ -4357,7 +4432,7 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
 
   // If we did any string manipulation, cache the result. We don't want to
   // do that again.
-  if (didStringManipulation && objc)
+  if (didStringManipulation && objc && !preferredName)
     const_cast<ObjCAttr *>(objc)->setName(result, /*implicit=*/true);
 
   return result;
@@ -4975,78 +5050,4 @@ void ClassDecl::setSuperclass(Type superclass) {
   assert((!superclass || !superclass->hasArchetype())
          && "superclass must be interface type");
   LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
-}
-
-StringRef swift::objc_translation::
-getNameForObjC(const ValueDecl *VD, CustomNamesOnly_t customNamesOnly) {
-  assert(isa<ClassDecl>(VD) || isa<ProtocolDecl>(VD) || isa<StructDecl>(VD) ||
-         isa<EnumDecl>(VD) || isa<EnumElementDecl>(VD));
-  if (auto objc = VD->getAttrs().getAttribute<ObjCAttr>()) {
-    if (auto name = objc->getName()) {
-      assert(name->getNumSelectorPieces() == 1);
-      return name->getSelectorPieces().front().str();
-    }
-  }
-
-  if (customNamesOnly)
-    return StringRef();
-
-  if (auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(VD->getClangDecl())) {
-    if (const clang::IdentifierInfo *II = clangDecl->getIdentifier())
-      return II->getName();
-    if (auto *anonDecl = dyn_cast<clang::TagDecl>(clangDecl))
-      if (auto *anonTypedef = anonDecl->getTypedefNameForAnonDecl())
-        return anonTypedef->getIdentifier()->getName();
-  }
-
-  return VD->getName().str();
-}
-
-bool swift::objc_translation::
-printSwiftEnumElemNameInObjC(const EnumElementDecl *EL, llvm::raw_ostream &OS,
-                             Identifier PreferredName) {
-  StringRef ElemName = getNameForObjC(EL, CustomNamesOnly);
-  if (!ElemName.empty()) {
-    OS << ElemName;
-    return true;
-  }
-  OS << getNameForObjC(EL->getDeclContext()->getAsEnumOrEnumExtensionContext());
-  if (PreferredName.empty())
-    ElemName = EL->getName().str();
-  else
-    ElemName = PreferredName.str();
-
-  SmallString<64> Scratch;
-  OS << camel_case::toSentencecase(ElemName, Scratch);
-  return false;
-}
-
-std::pair<Identifier, ObjCSelector> swift::objc_translation::
-getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
-  ASTContext &Ctx = VD->getASTContext();
-  LazyResolver *Resolver = Ctx.getLazyResolver();
-  if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    return {Identifier(), FD->getObjCSelector(Resolver, PreferredName)};
-  } else if (auto *VAD = dyn_cast<VarDecl>(VD)) {
-    if (PreferredName)
-      return {PreferredName.getBaseName(), ObjCSelector()};
-    return {VAD->getObjCPropertyName(), ObjCSelector()};
-  } else if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
-    return getObjCNameForSwiftDecl(SD->getGetter(), PreferredName);
-  } else if (auto *EL = dyn_cast<EnumElementDecl>(VD)) {
-    SmallString<64> Buffer;
-    {
-      llvm::raw_svector_ostream OS(Buffer);
-      printSwiftEnumElemNameInObjC(EL, OS, PreferredName.getBaseName());
-    }
-    return {Ctx.getIdentifier(Buffer.str()), ObjCSelector()};
-  } else {
-    // @objc(ExplicitName) > PreferredName > Swift name.
-    StringRef Name = getNameForObjC(VD, CustomNamesOnly);
-    if (!Name.empty())
-      return {Ctx.getIdentifier(Name), ObjCSelector()};
-    if (!PreferredName.getBaseName().empty())
-      return {PreferredName.getBaseName(), ObjCSelector()};
-    return {Ctx.getIdentifier(getNameForObjC(VD)), ObjCSelector()};
-  }
 }

@@ -3741,6 +3741,7 @@ container may use one of several representations:
   before IR generation.
   The following instructions manipulate "loadable" opaque existential containers:
   
+  * `init_existential_opaque`_
   * `open_existential_opaque`_
 
 - **Class existential containers**: If a protocol type is constrained by one or
@@ -3815,6 +3816,21 @@ initialized existential container can be destroyed with ``destroy_addr`` as
 usual. It is undefined behavior to ``destroy_addr`` a partially-initialized
 existential container.
 
+init_existential_opaque
+```````````````````````
+::
+
+  sil-instruction ::= 'init_existential_opaque' sil-operand ':' sil-type ','
+                                             sil-type
+
+  %1 = init_existential_opaque %0 : $L' : $C, $P
+  // %0 must be of loadable type $L', lowered from AST type $L, conforming to
+  //    protocol(s) $P
+  // %1 will be of type $P
+
+Loadable version of the above: Inits-up the existential
+container prepared to contain a value of type ``$P``.
+
 deinit_existential_addr
 ```````````````````````
 ::
@@ -3851,7 +3867,7 @@ container referenced by ``%0``. The protocol conformances associated
 with this existential container are associated directly with the
 archetype ``$*@opened P``. This pointer can be used with any operation
 on archetypes, such as ``witness_method`` assuming this operation obeys the
-access contraint: The returned address can either allow ``mutable_access`` or
+access constraint: The returned address can either allow ``mutable_access`` or
 ``immutable_access``. Users of the returned address may only consume
 (e.g ``destroy_addr`` or ``copy_addr [take]``) or mutate the value at the
 address if they have ``mutable_access``.
@@ -4413,7 +4429,7 @@ Checked Conversions
 
 Some user-level cast operations can fail and thus require runtime checking.
 
-The `unconditional_checked_cast_addr`_ and `unconditional_checked_cast`_
+The `unconditional_checked_cast_addr`_, `unconditional_checked_cast_opaque`_ and `unconditional_checked_cast`_
 instructions performs an unconditional checked cast; it is a runtime failure
 if the cast fails. The `checked_cast_addr_br`_ and `checked_cast_br`_
 terminator instruction performs a conditional checked cast; it branches to one
@@ -4450,6 +4466,20 @@ unconditional_checked_cast_addr
   // %1 will be of type $*B
 
 Performs a checked indirect conversion, causing a runtime failure if the
+conversion fails.
+
+unconditional_checked_cast_opaque
+`````````````````````````````````
+::
+
+  sil-instruction ::= 'unconditional_checked_cast_opaque' sil-operand 'to' sil-type
+
+  %1 = unconditional_checked_cast_opaque %0 : $A to $B
+  // $A must be not be an address
+  // $B must be an opaque value
+  // %1 will be of type $B
+
+Performs a checked conversion, causing a runtime failure if the
 conversion fails.
 
 Runtime Failures

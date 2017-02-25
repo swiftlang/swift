@@ -56,4 +56,4 @@ extension A {
 
 // FIXME: give these initializers a real mangled name
 // CHECK: define internal swiftcc void @globalinit_{{.*}}func0() {{.*}} {
-// CHECK:      store i64 5, i64* getelementptr inbounds (%Si, %Si* @_T07globals1AV3fooSivZ, i32 0, i32 0), align 8
+// CHECK:      store i64 5, i64* getelementptr inbounds (%TSi, %TSi* @_T07globals1AV3fooSivZ, i32 0, i32 0), align 8

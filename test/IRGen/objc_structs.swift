@@ -8,13 +8,13 @@
 import Foundation
 import gizmo
 
-// CHECK: [[GIZMO:%CSo5Gizmo]] = type opaque
-// CHECK: [[NSRECT:%VSC6NSRect]] = type <{ [[NSPOINT:%VSC7NSPoint]], [[NSSIZE:%VSC6NSSize]] }>
-// CHECK: [[NSPOINT]] = type <{ [[DOUBLE:%Sd]], [[DOUBLE]] }>
+// CHECK: [[GIZMO:%TSo5GizmoC]] = type opaque
+// CHECK: [[NSRECT:%TSC6NSRectV]] = type <{ [[NSPOINT:%TSC7NSPointV]], [[NSSIZE:%TSC6NSSizeV]] }>
+// CHECK: [[NSPOINT]] = type <{ [[DOUBLE:%TSd]], [[DOUBLE]] }>
 // CHECK: [[DOUBLE]] = type <{ double }>
 // CHECK: [[NSSIZE]] = type <{ [[DOUBLE]], [[DOUBLE]] }>
-// CHECK: [[NSSTRING:%CSo8NSString]] = type opaque
-// CHECK: [[NSVIEW:%CSo6NSView]] = type opaque
+// CHECK: [[NSSTRING:%TSo8NSStringC]] = type opaque
+// CHECK: [[NSVIEW:%TSo6NSViewC]] = type opaque
 
 // CHECK: define hidden swiftcc { double, double, double, double } @_T012objc_structs8getFrame{{[_0-9a-zA-Z]*}}F([[GIZMO]]*) {{.*}} {
 func getFrame(_ g: Gizmo) -> NSRect {
@@ -24,7 +24,7 @@ func getFrame(_ g: Gizmo) -> NSRect {
 }
 // CHECK: }
 
-// CHECK: define hidden swiftcc void @_T012objc_structs8setFrame{{[_0-9a-zA-Z]*}}F(%CSo5Gizmo*, double, double, double, double) {{.*}} {
+// CHECK: define hidden swiftcc void @_T012objc_structs8setFrame{{[_0-9a-zA-Z]*}}F(%TSo5GizmoC*, double, double, double, double) {{.*}} {
 func setFrame(_ g: Gizmo, frame: NSRect) {
   // CHECK: load i8*, i8** @"\01L_selector(setFrame:)"
   // CHECK: call void bitcast (void ()* @objc_msgSend to void ([[OPAQUE0:.*]]*, i8*, [[NSRECT]]*)*)([[OPAQUE0:.*]]* {{.*}}, i8* {{.*}}, [[NSRECT]]* byval align 8 {{.*}})

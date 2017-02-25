@@ -951,6 +951,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
 
   case ValueKind::InitExistentialAddrInst:
+  case ValueKind::InitExistentialOpaqueInst:
   case ValueKind::InitExistentialMetatypeInst:
   case ValueKind::InitExistentialRefInst:
   case ValueKind::AllocExistentialBoxInst: {
@@ -1889,6 +1890,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     ResultVal = Builder.createCheckedCastBranch(Loc, isExact, op, castTy,
                                                 successBB, failureBB);
+    break;
+  }
+  case ValueKind::UnconditionalCheckedCastOpaqueInst: {
+    SILValue Val = getLocalValue(
+        ValID, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
+    SILType Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
+    ResultVal = Builder.createUnconditionalCheckedCastOpaque(Loc, Val, Ty);
     break;
   }
   case ValueKind::UnconditionalCheckedCastAddrInst:

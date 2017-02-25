@@ -81,6 +81,19 @@ ManagedValue ManagedValue::copyUnmanaged(SILGenFunction &gen, SILLocation loc) {
   return gen.emitManagedRValueWithCleanup(result);
 }
 
+/// This is the same operation as 'copy', but works on +0 values that don't
+/// have cleanups.  It returns a +1 value with one.
+ManagedValue ManagedValue::formalAccessCopyUnmanaged(SILGenFunction &gen,
+                                                     SILLocation loc) {
+  if (getType().isObject()) {
+    return gen.B.createFormalAccessCopyValue(loc, *this);
+  }
+
+  SILValue result = gen.emitTemporaryAllocation(loc, getType());
+  return gen.B.createFormalAccessCopyAddr(loc, *this, result, IsNotTake,
+                                          IsInitialization);
+}
+
 /// Disable the cleanup for this value.
 void ManagedValue::forwardCleanup(SILGenFunction &gen) const {
   assert(hasCleanup() && "value doesn't have cleanup!");

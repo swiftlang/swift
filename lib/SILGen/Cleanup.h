@@ -232,11 +232,12 @@ public:
   /// Just remember whatever the current state of the given cleanup is.
   void pushCurrentCleanupState(CleanupHandle handle);
 
-  void pop();
+  void pop() &&;
 
-  ~CleanupStateRestorationScope() {
-    pop();
-  }
+  ~CleanupStateRestorationScope() { popImpl(); }
+
+private:
+  void popImpl();
 };
 
 } // end namespace Lowering

@@ -143,7 +143,15 @@ class XMLEscapingPrinter : public StreamPrinter {
   void printXML(StringRef Text);
 };
 
+enum class SemaTokenKind {
+  Invalid,
+  ValueRef,
+  ModuleRef,
+  StmtStart,
+};
+
 struct SemaToken {
+  SemaTokenKind Kind = SemaTokenKind::Invalid;
   ValueDecl *ValueD = nullptr;
   TypeDecl *CtorTyRef = nullptr;
   ExtensionDecl *ExtTyRef = nullptr;
@@ -154,17 +162,20 @@ struct SemaToken {
   Type Ty;
   DeclContext *DC = nullptr;
   Type ContainerType;
+  Stmt *TrailingStmt = nullptr;
 
   SemaToken() = default;
   SemaToken(ValueDecl *ValueD, TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
             SourceLoc Loc, bool IsRef, Type Ty, Type ContainerType) :
-            ValueD(ValueD), CtorTyRef(CtorTyRef), ExtTyRef(ExtTyRef), Loc(Loc),
-            IsRef(IsRef), Ty(Ty), DC(ValueD->getDeclContext()),
-            ContainerType(ContainerType) {}
-  SemaToken(ModuleEntity Mod, SourceLoc Loc) : Mod(Mod), Loc(Loc) { }
-
-  bool isValid() const { return ValueD != nullptr || Mod; }
-  bool isInvalid() const { return !isValid(); }
+            Kind(SemaTokenKind::ValueRef), ValueD(ValueD), CtorTyRef(CtorTyRef),
+            ExtTyRef(ExtTyRef), Loc(Loc), IsRef(IsRef), Ty(Ty),
+            DC(ValueD->getDeclContext()), ContainerType(ContainerType) {}
+  SemaToken(ModuleEntity Mod, SourceLoc Loc) : Kind(SemaTokenKind::ModuleRef),
+                                               Mod(Mod), Loc(Loc) { }
+  SemaToken(Stmt *TrailingStmt) : Kind(SemaTokenKind::StmtStart),
+                                  TrailingStmt(TrailingStmt) {}
+  bool isValid() const { return !isInvalid(); }
+  bool isInvalid() const { return Kind == SemaTokenKind::Invalid; }
 };
 
 class SemaLocResolver : public SourceEntityWalker {
@@ -196,6 +207,7 @@ private:
   bool tryResolve(ValueDecl *D, TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
                   SourceLoc Loc, bool IsRef, Type Ty = Type());
   bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
+  bool tryResolve(Stmt *St);
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override;
 };
@@ -295,7 +307,7 @@ public:
   unsigned commonPartsCount(DeclNameViewer &Other) const;
 };
 
-/// This provide a utility for writing to a underlying string buffer mulitiple
+/// This provide a utility for writing to a underlying string buffer multiple
 /// string pieces and retrieve them later when the underlying buffer is stable.
 class DelayedStringRetriever : public raw_ostream {
     SmallVectorImpl<char> &OS;

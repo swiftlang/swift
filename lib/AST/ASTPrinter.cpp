@@ -594,6 +594,17 @@ operator<<(llvm::raw_ostream &OS, tok keyword) {
   return OS;
 }
 
+uint8_t swift::getKeywordLen(tok keyword) {
+  switch (keyword) {
+#define KEYWORD(KW) case tok::kw_##KW: return StringRef(#KW).size();
+#define POUND_KEYWORD(KW) case tok::pound_##KW: return StringRef("#"#KW).size();
+#define PUNCTUATOR(PUN, TEXT) case tok::PUN: return StringRef(TEXT).size();
+#include "swift/Syntax/TokenKinds.def"
+  default:
+    llvm_unreachable("unexpected keyword or punctuator kind");
+  }
+}
+
 ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
   SmallString<16> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
@@ -1313,7 +1324,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
   }
 
   if (printRequirements) {
-    // Print the requirements.
     bool isFirstReq = true;
     for (const auto &req : requirements) {
       auto first = req.getFirstType();
@@ -1348,6 +1358,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         Printer << ", ";
       }
 
+      Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
       if (second) {
         Requirement substReq(req.getKind(), first, second);
         printRequirement(substReq);
@@ -1355,6 +1366,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         Requirement substReq(req.getKind(), first, req.getLayoutConstraint());
         printRequirement(substReq);
       }
+      Printer.printStructurePost(PrintStructureKind::GenericRequirement);
     }
   }
 

@@ -330,8 +330,9 @@ namespace {
              "base for ref element component must be an object");
       assert(base.getType().hasReferenceSemantics() &&
              "base for ref element component must be a reference type");
-      // Borrow the ref element addr.
-      base = base.borrow(gen, loc);
+      // Borrow the ref element addr using formal access. If we need the ref
+      // element addr, we will load it in this expression.
+      base = base.formalAccessBorrow(gen, loc);
       auto Res = gen.B.createRefElementAddr(loc, base.getUnmanagedValue(),
                                             Field, SubstFieldType);
       return ManagedValue::forLValue(Res);
@@ -693,10 +694,11 @@ namespace {
              RValue &&value, ManagedValue base) && override {
       SILDeclRef setter = gen.getSetterDeclRef(decl, IsDirectAccessorUse);
 
+      FormalEvaluationScope scope(gen);
       // Pass in just the setter.
       auto args =
         std::move(*this).prepareAccessorArgs(gen, loc, base, setter);
-      
+
       return gen.emitSetAccessor(loc, setter, substitutions,
                                  std::move(args.base), IsSuper,
                                  IsDirectAccessorUse,
@@ -939,6 +941,8 @@ namespace {
                ManagedValue base, SGFContext c) && override {
       SILDeclRef getter = gen.getGetterDeclRef(decl, IsDirectAccessorUse);
 
+      FormalEvaluationScope scope(gen);
+
       auto args =
         std::move(*this).prepareAccessorArgs(gen, loc, base, getter);
       
@@ -1130,13 +1134,16 @@ namespace {
 
       SILDeclRef addressor = gen.getAddressorDeclRef(decl, accessKind, 
                                                      IsDirectAccessorUse);
-      auto args =
-        std::move(*this).prepareAccessorArgs(gen, loc, base, addressor);
-      auto result = gen.emitAddressorAccessor(loc, addressor, substitutions,
-                                              std::move(args.base), IsSuper,
-                                              IsDirectAccessorUse,
-                                              std::move(args.subscripts),
-                                              SubstFieldType);
+      std::pair<ManagedValue, ManagedValue> result;
+      {
+        FormalEvaluationScope scope(gen);
+
+        auto args =
+            std::move(*this).prepareAccessorArgs(gen, loc, base, addressor);
+        result = gen.emitAddressorAccessor(
+            loc, addressor, substitutions, std::move(args.base), IsSuper,
+            IsDirectAccessorUse, std::move(args.subscripts), SubstFieldType);
+      }
       switch (cast<FuncDecl>(addressor.getDecl())->getAddressorKind()) {
       case AddressorKind::NotAddressor:
         llvm_unreachable("not an addressor!");
@@ -1453,7 +1460,8 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
     // Decide if we can evaluate this expression at +0 for the rest of the
     // lvalue.
     SGFContext Ctx;
-    
+    ManagedValue rv;
+
     // Calls through opaque protocols can be done with +0 rvalues.  This allows
     // us to avoid materializing copies of existentials.
     if (gen.SGM.Types.isIndirectPlusZeroSelfParameter(e->getType()))
@@ -1466,9 +1474,22 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
       // this handles the case in initializers where there is actually a stack
       // allocation for it as well.
       if (isa<ParamDecl>(DRE->getDecl()) &&
-          DRE->getDecl()->getName().str() == "self" &&
+          DRE->getDecl()->getName() == gen.getASTContext().Id_self &&
           DRE->getDecl()->isImplicit()) {
         Ctx = SGFContext::AllowGuaranteedPlusZero;
+        if (gen.SelfInitDelegationState != SILGenFunction::NormalSelf) {
+          // This needs to be inlined since there is a Formal EvaluatioN Scope
+          // in emitRValueForDecl that causing any borrow for this LValue to be
+          // popped too soon.
+          auto *vd = cast<ParamDecl>(DRE->getDecl());
+          ManagedValue selfLValue = gen.emitLValueForDecl(
+              DRE, vd, DRE->getType()->getCanonicalType(), AccessKind::Read,
+              DRE->getAccessSemantics());
+          rv = gen.emitRValueForSelfInDelegationInit(
+                      e, DRE->getType()->getCanonicalType(),
+                      selfLValue.getLValueAddress(), Ctx)
+                   .getScalarValue();
+        }
       } else if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
         // All let values are guaranteed to be held alive across their lifetime,
         // and won't change once initialized.  Any loaded value is good for the
@@ -1477,8 +1498,9 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
           Ctx = SGFContext::AllowGuaranteedPlusZero;
       }
     }
-    
-    ManagedValue rv = gen.emitRValueAsSingleValue(e, Ctx);
+
+    if (!rv)
+      rv = gen.emitRValueAsSingleValue(e, Ctx);
     CanType formalType = getSubstFormalRValueType(e);
     auto typeData = getValueTypeData(formalType, rv.getValue());
     LValue lv;
@@ -2037,12 +2059,65 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
   // we can perform a +0 load of the address instead of materializing a +1
   // value.
   if (isPlusZeroOk && addrTL.getLoweredType() == rvalueTL.getLoweredType()) {
-    return ManagedValue::forUnmanaged(B.createLoadBorrow(loc, addr));
+    return B.createLoadBorrow(loc, ManagedValue::forUnmanaged(addr));
   }
 
   // Load the loadable value, and retain it if we aren't taking it.
   SILValue loadedV = emitSemanticLoad(loc, addr, addrTL, rvalueTL, isTake);
-  return emitManagedRValueWithCleanup(loadedV, rvalueTL);
+  return emitManagedRValueWithCleanup(loadedV);
+}
+
+/// Load an r-value out of the given address.
+///
+/// \param rvalueTL - the type lowering for the type-of-rvalue
+///   of the address
+/// \param isGuaranteedValid - true if the value in this address
+///   is guaranteed to be valid for the duration of the current
+///   evaluation (see SGFContext::AllowGuaranteedPlusZero)
+ManagedValue SILGenFunction::emitFormalAccessLoad(SILLocation loc,
+                                                  SILValue addr,
+                                                  const TypeLowering &rvalueTL,
+                                                  SGFContext C, IsTake_t isTake,
+                                                  bool isGuaranteedValid) {
+  // Get the lowering for the address type.  We can avoid a re-lookup
+  // in the very common case of this being equivalent to the r-value
+  // type.
+  auto &addrTL = (addr->getType() == rvalueTL.getLoweredType().getAddressType()
+                      ? rvalueTL
+                      : getTypeLowering(addr->getType()));
+
+  // Never do a +0 load together with a take.
+  bool isPlusZeroOk =
+      (isTake == IsNotTake && (isGuaranteedValid ? C.isGuaranteedPlusZeroOk()
+                                                 : C.isImmediatePlusZeroOk()));
+
+  if (rvalueTL.isAddressOnly()) {
+    // If the client is cool with a +0 rvalue, the decl has an address-only
+    // type, and there are no conversions, then we can return this as a +0
+    // address RValue.
+    if (isPlusZeroOk && rvalueTL.getLoweredType() == addrTL.getLoweredType())
+      return ManagedValue::forUnmanaged(addr);
+
+    // Copy the address-only value.
+    return B.formalAccessBufferForExpr(
+        loc, rvalueTL.getLoweredType(), rvalueTL, C,
+        [&](SILValue addressForCopy) {
+          emitSemanticLoadInto(loc, addr, addrTL, addressForCopy, rvalueTL,
+                               isTake, IsInitialization);
+        });
+  }
+
+  // Ok, this is something loadable.  If this is a non-take access at plus zero,
+  // we can perform a +0 load of the address instead of materializing a +1
+  // value.
+  if (isPlusZeroOk && addrTL.getLoweredType() == rvalueTL.getLoweredType()) {
+    return B.createFormalAccessLoadBorrow(loc,
+                                          ManagedValue::forUnmanaged(addr));
+  }
+
+  // Load the loadable value, and retain it if we aren't taking it.
+  SILValue loadedV = emitSemanticLoad(loc, addr, addrTL, rvalueTL, isTake);
+  return emitFormalAccessManagedRValueWithCleanup(loc, loadedV);
 }
 
 static void emitUnloweredStoreOfCopy(SILGenBuilder &B, SILLocation loc,

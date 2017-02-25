@@ -239,6 +239,19 @@ bool GenericSignature::enumeratePairedRequirements(
   ArrayRef<GenericTypeParamType *> genericParams = getGenericParams();
   unsigned curGenericParamIdx = 0, numGenericParams = genericParams.size();
 
+  // Figure out which generic parameters are complete.
+  SmallVector<bool, 4> genericParamsAreConcrete(genericParams.size(), false);
+  for (auto req : reqs) {
+    if (req.getKind() != RequirementKind::SameType) continue;
+    if (req.getSecondType()->isTypeParameter()) continue;
+
+    auto gp = req.getFirstType()->getAs<GenericTypeParamType>();
+    if (!gp) continue;
+
+    unsigned index = GenericParamKey(gp).findIndexIn(genericParams);
+    genericParamsAreConcrete[index] = true;
+  }
+
   /// Local function to 'catch up' to the next dependent type we're going to
   /// visit, calling the function for each of the generic parameters in the
   /// generic parameter list prior to this parameter.
@@ -263,7 +276,10 @@ bool GenericSignature::enumeratePairedRequirements(
       if (curGenericParam->getDepth() < stopDepth ||
           (curGenericParam->getDepth() == stopDepth &&
            curGenericParam->getIndex() < stopIndex)) {
-        if (fn(curGenericParam, { })) return true;
+        if (!genericParamsAreConcrete[curGenericParamIdx] &&
+            fn(curGenericParam, { }))
+          return true;
+
         ++curGenericParamIdx;
         continue;
       }
@@ -291,16 +307,10 @@ bool GenericSignature::enumeratePairedRequirements(
 
     // Utility to skip over non-conformance constraints that apply to this
     // type.
-    bool sawSameTypeToConcreteConstraint = false;
     auto skipNonConformanceConstraints = [&] {
       while (curReqIdx != numReqs &&
              reqs[curReqIdx].getKind() != RequirementKind::Conformance &&
              reqs[curReqIdx].getFirstType()->getCanonicalType() == depTy) {
-        // Record whether we saw a same-type constraint mentioning this type.
-        if (reqs[curReqIdx].getKind() == RequirementKind::SameType &&
-            !reqs[curReqIdx].getSecondType()->isTypeParameter())
-          sawSameTypeToConcreteConstraint = true;
-
         ++curReqIdx;
       }
     };
@@ -324,7 +334,10 @@ bool GenericSignature::enumeratePairedRequirements(
     // If there were any conformance constraints, or we have a generic
     // parameter we can't skip, invoke the callback.
     if ((startIdx != endIdx ||
-         (isa<GenericTypeParamType>(depTy) && !sawSameTypeToConcreteConstraint)) &&
+         (isa<GenericTypeParamType>(depTy) &&
+          !genericParamsAreConcrete[
+            GenericParamKey(cast<GenericTypeParamType>(depTy))
+              .findIndexIn(genericParams)])) &&
         fn(depTy, reqs.slice(startIdx, endIdx-startIdx)))
       return true;
   }

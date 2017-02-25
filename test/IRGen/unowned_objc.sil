@@ -6,9 +6,9 @@
 //   These types end up in a completely different order with interop disabled.
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
-// CHECK: [[C:%C12unowned_objc1C]] = type <{ [[REF:%swift.refcounted]] }>
+// CHECK: [[C:%T12unowned_objc1CC]] = type <{ [[REF:%swift.refcounted]] }>
 // CHECK: [[UNKNOWN:%objc_object]] = type
-// CHECK: [[A:%V12unowned_objc1A]] = type <{ %swift.unowned }>
+// CHECK: [[A:%T12unowned_objc1AV]] = type <{ %swift.unowned }>
 
 class C {}
 sil_vtable C {}

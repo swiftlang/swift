@@ -1,4 +1,4 @@
-//===--- SyntaxBulider.cpp - Swift Syntax Builder Implementation *- C++ -*-===//
+//===--- SyntaxFactory.cpp - Swift Syntax Builder Implementation *- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Syntax/DeclSyntax.h"
+#include "swift/Syntax/ExprSyntax.h"
 #include "swift/Syntax/StmtSyntax.h"
 #include "swift/Syntax/TypeSyntax.h"
 #include "swift/Syntax/GenericSyntax.h"
@@ -293,6 +294,61 @@ ContinueStmtSyntax SyntaxFactory::makeBlankContinueStmtSyntax() {
   return { Data, Data.get() };
 }
 
+#pragma mark - return-statement
+
+/// Make a return statement with the given `return` keyword and returned
+/// expression.
+ReturnStmtSyntax
+SyntaxFactory::makeReturnStmt(RC<TokenSyntax> ReturnKeyword,
+                              ExprSyntax ReturnedExpression) {
+  auto Raw = RawSyntax::make(SyntaxKind::ReturnStmt,
+                             {
+                               ReturnKeyword,
+                               ReturnedExpression.getRaw(),
+                             },
+                             SourcePresence::Present);
+  auto Data = ReturnStmtSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+ReturnStmtSyntax SyntaxFactory::makeBlankReturnStmt() {
+  auto Raw = RawSyntax::make(SyntaxKind::ReturnStmt,
+    {
+     TokenSyntax::missingToken(tok::kw_return, "return"),
+     RawSyntax::missing(SyntaxKind::MissingExpr),
+    },
+    SourcePresence::Present);
+  auto Data = ReturnStmtSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+#pragma mark - Expressions
+
+IntegerLiteralExprSyntax
+SyntaxFactory::makeIntegerLiteralExpr(RC<TokenSyntax> Sign,
+                                      RC<TokenSyntax> Digits) {
+  auto Raw = RawSyntax::make(SyntaxKind::IntegerLiteralExpr,
+                             {
+                               Sign,
+                               Digits,
+                             },
+                             SourcePresence::Present);
+  auto Data = IntegerLiteralExprSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+IntegerLiteralExprSyntax SyntaxFactory::makeBlankIntegerLiteralExpr() {
+  auto Raw = RawSyntax::make(SyntaxKind::IntegerLiteralExpr,
+    {
+     TokenSyntax::missingToken(tok::oper_prefix, "-"),
+     TokenSyntax::missingToken(tok::integer_literal, ""),
+    },
+    SourcePresence::Present);
+  auto Data = IntegerLiteralExprSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+
 #pragma mark - Tokens
 
 RC<TokenSyntax>
@@ -321,6 +377,14 @@ RC<TokenSyntax> SyntaxFactory::
 makeContinueKeyword(const swift::syntax::Trivia &LeadingTrivia,
                     const swift::syntax::Trivia &TrailingTrivia) {
   return TokenSyntax::make(tok::kw_continue, "continue",
+                           SourcePresence::Present,
+                           LeadingTrivia, TrailingTrivia);
+}
+
+RC<TokenSyntax> SyntaxFactory::
+makeReturnKeyword(const swift::syntax::Trivia &LeadingTrivia,
+                  const swift::syntax::Trivia &TrailingTrivia) {
+  return TokenSyntax::make(tok::kw_return, "return",
                            SourcePresence::Present,
                            LeadingTrivia, TrailingTrivia);
 }
@@ -558,6 +622,17 @@ SyntaxFactory::makeProtocolToken(const Trivia &LeadingTrivia,
   };
 }
 
+RC<TokenSyntax>
+SyntaxFactory::makeIntegerLiteralToken(OwnedString Digits,
+                                       const Trivia &LeadingTrivia,
+                                       const Trivia &TrailingTrivia) {
+  return RC<TokenSyntax> {
+    new TokenSyntax(tok::integer_literal, Digits, SourcePresence::Present,
+                    LeadingTrivia,
+                    TrailingTrivia)
+  };
+}
+
 TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
   auto Raw = RawSyntax::make(SyntaxKind::TupleType,
     {
@@ -660,6 +735,16 @@ SyntaxFactory::makeDictionaryType(RC<TokenSyntax> LeftSquareBracket,
 DictionaryTypeSyntax SyntaxFactory::makeBlankDictionaryType() {
   auto Data = DictionaryTypeSyntaxData::makeBlank();
   return DictionaryTypeSyntax { Data, Data.get() };
+}
+
+#pragma mark - Operators
+
+/// Make a prefix operator with the given text.
+RC<TokenSyntax>
+SyntaxFactory::makePrefixOpereator(OwnedString Name,
+                                   const Trivia &LeadingTrivia) {
+  return TokenSyntax::make(tok::oper_prefix, Name,
+                           SourcePresence::Present, LeadingTrivia, {});
 }
 
 #pragma mark - Types

@@ -193,6 +193,7 @@ static bool isOwnershipForwardingValueKind(ValueKind K) {
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
   case ValueKind::UnconditionalCheckedCastInst:
+  case ValueKind::UnconditionalCheckedCastOpaqueInst:
   case ValueKind::TupleExtractInst:
   case ValueKind::StructExtractInst:
   case ValueKind::UncheckedEnumDataInst:
@@ -381,6 +382,7 @@ CONSTANT_OWNERSHIP_INST(Owned, true, StrongRelease)
 CONSTANT_OWNERSHIP_INST(Owned, true, StrongUnpin)
 CONSTANT_OWNERSHIP_INST(Owned, true, UnownedRelease)
 CONSTANT_OWNERSHIP_INST(Owned, true, InitExistentialRef)
+CONSTANT_OWNERSHIP_INST(Owned, true, OpenExistentialOpaque)
 CONSTANT_OWNERSHIP_INST(Trivial, false, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(Trivial, false, BindMemory)
 CONSTANT_OWNERSHIP_INST(Trivial, false, CheckedCastAddrBranch)
@@ -410,7 +412,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, ObjCExistentialMetatypeToObject)
 CONSTANT_OWNERSHIP_INST(Trivial, false, ObjCMetatypeToObject)
 CONSTANT_OWNERSHIP_INST(Trivial, false, ObjCToThickMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, false, OpenExistentialAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, false, OpenExistentialOpaque)
 CONSTANT_OWNERSHIP_INST(Trivial, false, OpenExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, false, PointerToAddress)
 CONSTANT_OWNERSHIP_INST(Trivial, false, PointerToThinFunction)
@@ -455,6 +456,7 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, DeallocValueBuffer)
   }
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, CheckedCastBranch)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, SwitchEnum)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, InitExistentialOpaque)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 #define ACCEPTS_ANY_OWNERSHIP_INST(INST)                                       \
@@ -562,6 +564,7 @@ FORWARD_ANY_OWNERSHIP_INST(ConvertFunction)
 FORWARD_ANY_OWNERSHIP_INST(RefToBridgeObject)
 FORWARD_ANY_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
+FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCastOpaque)
 FORWARD_ANY_OWNERSHIP_INST(MarkUninitialized)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 #undef FORWARD_ANY_OWNERSHIP_INST
