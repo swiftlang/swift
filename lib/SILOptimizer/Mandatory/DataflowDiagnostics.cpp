@@ -96,8 +96,7 @@ static void diagnoseMissingCases(ASTContext &Context,
     }
   }
 
-  // The switch is not about an enum decl or about an Optional decl,
-  // add "default:" instead.
+  // The switch is not about an enum decl, add "default:" instead.
   if (!SubjectED) {
     DefaultDiag();
     return;
