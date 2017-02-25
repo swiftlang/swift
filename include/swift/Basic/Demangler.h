@@ -88,7 +88,6 @@ public:
 
   /// Allocates an object of type T or an array of objects of type T.
   template<typename T> T *Allocate(size_t NumObjects = 1) {
-    static_assert(alignof(T) <= alignof(Slab *), "alignment not supported");
     size_t ObjectSize = NumObjects * sizeof(T);
     CurPtr = align(CurPtr, alignof(T));
 #ifdef NODE_FACTORY_DEBUGGING
@@ -100,7 +99,7 @@ public:
     if (CurPtr + ObjectSize > End) {
       // No. We have to malloc a new slab.
       // We doulbe the slab size for each allocated slab.
-      SlabSize = std::max(SlabSize * 2, ObjectSize);
+      SlabSize = std::max(SlabSize * 2, ObjectSize + alignof(T));
       size_t AllocSize = sizeof(Slab) + SlabSize;
       Slab *newSlab = (Slab *)malloc(AllocSize);
 
@@ -109,15 +108,14 @@ public:
       CurrentSlab = newSlab;
 
       // Initialize the pointers to the new slab.
-      CurPtr = (char *)(newSlab + 1);
-      assert(align(CurPtr, alignof(T)) == CurPtr);
-      End = CurPtr + SlabSize;
+      CurPtr = align((char *)(newSlab + 1), alignof(T));
+      End = (char *)newSlab + AllocSize;
+      assert(CurPtr + ObjectSize <= End);
 #ifdef NODE_FACTORY_DEBUGGING
       std::cerr << "    ** new slab " << newSlab << ", allocsize = "
                 << AllocSize << ", CurPtr = " << (void *)CurPtr
                 << ", End = " << (void *)End << "\n";
 #endif
-      assert(End == (char *)newSlab + AllocSize);
     }
     T *AllocatedObj = (T *)CurPtr;
     CurPtr += ObjectSize;
