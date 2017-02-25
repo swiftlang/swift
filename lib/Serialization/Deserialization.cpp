@@ -4240,7 +4240,11 @@ Type ModuleFile::getType(TypeID TID) {
 
 #ifndef NDEBUG
   PrettyStackTraceType trace(ctx, "deserializing", typeOrOffset.get());
-  assert(!typeOrOffset.get()->hasError());
+  if (typeOrOffset.get()->hasError()) {
+    typeOrOffset.get()->dump();
+    llvm_unreachable("deserialization produced an invalid type "
+                     "(rdar://problem/30382791)");
+  }
 #endif
 
   // Invoke the callback on the deserialized type.
