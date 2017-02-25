@@ -494,8 +494,6 @@ public:
       SGM.emitPropertyBehavior(vd);
     if (vd->hasStorage()) {
       assert(vd->isStatic() && "stored property in extension?!");
-      ExtensionDecl *ext = cast<ExtensionDecl>(vd->getDeclContext());
-      NominalTypeDecl *theType = ext->getExtendedType()->getAnyNominal();
       return emitTypeMemberGlobalVariable(SGM, vd);
     }
     visitAbstractStorageDecl(vd);
