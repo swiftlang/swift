@@ -54,6 +54,10 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
 
   // arm64 requires ISA-masking.
   target.ObjCUseISAMask = true;
+
+  // arm64 tops out at 56 effective bits of address space and reserves the high
+  // half for the kernel.
+  target.SwiftRetainIgnoresNegativeValues = true;
 }
 
 /// Configures target-specific information for x86-64 platforms.
@@ -75,6 +79,10 @@ static void configureX86_64(IRGenModule &IGM, const llvm::Triple &triple,
 
   // x86-64 requires ISA-masking.
   target.ObjCUseISAMask = true;
+  
+  // x86-64 only has 48 effective bits of address space and reserves the high
+  // half for the kernel.
+  target.SwiftRetainIgnoresNegativeValues = true;
 }
 
 /// Configures target-specific information for 32-bit x86 platforms.
