@@ -87,6 +87,7 @@ func test6<T: Barrable>(_ t: T) -> (Y, X) where T.Bar == Y {
 }
 
 func test7<T: Barrable>(_ t: T) -> (Y, X) where T.Bar == Y, T.Bar.Foo == X {
+	// expected-warning@-1{{redundant same-type constraint 'T.Bar.Foo' == 'X'}}
   return (t.bar, t.bar.foo)
 }
 
@@ -99,8 +100,9 @@ func fail4<T: Barrable>(_ t: T) -> (Y, Z)
 
 func fail5<T: Barrable>(_ t: T) -> (Y, Z)
   where
-  T.Bar.Foo == Z,
+  T.Bar.Foo == Z, // expected-warning{{redundant same-type constraint 'T.Bar.Foo' == 'Z'}}
   T.Bar == Y { // expected-error{{associated type 'T.Bar.Foo' cannot be equal to both 'Z' and 'X'}}
+	// expected-note@-1{{same-type constraint 'T.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
   return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Z'}}
 }
 
