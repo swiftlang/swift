@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
@@ -21,6 +22,8 @@
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/Syntax/TokenKinds.h"
+
 using namespace swift;
 
 template<typename...T, typename...U>
@@ -57,6 +60,88 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
 }
 
 
+/// If the pattern handles an enum element, remove the enum element from the
+/// given set. If seeing uncertain patterns, e.g. any pattern, return true;
+/// otherwise return false.
+static bool
+removedHandledEnumElements(Pattern *P,
+                           llvm::DenseSet<EnumElementDecl*> &UnhandledElements) {
+  if (auto *EEP = dyn_cast<EnumElementPattern>(P)) {
+    UnhandledElements.erase(EEP->getElementDecl());
+  } else if (auto *VP = dyn_cast<VarPattern>(P)) {
+    return removedHandledEnumElements(VP->getSubPattern(), UnhandledElements);
+  } else {
+    return true;
+  }
+  return false;
+};
+
+static void diagnoseMissingCases(ASTContext &Context,
+                                 const SwitchStmt *SwitchS) {
+  SourceLoc EndLoc = SwitchS->getEndLoc();
+  StringRef Placeholder = "<#Code#>";
+  SmallString<32> Buffer;
+  llvm::raw_svector_ostream OS(Buffer);
+
+  auto DefaultDiag = [&]() {
+    OS << tok::kw_default << ": " << Placeholder << "\n";
+    Context.Diags.diagnose(EndLoc, diag::non_exhaustive_switch).
+      fixItInsert(EndLoc, Buffer.str());
+  };
+  // To find the subject enum decl for this switch statement.
+  EnumDecl *SubjectED = nullptr;
+  if (auto SubjectTy = SwitchS->getSubjectExpr()->getType()) {
+    if (auto *ND = SubjectTy->getAnyNominal()) {
+      SubjectED = ND->getAsEnumOrEnumExtensionContext();
+    }
+  }
+
+  // The switch is not about an enum decl, add "default:" instead.
+  if (!SubjectED) {
+    DefaultDiag();
+    return;
+  }
+
+  // Assume enum elements are not handled in the switch statement.
+  llvm::DenseSet<EnumElementDecl*> UnhandledElements;
+
+  SubjectED->getAllElements(UnhandledElements);
+  for (auto Current : SwitchS->getCases()) {
+    // For each handled enum element, remove it from the bucket.
+    for (auto Item : Current->getCaseLabelItems()) {
+      if (removedHandledEnumElements(Item.getPattern(), UnhandledElements)) {
+        DefaultDiag();
+        return;
+      }
+    }
+  }
+
+  // No unhandled cases, so we are not sure the exact case to add, fall back to
+  // default instead.
+  if (UnhandledElements.empty()) {
+    DefaultDiag();
+    return;
+  }
+
+  // Sort the missing elements to a vector because set does not guarantee orders.
+  SmallVector<EnumElementDecl*, 4> SortedElements;
+  SortedElements.insert(SortedElements.begin(), UnhandledElements.begin(),
+                        UnhandledElements.end());
+  std::sort(SortedElements.begin(),SortedElements.end(),
+            [](EnumElementDecl *LHS, EnumElementDecl *RHS) {
+              return LHS->getNameStr().compare(RHS->getNameStr()) < 0;
+            });
+
+  // Print each enum element name.
+  std::for_each(SortedElements.begin(), SortedElements.end(),
+                [&](EnumElementDecl *EE) {
+    OS << tok::kw_case << " ." << EE->getNameStr() << ": " <<
+      Placeholder << "\n";
+  });
+  Context.Diags.diagnose(EndLoc, diag::non_exhaustive_switch).
+    fixItInsert(EndLoc, Buffer.str());
+}
+
 static void diagnoseUnreachable(const SILInstruction *I,
                                 ASTContext &Context) {
   if (auto *UI = dyn_cast<UnreachableInst>(I)) {
@@ -83,7 +168,7 @@ static void diagnoseUnreachable(const SILInstruction *I,
 
     // A non-exhaustive switch would also produce an unreachable instruction.
     if (L.isASTNode<SwitchStmt>()) {
-      diagnose(Context, L.getEndSourceLoc(), diag::non_exhaustive_switch);
+      diagnoseMissingCases(Context, L.getAsASTNode<SwitchStmt>());
       return;
     }
 
