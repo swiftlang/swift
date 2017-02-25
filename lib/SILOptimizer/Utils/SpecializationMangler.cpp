@@ -27,25 +27,25 @@ void SpecializationMangler::beginMangling() {
 
 std::string SpecializationMangler::finalize() {
   std::string MangledSpecialization = ASTMangler::finalize();
-  Demangler D(MangledSpecialization);
-  NodePointer TopLevel = D.demangleTopLevel();
+  Demangle::Demangler D;
+  NodePointer TopLevel = D.demangleSymbol(MangledSpecialization);
 
   StringRef FuncName = Function->getName();
-  NodePointer FuncTopLevel;
+  NodePointer FuncTopLevel = nullptr;
   if (FuncName.startswith(MANGLING_PREFIX_STR)) {
-    FuncTopLevel = Demangler(FuncName).demangleTopLevel();
+    FuncTopLevel = D.demangleSymbol(FuncName);
     assert(FuncTopLevel);
   } else if (FuncName.startswith("_T")) {
-    FuncTopLevel = demangleSymbolAsNode(FuncName.data(), FuncName.size());
+    FuncTopLevel = Demangle::demangleOldSymbolAsNode(FuncName, D);
   }
   if (!FuncTopLevel) {
-    FuncTopLevel = NodeFactory::create(Node::Kind::Global);
-    FuncTopLevel->addChild(NodeFactory::create(Node::Kind::Identifier, FuncName));
+    FuncTopLevel = D.createNode(Node::Kind::Global);
+    FuncTopLevel->addChild(D.createNode(Node::Kind::Identifier, FuncName), D);
   }
   for (NodePointer FuncChild : *FuncTopLevel) {
     assert(FuncChild->getKind() != Node::Kind::Suffix ||
            FuncChild->getText() == "merged");
-    TopLevel->addChild(FuncChild);
+    TopLevel->addChild(FuncChild, D);
   }
   return Demangle::mangleNode(TopLevel);
 }

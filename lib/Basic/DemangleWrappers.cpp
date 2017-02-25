@@ -45,14 +45,14 @@ static void printNode(llvm::raw_ostream &Out, const Node *node,
   }
   Out << '\n';
   for (auto &child : *node) {
-    printNode(Out, child.get(), depth + 1);
+    printNode(Out, child, depth + 1);
   }
 }
 
 void NodeDumper::dump() const { print(llvm::errs()); }
 
 void NodeDumper::print(llvm::raw_ostream &Out) const {
-  printNode(Out, Root.get(), 0);
+  printNode(Out, Root, 0);
 }
 
 void swift::demangle_wrappers::dumpNode(const NodePointer &Root) {
@@ -81,6 +81,6 @@ public:
 
 std::string nodeToString(NodePointer Root,
                          const DemangleOptions &Options) {
-  PrettyStackTraceNode trace("printing", Root.get());
+  PrettyStackTraceNode trace("printing", Root);
   return swift::Demangle::nodeToString(Root, Options);
 }
