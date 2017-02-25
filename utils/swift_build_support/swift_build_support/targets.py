@@ -126,6 +126,8 @@ class StdlibDeploymentTarget(object):
 
     Android = Platform("android", archs=["armv7"])
 
+    Windows = Platform("windows", archs=["x86_64"])
+
     # The list of known platforms.
     known_platforms = [
         OSX,
@@ -135,7 +137,8 @@ class StdlibDeploymentTarget(object):
         Linux,
         FreeBSD,
         Cygwin,
-        Android]
+        Android,
+        Windows]
 
     # Cache of targets by name.
     _targets_by_name = dict((target.name, target)
@@ -180,6 +183,10 @@ class StdlibDeploymentTarget(object):
         elif system == 'CYGWIN_NT-10.0':
             if machine == 'x86_64':
                 return StdlibDeploymentTarget.Cygwin.x86_64
+
+        elif system == 'Windows':
+            if machine == "AMD64":
+                return StdlibDeploymentTarget.Windows.x86_64
 
         raise NotImplementedError('System "%s" with architecture "%s" is not '
                                   'supported' % (system, machine))

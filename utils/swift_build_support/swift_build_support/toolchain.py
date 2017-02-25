@@ -16,6 +16,7 @@ Represent toolchain - the versioned executables.
 
 from __future__ import absolute_import
 
+import os
 import platform
 
 from . import cache_util
@@ -173,6 +174,15 @@ class Cygwin(Linux):
     pass
 
 
+class Windows(Toolchain):
+    def find_tool(self, *names):
+        for name in names:
+            found = which(name)
+            if found is not None:
+                return found
+        return None
+
+
 def host_toolchain(**kwargs):
     sys = platform.system()
     if sys == 'Darwin':
@@ -183,6 +193,8 @@ def host_toolchain(**kwargs):
         return FreeBSD()
     elif sys.startswith('CYGWIN'):
         return Cygwin()
+    elif sys == 'Windows':
+        return Windows()
     else:
         raise NotImplementedError('The platform "%s" does not have a defined '
                                   'toolchain.' % sys)
