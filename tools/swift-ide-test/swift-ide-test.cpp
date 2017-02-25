@@ -1410,8 +1410,8 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
 
   // If we were given a mangled name, do a very simple form of LLDB's logic to
   // look up a type based on that name.
-  Demangle::NodePointer node =
-    demangle_wrappers::demangleSymbolAsNode(MangledNameToFind);
+  Demangle::Context DCtx;
+  Demangle::NodePointer node = DCtx.demangleSymbolAsNode(MangledNameToFind);
   using NodeKind = Demangle::Node::Kind;
 
   if (!node) {
@@ -1560,7 +1560,8 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
     for (auto MangledName : MangledNames) {
 
       // Global
-      auto node = demangle_wrappers::demangleSymbolAsNode(MangledName);
+      Demangle::Context DCtx;
+      auto node = DCtx.demangleSymbolAsNode(MangledName);
 
       // TypeMangling
       node = node->getFirstChild();

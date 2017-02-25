@@ -79,34 +79,8 @@ public:
 };
 } // end unnamed namespace
 
-NodePointer
-swift::demangle_wrappers::demangleSymbolAsNode(llvm::StringRef MangledName,
-                                               const DemangleOptions &Options) {
-  PrettyStackTraceStringAction prettyStackTrace("demangling string",
-                                                MangledName);
-  return swift::Demangle::demangleSymbolAsNode(MangledName.data(),
-                                               MangledName.size(), Options);
-}
-
 std::string nodeToString(NodePointer Root,
                          const DemangleOptions &Options) {
   PrettyStackTraceNode trace("printing", Root.get());
   return swift::Demangle::nodeToString(Root, Options);
 }
-
-std::string swift::demangle_wrappers::demangleSymbolAsString(
-    llvm::StringRef MangledName, const DemangleOptions &Options) {
-  PrettyStackTraceStringAction prettyStackTrace("demangling string",
-                                                MangledName);
-  return swift::Demangle::demangleSymbolAsString(MangledName.data(),
-                                                 MangledName.size(), Options);
-}
-
-std::string swift::demangle_wrappers::demangleTypeAsString(
-    llvm::StringRef MangledName, const DemangleOptions &Options) {
-  PrettyStackTraceStringAction prettyStackTrace("demangling type string",
-                                                MangledName);
-  return swift::Demangle::demangleTypeAsString(MangledName.data(),
-                                               MangledName.size(), Options);
-}
-
