@@ -104,7 +104,7 @@ void IterativeTypeChecker::processResolveInheritedClauseEntry(
   // FIXME: Declaration validation is overkill. Sink it down into type
   // resolution when it is actually needed.
   if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
-    TC.validateDecl(nominal);
+    TC.validateDeclForNameLookup(nominal);
   else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
     TC.validateExtension(ext);
   }

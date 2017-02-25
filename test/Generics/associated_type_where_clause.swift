@@ -98,3 +98,31 @@ struct ConcreteNestedSameTypeDefault: NestedSameTypeDefault {
 struct ConcreteNestedSameTypeDefaultInfer: NestedSameTypeDefault {
     func foo(_: ConcreteConforms2) {}
 }
+
+protocol Inherits: NestedConforms {
+    associatedtype X: Conforms where X.T == U.T
+
+    func bar(_: X)
+}
+extension Inherits { func bar(_: X) {} }
+func needsInherits<X: Inherits>(_: X.Type) {
+    needsConforms(X.U.self)
+    needsConforms(X.X.self)
+    needsSameType(X.U.T.self, X.X.T.self)
+}
+struct ConcreteInherits: Inherits {
+    typealias U = ConcreteConforms
+    typealias X = ConcreteConforms
+}
+struct ConcreteInheritsDiffer: Inherits {
+    typealias U = ConcreteConforms
+    typealias X = ConcreteConforms2
+}
+/*
+FIXME: the sametype requirement gets dropped from the requirement signature
+(enumerateRequirements doesn't yield it), so this doesn't error as it should.
+struct BadConcreteInherits: Inherits {
+    typealias U = ConcreteConforms
+    typealias X = ConcreteConformsNonFoo2
+}
+*/
