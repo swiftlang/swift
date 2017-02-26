@@ -10,7 +10,6 @@ entry:
   br bb1(%1 : $@convention(witness_method) <T: P> (@in P) -> ())
 
 // CHECK:         phi i8* [ %0, %entry ]
-// CHECK-NEXT:    phi i8** [ %T.P, %entry ]
 bb1(%2 : $@convention(witness_method) <T: P> (@in P) -> ()):
   unreachable
 }
