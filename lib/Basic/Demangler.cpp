@@ -1412,19 +1412,19 @@ NodePointer Demangler::demangleFuncSpecParam(Node::IndexType ParamIdx) {
       // The parameters will be added later.
       return addChild(Param, createNode(
         Node::Kind::FunctionSignatureSpecializationParamKind,
-        unsigned(FunctionSigSpecializationParamKind::ClosureProp)));
+        uint64_t(FunctionSigSpecializationParamKind::ClosureProp)));
     case 'p': {
       switch (nextChar()) {
         case 'f':
           // Consumes an identifier parameter, which will be added later.
           return addChild(Param, createNode(
             Node::Kind::FunctionSignatureSpecializationParamKind,
-            unsigned(FunctionSigSpecializationParamKind::ConstantPropFunction)));
+            uint64_t(FunctionSigSpecializationParamKind::ConstantPropFunction)));
         case 'g':
           // Consumes an identifier parameter, which will be added later.
           return addChild(Param, createNode(
             Node::Kind::FunctionSignatureSpecializationParamKind,
-            unsigned(FunctionSigSpecializationParamKind::ConstantPropGlobal)));
+            uint64_t(FunctionSigSpecializationParamKind::ConstantPropGlobal)));
         case 'i':
           return addFuncSpecParamNumber(Param,
                     FunctionSigSpecializationParamKind::ConstantPropInteger);
