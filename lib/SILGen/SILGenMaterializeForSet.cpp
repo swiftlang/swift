@@ -21,10 +21,9 @@
 #include "Scope.h"
 #include "Initialization.h"
 #include "swift/AST/AST.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -129,6 +128,7 @@ private:
 
   MaterializeForSetEmitter(SILGenModule &SGM, SILLinkage linkage,
                            FuncDecl *witness, SubstitutionList subs,
+                           GenericEnvironment *genericEnv,
                            Type selfInterfaceType, Type selfType)
     : SGM(SGM),
       Linkage(linkage),
@@ -138,7 +138,7 @@ private:
       WitnessStorage(witness->getAccessorStorageDecl()),
       WitnessStoragePattern(AbstractionPattern::getInvalid()),
       WitnessSubs(subs),
-      GenericEnv(nullptr),
+      GenericEnv(genericEnv),
       SelfInterfaceType(selfInterfaceType->getCanonicalType()),
       SubstSelfType(selfType->getCanonicalType()),
       TheAccessSemantics(AccessSemantics::Ordinary),
@@ -164,6 +164,9 @@ private:
     WitnessStorageType =
       SGM.Types.getLoweredType(WitnessStoragePattern, SubstStorageType)
                .getObjectType();
+
+    if (genericEnv)
+      GenericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
   }
 
 public:
@@ -176,18 +179,7 @@ public:
                   FuncDecl *requirement, FuncDecl *witness,
                   SubstitutionList witnessSubs) {
     MaterializeForSetEmitter emitter(SGM, linkage, witness, witnessSubs,
-                                     selfInterfaceType, selfType);
-
-    if (conformance) {
-      if (auto signature = conformance->getGenericSignature())
-        emitter.GenericSig = signature->getCanonicalSignature();
-      emitter.GenericEnv = genericEnv;
-    } else {
-      auto signature = requirement->getGenericSignatureOfContext();
-      emitter.GenericSig = signature->getCanonicalSignature();
-      emitter.GenericEnv = genericEnv;
-    }
-
+                                     genericEnv, selfInterfaceType, selfType);
     emitter.RequirementStorage = requirement->getAccessorStorageDecl();
 
     // Determine the desired abstraction pattern of the storage type
@@ -214,15 +206,10 @@ public:
     Type selfType = witness->mapTypeIntoContext(selfInterfaceType);
 
     SILDeclRef constant(witness);
-    auto constantInfo = SGM.Types.getConstantInfo(constant);
-
     MaterializeForSetEmitter emitter(SGM, constant.getLinkage(ForDefinition),
                                      witness, witnessSubs,
+                                     witness->getGenericEnvironment(),
                                      selfInterfaceType, selfType);
-
-    if (auto signature = witness->getGenericSignatureOfContext())
-      emitter.GenericSig = signature->getCanonicalSignature();
-    emitter.GenericEnv = constantInfo.GenericEnv;
 
     emitter.RequirementStorage = emitter.WitnessStorage;
     emitter.RequirementStoragePattern = emitter.WitnessStoragePattern;
@@ -551,13 +538,21 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
       SGM.Types.getMaterializeForSetCallbackType(WitnessStorage,
                                                  GenericSig,
                                                  SelfInterfaceType);
-  auto callback =
-      SGM.M.getOrCreateFunction(Witness, CallbackName, Linkage,
-                                callbackType, IsBare,
-                                F.isTransparent(),
-                                F.isFragile());
 
-  callback->setGenericEnvironment(GenericEnv);
+  auto *genericEnv = GenericEnv;
+  if (GenericEnv && GenericEnv->getGenericSignature()->areAllParamsConcrete())
+    genericEnv = nullptr;
+
+  auto callback =
+    SGM.M.createFunction(Linkage, CallbackName, callbackType,
+                         genericEnv, SILLocation(Witness),
+                         IsBare, F.isTransparent(), F.isFragile(),
+                         IsNotThunk,
+                         /*ClassVisibility=*/SILFunction::NotRelevant,
+                         /*InlineStrategy=*/InlineDefault,
+                         /*EffectsKind=*/EffectsKind::Unspecified,
+                         /*InsertBefore=*/&F);
+
   callback->setDebugScope(new (SGM.M) SILDebugScope(Witness, callback));
 
   PrettyStackTraceSILFunction X("silgen materializeForSet callback", callback);

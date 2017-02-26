@@ -120,8 +120,8 @@ extension ResilientStorage {
 // CHECK-LABEL: sil @_T019protocol_resilience16ResilientStoragePAAE26mutablePropertyWithDefaultSifg
 // CHECK-LABEL: sil [transparent] [thunk] @_T019protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSifs
 // CHECK-LABEL: sil @_T019protocol_resilience16ResilientStoragePAAE26mutablePropertyWithDefaultSifs
-// CHECK-LABEL: sil [transparent] [thunk] @_T019protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSifm
 // CHECK-LABEL: sil [transparent] @_T019protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSifmytfU_
+// CHECK-LABEL: sil [transparent] [thunk] @_T019protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSifm
   public var mutablePropertyWithDefault: Int {
     get { return 0 }
     set { }
@@ -136,8 +136,8 @@ extension ResilientStorage {
 // CHECK-LABEL: sil @_T019protocol_resilience16ResilientStoragePAAE33mutableGenericPropertyWithDefault1TQzfg
 // CHECK-LABEL: sil [transparent] [thunk] @_T019protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzfs
 // CHECK-LABEL: sil @_T019protocol_resilience16ResilientStoragePAAE33mutableGenericPropertyWithDefault1TQzfs
-// CHECK-LABEL: sil [transparent] [thunk] @_T019protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzfm
 // CHECK-LABEL: sil [transparent] @_T019protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzfmytfU_
+// CHECK-LABEL: sil [transparent] [thunk] @_T019protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzfm
   public var mutableGenericPropertyWithDefault: T {
     get {
       return T(default: ())
@@ -149,8 +149,8 @@ extension ResilientStorage {
 // CHECK-LABEL: sil @_T019protocol_resilience16ResilientStoragePAAE9subscript1TQzAFcfg
 // CHECK-LABEL: sil [transparent] [thunk] @_T019protocol_resilience16ResilientStorageP9subscript1TQzAFcfs
 // CHECK-LABEL: sil @_T019protocol_resilience16ResilientStoragePAAE9subscript1TQzAFcfs
-// CHECK-LABEL: sil [transparent] [thunk] @_T019protocol_resilience16ResilientStorageP9subscript1TQzAFcfm
 // CHECK-LABEL: sil [transparent] @_T019protocol_resilience16ResilientStorageP9subscript1TQzAFcfmytfU_
+// CHECK-LABEL: sil [transparent] [thunk] @_T019protocol_resilience16ResilientStorageP9subscript1TQzAFcfm
   public subscript(x: T) -> T {
     get {
       return x
@@ -162,8 +162,8 @@ extension ResilientStorage {
 // CHECK-LABEL: sil @_T019protocol_resilience16ResilientStoragePAAE36mutatingGetterWithNonMutatingDefaultSifg
 // CHECK-LABEL: sil [transparent] [thunk] @_T019protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSifs
 // CHECK-LABEL: sil @_T019protocol_resilience16ResilientStoragePAAE36mutatingGetterWithNonMutatingDefaultSifs
-// CHECK-LABEL: sil [transparent] [thunk] @_T019protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSifm
 // CHECK-LABEL: sil [transparent] @_T019protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSifmytfU_
+// CHECK-LABEL: sil [transparent] [thunk] @_T019protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSifm
   public var mutatingGetterWithNonMutatingDefault: Int {
     get {
       return 0
