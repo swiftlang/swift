@@ -769,6 +769,8 @@ struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
   value_witness_types::storeExtraInhabitant *storeExtraInhabitant;
   value_witness_types::getExtraInhabitantIndex *getExtraInhabitantIndex;
 
+#define SET_WITNESS(NAME) base.NAME,
+
   constexpr ExtraInhabitantsValueWitnessTable()
     : ValueWitnessTable{}, extraInhabitantFlags(),
       storeExtraInhabitant(nullptr),
@@ -778,9 +780,15 @@ struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
                             value_witness_types::extraInhabitantFlags eif,
                             value_witness_types::storeExtraInhabitant *sei,
                             value_witness_types::getExtraInhabitantIndex *geii)
-    : ValueWitnessTable(base), extraInhabitantFlags(eif),
+    : ValueWitnessTable{
+      FOR_ALL_FUNCTION_VALUE_WITNESSES(SET_WITNESS)
+      base.size,
+      base.flags,
+      base.stride
+    }, extraInhabitantFlags(eif),
       storeExtraInhabitant(sei),
       getExtraInhabitantIndex(geii) {}
+#undef SET_WITNESS
 
   static bool classof(const ValueWitnessTable *table) {
     return table->flags.hasExtraInhabitants();
