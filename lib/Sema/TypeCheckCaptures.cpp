@@ -192,7 +192,9 @@ public:
 
     // If VD is a noescape decl, then the closure we're computing this for
     // must also be noescape.
-    if (VD->hasInterfaceType() &&
+    if (AFR.hasType() &&
+        !AFR.getType()->hasError() &&
+        VD->hasInterfaceType() &&
         VD->getInterfaceType()->is<AnyFunctionType>() &&
         VD->getInterfaceType()->castTo<AnyFunctionType>()->isNoEscape() &&
         !capture.isNoEscape() &&

@@ -266,10 +266,8 @@ struct S<T> {
 // Make sure we cannot infer an () argument from an empty parameter list.
 func acceptNothingToInt (_: () -> Int) {}
 func testAcceptNothingToInt(ac1: @autoclosure () -> Int) {
-  // expected-note@-1{{parameter 'ac1' is implicitly non-escaping because it was declared @autoclosure}}
   acceptNothingToInt({ac1($0)})
   // expected-error@-1{{contextual closure type '() -> Int' expects 0 arguments, but 1 was used in closure body}}
-  // FIXME: expected-error@-2{{closure use of non-escaping parameter 'ac1' may allow it to escape}}
 }
 
 // <rdar://problem/23570873> QoI: Poor error calling map without being able to infer "U" (closure result inference)
