@@ -143,28 +143,43 @@ protected:
   
   SILType getTypeInClonedContext(SILType Ty) {
     // Substitute opened existential types, if we have any.
-    if (!OpenedExistentialSubs.empty()) {
-      auto &F = getBuilder().getFunction();
-      Ty = Ty.subst(F.getModule(),
-                    QueryTypeSubstitutionMap{OpenedExistentialSubs},
-                    MakeAbstractConformanceForGenericType());
-    }
-
-    return Ty;
+    return SILType::getPrimitiveObjectType(
+      getASTTypeInClonedContext(Ty.getSwiftRValueType()))
+      .copyCategory(Ty);
   }
   SILType getOpType(SILType Ty) {
     Ty = getTypeInClonedContext(Ty);
     return asImpl().remapType(Ty);
   }
-  
+
   CanType getASTTypeInClonedContext(CanType ty) {
-    // Substitute opened existential types, if we have any.
-    if (!OpenedExistentialSubs.empty()) {
-      ty = ty.subst(QueryTypeSubstitutionMap{OpenedExistentialSubs},
-                    MakeAbstractConformanceForGenericType())
-          ->getCanonicalType();
-    }
-    return ty;
+    // Do not substitute opened existential types, if we do not have any.
+    if (!ty->hasOpenedExistential())
+      return ty;
+    // Do not substitute opened existential types, if it is not required.
+    // This is often the case when cloning basic blocks inside the same
+    // function.
+    if (OpenedExistentialSubs.empty())
+      return ty;
+
+    return ty.transform(
+      [&](Type t) -> Type {
+        if (t->isOpenedExistential()) {
+          auto found = OpenedExistentialSubs.find(
+            t->castTo<ArchetypeType>());
+          // If an opened existential is supposed to be
+          // remapped, it is guaranteed by construction
+          // to be in the OpenedExistentialSubs, because
+          // a cloner always processes definitions of
+          // opened existentials before their uses and
+          // adds found opened existentials definitions
+          // to the map.
+          if (found != OpenedExistentialSubs.end())
+            return found->second;
+          return t;
+        }
+        return t;
+      })->getCanonicalType();
   }
   CanType getOpASTType(CanType ty) {
     ty = getASTTypeInClonedContext(ty);
