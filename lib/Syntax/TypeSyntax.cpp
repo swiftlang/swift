@@ -1,4 +1,4 @@
-//===--- TypeSyntax.cpp - Swift Type Syntax Implementation ------*- C++ -*-===//
+//===--- TypeSyntax.cpp - Swift Type Syntax Implementation ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

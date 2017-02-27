@@ -1,4 +1,4 @@
-//===--- DeclSyntax.cpp - Declaration Syntax Implementation -----*- C++ -*-===//
+//===--- DeclSyntax.cpp - Declaration Syntax Implementation ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //

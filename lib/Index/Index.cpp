@@ -605,7 +605,7 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
         return false;
 
     } else if (auto ParentED = dyn_cast<ExtensionDecl>(Parent)) {
-      if (NominalTypeDecl *NTD = ParentED->getExtendedType()->getAnyNominal()) {
+      if (ParentED->getExtendedType()->getAnyNominal()) {
         if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationChildOf, ParentED))
           return false;
       }
