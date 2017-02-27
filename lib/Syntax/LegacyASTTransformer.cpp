@@ -1,4 +1,4 @@
-//===--- LegacyASTTransformer.cpp - Swift lib/AST -> lib/Syntax -*- C++ -*-===//
+//===--- LegacyASTTransformer.cpp - Swift lib/AST -> lib/Syntax -----------===//
 //
 // This source file is part of the Swift.org open source project
 //

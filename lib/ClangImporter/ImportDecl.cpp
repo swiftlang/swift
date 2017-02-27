@@ -2009,10 +2009,34 @@ namespace {
             /*fullyQualified=*/correctSwiftName.importAsMember(), os);
       }
 
-      auto attr = AvailableAttr::createPlatformAgnostic(
-                    ctx, StringRef(), ctx.AllocateCopy(renamed.str()),
-                    PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
-                    clang::VersionTuple(3));
+      unsigned majorVersion = majorVersionNumberForNameVersion(getVersion());
+      DeclAttribute *attr;
+      if (isActiveSwiftVersion() || getVersion() == ImportNameVersion::Raw) {
+        // "Raw" is the Objective-C name, which was never available in Swift.
+        // Variants within the active version are usually declarations that
+        // have been superseded, like the accessors of a property.
+        attr = AvailableAttr::createPlatformAgnostic(
+            ctx, /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
+            PlatformAgnosticAvailabilityKind::UnavailableInSwift);
+      } else if (getVersion() < getActiveSwiftVersion()) {
+        // A Swift 2 name, for example, was obsoleted in Swift 3.
+        attr = AvailableAttr::createPlatformAgnostic(
+            ctx, /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
+            PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
+            clang::VersionTuple(majorVersion + 1));
+      } else {
+        // Future names are introduced in their future version.
+        assert(getVersion() > getActiveSwiftVersion());
+        attr = new (ctx) AvailableAttr(
+            SourceLoc(), SourceRange(), PlatformKind::none,
+            /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
+            /*Introduced*/clang::VersionTuple(majorVersion), SourceRange(),
+            /*Deprecated*/clang::VersionTuple(), SourceRange(),
+            /*Obsoleted*/clang::VersionTuple(), SourceRange(),
+            PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
+            /*Implicit*/true);
+      }
+
       decl->getAttrs().add(attr);
       decl->setImplicit();
     }
@@ -3485,31 +3509,12 @@ namespace {
                             {decl->param_begin(), decl->param_size()},
                             decl->isVariadic(), redundant);
 
-      // Directly ask the NameImporter for the non-init variant of the Swift 2
-      // name.
-      auto rawName = Impl.importFullName(decl, ImportNameVersion::Raw);
-      if (!rawName)
-        return result;
-
-      auto rawDecl = importNonInitObjCMethodDecl(decl, dc, rawName, selector,
-                                                 forceClassMethod);
-      if (!rawDecl)
-        return result;
-
-      // Mark the raw imported class method "unavailable", with a useful error
-      // message.
-      llvm::SmallString<64> message;
-      llvm::raw_svector_ostream os(message);
-      os << "use object construction '" << decl->getClassInterface()->getName()
-         << "(";
-      for (auto arg : importedName.getDeclName().getArgumentNames()) {
-        os << arg << ":";
+      if (auto rawDecl = Impl.importDecl(decl, ImportNameVersion::Raw)) {
+        // We expect the raw decl to always be a method.
+        assert(isa<FuncDecl>(rawDecl));
+        Impl.addAlternateDecl(result, cast<ValueDecl>(rawDecl));
       }
-      os << ")'";
-      rawDecl->getAttrs().add(AvailableAttr::createPlatformAgnostic(
-          Impl.SwiftContext, Impl.SwiftContext.AllocateCopy(os.str())));
-      markAsVariant(rawDecl, importedName);
-      Impl.addAlternateDecl(result, cast<ValueDecl>(rawDecl));
+
       return result;
     }
 

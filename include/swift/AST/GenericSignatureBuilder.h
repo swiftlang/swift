@@ -264,7 +264,7 @@ public:
                                               GenericSignatureBuilder &builder,
                                               ProtocolDecl *protocol);
 
-  /// Retrieve an requirement source for nested type name matches.
+  /// Retrieve a requirement source for nested type name matches.
   static const RequirementSource *forNestedTypeNameMatch(
                                               GenericSignatureBuilder &builder);
 
@@ -376,6 +376,19 @@ public:
 
   using RequirementRHS =
       llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
+
+  /// Describes an equivalence class of potential archetypes.
+  struct EquivalenceClass {
+    /// Concrete type to which this equivalence class is equal.
+    Type concreteType;
+
+    /// The members of the equivalence class.
+    TinyPtrVector<PotentialArchetype *> members;
+
+    /// Construct a new equivalence class containing only the given
+    /// potential archetype (which represents itself).
+    EquivalenceClass(PotentialArchetype *representative);
+  };
 
   friend class RequirementSource;
 
@@ -620,6 +633,14 @@ public:
   bool diagnoseRemainingRenames(SourceLoc loc,
                                 ArrayRef<GenericTypeParamType *> genericParams);
 
+private:
+  /// Check for redundant concrete type constraints within the equivalence
+  /// class of the given potential archetype.
+  void checkRedundantConcreteTypeConstraints(
+                            ArrayRef<GenericTypeParamType *> genericParams,
+                            PotentialArchetype *pa);
+
+public:
   /// \brief Resolve the given type to the potential archetype it names.
   ///
   /// This routine will synthesize nested types as required to refer to a
@@ -682,8 +703,10 @@ class GenericSignatureBuilder::PotentialArchetype {
   } identifier;
 
   /// \brief The representative of the equivalence class of potential archetypes
-  /// to which this potential archetype belongs.
-  mutable PotentialArchetype *Representative;
+  /// to which this potential archetype belongs, or (for the representative)
+  /// the equivalence class itself.
+  mutable llvm::PointerUnion<PotentialArchetype *, EquivalenceClass *>
+    representativeOrEquivClass;
 
   /// Same-type constraints between this potential archetype and any other
   /// archetype in its equivalence class.
@@ -713,13 +736,15 @@ class GenericSignatureBuilder::PotentialArchetype {
   llvm::MapVector<Identifier, llvm::TinyPtrVector<PotentialArchetype *>>
     NestedTypes;
 
-  /// The concrete type to which a this potential archetype has been
+  /// The concrete types to which this potential archetype has been
   /// constrained.
-  Type ConcreteType;
+  ///
+  /// This vector runs parallel to ConcreteTypeSources.
+  llvm::TinyPtrVector<Type> concreteTypes;
 
-  /// The source of the concrete type requirement, if one was written
-  /// on this potential archetype.
-  const RequirementSource *ConcreteTypeSource = nullptr;
+  /// The source of the concrete type requirements that were written on
+  /// this potential archetype.
+  llvm::TinyPtrVector<const RequirementSource *> concreteTypeSources;
 
   /// Whether this is an unresolved nested type.
   unsigned isUnresolvedNestedType : 1;
@@ -746,63 +771,54 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// the old name.
   Identifier OrigName;
 
-  /// The equivalence class of this potential archetype.
-  llvm::TinyPtrVector<PotentialArchetype *> EquivalenceClass;
-
   /// \brief Construct a new potential archetype for an unresolved
   /// associated type.
   PotentialArchetype(PotentialArchetype *parent, Identifier name)
-    : parentOrBuilder(parent), identifier(name), Representative(this),
-      isUnresolvedNestedType(true),
+    : parentOrBuilder(parent), identifier(name), isUnresolvedNestedType(true),
       IsRecursive(false), Invalid(false),
       RecursiveConcreteType(false), RecursiveSuperclassType(false),
       DiagnosedRename(false)
   { 
     assert(parent != nullptr && "Not an associated type?");
-    EquivalenceClass.push_back(this);
   }
 
   /// \brief Construct a new potential archetype for an associated type.
   PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType)
     : parentOrBuilder(parent), identifier(assocType),
-      Representative(this), isUnresolvedNestedType(false),
-      IsRecursive(false), Invalid
-  (false),
+      isUnresolvedNestedType(false), IsRecursive(false), Invalid(false),
       RecursiveConcreteType(false),
       RecursiveSuperclassType(false), DiagnosedRename(false)
   {
     assert(parent != nullptr && "Not an associated type?");
-    EquivalenceClass.push_back(this);
   }
 
   /// \brief Construct a new potential archetype for a type alias.
   PotentialArchetype(PotentialArchetype *parent, TypeAliasDecl *typeAlias)
     : parentOrBuilder(parent), identifier(typeAlias),
-      Representative(this), isUnresolvedNestedType(false),
+      isUnresolvedNestedType(false),
       IsRecursive(false), Invalid(false),
       RecursiveConcreteType(false),
       RecursiveSuperclassType(false), DiagnosedRename(false)
   {
     assert(parent != nullptr && "Not an associated type?");
-    EquivalenceClass.push_back(this);
   }
 
   /// \brief Construct a new potential archetype for a generic parameter.
   PotentialArchetype(GenericSignatureBuilder *builder, GenericParamKey genericParam)
     : parentOrBuilder(builder), identifier(genericParam),
-      Representative(this), isUnresolvedNestedType(false),
+      isUnresolvedNestedType(false),
       IsRecursive(false), Invalid(false),
       RecursiveConcreteType(false), RecursiveSuperclassType(false),
       DiagnosedRename(false)
   {
-    EquivalenceClass.push_back(this);
   }
 
   /// \brief Retrieve the representative for this archetype, performing
   /// path compression on the way.
   PotentialArchetype *getRepresentative() const;
 
-  /// Retrieve the generic signature builder with which this archetype is associated.
+  /// Retrieve the generic signature builder with which this archetype is
+  /// associated.
   GenericSignatureBuilder *getBuilder() const {
     const PotentialArchetype *pa = this;
     while (auto parent = pa->getParent())
@@ -919,9 +935,24 @@ public:
   /// the number of associated type references.
   unsigned getNestingDepth() const;
 
+  /// Retrieve the equivalence class, if it's already present.
+  ///
+  /// Otherwise, return null.
+  EquivalenceClass *getEquivalenceClassIfPresent() const {
+    return getRepresentative()->representativeOrEquivClass
+             .dyn_cast<EquivalenceClass *>();
+  }
+
+  /// Retrieve or create the equivalence class.
+  EquivalenceClass *getOrCreateEquivalenceClass() const;
+
   /// Retrieve the equivalence class containing this potential archetype.
-  ArrayRef<PotentialArchetype *> getEquivalenceClass() {
-    return getRepresentative()->EquivalenceClass;
+  TinyPtrVector<PotentialArchetype *> getEquivalenceClassMembers() const {
+    if (auto equivClass = getEquivalenceClassIfPresent())
+      return equivClass->members;
+
+    return TinyPtrVector<PotentialArchetype *>(
+                                       const_cast<PotentialArchetype *>(this));
   }
 
   /// \brief Retrieve the potential archetype to be used as the anchor for
@@ -942,15 +973,21 @@ public:
                             SameTypeConstraints.end());
   }
 
-  /// Retrieve the concrete type source as written on this potential archetype.
-  const RequirementSource *getConcreteTypeSourceAsWritten() const {
-    return ConcreteTypeSource;
+  /// Retrieve the concrete types as written on this potential archetype.
+  const llvm::TinyPtrVector<Type>& getConcreteTypesAsWritten() const {
+    return concreteTypes;
+  }
+
+  /// Retrieve the concrete type sources as written on this potential archetype.
+  ArrayRef<const RequirementSource *> getConcreteTypeSourcesAsWritten() const {
+    return concreteTypeSources;
   }
 
   /// Find a source of the same-type constraint that maps this potential
   /// archetype to a concrete type somewhere in the equivalence class of this
-  /// type.
-  const RequirementSource *findAnyConcreteTypeSourceAsWritten() const;
+  /// type along with the concrete type that was written there.
+  Optional<std::pair<Type, const RequirementSource *>>
+  findAnyConcreteTypeSourceAsWritten() const;
 
   /// \brief Retrieve (or create) a nested type with the given name.
   PotentialArchetype *getNestedType(Identifier Name,
@@ -980,17 +1017,18 @@ public:
   /// True if the potential archetype has been bound by a concrete type
   /// constraint.
   bool isConcreteType() const {
-    if (Representative != this)
-      return Representative->isConcreteType();
+    if (auto equivClass = getEquivalenceClassIfPresent())
+      return static_cast<bool>(equivClass->concreteType);
 
-    return static_cast<bool>(ConcreteType);
+    return false;
   }
   
   /// Get the concrete type this potential archetype is constrained to.
   Type getConcreteType() const {
-    if (Representative != this)
-      return Representative->getConcreteType();
-    return ConcreteType;
+    if (auto equivClass = getEquivalenceClassIfPresent())
+      return equivClass->concreteType;
+
+    return Type();
   }
 
   void setIsRecursive() { IsRecursive = true; }

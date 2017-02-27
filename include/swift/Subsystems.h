@@ -346,7 +346,6 @@ namespace swift {
     struct Implementation;
     Implementation &Impl;
   };
-
 } // end namespace swift
 
 #endif // SWIFT_SUBSYSTEMS_H

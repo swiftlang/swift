@@ -353,7 +353,7 @@ struct SyntaxFactory {
   /// Make a metatype type with all elements marked as missing.
   static MetatypeTypeSyntax makeBlankMetatypeType();
 
-  /// Make an sugared Array type, as in `[MyType]`.
+  /// Make a sugared Array type, as in `[MyType]`.
   static ArrayTypeSyntax makeArrayType(RC<TokenSyntax> LeftSquareBracket,
                                        TypeSyntax ElementType,
                                        RC<TokenSyntax> RightSquareBracket);

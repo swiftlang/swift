@@ -253,18 +253,17 @@ final class XXX : BBB {
 // Check that sil-combine does not crash on this example and does not generate a wrong
 // upcast.
 // CHECK-LABEL: sil @silcombine_dont_generate_wrong_upcasts_during_devirt
-// CHECK-NOT: upcast
-// CHECK: witness_method $XXX, #PPP.foo!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
-// CHECK-NOT: upcast
+// CHECK: [[SELF:%.*]] = unchecked_ref_cast %0 : $BBB to $XXX
+// CHECK: [[WITNESS_THUNK:%.*]] = function_ref @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_ : $@convention(witness_method) (@guaranteed XXX) -> ()
+// CHECK: apply [[WITNESS_THUNK]]([[SELF]])
 // CHECK: return
 sil @silcombine_dont_generate_wrong_upcasts_during_devirt: $@convention(thin) (@owned BBB) -> () {
 bb0(%0 : $BBB):
   strong_retain %0 : $BBB
   %3 = init_existential_ref %0 : $BBB : $BBB, $PPP
   %5 = open_existential_ref %3 : $PPP to $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP
-  %6 = witness_method $XXX, #PPP.foo!1, %5 : $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
+  %6 = witness_method $BBB, #PPP.foo!1, %5 : $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
   %7 = apply %6<@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
-  %8 = apply %6<@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
   strong_release %3 : $PPP
   %9 = tuple ()
   strong_release %0 : $BBB
@@ -279,8 +278,6 @@ bb0(%0 : $BBB):
 // CHECK-NOT: witness_method
 // CHECK: [[FR1:%.*]] = function_ref @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_
 // CHECK: apply [[FR1]](%0)
-// CHECK: [[FR2:%.*]] = function_ref @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_
-// CHECK: apply [[FR2]](%0)
 // CHECK: return
 sil @silcombine_devirt_both_applies_of_witness_method : $@convention(thin) (@owned XXX) -> () {
 bb0(%0 : $XXX):
@@ -289,7 +286,6 @@ bb0(%0 : $XXX):
   %5 = open_existential_ref %3 : $PPP to $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP
   %6 = witness_method $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP, #PPP.foo!1, %5 : $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
   %7 = apply %6<@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
-  %8 = apply %6<@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
   strong_release %3 : $PPP
   %9 = tuple ()
   strong_release %0 : $XXX

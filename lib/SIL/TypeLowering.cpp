@@ -1118,20 +1118,10 @@ namespace {
 
     // --- Same as NonTrivialLoadableTypeLowering
 
-    SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
-                            SILValue addr, IsTake_t isTake) const override {
-      llvm_unreachable("load copy");
-    }
-
     void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
                          SILValue newValue, SILValue addr,
                          IsInitialization_t isInit) const override {
       llvm_unreachable("store copy");
-    }
-
-    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
-                      LoadOwnershipQualifier qual) const override {
-      llvm_unreachable("store");
     }
 
     // --- Same as LeafLoadableTypeLowering.
@@ -2140,7 +2130,8 @@ TypeConverter::getProtocolDispatchStrategy(ProtocolDecl *P) {
 CanSILFunctionType TypeConverter::
 getMaterializeForSetCallbackType(AbstractStorageDecl *storage,
                                  CanGenericSignature genericSig,
-                                 Type selfType) {
+                                 Type selfType,
+                                 SILFunctionTypeRepresentation rep) {
   auto &ctx = M.getASTContext();
 
   // Get lowered formal types for callback parameters.
@@ -2178,9 +2169,8 @@ getMaterializeForSetCallbackType(AbstractStorageDecl *storage,
     { canSelfMetatypeType, ParameterConvention::Direct_Unowned },
   };
   ArrayRef<SILResultInfo> results = {};
-  auto extInfo = 
-    SILFunctionType::ExtInfo()
-      .withRepresentation(SILFunctionTypeRepresentation::Thin);
+
+  auto extInfo = SILFunctionType::ExtInfo().withRepresentation(rep);
 
   if (genericSig && genericSig->areAllParamsConcrete())
     genericSig = nullptr;

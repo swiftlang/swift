@@ -299,10 +299,13 @@ public:
 };
 
 static void emitTypeMemberGlobalVariable(SILGenModule &SGM,
-                                         GenericParamList *generics,
-                                         NominalTypeDecl *theType,
                                          VarDecl *var) {
-  assert(!generics && "generic static properties not implemented");
+  if (var->getDeclContext()->isGenericContext()) {
+    assert(var->getDeclContext()->getGenericSignatureOfContext()
+              ->areAllParamsConcrete()
+           && "generic static vars are not implemented yet");
+  }
+
   if (var->getDeclContext()->getAsClassOrClassExtensionContext()) {
     assert(var->isFinal() && "only 'static' ('class final') stored properties are implemented in classes");
   }
@@ -405,8 +408,7 @@ public:
     // Collect global variables for static properties.
     // FIXME: We can't statically emit a global variable for generic properties.
     if (vd->isStatic() && vd->hasStorage()) {
-      return emitTypeMemberGlobalVariable(SGM, theType->getGenericParams(),
-                                          theType, vd);
+      return emitTypeMemberGlobalVariable(SGM, vd);
     }
 
     visitAbstractStorageDecl(vd);
@@ -492,10 +494,7 @@ public:
       SGM.emitPropertyBehavior(vd);
     if (vd->hasStorage()) {
       assert(vd->isStatic() && "stored property in extension?!");
-      ExtensionDecl *ext = cast<ExtensionDecl>(vd->getDeclContext());
-      NominalTypeDecl *theType = ext->getExtendedType()->getAnyNominal();
-      return emitTypeMemberGlobalVariable(SGM, ext->getGenericParams(),
-                                          theType, vd);
+      return emitTypeMemberGlobalVariable(SGM, vd);
     }
     visitAbstractStorageDecl(vd);
   }

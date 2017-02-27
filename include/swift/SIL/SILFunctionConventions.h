@@ -148,6 +148,12 @@ public:
   /// Get the error result type.
   SILType getSILErrorType() { return getSILType(funcTy->getErrorResult()); }
 
+  /// Returns an array of result info.
+  /// Provides convenient access to the underlying SILFunctionType.
+  ArrayRef<SILResultInfo> getResults() const {
+    return funcTy->getResults();
+  }
+
   /// Get the number of SIL results passed as address-typed arguments.
   unsigned getNumIndirectSILResults() const {
     return silConv.loweredAddresses ? funcTy->getNumIndirectFormalResults() : 0;
@@ -243,7 +249,7 @@ public:
   /// SILFunctionType.
   unsigned getNumParameters() const { return funcTy->getNumParameters(); }
 
-  /// Returns an array if parameter info, not including indirect
+  /// Returns an array of parameter info, not including indirect
   /// results. Provides convenient access to the underlying SILFunctionType.
   ArrayRef<SILParameterInfo> getParameters() const {
     return funcTy->getParameters();

@@ -19,6 +19,7 @@
 
 #include "swift/Runtime/Metadata.h"
 #include "swift/Remote/MemoryReader.h"
+#include "swift/Basic/Demangler.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Unreachable.h"
@@ -105,8 +106,7 @@ class TypeDecoder {
         if (repr->getKind() != NodeKind::MetatypeRepresentation ||
             !repr->hasText())
           return BuiltType();
-        auto &str = repr->getText();
-        if (str != "@thin")
+        if (repr->getText() != "@thin")
           wasAbstract = true;
       }
       auto instance = decodeMangledType(Node->getChild(i));
@@ -142,12 +142,13 @@ class TypeDecoder {
       auto name = Node->getChild(1)->getText();
 
       // Consistent handling of protocols and protocol compositions
-      auto protocolList = Demangle::NodeFactory::create(NodeKind::ProtocolList);
-      auto typeList = Demangle::NodeFactory::create(NodeKind::TypeList);
-      auto type = Demangle::NodeFactory::create(NodeKind::Type);
-      type->addChild(Node);
-      typeList->addChild(type);
-      protocolList->addChild(typeList);
+      Demangle::Demangler Dem;
+      auto protocolList = Dem.createNode(NodeKind::ProtocolList);
+      auto typeList = Dem.createNode(NodeKind::TypeList);
+      auto type = Dem.createNode(NodeKind::Type);
+      type->addChild(Node, Dem);
+      typeList->addChild(type, Dem);
+      protocolList->addChild(typeList, Dem);
 
       auto mangledName = Demangle::mangleNode(protocolList);
       return Builder.createProtocolType(mangledName, moduleName, name);
@@ -199,9 +200,7 @@ class TypeDecoder {
           if (!child->hasText())
             return BuiltType();
 
-          auto &text = child->getText();
-
-          if (text == "@convention(thin)") {
+          if (child->getText() == "@convention(thin)") {
             flags =
               flags.withConvention(FunctionMetadataConvention::Thin);
           }
@@ -209,7 +208,7 @@ class TypeDecoder {
           if (!child->hasText())
             return BuiltType();
 
-          auto &text = child->getText();
+          StringRef text = child->getText();
           if (text == "@convention(c)") {
             flags =
               flags.withConvention(FunctionMetadataConvention::CFunctionPointer);
@@ -733,7 +732,8 @@ public:
         if (!Reader->readString(RemoteAddress(ProtocolDescriptor->Name),
                                 MangledName))
           return BuiltType();
-        auto Demangled = Demangle::demangleSymbolAsNode(MangledName);
+        Demangle::Context DCtx;
+        auto Demangled = DCtx.demangleSymbolAsNode(MangledName);
         auto Protocol = decodeMangledType(Demangled);
         if (!Protocol)
           return BuiltType();
@@ -803,7 +803,9 @@ public:
 
   BuiltType readTypeFromMangledName(const char *MangledTypeName,
                                     size_t Length) {
-    auto Demangled = Demangle::demangleSymbolAsNode(MangledTypeName, Length);
+    Demangle::Demangler Dem;
+    Demangle::NodePointer Demangled =
+      Dem.demangleSymbol(StringRef(MangledTypeName, Length));
     return decodeMangledType(Demangled);
   }
 
@@ -867,6 +869,8 @@ public:
       return {true, metadataPointer};
     }
     }
+
+    swift_runtime_unreachable("Unhandled IsaEncodingKind in switch.");
   }
 
   /// Read the parent type metadata from a nested nominal type metadata.

@@ -975,10 +975,6 @@ ERROR(case_after_default,none,
       "additional 'case' blocks cannot appear after the 'default' block of a 'switch'",
       ())
 
-ERROR(empty_switch_stmt,none,
-      "'switch' statement body must have at least one 'case' or 'default' block",
-      ())
-
 // Case Stmt
 ERROR(expected_case_where_expr,PointsToFirstBadToken,
       "expected expression for 'where' guard of 'case'", ())

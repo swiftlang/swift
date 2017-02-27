@@ -1,21 +1,18 @@
-// RUN: %swift -target x86_64-apple-macosx10.9 -module-name function_types %s -emit-ir -o - | %FileCheck %s
-// RUN: %swift -target i386-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
-// RUN: %swift -target x86_64-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
-// RUN: %swift -target armv7-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
-// RUN: %swift -target arm64-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
-// RUN: %swift -target x86_64-unknown-linux-gnu -disable-objc-interop %s -module-name function_types -emit-ir -o - | %FileCheck %s
+// RUN: %swift -target x86_64-apple-macosx10.9 -module-name function_types -assume-parsing-unqualified-ownership-sil %s -emit-ir -o - | %FileCheck %s
+// RUN: %swift -target i386-apple-ios7.1 %s -module-name function_types -assume-parsing-unqualified-ownership-sil -emit-ir -o - | %FileCheck %s
+// RUN: %swift -target x86_64-apple-ios7.1 %s -module-name function_types -assume-parsing-unqualified-ownership-sil -emit-ir -o - | %FileCheck %s
+// RUN: %swift -target armv7-apple-ios7.1 %s -module-name function_types -assume-parsing-unqualified-ownership-sil -emit-ir -o - | %FileCheck %s
+// RUN: %swift -target arm64-apple-ios7.1 %s -module-name function_types -assume-parsing-unqualified-ownership-sil -emit-ir -o - | %FileCheck %s
+// RUN: %swift -target x86_64-unknown-linux-gnu -disable-objc-interop %s -module-name function_types -assume-parsing-unqualified-ownership-sil -emit-ir -o - | %FileCheck %s
 
 // REQUIRES: CODEGENERATOR=X86
 // REQUIRES: CODEGENERATOR=ARM
 
-// FIXME: SR-3603 test is failing after being unintentionally disabled for a while
-// REQUIRES: SR3603
- 
 import Builtin
 
 sil_stage canonical
 
-// CHECK-LABEL: define{{( protected)?}} i8* @thin_func_value(i8*) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @thin_func_value(i8*) {{.*}} {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    ret i8* %0
 // CHECK-NEXT:  }
@@ -24,7 +21,7 @@ entry(%x : $@convention(thin) () -> ()):
   return %x : $@convention(thin) () -> ()
 }
 
-// CHECK-LABEL: define{{( protected)?}} { i8*, %swift.refcounted* } @thick_func_value(i8*, %swift.refcounted*) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @thick_func_value(i8*, %swift.refcounted*) {{.*}} {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    call void @swift_rt_swift_retain(%swift.refcounted* %1) {{#[0-9]+}}
 // CHECK-NEXT:    call void @swift_rt_swift_release(%swift.refcounted* %1) {{#[0-9]+}}
@@ -39,11 +36,9 @@ entry(%x : $() -> ()):
   return %x : $() -> ()
 }
 
-// CHECK-LABEL: define{{( protected)?}} { i8*, i8** } @thin_witness_value(i8*, i8**) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @thin_witness_value(i8*) {{.*}} {
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[T0:%.*]] = insertvalue { i8*, i8** } undef, i8* %0, 0
-// CHECK-NEXT:    [[T1:%.*]] = insertvalue { i8*, i8** } [[T0]], i8** %1, 1
-// CHECK-NEXT:    ret { i8*, i8** } [[T1]]
+// CHECK-NEXT:    ret i8* %0
 // CHECK-NEXT:  }
 sil @thin_witness_value : $@convention(thin) (@convention(witness_method) () -> ()) -> @convention(witness_method) () -> () {
 entry(%x : $@convention(witness_method) () -> ()):
@@ -54,9 +49,9 @@ struct X {}
 
 sil @out_void_return : $@convention(thin) () -> @out X
 
-// CHECK-LABEL: define{{( protected)?}} void @use_void_return_value(%V14function_types1X* noalias nocapture sret) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @use_void_return_value(%T14function_types1XV* noalias nocapture sret) {{.*}} {
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    call void @out_void_return(%V14function_types1X* noalias nocapture sret %0)
+// CHECK-NEXT:    call swiftcc void @out_void_return(%T14function_types1XV* noalias nocapture sret %0)
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
 sil @use_void_return_value : $@convention(thin) () -> @out X {
@@ -66,7 +61,7 @@ entry(%x : $*X):
   return %z : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} i1 @test_is_nonnull_function(i8*, %swift.refcounted*) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc i1 @test_is_nonnull_function(i8*, %swift.refcounted*) {{.*}} {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:  %2 = icmp ne i8* %0, null
 // CHECK-NEXT:  ret i1 %2
@@ -78,7 +73,7 @@ bb0(%0 : $() -> ()):
   return %3 : $Builtin.Int1                                 // id: %5
 }
 
-// CHECK-LABEL: define{{( protected)?}} i8* @test_function_to_pointer(i8*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @test_function_to_pointer(i8*)
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    ret i8* %0
 sil @test_function_to_pointer : $@convention(thin) (@convention(thin) () -> ()) -> Builtin.RawPointer {
@@ -87,7 +82,7 @@ bb0(%0 : $@convention(thin) () -> ()):
   return %1 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define{{( protected)?}} i8* @test_pointer_to_function(i8*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @test_pointer_to_function(i8*)
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    ret i8* %0
 sil @test_pointer_to_function : $@convention(thin) (Builtin.RawPointer) -> @convention(thin) () -> () {

@@ -1,4 +1,4 @@
-//===--- Syntax.cpp - Swift Syntax Trivia Implementation --------*- C++ -*-===//
+//===--- Trivia.cpp - Swift Syntax Trivia Implementation ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

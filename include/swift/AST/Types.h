@@ -882,13 +882,15 @@ public:
   /// Get the substitutions to apply to the type of the given member as seen
   /// from this base type.
   ///
-  /// If the member has its own generic parameters, they will remain unchanged
-  /// by the substitution.
+  /// \param genericEnv If non-null, generic parameters of the member are
+  /// mapped to context archetypes of this generic environment.
   SubstitutionMap getMemberSubstitutionMap(ModuleDecl *module,
-                                           const ValueDecl *member);
+                                           const ValueDecl *member,
+                                           GenericEnvironment *genericEnv=nullptr);
 
   /// Deprecated version of the above.
-  TypeSubstitutionMap getMemberSubstitutions(const ValueDecl *member);
+  TypeSubstitutionMap getMemberSubstitutions(const ValueDecl *member,
+                                             GenericEnvironment *genericEnv=nullptr);
 
   /// Retrieve the type of the given member as seen through the given base
   /// type, substituting generic arguments where necessary.

@@ -1,4 +1,4 @@
-//===--- TokenSyntax.cpp - Swift Token Syntax Implementation ----*- C++ -*-===//
+//===--- TokenSyntax.cpp - Swift Token Syntax Implementation --------------===//
 //
 // This source file is part of the Swift.org open source project
 //

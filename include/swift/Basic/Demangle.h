@@ -75,7 +75,7 @@ struct DemangleOptions {
 };
 
 class Node;
-typedef std::shared_ptr<Node> NodePointer;
+typedef Node *NodePointer;
 
 enum class FunctionSigSpecializationParamKind : unsigned {
   // Option Flags use bits 0-5. This give us 6 bits implying 64 entries to
@@ -123,11 +123,10 @@ enum class Directness {
   Direct, Indirect
 };
 
-struct NodeFactory;
+class NodeFactory;
 class Context;
 
-
-class Node : public std::enable_shared_from_this<Node> {
+class Node {
 public:
   enum class Kind : uint16_t {
 #define NODE(ID) ID,
@@ -136,6 +135,8 @@ public:
 
   typedef uint64_t IndexType;
 
+  friend class NodeFactory;
+  
 private:
   Kind NodeKind;
 
@@ -145,20 +146,20 @@ private:
   PayloadKind NodePayloadKind;
 
   union {
-    std::string TextPayload;
+    llvm::StringRef TextPayload;
     IndexType IndexPayload;
   };
 
-  // FIXME: use allocator.
-  typedef std::vector<NodePointer> NodeVector;
-  NodeVector Children;
+  NodePointer *Children = nullptr;
+  size_t NumChildren = 0;
+  size_t ReservedChildren = 0;
 
   Node(Kind k)
       : NodeKind(k), NodePayloadKind(PayloadKind::None) {
   }
-  Node(Kind k, std::string &&t)
+  Node(Kind k, llvm::StringRef t)
       : NodeKind(k), NodePayloadKind(PayloadKind::Text) {
-    new (&TextPayload) std::string(std::move(t));
+    TextPayload = t;
   }
   Node(Kind k, IndexType index)
       : NodeKind(k), NodePayloadKind(PayloadKind::Index) {
@@ -167,15 +168,11 @@ private:
   Node(const Node &) = delete;
   Node &operator=(const Node &) = delete;
 
-  friend struct NodeFactory;
-
 public:
-  ~Node();
-
   Kind getKind() const { return NodeKind; }
 
   bool hasText() const { return NodePayloadKind == PayloadKind::Text; }
-  const std::string &getText() const {
+  llvm::StringRef getText() const {
     assert(hasText());
     return TextPayload;
   }
@@ -186,37 +183,29 @@ public:
     return IndexPayload;
   }
   
-  typedef NodeVector::iterator iterator;
-  typedef NodeVector::const_iterator const_iterator;
-  typedef NodeVector::size_type size_type;
+  typedef NodePointer *iterator;
+  typedef const NodePointer *const_iterator;
+  typedef size_t size_type;
 
-  bool hasChildren() const { return !Children.empty(); }
-  size_t getNumChildren() const { return Children.size(); }
-  iterator begin() { return Children.begin(); }
-  iterator end() { return Children.end(); }
-  const_iterator begin() const { return Children.begin(); }
-  const_iterator end() const { return Children.end(); }
+  bool hasChildren() const { return NumChildren != 0; }
+  size_t getNumChildren() const { return NumChildren; }
+  iterator begin() { return Children; }
+  iterator end() { return Children + NumChildren; }
+  const_iterator begin() const { return Children; }
+  const_iterator end() const { return Children + NumChildren; }
 
-  NodePointer getFirstChild() const { return Children.front(); }
-  NodePointer getChild(size_t index) const { return Children[index]; }
-
-  /// Deprecated - use addChild(NodePointer Child, Context &Ctx) instead.
-  NodePointer addChild(NodePointer child) {
-    assert(child && "adding null child!");
-    Children.push_back(child);
-    return child;
+  NodePointer getFirstChild() const {
+    assert(NumChildren >= 1);
+    return Children[0];
+  }
+  NodePointer getChild(size_t index) const {
+    assert(NumChildren > index);
+    return Children[index];
   }
 
-  /// Deprecated - use addChild(NodePointer Child, Context &Ctx) instead.
-  void addChildren(NodePointer child1, NodePointer child2) {
-    addChild(std::move(child1));
-    addChild(std::move(child2));
-  }
-
-  /// Add a new node as a child of this one.
   void addChild(NodePointer Child, Context &Ctx);
 
-  /// Add a new node as a child of this one.
+  // Only to be used by the demangler parsers.
   void addChild(NodePointer Child, NodeFactory &Factory);
 };
 
@@ -245,6 +234,8 @@ class Demangler;
 /// allocations.
 ///
 class Context {
+  Demangler *D;
+
   friend class Node;
 
 public:
@@ -360,33 +351,6 @@ demangleSymbolAsString(llvm::StringRef MangledName,
                                 MangledName.size(), Options);
 }
 
-/// Deprecated - use Context::demangleTypeAsNode instead.
-NodePointer
-demangleTypeAsNode(const char *mangledName, size_t mangledNameLength,
-                   const DemangleOptions &options = DemangleOptions());
-
-/// Deprecated - use Context::demangleTypeAsNode instead.
-inline NodePointer
-demangleTypeAsNode(const std::string &mangledName,
-                   const DemangleOptions &options = DemangleOptions()) {
-  return demangleTypeAsNode(mangledName.data(), mangledName.size(), options);
-}
-
-/// Deprecated - use Context::isThunkSymbol instead.
-bool isThunkSymbol(const char *mangledName, size_t mangledNameLength);
-
-/// Deprecated - use Context::demangleSymbolAsNode instead.
-NodePointer
-demangleSymbolAsNode(const char *mangledName, size_t mangledNameLength,
-                     const DemangleOptions &options = DemangleOptions());
-
-/// Deprecated - use Context::demangleSymbolAsNode instead.
-inline NodePointer
-demangleSymbolAsNode(const std::string &mangledName,
-                     const DemangleOptions &options = DemangleOptions()) {
-  return demangleSymbolAsNode(mangledName.data(), mangledName.size(), options);
-}
-
 /// Standalong utility function to demangle the given type as string.
 ///
 /// If performance is an issue when demangling multiple symbols,
@@ -465,26 +429,6 @@ inline std::string mangleNode(const NodePointer &root, bool NewMangling) {
 std::string nodeToString(NodePointer Root,
                          const DemangleOptions &Options = DemangleOptions());
 
-/// Deprecated - use Context::createNode instead.
-struct NodeFactory {
-  static NodePointer create(Node::Kind K) {
-    return NodePointer(new Node(K));
-  }
-  static NodePointer create(Node::Kind K, Node::IndexType Index) {
-    return NodePointer(new Node(K, Index));
-  }
-  static NodePointer create(Node::Kind K, llvm::StringRef Text) {
-    return NodePointer(new Node(K, Text));
-  }
-  static NodePointer create(Node::Kind K, std::string &&Text) {
-    return NodePointer(new Node(K, std::move(Text)));
-  }
-  template <size_t N>
-  static NodePointer create(Node::Kind K, const char (&Text)[N]) {
-    return NodePointer(new Node(K, llvm::StringRef(Text)));
-  }
-};
-
 /// A class for printing to a std::string.
 class DemanglerPrinter {
 public:
@@ -532,7 +476,7 @@ private:
 
 bool mangleStandardSubstitution(Node *node, DemanglerPrinter &Out);
 bool isSpecialized(Node *node);
-NodePointer getUnspecialized(Node *node);
+NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
 
 /// Is a character considered a digit by the demangling grammar?
 ///

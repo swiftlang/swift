@@ -52,7 +52,8 @@ static unsigned getBoundGenericDepth(Type t) {
 // Initialize SpecializedType iff the specialization is allowed.
 ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *OrigF,
                                      SubstitutionList ParamSubs) {
-  if (!OrigF->shouldOptimize()) {
+  if (!OrigF->shouldOptimize() ||
+      OrigF->hasSemanticsAttr("optimize.sil.specialize.generic.never")) {
     DEBUG(llvm::dbgs() << "    Cannot specialize function " << OrigF->getName()
                        << " marked to be excluded from optimizations.\n");
     return;

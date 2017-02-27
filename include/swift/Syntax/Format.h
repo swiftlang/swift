@@ -1,4 +1,4 @@
-//===--- Format.cpp - Declaration Syntax Formatting Interface ---*- C++ -*-===//
+//===--- Format.h - Declaration Syntax Formatting Interface -----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

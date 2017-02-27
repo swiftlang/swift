@@ -331,6 +331,14 @@ class G {
 // CHECK:   store [[VALUE]] to [[T2]] : $*Int32
 // CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
 
+//   materializeForSet callback for G.value
+// CHECK-LABEL: sil hidden [transparent] @_T010addressors1GC5values5Int32VfmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout G, @thick G.Type) -> () {
+// CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $*G, [[SELFTYPE:%3]] : $@thick G.Type):
+// CHECK:   [[T0:%.*]] = project_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
+// CHECK:   [[OWNER:%.*]] = load [[T0]]
+// CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
+// CHECK:   dealloc_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
+
 //   materializeForSet for G.value
 // CHECK-LABEL: sil hidden [transparent] @_T010addressors1GC5values5Int32Vfm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed G) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $G):
@@ -354,14 +362,6 @@ class G {
 //   Epilogue.
 // CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<Builtin.RawPointer>)
 // CHECK:   return [[RESULT]]
-
-//   materializeForSet callback for G.value
-// CHECK-LABEL: sil hidden [transparent] @_T010addressors1GC5values5Int32VfmytfU_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout G, @thick G.Type) -> () {
-// CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $*G, [[SELFTYPE:%3]] : $@thick G.Type):
-// CHECK:   [[T0:%.*]] = project_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
-// CHECK:   [[OWNER:%.*]] = load [[T0]]
-// CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
-// CHECK:   dealloc_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
 
 class H {
   var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer.allocate(capacity: 100)
@@ -451,6 +451,14 @@ class I {
 // CHECK:   store [[VALUE]] to [[T2]] : $*Int32
 // CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
 
+//   materializeForSet callback for I.value
+// CHECK-LABEL: sil hidden [transparent] @_T010addressors1IC5values5Int32VfmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout I, @thick I.Type) -> () {
+// CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $*I, [[SELFTYPE:%3]] : $@thick I.Type):
+// CHECK:   [[T0:%.*]] = project_value_buffer $Optional<Builtin.NativeObject> in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
+// CHECK:   [[OWNER:%.*]] = load [[T0]]
+// CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
+// CHECK:   dealloc_value_buffer $Optional<Builtin.NativeObject> in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
+
 // CHECK-LABEL: sil hidden [transparent] @_T010addressors1IC5values5Int32Vfm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed I) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $I):
 //   Call the addressor.
@@ -473,14 +481,6 @@ class I {
 //   Epilogue.
 // CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<Builtin.RawPointer>)
 // CHECK:   return [[RESULT]]
-
-//   materializeForSet callback for I.value
-// CHECK-LABEL: sil hidden [transparent] @_T010addressors1IC5values5Int32VfmytfU_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout I, @thick I.Type) -> () {
-// CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $*I, [[SELFTYPE:%3]] : $@thick I.Type):
-// CHECK:   [[T0:%.*]] = project_value_buffer $Optional<Builtin.NativeObject> in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
-// CHECK:   [[OWNER:%.*]] = load [[T0]]
-// CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
-// CHECK:   dealloc_value_buffer $Optional<Builtin.NativeObject> in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
 
 struct RecInner {
   subscript(i: Int32) -> Int32 {

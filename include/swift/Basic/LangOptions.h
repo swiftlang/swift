@@ -114,6 +114,10 @@ namespace swift {
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
 
+    /// \brief Enable the experimental constraint propagation in the
+    /// type checker.
+    bool EnableConstraintPropagation = false;
+
     /// \brief Enable the iterative type checker.
     bool IterativeTypeChecker = false;
 

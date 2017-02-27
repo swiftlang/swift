@@ -91,7 +91,7 @@ parser.add_argument('remainder', nargs=argparse.REMAINDER,
 args = parser.parse_args()
 if len(args.remainder) == 0:
     parser.print_help()
-    exit(1)
+    sys.exit(1)
 
 if args.enforce:
     if args.time is not None:

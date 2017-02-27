@@ -879,8 +879,14 @@ namespace {
             rawPointerTy, ValueOwnershipKind::Trivial);
 
         // Cast the callback to the correct polymorphic function type.
+        SILFunctionTypeRepresentation rep;
+        if (isa<ProtocolDecl>(decl->getDeclContext()))
+          rep = SILFunctionTypeRepresentation::WitnessMethod;
+        else
+          rep = SILFunctionTypeRepresentation::Method;
+
         auto origCallbackFnType = gen.SGM.Types.getMaterializeForSetCallbackType(
-            decl, materialized.genericSig, materialized.origSelfType);
+          decl, materialized.genericSig, materialized.origSelfType, rep);
         auto origCallbackType = SILType::getPrimitiveObjectType(origCallbackFnType);
         callback = gen.B.createPointerToThinFunction(loc, callback, origCallbackType);
 
@@ -1757,11 +1763,6 @@ void LValue::addMemberVarComponent(SILGenFunction &gen, SILLocation loc,
   // FIXME: This has to be dynamically looked up for classes, and
   // dynamically instantiated for generics.
   if (strategy == AccessStrategy::Storage && var->isStatic()) {
-    auto baseMeta = baseFormalType->castTo<MetatypeType>()->getInstanceType();
-    (void)baseMeta;
-    assert(!baseMeta->is<BoundGenericType>() &&
-           "generic static stored properties not implemented");
-
     // FIXME: this implicitly drops the earlier components, but maybe
     // we ought to evaluate them for side-effects even during the
     // formal access?
@@ -2039,7 +2040,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
                        (isGuaranteedValid ? C.isGuaranteedPlusZeroOk()
                                           : C.isImmediatePlusZeroOk()));
 
-  if (rvalueTL.isAddressOnly()) {
+  if (rvalueTL.isAddressOnly() && silConv.useLoweredAddresses()) {
     // If the client is cool with a +0 rvalue, the decl has an address-only
     // type, and there are no conversions, then we can return this as a +0
     // address RValue.
@@ -2296,7 +2297,7 @@ SILValue SILGenFunction::emitSemanticLoad(SILLocation loc,
                                           const TypeLowering &rvalueTL,
                                           IsTake_t isTake) {
   assert(srcTL.getLoweredType().getAddressType() == src->getType());
-  assert(rvalueTL.isLoadable());
+  assert(rvalueTL.isLoadable() || !silConv.useLoweredAddresses());
 
   // Easy case: the types match.
   if (srcTL.getLoweredType() == rvalueTL.getLoweredType()) {

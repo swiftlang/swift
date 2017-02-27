@@ -77,6 +77,12 @@ public:
     return valueHashMap.find(value) != valueHashMap.end();
   }
 
+  ValueStorage &getStorage(SILValue value) {
+    auto hashIter = valueHashMap.find(value);
+    assert(hashIter != valueHashMap.end() && "Missing SILValue");
+    return valueVector[hashIter->second].second;
+  }
+
   ValueStorage &insertValue(SILValue value) {
     auto hashResult =
         valueHashMap.insert(std::make_pair(value, valueVector.size()));
@@ -87,10 +93,18 @@ public:
     return valueVector.back().second;
   }
 
-  ValueStorage &getStorage(SILValue value) {
-    auto hashIter = valueHashMap.find(value);
+  // Replace entry for `oldValue` with an entry for `newValue` preserving the
+  // the mapped ValueStorage.
+  void replaceValue(SILValue oldValue, SILValue newValue) {
+    auto hashIter = valueHashMap.find(oldValue);
     assert(hashIter != valueHashMap.end() && "Missing SILValue");
-    return valueVector[hashIter->second].second;
+    unsigned idx = hashIter->second;
+    valueHashMap.erase(hashIter);
+
+    valueVector[idx].first = newValue;
+    
+    auto hashResult = valueHashMap.insert(std::make_pair(newValue, idx));
+    assert(hashResult.second && "SILValue already mapped");
   }
 };
 } // end anonymous namespace
@@ -117,7 +131,10 @@ struct AddressLoweringState {
   AddressLoweringState(SILFunction *F) : F(F) {}
 
   void markDeadInst(SILInstruction *inst) {
-    assert(onlyHaveDebugUses(inst));
+#ifndef NDEBUG
+    for (Operand *use : inst->getUses())
+      assert(instsToDelete.count(use->getUser()));
+#endif
     instsToDelete.insert(inst);
   }
 };
@@ -128,7 +145,7 @@ struct AddressLoweringState {
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Collect all Opaque/Resilient values, inserting them in a ValueStorageMap in
+/// Collect all opaque/resilient values, inserting them in `valueStorageMap` in
 /// RPO order.
 ///
 /// Collect all call arguments with formally indirect SIL argument convention in
@@ -152,7 +169,10 @@ protected:
 };
 } // end anonymous namespace
 
-/// Populate valueStorageMap. Find all Opaque/Resilient SILValues and add them
+/// Top-level entry: Populate `valueStorageMap`, `indirectResults`, and
+/// `indirectOperands`.
+///
+/// Find all Opaque/Resilient SILValues and add them
 /// to valueStorageMap in RPO.
 void OpaqueValueVisitor::mapValueStorage() {
   for (auto *BB : postorderInfo.getReversePostOrder()) {
@@ -176,8 +196,12 @@ void OpaqueValueVisitor::mapValueStorage() {
   }
 }
 
-/// Populate indirectOperands. Add an operand for each call argument with a
-/// formally indirect convention.
+/// Populate `indirectResults` and `indirectOperands`.
+///
+/// If this call has indirect formal results, add it to `indirectResults`.
+/// 
+/// Add each call operand with a formally indirect convention to
+/// `indirectOperands`.
 void OpaqueValueVisitor::visitApply(ApplySite applySite) {
   if (applySite.getSubstCalleeType()->hasIndirectFormalResults())
     pass.indirectResults.push_back(applySite.getInstruction());
@@ -195,11 +219,14 @@ void OpaqueValueVisitor::visitApply(ApplySite applySite) {
   }
 }
 
+/// If `value` is address-only add it to the `valueStorageMap`.
+/// 
 /// TODO: Set ValueStorage.projectionFrom whenever there is a single
 /// isComposingOperand() use and the aggregate's storage can be hoisted to a
 /// dominating point.
 void OpaqueValueVisitor::visitValue(SILValue value) {
-  if (value->getType().isAddressOnly(pass.F->getModule())) {
+  if (value->getType().isObject()
+      && value->getType().isAddressOnly(pass.F->getModule())) {
     if (pass.valueStorageMap.contains(value)) {
       assert(isa<SILFunctionArgument>(
           pass.valueStorageMap.getStorage(value).storageAddress));
@@ -241,6 +268,11 @@ protected:
   unsigned insertIndirectResultParameters(unsigned argIdx, SILType resultType);
   void allocateForValue(SILValue value, ValueStorage &storage);
   void allocateForOperand(Operand *operand);
+  void canonicalizeResults(
+    ApplyInst *applyInst,
+    SmallVectorImpl<SILInstruction*> &directResultValues,
+    ArrayRef<Operand*> nonCanonicalUses);
+  void canonicalizeResults(ApplyInst *applyInst);
   void allocateForResults(SILInstruction *origInst);
 };
 } // end anonymous namespace
@@ -280,14 +312,17 @@ void OpaqueStorageAllocation::allocateOpaqueStorage() {
   // Create an AllocStack for every formally indirect argument.
   for (Operand *operand : pass.indirectOperands)
     allocateForOperand(operand);
+  pass.indirectOperands.clear();
 
   // Create an AllocStack for every formally indirect result.
+  // This rewrites and potentially erases the original call.
   for (SILInstruction *callInst : pass.indirectResults)
     allocateForResults(callInst);
+  pass.indirectResults.clear();
 }
 
-/// Replace each value-typed argument with an address-typed argument by
-/// inserting a temprorary load instruction.
+/// Replace each value-typed argument to the current function with an
+/// address-typed argument by inserting a temporary load instruction.
 void OpaqueStorageAllocation::replaceFunctionArgs() {
   // Insert temporary argument loads at the top of the function.
   SILBuilder argBuilder(pass.F->getEntryBlock()->begin());
@@ -297,7 +332,7 @@ void OpaqueStorageAllocation::replaceFunctionArgs() {
   for (SILParameterInfo param :
        pass.F->getLoweredFunctionType()->getParameters()) {
 
-    if (param.isFormalIndirect()) {
+    if (param.isFormalIndirect() && !fnConv.isSILIndirect(param)) {
       SILArgument *arg = pass.F->getArgument(argIdx);
       SILType addrType = arg->getType().getAddressType();
 
@@ -326,7 +361,8 @@ void OpaqueStorageAllocation::replaceFunctionArgs() {
 /// Recursively insert function arguments for any @out result type at the
 /// specified index. Return the index after the last inserted result argument.
 ///
-/// This is effectively moved from the old SILGen emitIndirectResultParameters.
+/// Note: This is effectively moved from the old SILGen
+/// emitIndirectResultParameters.
 ///
 /// TODO: It might be faster to generate args directly from
 /// SILFunctionConventions without drilling through the result SILType. But one
@@ -362,6 +398,7 @@ OpaqueStorageAllocation::insertIndirectResultParameters(unsigned argIdx,
 }
 
 /// Utility to derive SILLocation.
+/// 
 /// TODO: This should be a common utility.
 static SILLocation getLocForValue(SILValue value) {
   if (auto *instr = dyn_cast<SILInstruction>(value)) {
@@ -384,6 +421,11 @@ void OpaqueStorageAllocation::allocateForValue(SILValue value,
   if (isa<TupleInst>(value))
     return;
 
+  // Don't bother allocating storage for result tuples. Each element has its own
+  // storage.
+  if (isa<FullApplySite>(value))
+    return;
+
   // Argument loads already have a storage address.
   if (storage.storageAddress) {
     assert(isa<SILFunctionArgument>(storage.storageAddress));
@@ -404,11 +446,16 @@ void OpaqueStorageAllocation::allocateForValue(SILValue value,
 }
 
 /// Deallocate temporary call-site stack storage.
+///
+/// `argLoad` is non-null for @out args that are loaded.
 static void insertStackDeallocationAtCall(AllocStackInst *allocInst,
-                                          SILInstruction *applyInst) {
+                                          SILInstruction *applyInst,
+                                          SILInstruction *argLoad) {
+  SILInstruction *lastUse = argLoad ? argLoad : applyInst;
+
   switch (applyInst->getKind()) {
   case ValueKind::ApplyInst: {
-    SILBuilder deallocBuilder(&*std::next(applyInst->getIterator()));
+    SILBuilder deallocBuilder(&*std::next(lastUse->getIterator()));
     deallocBuilder.createDeallocStack(allocInst->getLoc(), allocInst);
     break;
   }
@@ -425,6 +472,9 @@ static void insertStackDeallocationAtCall(AllocStackInst *allocInst,
 /// Allocate storage for formally indirect arguments.
 /// Update the operand to this address.
 /// After this, the SIL argument types no longer match SIL function conventions.
+///
+/// Note: The temporary argument storage does not own its value. If the argument
+/// is owner, the stored value should already have been copied.
 void OpaqueStorageAllocation::allocateForOperand(Operand *operand) {
   SILInstruction *apply = operand->getUser();
   SILValue argValue = operand->get();
@@ -433,77 +483,174 @@ void OpaqueStorageAllocation::allocateForOperand(Operand *operand) {
   AllocStackInst *allocInstr =
       callBuilder.createAllocStack(apply->getLoc(), argValue->getType());
 
-  // This is a store [init], but qualifications aren't allowed.
   callBuilder.createStore(apply->getLoc(), argValue, allocInstr,
                           StoreOwnershipQualifier::Unqualified);
 
   operand->set(allocInstr);
 
-  insertStackDeallocationAtCall(allocInstr, apply);
+  insertStackDeallocationAtCall(allocInstr, apply, /*argLoad=*/nullptr);
+}
+
+// Canonicalize call result uses. Treat each result of a multi-result call as
+// independent values. Currently, SILGen may generate tuple_extract for each
+// result but generate a single destroy_value for the entire tuple of
+// results. This makes it impossible to reason about each call result as an
+// independent value according to the callee's function type.
+//
+// directResultValues has an entry for each tuple extract corresponding to
+// that result if one exists. This function will add an entry to
+// directResultValues whenever it needs to materialize a TupleExtractInst.
+void OpaqueStorageAllocation::canonicalizeResults(
+  ApplyInst *applyInst,
+  SmallVectorImpl<SILInstruction*> &directResultValues,
+  ArrayRef<Operand*> nonCanonicalUses) {
+
+  for (Operand *operand : nonCanonicalUses) {
+    auto *destroyInst = dyn_cast<DestroyValueInst>(operand->getUser());
+    if (!destroyInst)
+      llvm::report_fatal_error("Simultaneous use of multiple call results.");
+
+    for (unsigned resultIdx = 0, endIdx = directResultValues.size();
+         resultIdx < endIdx; ++resultIdx) {
+      SILInstruction *result = directResultValues[resultIdx];
+      if (!result) {
+        SILBuilder resultBuilder(std::next(SILBasicBlock::iterator(applyInst)));
+        result = resultBuilder.createTupleExtract(applyInst->getLoc(),
+                                                  applyInst, resultIdx);
+        directResultValues[resultIdx] = result;
+      }
+      SILBuilder B(destroyInst);
+      auto &TL = pass.F->getModule().getTypeLowering(result->getType());
+      TL.emitDestroyValue(B, destroyInst->getLoc(), result);
+    }
+    destroyInst->eraseFromParent();
+  }
 }
 
 /// Allocate storage for formally indirect results at the given call site.
 /// Create a new call instruction with indirect SIL arguments.
-void OpaqueStorageAllocation::allocateForResults(SILInstruction *origInst) {
-  ApplySite apply(origInst);
+void OpaqueStorageAllocation::allocateForResults(SILInstruction *origCallInst) {
+  ApplySite apply(origCallInst);
+
+  SILFunctionConventions origFnConv = apply.getSubstCalleeConv();
+
+  // Gather the original direct return values.
+  // Canonicalize results so no user uses more than one result.
+  SmallVector<SILInstruction *, 8> origDirectResultValues(
+    origFnConv.getNumDirectSILResults());
+  SmallVector<Operand *, 4> nonCanonicalUses;
+  if (origCallInst->getType().is<TupleType>()) {
+    for (Operand *operand : origCallInst->getUses()) {
+      if (auto *extract = dyn_cast<TupleExtractInst>(operand->getUser()))
+        origDirectResultValues[extract->getFieldNo()] = extract;
+      else
+        nonCanonicalUses.push_back(operand);
+    }
+    if (!nonCanonicalUses.empty()) {
+      auto *applyInst = cast<ApplyInst>(origCallInst);
+      canonicalizeResults(applyInst, origDirectResultValues, nonCanonicalUses);
+    }
+  } else {
+    // A call with no indirect results should not have been added to
+    // pass.indirectResults.
+    assert(origDirectResultValues.size() == 1);
+    if (!origCallInst->use_empty()) {
+      origDirectResultValues[0] = origCallInst;
+      // Tuple extract values were already mapped. The call itself was not.
+      pass.valueStorageMap.insertValue(origCallInst);
+    }
+  }
+
+  // Prepare to emit a new call instruction.
+  SILLocation loc = origCallInst->getLoc();
+  SILBuilder callBuilder(origCallInst);
+
+  // Lambda to allocate and map storage for an indirect result.
+  // Note: origDirectResultValues contains null for unused results.
+  auto mapIndirectArg = [&](SILInstruction *origDirectResultVal,
+                            SILType argTy) {
+    if (origDirectResultVal
+        && pass.valueStorageMap.contains(origDirectResultVal)) {
+      // Pass the local storage address as the indirect result address.
+      return
+        pass.valueStorageMap.getStorage(origDirectResultVal).storageAddress;
+    }
+    // Allocate temporary call-site storage for an unused or loadable result.
+    auto *allocInst =
+    callBuilder.createAllocStack(loc, argTy);
+    LoadInst *loadInst = nullptr;
+    if (origDirectResultVal) {
+      // TODO: Find the try_apply's result block.
+      // Build results outside-in to next stack allocations.
+      SILBuilder resultBuilder(
+        std::next(SILBasicBlock::iterator(origCallInst)));
+      // This is a formally indirect argument, but is loadable.
+      loadInst = resultBuilder.createLoad(loc, allocInst,
+                                          LoadOwnershipQualifier::Unqualified);
+      origDirectResultVal->replaceAllUsesWith(loadInst);
+      pass.markDeadInst(origDirectResultVal);
+    }
+    insertStackDeallocationAtCall(allocInst, origCallInst, loadInst);
+    return SILValue(allocInst);
+  };
+
+  // The new call instruction's SIL calling convention.
   SILFunctionConventions loweredFnConv(
       apply.getSubstCalleeType(),
       SILModuleConventions::getLoweredAddressConventions());
 
-  SILLocation loc = origInst->getLoc();
-  SILBuilder callBuilder(origInst);
+  // The new call instruction's SIL argument list.
+  SmallVector<SILValue, 8> newCallArgs(loweredFnConv.getNumSILArguments());
 
-  SmallVector<SILValue, 8> args(loweredFnConv.getNumSILArguments());
-  unsigned firstResultIdx = loweredFnConv.getSILArgIndexOfFirstIndirectResult();
+  // Map the original result indices to new result indices.
+  SmallVector<unsigned, 8> newDirectResultIndices(
+    origFnConv.getNumDirectSILResults());
+  // Indices used to populate newDirectResultIndices.
+  unsigned oldDirectResultIdx = 0, newDirectResultIdx = 0;
 
-  // Find the storage location of each indirect result and populate the SIL
-  // argument vector.
-  SmallVector<TupleExtractInst *, 4> concreteResults;
-  if (origInst->getType().is<TupleType>()) {
-    for (Operand *operand : origInst->getUses()) {
-      if (auto *extract = dyn_cast<TupleExtractInst>(operand->getUser())) {
-        unsigned argIdx = firstResultIdx + extract->getFieldNo();
-        assert(argIdx < loweredFnConv.getSILArgIndexOfFirstParam());
-        if (!extract->getType().isAddressOnly(pass.F->getModule())) {
-          concreteResults.push_back(extract);
-          continue;
-        }
-        auto addr = pass.valueStorageMap.getStorage(extract).storageAddress;
-        assert(addr);
-        args[argIdx] = addr;
+  // The index of the next indirect result argument.
+  unsigned newResultArgIdx =
+    loweredFnConv.getSILArgIndexOfFirstIndirectResult();
+
+  // Visit each result. Redirect results that are now indirect.
+  // Result that remain direct will be redirected later.
+  // Populate newCallArgs and newDirectResultIndices.
+  for_each(
+    apply.getSubstCalleeType()->getResults(),
+    origDirectResultValues, 
+    [&](SILResultInfo resultInfo, SILInstruction *origDirectResultVal) {
+      // Assume that all original results are direct in SIL.
+      assert(!origFnConv.isSILIndirect(resultInfo));
+
+      if (loweredFnConv.isSILIndirect(resultInfo)) {
+        newCallArgs[newResultArgIdx++] =
+          mapIndirectArg(origDirectResultVal,
+                         loweredFnConv.getSILType(resultInfo));;
+        newDirectResultIndices[oldDirectResultIdx++] = newDirectResultIdx;
+      } else {
+        newDirectResultIndices[oldDirectResultIdx++] = newDirectResultIdx++;
       }
-    }
-  } else {
-    auto addr = pass.valueStorageMap.getStorage(origInst).storageAddress;
-    assert(addr);
-    args[firstResultIdx] = addr;
-  }
-  // Allocate storage for any unused or concrete results. One for each missing
-  // entry in the SIL arguments list.
-  unsigned argIdx = firstResultIdx;
-  for (SILType resultTy : loweredFnConv.getIndirectSILResultTypes()) {
-    if (!args[argIdx]) {
-      AllocStackInst *allocInstr = callBuilder.createAllocStack(loc, resultTy);
-      args[argIdx] = allocInstr;
-      insertStackDeallocationAtCall(allocInstr, origInst);
-    }
-    ++argIdx;
-  }
+      // replaceAllUses will be called later to handle direct results that
+      // remain direct results of the new call instruction.
+    });
+
   // Append the existing call arguments to the SIL argument list. They were
   // already lowered to addresses by allocateForOperand.
-  assert(argIdx == loweredFnConv.getSILArgIndexOfFirstParam());
+  assert(newResultArgIdx == loweredFnConv.getSILArgIndexOfFirstParam());
   unsigned origArgIdx = apply.getSubstCalleeConv().getSILArgIndexOfFirstParam();
-  for (unsigned endIdx = args.size(); argIdx < endIdx; ++argIdx, ++origArgIdx) {
-    args[argIdx] = apply.getArgument(origArgIdx);
+  for (unsigned endIdx = newCallArgs.size(); newResultArgIdx < endIdx;
+       ++newResultArgIdx, ++origArgIdx) {
+    newCallArgs[newResultArgIdx] = apply.getArgument(origArgIdx);
   }
+
   // Create a new apply with indirect result operands.
-  SILInstruction *callInst;
-  switch (origInst->getKind()) {
+  SILInstruction *newCallInst;
+  switch (origCallInst->getKind()) {
   case ValueKind::ApplyInst:
-    callInst = callBuilder.createApply(
+    newCallInst = callBuilder.createApply(
         loc, apply.getCallee(), apply.getSubstCalleeSILType(),
-        loweredFnConv.getSILResultType(), apply.getSubstitutions(), args,
-        cast<ApplyInst>(origInst)->isNonThrowing());
+        loweredFnConv.getSILResultType(), apply.getSubstitutions(), newCallArgs,
+        cast<ApplyInst>(origCallInst)->isNonThrowing());
     break;
   case ValueKind::TryApplyInst:
     // TODO: insert dealloc in the catch block.
@@ -513,23 +660,48 @@ void OpaqueStorageAllocation::allocateForResults(SILInstruction *origInst) {
   default:
     llvm_unreachable("not implemented for this instruction!");
   }
-  if (pass.valueStorageMap.contains(origInst)) {
-    pass.valueStorageMap.insertValue(callInst);
-    pass.valueStorageMap.getStorage(callInst).storageAddress =
-        pass.valueStorageMap.getStorage(origInst).storageAddress;
-    // origInst remains in the map but has no users.
+
+  // Replace all unmapped uses of the original call with uses of the new call.
+  // 
+  // TODO: handle bbargs from try_apply.
+  SILBuilder resultBuilder(
+    std::next(SILBasicBlock::iterator(origCallInst)));
+  SmallVector<Operand*, 8> origUses(origCallInst->getUses());
+  for (Operand *operand : origUses) {
+    auto *extractInst = dyn_cast<TupleExtractInst>(operand->getUser());
+    if (!extractInst) {
+      assert(origFnConv.getNumDirectSILResults() == 1);
+      assert(pass.valueStorageMap.contains(origCallInst));
+      continue;
+    }
+    unsigned origResultIdx = extractInst->getFieldNo();
+    auto resultInfo = origFnConv.getResults()[origResultIdx];
+
+    if (extractInst->getType().isAddressOnly(pass.F->getModule())) {
+      assert(loweredFnConv.isSILIndirect(resultInfo));
+      assert(pass.valueStorageMap.contains(extractInst));
+      continue;
+    }
+    if (loweredFnConv.isSILIndirect(resultInfo)) {
+      // This loadable indirect use should already be
+      // redirected to a load from the argument storage and marked dead.
+      assert(extractInst->use_empty());
+      continue;
+    }
+    // Either the new call instruction has only a single direct result, or we
+    // map the original tuple field to the new tuple field.
+    SILInstruction *newValue = newCallInst;
+    if (loweredFnConv.getNumDirectSILResults() > 1) {
+      assert(newCallInst->getType().is<TupleType>());
+      newValue = resultBuilder.createTupleExtract(
+        extractInst->getLoc(), newCallInst,
+        newDirectResultIndices[origResultIdx]);
+    }
+    extractInst->replaceAllUsesWith(newValue);
+    extractInst->eraseFromParent();
   }
-  origInst->replaceAllUsesWith(callInst);
-  pass.markDeadInst(origInst);
-  // Load concrete args, and mark the extract for deletion.
-  for (TupleExtractInst *extract : concreteResults) {
-    unsigned argIdx = firstResultIdx + extract->getFieldNo();
-    SILValue arg = args[argIdx];
-    LoadInst *loadArg = callBuilder.createLoad(
-        extract->getLoc(), arg, LoadOwnershipQualifier::Unqualified);
-    extract->replaceAllUsesWith(loadArg);
-    pass.markDeadInst(extract);
-  }
+  if (!pass.valueStorageMap.contains(origCallInst))
+    pass.markDeadInst(origCallInst);
 }
 
 //===----------------------------------------------------------------------===//
@@ -553,15 +725,21 @@ public:
 
   void rewriteFunction() {
     for (auto &valueStorageI : pass.valueStorageMap) {
+      SILValue valueDef = valueStorageI.first;
       valueStorage = valueStorageI.second;
-      DEBUG(llvm::dbgs() << "VALUE   "; valueStorageI.first->dump());
+      DEBUG(llvm::dbgs() << "VALUE   "; valueDef->dump());
       DEBUG(if (valueStorage.storageAddress) {
-        llvm::dbgs() << "STORAGE ";
+        llvm::dbgs() << "  STORAGE ";
         valueStorage.storageAddress->dump();
       });
-      for (Operand *currOper : valueStorageI.first->getUses()) {
+      SmallVector<Operand*, 8> uses(valueDef->getUses());
+      for (Operand *oper : uses) {
+        currOper = oper;
         visit(currOper->getUser());
       }
+      currOper = nullptr;
+      if (auto *defInst = dyn_cast<SILInstruction>(valueDef))
+        visit(defInst);
     }
   }
 
@@ -572,19 +750,24 @@ protected:
   }
 
   void beforeVisit(ValueBase *V) {
-    DEBUG(llvm::dbgs() << "REWRITE "; V->dump());
+    DEBUG(llvm::dbgs() << "  REWRITE "; V->dump());
     auto *I = cast<SILInstruction>(V);
     B.setInsertionPoint(I);
     B.setCurrentDebugScope(I->getDebugScope());
   }
 
   void visitApplyInst(ApplyInst *applyInst) {
-    DEBUG(llvm::dbgs() << "CALL "; applyInst->dump();
-          llvm::dbgs() << "OPERAND "; currOper->get()->dump());
-    llvm_unreachable("Unhandled call result.");
+    if (currOper) {
+      DEBUG(llvm::dbgs() << "  CALL "; applyInst->dump();
+            llvm::dbgs() << "  OPERAND "; currOper->get()->dump());
+      llvm_unreachable("Unhandled call result.");
+    }
   }
 
   void visitCopyValueInst(CopyValueInst *copyInst) {
+    if (!currOper)
+      return;
+    
     SILValue srcAddr =
         pass.valueStorageMap.getStorage(copyInst->getOperand()).storageAddress;
     SILValue destAddr =
@@ -593,40 +776,126 @@ protected:
                      IsInitialization);
   }
   
+  void visitDebugValueInst(DebugValueInst *debugInst) {
+    SILValue addr =
+      pass.valueStorageMap.getStorage((debugInst->getOperand())).storageAddress;
+    B.createDebugValueAddr(debugInst->getLoc(), addr);
+    pass.markDeadInst(debugInst);
+  }
+  
   void visitDestroyValueInst(DestroyValueInst *destroyInst) {
-    SILValue src = destroyInst->getOperand();
+    assert(currOper->get() == destroyInst->getOperand());
+    SILValue src = currOper->get();
     SILValue addr = pass.valueStorageMap.getStorage(src).storageAddress;
     B.createDestroyAddr(destroyInst->getLoc(), addr);
     pass.markDeadInst(destroyInst);
   }
 
+  void visitLoadInst(LoadInst *loadInst) {
+    assert(!currOper);
+    // Bitwise copy the value. Two locations now share ownership. This is
+    // modeled as a take-init.
+    SILValue addr = pass.valueStorageMap.getStorage(loadInst).storageAddress;
+    if (addr != loadInst->getOperand()) {
+      B.createCopyAddr(loadInst->getLoc(), loadInst->getOperand(), addr,
+                       IsTake, IsInitialization);
+    }
+  }
+
   void visitReturnInst(ReturnInst *returnInst) {
+    assert(currOper->get() == returnInst->getOperand());
+
+    auto insertPt = SILBasicBlock::iterator(returnInst);
+    auto bbStart = returnInst->getParent()->begin();
+    while (insertPt != bbStart) {
+      --insertPt;
+      if (!isa<DeallocStackInst>(*insertPt))
+        break;
+    }
+    B.setInsertionPoint(insertPt);
+
+    // Gather direct function results.
+    unsigned numOrigDirectResults =
+      pass.F->getConventions().getNumDirectSILResults();
+    SmallVector<SILValue, 8> origDirectResultValues;
+    if (numOrigDirectResults == 1)
+      origDirectResultValues.push_back(currOper->get());
+    else {
+      auto *tupleInst = cast<TupleInst>(currOper->get());
+      origDirectResultValues.append(tupleInst->getElements().begin(),
+                                    tupleInst->getElements().end());
+      assert(origDirectResultValues.size() == numOrigDirectResults);
+    }
+
+    SILFunctionConventions origFnConv(pass.F->getConventions());
     SILFunctionConventions loweredFnConv(
         pass.F->getLoweredFunctionType(),
         SILModuleConventions::getLoweredAddressConventions());
 
-    unsigned resultArgIdx = loweredFnConv.getSILArgIndexOfFirstIndirectResult();
-    auto copyResult = [&](SILValue result) {
-      SILArgument *resultArg = B.getFunction().getArgument(resultArgIdx);
-      SILValue resultAddr =
-          pass.valueStorageMap.getStorage(result).storageAddress;
-      B.createCopyAddr(returnInst->getLoc(), resultAddr, resultArg, IsTake,
-                       IsInitialization);
-    };
-    unsigned numIndirectResults = loweredFnConv.getNumIndirectSILResults();
-    if (numIndirectResults == 1) {
-      copyResult(returnInst->getOperand());
-    } else {
-      for (unsigned endIdx = resultArgIdx + numIndirectResults;
-           resultArgIdx < endIdx; ++resultArgIdx) {
-        auto *tupleInst = cast<TupleInst>(returnInst->getOperand());
-        copyResult(tupleInst->getElement(resultArgIdx));
-      }
-    }
-    SILType emptyTy = B.getModule().Types.getLoweredType(
+    // Convert each result.
+    SmallVector<SILValue, 8> newDirectResults;
+    unsigned newResultArgIdx =
+      loweredFnConv.getSILArgIndexOfFirstIndirectResult();
+
+    for_each(
+      pass.F->getLoweredFunctionType()->getResults(),
+      origDirectResultValues, 
+      [&](SILResultInfo resultInfo, SILValue origDirectResultVal) 
+      {
+        // Assume that all original results are direct in SIL.
+        assert(!origFnConv.isSILIndirect(resultInfo));
+        if (loweredFnConv.isSILIndirect(resultInfo)) {
+          assert(newResultArgIdx < loweredFnConv.getSILArgIndexOfFirstParam());
+          SILArgument *resultArg = B.getFunction().getArgument(newResultArgIdx);
+          if (pass.valueStorageMap.contains(origDirectResultVal)) {
+            // Copy the result from local storage into the result argument.
+            SILValue resultAddr =
+              pass.valueStorageMap.getStorage(origDirectResultVal)
+              .storageAddress;
+
+            B.createCopyAddr(returnInst->getLoc(), resultAddr, resultArg,
+                             IsTake, IsInitialization);
+            ++newResultArgIdx;
+          }
+          else {
+            // Sore the result into the result argument.
+            B.createStore(returnInst->getLoc(), origDirectResultVal,
+                          resultArg, StoreOwnershipQualifier::Init);
+            llvm_unreachable("untested."); //!!!
+          }
+        } else {
+          // Record the direct result for populating the result tuple.
+          newDirectResults.push_back(origDirectResultVal);
+        }
+      });
+    assert(newDirectResults.size() == loweredFnConv.getNumDirectSILResults());
+    SILValue newReturnVal;
+    if (newDirectResults.empty()) {
+      SILType emptyTy = B.getModule().Types.getLoweredType(
         TupleType::getEmpty(B.getModule().getASTContext()));
-    auto *tupleInst = B.createTuple(returnInst->getLoc(), emptyTy, {});
-    returnInst->setOperand(tupleInst);
+      newReturnVal = B.createTuple(returnInst->getLoc(), emptyTy, {});
+    } else if (newDirectResults.size() == 1) {
+      newReturnVal = newDirectResults[0];
+    } else {
+      newReturnVal = B.createTuple(returnInst->getLoc(),
+                                   loweredFnConv.getSILResultType(),
+                                   newDirectResults);
+    }
+    returnInst->setOperand(newReturnVal);
+  }
+
+  void visitStoreInst(StoreInst *storeInst) {
+    assert(currOper->get() == storeInst->getSrc());
+    SILValue srcAddr =
+      pass.valueStorageMap.getStorage(currOper->get()).storageAddress;
+    assert(storeInst->getOwnershipQualifier() ==
+           StoreOwnershipQualifier::Unqualified);
+
+    // Bitwise copy the value. Two locations now share ownership. This is
+    // modeled as a take-init.
+    B.createCopyAddr(storeInst->getLoc(), srcAddr, storeInst->getDest(),
+                     IsTake, IsInitialization);
+    pass.markDeadInst(storeInst);
   }
 
   void visitTupleInst(TupleInst *tupleInst) {
@@ -635,15 +904,16 @@ protected:
   }
 
   void visitTupleExtractInst(TupleExtractInst *extractInst) {
-    // Tuple element instructions don't require rewrite. They are dead.
-    llvm_unreachable("Untested.");
-    return;
+    // TupleExtract merely names a storage location. It doesn't need to be
+    // rewritten.
+    assert(extractInst->use_empty()
+           || pass.valueStorageMap.getStorage(extractInst).storageAddress);
   }
 };
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
-// AddressLowering: Top Level Function Transform.
+// AddressLowering: Top-Level Function Transform.
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -658,13 +928,13 @@ class AddressLowering : public SILModuleTransform {
 } // end anonymous namespace
 
 void AddressLowering::runOnFunction(SILFunction *F) {
-  DEBUG(llvm::dbgs() << "LOWER "; F->dump());
-
   AddressLoweringState pass(F);
 
   // Rewrite function args and insert alloc_stack/dealloc_stack.
   OpaqueStorageAllocation allocator(pass);
   allocator.allocateOpaqueStorage();
+
+  DEBUG(llvm::dbgs() << "\nREWRITING: " << F->getName(); F->dump());
 
   // Rewrite instructions with address-only operands or results.
   AddressOnlyRewriter(pass).rewriteFunction();
