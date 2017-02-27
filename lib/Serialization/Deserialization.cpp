@@ -1321,11 +1321,10 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
     IdentifierID IID;
     TypeID TID = 0;
     bool isType = (recordID == XREF_TYPE_PATH_PIECE);
-    bool onlyInNominal = false;
     bool inProtocolExt = false;
     bool isStatic = false;
     if (isType)
-      XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
+      XRefTypePathPieceLayout::readRecord(scratch, IID, inProtocolExt);
     else
       XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
                                            isStatic);
@@ -1496,13 +1495,12 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
       Identifier memberName;
       Optional<swift::CtorInitializerKind> ctorInit;
       bool isType = false;
-      bool onlyInNominal = false;
       bool inProtocolExt = false;
       bool isStatic = false;
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID;
-        XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
+        XRefTypePathPieceLayout::readRecord(scratch, IID, inProtocolExt);
         memberName = getIdentifier(IID);
         isType = true;
         break;
@@ -1548,7 +1546,7 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
         return nullptr;
       }
 
-      auto members = nominal->lookupDirect(memberName, onlyInNominal);
+      auto members = nominal->lookupDirect(memberName);
       values.append(members.begin(), members.end());
       filterValues(filterTy, M, genericSig, isType, inProtocolExt, isStatic,
                    ctorInit, values);
