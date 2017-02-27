@@ -151,7 +151,7 @@
 //
 // @convention(method) <T, U, V> (..., Foo<T, U>.Type)
 // @convention(witness_method) <T, U, V> (..., Foo<T, U>.Type)
-// @convention(witness_method) <Self : P, T, U, V> (..., Self.Type)
+// @convention(witness_method) <Self : P, V> (..., Self.Type)
 //
 //===----------------------------------------------------------------------===//
 
