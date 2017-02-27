@@ -446,44 +446,16 @@ bool TypeBase::isAssignableType() {
   return false;
 }
 
-namespace {
-class GetRValueTypeVisitor : public TypeVisitor<GetRValueTypeVisitor, Type> {
-public:
-  Type visitLValueType(LValueType *lvt) {
-    // Look through lvalue types.
-    assert(!lvt->getObjectType()->isLValueType()
-           && "unexpected nested lvalue");
-    return lvt->getObjectType();
-  }
-  
-  Type visitTupleType(TupleType *tt) {
-    // Look through lvalues in tuples.
-    SmallVector<TupleTypeElt, 4> elts;
-    for (auto &elt : tt->getElements()) {
-      elts.push_back(elt.getWithType(visit(elt.getType())));
-    }
-    return TupleType::get(elts, tt->getASTContext());
-  }
-  
-  Type visitParenType(ParenType *pt) {
-    return ParenType::get(pt->getASTContext(), visit(pt->getUnderlyingType()));
-  }
-
-  Type visitType(TypeBase *t) {
-    // Other types should not structurally contain lvalues.
-    assert(!t->isLValueType()
-           && "unexpected structural lvalue");
-    return t;
-  }
-};
-} // end anonymous namespace
-
 Type TypeBase::getRValueType() {
   // If the type is not an lvalue, this is a no-op.
   if (!isLValueType())
     return this;
-  
-  return GetRValueTypeVisitor().visit(this);
+
+  return Type(this).transform([](Type t) -> Type {
+      if (auto *lvalueTy = dyn_cast<LValueType>(t.getPointer()))
+        return lvalueTy->getObjectType();
+      return t;
+    });
 }
 
 Type TypeBase::getOptionalObjectType() {
