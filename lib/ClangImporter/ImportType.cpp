@@ -1625,7 +1625,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     }
 
     // Figure out the name for this parameter.
-    Identifier bodyName = importFullName(param, ImportNameVersion::Swift3)
+    Identifier bodyName = importFullName(param, CurrentVersion)
                               .getDeclName()
                               .getBaseName();
 
@@ -2036,7 +2036,7 @@ Type ClangImporter::Implementation::importMethodType(
     }
 
     // Figure out the name for this parameter.
-    Identifier bodyName = importFullName(param, ImportNameVersion::Swift3)
+    Identifier bodyName = importFullName(param, CurrentVersion)
                               .getDeclName()
                               .getBaseName();
 
@@ -2193,7 +2193,7 @@ Type ClangImporter::Implementation::importAccessorMethodType(
 
   } else {
     const clang::ParmVarDecl *param = clangDecl->parameters().front();
-    ImportedName fullBodyName = importFullName(param,ImportNameVersion::Swift3);
+    ImportedName fullBodyName = importFullName(param, CurrentVersion);
     Identifier bodyName = fullBodyName.getDeclName().getBaseName();
     SourceLoc nameLoc = importSourceLoc(param->getLocation());
     Identifier argLabel = functionName.getDeclName().getArgumentNames().front();
