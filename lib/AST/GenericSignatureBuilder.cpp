@@ -2316,16 +2316,11 @@ bool GenericSignatureBuilder::addRequirement(
 class GenericSignatureBuilder::InferRequirementsWalker : public TypeWalker {
   GenericSignatureBuilder &Builder;
   TypeRepr *typeRepr;
-  unsigned MinDepth;
-  unsigned MaxDepth;
 
 public:
   InferRequirementsWalker(GenericSignatureBuilder &builder,
-                          TypeRepr *typeRepr,
-                          unsigned MinDepth,
-                          unsigned MaxDepth)
-    : Builder(builder), typeRepr(typeRepr), MinDepth(MinDepth),
-      MaxDepth(MaxDepth) { }
+                          TypeRepr *typeRepr)
+    : Builder(builder), typeRepr(typeRepr) { }
 
   Action walkToTypePost(Type ty) override {
     auto boundGeneric = ty->getAs<BoundGenericType>();
@@ -2364,14 +2359,11 @@ public:
   }
 };
 
-void GenericSignatureBuilder::inferRequirements(TypeLoc type,
-                                         unsigned minDepth,
-                                         unsigned maxDepth) {
+void GenericSignatureBuilder::inferRequirements(TypeLoc type) {
   if (!type.getType())
     return;
   // FIXME: Crummy source-location information.
-  InferRequirementsWalker walker(*this, type.getTypeRepr(),
-                                 minDepth, maxDepth);
+  InferRequirementsWalker walker(*this, type.getTypeRepr());
   type.getType().walk(walker);
 }
 
@@ -2382,9 +2374,7 @@ void GenericSignatureBuilder::inferRequirements(ParameterList *params,
 
   unsigned depth = genericParams->getDepth();
   for (auto P : *params)
-    inferRequirements(P->getTypeLoc(),
-                      /*minDepth=*/depth,
-                      /*maxDepth=*/depth);
+    inferRequirements(P->getTypeLoc());
 }
 
 /// Perform typo correction on the given nested type, producing the
