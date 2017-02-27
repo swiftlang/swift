@@ -745,6 +745,9 @@ class RefCounts {
   LLVM_ATTRIBUTE_NOINLINE
   bool tryIncrementSlow(RefCountBits oldbits);
 
+  LLVM_ATTRIBUTE_NOINLINE
+  bool tryIncrementNonAtomicSlow(RefCountBits oldbits);
+
   public:
   enum Initialized_t { Initialized };
 
@@ -859,16 +862,17 @@ class RefCounts {
     return true;
   }
 
-  // Increment the reference count, unless the object is deallocating.
   bool tryIncrementNonAtomic() {
-    uint32_t oldval = __atomic_load_n(&refCount, __ATOMIC_RELAXED);
-    if (oldval & RC_DEALLOCATING_FLAG) {
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    if (!oldbits.hasSideTable() && oldbits.getIsDeiniting())
       return false;
-    } else {
-      uint32_t newval = oldval + RC_ONE;
-      __atomic_store_n(&refCount, newval, __ATOMIC_RELAXED);
-      return true;
-    }
+
+    auto newbits = oldbits;
+    bool fast = newbits.incrementStrongExtraRefCount(1);
+    if (!fast)
+      return tryIncrementNonAtomicSlow(oldbits);
+    refCounts.store(newbits, std::memory_order_relaxed);
+    return true;
   }
 
   // Simultaneously clear the pinned flag and decrement the reference
@@ -1089,6 +1093,18 @@ class RefCounts {
                                               std::memory_order_relaxed));
   }
 
+  void incrementUnownedNonAtomic(uint32_t inc) {
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    if (oldbits.hasSideTable())
+      return oldbits.getSideTable()->incrementUnownedNonAtomic(inc);
+
+    auto newbits = oldbits;
+    assert(newbits.getUnownedRefCount() != 0);
+    newbits.incrementUnownedRefCount(inc);
+    // FIXME: overflow check?
+    refCounts.store(newbits, std::memory_order_relaxed);
+  }
+
   // Decrement the unowned reference count.
   // Return true if the caller should free the object.
   bool decrementUnownedShouldFree(uint32_t dec) {
@@ -1114,6 +1130,29 @@ class RefCounts {
       // FIXME: underflow check?
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
+    return performFree;
+  }
+
+  bool decrementUnownedShouldFreeNonAtomic(uint32_t dec) {
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+
+    if (oldbits.hasSideTable())
+      return oldbits.getSideTable()->decrementUnownedShouldFreeNonAtomic(dec);
+
+    bool performFree;
+    auto newbits = oldbits;
+    newbits.decrementUnownedRefCount(dec);
+    if (newbits.getUnownedRefCount() == 0) {
+      // DEINITED -> FREED  or  DEINITED -> DEAD
+      // Caller will free the object. Weak decrement is handled by
+      // HeapObjectSideTableEntry::decrementUnownedShouldFreeNonAtomic.
+      assert(newbits.getIsDeiniting());
+      performFree = true;
+    } else {
+      performFree = false;
+    }
+    // FIXME: underflow check?
+    refCounts.store(newbits, std::memory_order_relaxed);
     return performFree;
   }
 
@@ -1160,6 +1199,16 @@ class RefCounts {
       performFree = newbits.decrementWeakRefCount();
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
+
+    return performFree;
+  }
+
+  bool decrementWeakShouldCleanUpNonAtomic() {
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+
+    auto newbits = oldbits;
+    auto performFree = newbits.decrementWeakRefCount();
+    refCounts.store(newbits, std::memory_order_relaxed);
 
     return performFree;
   }
@@ -1260,6 +1309,14 @@ class HeapObjectSideTableEntry {
     return refCounts.tryIncrementAndPin();
   }
 
+  bool tryIncrementNonAtomic() {
+    return refCounts.tryIncrementNonAtomic();
+  }
+
+  bool tryIncrementAndPinNonAtomic() {
+    return refCounts.tryIncrementAndPinNonAtomic();
+  }
+
   // Return weak reference count.
   // Note that this is not equal to the number of outstanding weak pointers.
   uint32_t getCount() const {
@@ -1276,12 +1333,27 @@ class HeapObjectSideTableEntry {
     return refCounts.incrementUnowned(inc);
   }
 
+  void incrementUnownedNonAtomic(uint32_t inc) {
+    return refCounts.incrementUnownedNonAtomic(inc);
+  }
+
   bool decrementUnownedShouldFree(uint32_t dec) {
     bool shouldFree = refCounts.decrementUnownedShouldFree(dec);
     if (shouldFree) {
       // DEINITED -> FREED
       // Caller will free the object.
       decrementWeak();
+    }
+
+    return shouldFree;
+  }
+
+  bool decrementUnownedShouldFreeNonAtomic(uint32_t dec) {
+    bool shouldFree = refCounts.decrementUnownedShouldFreeNonAtomic(dec);
+    if (shouldFree) {
+      // DEINITED -> FREED
+      // Caller will free the object.
+      decrementWeakNonAtomic();
     }
 
     return shouldFree;
@@ -1311,6 +1383,19 @@ class HeapObjectSideTableEntry {
     // FIXME: assertions
     // FIXME: optimize barriers
     bool cleanup = refCounts.decrementWeakShouldCleanUp();
+    if (!cleanup)
+      return;
+
+    // Weak ref count is now zero. Delete the side table entry.
+    // FREED -> DEAD
+    assert(refCounts.getUnownedCount() == 0);
+    delete this;
+  }
+
+  void decrementWeakNonAtomic() {
+    // FIXME: assertions
+    // FIXME: optimize barriers
+    bool cleanup = refCounts.decrementWeakShouldCleanUpNonAtomic();
     if (!cleanup)
       return;
 

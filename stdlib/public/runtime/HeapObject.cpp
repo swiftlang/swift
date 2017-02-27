@@ -346,23 +346,24 @@ void swift::swift_unownedRelease(HeapObject *object)
 
 void swift::swift_nonatomic_unownedRetain(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
-  if (!object)
+  if (!isValidPointerForNativeRetain(object))
     return;
 
-  object->weakRefCount.incrementNonAtomic();
+  object->refCounts.incrementUnownedNonAtomic(1);
 }
 
 void swift::swift_nonatomic_unownedRelease(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
-  if (!object)
+  if (!isValidPointerForNativeRetain(object))
     return;
 
-  if (object->weakRefCount.decrementShouldDeallocateNonAtomic()) {
-    // Only class objects can be weak-retained and weak-released.
-    auto metadata = object->metadata;
-    assert(metadata->isClassObject());
-    auto classMetadata = static_cast<const ClassMetadata*>(metadata);
-    assert(classMetadata->isTypeMetadata());
+  // Only class objects can be unowned-retained and unowned-released.
+  assert(object->metadata->isClassObject());
+  assert(static_cast<const ClassMetadata*>(object->metadata)->isTypeMetadata());
+
+  if (object->refCounts.decrementUnownedShouldFreeNonAtomic(1)) {
+    auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
+
     SWIFT_RT_ENTRY_CALL(swift_slowDealloc)
         (object, classMetadata->getInstanceSize(),
          classMetadata->getInstanceAlignMask());
@@ -396,23 +397,23 @@ void swift::swift_unownedRelease_n(HeapObject *object, int n)
 
 void swift::swift_nonatomic_unownedRetain_n(HeapObject *object, int n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
-  if (!object)
+  if (!isValidPointerForNativeRetain(object))
     return;
 
-  object->weakRefCount.incrementNonAtomic(n);
+  object->refCounts.incrementUnownedNonAtomic(n);
 }
 
 void swift::swift_nonatomic_unownedRelease_n(HeapObject *object, int n)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
-  if (!object)
+  if (!isValidPointerForNativeRetain(object))
     return;
 
-  if (object->weakRefCount.decrementShouldDeallocateNNonAtomic(n)) {
-    // Only class objects can be weak-retained and weak-released.
-    auto metadata = object->metadata;
-    assert(metadata->isClassObject());
-    auto classMetadata = static_cast<const ClassMetadata*>(metadata);
-    assert(classMetadata->isTypeMetadata());
+  // Only class objects can be unowned-retained and unowned-released.
+  assert(object->metadata->isClassObject());
+  assert(static_cast<const ClassMetadata*>(object->metadata)->isTypeMetadata());
+
+  if (object->refCounts.decrementUnownedShouldFreeNonAtomic(n)) {
+    auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
     SWIFT_RT_ENTRY_CALL(swift_slowDealloc)
         (object, classMetadata->getInstanceSize(),
          classMetadata->getInstanceAlignMask());
@@ -501,13 +502,13 @@ void swift::swift_unownedRetainStrong(HeapObject *object)
 
 void swift::swift_nonatomic_unownedRetainStrong(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
-  if (!object)
+  if (!isValidPointerForNativeRetain(object))
     return;
-  assert(object->weakRefCount.getCount() &&
-         "object is not currently weakly retained");
+  assert(object->refCounts.getUnownedCount() &&
+         "object is not currently unowned-retained");
 
-  if (! object->refCount.tryIncrementNonAtomic())
-    _swift_abortRetainUnowned(object);
+  if (! object->refCounts.tryIncrementNonAtomic())
+    swift::swift_abortRetainUnowned(object);
 }
 
 void swift::swift_unownedRetainStrongAndRelease(HeapObject *object)
@@ -528,16 +529,16 @@ void swift::swift_unownedRetainStrongAndRelease(HeapObject *object)
 
 void swift::swift_nonatomic_unownedRetainStrongAndRelease(HeapObject *object)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
-  if (!object)
+  if (!isValidPointerForNativeRetain(object))
     return;
-  assert(object->weakRefCount.getCount() &&
-         "object is not currently weakly retained");
+  assert(object->refCounts.getUnownedCount() &&
+         "object is not currently unowned-retained");
 
-  if (! object->refCount.tryIncrementNonAtomic())
-    _swift_abortRetainUnowned(object);
+  if (! object->refCounts.tryIncrementNonAtomic())
+    swift::swift_abortRetainUnowned(object);
 
   // This should never cause a deallocation.
-  bool dealloc = object->weakRefCount.decrementShouldDeallocateNonAtomic();
+  bool dealloc = object->refCounts.decrementUnownedShouldFreeNonAtomic(1);
   assert(!dealloc && "retain-strong-and-release caused dealloc?");
   (void) dealloc;
 }
