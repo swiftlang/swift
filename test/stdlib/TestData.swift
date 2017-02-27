@@ -991,9 +991,7 @@ DataTests.test("test_doubleDeallocation") { TestData().test_doubleDeallocation()
 DataTests.test("test_repeatingValueInitialization") { TestData().test_repeatingValueInitialization() }
 
 // XCTest does not have a crash detection, whereas lit does
-DataTests.test("bounding failure subdata")
-        .skip(.always("fails with resilient stdlib (rdar://problem/30560514)"))
-        .code {
+DataTests.test("bounding failure subdata") {
     let data = "Hello World".data(using: .utf8)!
     expectCrashLater()
     let c = data.subdata(in: 5..<200)
@@ -1051,7 +1049,9 @@ DataTests.test("bounding failure append absurd length") {
     data.append("hello", count: Int.min)
 }
 
-DataTests.test("bounding failure subscript") {
+DataTests.test("bounding failure subscript")
+        .skip(.always("fails with resilient stdlib (rdar://problem/30560514)"))
+        .code {
     var data = "Hello World".data(using: .utf8)!
     expectCrashLater()
     data[100] = 4
