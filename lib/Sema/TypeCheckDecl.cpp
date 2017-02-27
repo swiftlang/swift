@@ -5011,6 +5011,10 @@ public:
         return false;
       if (func->isGeneric() != parentFunc->isGeneric())
         return false;
+    } else if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
+      auto parentCtor = cast<ConstructorDecl>(parentDecl);
+      if (ctor->isGeneric() != parentCtor->isGeneric())
+        return false;
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
       auto parentVar = cast<VarDecl>(parentDecl);
       if (var->isStatic() != parentVar->isStatic())
