@@ -127,7 +127,7 @@ public:
                   Explosion &out) const override {
     addr = asDerived().projectScalar(IGF, addr);
     llvm::Value *value = IGF.Builder.CreateLoad(addr);
-    asDerived().emitScalarRetain(IGF, value, Atomicity::Atomic);
+    asDerived().emitScalarRetain(IGF, value, IGF.getDefaultAtomicity());
     out.add(value);
   }
 
@@ -153,7 +153,7 @@ public:
 
     // Release the old value if we need to.
     if (!Derived::IsScalarPOD) {
-      asDerived().emitScalarRelease(IGF, oldValue, Atomicity::Atomic);
+      asDerived().emitScalarRelease(IGF, oldValue, IGF.getDefaultAtomicity());
     }
   }
 
@@ -179,7 +179,7 @@ public:
     if (!Derived::IsScalarPOD) {
       addr = asDerived().projectScalar(IGF, addr);
       llvm::Value *value = IGF.Builder.CreateLoad(addr, "toDestroy");
-      asDerived().emitScalarRelease(IGF, value, Atomicity::Atomic);
+      asDerived().emitScalarRelease(IGF, value, IGF.getDefaultAtomicity());
     }
   }
   

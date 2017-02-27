@@ -72,7 +72,8 @@ static ManagedValue emitBuiltinRetain(SILGenFunction &gen,
   // The value was produced at +1; we can produce an unbalanced retain simply by
   // disabling the cleanup. But this would violate ownership semantics. Instead,
   // we must allow for the cleanup and emit a new unmanaged retain value.
-  gen.B.createUnmanagedRetainValue(loc, args[0].getValue());
+  gen.B.createUnmanagedRetainValue(loc, args[0].getValue(),
+                                   gen.B.getDefaultAtomicity());
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
 }
 
@@ -85,7 +86,8 @@ static ManagedValue emitBuiltinRelease(SILGenFunction &gen,
   // The value was produced at +1, so to produce an unbalanced
   // release we need to leave the cleanup intact and then do a *second*
   // release.
-  gen.B.createUnmanagedReleaseValue(loc, args[0].getValue());
+  gen.B.createUnmanagedReleaseValue(loc, args[0].getValue(),
+                                    gen.B.getDefaultAtomicity());
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
 }
 
@@ -95,7 +97,8 @@ static ManagedValue emitBuiltinAutorelease(SILGenFunction &gen,
                                            ArrayRef<ManagedValue> args,
                                            CanFunctionType formalApplyType,
                                            SGFContext C) {
-  gen.B.createUnmanagedAutoreleaseValue(loc, args[0].getValue());
+  gen.B.createUnmanagedAutoreleaseValue(loc, args[0].getValue(),
+                                        gen.B.getDefaultAtomicity());
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
 }
 
@@ -127,7 +130,7 @@ static ManagedValue emitBuiltinTryPin(SILGenFunction &gen,
   // retain, so we have to leave the cleanup in place.  TODO: try to
   // emit the argument at +0.
   SILValue result =
-      gen.B.createStrongPin(loc, args[0].getValue(), Atomicity::Atomic);
+      gen.B.createStrongPin(loc, args[0].getValue(), gen.B.getDefaultAtomicity());
 
   // The handle, if non-null, is effectively +1.
   return gen.emitManagedRValueWithCleanup(result);
@@ -143,7 +146,7 @@ static ManagedValue emitBuiltinUnpin(SILGenFunction &gen,
 
   if (requireIsOptionalNativeObject(gen, loc, subs[0].getReplacement())) {
     // Unpinning takes responsibility for the +1 handle.
-    gen.B.createStrongUnpin(loc, args[0].forward(gen), Atomicity::Atomic);
+    gen.B.createStrongUnpin(loc, args[0].forward(gen), gen.B.getDefaultAtomicity());
   }
 
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));

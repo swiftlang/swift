@@ -826,7 +826,7 @@ MaterializeForSetEmitter::createAddressorCallback(SILFunction &F,
       break;
 
     case AddressorKind::NativePinning:
-      gen.B.createStrongUnpin(loc, owner, Atomicity::Atomic);
+      gen.B.createStrongUnpin(loc, owner, gen.B.getDefaultAtomicity());
       break;
     }
 

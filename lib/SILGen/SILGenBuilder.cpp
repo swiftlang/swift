@@ -209,7 +209,7 @@ SILGenBuilder::createUnsafeCopyUnownedValue(SILLocation loc,
   SILValue result = SILBuilder::createUnmanagedToRef(
       loc, originalValue.getValue(),
       SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
-  SILBuilder::createUnmanagedRetainValue(loc, result);
+  SILBuilder::createUnmanagedRetainValue(loc, result, getDefaultAtomicity());
   return gen.emitManagedRValueWithCleanup(result);
 }
 

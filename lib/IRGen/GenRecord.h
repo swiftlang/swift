@@ -489,14 +489,14 @@ public:
             Explosion &dest, Atomicity atomicity) const override {
     for (auto &field : getFields())
       cast<LoadableTypeInfo>(field.getTypeInfo())
-          .copy(IGF, src, dest, Atomicity::Atomic);
+          .copy(IGF, src, dest, atomicity);
   }
 
   void consume(IRGenFunction &IGF, Explosion &src,
                Atomicity atomicity) const override {
     for (auto &field : getFields())
       cast<LoadableTypeInfo>(field.getTypeInfo())
-          .consume(IGF, src, Atomicity::Atomic);
+          .consume(IGF, src, atomicity);
   }
 
   void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
