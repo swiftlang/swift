@@ -2060,6 +2060,10 @@ public:
   /// \returns a possibly-sanitized initializer, or null if an error occurred.
   Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator);
 
+  /// \brief Propagate constraints in an effort to enforce local
+  /// consistency to reduce the time to solve the system.
+  void propagateConstraints();
+
   /// \brief The result of attempting to resolve a constraint or set of
   /// constraints.
   enum class SolutionKind : char {
