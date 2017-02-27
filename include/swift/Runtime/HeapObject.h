@@ -530,12 +530,12 @@ SWIFT_RT_ENTRY_VISIBILITY
 void swift_unownedRelease_n(HeapObject *value, int n)
     SWIFT_CC(RegisterPreservingCC);
 
-/// Increment the weak/unowned retain count by n.
+/// Increment the unowned retain count by n.
 SWIFT_RT_ENTRY_VISIBILITY
 void swift_nonatomic_unownedRetain_n(HeapObject *value, int n)
     SWIFT_CC(RegisterPreservingCC);
 
-/// Decrement the weak/unowned retain count by n.
+/// Decrement the unowned retain count by n.
 SWIFT_RT_ENTRY_VISIBILITY
 void swift_nonatomic_unownedRelease_n(HeapObject *value, int n)
     SWIFT_CC(RegisterPreservingCC);
@@ -561,7 +561,7 @@ void swift_unownedRetainStrongAndRelease(HeapObject *value)
 
 /// Increment the strong retain count of an object which may have been
 /// deallocated, aborting if it has been deallocated, and decrement its
-/// weak/unowned reference count.
+/// unowned reference count.
 SWIFT_RT_ENTRY_VISIBILITY
 void swift_nonatomic_unownedRetainStrongAndRelease(HeapObject *value)
     SWIFT_CC(RegisterPreservingCC);
