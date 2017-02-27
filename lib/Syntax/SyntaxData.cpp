@@ -1,4 +1,4 @@
-//===--- SyntaxData.cpp - Swift Syntax Data Implementation ------*- C++ -*-===//
+//===--- SyntaxData.cpp - Swift Syntax Data Implementation ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

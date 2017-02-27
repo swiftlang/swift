@@ -1,4 +1,4 @@
-//===--- RawSyntax.cpp - Swift Raw Syntax Implementation --------*- C++ -*-===//
+//===--- RawSyntax.cpp - Swift Raw Syntax Implementation ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

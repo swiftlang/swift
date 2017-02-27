@@ -2321,15 +2321,6 @@ class GenericSignatureBuilder::InferRequirementsWalker : public TypeWalker {
   unsigned MinDepth;
   unsigned MaxDepth;
 
-  /// We cannot add requirements to archetypes from outer generic parameter
-  /// lists.
-  bool isOuterArchetype(PotentialArchetype *PA) {
-    unsigned ParamDepth = PA->getRootGenericParamKey().Depth;
-    assert(ParamDepth <= MaxDepth);
-    (void) MaxDepth;
-    return ParamDepth < MinDepth;
-  }
-
 public:
   InferRequirementsWalker(GenericSignatureBuilder &builder,
                           TypeRepr *typeRepr,
