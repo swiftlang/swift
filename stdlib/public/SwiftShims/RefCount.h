@@ -1000,7 +1000,12 @@ class RefCounts {
   // object may have a side table entry.
   template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
   bool doDecrementSideTable(RefCountBits oldbits, uint32_t dec);
-  
+
+  // Second slow path of doDecrementNonAtomic, where the
+  // object may have a side table entry.
+  template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+  bool doDecrementNonAtomicSideTable(RefCountBits oldbits, uint32_t dec);
+
   // First slow path of doDecrement, where the object may need to be deinited.
   // Side table is handled in the second slow path, doDecrementSideTable().
   template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
@@ -1042,6 +1047,42 @@ class RefCounts {
 
     return deinitNow;
   }
+
+  // First slow path of doDecrementNonAtomic, where the object may need to be deinited.
+  // Side table is handled in the second slow path, doDecrementNonAtomicSideTable().
+  template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+  bool doDecrementNonAtomicSlow(RefCountBits oldbits, uint32_t dec) {
+    bool deinitNow;
+    auto newbits = oldbits;
+
+    bool fast = newbits.decrementStrongExtraRefCount(dec, clearPinnedFlag);
+    if (fast) {
+      // Decrement completed normally. New refcount is not zero.
+      deinitNow = false;
+    }
+    else if (oldbits.hasSideTable()) {
+      // Decrement failed because we're on some other slow path.
+      return doDecrementNonAtomicSideTable<clearPinnedFlag,
+                                           performDeinit>(oldbits, dec);
+    }
+    else {
+      // Decrement underflowed. Begin deinit.
+      // LIVE -> DEINITING
+      deinitNow = true;
+      assert(!oldbits.getIsDeiniting());  // FIXME: make this an error?
+      newbits = oldbits;  // Undo failed decrement of newbits.
+      newbits.setStrongExtraRefCount(0);
+      newbits.setIsDeiniting(true);
+      if (clearPinnedFlag)
+        newbits.setIsPinned(false);
+    }
+    refCounts.store(newbits, std::memory_order_relaxed);
+    if (performDeinit && deinitNow) {
+      _swift_release_dealloc(getHeapObject());
+    }
+
+    return deinitNow;
+  }
   
   public:  // FIXME: access control hack
 
@@ -1066,8 +1107,6 @@ class RefCounts {
 
     return false;  // don't deinit
   }
-  
-  private:
 
   // This is independently specialized below for inline and out-of-line use.
   template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
@@ -1292,9 +1331,13 @@ class HeapObjectSideTableEntry {
     return refCounts.doDecrement<clearPinnedFlag, performDeinit>(dec);
   }
 
+  template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+  bool decrementNonAtomicStrong(uint32_t dec) {
+    return refCounts.doDecrementNonAtomic<clearPinnedFlag, performDeinit>(dec);
+  }
+
   void decrementFromOneNonAtomic() {
-    // FIXME: can there be a non-atomic implementation?
-    decrementStrong<DontClearPinnedFlag, DontPerformDeinit>(1);
+    decrementNonAtomicStrong<DontClearPinnedFlag, DontPerformDeinit>(1);
   }
   
   bool isDeiniting() const {
@@ -1431,12 +1474,12 @@ inline bool RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
 
   // Use slow path if we can't guarantee atomicity.
   if (oldbits.hasSideTable() || oldbits.getUnownedRefCount() != 1)
-    return doDecrementSlow<clearPinnedFlag, performDeinit>(oldbits, dec);
+    return doDecrementNonAtomicSlow<clearPinnedFlag, performDeinit>(oldbits, dec);
 
   auto newbits = oldbits;
   bool fast = newbits.decrementStrongExtraRefCount(dec, clearPinnedFlag);
   if (!fast)
-    return doDecrementSlow<clearPinnedFlag, performDeinit>(oldbits, dec);
+    return doDecrementNonAtomicSlow<clearPinnedFlag, performDeinit>(oldbits, dec);
 
   refCounts.store(newbits, std::memory_order_relaxed);
   return false;  // don't deinit
@@ -1463,8 +1506,24 @@ doDecrementSideTable(InlineRefCountBits oldbits, uint32_t dec) {
 
 template <>
 template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+inline bool RefCounts<InlineRefCountBits>::
+doDecrementNonAtomicSideTable(InlineRefCountBits oldbits, uint32_t dec) {
+  auto side = oldbits.getSideTable();
+  return side->decrementNonAtomicStrong<clearPinnedFlag, performDeinit>(dec);
+}
+
+template <>
+template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
 inline bool RefCounts<SideTableRefCountBits>::
 doDecrementSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
+  swift::crash("side table refcount must not have "
+               "a side table entry of its own");
+}
+
+template <>
+template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+inline bool RefCounts<SideTableRefCountBits>::
+doDecrementNonAtomicSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
   swift::crash("side table refcount must not have "
                "a side table entry of its own");
 }
