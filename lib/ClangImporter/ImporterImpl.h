@@ -815,13 +815,11 @@ public:
 
   /// \brief Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.
-  ClangModuleUnit *getWrapperForModule(ClangImporter &importer,
-                                       const clang::Module *underlying);
+  ClangModuleUnit *getWrapperForModule(const clang::Module *underlying);
 
   /// \brief Constructs a Swift module for the given Clang module.
-  ModuleDecl *finishLoadingClangModule(ClangImporter &importer,
-                                   const clang::Module *clangModule,
-                                   bool preferAdapter);
+  ModuleDecl *finishLoadingClangModule(const clang::Module *clangModule,
+                                       bool preferAdapter);
 
   /// \brief Retrieve the named Swift type, e.g., Int32.
   ///
