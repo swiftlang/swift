@@ -483,55 +483,53 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
   if (SrcTy == DestTy)
     return Value;
 
-  SILValue CastedValue;
+  assert(SrcTy.isAddress() == DestTy.isAddress() &&
+         "Addresses aren't compatible with values");
 
   if (SrcTy.isAddress() && DestTy.isAddress()) {
     // Cast between two addresses and that's it.
-    CastedValue = B->createUncheckedAddrCast(Loc, Value, DestTy);
-    return CastedValue;
+    return B->createUncheckedAddrCast(Loc, Value, DestTy);
   }
-
-  if (SrcTy.isAddress() != DestTy.isAddress()) {
-    // Addresses aren't compatible with values.
-    llvm_unreachable("Addresses aren't compatible with values");
-  }
-
-  auto &M = B->getModule();
-
-  // Check if src and dest types are optional.
-  auto OptionalSrcTy = SrcTy.getSwiftRValueType()
-                            .getAnyOptionalObjectType();
-  auto OptionalDestTy = DestTy.getSwiftRValueType()
-                              .getAnyOptionalObjectType();
 
   // If both types are classes and dest is the superclass of src,
   // simply perform an upcast.
-  if (SrcTy.getSwiftRValueType()->mayHaveSuperclass() &&
-      DestTy.getSwiftRValueType()->mayHaveSuperclass() &&
-      DestTy.isExactSuperclassOf(SrcTy)) {
-    CastedValue = B->createUpcast(Loc, Value, DestTy);
-    return CastedValue;
+  if (DestTy.isExactSuperclassOf(SrcTy)) {
+    return B->createUpcast(Loc, Value, DestTy);
   }
 
-  SILType OptionalSrcLoweredTy;
-  SILType OptionalDestLoweredTy;
+  if (SrcTy.isHeapObjectReferenceType() &&
+      DestTy.isHeapObjectReferenceType()) {
+    return B->createUncheckedRefCast(Loc, Value, DestTy);
+  }
 
-  if (OptionalSrcTy)
-    OptionalSrcLoweredTy = M.Types.getLoweredType(OptionalSrcTy);
+  if (auto mt1 = dyn_cast<AnyMetatypeType>(SrcTy.getSwiftRValueType())) {
+    if (auto mt2 = dyn_cast<AnyMetatypeType>(DestTy.getSwiftRValueType())) {
+      if (mt1->getRepresentation() == mt2->getRepresentation()) {
+        // If B.Type needs to be casted to A.Type and
+        // A is a superclass of B, then it can be done by means
+        // of a simple upcast.
+        if (mt2.getInstanceType()->isExactSuperclassOf(
+              mt1.getInstanceType(), nullptr)) {
+          return B->createUpcast(Loc, Value, DestTy);
+        }
+ 
+        // Cast between two metatypes and that's it.
+        return B->createUncheckedBitCast(Loc, Value, DestTy);
+      }
+    }
+  }
 
-  if (OptionalDestTy)
-    OptionalDestLoweredTy = M.Types.getLoweredType(OptionalDestTy);
+  // Check if src and dest types are optional.
+  auto OptionalSrcTy = SrcTy.getAnyOptionalObjectType();
+  auto OptionalDestTy = DestTy.getAnyOptionalObjectType();
 
   // Both types are optional.
   if (OptionalDestTy && OptionalSrcTy) {
     // If both wrapped types are classes and dest is the superclass of src,
     // simply perform an upcast.
-    if (OptionalDestTy->mayHaveSuperclass() &&
-        OptionalSrcTy->mayHaveSuperclass() &&
-        OptionalDestLoweredTy.isExactSuperclassOf(OptionalSrcLoweredTy)) {
+    if (OptionalDestTy.isExactSuperclassOf(OptionalSrcTy)) {
       // Insert upcast.
-      CastedValue = B->createUpcast(Loc, Value, DestTy);
-      return CastedValue;
+      return B->createUpcast(Loc, Value, DestTy);
     }
 
     // Unwrap the original optional value.
@@ -555,10 +553,10 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
     // Cast the unwrapped value.
     auto CastedUnwrappedValue =
         castValueToABICompatibleType(B, Loc, UnwrappedValue,
-                                     OptionalSrcLoweredTy,
-                                     OptionalDestLoweredTy);
+                                     OptionalSrcTy,
+                                     OptionalDestTy);
     // Wrap into optional.
-    CastedValue =  B->createOptionalSome(Loc, CastedUnwrappedValue, DestTy);
+    auto CastedValue =  B->createOptionalSome(Loc, CastedUnwrappedValue, DestTy);
     B->createBranch(Loc, ContBB, {CastedValue});
 
     // Handle the None case.
@@ -567,15 +565,15 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
     B->createBranch(Loc, ContBB, {CastedValue});
     B->setInsertionPoint(ContBB->begin());
 
-    CastedValue = ContBB->getArgument(0);
-    return CastedValue;
+    return ContBB->getArgument(0);
   }
 
   // Src is not optional, but dest is optional.
   if (!OptionalSrcTy && OptionalDestTy) {
-    auto OptionalSrcCanTy =
-      OptionalType::get(SrcTy.getSwiftRValueType())->getCanonicalType();
-    auto LoweredOptionalSrcType = M.Types.getLoweredType(OptionalSrcCanTy);
+    auto OptionalSrcCanTy = OptionalType::get(SrcTy.getSwiftRValueType())
+      ->getCanonicalType();
+    auto LoweredOptionalSrcType = SILType::getPrimitiveObjectType(
+      OptionalSrcCanTy);
 
     // Wrap the source value into an optional first.
     SILValue WrappedValue = B->createOptionalSome(Loc, Value,
@@ -586,88 +584,32 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
                                         DestTy);
   }
 
-  // Both types are not optional.
-  if (SrcTy.getSwiftRValueType()->mayHaveSuperclass() &&
-      DestTy.getSwiftRValueType()->mayHaveSuperclass()) {
-    if (DestTy.isExactSuperclassOf(SrcTy)) {
-      // Insert upcast.
-      CastedValue = B->createUpcast(Loc, Value, DestTy);
-      return CastedValue;
-    }
-
-    // Cast the reference.
-    CastedValue = B->createUncheckedRefCast(Loc, Value, DestTy);
-    return CastedValue;
-  }
-
-  // If B.Type needs to be casted to A.Type and
-  // A is a superclass of B, then it can be done by means
-  // of a simple upcast.
-  if (isa<AnyMetatypeType>(SrcTy.getSwiftRValueType()) &&
-      isa<AnyMetatypeType>(DestTy.getSwiftRValueType()) &&
-      SrcTy.isClassOrClassMetatype() &&
-      DestTy.getMetatypeInstanceType(M).isExactSuperclassOf(
-          SrcTy.getMetatypeInstanceType(M))) {
-    CastedValue = B->createUpcast(Loc, Value, DestTy);
-    return CastedValue;
-  }
-
-  if (auto mt1 = dyn_cast<AnyMetatypeType>(SrcTy.getSwiftRValueType())) {
-    if (auto mt2 = dyn_cast<AnyMetatypeType>(DestTy.getSwiftRValueType())) {
-      if (mt1->getRepresentation() == mt2->getRepresentation()) {
-        // Cast between two metatypes and that's it.
-        CastedValue = B->createUncheckedBitCast(Loc, Value, DestTy);
-        return CastedValue;
-      }
-    }
-  }
-
-  if (SrcTy.isAddress() && DestTy.isAddress()) {
-    CastedValue = B->createUncheckedAddrCast(Loc, Value, DestTy);
-    return CastedValue;
-  }
-
-  if (SrcTy.isHeapObjectReferenceType() && DestTy.isHeapObjectReferenceType()) {
-    CastedValue = B->createUncheckedRefCast(Loc, Value, DestTy);
-    return CastedValue;
-  }
-
   // Handle tuple types.
   // Extract elements, cast each of them, create a new tuple.
-  if (auto tup = SrcTy.getAs<TupleType>()) {
-    SmallVector<CanType, 1> aElements, bElements;
-    auto atypes = tup.getElementTypes();
-    aElements.append(atypes.begin(), atypes.end());
-    auto btypes = DestTy.getAs<TupleType>().getElementTypes();
-    bElements.append(btypes.begin(), btypes.end());
-
-    assert (aElements.size() == bElements.size() &&
-          "Tuple types should have the same number of elements");
-
+  if (auto SrcTupleTy = SrcTy.getAs<TupleType>()) {
     SmallVector<SILValue, 8> ExpectedTuple;
-    for (unsigned i : indices(aElements)) {
-      auto aa = M.Types.getLoweredType(aElements[i]),
-           bb = M.Types.getLoweredType(bElements[i]);
-
+    for (unsigned i = 0, e = SrcTupleTy->getNumElements(); i < e; i++) {
       SILValue Element = B->createTupleExtract(Loc, Value, i);
       // Cast the value if necessary.
-      Element = castValueToABICompatibleType(B, Loc, Element, aa, bb);
+      Element = castValueToABICompatibleType(B, Loc, Element,
+                                             SrcTy.getTupleElementType(i),
+                                             DestTy.getTupleElementType(i));
       ExpectedTuple.push_back(Element);
     }
 
-    CastedValue = B->createTuple(Loc, DestTy, ExpectedTuple);
-    return CastedValue;
+    return B->createTuple(Loc, DestTy, ExpectedTuple);
   }
 
   // Function types are interchangeable if they're also ABI-compatible.
   if (SrcTy.getAs<SILFunctionType>()) {
     if (DestTy.getAs<SILFunctionType>()) {
       // Insert convert_function.
-      CastedValue = B->createConvertFunction(Loc, Value, DestTy);
-      return CastedValue;
+      return B->createConvertFunction(Loc, Value, DestTy);
     }
   }
 
+  llvm::errs() << "Source type: " << SrcTy << "\n";
+  llvm::errs() << "Destination type: " << DestTy << "\n";
   llvm_unreachable("Unknown combination of types for casting");
 }
 
