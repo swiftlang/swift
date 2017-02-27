@@ -1,4 +1,4 @@
-//===--- FunctionConversion.swift -----------------------------------------===//
+//===--- generic_subscript.swift ------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
