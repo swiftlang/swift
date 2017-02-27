@@ -241,6 +241,8 @@ function(_add_variant_c_compile_flags)
     list(APPEND result "-D_CRT_USE_WINAPI_FAMILY_DESKTOP_APP")
     # TODO(compnerd) handle /MT
     list(APPEND result "-D_DLL")
+    # NOTE: We assume that we are using VS 2015 U2+
+    list(APPEND result "-D_ENABLE_ATOMIC_ALIGNMENT_FIX")
   endif()
 
   if(CFLAGS_ENABLE_ASSERTIONS)
