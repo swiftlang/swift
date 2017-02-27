@@ -377,10 +377,24 @@ public:
   using RequirementRHS =
       llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
 
+  /// Describes a constraint that is bounded on one side by a concrete type.
+  struct ConcreteConstraint {
+    PotentialArchetype *archetype;
+    Type concreteType;
+    const RequirementSource *source;
+  };
+
   /// Describes an equivalence class of potential archetypes.
   struct EquivalenceClass {
     /// Concrete type to which this equivalence class is equal.
+    ///
+    /// This is the semantic concrete type; the constraints as written
+    /// (or implied) are stored in \c concreteTypeConstraints;
     Type concreteType;
+
+    /// The same-type-to-concrete constraints written within this
+    /// equivalence class.
+    std::vector<ConcreteConstraint> concreteTypeConstraints;
 
     /// The members of the equivalence class.
     TinyPtrVector<PotentialArchetype *> members;
@@ -388,6 +402,13 @@ public:
     /// Construct a new equivalence class containing only the given
     /// potential archetype (which represents itself).
     EquivalenceClass(PotentialArchetype *representative);
+
+    /// Find a source of the same-type constraint that maps a potential
+    /// archetype in this equivalence class to a concrete type along with
+    /// that concrete type as written.
+    Optional<ConcreteConstraint>
+    findAnyConcreteConstraintAsWritten(
+                              PotentialArchetype *preferredPA = nullptr) const;
   };
 
   friend class RequirementSource;
@@ -602,7 +623,7 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(TypeLoc type, unsigned minDepth, unsigned maxDepth);
+  void inferRequirements(TypeLoc type);
 
   /// Infer requirements from the given pattern, recursively.
   ///
@@ -735,16 +756,6 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// that share a name.
   llvm::MapVector<Identifier, llvm::TinyPtrVector<PotentialArchetype *>>
     NestedTypes;
-
-  /// The concrete types to which this potential archetype has been
-  /// constrained.
-  ///
-  /// This vector runs parallel to ConcreteTypeSources.
-  llvm::TinyPtrVector<Type> concreteTypes;
-
-  /// The source of the concrete type requirements that were written on
-  /// this potential archetype.
-  llvm::TinyPtrVector<const RequirementSource *> concreteTypeSources;
 
   /// Whether this is an unresolved nested type.
   unsigned isUnresolvedNestedType : 1;
@@ -972,22 +983,6 @@ public:
     return llvm::make_range(SameTypeConstraints.begin(),
                             SameTypeConstraints.end());
   }
-
-  /// Retrieve the concrete types as written on this potential archetype.
-  const llvm::TinyPtrVector<Type>& getConcreteTypesAsWritten() const {
-    return concreteTypes;
-  }
-
-  /// Retrieve the concrete type sources as written on this potential archetype.
-  ArrayRef<const RequirementSource *> getConcreteTypeSourcesAsWritten() const {
-    return concreteTypeSources;
-  }
-
-  /// Find a source of the same-type constraint that maps this potential
-  /// archetype to a concrete type somewhere in the equivalence class of this
-  /// type along with the concrete type that was written there.
-  Optional<std::pair<Type, const RequirementSource *>>
-  findAnyConcreteTypeSourceAsWritten() const;
 
   /// \brief Retrieve (or create) a nested type with the given name.
   PotentialArchetype *getNestedType(Identifier Name,
