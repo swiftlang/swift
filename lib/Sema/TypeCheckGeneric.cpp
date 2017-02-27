@@ -287,9 +287,7 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
 
       // Infer requirements from the inherited types.
       for (const auto &inherited : param->getInherited()) {
-        builder->inferRequirements(inherited,
-                                   /*minDepth=*/depth,
-                                   /*maxDepth=*/depth);
+        builder->inferRequirements(inherited);
       }
     }
   }
@@ -489,9 +487,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
       if (builder && genericParams &&
           fn->getBodyResultTypeLoc().getTypeRepr()) {
         unsigned depth = genericParams->getDepth();
-        builder->inferRequirements(fn->getBodyResultTypeLoc(),
-                                   /*minDepth=*/depth,
-                                   /*maxDepth=*/depth);
+        builder->inferRequirements(fn->getBodyResultTypeLoc());
       }
     }
   }
@@ -828,9 +824,7 @@ static bool checkGenericSubscriptSignature(TypeChecker &tc,
   if (genericParams && builder &&
       subscript->getElementTypeLoc().getTypeRepr()) {
     unsigned depth = genericParams->getDepth();
-    builder->inferRequirements(subscript->getElementTypeLoc(),
-                               /*minDepth=*/depth,
-                               /*maxDepth=*/depth);
+    builder->inferRequirements(subscript->getElementTypeLoc());
   }
 
   // Check the indices.
