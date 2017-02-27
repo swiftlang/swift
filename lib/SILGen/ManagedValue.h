@@ -230,12 +230,6 @@ public:
     return M;
   }
 
-  CanType getSwiftType() const {
-    return isLValue()
-      ? getType().getSwiftType()
-      : getType().getSwiftRValueType();
-  }
-  
   /// Emit a copy of this value with independent ownership.
   ManagedValue copy(SILGenFunction &gen, SILLocation loc);
 

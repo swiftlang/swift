@@ -569,8 +569,10 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
 void IRGenDebugInfo::createParameterType(
     llvm::SmallVectorImpl<llvm::Metadata *> &Parameters, SILType type,
     DeclContext *DeclCtx) {
-  // FIXME: This use of getSwiftType() is extremely suspect.
-  auto DbgTy = DebugTypeInfo::getFromTypeInfo(DeclCtx, type.getSwiftType(),
+  auto RealType = type.getSwiftRValueType();
+  if (type.isAddress())
+    RealType = CanInOutType::get(RealType);
+  auto DbgTy = DebugTypeInfo::getFromTypeInfo(DeclCtx, RealType,
                                               IGM.getTypeInfo(type));
   Parameters.push_back(getOrCreateType(DbgTy));
 }
