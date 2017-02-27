@@ -140,17 +140,13 @@ protected:
     
     return Subs;
   }
+
   
   SILType getTypeInClonedContext(SILType Ty) {
     // Substitute opened existential types, if we have any.
-    if (!OpenedExistentialSubs.empty()) {
-      auto &F = getBuilder().getFunction();
-      Ty = Ty.subst(F.getModule(),
-                    QueryTypeSubstitutionMap{OpenedExistentialSubs},
-                    MakeAbstractConformanceForGenericType());
-    }
-
-    return Ty;
+    return SILType::getPrimitiveObjectType(
+      getASTTypeInClonedContext(Ty.getSwiftRValueType()))
+      .copyCategory(Ty);
   }
   SILType getOpType(SILType Ty) {
     Ty = getTypeInClonedContext(Ty);
@@ -159,13 +155,21 @@ protected:
   
   CanType getASTTypeInClonedContext(CanType ty) {
     // Substitute opened existential types, if we have any.
-    if (!OpenedExistentialSubs.empty()) {
-      ty = ty.subst(QueryTypeSubstitutionMap{OpenedExistentialSubs},
-                    MakeAbstractConformanceForGenericType())
-          ->getCanonicalType();
-    }
-    return ty;
+    if (!ty->hasOpenedExistential())
+      return ty;
+
+    return ty.transform(
+      [&](Type t) -> Type {
+        if (t->isOpenedExistential()) {
+          auto found = OpenedExistentialSubs.find(
+            t->castTo<ArchetypeType>());
+          assert(found != OpenedExistentialSubs.end());
+          return found->second;
+        }
+        return t;
+      })->getCanonicalType();
   }
+
   CanType getOpASTType(CanType ty) {
     ty = getASTTypeInClonedContext(ty);
     return asImpl().remapASTType(ty);
