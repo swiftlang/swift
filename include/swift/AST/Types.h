@@ -606,13 +606,6 @@ public:
                            LazyResolver *resolver,
                            DeclContext *gpContext = nullptr);
 
-  /// \brief Determine whether the given type is "generic", meaning that
-  /// it involves generic types for which generic arguments have not been
-  /// provided.
-  /// For example, the type Vector and Vector<Int>.InnerGeneric are both
-  /// unspecialized generic, but the type Vector<Int> is not.
-  bool isUnspecializedGeneric();
-
   /// \brief Determine whether this type is a legal, lowered SIL type.
   ///
   /// A type is SIL-illegal if it is:

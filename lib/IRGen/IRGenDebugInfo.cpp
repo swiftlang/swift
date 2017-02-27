@@ -1590,7 +1590,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       auto DT = getOrCreateDesugaredType(ObjectTy, DbgTy);
       return createPointerSizedStruct(
           Scope, MangledName, DT, File, 0, Flags,
-          BaseTy->isUnspecializedGeneric() ? StringRef() : MangledName);
+          MangledName);
     } else
       return createOpaqueStruct(Scope, MangledName, File, 0, SizeInBits,
                                 AlignInBits, Flags, MangledName);
