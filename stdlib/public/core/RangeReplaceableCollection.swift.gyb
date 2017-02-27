@@ -1198,7 +1198,7 @@ public func +<
 /// - Complexity: O(*n*), where *n* is the length of the resulting array.
 public func += <
   R : RangeReplaceableCollection, S : Sequence
->(lhs: inout R, rhs: S) 
+>(lhs: inout R, rhs: S)
  where R.Iterator.Element == S.Iterator.Element {
   lhs.append(contentsOf: rhs)
 }

@@ -20,16 +20,16 @@ import SwiftShims
 /// Each `UnicodeDecodingResult` instance can represent a Unicode scalar value,
 /// an indication that no more Unicode scalars are available, or an indication
 /// of a decoding error.
-/// 
+///
 /// - SeeAlso: `UnicodeCodec.decode(next:)`
 @_fixed_layout
 public enum UnicodeDecodingResult : Equatable {
   /// A decoded Unicode scalar value.
   case scalarValue(UnicodeScalar)
-  
+
   /// An indication that no more Unicode scalars are available in the input.
   case emptyInput
-  
+
   /// An indication of a decoding error.
   case error
 

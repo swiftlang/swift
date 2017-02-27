@@ -49,7 +49,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
   /// The spare bits that are set when a native array needs deferred
   /// element type checking.
   internal var deferredTypeCheckMask: Int { return 1 }
-  
+
   /// Returns an `_ArrayBuffer<U>` containing the same elements,
   /// deferring checking each element's `U`-ness until it is accessed.
   ///
@@ -60,7 +60,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
   ) -> _ArrayBuffer<U> {
     _sanityCheck(_isClassOrObjCExistential(Element.self))
     _sanityCheck(_isClassOrObjCExistential(U.self))
-    
+
     // FIXME: can't check that U is derived from Element pending
     // <rdar://problem/20028320> generic metatype casting doesn't work
     // _sanityCheck(U.self is Element.Type)
@@ -74,7 +74,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
     // NSArray's need an element typecheck when the element type isn't AnyObject
     return !_isNativeTypeChecked && !(AnyObject.self is Element.Type)
   }
-  
+
   //===--- private --------------------------------------------------------===//
   internal init(storage: _ArrayBridgeStorage) {
     _storage = storage
@@ -210,10 +210,10 @@ extension _ArrayBuffer {
 
     let buffer = UnsafeMutableRawPointer(target).assumingMemoryBound(
       to: AnyObject.self)
-    
+
     // Copies the references out of the NSArray without retaining them
     nonNative.getObjects(buffer, range: nsSubRange)
-    
+
     // Make another pass to retain the copied objects
     var result = target
     for _ in CountableRange(bounds) {
@@ -298,7 +298,7 @@ extension _ArrayBuffer {
       _native.count = newValue
     }
   }
-  
+
   /// Traps if an inout violation is detected or if the buffer is
   /// native and the subscript is out of range.
   ///
@@ -316,7 +316,7 @@ extension _ArrayBuffer {
   }
 
   // TODO: gyb this
-  
+
   /// Traps if an inout violation is detected or if the buffer is
   /// native and typechecked and the subscript is out of range.
   ///
@@ -361,7 +361,7 @@ extension _ArrayBuffer {
       // checking for the native un-typechecked case.  Therefore we
       // have to do it here.
       _native._checkValidSubscript(i)
-      
+
       element = cast(toBufferOf: AnyObject.self)._native[i]
       _precondition(
         element is Element,
@@ -381,7 +381,7 @@ extension _ArrayBuffer {
     get {
       return getElement(i, wasNativeTypeChecked: _isNativeTypeChecked)
     }
-    
+
     nonmutating set {
       if _fastPath(_isNative) {
         _native[i] = newValue
@@ -409,7 +409,7 @@ extension _ArrayBuffer {
     }
     return try ContiguousArray(self).withUnsafeBufferPointer(body)
   }
-  
+
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
   ///
@@ -425,12 +425,12 @@ extension _ArrayBuffer {
     return try body(UnsafeMutableBufferPointer(
       start: firstElementAddressIfContiguous, count: count))
   }
-  
+
   /// An object that keeps the elements stored in this buffer alive.
   internal var owner: AnyObject {
     return _fastPath(_isNative) ? _native._storage : _nonNative
   }
-  
+
   /// An object that keeps the elements stored in this buffer alive.
   ///
   /// - Precondition: This buffer is backed by a `_ContiguousArrayBuffer`.
@@ -450,7 +450,7 @@ extension _ArrayBuffer {
       return UnsafeRawPointer(Unmanaged.passUnretained(_nonNative).toOpaque())
     }
   }
-  
+
   //===--- Collection conformance -------------------------------------===//
   /// The position of the first element in a non-empty collection.
   ///

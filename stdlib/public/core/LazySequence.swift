@@ -72,7 +72,7 @@
 ///       private var base: Base                  // The underlying iterator.
 ///       private let nextPartialResult: (ResultElement, Base.Element) -> ResultElement
 ///     }
-///     
+///
 ///     struct LazyScanSequence<Base: Sequence, ResultElement>
 ///       : LazySequenceProtocol // Chained operations on self are lazy, too
 ///     {
@@ -87,7 +87,7 @@
 ///     }
 ///
 /// and finally, we can give all lazy sequences a lazy `scan` method:
-///     
+///
 ///     extension LazySequenceProtocol {
 ///       /// Returns a sequence containing the results of
 ///       ///

@@ -228,7 +228,7 @@ func _memmove(
 public struct COpaquePointer {}
 
 extension OpaquePointer {
-  @available(*, unavailable, 
+  @available(*, unavailable,
     message:"use 'Unmanaged.toOpaque()' instead")
   public init<T>(bitPattern bits: Unmanaged<T>) {
     Builtin.unreachable()

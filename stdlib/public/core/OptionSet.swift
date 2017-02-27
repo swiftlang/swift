@@ -88,7 +88,7 @@ public protocol OptionSet : SetAlgebra, RawRepresentable {
   // We can't constrain the associated Element type to be the same as
   // Self, but we can do almost as well with a default and a
   // constrained extension
-  
+
   /// The element type of the option set.
   ///
   /// To inherit all the default implementations from the `OptionSet` protocol,
@@ -102,7 +102,7 @@ public protocol OptionSet : SetAlgebra, RawRepresentable {
   // default (zero-argument) initializer.  Since OptionSet's main
   // purpose is to create convenient conformances to SetAlgebra,
   // we opt for a non-failable initializer.
-  
+
   /// Creates a new option set from the given raw value.
   ///
   /// This initializer always succeeds, even if the value passed as `rawValue`
@@ -148,7 +148,7 @@ extension OptionSet {
     r.formUnion(other)
     return r
   }
-  
+
   /// Returns a new option set with only the elements contained in both this
   /// set and the given set.
   ///
@@ -174,7 +174,7 @@ extension OptionSet {
     r.formIntersection(other)
     return r
   }
-  
+
   /// Returns a new option set with the elements contained in this set or in
   /// the given set, but not in both.
   ///
@@ -213,7 +213,7 @@ extension OptionSet where Element == Self {
   public func contains(_ member: Self) -> Bool {
     return self.isSuperset(of: member)
   }
-  
+
   /// Adds the given element to the option set if it is not already a member.
   ///
   /// In the following example, the `.secondDay` shipping option is added to
@@ -248,7 +248,7 @@ extension OptionSet where Element == Self {
     }
     return result
   }
-  
+
   /// Removes the given element and all elements subsumed by it.
   ///
   /// In the following example, the `.priority` shipping option is removed from
@@ -337,8 +337,8 @@ extension OptionSet where RawValue : BitwiseOperations {
   public mutating func formUnion(_ other: Self) {
     self = Self(rawValue: self.rawValue | other.rawValue)
   }
-  
-  /// Removes all elements of this option set that are not 
+
+  /// Removes all elements of this option set that are not
   /// also present in the given set.
   ///
   /// This method is implemented as a `&` (bitwise AND) operation on the
@@ -348,8 +348,8 @@ extension OptionSet where RawValue : BitwiseOperations {
   public mutating func formIntersection(_ other: Self) {
     self = Self(rawValue: self.rawValue & other.rawValue)
   }
-  
-  /// Replaces this set with a new set containing all elements 
+
+  /// Replaces this set with a new set containing all elements
   /// contained in either this set or the given set, but not in both.
   ///
   /// This method is implemented as a `^` (bitwise XOR) operation on the two

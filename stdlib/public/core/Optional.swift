@@ -184,7 +184,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///     // Prints "Optional(1746)"
   ///
   /// - Parameter transform: A closure that takes the unwrapped value
-  ///   of the instance.  
+  ///   of the instance.
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   public func flatMap<U>(

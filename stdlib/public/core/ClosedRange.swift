@@ -40,7 +40,7 @@ public struct ClosedRangeIndex<Bound>
 
   /// Creates a position `p` for which `r[p] == x`.
   internal init(_ x: Bound) { _value = .inRange(x) }
-  
+
   internal var _value: _ClosedRangeIndexRepresentation<Bound>
   internal var _dereferenced: Bound {
     switch _value {
@@ -207,9 +207,9 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
     switch i._value {
     case .inRange(let x):
       return x == upperBound
-        ? ClosedRangeIndex() 
+        ? ClosedRangeIndex()
         : ClosedRangeIndex(x.advanced(by: 1))
-    case .pastEnd: 
+    case .pastEnd:
       _preconditionFailure("Incrementing past end index")
     }
   }
@@ -219,7 +219,7 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
     case .inRange(let x):
       _precondition(x > lowerBound, "Incrementing past start index")
       return ClosedRangeIndex(x.advanced(by: -1))
-    case .pastEnd: 
+    case .pastEnd:
       _precondition(upperBound >= lowerBound, "Incrementing past start index")
       return ClosedRangeIndex(upperBound)
     }
@@ -240,7 +240,7 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
     case .pastEnd:
       if n == 0 {
         return i
-      } 
+      }
       if n < 0 {
         return index(ClosedRangeIndex(upperBound), offsetBy: (n + 1))
       }

@@ -308,7 +308,7 @@ func swift_class_getInstanceExtents(_ theClass: AnyClass)
 func swift_objc_class_unknownGetInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
-/// - Returns: 
+/// - Returns:
 @inline(__always)
 internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int {
 #if _runtime(_ObjC)

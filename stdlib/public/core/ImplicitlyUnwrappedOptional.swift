@@ -18,7 +18,7 @@ public enum ImplicitlyUnwrappedOptional<Wrapped> : ExpressibleByNilLiteral {
   // The compiler has special knowledge of the existence of
   // `ImplicitlyUnwrappedOptional<Wrapped>`, but always interacts with it using
   // the library intrinsics below.
-  
+
   /// The absence of a value. Typically written using the nil literal, `nil`.
   case none
 

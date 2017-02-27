@@ -26,7 +26,7 @@ extension LazySequenceProtocol {
     FlattenSequence<LazyMapSequence<Elements, SegmentOfResult>>> {
     return self.map(transform).joined()
   }
-  
+
   /// Returns the non-`nil` results of mapping the given transformation over
   /// this sequence.
   ///
@@ -66,7 +66,7 @@ extension LazyCollectionProtocol {
   > {
     return self.map(transform).joined()
   }
-  
+
   /// Returns the non-`nil` results of mapping the given transformation over
   /// this collection.
   ///
@@ -110,7 +110,7 @@ extension LazyCollectionProtocol
     where SegmentOfResult : BidirectionalCollection {
     return self.map(transform).joined()
   }
-  
+
   /// Returns the non-`nil` results of mapping the given transformation over
   /// this collection.
   ///

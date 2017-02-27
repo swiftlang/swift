@@ -42,7 +42,7 @@ public struct Repeated<Element> : RandomAccessCollection {
     self.count = count
     self.repeatedValue = repeatedValue
   }
-  
+
   /// The position of the first element in a nonempty collection.
   ///
   /// In a `Repeated` collection, `startIndex` is always equal to zero. If the

@@ -115,13 +115,13 @@ extension String {
     internal func _fromCoreIndex(_ i: Int) -> Index {
       return Index(_position: i + _coreOffset)
     }
-    
+
     /// Translates a `UnicodeScalarIndex` into a `_core` index using this view's
     /// `_coreOffset`.
     internal func _toCoreIndex(_ i: Index) -> Int {
       return i._position - _coreOffset
     }
-    
+
     /// The position of the first Unicode scalar value if the string is
     /// nonempty.
     ///
@@ -293,7 +293,7 @@ extension String {
     }
 
     internal var _core: _StringCore
-    
+
     /// The offset of this view's `_core` from an original core. This works
     /// around the fact that `_StringCore` is always zero-indexed.
     /// `_coreOffset` should be subtracted from `UnicodeScalarIndex._position`
@@ -359,7 +359,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   public init() {
     self = String.UnicodeScalarView(_StringCore())
   }
-  
+
   /// Reserves enough space in the view's underlying storage to store the
   /// specified number of ASCII characters.
   ///
@@ -375,7 +375,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   public mutating func reserveCapacity(_ n: Int) {
     _core.reserveCapacity(n)
   }
-  
+
   /// Appends the given Unicode scalar to the view.
   ///
   /// - Parameter c: The character to append to the string.
@@ -392,7 +392,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
     where S.Iterator.Element == UnicodeScalar {
     _core.append(contentsOf: newElements.lazy.flatMap { $0.utf16 })
   }
-  
+
   /// Replaces the elements within the specified bounds with the given Unicode
   /// scalar values.
   ///

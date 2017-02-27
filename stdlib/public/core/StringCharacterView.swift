@@ -65,7 +65,7 @@ extension String {
       self._core = text._core
       self._coreOffset = 0
     }
-    
+
     public // @testable
     init(_ _core: _StringCore, coreOffset: Int = 0) {
       self._core = _core
@@ -151,7 +151,7 @@ extension String.CharacterView : BidirectionalCollection {
   internal var unicodeScalars: UnicodeScalarView {
     return UnicodeScalarView(_core, coreOffset: _coreOffset)
   }
-  
+
   /// A position in a string's `CharacterView` instance.
   ///
   /// You can convert between indices of the different string views by using
@@ -167,7 +167,7 @@ extension String.CharacterView : BidirectionalCollection {
   ///     }
   ///     // Prints "[72, 101, 97, 114, 116, 115]"
   public struct Index : Comparable, CustomPlaygroundQuickLookable {
-    public // SPI(Foundation)    
+    public // SPI(Foundation)
     init(_base: String.UnicodeScalarView.Index, in c: String.CharacterView) {
       self._base = _base
       self._countUTF16 = c._measureExtendedGraphemeClusterForward(from: _base)
@@ -203,7 +203,7 @@ extension String.CharacterView : BidirectionalCollection {
   public typealias IndexDistance = Int
 
   /// The position of the first character in a nonempty character view.
-  /// 
+  ///
   /// In an empty character view, `startIndex` is equal to `endIndex`.
   public var startIndex: Index {
     return Index(_base: unicodeScalars.startIndex, in: self)
@@ -260,16 +260,16 @@ extension String.CharacterView : BidirectionalCollection {
     if start == end {
       return 0
     }
-    
+
     let startIndexUTF16 = start._position
     let graphemeClusterBreakProperty =
       _UnicodeGraphemeClusterBreakPropertyTrie()
     let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
-    
+
     var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
       unicodeScalars[start].value)
     unicodeScalars.formIndex(after: &start)
-    
+
     while start != end {
       // FIXME(performance): consider removing this "fast path".  A branch
       // that is hard to predict could be worse for performance than a few
@@ -285,7 +285,7 @@ extension String.CharacterView : BidirectionalCollection {
       gcb0 = gcb1
       unicodeScalars.formIndex(after: &start)
     }
-    
+
     return start._position - startIndexUTF16
   }
 
@@ -302,20 +302,20 @@ extension String.CharacterView : BidirectionalCollection {
     if start == end {
       return 0
     }
-    
+
     let endIndexUTF16 = end._position
     let graphemeClusterBreakProperty =
       _UnicodeGraphemeClusterBreakPropertyTrie()
     let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
-    
+
     var graphemeClusterStart = end
-    
+
     unicodeScalars.formIndex(before: &graphemeClusterStart)
     var gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
       unicodeScalars[graphemeClusterStart].value)
-    
+
     var graphemeClusterStartUTF16 = graphemeClusterStart._position
-    
+
     while graphemeClusterStart != start {
       unicodeScalars.formIndex(before: &graphemeClusterStart)
       let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(
@@ -326,10 +326,10 @@ extension String.CharacterView : BidirectionalCollection {
       gcb0 = gcb1
       graphemeClusterStartUTF16 = graphemeClusterStart._position
     }
-    
+
     return endIndexUTF16 - graphemeClusterStartUTF16
   }
-  
+
   /// Accesses the character at the given position.
   ///
   /// The following example searches a string's character view for a capital
@@ -409,7 +409,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   }
 
   /// Appends the characters in the given sequence to the character view.
-  /// 
+  ///
   /// - Parameter newElements: A sequence of characters.
   public mutating func append<S : Sequence>(contentsOf newElements: S)
     where S.Iterator.Element == Character {
@@ -460,7 +460,7 @@ extension String.CharacterView {
   ) where C : Collection, C.Iterator.Element == Character {
     Builtin.unreachable()
   }
-    
+
   @available(*, unavailable, renamed: "append(contentsOf:)")
   public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
     where S.Iterator.Element == Character {

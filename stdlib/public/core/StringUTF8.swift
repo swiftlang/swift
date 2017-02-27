@@ -166,8 +166,8 @@ extension String {
   ///     print(String(s1.utf8.prefix(15)))
   ///     // Prints "They call me 'B"
   public struct UTF8View
-    : Collection, 
-      CustomStringConvertible, 
+    : Collection,
+      CustomStringConvertible,
       CustomDebugStringConvertible {
     internal let _core: _StringCore
     internal let _startIndex: Index
@@ -235,7 +235,7 @@ extension String {
       internal var _utf8ContinuationBytesUntilNextUnicodeScalar: Int {
         var buffer = _buffer
         var count = 0
-        
+
         while true {
           let currentUnit = UTF8.CodeUnit(truncatingBitPattern: buffer)
           if currentUnit & 0b1100_0000 != 0b1000_0000 {
@@ -256,7 +256,7 @@ extension String {
       internal static var _bufferHiByte: Buffer {
         return 0xFF << numericCast((MemoryLayout<Buffer>.size &- 1) &* 8)
       }
-      
+
       /// Consume a byte of the given buffer: shift out the low byte
       /// and put FF in the high byte
       internal static func _nextBuffer(after thisBuffer: Buffer) -> Buffer {
@@ -302,14 +302,14 @@ extension String {
       // UTF-8 code unit. If the high nibble is:
       //
       // - 0b0000-0b0111: U+0000...U+007F: increment the UTF-16 pointer by 1
-      // - 0b1000-0b1011: UTF-8 continuation byte, do not increment 
+      // - 0b1000-0b1011: UTF-8 continuation byte, do not increment
       //                  the UTF-16 pointer
       // - 0b1100-0b1110: U+0080...U+FFFF: increment the UTF-16 pointer by 1
       // - 0b1111:        U+10000...U+1FFFFF: increment the UTF-16 pointer by 2
       let u16Increments = Int(bitPattern:
       // 1111 1110 1101 1100 1011 1010 1001 1000 0111 0110 0101 0100 0011 0010 0001 0000
          0b10___01___01___01___00___00___00___00___01___01___01___01___01___01___01___01)
-      
+
       // Map the high nibble of the current code unit into the
       // amount by which to increment the UTF-16 index.
       let increment = (u16Increments >> numericCast(hiNibble << 1)) & 0x3
@@ -453,7 +453,7 @@ extension String {
 }
 
 extension String.UTF8View.Index : Comparable {
-  // FIXME: swift-3-indexing-model: add complete set of forwards for Comparable 
+  // FIXME: swift-3-indexing-model: add complete set of forwards for Comparable
   //        assuming String.UTF8View.Index continues to exist
   public static func == (
     lhs: String.UTF8View.Index,

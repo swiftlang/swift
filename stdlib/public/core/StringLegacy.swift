@@ -74,7 +74,7 @@ extension String {
   public var _lines : [String] {
     return _split(separator: "\n")
   }
-  
+
   public func _split(separator: UnicodeScalar) -> [String] {
     let scalarSlices = unicodeScalars.split { $0 == separator }
     return scalarSlices.map { String($0) }
@@ -247,7 +247,7 @@ extension String {
   ///
   /// Numerals greater than 9 are represented as Roman letters. These letters
   /// start with `"A"` if `uppercase` is `true`; otherwise, with `"a"`.
-  /// 
+  ///
   ///     let v = 999_999
   ///     print(String(v, radix: 2))
   ///     // Prints "11110100001000111111"
@@ -271,7 +271,7 @@ extension String {
     self = _int64ToString(
       value.toIntMax(), radix: Int64(radix), uppercase: uppercase)
   }
-  
+
   /// Creates a string representing the given value in base 10, or some other
   /// specified base.
   ///
@@ -320,7 +320,7 @@ extension String {
     let rng = unicodeScalars
     for i in rng.indices {
       if rng[i] == delim {
-        return (String(rng[rng.startIndex..<i]), 
+        return (String(rng[rng.startIndex..<i]),
                 String(rng[rng.index(after: i)..<rng.endIndex]),
                 true)
       }
@@ -329,7 +329,7 @@ extension String {
   }
 
   /// Split the given string at the first character for which the given
-  /// predicate returns true. Returns the string before that character, the 
+  /// predicate returns true. Returns the string before that character, the
   /// character that matches, the string after that character,
   /// and a boolean value indicating whether any character was found.
   public func _splitFirstIf(_ predicate: (UnicodeScalar) -> Bool)
@@ -339,7 +339,7 @@ extension String {
     for i in rng.indices {
       if predicate(rng[i]) {
         return (String(rng[rng.startIndex..<i]),
-                rng[i], 
+                rng[i],
                 String(rng[rng.index(after: i)..<rng.endIndex]),
                 true)
       }

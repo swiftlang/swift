@@ -353,7 +353,7 @@ extension String {
 }
 
 extension String.UTF16View.Index : Comparable {
-  // FIXME: swift-3-indexing-model: add complete set of forwards for Comparable 
+  // FIXME: swift-3-indexing-model: add complete set of forwards for Comparable
   //        assuming String.UTF8View.Index continues to exist
   public static func == (
     lhs: String.UTF16View.Index,

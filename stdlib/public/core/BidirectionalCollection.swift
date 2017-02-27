@@ -88,7 +88,7 @@ public protocol BidirectionalCollection
     = BidirectionalSlice<Self>
   // FIXME(ABI)#93 (Recursive Protocol Constraints):
   // FIXME(ABI)#94 (Associated Types with where clauses):
-  // This is dependent on both recursive protocol constraints AND associated 
+  // This is dependent on both recursive protocol constraints AND associated
   // types with where clauses.
   // associatedtype SubSequence : BidirectionalCollection
 
@@ -98,7 +98,7 @@ public protocol BidirectionalCollection
     = DefaultBidirectionalIndices<Self>
   // FIXME(ABI)#95 (Recursive Protocol Constraints):
   // FIXME(ABI)#96 (Associated Types with where clauses):
-  // This is dependent on both recursive protocol constraints AND associated 
+  // This is dependent on both recursive protocol constraints AND associated
   // types with where clauses.
   // associatedtype Indices : BidirectionalCollection
 
@@ -120,7 +120,7 @@ public protocol BidirectionalCollection
   ///     }
   ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
   var indices: Indices { get }
-  
+
   // TODO: swift-3-indexing-model: tests.
   /// The last element of the collection.
   ///
@@ -131,7 +131,7 @@ public protocol BidirectionalCollection
   ///         print(lastNumber)
   ///     }
   ///     // Prints "50"
-  ///     
+  ///
   /// - Complexity: O(1)
   var last: Iterator.Element? { get }
 

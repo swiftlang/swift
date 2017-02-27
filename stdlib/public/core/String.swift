@@ -561,7 +561,7 @@ extension String {
     start: UnsafeMutablePointer<UTF8.CodeUnit>,
     utf8CodeUnitCount: Int
   ) {
-    resultStorage.initialize(to: 
+    resultStorage.initialize(to:
       String._fromWellFormedCodeUnitSequence(
         UTF8.self,
         input: UnsafeBufferPointer(start: start, count: utf8CodeUnitCount)))
@@ -802,7 +802,7 @@ extension String {
     return _nativeUnicodeUppercaseString(self)
 #endif
   }
-  
+
   /// Creates an instance from the description of a given
   /// `LosslessStringConvertible` instance.
   public init<T : LosslessStringConvertible>(_ value: T) {
@@ -847,14 +847,14 @@ extension String {
   ) where C.Iterator.Element == Character {
     Builtin.unreachable()
   }
-    
+
   @available(*, unavailable, renamed: "replaceSubrange")
   public mutating func replaceRange(
     _ subRange: Range<Index>, with newElements: String
   ) {
     Builtin.unreachable()
   }
-  
+
   @available(*, unavailable, renamed: "remove(at:)")
   public mutating func removeAtIndex(_ i: Index) -> Character {
     Builtin.unreachable()

@@ -293,9 +293,9 @@ extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {
 
 extension UnsafeMutableBufferPointer {
   /// Initializes memory in the buffer with the elements of `source`.
-  /// Returns an iterator to any elements of `source` that didn't fit in the 
+  /// Returns an iterator to any elements of `source` that didn't fit in the
   /// buffer, and an index to the point in the buffer one past the last element
-  /// written (so `startIndex` if no elements written, `endIndex` if the buffer 
+  /// written (so `startIndex` if no elements written, `endIndex` if the buffer
   /// was completely filled).
   ///
   /// - Precondition: The memory in `self` is uninitialized. The buffer must

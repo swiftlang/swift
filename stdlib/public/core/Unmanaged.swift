@@ -232,13 +232,13 @@ public struct Unmanaged<Instance : AnyObject> {
 }
 
 extension Unmanaged {
-  @available(*, unavailable, 
+  @available(*, unavailable,
     message:"use 'fromOpaque(_: UnsafeRawPointer)' instead")
   public static func fromOpaque(_ value: OpaquePointer) -> Unmanaged {
     Builtin.unreachable()
   }
-  
-  @available(*, unavailable, 
+
+  @available(*, unavailable,
     message:"use 'toOpaque() -> UnsafeRawPointer' instead")
   public func toOpaque() -> OpaquePointer {
     Builtin.unreachable()

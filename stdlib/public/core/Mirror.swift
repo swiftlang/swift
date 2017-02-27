@@ -145,7 +145,7 @@ public struct Mirror {
   /// corresponding to the superclass of `staticSubclass`.
   internal static func _legacyMirror(
     _ subject: AnyObject, asClass targetSuperclass: AnyClass) -> _Mirror? {
-    
+
     // get a legacy mirror and the most-derived type
     var cls: AnyClass = type(of: subject)
     var clsMirror = _reflect(subject)
@@ -153,15 +153,15 @@ public struct Mirror {
     // Walk up the chain of mirrors/classes until we find staticSubclass
     while let superclass: AnyClass = _getSuperclass(cls) {
       guard let superclassMirror = clsMirror._superMirror() else { break }
-      
+
       if superclass == targetSuperclass { return superclassMirror }
-      
+
       clsMirror = superclassMirror
       cls = superclass
     }
     return nil
   }
-  
+
   internal static func _superclassIterator<Subject>(
     _ subject: Subject, _ ancestorRepresentation: AncestorRepresentation
   ) -> () -> Mirror? {
@@ -187,7 +187,7 @@ public struct Mirror {
     }
     return Mirror._noSuperclassMirror
   }
-  
+
   /// Represent `subject` with structure described by `children`,
   /// using an optional `displayStyle`.
   ///
@@ -233,7 +233,7 @@ public struct Mirror {
     self.subjectType = Subject.self
     self._makeSuperclassMirror = Mirror._superclassIterator(
       subject, ancestorRepresentation)
-      
+
     self.children = Children(children)
     self.displayStyle = displayStyle
     self._defaultDescendantRepresentation
@@ -288,7 +288,7 @@ public struct Mirror {
     self.subjectType = Subject.self
     self._makeSuperclassMirror = Mirror._superclassIterator(
       subject, ancestorRepresentation)
-      
+
     let lazyChildren =
       unlabeledChildren.lazy.map { Child(label: nil, value: $0) }
     self.children = Children(lazyChildren)
@@ -330,7 +330,7 @@ public struct Mirror {
     self.subjectType = Subject.self
     self._makeSuperclassMirror = Mirror._superclassIterator(
       subject, ancestorRepresentation)
-      
+
     let lazyChildren = children.lazy.map { Child(label: $0.0, value: $0.1) }
     self.children = Children(lazyChildren)
 
@@ -516,7 +516,7 @@ internal extension Mirror {
   /// traversal in general.
   internal struct LegacyChildren : RandomAccessCollection {
     typealias Indices = CountableRange<Int>
-    
+
     init(_ oldMirror: _Mirror) {
       self._oldMirror = oldMirror
     }
@@ -555,7 +555,7 @@ internal extension Mirror {
     else {
       let legacyMirror = legacyMirror ?? Mirror._legacyMirror(
         subject, asClass: subjectClass)!
-      
+
       self = Mirror(
         legacy: legacyMirror,
         subjectType: subjectClass,
@@ -803,7 +803,7 @@ public struct DictionaryLiteral<Key, Value> : ExpressibleByDictionaryLiteral {
 /// interoperate with the rest of the standard library.
 extension DictionaryLiteral : RandomAccessCollection {
   public typealias Indices = CountableRange<Int>
-  
+
   /// The position of the first element in a nonempty collection.
   ///
   /// If the `DictionaryLiteral` instance is empty, `startIndex` is equal to
