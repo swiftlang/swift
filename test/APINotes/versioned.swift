@@ -15,22 +15,50 @@
 
 import APINotesFrameworkTest
 
+// CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE-1]]:
+class ProtoWithVersionedUnavailableMemberImpl: ProtoWithVersionedUnavailableMember {
+  // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:7: error: type 'ProtoWithVersionedUnavailableMemberImpl' cannot conform to protocol 'ProtoWithVersionedUnavailableMember' because it has requirements that cannot be satisfied
+  func requirement() -> Any? { return nil }
+}
+
 func testRenamedTopLevel() {
   var value = 0.0
 
-  // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]
+  // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]:
   accept(&value)
   // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:3: error: 'accept' has been renamed to 'acceptPointer(_:)'
   // CHECK-DIAGS-3: note: 'accept' was introduced in Swift 4
 
-  // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]
+  // CHECK-DIAGS-3-NOT: versioned.swift:[[@LINE+1]]:
   acceptPointer(&value)
   // CHECK-DIAGS-4: versioned.swift:[[@LINE-1]]:3: error: 'acceptPointer' has been renamed to 'accept(_:)'
   // CHECK-DIAGS-4: note: 'acceptPointer' was obsoleted in Swift 4
 
   acceptDoublePointer(&value)
   // CHECK-DIAGS: versioned.swift:[[@LINE-1]]:3: error: 'acceptDoublePointer' has been renamed to
-  // CHECK-DIAGS-4: 'accept(_:)'
-  // CHECK-DIAGS-3: 'acceptPointer(_:)'
+  // CHECK-DIAGS-4-SAME: 'accept(_:)'
+  // CHECK-DIAGS-3-SAME: 'acceptPointer(_:)'
   // CHECK-DIAGS: note: 'acceptDoublePointer' was obsoleted in Swift 3
+
+  oldAcceptDoublePointer(&value)
+  // CHECK-DIAGS: versioned.swift:[[@LINE-1]]:3: error: 'oldAcceptDoublePointer' has been renamed to
+  // CHECK-DIAGS-4-SAME: 'accept(_:)'
+  // CHECK-DIAGS-3-SAME: 'acceptPointer(_:)'
+  // CHECK-DIAGS: note: 'oldAcceptDoublePointer' has been explicitly marked unavailable here
+
+  _ = SomeCStruct()
+  // CHECK-DIAGS: versioned.swift:[[@LINE-1]]:7: error: 'SomeCStruct' has been renamed to
+  // CHECK-DIAGS-4-SAME: 'VeryImportantCStruct'
+  // CHECK-DIAGS-3-SAME: 'ImportantCStruct'
+  // CHECK-DIAGS: note: 'SomeCStruct' was obsoleted in Swift 3
+
+  // CHECK-DIAGS-3-NOT: versioned.swift:[[@LINE+1]]:
+  _ = ImportantCStruct()
+  // CHECK-DIAGS-4: versioned.swift:[[@LINE-1]]:7: error: 'ImportantCStruct' has been renamed to 'VeryImportantCStruct'
+  // CHECK-DIAGS-4: note: 'ImportantCStruct' was obsoleted in Swift 4
+
+  // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]:
+  _ = VeryImportantCStruct()
+  // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:7: error: 'VeryImportantCStruct' has been renamed to 'ImportantCStruct'
+  // CHECK-DIAGS-3: note: 'VeryImportantCStruct' was introduced in Swift 4
 }
