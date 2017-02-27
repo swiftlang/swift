@@ -132,6 +132,7 @@ private:
     RequirementRepr,
     ProtocolDecl,
     ProtocolConformance,
+    AssociatedTypeDecl,
   };
 
   /// The kind of storage we have.
@@ -150,6 +151,9 @@ private:
 
     /// A protocol conformance used to satisfy the requirement.
     ProtocolConformance *conformance;
+
+    /// An associated type to which a requirement is being applied.
+    AssociatedTypeDecl *assocType;
   } storage;
 
   /// Determines whether we have been provided with an acceptable storage kind
@@ -217,7 +221,7 @@ public:
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
-                   ProtocolDecl *protocol)
+                    ProtocolDecl *protocol)
     : kind(kind), storageKind(StorageKind::ProtocolDecl), parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
@@ -228,7 +232,7 @@ public:
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
-                   ProtocolConformance *conformance)
+                    ProtocolConformance *conformance)
     : kind(kind), storageKind(StorageKind::ProtocolConformance),
       parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
@@ -237,6 +241,18 @@ public:
            "RequirementSource kind/storageKind mismatch");
 
     storage.conformance = conformance;
+  }
+
+  RequirementSource(Kind kind, const RequirementSource *parent,
+                    AssociatedTypeDecl *assocType)
+    : kind(kind), storageKind(StorageKind::AssociatedTypeDecl),
+      parent(parent) {
+    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
+           "Root RequirementSource should not have parent (or vice versa)");
+    assert(isAcceptableStorageKind(kind, storageKind) &&
+           "RequirementSource kind/storageKind mismatch");
+
+    storage.assocType = assocType;
   }
 
 public:
@@ -288,7 +304,10 @@ public:
 
   /// A constraint source that describes that a constraint that is resolved
   /// for a nested type via a constraint on its parent.
-  const RequirementSource *viaParent(GenericSignatureBuilder &builder) const;
+  ///
+  /// \param assocType the associated type that
+  const RequirementSource *viaParent(GenericSignatureBuilder &builder,
+                                     AssociatedTypeDecl *assocType) const;
 
   /// Whether the requirement can be derived from something in its path.
   ///
@@ -332,6 +351,13 @@ public:
   ProtocolConformance *getProtocolConformance() const {
     if (storageKind != StorageKind::ProtocolConformance) return nullptr;
     return storage.conformance;
+  }
+
+  /// Retrieve the associated type declaration for this requirement, if there
+  /// is one.
+  AssociatedTypeDecl *getAssociatedType() const {
+    if (storageKind != StorageKind::AssociatedTypeDecl) return nullptr;
+    return storage.assocType;
   }
 
   /// Profiling support for \c FoldingSet.

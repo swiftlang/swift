@@ -86,6 +86,7 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
 
     case StorageKind::ProtocolDecl:
     case StorageKind::ProtocolConformance:
+    case StorageKind::AssociatedTypeDecl:
       return false;
     }
 
@@ -98,15 +99,29 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
     case StorageKind::ProtocolDecl:
     case StorageKind::ProtocolConformance:
     case StorageKind::RequirementRepr:
+    case StorageKind::AssociatedTypeDecl:
       return false;
     }
 
   case NestedTypeNameMatch:
-  case Parent:
     switch (storageKind) {
     case StorageKind::None:
         return true;
 
+    case StorageKind::TypeRepr:
+    case StorageKind::ProtocolDecl:
+    case StorageKind::ProtocolConformance:
+    case StorageKind::RequirementRepr:
+    case StorageKind::AssociatedTypeDecl:
+      return false;
+    }
+
+  case Parent:
+    switch (storageKind) {
+    case StorageKind::AssociatedTypeDecl:
+        return true;
+
+    case StorageKind::None:
     case StorageKind::TypeRepr:
     case StorageKind::ProtocolDecl:
     case StorageKind::ProtocolConformance:
@@ -124,6 +139,7 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
     case StorageKind::TypeRepr:
     case StorageKind::ProtocolConformance:
     case StorageKind::RequirementRepr:
+    case StorageKind::AssociatedTypeDecl:
       return false;
     }
 
@@ -137,6 +153,7 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
     case StorageKind::ProtocolDecl:
     case StorageKind::TypeRepr:
     case StorageKind::RequirementRepr:
+    case StorageKind::AssociatedTypeDecl:
       return false;
     }
   }
@@ -159,6 +176,9 @@ const void *RequirementSource::getOpaqueStorage() const {
 
   case StorageKind::ProtocolDecl:
     return storage.protocol;
+
+  case StorageKind::AssociatedTypeDecl:
+    return storage.assocType;
   }
 }
 
@@ -286,8 +306,9 @@ const RequirementSource *RequirementSource::viaConcrete(
 }
 
 const RequirementSource *RequirementSource::viaParent(
-                                      GenericSignatureBuilder &builder) const {
-  REQUIREMENT_SOURCE_FACTORY_BODY_NOSTORAGE(Parent, this);
+                                      GenericSignatureBuilder &builder,
+                                      AssociatedTypeDecl *assocType) const {
+  REQUIREMENT_SOURCE_FACTORY_BODY(Parent, this, assocType);
 }
 
 #undef REQUIREMENT_SOURCE_FACTORY_BODY_NOSTORAGE
@@ -308,6 +329,9 @@ ProtocolDecl *RequirementSource::getProtocolDecl() const {
       return storage.conformance->getProtocol();
 
     return nullptr;
+
+  case StorageKind::AssociatedTypeDecl:
+    return storage.assocType->getProtocol();
   }
 }
 
@@ -432,6 +456,11 @@ void RequirementSource::print(llvm::raw_ostream &out,
       out << " (" << storage.conformance->getType()->getString() << ": "
           << storage.conformance->getProtocol()->getName() << ")";
     }
+    break;
+
+  case StorageKind::AssociatedTypeDecl:
+    out << " (" << storage.assocType->getProtocol()->getName()
+        << "::" << storage.assocType->getName() << ")";
     break;
   }
 }
@@ -620,7 +649,7 @@ static void maybeAddSameTypeRequirementForNestedType(
   if (!concreteType) return;
 
   // Add the same-type constraint.
-  auto nestedSource = superSource->viaParent(builder);
+  auto nestedSource = superSource->viaParent(builder, assocType);
   concreteType = superConformance->getDeclContext()
       ->mapTypeOutOfContext(concreteType);
 
@@ -906,10 +935,11 @@ static void concretizeNestedTypeFromConcreteParent(
 
   // These requirements are all implied based on the parent's concrete
   // conformance.
-  auto source = parentConcreteSource->viaConcrete(builder, /*FIXME: */nullptr)
-    ->viaParent(builder);
   auto assocType = nestedPA->getResolvedAssociatedType();
   if (!assocType) return;
+
+  auto source = parentConcreteSource->viaConcrete(builder, /*FIXME: */nullptr)
+    ->viaParent(builder, assocType);
 
   // FIXME: Get the conformance from the parent.
   auto conformance = lookupConformance(assocType->getProtocol());
