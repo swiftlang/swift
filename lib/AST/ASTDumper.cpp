@@ -365,11 +365,11 @@ static StringRef getAssociativityString(Associativity value) {
 //===----------------------------------------------------------------------===//
 
 // Print a name.
-static void printName(raw_ostream &os, Identifier name) {
-  if (name.empty())
+static void printName(raw_ostream &os, DeclName name) {
+  if (!name)
     os << "<anonymous>";
   else
-    os << name.str();
+    os << name;
 }
 
 namespace {
@@ -1148,7 +1148,7 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
         break;
       }
     }
-    os << "extension";
+    os << " extension";
     break;
 
   case DeclContextKind::Initializer:
@@ -1166,18 +1166,12 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     os << "top-level code";
     break;
 
-  case DeclContextKind::AbstractFunctionDecl: {
-    auto *AFD = cast<AbstractFunctionDecl>(dc);
-    if (isa<FuncDecl>(AFD))
-      os << "func decl";
-    if (isa<ConstructorDecl>(AFD))
-      os << "init";
-    if (isa<DestructorDecl>(AFD))
-      os << "deinit";
+  case DeclContextKind::AbstractFunctionDecl:
+    printName(os, cast<AbstractFunctionDecl>(dc)->getFullName());
     break;
-  }
+
   case DeclContextKind::SubscriptDecl:
-    os << "subscript decl";
+    printName(os, cast<SubscriptDecl>(dc)->getFullName());
     break;
   }
 }
