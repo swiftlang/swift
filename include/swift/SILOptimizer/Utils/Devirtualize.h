@@ -54,9 +54,7 @@ DevirtualizationResult devirtualizeClassMethod(FullApplySite AI,
                                                SILValue ClassInstance);
 DevirtualizationResult tryDevirtualizeClassMethod(FullApplySite AI,
                                                   SILValue ClassInstance);
-DevirtualizationResult tryDevirtualizeWitnessMethod(ApplySite AI); 
-/// Check if an upcast is legal.
-bool isLegalUpcast(SILType FromTy, SILType ToTy);
+DevirtualizationResult tryDevirtualizeWitnessMethod(ApplySite AI);
 }
 
 #endif

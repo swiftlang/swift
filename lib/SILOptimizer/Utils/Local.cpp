@@ -475,10 +475,9 @@ void swift::removeDeadBlock(SILBasicBlock *BB) {
 ///
 /// NOTE: The implementation of this function is very closely related to the
 /// rules checked by SILVerifier::requireABICompatibleFunctionTypes.
-Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
+SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
                                              SILValue Value,
-                                             SILType SrcTy, SILType DestTy,
-                                             bool CheckOnly) {
+                                             SILType SrcTy, SILType DestTy) {
 
   // No cast is required if types are the same.
   if (SrcTy == DestTy)
@@ -488,18 +487,13 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
 
   if (SrcTy.isAddress() && DestTy.isAddress()) {
     // Cast between two addresses and that's it.
-    if (CheckOnly)
-      return Value;
     CastedValue = B->createUncheckedAddrCast(Loc, Value, DestTy);
     return CastedValue;
   }
 
   if (SrcTy.isAddress() != DestTy.isAddress()) {
     // Addresses aren't compatible with values.
-    if (CheckOnly)
-      return None;
     llvm_unreachable("Addresses aren't compatible with values");
-    return SILValue();
   }
 
   auto &M = B->getModule();
@@ -515,8 +509,6 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
   if (SrcTy.getSwiftRValueType()->mayHaveSuperclass() &&
       DestTy.getSwiftRValueType()->mayHaveSuperclass() &&
       DestTy.isExactSuperclassOf(SrcTy)) {
-    if (CheckOnly)
-      return Value;
     CastedValue = B->createUpcast(Loc, Value, DestTy);
     return CastedValue;
   }
@@ -538,16 +530,9 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
         OptionalSrcTy->mayHaveSuperclass() &&
         OptionalDestLoweredTy.isExactSuperclassOf(OptionalSrcLoweredTy)) {
       // Insert upcast.
-      if (CheckOnly)
-        return Value;
       CastedValue = B->createUpcast(Loc, Value, DestTy);
       return CastedValue;
     }
-
-    if (CheckOnly)
-      return castValueToABICompatibleType(B, Loc, Value,
-          OptionalSrcLoweredTy,
-          OptionalDestLoweredTy, CheckOnly);
 
     // Unwrap the original optional value.
     auto *SomeDecl = B->getASTContext().getOptionalSomeDecl();
@@ -571,7 +556,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     auto CastedUnwrappedValue =
         castValueToABICompatibleType(B, Loc, UnwrappedValue,
                                      OptionalSrcLoweredTy,
-                                     OptionalDestLoweredTy).getValue();
+                                     OptionalDestLoweredTy);
     // Wrap into optional.
     CastedValue =  B->createOptionalSome(Loc, CastedUnwrappedValue, DestTy);
     B->createBranch(Loc, ContBB, {CastedValue});
@@ -591,10 +576,6 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     auto OptionalSrcCanTy =
       OptionalType::get(SrcTy.getSwiftRValueType())->getCanonicalType();
     auto LoweredOptionalSrcType = M.Types.getLoweredType(OptionalSrcCanTy);
-    if (CheckOnly)
-      return castValueToABICompatibleType(B, Loc, Value,
-                                          LoweredOptionalSrcType, DestTy,
-                                          CheckOnly);
 
     // Wrap the source value into an optional first.
     SILValue WrappedValue = B->createOptionalSome(Loc, Value,
@@ -608,9 +589,6 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
   // Both types are not optional.
   if (SrcTy.getSwiftRValueType()->mayHaveSuperclass() &&
       DestTy.getSwiftRValueType()->mayHaveSuperclass()) {
-    if (CheckOnly)
-      return Value;
-
     if (DestTy.isExactSuperclassOf(SrcTy)) {
       // Insert upcast.
       CastedValue = B->createUpcast(Loc, Value, DestTy);
@@ -630,8 +608,6 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
       SrcTy.isClassOrClassMetatype() &&
       DestTy.getMetatypeInstanceType(M).isExactSuperclassOf(
           SrcTy.getMetatypeInstanceType(M))) {
-    if (CheckOnly)
-      return Value;
     CastedValue = B->createUpcast(Loc, Value, DestTy);
     return CastedValue;
   }
@@ -640,8 +616,6 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     if (auto mt2 = dyn_cast<AnyMetatypeType>(DestTy.getSwiftRValueType())) {
       if (mt1->getRepresentation() == mt2->getRepresentation()) {
         // Cast between two metatypes and that's it.
-        if (CheckOnly)
-          return Value;
         CastedValue = B->createUncheckedBitCast(Loc, Value, DestTy);
         return CastedValue;
       }
@@ -649,15 +623,11 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
   }
 
   if (SrcTy.isAddress() && DestTy.isAddress()) {
-    if (CheckOnly)
-      return Value;
     CastedValue = B->createUncheckedAddrCast(Loc, Value, DestTy);
     return CastedValue;
   }
 
   if (SrcTy.isHeapObjectReferenceType() && DestTy.isHeapObjectReferenceType()) {
-    if (CheckOnly)
-      return Value;
     CastedValue = B->createUncheckedRefCast(Loc, Value, DestTy);
     return CastedValue;
   }
@@ -671,9 +641,6 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     auto btypes = DestTy.getAs<TupleType>().getElementTypes();
     bElements.append(btypes.begin(), btypes.end());
 
-    if (CheckOnly && aElements.size() != bElements.size())
-      return None;
-
     assert (aElements.size() == bElements.size() &&
           "Tuple types should have the same number of elements");
 
@@ -682,20 +649,11 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
       auto aa = M.Types.getLoweredType(aElements[i]),
            bb = M.Types.getLoweredType(bElements[i]);
 
-      if (CheckOnly) {
-        if (!castValueToABICompatibleType(B, Loc, Value, aa, bb, CheckOnly).hasValue())
-          return None;
-        continue;
-      }
-
       SILValue Element = B->createTupleExtract(Loc, Value, i);
       // Cast the value if necessary.
-      Element = castValueToABICompatibleType(B, Loc, Element, aa, bb).getValue();
+      Element = castValueToABICompatibleType(B, Loc, Element, aa, bb);
       ExpectedTuple.push_back(Element);
     }
-
-    if (CheckOnly)
-      return Value;
 
     CastedValue = B->createTuple(Loc, DestTy, ExpectedTuple);
     return CastedValue;
@@ -704,28 +662,13 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
   // Function types are interchangeable if they're also ABI-compatible.
   if (SrcTy.getAs<SILFunctionType>()) {
     if (DestTy.getAs<SILFunctionType>()) {
-      if (CheckOnly)
-        return Value;
       // Insert convert_function.
       CastedValue = B->createConvertFunction(Loc, Value, DestTy);
       return CastedValue;
     }
   }
 
-  if (CheckOnly)
-    return None;
   llvm_unreachable("Unknown combination of types for casting");
-  return SILValue();
-}
-
-bool swift::canCastValueToABICompatibleType(SILModule &M,
-                                            SILType SrcTy, SILType DestTy) {
-  SILBuilder B(*M.begin());
-  SILLocation Loc = ArtificialUnreachableLocation();
-  auto Result = castValueToABICompatibleType(&B, Loc, SILValue(),
-                                             SrcTy, DestTy,
-                                             /* CheckOnly */ true);
-  return Result.hasValue();
 }
 
 ProjectBoxInst *swift::getOrCreateProjectBox(AllocBoxInst *ABI, unsigned Index){
