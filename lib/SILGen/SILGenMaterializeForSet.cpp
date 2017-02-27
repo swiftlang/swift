@@ -28,6 +28,7 @@
 // As far as caller is concerned, the callback is invoked with the following
 // SIL type:
 //
+// @convention(method)
 // <T> (RawPointer, @inout UnsafeValueBuffer, @inout Base<T>, @thick Base<T>.Type) -> ()
 //
 // The caller will pass the first four formal parameters, followed by the
@@ -36,6 +37,7 @@
 // However if the dynamic type of the parameter 'b' is actually 'Derived',
 // then the actual callback has this SIL type:
 //
+// @convention(method)
 // (RawPointer, @inout UnsafeValueBuffer, @inout Derived, @thick Derived.Type) -> ()
 //
 // This is a fully concrete function type, with no additional generic metadata.
@@ -83,6 +85,7 @@
 //
 //    Here, the actual callback will have the following type:
 //
+//    @convention(method)
 //    <T> (RawPointer, @inout UnsafeValueBuffer, @inout Box<T>, @thick Box<T>.Type) -> ()
 //
 //    As with the class case, IRGen can already do the right thing -- the type
@@ -98,6 +101,7 @@
 //
 //    Here, the actual callback will have the following type:
 //
+//    @convention(method)
 //    <Self : SomeOtherProtocol> (RawPointer, @inout UnsafeValueBuffer, @inout Self, @thick Self.Type) -> ()
 //
 //    Here, the actual callback expects to receive the four formal parameters,
@@ -128,19 +132,26 @@
 //
 // At the call site, the callback is invoked with the following signature:
 //
+// @convention(witness_method)
 // <Self : GenericSubscript, T, U> (RawPointer, @inout UnsafeValueBuffer, @inout Self, @thick Self.Type) -> ()
 //
 // If the witness is a member of a concrete type 'AnyDictionary', the actual
 // callback will have the following signature:
 //
+// @convention(method)
 // <T, U> (RawPointer, @inout UnsafeValueBuffer, @inout AnyDictionary, @thick SelfAnyDictionary.Type) -> ()
 //
-// This is not ABI-compatible with the type at the call site, because the type
-// metadata for 'T' and 'U' trails the type metadata for 'Self' and the protocol
-// witness table for the conformance 'Self : GenericSubscript'.
+// These are ABI-compatible; the key is that witness_method passes the Self
+// metadata and conformance at the end, after the type metadata for innermost
+// generic parameters, and so everything lines up.
 //
-// So again, protocol witness thunks for materializeForSet of a generic
-// subscript must be open-coded.
+// === Summary ===
+//
+// To recap, we assume the following types are ABI-compatible:
+//
+// @convention(method) <T, U, V> (..., Foo<T, U>.Type)
+// @convention(witness_method) <T, U, V> (..., Foo<T, U>.Type)
+// @convention(witness_method) <Self : P, T, U, V> (..., Self.Type)
 //
 //===----------------------------------------------------------------------===//
 
