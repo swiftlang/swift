@@ -229,6 +229,23 @@ extension Substring : TextOutputStreamable {
   }
 }
 
+extension Substring : ExpressibleByUnicodeScalarLiteral {
+  public init(unicodeScalarLiteral value: String) {
+     self.init(_base: value, value.startIndex ..< value.endIndex)
+  }
+}
+extension Substring : ExpressibleByExtendedGraphemeClusterLiteral {
+  public init(extendedGraphemeClusterLiteral value: String) {
+     self.init(_base: value, value.startIndex ..< value.endIndex)
+  }
+}
+
+extension Substring : ExpressibleByStringLiteral {
+  public init(stringLiteral value: String) {
+     self.init(_base: value, value.startIndex ..< value.endIndex)
+  }
+}
+
 extension String {
   //@available(swift, obsoleted: 4)
   @available(*, unavailable, message: "")
