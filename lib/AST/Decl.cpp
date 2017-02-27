@@ -2735,22 +2735,40 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
 }
 
 bool ProtocolDecl::requiresClassSlow() {
-  if (!isRequirementSignatureComputed()) return false;
-
   ProtocolDeclBits.RequiresClass = false;
 
-  // Ensure that the result cannot change in future.
+  // Visit all of the inherited protocols.
+  SmallPtrSet<ProtocolDecl *, 8> visited;
+  SmallVector<ProtocolDecl *, 4> stack;
+  stack.push_back(this);
+  visited.insert(this);
+  while (!stack.empty()) {
+    // Pull the next protocol off the stack.
+    auto proto = stack.back();
+    stack.pop_back();
 
-  if (getAttrs().hasAttribute<ObjCAttr>() || isObjC()) {
-    ProtocolDeclBits.RequiresClass = true;
-    return true;
-  }
+    // If the 'requires class' bit is valid, we don't need to search any
+    // further.
+    if (proto->ProtocolDeclBits.RequiresClassValid) {
+      // If this protocol has a class requirement, we're done.
+      if (proto->ProtocolDeclBits.RequiresClass) {
+        ProtocolDeclBits.RequiresClass = true;
+        return true;
+      }
 
-  // Check inherited protocols for class-ness.
-  for (auto *proto : getInheritedProtocols()) {
-    if (proto->requiresClass()) {
+      continue;
+    }
+
+    // Quick check: @objc indicates that it requires a class.
+    if (proto->getAttrs().hasAttribute<ObjCAttr>() || proto->isObjC()) {
       ProtocolDeclBits.RequiresClass = true;
       return true;
+    }
+
+    // Add inherited protocols to the stack.
+    for (auto inherited : proto->getInheritedProtocols()) {
+      if (visited.insert(inherited).second)
+        stack.push_back(inherited);
     }
   }
 
