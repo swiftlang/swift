@@ -1397,6 +1397,9 @@ NOTE(no_witnesses,none,
      "%select{initializer %1|function %1|property %1|subscript}0 with type %2"
      "%select{|; do you want to add a stub?}3",
      (RequirementKind, DeclName, Type, bool))
+NOTE(no_witnesses_general,none,
+     "protocol requires something, do you want to add a stub?",
+     ())
 NOTE(ambiguous_witnesses,none,
      "multiple matching "
      "%select{initializers named %1|functions named %1|properties named %1|"

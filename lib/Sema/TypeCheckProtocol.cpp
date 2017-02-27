@@ -1704,6 +1704,8 @@ namespace {
     /// Whether we've already complained about problems with this conformance.
     bool AlreadyComplained = false;
 
+    SmallVector<std::pair<ValueDecl*, Type>, 4> MissingWitnessesAndTypes;
+
     /// Retrieve the associated types that are referenced by the given
     /// requirement with a base of 'Self'.
     ArrayRef<AssociatedTypeDecl *> getReferencedAssociatedTypes(ValueDecl *req);
@@ -2391,10 +2393,11 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
 
 /// Generates a note for a protocol requirement for which no witness was found
 /// and provides a fixit to add a stub to the adopter
-static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
+static void diagnoseNoWitness(ArrayRef<std::pair<ValueDecl*, Type>>
+                                RequirementsAndTypes,
                               NormalProtocolConformance *Conformance) {
-  // FIXME: Try an ignore-access lookup?
-
+  if (RequirementsAndTypes.empty())
+    return;
   DeclContext *Adopter = Conformance->getDeclContext();
 
   SourceLoc FixitLocation;
@@ -2409,28 +2412,24 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
     llvm_unreachable("Unknown adopter kind");
   }
 
-  ASTContext &Ctx = Requirement->getASTContext();
+  ASTContext &Ctx = Conformance->getDeclContext()->getASTContext();
   auto &Diags = Ctx.Diags;
   std::string FixitString;
   llvm::raw_string_ostream FixitStream(FixitString);
 
-  bool AddFixit = printRequirementStub(Requirement, Adopter,
-                                       Conformance->getType(), TypeLoc,
-                                       FixitStream);
+  bool AddFixit = false;
+  std::for_each(RequirementsAndTypes.begin(), RequirementsAndTypes.end(),
+                [&](std::pair<ValueDecl*, Type> Pair) {
+                  AddFixit |= printRequirementStub(Pair.first, Adopter,
+                                                   Conformance->getType(),
+                                                   TypeLoc,
+                                                   FixitStream);
+                });
 
-  if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
-    Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
-                   MissingTypeWitness->getName())
-      .fixItInsertAfter(FixitLocation, FixitStream.str());
-  } else {
-    // Point out the requirement that wasn't met.
-    auto diag = Diags.diagnose(Requirement, diag::no_witnesses,
-                               getRequirementKind(Requirement),
-                               Requirement->getFullName(),
-                               RequirementType, AddFixit);
-    if (AddFixit) {
-      diag.fixItInsertAfter(FixitLocation, FixitStream.str());
-    }
+  // Point out the requirement that wasn't met.
+  auto diag = Diags.diagnose(TypeLoc, diag::no_witnesses_general);
+  if (AddFixit) {
+    diag.fixItInsertAfter(FixitLocation, FixitStream.str());
   }
 }
 
@@ -2745,30 +2744,29 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     return ResolveWitnessResult::ExplicitFailed;
   }
 
+  auto dc = Conformance->getDeclContext();
+
+  // Determine the type that the requirement is expected to have.
+  Type reqType = getRequirementTypeForDisplay(dc->getParentModule(),
+                                              Conformance, requirement);
+
+  if (!numViable) {
+    MissingWitnessesAndTypes.emplace_back(requirement, reqType);
+    return ResolveWitnessResult::ExplicitFailed;
+  }
+
   diagnoseOrDefer(requirement, true,
-    [requirement, matches, ignoringNames, numViable](
+    [requirement, matches, ignoringNames, numViable, reqType, dc](
       NormalProtocolConformance *conformance) {
-      auto dc = conformance->getDeclContext();
       auto &diags = dc->getASTContext().Diags;
-
-      // Determine the type that the requirement is expected to have.
-      Type reqType = getRequirementTypeForDisplay(dc->getParentModule(),
-                                                  conformance, requirement);
-
-      if (numViable > 0) {
-        auto diagnosticMessage = diag::ambiguous_witnesses;
-        if (ignoringNames) {
-          diagnosticMessage = diag::ambiguous_witnesses_wrong_name;
-        }
-        diags.diagnose(requirement, diagnosticMessage,
-                       getRequirementKind(requirement),
-                       requirement->getFullName(),
-                       reqType);
-      } else {
-        // Generate diagnostics for the missing requirement and a fixit to add
-        // it
-        diagnoseNoWitness(requirement, reqType, conformance);
+      auto diagnosticMessage = diag::ambiguous_witnesses;
+      if (ignoringNames) {
+        diagnosticMessage = diag::ambiguous_witnesses_wrong_name;
       }
+      diags.diagnose(requirement, diagnosticMessage,
+                     getRequirementKind(requirement),
+                     requirement->getFullName(),
+                     reqType);
 
       // Diagnose each of the matches.
       for (const auto &match : matches)
@@ -4216,10 +4214,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
     }
 
     for (auto missingTypeWitness : unresolvedAssocTypes) {
-      diagnoseOrDefer(missingTypeWitness, true,
-        [missingTypeWitness](NormalProtocolConformance *conformance) {
-          diagnoseNoWitness(missingTypeWitness, Type(), conformance);
-        });
+      MissingWitnessesAndTypes.emplace_back(missingTypeWitness, Type());
     }
 
     return;
@@ -4634,7 +4629,11 @@ void ConformanceChecker::checkConformance() {
       break;
     }
   }
-
+  if (!MissingWitnessesAndTypes.empty()) {
+    diagnoseNoWitness(MissingWitnessesAndTypes, Conformance);
+    AlreadyComplained = true;
+    Conformance->setInvalid();
+  }
   emitDelayedDiags();
 
   // Except in specific whitelisted cases for Foundation/Swift
