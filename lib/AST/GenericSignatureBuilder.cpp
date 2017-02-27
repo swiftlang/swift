@@ -40,6 +40,7 @@ using llvm::DenseMap;
 
 namespace {
   typedef GenericSignatureBuilder::PotentialArchetype PotentialArchetype;
+  typedef GenericSignatureBuilder::ConcreteConstraint ConcreteConstraint;
   typedef GenericSignatureBuilder::EquivalenceClass EquivalenceClass;
 
 } // end anonymous namespace
@@ -501,38 +502,23 @@ void GenericSignatureBuilder::PotentialArchetype::resolveAssociatedType(
   --builder.Impl->NumUnresolvedNestedTypes;
 }
 
-Optional<std::pair<Type, const RequirementSource *>>
-PotentialArchetype::findAnyConcreteTypeSourceAsWritten() const {
-  using Result = std::pair<Type, const RequirementSource *>;
-
-  // Local function to look for a source in the given potential archetype.
-  auto lookInPA = [](const PotentialArchetype *pa) -> Optional<Result> {
-    for (unsigned i : indices(pa->concreteTypeSources)) {
-      auto source = pa->concreteTypeSources[i];
-      if (source->getLoc().isValid())
-        return Result(pa->concreteTypes[i], source);
-    }
-
-    return None;
-  };
-
-  // If we have a concrete type source with location information, use that.
-  if (auto result = lookInPA(this))
-    return result;
-
+Optional<ConcreteConstraint>
+EquivalenceClass::findAnyConcreteConstraintAsWritten(
+                                      PotentialArchetype *preferredPA) const {
   // If we don't have a concrete type, there's no source.
-  auto rep = getRepresentative();
-  if (!rep->isConcreteType()) return None;
+  if (!concreteType) return None;
 
-  // Otherwise, go look for the source.
-  for (auto pa : rep->getEquivalenceClassMembers()) {
-    if (pa != this) {
-      if (auto result = lookInPA(pa))
+  // Go look for a source with source-location information.
+  Optional<ConcreteConstraint> result;
+  for (const auto &constraint : concreteTypeConstraints) {
+    if (constraint.source->getLoc().isValid()) {
+      result = constraint;
+      if (!preferredPA || constraint.archetype == preferredPA)
         return result;
     }
   }
 
-  return None;
+  return result;
 }
 
 bool GenericSignatureBuilder::updateRequirementSource(
@@ -603,7 +589,6 @@ public:
 
   static ResolvedType forNewTypeAlias(PotentialArchetype *pa) {
     assert(pa->getParent() && pa->getTypeAliasDecl() &&
-           pa->concreteTypes.empty() &&
            pa->getEquivalenceClassMembers().size() == 1 &&
            "not a new typealias");
     return ResolvedType(pa);
@@ -1341,6 +1326,8 @@ void GenericSignatureBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
   else
     Out.indent(Indent) << getNestedName();
 
+  auto equivClass = getEquivalenceClassIfPresent();
+
   // Print superclass.
   if (Superclass) {
     Out << " : ";
@@ -1354,18 +1341,20 @@ void GenericSignatureBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
   }
 
   // Print concrete type.
-  for (unsigned i : indices(concreteTypes)) {
-    auto concreteType = concreteTypes[i];
-    Out << " == ";
-    concreteType.print(Out);
+  if (equivClass && equivClass->concreteType) {
+    for (const auto &constraint : equivClass->concreteTypeConstraints) {
+      if (constraint.archetype != this) continue;
 
-    auto concreteTypeSource = concreteTypeSources[i];
-    Out << " ";
-    if (!concreteTypeSource->isDerivedRequirement())
-      Out << "*";
-    Out << "[";
-    concreteTypeSource->print(Out, SrcMgr);
-    Out << "]";
+      Out << " == ";
+      constraint.concreteType.print(Out);
+
+      Out << " ";
+      if (!constraint.source->isDerivedRequirement())
+        Out << "*";
+      Out << "[";
+      constraint.source->print(Out, SrcMgr);
+      Out << "]";
+    }
   }
 
   // Print requirements.
@@ -1687,11 +1676,12 @@ bool GenericSignatureBuilder::addSuperclassRequirement(PotentialArchetype *T,
   if (T->isConcreteType()) {
     Type concrete = T->getConcreteType();
     if (!Superclass->isExactSuperclassOf(concrete, getLazyResolver())) {
-      if (auto source = T->findAnyConcreteTypeSourceAsWritten()) {
-        Diags.diagnose(source->second->getLoc(), diag::type_does_not_inherit,
+      if (auto existing = T->getOrCreateEquivalenceClass()
+                                      ->findAnyConcreteConstraintAsWritten(T)) {
+        Diags.diagnose(existing->source->getLoc(), diag::type_does_not_inherit,
                        T->getDependentType(/*FIXME:*/{ },
                                            /*allowUnresolved=*/true),
-                       source->first, Superclass)
+                       existing->concreteType, Superclass)
           .highlight(Source->getLoc());
       }
       return true;
@@ -1882,12 +1872,19 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
     delete equivClass2;
   };
 
+  // Same-type-to-concrete requirements.
+  if (equivClass2 && equivClass2->concreteType) {
+    if (!equivClass->concreteType)
+      equivClass->concreteType = equivClass2->concreteType;
+
+    equivClass->concreteTypeConstraints.insert(
+                                 equivClass->concreteTypeConstraints.end(),
+                                 equivClass2->concreteTypeConstraints.begin(),
+                                 equivClass2->concreteTypeConstraints.end());
+  }
+
   // Make T1 the representative of T2, merging the equivalence classes.
   T2->representativeOrEquivClass = T1;
-
-  // Same-type-to-concrete requirement.
-  if (equivClass2 && equivClass2->concreteType && !equivClass->concreteType)
-    equivClass->concreteType = equivClass2->concreteType;
 
   // Superclass requirements.
   if (T2->Superclass) {
@@ -1926,21 +1923,25 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
        PotentialArchetype *T,
        Type Concrete,
        const RequirementSource *Source) {
+  auto rep = T->getRepresentative();
+  auto equivClass = rep->getOrCreateEquivalenceClass();
+
   // Record the concrete type and its source.
-  T->concreteTypes.push_back(Concrete);
-  T->concreteTypeSources.push_back(Source);
+  equivClass->concreteTypeConstraints.push_back(
+                                      ConcreteConstraint{T, Concrete, Source});
 
   // If we've already been bound to a type, match that type.
-  if (auto oldConcrete = T->getConcreteType()) {
+  if (equivClass->concreteType) {
     bool mismatch = addSameTypeRequirement(
-        oldConcrete, Concrete, Source, [&](Type type1, Type type2) {
-          Diags.diagnose(Source->getLoc(),
-                         diag::requires_same_type_conflict,
-                         T->isGenericParam(),
-                         T->getDependentType(/*FIXME: */{ }, true), type1,
-                         type2);
+            equivClass->concreteType, Concrete, Source,
+            [&](Type type1, Type type2) {
+            Diags.diagnose(Source->getLoc(),
+                           diag::requires_same_type_conflict,
+                           T->isGenericParam(),
+                           T->getDependentType(/*FIXME: */{ }, true), type1,
+                           type2);
 
-        });
+          });
 
     if (mismatch) return true;
 
@@ -1949,10 +1950,7 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
   }
 
   // Record the requirement.
-  auto rep = T->getRepresentative();
-  auto equivClass = rep->getOrCreateEquivalenceClass();
-  if (!equivClass->concreteType)
-    equivClass->concreteType = Concrete;
+  equivClass->concreteType = Concrete;
 
   // Make sure the concrete type fulfills the requirements on the archetype.
   // FIXME: Move later...
@@ -2539,15 +2537,17 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
   visitPotentialArchetypes([&](PotentialArchetype *archetype) {
     if (archetype != archetype->getRepresentative()) return;
 
-    if (archetype->isConcreteType()) {
+    auto equivClass = archetype->getOrCreateEquivalenceClass();
+    if (equivClass->concreteType) {
       // Check for recursive same-type bindings.
       if (isRecursiveConcreteType(archetype, /*isSuperclass=*/false)) {
-        if (auto source = archetype->findAnyConcreteTypeSourceAsWritten()) {
-          Diags.diagnose(source->second->getLoc(),
+        if (auto constraint =
+              equivClass->findAnyConcreteConstraintAsWritten()) {
+          Diags.diagnose(constraint->source->getLoc(),
                          diag::recursive_same_type_constraint,
                          archetype->getDependentType(genericParams,
                                                      /*allowUnresolved=*/true),
-                         source->first);
+                         constraint->concreteType);
         }
 
         archetype->RecursiveConcreteType = true;
@@ -2591,9 +2591,10 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
 
       // Don't allow a generic parameter to be equivalent to a concrete type,
       // because then we don't actually have a parameter.
-      if (rep->getConcreteType()) {
-        if (auto source = rep->findAnyConcreteTypeSourceAsWritten())
-          Diags.diagnose(source->second->getLoc(),
+      auto equivClass = rep->getOrCreateEquivalenceClass();
+      if (equivClass->concreteType) {
+        if (auto constraint = equivClass->findAnyConcreteConstraintAsWritten())
+          Diags.diagnose(constraint->source->getLoc(),
                          diag::requires_generic_param_made_equal_to_concrete,
                          rep->getDependentType(genericParams,
                                                /*allowUnresolved=*/true));
@@ -2681,33 +2682,24 @@ bool GenericSignatureBuilder::diagnoseRemainingRenames(
   return invalid;
 }
 
-namespace {
-  /// Describes a concrete constraint on a potential archetype.
-  struct ConcreteConstraint {
-    PotentialArchetype *archetype;
-    Type concreteType;
-    const RequirementSource *source;
+namespace swift {
+  bool operator<(const ConcreteConstraint &lhs, const ConcreteConstraint &rhs) {
+    auto lhsPA = lhs.archetype;
+    auto rhsPA = rhs.archetype;
+    if (int result = compareDependentTypes(&lhsPA, &rhsPA))
+      return result < 0;
 
-    friend bool operator<(const ConcreteConstraint &lhs,
-                          const ConcreteConstraint &rhs) {
-      auto lhsPA = lhs.archetype;
-      auto rhsPA = rhs.archetype;
-      if (int result = compareDependentTypes(&lhsPA, &rhsPA))
-        return result < 0;
+    if (int result = lhs.source->compare(rhs.source))
+      return result < 0;
 
-      if (int result = lhs.source->compare(rhs.source))
-        return result < 0;
+    return false;
+  }
 
-      return false;
-    }
-
-    friend bool operator==(const ConcreteConstraint &lhs,
-                           const ConcreteConstraint &rhs) {
-      return lhs.archetype == rhs.archetype &&
-             lhs.concreteType->isEqual(rhs.concreteType) &&
-             lhs.source == rhs.source;
-    }
-  };
+  bool operator==(const ConcreteConstraint &lhs, const ConcreteConstraint &rhs){
+    return lhs.archetype == rhs.archetype &&
+           lhs.concreteType->isEqual(rhs.concreteType) &&
+           lhs.source == rhs.source;
+  }
 }
 
 void GenericSignatureBuilder::checkRedundantConcreteTypeConstraints(
@@ -2716,61 +2708,54 @@ void GenericSignatureBuilder::checkRedundantConcreteTypeConstraints(
   Type concreteType = representative->getConcreteType();
   assert(concreteType && "No concrete type to check");
 
+  // Sort the concrete constraints, so we get a deterministic ordering of
+  // diagnostics.
+  auto equivClass = representative->getOrCreateEquivalenceClass();
+  auto &concreteConstraints = equivClass->concreteTypeConstraints;
+  llvm::array_pod_sort(concreteConstraints.begin(), concreteConstraints.end());
+
+  // Find a representative constraint to use for diagnostics.
   Optional<ConcreteConstraint> representativeConstraint;
-
-  // Gather the concrete constraints within this equivalence class.
-  SmallVector<ConcreteConstraint, 4> concreteConstraints;
-  for (auto pa : representative->getEquivalenceClassMembers()) {
-    auto types = pa->getConcreteTypesAsWritten();
-    auto sources = pa->getConcreteTypeSourcesAsWritten();
-    for (unsigned i : indices(types)) {
-      auto source = sources[i];
-
-      // Save this constraint.
-      auto constraint = ConcreteConstraint{pa, types[i], source};
-      concreteConstraints.push_back(constraint);
-
-      // Check whether this constraint is better than the best we've seen so far
-      // at being the representative constraint against which others will be
-      // compared.
-      if (!representativeConstraint) {
-        representativeConstraint = constraint;
-        continue;
-      }
-
-      // We prefer derived constraints to non-derived constraints.
-      bool thisIsDerived = source->isDerivedRequirement();
-      bool representativeIsDerived =
-        representativeConstraint->source->isDerivedRequirement();
-      if (thisIsDerived != representativeIsDerived) {
-        if (thisIsDerived)
-          representativeConstraint = constraint;
-
-        continue;
-      }
-
-      // We prefer constraints with locations to constraints without locations.
-      bool thisHasValidSourceLoc = source->getLoc().isValid();
-      bool representativeHasValidSourceLoc =
-        representativeConstraint->source->getLoc().isValid();
-      if (thisHasValidSourceLoc != representativeHasValidSourceLoc) {
-        if (thisHasValidSourceLoc)
-          representativeConstraint = constraint;
-
-        continue;
-      }
-
-      // Otherwise, order via the constraint itself.
-      if (constraint < *representativeConstraint)
-        representativeConstraint = constraint;
+  for (const auto &constraint : concreteConstraints) {
+    // Check whether this constraint is better than the best we've seen so far
+    // at being the representative constraint against which others will be
+    // compared.
+    if (!representativeConstraint) {
+      representativeConstraint = constraint;
+      continue;
     }
+
+    // We prefer derived constraints to non-derived constraints.
+    bool thisIsDerived = constraint.source->isDerivedRequirement();
+    bool representativeIsDerived =
+      representativeConstraint->source->isDerivedRequirement();
+    if (thisIsDerived != representativeIsDerived) {
+      if (thisIsDerived)
+        representativeConstraint = constraint;
+
+      continue;
+    }
+
+    // We prefer constraints with locations to constraints without locations.
+    bool thisHasValidSourceLoc = constraint.source->getLoc().isValid();
+    bool representativeHasValidSourceLoc =
+      representativeConstraint->source->getLoc().isValid();
+    if (thisHasValidSourceLoc != representativeHasValidSourceLoc) {
+      if (thisHasValidSourceLoc)
+        representativeConstraint = constraint;
+
+      continue;
+    }
+
+    // Otherwise, order via the constraint itself.
+    if (constraint < *representativeConstraint)
+      representativeConstraint = constraint;
   }
 
   // Sort the concrete constraints, so we get deterministic ordering of
   // diagnostics.
-  llvm::array_pod_sort(concreteConstraints.begin(), concreteConstraints.end());
 
-  // Local function to provide a note desribing the representative constraint.
+  // Local function to provide a note describing the representative constraint.
   auto noteRepresentativeConstraint = [&] {
     if (representativeConstraint->source->getLoc().isInvalid()) return;
 
@@ -2840,17 +2825,19 @@ void GenericSignatureBuilder::visitPotentialArchetypes(F f) {
 /// the *implicit* same-type constraints.
 ///
 /// \param pa The potential archetype to visit.
-/// \param visited The set of potential archetypes that have already been
-/// seen.
-/// \param found Used to record each potential archetype visited
-static void sameTypeDFS(PotentialArchetype *pa,
-                        SmallPtrSetImpl<PotentialArchetype *> &visited,
-                        SmallVectorImpl<PotentialArchetype *> &found) {
-  // If we've already visited this potential archetype, we're done.
-  if (!visited.insert(pa).second) return;
+/// \param paToComponent A mapping from each potential archetype to its
+/// component number.
+/// \param component The component number we're currently visiting.
+///
+/// \returns the best archetype anchor seen so far.
+static PotentialArchetype *sameTypeDFS(PotentialArchetype *pa,
+                        unsigned component,
+                        llvm::SmallDenseMap<PotentialArchetype *, unsigned>
+                          &paToComponent) {
+  PotentialArchetype *anchor = pa;
 
-  // Note that we've found this potential archetype.
-  found.push_back(pa);
+  // If we've already visited this potential archetype, we're done.
+  if (!paToComponent.insert({pa, component}).second) return anchor;
 
   // Visit its adjacent potential archetypes.
   for (const auto &sameType : pa->getSameTypeConstraints()) {
@@ -2869,19 +2856,25 @@ static void sameTypeDFS(PotentialArchetype *pa,
       break;
     }
 
-    sameTypeDFS(sameType.first, visited, found);
+    sameTypeDFS(sameType.first, component, paToComponent);
+
+    // If this type is better than the anchor, use it for the anchor.
+    if (compareDependentTypes(&sameType.first, &anchor) < 0)
+      anchor = sameType.first;
   }
+
+  return anchor;
 }
 
 namespace {
   /// Describes a component in the (implied) same-type constraint graph.
   struct SameTypeComponent {
     /// The potential archetype that acts as the anchor for this component.
-    PotentialArchetype * anchor;
+    PotentialArchetype *anchor;
 
     /// The (best) requirement source within the component that makes the
     /// potential archetypes in this component equivalent to the concrete type.
-    const RequirementSource * concreteTypeSource;
+    const RequirementSource *concreteTypeSource;
 
     friend bool operator<(const SameTypeComponent &lhs,
                           const SameTypeComponent &rhs) {
@@ -2928,44 +2921,37 @@ namespace {
 /// canonical edges connects vertex i to vertex i+1 for i in 0..<size-1.
 static SmallVector<SameTypeComponent, 2> getSameTypeComponents(
                                                      PotentialArchetype *rep) {
-  SmallPtrSet<PotentialArchetype *, 8> visited;
+  llvm::SmallDenseMap<PotentialArchetype *, unsigned> paToComponent;
   SmallVector<SameTypeComponent, 2> components;
   for (auto pa : rep->getEquivalenceClassMembers()) {
     // If we've already seen this potential archetype, there's nothing else to
     // do.
-    if (visited.count(pa) != 0) continue;
+    if (paToComponent.count(pa) != 0) continue;
 
     // Find all of the potential archetypes within this connected component.
-    SmallVector<PotentialArchetype *, 2> component;
-    sameTypeDFS(pa, visited, component);
-
-    // Find the best anchor and concrete type source for this component.
-    PotentialArchetype *anchor = component[0];
-    const RequirementSource *bestConcreteTypeSource = nullptr;
-    auto considerNewSource = [&](const RequirementSource *source) {
-      if (!bestConcreteTypeSource ||
-          source->compare(bestConcreteTypeSource) < 0)
-        bestConcreteTypeSource = source;
-    };
-
-    if (!anchor->getConcreteTypeSourcesAsWritten().empty())
-      bestConcreteTypeSource = anchor->getConcreteTypeSourcesAsWritten()[0];
-
-    for (auto componentPA : ArrayRef<PotentialArchetype *>(component)) {
-      // Update the anchor.
-      if (compareDependentTypes(&componentPA, &anchor) < 0)
-        anchor = componentPA;
-
-      // If this potential archetype has a better concrete type source than
-      // the best we've seen, take it.
-      for (auto source: componentPA->getConcreteTypeSourcesAsWritten())
-        considerNewSource(source);
-    }
+    auto anchor = sameTypeDFS(pa, components.size(), paToComponent);
 
     // Record the anchor.
-    components.push_back({anchor, bestConcreteTypeSource});
+    components.push_back({anchor, nullptr});
   }
 
+  // If there is a concrete type, figure out the best concrete type anchor
+  // per component.
+  auto equivClass = rep->getOrCreateEquivalenceClass();
+  for (const auto &concrete : equivClass->concreteTypeConstraints) {
+    // Dig out the component associated with constraint.
+    assert(paToComponent.count(concrete.archetype) > 0);
+    auto &component = components[paToComponent[concrete.archetype]];
+
+    // If it has a better source than we'd seen before for this component,
+    // keep it.
+    auto &bestConcreteTypeSource = component.concreteTypeSource;
+    if (!bestConcreteTypeSource ||
+        concrete.source->compare(bestConcreteTypeSource) < 0)
+      bestConcreteTypeSource = concrete.source;
+  }
+
+  // Sort the components.
   llvm::array_pod_sort(components.begin(), components.end());
 
   return components;
