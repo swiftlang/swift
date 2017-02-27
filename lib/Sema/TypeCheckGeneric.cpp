@@ -276,8 +276,6 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
       builder->addGenericParameter(param);
   }
 
-  unsigned depth = genericParams->getDepth();
-
   // Now, check the inheritance clauses of each parameter.
   for (auto param : *genericParams) {
     checkInheritanceClause(param, resolver);
@@ -486,7 +484,6 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
       // Infer requirements from it.
       if (builder && genericParams &&
           fn->getBodyResultTypeLoc().getTypeRepr()) {
-        unsigned depth = genericParams->getDepth();
         builder->inferRequirements(fn->getBodyResultTypeLoc());
       }
     }
@@ -823,7 +820,6 @@ static bool checkGenericSubscriptSignature(TypeChecker &tc,
   // Infer requirements from it.
   if (genericParams && builder &&
       subscript->getElementTypeLoc().getTypeRepr()) {
-    unsigned depth = genericParams->getDepth();
     builder->inferRequirements(subscript->getElementTypeLoc());
   }
 
