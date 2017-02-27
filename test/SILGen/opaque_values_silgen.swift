@@ -290,3 +290,20 @@ var foo_var : Foo = s180_______return_foo()
 func s190___return_foo_var() -> Foo {
   return foo_var
 }
+
+// Tests deinit of opaque existentials
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s200______use_foo_varyyF : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[GLOBAL:%.*]] = global_addr {{.*}} : $*Foo
+// CHECK:   [[LOAD_GLOBAL:%.*]] = load [copy] [[GLOBAL]] : $*Foo
+// CHECK:   [[OPEN_VAR:%.*]] = open_existential_opaque [[LOAD_GLOBAL]] : $Foo
+// CHECK:   [[WITNESS:%.*]] = witness_method $@opened
+// CHECK:   apply [[WITNESS]]
+// CHECK:   destroy_value [[OPEN_VAR]]
+// CHECK:   deinit_existential_opaque [[LOAD_GLOBAL]] : $Foo
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s200______use_foo_varyyF'
+func s200______use_foo_var() {
+  foo_var.foo()
+}

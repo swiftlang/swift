@@ -781,26 +781,25 @@ SILGenFunction::emitOpenExistential(
   SILType existentialType = existentialValue.getType();
   switch (existentialType.getPreferredExistentialRepresentation(SGM.M)) {
   case ExistentialRepresentation::Opaque: {
+    SILValue archetypeValue;
     if (existentialType.isAddress()) {
       OpenedExistentialAccess allowedAccess =
           getOpenedExistentialAccessFor(accessKind);
-      SILValue archetypeValue = B.createOpenExistentialAddr(
-          loc, existentialValue.forward(*this), loweredOpenedType,
-          allowedAccess);
-      if (existentialValue.hasCleanup()) {
-        canConsume = true;
-        // Leave a cleanup to deinit the existential container.
-        enterDeinitExistentialCleanup(existentialValue.getValue(), CanType(),
-                                      ExistentialRepresentation::Opaque);
-        archetypeMV = emitManagedBufferWithCleanup(archetypeValue);
-      } else {
-        canConsume = false;
-        archetypeMV = ManagedValue::forUnmanaged(archetypeValue);
-      }
+      archetypeValue =
+          B.createOpenExistentialAddr(loc, existentialValue.forward(*this),
+                                      loweredOpenedType, allowedAccess);
     } else {
-      SILValue archetypeValue = B.createOpenExistentialOpaque(
+      archetypeValue = B.createOpenExistentialOpaque(
           loc, existentialValue.forward(*this), loweredOpenedType);
-      assert(!existentialValue.hasCleanup());
+    }
+
+    if (existentialValue.hasCleanup()) {
+      canConsume = true;
+      // Leave a cleanup to deinit the existential container.
+      enterDeinitExistentialCleanup(existentialValue.getValue(), CanType(),
+                                    ExistentialRepresentation::Opaque);
+      archetypeMV = emitManagedBufferWithCleanup(archetypeValue);
+    } else {
       canConsume = false;
       archetypeMV = ManagedValue::forUnmanaged(archetypeValue);
     }
