@@ -2725,6 +2725,41 @@ ProtocolDecl::getInheritedProtocols() const {
   return result;
 }
 
+bool ProtocolDecl::walkInheritedProtocols(
+              llvm::function_ref<TypeWalker::Action(ProtocolDecl *)> fn) const {
+  auto self = const_cast<ProtocolDecl *>(this);
+
+  // Visit all of the inherited protocols.
+  SmallPtrSet<ProtocolDecl *, 8> visited;
+  SmallVector<ProtocolDecl *, 4> stack;
+  stack.push_back(self);
+  visited.insert(self);
+  while (!stack.empty()) {
+    // Pull the next protocol off the stack.
+    auto proto = stack.back();
+    stack.pop_back();
+
+    switch (fn(proto)) {
+    case TypeWalker::Action::Stop:
+      return true;
+
+    case TypeWalker::Action::Continue:
+      // Add inherited protocols to the stack.
+      for (auto inherited : proto->getInheritedProtocols()) {
+        if (visited.insert(inherited).second)
+          stack.push_back(inherited);
+      }
+      break;
+
+    case TypeWalker::Action::SkipChildren:
+      break;
+    }
+  }
+
+  return false;
+
+}
+
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
   if (this == super)
     return false;
@@ -2735,44 +2770,27 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
 }
 
 bool ProtocolDecl::requiresClassSlow() {
-  ProtocolDeclBits.RequiresClass = false;
+  ProtocolDeclBits.RequiresClass =
+    walkInheritedProtocols([&](ProtocolDecl *proto) {
+      // If the 'requires class' bit is valid, we don't need to search any
+      // further.
+      if (proto->ProtocolDeclBits.RequiresClassValid) {
+        // If this protocol has a class requirement, we're done.
+        if (proto->ProtocolDeclBits.RequiresClass)
+          return TypeWalker::Action::Stop;
 
-  // Visit all of the inherited protocols.
-  SmallPtrSet<ProtocolDecl *, 8> visited;
-  SmallVector<ProtocolDecl *, 4> stack;
-  stack.push_back(this);
-  visited.insert(this);
-  while (!stack.empty()) {
-    // Pull the next protocol off the stack.
-    auto proto = stack.back();
-    stack.pop_back();
-
-    // If the 'requires class' bit is valid, we don't need to search any
-    // further.
-    if (proto->ProtocolDeclBits.RequiresClassValid) {
-      // If this protocol has a class requirement, we're done.
-      if (proto->ProtocolDeclBits.RequiresClass) {
-        ProtocolDeclBits.RequiresClass = true;
-        return true;
+        return TypeWalker::Action::SkipChildren;
       }
 
-      continue;
-    }
+      // Quick check: @objc indicates that it requires a class.
+      if (proto->getAttrs().hasAttribute<ObjCAttr>() || proto->isObjC())
+        return TypeWalker::Action::Stop;
 
-    // Quick check: @objc indicates that it requires a class.
-    if (proto->getAttrs().hasAttribute<ObjCAttr>() || proto->isObjC()) {
-      ProtocolDeclBits.RequiresClass = true;
-      return true;
-    }
+      // Keep looking.
+      return TypeWalker::Action::Continue;
+    });
 
-    // Add inherited protocols to the stack.
-    for (auto inherited : proto->getInheritedProtocols()) {
-      if (visited.insert(inherited).second)
-        stack.push_back(inherited);
-    }
-  }
-
-  return false;
+  return ProtocolDeclBits.RequiresClass;
 }
 
 bool ProtocolDecl::existentialConformsToSelfSlow() {
@@ -2805,7 +2823,6 @@ bool ProtocolDecl::existentialConformsToSelfSlow() {
 
   // Check whether any of the inherited protocols fail to conform to
   // themselves.
-  // FIXME: does this need a resolver?
   for (auto proto : getInheritedProtocols()) {
     if (!proto->existentialConformsToSelf()) {
       ProtocolDeclBits.ExistentialConformsToSelf = false;
