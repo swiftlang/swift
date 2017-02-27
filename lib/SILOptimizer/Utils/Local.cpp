@@ -618,7 +618,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     }
 
     // Cast the reference.
-    CastedValue = B->createUncheckedBitCast(Loc, Value, DestTy);
+    CastedValue = B->createUncheckedRefCast(Loc, Value, DestTy);
     return CastedValue;
   }
 
@@ -627,7 +627,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
   // of a simple upcast.
   if (isa<AnyMetatypeType>(SrcTy.getSwiftRValueType()) &&
       isa<AnyMetatypeType>(DestTy.getSwiftRValueType()) &&
-      SrcTy.isClassOrClassMetatype() && DestTy.isClassOrClassMetatype() &&
+      SrcTy.isClassOrClassMetatype() &&
       DestTy.getMetatypeInstanceType(M).isExactSuperclassOf(
           SrcTy.getMetatypeInstanceType(M))) {
     if (CheckOnly)

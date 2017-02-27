@@ -979,7 +979,8 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   for (auto arg : AI.getArguments()) {
     auto paramType = substConv.getSILArgumentType(substArgIdx++);
     if (arg->getType() != paramType)
-      arg = B.createUpcast(AI.getLoc(), arg, paramType);
+      arg = castValueToABICompatibleType(&B, AI.getLoc(), arg,
+                                         arg->getType(), paramType);
     Arguments.push_back(arg);
   }
   assert(substArgIdx == substConv.getNumSILArguments());
