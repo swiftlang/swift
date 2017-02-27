@@ -1412,7 +1412,7 @@ NodePointer Demangler::demangleFuncSpecParam(Node::IndexType ParamIdx) {
       // The parameters will be added later.
       return addChild(Param, createNode(
         Node::Kind::FunctionSignatureSpecializationParamKind,
-        unsigned(FunctionSigSpecializationParamKind::ClosureProp)));
+        uint64_t(FunctionSigSpecializationParamKind::ClosureProp)));
     case 'p': {
       switch (nextChar()) {
         case 'f':

@@ -22,6 +22,13 @@ function(_report_sdk prefix)
   message(STATUS "  Triple name: ${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
   message(STATUS "  Architectures: ${SWIFT_SDK_${prefix}_ARCHITECTURES}")
   message(STATUS "  Object Format: ${SWIFT_SDK_${prefix}_OBJECT_FORMAT}")
+  foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
+    if(${SWIFT_SDK_${prefix}_ARCH_${arch}_LINKER})
+      message(STATUS "  Linker (${arch}): ${SWIFT_SDK_${prefix}_ARCH_${arch}_LINKER}")
+    else()
+      message(STATUS "  Linker (${arch}): ${CMAKE_LINKER}")
+    endif()
+  endforeach()
 
   foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
     message(STATUS
