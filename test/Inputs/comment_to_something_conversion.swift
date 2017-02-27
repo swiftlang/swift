@@ -11,7 +11,7 @@
 
 /// Aaa.  init().
 public init() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>init()</Name><USR>c:objc(cs)A010_AttachToEntities(cm)init</USR><Declaration>public init()</Declaration><Abstract><Para>Aaa.  init().</Para></Abstract></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>init()</Name><USR>c:objc(cs)A010_AttachToEntities(im)init</USR><Declaration>public init()</Declaration><Abstract><Para>Aaa.  init().</Para></Abstract></Function>]
 
 /// Aaa.  subscript(i: Int).
 public subscript(i: Int) -> Int {
