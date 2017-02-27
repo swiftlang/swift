@@ -10,7 +10,7 @@ extension Array where Element == Int {
 
   // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE16instancePropertySifg : $@convention(method) (@guaranteed Array<Int>) -> Int
   // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE16instancePropertySifs : $@convention(method) (Int, @inout Array<Int>) -> ()
-  // CHECK-LABEL: sil [transparent] [fragile] @_T0Sa22constrained_extensionsSiRszlE16instancePropertySifmytfU_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Array<Int>, @thick Array<Int>.Type) -> ()
+  // CHECK-LABEL: sil [transparent] [fragile] @_T0Sa22constrained_extensionsSiRszlE16instancePropertySifmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Array<Int>, @thick Array<Int>.Type) -> ()
   // CHECK-LABEL: sil [transparent] [fragile] @_T0Sa22constrained_extensionsSiRszlE16instancePropertySifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Array<Int>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
 
   public var instanceProperty: Element {
@@ -71,7 +71,7 @@ extension Dictionary where Key == Int {
 
   // CHECK-LABEL: sil @_T0s10DictionaryV22constrained_extensionsSiRszr0_lE16instancePropertyq_fg : $@convention(method) <Key, Value where Key == Int> (@guaranteed Dictionary<Int, Value>) -> @out Value
   // CHECK-LABEL: sil @_T0s10DictionaryV22constrained_extensionsSiRszr0_lE16instancePropertyq_fs : $@convention(method) <Key, Value where Key == Int> (@in Value, @inout Dictionary<Int, Value>) -> ()
-  // CHECK-LABEL: sil [transparent] [fragile] @_T0s10DictionaryV22constrained_extensionsSiRszr0_lE16instancePropertyq_fmytfU_ : $@convention(thin) <Key, Value where Key == Int> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Dictionary<Int, Value>, @thick Dictionary<Int, Value>.Type) -> ()
+  // CHECK-LABEL: sil [transparent] [fragile] @_T0s10DictionaryV22constrained_extensionsSiRszr0_lE16instancePropertyq_fmytfU_ : $@convention(method) <Key, Value where Key == Int> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Dictionary<Int, Value>, @thick Dictionary<Int, Value>.Type) -> ()
   // CHECK-LABEL: sil [transparent] [fragile] @_T0s10DictionaryV22constrained_extensionsSiRszr0_lE16instancePropertyq_fm : $@convention(method) <Key, Value where Key == Int> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Dictionary<Int, Value>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   public var instanceProperty: Value {
     get {
