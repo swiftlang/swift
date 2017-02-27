@@ -6,7 +6,9 @@ add_swift_unittest(SwiftSyntaxTests
   StmtSyntaxTests.cpp
   ThreadSafeCachingTests.cpp
   TriviaTests.cpp
-  TypeSyntaxTests.cpp)
+  TypeSyntaxTests.cpp
+  UnknownSyntaxTests.cpp
+  )
 
 target_link_libraries(SwiftSyntaxTests
   swiftSyntax)

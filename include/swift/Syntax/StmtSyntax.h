@@ -22,6 +22,7 @@
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/SyntaxData.h"
+#include "swift/Syntax/UnknownSyntax.h"
 
 using llvm::Optional;
 
@@ -66,7 +67,7 @@ public:
 
 #pragma mark - unknown-statement Data
 
-class UnknownStmtSyntaxData : public StmtSyntaxData {
+class UnknownStmtSyntaxData : public UnknownSyntaxData {
   UnknownStmtSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
                         CursorIndex IndexInParent = 0);
 public:
@@ -81,12 +82,12 @@ public:
 
 #pragma mark - unknown-statement API
 
-class UnknownStmtSyntax : public StmtSyntax {
+class UnknownStmtSyntax : public UnknownSyntax {
   friend class SyntaxData;
   friend class UnknownStmtSyntaxData;
   friend class LegacyASTTransformer;
 
-  using DataType = UnknownExprSyntaxData;
+  using DataType = UnknownStmtSyntaxData;
 
   UnknownStmtSyntax(const RC<SyntaxData> Root,
                     const UnknownStmtSyntaxData *Data);

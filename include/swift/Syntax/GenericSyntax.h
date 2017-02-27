@@ -435,6 +435,7 @@ class GenericArgumentClauseSyntax : public Syntax {
   friend class GenericArgumentClauseBuilder;
   friend class SymbolicReferenceExprSyntax;
   friend class SyntaxData;
+  friend class Syntax;
 
   using DataType = GenericArgumentClauseSyntaxData;
 

@@ -235,6 +235,18 @@ struct RawSyntax : public llvm::ThreadSafeRefCountedBase<RawSyntax> {
     return Kind >= SyntaxKind::First_Expr && Kind <= SyntaxKind::Last_Expr;
   }
 
+  /// Return true if this raw syntax node is a token.
+  bool isToken() const {
+    return Kind == SyntaxKind::Token;
+  }
+
+  bool isUnknown() const {
+    return Kind == SyntaxKind::Unknown ||
+           Kind == SyntaxKind::UnknownDecl ||
+           Kind == SyntaxKind::UnknownExpr ||
+           Kind == SyntaxKind::UnknownStmt;
+  }
+
   /// Get the absolute position of this raw syntax: its offset, line,
   /// and column.
   AbsolutePosition getAbsolutePosition(RC<RawSyntax> Root) const;

@@ -25,6 +25,7 @@
 #include "swift/Syntax/SyntaxData.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "swift/Syntax/TypeSyntax.h"
+#include "swift/Syntax/UnknownSyntax.h"
 
 #include "llvm/ADT/BitVector.h"
 
@@ -56,7 +57,7 @@ public:
 
 #pragma mark - unknown-declaration Data
 
-class UnknownDeclSyntaxData : public DeclSyntaxData {
+class UnknownDeclSyntaxData : public UnknownSyntaxData {
   UnknownDeclSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
                         CursorIndex IndexInParent = 0);
 public:
@@ -71,7 +72,7 @@ public:
 
 #pragma mark - unknown-declaration API
 
-class UnknownDeclSyntax : public DeclSyntax {
+class UnknownDeclSyntax : public UnknownSyntax {
   friend class SyntaxData;
   friend class UnknownStmtSyntaxData;
   friend class LegacyASTTransformer;

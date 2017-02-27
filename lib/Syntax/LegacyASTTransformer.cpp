@@ -19,6 +19,7 @@
 #include "swift/Syntax/StmtSyntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/UnknownSyntax.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -500,7 +501,7 @@ LegacyASTTransformer::visitGuardStmt(GuardStmt *S,
 RC<SyntaxData>
 LegacyASTTransformer::visitWhileStmt(WhileStmt *S,
                                      const SyntaxData *Parent,
-                                     const CursorIndex IndexInParent) {
+                                     const CursorIndex IndexInParent) { 
   return getUnknownStmt(S);
 }
 

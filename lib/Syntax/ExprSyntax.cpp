@@ -42,7 +42,7 @@ ExprSyntax::ExprSyntax(const RC<SyntaxData> Root, const ExprSyntaxData *Data)
 UnknownExprSyntaxData::UnknownExprSyntaxData(RC<RawSyntax> Raw,
                                              const SyntaxData *Parent,
                                              CursorIndex IndexInParent)
-  : ExprSyntaxData(Raw, Parent, IndexInParent) {
+  : UnknownSyntaxData(Raw, Parent, IndexInParent) {
   assert(Raw->Kind == SyntaxKind::UnknownExpr);
 }
 
@@ -50,9 +50,11 @@ RC<UnknownExprSyntaxData>
 UnknownExprSyntaxData::make(RC<RawSyntax> Raw,
                             const SyntaxData *Parent,
                             CursorIndex IndexInParent) {
+  auto UnknownRaw = RawSyntax::make(SyntaxKind::UnknownExpr, Raw->Layout,
+                                    Raw->Presence);
   return RC<UnknownExprSyntaxData> {
     new UnknownExprSyntaxData {
-      Raw, Parent, IndexInParent
+      UnknownRaw, Parent, IndexInParent
     }
   };
 }
@@ -61,7 +63,7 @@ UnknownExprSyntaxData::make(RC<RawSyntax> Raw,
 
 UnknownExprSyntax::UnknownExprSyntax(const RC<SyntaxData> Root,
                                      const UnknownExprSyntaxData *Data)
-  : ExprSyntax(Root, Data) {}
+  : UnknownSyntax(Root, Data) {}
 
 #pragma mark - integer-literal-expression Data
 

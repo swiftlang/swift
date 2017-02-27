@@ -152,7 +152,7 @@ struct SyntaxFactory {
   /// Make a function call argument list with the given arguments.
   static FunctionCallArgumentListSyntax
   makeFunctionCallArgumentList(
-    std::vector<FunctionCallArgumentSyntax> &Arguments);
+    std::vector<FunctionCallArgumentSyntax> Arguments);
 
   /// Make a function call argument list with no arguments.
   static FunctionCallArgumentListSyntax makeBlankFunctionCallArgumentList();
