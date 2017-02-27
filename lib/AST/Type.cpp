@@ -283,13 +283,17 @@ bool CanType::isObjCExistentialTypeImpl(CanType type) {
 }
 
 bool TypeBase::isSpecialized() {
-  CanType CT = getCanonicalType();
-  if (CT.getPointer() != this)
-    return CT->isSpecialized();
+  Type t = getCanonicalType();
 
-  return CT.findIf([](Type type) -> bool {
-    return isa<BoundGenericType>(type.getPointer());
-  });
+  for (;;) {
+    if (!t || !t->getAnyNominal())
+      return false;
+    if (t->is<BoundGenericType>())
+      return true;
+    t = t->getNominalParent();
+  }
+
+  return false;
 }
 
 bool TypeBase::hasOpenedExistential(ArchetypeType *opened) {
