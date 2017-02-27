@@ -622,7 +622,8 @@ public:
   CanSILFunctionType
   getMaterializeForSetCallbackType(AbstractStorageDecl *storage,
                                    CanGenericSignature genericSig,
-                                   Type selfType);
+                                   Type selfType,
+                                   SILFunctionTypeRepresentation rep);
 
   /// Return the SILFunctionType for a native function value of the
   /// given type.

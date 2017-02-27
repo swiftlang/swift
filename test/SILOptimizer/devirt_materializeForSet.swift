@@ -5,7 +5,7 @@
 
 // CHECK-LABEL: sil [transparent] [fragile] [thunk] @_T024devirt_materializeForSet7BaseFooCAA0F0AaaDP3barSSfmTW
 // CHECK: checked_cast_br [exact] %{{.*}} : $BaseFoo to $ChildFoo
-// CHECK: thin_function_to_pointer %{{.*}} : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout ChildFoo, @thick ChildFoo.Type) -> () to $Builtin.RawPointer
+// CHECK: thin_function_to_pointer %{{.*}} : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout ChildFoo, @thick ChildFoo.Type) -> () to $Builtin.RawPointer
 // CHECK: enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, %{{.*}} : $Builtin.RawPointer
 // CHECK: tuple (%{{.*}} : $Builtin.RawPointer, %{{.*}} : $Optional<Builtin.RawPointer>)
 

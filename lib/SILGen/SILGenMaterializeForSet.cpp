@@ -12,6 +12,136 @@
 //
 // Emission of materializeForSet.
 //
+// There are two cases where materializeForSet is used for inout access:
+//
+// === Storage is virtually dispatched on a base class ===
+//
+// For example, suppose we have this setup, where a computed property in a
+// base class is overridden with a computed property in the derived class:
+//
+//   class Base<T> { var x: T }
+//   class Derived : Base<Int> { override var x: Int { ... } }
+//   func operate(b: Base<Int>) {
+//     b.x += 1
+//   }
+//
+// As far as caller is concerned, the callback is invoked with the following
+// SIL type:
+//
+// <T> (RawPointer, @inout UnsafeValueBuffer, @inout Base<T>, @thick Base<T>.Type) -> ()
+//
+// The caller will pass the first four formal parameters, followed by the
+// type metadata for 'T'.
+//
+// However if the dynamic type of the parameter 'b' is actually 'Derived',
+// then the actual callback has this SIL type:
+//
+// (RawPointer, @inout UnsafeValueBuffer, @inout Derived, @thick Derived.Type) -> ()
+//
+// This is a fully concrete function type, with no additional generic metadata.
+//
+// These two callbacks are be ABI-compatible though, because IRGen makes three
+// guarantees:
+//
+// 1) Passing extra arguments (in this case, the type metadata for 'T') is a
+//    no-op.
+//
+// 2) IRGen knows to recover the type metadata for 'T' from the
+//    '@thick Base<T>.Type' parameter, instead of passing it separately.
+//
+// 3) The metatype for 'Derived' must be layout-compatible with 'Base<T>';
+//    since the generic parameter 'T' is made concrete, we expect to find the
+//    type metadata for 'Int' at the same offset within 'Derived.Type' as the
+//    generic parameter 'T' in 'Base<T>.Type'.
+//
+// === Storage is virtually dispatched on a protocol ===
+//
+// For example,
+//
+//   protocol BoxLike { associatedtype Element; var x: Element { get set } }
+//   func operate<B : BoxLike>(b: B) where B.Element == Int {
+//     b.x += 1
+//   }
+//
+// As far as the caller is concerned, the callback is invoked with following
+// SIL type:
+//
+// <Self : BoxLike> (RawPointer, @inout UnsafeValueBuffer, @inout Self, @thick Self.Type) -> ()
+//
+// At the IRGen level, a call of a SIL function with the above type will pass
+// the four formal parameters, followed by the type metadata for 'Self', and
+// then followed by the protocol witness table for 'Self : BoxLike'.
+//
+// As in the class case, the callback won't have the same identical SIL type,
+// because it might have a different representation of 'Self'.
+//
+// So we must consider two separate cases:
+//
+// 1) The witness is a method of the concrete conforming type, eg,
+//
+//      struct Box<T> : BoxLike { var x: T }
+//
+//    Here, the actual callback will have the following type:
+//
+//    <T> (RawPointer, @inout UnsafeValueBuffer, @inout Box<T>, @thick Box<T>.Type) -> ()
+//
+//    As with the class case, IRGen can already do the right thing -- the type
+//    metadata for 'T' is recovered from the '@thick Box<T>.Type' parameter,
+//    and the type metadata for 'Self' as well as the conformance
+//    'Self : BoxLike' are ignored.
+//
+// 2) The witness is a protocol extension method, possibly of some other protocol, eg,
+//
+//      protocol SomeOtherProtocol { }
+//      extension SomeOtherProtocol { var x: Element { ... } }
+//      struct FunnyBox<T> : BoxLike, SomeOtherProtocol { typealias Element = T }
+//
+//    Here, the actual callback will have the following type:
+//
+//    <Self : SomeOtherProtocol> (RawPointer, @inout UnsafeValueBuffer, @inout Self, @thick Self.Type) -> ()
+//
+//    Here, the actual callback expects to receive the four formal parameters,
+//    followed by the type metadata for 'Self', followed by the witness table
+//    for the conformance 'Self : SomeOtherProtocol'. Note that the
+//    conformance cannot be recovered from the thick metatype.
+//
+//    This is *not* ABI-compatible with the type used at the call site,
+//    because the caller is passing in the conformance of 'Self : BoxLike'
+//    (the requirement's signature) but the callee is expecting
+//    'Self : SomeOtherProtocol' (the witness signature).
+//
+//    For this reason the materializeForSet method in the protocol extension
+//    of 'SomeOtherProtocol' cannot witness the materializeForSet requirement
+//    of 'BoxLike'. So instead, the protocol witness thunk for
+//    materializeForSet cannot delegate to the materializeForSet witness at
+//    all; it's entirely open-coded, with its own callback that has the right
+//    calling convention.
+//
+// === Storage has its own generic parameters ===
+//
+// One final special case is where the storage has its own generic parameters;
+// that is, a generic subscript.
+//
+// Suppose we have the following protocol:
+//
+//   protocol GenericSubscript { subscript<T, U>(t: T) -> U { get set } }
+//
+// At the call site, the callback is invoked with the following signature:
+//
+// <Self : GenericSubscript, T, U> (RawPointer, @inout UnsafeValueBuffer, @inout Self, @thick Self.Type) -> ()
+//
+// If the witness is a member of a concrete type 'AnyDictionary', the actual
+// callback will have the following signature:
+//
+// <T, U> (RawPointer, @inout UnsafeValueBuffer, @inout AnyDictionary, @thick SelfAnyDictionary.Type) -> ()
+//
+// This is not ABI-compatible with the type at the call site, because the type
+// metadata for 'T' and 'U' trails the type metadata for 'Self' and the protocol
+// witness table for the conformance 'Self : GenericSubscript'.
+//
+// So again, protocol witness thunks for materializeForSet of a generic
+// subscript must be open-coded.
+//
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
@@ -124,12 +254,15 @@ struct MaterializeForSetEmitter {
 
   SILType WitnessStorageType;
 
+  SILFunctionTypeRepresentation CallbackRepresentation;
+
 private:
 
   MaterializeForSetEmitter(SILGenModule &SGM, SILLinkage linkage,
                            FuncDecl *witness, SubstitutionList subs,
                            GenericEnvironment *genericEnv,
-                           Type selfInterfaceType, Type selfType)
+                           Type selfInterfaceType, Type selfType,
+                           SILFunctionTypeRepresentation callbackRepresentation)
     : SGM(SGM),
       Linkage(linkage),
       RequirementStorage(nullptr),
@@ -142,7 +275,8 @@ private:
       SelfInterfaceType(selfInterfaceType->getCanonicalType()),
       SubstSelfType(selfType->getCanonicalType()),
       TheAccessSemantics(AccessSemantics::Ordinary),
-      IsSuper(false) {
+      IsSuper(false),
+      CallbackRepresentation(callbackRepresentation) {
 
     // Determine the formal type of the 'self' parameter.
     if (WitnessStorage->isStatic()) {
@@ -179,7 +313,8 @@ public:
                   FuncDecl *requirement, FuncDecl *witness,
                   SubstitutionList witnessSubs) {
     MaterializeForSetEmitter emitter(SGM, linkage, witness, witnessSubs,
-                                     genericEnv, selfInterfaceType, selfType);
+                                     genericEnv, selfInterfaceType, selfType,
+                                     SILFunctionTypeRepresentation::WitnessMethod);
     emitter.RequirementStorage = requirement->getAccessorStorageDecl();
 
     // Determine the desired abstraction pattern of the storage type
@@ -209,7 +344,8 @@ public:
     MaterializeForSetEmitter emitter(SGM, constant.getLinkage(ForDefinition),
                                      witness, witnessSubs,
                                      witness->getGenericEnvironment(),
-                                     selfInterfaceType, selfType);
+                                     selfInterfaceType, selfType,
+                                     SILFunctionTypeRepresentation::Method);
 
     emitter.RequirementStorage = emitter.WitnessStorage;
     emitter.RequirementStoragePattern = emitter.WitnessStoragePattern;
@@ -374,9 +510,12 @@ public:
   /// Given part of the witness's interface type, produce its
   /// substitution according to the witness substitutions.
   CanType getSubstWitnessInterfaceType(CanType type) {
-    auto subs = SubstSelfType->getRValueInstanceType()
-        ->getMemberSubstitutionMap(SGM.SwiftModule, WitnessStorage);
-    return type.subst(subs)->getCanonicalType();
+    if (auto *witnessSig = Witness->getGenericSignature()) {
+      auto subMap = witnessSig->getSubstitutionMap(WitnessSubs);
+      return type.subst(subMap, SubstFlags::UseErrorType)->getCanonicalType();
+    }
+
+    return type;
   }
 
 };
@@ -537,7 +676,8 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
   auto callbackType =
       SGM.Types.getMaterializeForSetCallbackType(WitnessStorage,
                                                  GenericSig,
-                                                 SelfInterfaceType);
+                                                 SelfInterfaceType,
+                                                 CallbackRepresentation);
 
   auto *genericEnv = GenericEnv;
   if (GenericEnv && GenericEnv->getGenericSignature()->areAllParamsConcrete())
