@@ -331,6 +331,7 @@ NO_RESULT_OWNERSHIP_INST(DestroyValue)
 NO_RESULT_OWNERSHIP_INST(AllocGlobal)
 NO_RESULT_OWNERSHIP_INST(InjectEnumAddr)
 NO_RESULT_OWNERSHIP_INST(DeinitExistentialAddr)
+NO_RESULT_OWNERSHIP_INST(DeinitExistentialOpaque)
 NO_RESULT_OWNERSHIP_INST(CondFail)
 
 // Terminators. These do not produce SILValue, so they do not have a

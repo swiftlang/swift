@@ -4176,6 +4176,15 @@ class DeinitExistentialAddrInst
       : UnaryInstructionBase(DebugLoc, Existential) {}
 };
 
+class DeinitExistentialOpaqueInst
+    : public UnaryInstructionBase<ValueKind::DeinitExistentialOpaqueInst,
+                                  SILInstruction, /*HAS_RESULT*/ false> {
+  friend SILBuilder;
+
+  DeinitExistentialOpaqueInst(SILDebugLocation DebugLoc, SILValue Existential)
+      : UnaryInstructionBase(DebugLoc, Existential) {}
+};
+
 /// Projects the capture storage address from a @block_storage address.
 class ProjectBlockStorageInst
   : public UnaryInstructionBase<ValueKind::ProjectBlockStorageInst,

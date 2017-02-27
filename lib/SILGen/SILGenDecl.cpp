@@ -1233,7 +1233,11 @@ namespace {
       case ExistentialRepresentation::Metatype:
         llvm_unreachable("cannot cleanup existential");
       case ExistentialRepresentation::Opaque:
-        gen.B.createDeinitExistentialAddr(l, existentialAddr);
+        if (gen.silConv.useLoweredAddresses()) {
+          gen.B.createDeinitExistentialAddr(l, existentialAddr);
+        } else {
+          gen.B.createDeinitExistentialOpaque(l, existentialAddr);
+        }
         break;
       case ExistentialRepresentation::Boxed:
         gen.B.createDeallocExistentialBox(l, concreteFormalType,
