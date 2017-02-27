@@ -2372,7 +2372,6 @@ void GenericSignatureBuilder::inferRequirements(ParameterList *params,
   if (genericParams == nullptr)
     return;
 
-  unsigned depth = genericParams->getDepth();
   for (auto P : *params)
     inferRequirements(P->getTypeLoc());
 }
