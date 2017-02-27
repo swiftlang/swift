@@ -869,6 +869,8 @@ public:
       return {true, metadataPointer};
     }
     }
+
+    swift_runtime_unreachable("Unhandled IsaEncodingKind in switch.");
   }
 
   /// Read the parent type metadata from a nested nominal type metadata.

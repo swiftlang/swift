@@ -629,7 +629,7 @@ private:
 /// TODO: This is an atrocity. Come up with a shorter name.
 #define FUNCSIGSPEC_CREATE_PARAM_KIND(kind)                                    \
   Factory.createNode(Node::Kind::FunctionSignatureSpecializationParamKind,    \
-                      unsigned(FunctionSigSpecializationParamKind::kind))
+                      uint64_t(FunctionSigSpecializationParamKind::kind))
 #define FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(payload)                              \
   Factory.createNode(Node::Kind::FunctionSignatureSpecializationParamPayload, \
                       payload)

@@ -283,6 +283,9 @@ public:
   SimpleIdentTypeRepr(SourceLoc Loc, Identifier Id)
     : ComponentIdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id) {}
 
+  SimpleIdentTypeRepr(const SimpleIdentTypeRepr &repr)
+    : SimpleIdentTypeRepr(repr.getLoc(), repr.getIdentifier()) {}
+
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::SimpleIdent;
   }
@@ -845,6 +848,9 @@ class FixedTypeRepr : public TypeRepr {
 public:
   FixedTypeRepr(Type Ty, SourceLoc Loc)
     : TypeRepr(TypeReprKind::Fixed), Ty(Ty), Loc(Loc) {}
+
+  FixedTypeRepr(const FixedTypeRepr& repr)
+    : FixedTypeRepr(repr.Ty, repr.Loc) {}
 
   /// Retrieve the location.
   SourceLoc getLoc() const { return Loc; }
