@@ -451,11 +451,8 @@ public:
     CanType witnessSelfType =
       Witness->computeInterfaceSelfType()->getCanonicalType();
     witnessSelfType = getSubstWitnessInterfaceType(witnessSelfType);
-    if (auto selfTuple = dyn_cast<TupleType>(witnessSelfType)) {
-      assert(selfTuple->getNumElements() == 1);
-      witnessSelfType = selfTuple.getElementType(0);
-    }
-    witnessSelfType = witnessSelfType.getLValueOrInOutObjectType();
+    witnessSelfType = witnessSelfType->getInOutObjectType()
+      ->getCanonicalType();
 
     // Eagerly loading here could cause an unnecessary
     // load+materialize in some cases, but it's not really important.
