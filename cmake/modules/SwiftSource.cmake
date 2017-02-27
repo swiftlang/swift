@@ -239,6 +239,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-enable-resilience")
   endif()
 
+  if(SWIFT_STDLIB_USE_NONATOMIC_RC)
+    list(APPEND swift_flags "-Xfrontend" "-assume-single-threaded")
+  endif()
+
   if(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP AND SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-Xfrontend" "-enable-sil-ownership")
   endif()

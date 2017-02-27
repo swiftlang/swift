@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// UNSUPPORTED: nonatomic_rc
 
 import SwiftPrivate
 import StdlibUnittest
