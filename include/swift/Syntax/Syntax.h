@@ -39,7 +39,6 @@ namespace syntax {
 const auto NoParent = llvm::None;
 
 class SyntaxData;
-class UnknownSyntaxData;
 
 /// The main handle for syntax nodes - subclasses contain all public
 /// structured editing APIs.
@@ -138,6 +137,9 @@ public:
   /// Returns true if this syntax node represents a type.
   bool isType() const;
 
+  /// Returns true if this syntax is of some "unknown" kind.
+  bool isUnknown() const;
+
   /// Print the syntax node with full fidelity to the given output stream.
   void print(llvm::raw_ostream &OS) const;
 
@@ -153,19 +155,6 @@ public:
   }
 
   // TODO: hasSameStructureAs ?
-};
-
-/// A chunk of "unknown" syntax - effectively a sequence of tokens.
-class UnknownSyntax final : public Syntax {
-  friend struct SyntaxFactory;
-
-  UnknownSyntax(const RC<SyntaxData> Root, UnknownSyntaxData *Data);
-  static UnknownSyntax make(RC<RawSyntax> Raw);
-
-public:
-  static bool classof(const Syntax *S) {
-    return S->getKind() == SyntaxKind::Unknown;
-  }
 };
 
 } // end namespace syntax

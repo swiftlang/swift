@@ -12,4 +12,5 @@ add_swift_library(swiftSyntax STATIC
   SyntaxFactory.cpp
   SyntaxData.cpp
   TypeSyntax.cpp
+  UnknownSyntax.cpp
 )
