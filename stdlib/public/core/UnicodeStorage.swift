@@ -44,7 +44,6 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
 /// A lazy collection of `Encoding.EncodedScalar` that results
 /// from parsing an instance of codeUnits using that `Encoding`.
 extension UnicodeStorage {
-
   public struct EncodedScalars {
     let codeUnits: CodeUnits
     
@@ -386,7 +385,7 @@ extension UnicodeStorage : _UTextable {
 }
 
 extension UnicodeStorage {
-  var scalars: EncodedScalars {
+  public var scalars: EncodedScalars {
     return EncodedScalars(codeUnits, Encoding.self)
   }
 }
