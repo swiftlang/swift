@@ -1111,14 +1111,6 @@ namespace {
       llvm_unreachable("copy into");
     }
 
-    // --- Same as NonTrivialLoadableTypeLowering
-
-    void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
-                         SILValue newValue, SILValue addr,
-                         IsInitialization_t isInit) const override {
-      llvm_unreachable("store copy");
-    }
-
     // --- Same as LeafLoadableTypeLowering.
 
     SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,

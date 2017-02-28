@@ -307,3 +307,21 @@ func s190___return_foo_var() -> Foo {
 func s200______use_foo_var() {
   foo_var.foo()
 }
+
+// Tests composition erasure of opaque existentials + copy into of opaques
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s210______compErasures5Error_psAC_AA3FoopF : $@convention(thin) (@in Error & Foo) -> @owned Error {
+// CHECK: bb0([[ARG:%.*]] : $Error & Foo):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_opaque [[BORROWED_ARG]] : $Error & Foo to $@opened({{.*}}) Error & Foo
+// CHECK:   [[EXIST_BOX:%.*]] = alloc_existential_box $Error, $@opened({{.*}}) Error & Foo
+// CHECK:   [[PROJ_BOX:%.*]] = project_existential_box $@opened({{.*}}) Error & Foo in [[EXIST_BOX]]
+// CHECK:   [[COPY_OPAQUE:%.*]] = copy_value [[OPAQUE_ARG]] : $@opened({{.*}}) Error & Foo
+// CHECK:   store [[COPY_OPAQUE]] to [init] [[PROJ_BOX]] : $*@opened({{.*}}) Error & Foo
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK:   destroy_value [[ARG]] : $Error & Foo
+// CHECK:   return [[EXIST_BOX]] : $Error
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s210______compErasures5Error_psAC_AA3FoopF'
+func s210______compErasure(_ x: Foo & Error) -> Error {
+  return x
+}
