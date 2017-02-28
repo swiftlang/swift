@@ -222,9 +222,11 @@ namespace driver {
     }
 
     /// When a task finishes, check other Jobs that may be blocked.
-    void markFinished(const Job *Cmd) {
+    void markFinished(const Job *Cmd, bool Skipped=false) {
       if (Comp.ShowIncrementalBuildDecisions) {
-        llvm::outs() << "Job finished: " << LogJob(Cmd) << "\n";
+        llvm::outs() << "Job "
+                     << (Skipped ? "skipped" : "finished")
+                     << ": " << LogJob(Cmd) << "\n";
       }
       FinishedCommands.insert(Cmd);
 
@@ -590,8 +592,9 @@ namespace driver {
           }
 
           ScheduledCommands.insert(Cmd);
-          markFinished(Cmd);
+          markFinished(Cmd, /*Skipped=*/true);
         }
+        DeferredCommands.clear();
 
         // ...which may allow us to go on and do later tasks.
       } while (Result == 0 && TQ->hasRemainingTasks());
