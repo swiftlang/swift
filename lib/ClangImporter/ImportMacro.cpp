@@ -51,9 +51,7 @@ ClangModuleUnit *ClangImporter::Implementation::getClangModuleForMacro(
   // ClangModule.
   auto *M = maybeModule.getValue()->getTopLevelModule();
 
-  auto &importer =
-    static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
-  return getWrapperForModule(importer, M);
+  return getWrapperForModule(M);
 }
 
 template <typename T = clang::Expr>

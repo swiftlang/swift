@@ -83,9 +83,7 @@ namespace {
     void handleImport(const clang::Module *imported) {
       if (!imported)
         return;
-      ModuleDecl *nativeImported = Impl.finishLoadingClangModule(Importer, imported,
-        /*preferAdapter=*/true);
-      Impl.ImportedHeaderExports.push_back({ /*filter=*/{}, nativeImported });
+      Impl.DeferredHeaderImports.push_back(imported);
     }
 
     void InclusionDirective(clang::SourceLocation HashLoc,
@@ -835,7 +833,7 @@ ClangImporter::create(ASTContext &ctx,
   // Set up the imported header module.
   auto *importedHeaderModule = ModuleDecl::create(ctx.getIdentifier("__ObjC"), ctx);
   importer->Impl.ImportedHeaderUnit =
-    new (ctx) ClangModuleUnit(*importedHeaderModule, *importer, nullptr);
+    new (ctx) ClangModuleUnit(*importedHeaderModule, importer->Impl, nullptr);
   importedHeaderModule->addFile(*importer->Impl.ImportedHeaderUnit);
 
   importer->Impl.IsReadingBridgingPCH = false;
@@ -963,6 +961,9 @@ bool ClangImporter::Implementation::importHeader(
   // Add any defined macros to the bridging header lookup table.
   addMacrosToLookupTable(*BridgingHeaderLookupTable, getNameImporter());
 
+  // Finish loading any extra modules that were (transitively) imported.
+  handleDeferredImports();
+
   // Wrap all Clang imports under a Swift import decl.
   for (auto &Import : BridgeHeaderTopLevelImports) {
     if (auto *ClangImport = Import.dyn_cast<clang::ImportDecl*>()) {
@@ -1008,16 +1009,11 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
                                          bool trackParsedSymbols,
                                          bool implicitImport) {
   if (llvm::sys::path::extension(header).endswith(PCH_EXTENSION)) {
-    // We already imported this with -include-pch above, so we should have
-    // collected a bunch of PCH-encoded module imports that we need to
-    // replay to the HeaderImportCallbacks for processing.
     Impl.ImportedHeaderOwners.push_back(adapter);
-    clang::ASTReader &R = *Impl.Instance->getModuleManager();
-    HeaderImportCallbacks CB(*this, Impl);
-    for (auto ID : Impl.PCHImportedSubmodules) {
-      CB.handleImport(R.getSubmodule(ID));
-    }
-    Impl.PCHImportedSubmodules.clear();
+    // We already imported this with -include-pch above, so we should have
+    // collected a bunch of PCH-encoded module imports that we just need to
+    // replay in handleDeferredImports.
+    Impl.handleDeferredImports();
     return false;
   }
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
@@ -1037,7 +1033,6 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
     llvm::MemoryBuffer::getMemBufferCopy(
       importLine, Implementation::bridgingHeaderBufferName)
   };
-
   return Impl.importHeader(adapter, header, diagLoc, trackParsedSymbols,
                            std::move(sourceBuffer), implicitImport);
 }
@@ -1234,12 +1229,11 @@ ModuleDecl *ClangImporter::loadModule(
   if (!clangModule)
     return nullptr;
 
-  return Impl.finishLoadingClangModule(*this, clangModule,
+  return Impl.finishLoadingClangModule(clangModule,
                                        /*preferAdapter=*/false);
 }
 
 ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
-    ClangImporter &owner,
     const clang::Module *clangModule,
     bool findAdapter) {
   assert(clangModule);
@@ -1269,7 +1263,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     result->setTestingEnabled();
 
     wrapperUnit =
-      new (SwiftContext) ClangModuleUnit(*result, owner, clangModule);
+      new (SwiftContext) ClangModuleUnit(*result, *this, clangModule);
     result->addFile(*wrapperUnit);
     cacheEntry.setPointerAndInt(wrapperUnit, true);
 
@@ -1280,7 +1274,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
   }
 
   if (clangModule->isSubModule()) {
-    finishLoadingClangModule(owner, clangModule->getTopLevelModule(), true);
+    finishLoadingClangModule(clangModule->getTopLevelModule(), true);
   } else {
     ModuleDecl *&loaded = SwiftContext.LoadedModules[result->getName()];
     if (!loaded)
@@ -1292,6 +1286,25 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
       result = adapter;
 
   return result;
+}
+
+// Run through the set of deferred imports -- either those referenced by
+// submodule ID from a bridging PCH, or those already loaded as clang::Modules
+// in response to an import directive in a bridging header -- and call
+// finishLoadingClangModule on each.
+void ClangImporter::Implementation::handleDeferredImports()
+{
+  clang::ASTReader &R = *Instance->getModuleManager();
+  for (clang::serialization::SubmoduleID ID : PCHImportedSubmodules) {
+    DeferredHeaderImports.push_back(R.getSubmodule(ID));
+  }
+  PCHImportedSubmodules.clear();
+  for (const clang::Module *M : DeferredHeaderImports) {
+    ModuleDecl *nativeImported =
+      finishLoadingClangModule(M, /*preferAdapter=*/true);
+    ImportedHeaderExports.push_back({ /*filter=*/{}, nativeImported });
+  }
+  DeferredHeaderImports.clear();
 }
 
 ModuleDecl *ClangImporter::getImportedHeaderModule() const {
@@ -1381,7 +1394,6 @@ ClangImporter::Implementation::~Implementation() {
 }
 
 ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
-    ClangImporter &importer,
     const clang::Module *underlying) {
   auto &cacheEntry = ModuleWrappers[underlying];
   if (ClangModuleUnit *cached = cacheEntry.getPointer())
@@ -1393,7 +1405,7 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   // Silence error messages about testably importing a Clang module.
   wrapper->setTestingEnabled();
 
-  auto file = new (SwiftContext) ClangModuleUnit(*wrapper, importer,
+  auto file = new (SwiftContext) ClangModuleUnit(*wrapper, *this,
                                                  underlying);
   wrapper->addFile(*file);
   cacheEntry.setPointer(file);
@@ -1414,9 +1426,7 @@ ClangModuleUnit *ClangImporter::Implementation::getClangModuleForDecl(
   // ClangModuleUnit.
   auto *M = maybeModule.getValue()->getTopLevelModule();
 
-  auto &importer =
-    static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
-  return getWrapperForModule(importer, M);
+  return getWrapperForModule(M);
 }
 
 #pragma mark Source locations
@@ -1988,9 +1998,9 @@ void ClangModuleUnit::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
   }
 
   // Find the corresponding lookup table.
-  if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
+  if (auto lookupTable = owner.findLookupTable(clangModule)) {
     // Search it.
-    owner.Impl.lookupVisibleDecls(*lookupTable, *actualConsumer);
+    owner.lookupVisibleDecls(*lookupTable, *actualConsumer);
   }
 }
 
@@ -2021,14 +2031,14 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     actualConsumer = &blacklistConsumer;
 
   // Find the corresponding lookup table.
-  if (auto lookupTable = owner.Impl.findLookupTable(topLevelModule)) {
+  if (auto lookupTable = owner.findLookupTable(topLevelModule)) {
     // Search it.
-    owner.Impl.lookupVisibleDecls(*lookupTable, *actualConsumer);
+    owner.lookupVisibleDecls(*lookupTable, *actualConsumer);
 
     // Add the extensions produced by importing categories.
     for (auto category : lookupTable->categories()) {
       if (auto extension = cast_or_null<ExtensionDecl>(
-              owner.Impl.importDecl(category, owner.Impl.CurrentVersion)))
+              owner.importDecl(category, owner.CurrentVersion)))
         results.push_back(extension);
     }
 
@@ -2040,7 +2050,7 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     for (auto entry : lookupTable->allGlobalsAsMembers()) {
       auto decl = entry.get<clang::NamedDecl *>();
       auto importedDecl =
-          owner.Impl.importDecl(decl, owner.Impl.CurrentVersion);
+          owner.importDecl(decl, owner.CurrentVersion);
       if (!importedDecl) continue;
 
       auto ext = dyn_cast<ExtensionDecl>(importedDecl->getDeclContext());
@@ -2125,9 +2135,9 @@ void ClangModuleUnit::lookupValue(ModuleDecl::AccessPathTy accessPath,
   }
 
   // Find the corresponding lookup table.
-  if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
+  if (auto lookupTable = owner.findLookupTable(clangModule)) {
     // Search it.
-    owner.Impl.lookupValue(*lookupTable, name, *consumer);
+    owner.lookupValue(*lookupTable, name, *consumer);
   }
 }
 
@@ -2265,9 +2275,9 @@ ClangModuleUnit::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
   VectorDeclConsumer consumer(results);
 
   // Find the corresponding lookup table.
-  if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
+  if (auto lookupTable = owner.findLookupTable(clangModule)) {
     // Search it.
-    owner.Impl.lookupObjCMembers(*lookupTable, name, consumer);
+    owner.lookupObjCMembers(*lookupTable, name, consumer);
   }
 }
 
@@ -2278,9 +2288,9 @@ void ClangModuleUnit::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
     return;
 
   // Find the corresponding lookup table.
-  if (auto lookupTable = owner.Impl.findLookupTable(clangModule)) {
+  if (auto lookupTable = owner.findLookupTable(clangModule)) {
     // Search it.
-    owner.Impl.lookupAllObjCMembers(*lookupTable, consumer);
+    owner.lookupAllObjCMembers(*lookupTable, consumer);
   }
 }
 
@@ -2292,12 +2302,12 @@ void ClangModuleUnit::lookupObjCMethods(
     return;
 
   // Map the selector into a Clang selector.
-  auto clangSelector = owner.Impl.exportSelector(selector);
+  auto clangSelector = owner.exportSelector(selector);
   if (clangSelector.isNull()) return;
 
   // Collect all of the Objective-C methods with this selector.
   SmallVector<clang::ObjCMethodDecl *, 8> objcMethods;
-  auto &clangSema = owner.Impl.getClangSema();
+  auto &clangSema = owner.getClangSema();
   clangSema.CollectMultipleMethodsInGlobalPool(clangSelector,
                                                objcMethods,
                                                /*InstanceFirst=*/true,
@@ -2319,23 +2329,23 @@ void ClangModuleUnit::lookupObjCMethods(
 
     // If we found a property accessor, import the property.
     if (objcMethod->isPropertyAccessor())
-      (void)owner.Impl.importDecl(objcMethod->findPropertyDecl(true),
-                                  owner.Impl.CurrentVersion);
+      (void)owner.importDecl(objcMethod->findPropertyDecl(true),
+                             owner.CurrentVersion);
 
     // Import it.
     // FIXME: Retrying a failed import works around recursion bugs in the Clang
     // importer.
     auto imported =
-        owner.Impl.importDecl(objcMethod, owner.Impl.CurrentVersion);
+        owner.importDecl(objcMethod, owner.CurrentVersion);
     if (!imported)
-      imported = owner.Impl.importDecl(objcMethod, owner.Impl.CurrentVersion);
+      imported = owner.importDecl(objcMethod, owner.CurrentVersion);
     if (!imported) continue;
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(imported))
       results.push_back(func);
 
     // If there is an alternate declaration, also look at it.
-    for (auto alternate : owner.Impl.getAlternateDecls(imported)) {
+    for (auto alternate : owner.getAlternateDecls(imported)) {
       if (auto func = dyn_cast<AbstractFunctionDecl>(alternate))
         results.push_back(func);
     }
@@ -2435,7 +2445,8 @@ void ClangImporter::verifyAllModules() {
 // ClangModule Implementation
 //===----------------------------------------------------------------------===//
 
-ClangModuleUnit::ClangModuleUnit(ModuleDecl &M, ClangImporter &owner,
+ClangModuleUnit::ClangModuleUnit(ModuleDecl &M,
+                                 ClangImporter::Implementation &owner,
                                  const clang::Module *clangModule)
   : LoadedFile(FileUnitKind::ClangModule, M), owner(owner),
     clangModule(clangModule) {
@@ -2468,7 +2479,7 @@ ModuleDecl *ClangModuleUnit::getAdapterModule() const {
   if (!isTopLevel()) {
     // FIXME: Is this correct for submodules?
     auto topLevel = clangModule->getTopLevelModule();
-    auto wrapper = owner.Impl.getWrapperForModule(owner, topLevel);
+    auto wrapper = owner.getWrapperForModule(topLevel);
     return wrapper->getAdapterModule();
   }
 
@@ -2504,8 +2515,8 @@ void ClangModuleUnit::getImportedModules(
   if (!clangModule) {
     // This is the special "imported headers" module.
     if (filter != ModuleDecl::ImportFilter::Private) {
-      imports.append(owner.Impl.ImportedHeaderExports.begin(),
-                     owner.Impl.ImportedHeaderExports.end());
+      imports.append(owner.ImportedHeaderExports.begin(),
+                     owner.ImportedHeaderExports.end());
     }
     return;
   }
@@ -2541,7 +2552,7 @@ void ClangModuleUnit::getImportedModules(
   }
 
   for (auto importMod : imported) {
-    auto wrapper = owner.Impl.getWrapperForModule(owner, importMod);
+    auto wrapper = owner.getWrapperForModule(importMod);
 
     auto actualMod = wrapper->getAdapterModule();
     if (!actualMod) {
@@ -2550,8 +2561,7 @@ void ClangModuleUnit::getImportedModules(
       auto importTopLevel = importMod->getTopLevelModule();
       if (importTopLevel != importMod &&
           importTopLevel != clangModule->getTopLevelModule()) {
-        auto topLevelWrapper = owner.Impl.getWrapperForModule(owner,
-                                                              importTopLevel);
+        auto topLevelWrapper = owner.getWrapperForModule(importTopLevel);
         imports.push_back({ ModuleDecl::AccessPathTy(),
                             topLevelWrapper->getParentModule() });
       }
@@ -2570,8 +2580,8 @@ void ClangModuleUnit::getImportedModulesForLookup(
 
   if (!clangModule) {
     // This is the special "imported headers" module.
-    imports.append(owner.Impl.ImportedHeaderExports.begin(),
-                   owner.Impl.ImportedHeaderExports.end());
+    imports.append(owner.ImportedHeaderExports.begin(),
+                   owner.ImportedHeaderExports.end());
     return;
   }
 
@@ -2608,7 +2618,7 @@ void ClangModuleUnit::getImportedModulesForLookup(
 
       // Don't continue looking through submodules of modules that have
       // overlays. The overlay might shadow things.
-      auto wrapper = owner.Impl.getWrapperForModule(owner, nextTopLevel);
+      auto wrapper = owner.getWrapperForModule(nextTopLevel);
       if (wrapper->getAdapterModule())
         continue;
     }
@@ -2626,7 +2636,7 @@ void ClangModuleUnit::getImportedModulesForLookup(
   }
 
   for (auto importMod : topLevelImported) {
-    auto wrapper = owner.Impl.getWrapperForModule(owner, importMod);
+    auto wrapper = owner.getWrapperForModule(importMod);
 
     auto actualMod = wrapper->getAdapterModule();
     if (!actualMod || actualMod == topLevelAdapter)
