@@ -325,3 +325,18 @@ func s200______use_foo_var() {
 func s210______compErasure(_ x: Foo & Error) -> Error {
   return x
 }
+
+// Tests that existential boxes can contain opaque types
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s220_____openExistBoxSSs5Error_pF : $@convention(thin) (@owned Error) -> @owned String {
+// CHECK: bb0([[ARG:%.*]] : $Error):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[BORROWED_ARG]] : $Error to $@opened({{.*}}) Error
+// CHECK:   [[RET_STRING:%.*]] = apply{{.*}}<@opened({{.*}}) Error>([[OPAQUE_ARG]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> @owned String
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK:   destroy_value [[ARG]] : $Error
+// CHECK:   return [[RET_STRING]] : $String
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s220_____openExistBoxSSs5Error_pF'
+func s220_____openExistBox(_ x: Error) -> String {
+  return x._domain
+}
