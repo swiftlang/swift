@@ -1,4 +1,4 @@
-//===--- ExprSyntax.cpp - Swift Expression Syntax Impl. ---------*- C++ -*-===//
+//===--- ExprSyntax.cpp - Swift Expression Syntax Impl. -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
