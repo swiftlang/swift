@@ -84,7 +84,7 @@ extension CGColor {
   func anyOldMethod() {}
 }
 
-// CHECK-LABEL: @interface GenericClass (SWIFT_EXTENSION(extensions))
+// CHECK-LABEL: @interface GenericClass<T> (SWIFT_EXTENSION(extensions))
 // CHECK-NEXT: - (void)bar;
 // CHECK-NEXT: @end
 extension GenericClass {
@@ -115,3 +115,17 @@ extension NSString {
   class func fromColor(_ color: NSColor) -> NSString? { return nil; }
 }
 
+// CHECK-LABEL: @interface PettableContainer<T> (SWIFT_EXTENSION(extensions))
+// CHECK-NEXT: - (PettableContainer<T> * _Nonnull)duplicate SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (PettableContainer<T> * _Nonnull)duplicate2 SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (PettableContainer<PettableOverextendedMetaphor *> * _Nonnull)duplicate3 SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (T _Nonnull)extract SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (T _Nullable)extract2 SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: @end
+extension PettableContainer {
+  func duplicate() -> PettableContainer { fatalError() }
+  func duplicate2() -> PettableContainer<T> { fatalError() }
+  func duplicate3() -> PettableContainer<PettableOverextendedMetaphor> { fatalError() }
+  func extract() -> T { fatalError() }
+  func extract2() -> T? { fatalError() }
+}
