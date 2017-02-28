@@ -254,7 +254,7 @@ SILValue swift::getInstanceWithExactDynamicType(SILValue S, SILModule &M,
     if (!SinglePred) {
       if (!isa<SILFunctionArgument>(Arg))
         break;
-      auto *CD = getClassDecl(Arg->getType());
+      auto *CD = Arg->getType().getClassOrBoundGenericClass();
       // Check if this class is effectively final.
       if (!CD || !isKnownFinalClass(CD, M, CHA))
         break;
@@ -352,7 +352,7 @@ SILType swift::getExactDynamicType(SILValue S, SILModule &M,
       if (FArg->getType().is<AnyMetatypeType>()) {
         return SILType();
       }
-      auto *CD = getClassDecl(FArg->getType());
+      auto *CD = FArg->getType().getClassOrBoundGenericClass();
       // If it is not class and it is a trivial type, then it
       // should be the exact type.
       if (!CD && FArg->getType().isTrivial(M)) {
