@@ -99,7 +99,6 @@ SYNTAX(FunctionTypeArgument, Syntax)
 SYNTAX(FunctionCallArgumentList, Syntax)
 SYNTAX(FunctionCallArgument, Syntax)
 
-
 #undef ABSTRACT_SYNTAX
 #undef DECL
 #undef STMT

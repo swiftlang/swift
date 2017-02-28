@@ -242,26 +242,12 @@ public:
   /// Returns true if the data node represents expression syntax.
   bool isExpr() const;
 
+  /// Returns true if this syntax is of some "unknown" kind.
+  bool isUnknown() const;
+
   /// Dump a debug description of the syntax data for debugging to
   /// standard error.
   void dump(llvm::raw_ostream &OS) const;
-};
-
-class UnknownSyntaxData final : public SyntaxData {
-  friend class SyntaxData;
-  friend class UnknownSyntax;
-  friend struct SyntaxFactory;
-  friend class LegacyASTTransformer;
-
-  UnknownSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-                    CursorIndex IndexInParent = 0)
-    : SyntaxData(Raw, Parent, IndexInParent) {}
-
-  static RC<UnknownSyntaxData> make(RC<RawSyntax> Raw,
-                                    const SyntaxData *Parent = nullptr,
-                                    CursorIndex IndexInParent = 0);
-public:
-  static bool classof(const SyntaxData *SD);
 };
 
 } // end namespace syntax

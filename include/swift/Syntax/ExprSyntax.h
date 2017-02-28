@@ -23,6 +23,7 @@
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/SyntaxData.h"
 #include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/UnknownSyntax.h"
 
 using llvm::Optional;
 
@@ -61,7 +62,7 @@ public:
 
 #pragma mark - unknown-expression Data
 
-class UnknownExprSyntaxData : public ExprSyntaxData {
+class UnknownExprSyntaxData : public UnknownSyntaxData {
   UnknownExprSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
                         CursorIndex IndexInParent = 0);
 public:
@@ -76,17 +77,17 @@ public:
 
 #pragma mark - unknown-expression API
 
-class UnknownExprSyntax : public ExprSyntax {
+class UnknownExprSyntax : public UnknownSyntax {
   friend class SyntaxData;
   friend class UnknownExprSyntaxData;
   friend class LegacyASTTransformer;
 
   using DataType = UnknownExprSyntaxData;
 
+public:
   UnknownExprSyntax(const RC<SyntaxData> Root,
                     const UnknownExprSyntaxData *Data);
 
-public:
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::UnknownExpr;
   }
@@ -333,12 +334,13 @@ public:
 /// function-call-argument-list -> function-call-argument
 ///                                function-call-argument-list?
 class FunctionCallArgumentListSyntax : public Syntax {
-  using DataType = FunctionCallArgumentListSyntaxData;
   friend struct SyntaxFactory;
   friend class FunctionCallArgumentListSyntaxData;
   friend class FunctionCallExprSyntax;
   friend class Syntax;
   friend class SyntaxData;
+
+  using DataType = FunctionCallArgumentListSyntaxData;
 
   FunctionCallArgumentListSyntax(const RC<SyntaxData> Root,
                                  const DataType *Data);
@@ -356,7 +358,7 @@ public:
   withAdditionalArgument(FunctionCallArgumentSyntax AdditionalArgument) const;
 
   static bool classof(const Syntax *S) {
-    return S->getKind() == SyntaxKind::FunctionCallExpr;
+    return S->getKind() == SyntaxKind::FunctionCallArgumentList;
   }
 };
 

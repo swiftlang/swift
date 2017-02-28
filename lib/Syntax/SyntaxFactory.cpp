@@ -18,6 +18,7 @@
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/UnknownSyntax.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -401,7 +402,7 @@ SyntaxFactory::makeFunctionCallArgument(RC<TokenSyntax> Label,
 /// Make a function call argument list with the given arguments.
 FunctionCallArgumentListSyntax
 SyntaxFactory::makeFunctionCallArgumentList(
-  std::vector<FunctionCallArgumentSyntax> &Arguments) {
+  std::vector<FunctionCallArgumentSyntax> Arguments) {
   RawSyntax::LayoutList Layout;
   for (const auto &Arg : Arguments) {
     Layout.push_back(Arg.getRaw());
