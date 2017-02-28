@@ -90,7 +90,7 @@ DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
                                        Alignment align) {
   // Prefer the original, potentially sugared version of the type if
   // the type hasn't been mucked with by an optimization pass.
-  auto LowTy = GV->getLoweredType().getSwiftType();
+  auto LowTy = GV->getLoweredType().getSwiftRValueType();
   auto *Type = LowTy.getPointer();
   if (auto *Decl = GV->getDecl()) {
     auto DeclType =

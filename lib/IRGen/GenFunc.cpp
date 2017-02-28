@@ -1216,24 +1216,20 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     argValTypes.push_back(argType);
     argConventions.push_back(param.getConvention());
     
-    CanType argLoweringTy;
+    auto argLoweringTy = argType.getSwiftRValueType();
     switch (param.getConvention()) {
     // Capture value parameters by value, consuming them.
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:
-      argLoweringTy = argType.getSwiftRValueType();
-      break;
-      
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed:
-      argLoweringTy = argType.getSwiftRValueType();
       break;
       
     // Capture inout parameters by pointer.
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
-      argLoweringTy = argType.getSwiftType();
+      argLoweringTy = CanInOutType::get(argLoweringTy);
       break;
     }
     
