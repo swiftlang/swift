@@ -4,7 +4,7 @@
 // REQUIRES: objc_interop
 
 // CHECK: [[TYPE:%swift.type]] = type
-// CHECK: [[REFRIGERATOR:%CSo14CCRefrigerator]] = type
+// CHECK: [[REFRIGERATOR:%TSo14CCRefrigeratorC]] = type
 // CHECK: [[OBJC:%objc_object]] = type
 
 // CHECK: [[REFRIGERATOR_NAME:@.*]] = private unnamed_addr constant [20 x i8] c"So14CCRefrigeratorC\00"

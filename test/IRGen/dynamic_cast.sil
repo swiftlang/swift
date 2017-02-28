@@ -17,7 +17,7 @@ struct S {
   var v: Int
 }
 
-// CHECK: [[INT:%Si]] = type <{ [[LLVM_PTRSIZE_INT:i(32|64)]] }>
+// CHECK: [[INT:%TSi]] = type <{ [[LLVM_PTRSIZE_INT:i(32|64)]] }>
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @testUnconditional0(
 sil @testUnconditional0 : $@convention(thin) (@in P) -> () {
