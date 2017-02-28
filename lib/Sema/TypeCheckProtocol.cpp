@@ -4112,6 +4112,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
   // associated type witness as erroneous.
   for (auto assocType : unresolvedAssocTypes) {
     recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr, true);
+    MissingWitnessesAndTypes.emplace_back(assocType, Type());
   }
 
   // No solutions. Diagnose the first associated type for which we
@@ -4210,10 +4211,6 @@ void ConformanceChecker::resolveTypeWitnesses() {
         });
 
       return;
-    }
-
-    for (auto missingTypeWitness : unresolvedAssocTypes) {
-      MissingWitnessesAndTypes.emplace_back(missingTypeWitness, Type());
     }
 
     return;
