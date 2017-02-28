@@ -1103,8 +1103,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           TC.diagnose(comp->getIdLoc(),
                       diag::inheritance_from_non_protocol_or_class,
                       diagnosedType);
+          return ErrorType::get(diagnosedType);
         }
-        return ErrorType::get(diagnosedType);
       }
     }
 
