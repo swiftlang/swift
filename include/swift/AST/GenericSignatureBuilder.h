@@ -617,8 +617,8 @@ public:
   /// Retrieve a requirement source representing the requirement signature
   /// computation for a protocol.
   static const RequirementSource *forRequirementSignature(
-                                              GenericSignatureBuilder &builder,
-                                              ProtocolDecl *protocol);
+                                                      PotentialArchetype *root,
+                                                      ProtocolDecl *protocol);
 
   /// Retrieve a requirement source for nested type name matches.
   static const RequirementSource *forNestedTypeNameMatch(

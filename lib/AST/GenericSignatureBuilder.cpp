@@ -278,8 +278,10 @@ const RequirementSource *RequirementSource::forInferred(
 }
 
 const RequirementSource *RequirementSource::forRequirementSignature(
-                                              GenericSignatureBuilder &builder,
+                                              PotentialArchetype *root,
                                               ProtocolDecl *protocol) {
+  auto &builder = *root->getBuilder();
+  // FIXME: Store the root
   REQUIREMENT_SOURCE_FACTORY_BODY(RequirementSignatureSelf, nullptr, protocol);
 }
 
