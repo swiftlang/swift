@@ -73,6 +73,8 @@ public:
 
   class RequirementSource;
 
+  class FloatingRequirementSource;
+
   /// Describes a constraint that is bounded on one side by a concrete type.
   struct ConcreteConstraint {
     PotentialArchetype *archetype;
@@ -166,7 +168,7 @@ public:
   /// previous example).
   bool
   addSameTypeRequirement(ResolvedType paOrT1, ResolvedType paOrT2,
-                         const RequirementSource *Source,
+                         FloatingRequirementSource Source,
                          llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
   /// \brief Add a new same-type requirement between two fully resolved types
@@ -174,14 +176,14 @@ public:
   ///
   /// The two types must not be incompatible concrete types.
   bool addSameTypeRequirement(ResolvedType paOrT1, ResolvedType paOrT2,
-                              const RequirementSource *Source);
+                              FloatingRequirementSource Source);
 
   /// \brief Add a new same-type requirement between two unresolved types.
   ///
   /// The types are resolved with \c GenericSignatureBuilder::resolve, and must
   /// not be incompatible concrete types.
   bool addSameTypeRequirement(UnresolvedType paOrT1, UnresolvedType paOrT2,
-                              const RequirementSource *Source);
+                              FloatingRequirementSource Source);
 
   /// \brief Add a new same-type requirement between two unresolved types.
   ///
@@ -190,7 +192,7 @@ public:
   /// types.
   bool
   addSameTypeRequirement(UnresolvedType paOrT1, UnresolvedType paOrT2,
-                         const RequirementSource *Source,
+                         FloatingRequirementSource Source,
                          llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
 private:
@@ -218,7 +220,7 @@ private:
   /// \param diagnoseMismatch Callback invoked when the types in the same-type
   /// requirement mismatch.
   bool addSameTypeRequirementBetweenConcrete(
-      Type T1, Type T2, const RequirementSource *Source,
+      Type T1, Type T2, FloatingRequirementSource Source,
       llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
   /// Add the requirements placed on the given type parameter
@@ -294,9 +296,9 @@ public:
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  bool addRequirement(const Requirement &req, const RequirementSource *source);
+  bool addRequirement(const Requirement &req, FloatingRequirementSource source);
 
-  bool addRequirement(const Requirement &req, const RequirementSource *source,
+  bool addRequirement(const Requirement &req, FloatingRequirementSource source,
                       llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
 
   /// \brief Add a new requirement.
@@ -596,22 +598,23 @@ public:
 
 public:
   /// Retrieve an abstract requirement source.
-  static const RequirementSource *forAbstract(GenericSignatureBuilder &builder);
+  static const RequirementSource *forAbstract(PotentialArchetype *root);
 
   /// Retrieve a requirement source representing an explicit requirement
   /// stated in an 'inheritance' clause.
-  static const RequirementSource *forExplicit(GenericSignatureBuilder &builder,
+  static const RequirementSource *forExplicit(PotentialArchetype *root,
                                               const TypeRepr *typeRepr);
 
   /// Retrieve a requirement source representing an explicit requirement
   /// stated in an 'where' clause.
-  static const RequirementSource *forExplicit(GenericSignatureBuilder &builder,
+  static const RequirementSource *forExplicit(
+                                        PotentialArchetype *root,
                                         const RequirementRepr *requirementRepr);
 
   /// Retrieve a requirement source representing a requirement that is
   /// inferred from some part of a generic declaration's signature, e.g., the
   /// parameter or result type of a generic function.
-  static const RequirementSource *forInferred(GenericSignatureBuilder &builder,
+  static const RequirementSource *forInferred(PotentialArchetype *root,
                                               const TypeRepr *typeRepr);
 
   /// Retrieve a requirement source representing the requirement signature
@@ -726,6 +729,58 @@ public:
 
   /// Print the requirement source (shorter form)
   void print(llvm::raw_ostream &out, SourceManager *SrcMgr) const;
+};
+
+/// A requirement source that potentially lacks a root \c PotentialArchetype.
+/// The root will be supplied as soon as the appropriate dependent type is
+/// resolved.
+class GenericSignatureBuilder::FloatingRequirementSource {
+  enum Kind {
+    /// A fully-resolved requirement source, which does not need a root.
+    Resolved,
+    /// An explicit requirement source lacking a root.
+    Explicit,
+    /// An inferred requirement source lacking a root.
+    Inferred
+  } kind;
+
+  using Storage =
+    llvm::PointerUnion3<const RequirementSource *, const TypeRepr *,
+                        const RequirementRepr *>;
+
+  Storage storage;
+
+  FloatingRequirementSource(Kind kind, Storage storage)
+    : kind(kind), storage(storage) { }
+
+public:
+  /// Implicit conversion from a resolved requirement source.
+  FloatingRequirementSource(const RequirementSource *source)
+    : FloatingRequirementSource(Resolved, source) { }
+
+  static FloatingRequirementSource forAbstract() {
+    return { Explicit, Storage() };
+  }
+
+  static FloatingRequirementSource forExplicit(const TypeRepr *typeRepr) {
+    return { Explicit, typeRepr };
+  }
+
+  static FloatingRequirementSource forExplicit(
+                                     const RequirementRepr *requirementRepr) {
+    return { Explicit, requirementRepr };
+  }
+
+  static FloatingRequirementSource forInferred(const TypeRepr *typeRepr) {
+    return { Inferred, typeRepr };
+  }
+
+  /// Retrieve the complete requirement source rooted at the given potential
+  /// archetype.
+  const RequirementSource *getSource(PotentialArchetype *pa) const;
+
+  /// Retrieve the source location for this requirement.
+  SourceLoc getLoc() const;
 };
 
 class GenericSignatureBuilder::PotentialArchetype {
