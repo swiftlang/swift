@@ -158,6 +158,7 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
     break;
 
   case llvm::Triple::arm:
+  case llvm::Triple::thumb:
     configureARM(IGM, triple, target);
     break;
 
