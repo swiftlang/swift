@@ -34,7 +34,7 @@ function check_thin_archive_for_bitcode() {
     mkdir -p "${LIB_TEMP_DIR}"
     cd "${LIB_TEMP_DIR}"
     ar -x ${ARCHIVE}
-    if find ./ -iname '*.o' -exec file {} \; | grep -q -v -e bitcode -e bit-code; then
+    if find ./ -iname '*.o' -exec file {} \; | grep -q -e bitcode -e bit-code; then
         echo "Found bitcode file in thin archive: ${ARCHIVE}"
         exit 1
     else
