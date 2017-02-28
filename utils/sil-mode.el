@@ -51,7 +51,7 @@
                     font-lock-keyword-face)
 
    ;; Highlight attributes written in [...].
-   '("\\[\\(.+\\)\\]" 1 font-lock-keyword-face)
+   '("\\[\\(.+?\\)\\]" 1 font-lock-keyword-face)
 
    ;; SIL Instructions - Allocation/Deallocation.
    `(,(regexp-opt '("alloc_stack" "alloc_ref" "alloc_ref_dynamic" "alloc_box"
