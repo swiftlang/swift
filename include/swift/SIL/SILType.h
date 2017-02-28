@@ -166,15 +166,6 @@ public:
   CanType getSwiftRValueType() const {
     return CanType(value.getPointer());
   }
-
-  /// Returns the Swift type equivalent to this SIL type. If the SIL type is
-  /// an address type, returns an InOutType.
-  CanType getSwiftType() const {
-    CanType rvalueTy = getSwiftRValueType();
-    if (isAddress())
-      return CanInOutType::get(rvalueTy);
-    return rvalueTy;
-  }
   
   /// Returns the AbstractCC of a function type.
   /// The SILType must refer to a function type.

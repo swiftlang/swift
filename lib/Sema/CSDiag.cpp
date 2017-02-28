@@ -5915,14 +5915,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (auto fn = fnType->getAs<AnyFunctionType>()) {
     using Closeness = CalleeCandidateInfo::ClosenessResultTy;
 
-    auto isGenericType = [](Type type) -> bool {
-      if (type->hasError() || type->hasTypeVariable() ||
-          type->hasUnresolvedType())
-        return false;
-
-      return type->isCanonical() && type->isUnspecializedGeneric();
-    };
-
     calleeInfo.filterList([&](UncurriedCandidate candidate) -> Closeness {
       auto resultType = candidate.getResultType();
       if (!resultType)
@@ -5933,8 +5925,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       // because there is no easy way to do that, and candidate set is going
       // to be pruned by matching of the argument types later on anyway, so
       // it's better to over report than to be too conservative.
-      if ((isGenericType(resultType) && isGenericType(fn->getResult())) ||
-          resultType->isEqual(fn->getResult()))
+      if (resultType->isEqual(fn->getResult()))
         return {CC_ExactMatch, {}};
 
       return {CC_GeneralMismatch, {}};

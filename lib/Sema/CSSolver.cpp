@@ -889,7 +889,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       hasNonDependentMemberRelationalConstraints = true;
 
       // Handle unspecialized types directly.
-      if (!defaultType->isUnspecializedGeneric()) {
+      if (!defaultType->hasUnboundGenericType()) {
         if (!exactTypes.insert(defaultType->getCanonicalType()).second)
           continue;
 

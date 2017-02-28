@@ -151,7 +151,7 @@
 //
 // @convention(method) <T, U, V> (..., Foo<T, U>.Type)
 // @convention(witness_method) <T, U, V> (..., Foo<T, U>.Type)
-// @convention(witness_method) <Self : P, T, U, V> (..., Self.Type)
+// @convention(witness_method) <Self : P, V> (..., Self.Type)
 //
 //===----------------------------------------------------------------------===//
 
@@ -451,11 +451,8 @@ public:
     CanType witnessSelfType =
       Witness->computeInterfaceSelfType()->getCanonicalType();
     witnessSelfType = getSubstWitnessInterfaceType(witnessSelfType);
-    if (auto selfTuple = dyn_cast<TupleType>(witnessSelfType)) {
-      assert(selfTuple->getNumElements() == 1);
-      witnessSelfType = selfTuple.getElementType(0);
-    }
-    witnessSelfType = witnessSelfType.getLValueOrInOutObjectType();
+    witnessSelfType = witnessSelfType->getInOutObjectType()
+      ->getCanonicalType();
 
     // Eagerly loading here could cause an unnecessary
     // load+materialize in some cases, but it's not really important.

@@ -35,7 +35,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
                              ManagedValue swiftValue,
                              ProtocolConformance *conformance) {
   // Dig out the nominal type we're bridging from.
-  Type swiftValueType = swiftValue.getSwiftType()->getRValueType();
+  Type swiftValueType = swiftValue.getType().getSwiftRValueType();
 
   // Find the _bridgeToObjectiveC requirement.
   auto requirement = gen.SGM.getBridgeToObjectiveCRequirement(loc);
@@ -988,7 +988,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
       gen.emitBridgedToNativeValue(loc,
                                    bridgedArgs[i],
                                    SILFunctionTypeRepresentation::ObjCMethod,
-                                   argTy.getSwiftType());
+                                   argTy.getSwiftRValueType());
     SILValue argValue;
 
     if (nativeInputs[i].isConsumed()) {

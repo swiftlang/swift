@@ -348,7 +348,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   }
 
   // Cannot extend a bound generic type.
-  if (extendedType->isSpecialized() && extendedType->getAnyNominal()) {
+  if (extendedType->isSpecialized()) {
     TC.diagnose(ED->getLoc(), diag::extension_specialization,
                 extendedType->getAnyNominal()->getName())
       .highlight(ED->getExtendedTypeLoc().getSourceRange());
