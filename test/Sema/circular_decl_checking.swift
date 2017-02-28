@@ -44,9 +44,8 @@ var TopLevelVar: TopLevelVar? { return nil } // expected-error 2 {{use of undecl
 
 
 protocol AProtocol {
+  // FIXME: Should produce an error here, but it's currently causing problems.
   associatedtype e : e
-  // expected-error@-1 {{type 'e' references itself}}
-  // expected-note@-2 {{type declared here}}
 }
 
 

@@ -1105,6 +1105,8 @@ public:
     D->setAccessibility(access);
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
       ASD->setSetterAccessibility(access);
+    // All imported decls are constructed fully validated.
+    D->setValidationStarted();
     return D;
   }
 

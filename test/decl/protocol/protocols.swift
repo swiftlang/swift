@@ -36,7 +36,7 @@ func test1() {
   v1.creator = "Me"                   // expected-error {{cannot assign to property: 'creator' is a get-only property}}
 }
 
-protocol Bogus : Int {} // expected-error{{inheritance from non-protocol type 'Int'}}
+protocol Bogus : Int {} // expected-error{{inheritance from non-protocol, non-class type 'Int'}}
 
 // Explicit conformance checks (successful).
 

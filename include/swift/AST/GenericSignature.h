@@ -114,8 +114,9 @@ public:
   /// \param substitutions The generic parameter -> generic argument
   /// substitutions that will have been applied to these types.
   /// These are used to produce the "parameter = argument" bindings in the test.
-  std::string gatherGenericParamBindingsText(
-      ArrayRef<Type> types, const TypeSubstitutionMap &substitutions) const;
+  std::string
+  gatherGenericParamBindingsText(ArrayRef<Type> types,
+                                 TypeSubstitutionFn substitutions) const;
 
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const {
