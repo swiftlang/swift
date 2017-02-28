@@ -1,5 +1,5 @@
 // RUN: %swift -typecheck -target i386-apple-watchos2.0 -verify -sdk %sdk %s
-// REQUIRES: OS=watchos
+// REQUIRES: CPU=i386, OS=watchos
 // REQUIRES: objc_interop
 
 import Foundation
