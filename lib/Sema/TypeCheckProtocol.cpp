@@ -2416,7 +2416,8 @@ void ConformanceChecker::diagnoseMissingWitness() {
   bool AddFixit = false;
   {
     llvm::raw_string_ostream FixitStream(FixitString);
-    std::for_each(MissingWitnessesAndTypes.begin(), MissingWitnessesAndTypes.end(),
+    std::for_each(MissingWitnessesAndTypes.begin(),
+                  MissingWitnessesAndTypes.end(),
       [&](std::pair<ValueDecl*, Type> Pair) {
         AddFixit |= printRequirementStub(Pair.first, Adopter,
                                        Conformance->getType(), TypeLoc,
