@@ -234,6 +234,55 @@ bool RequirementSource::isDerivedViaConcreteConformance() const {
   return false;
 }
 
+bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa) const {
+  // If it's not a derived requirement, it's not self-derived.
+  if (!isDerivedRequirement()) return false;
+
+  // Collect the path of associated types from the root pa.
+  SmallVector<AssociatedTypeDecl *, 4> assocTypes;
+  PotentialArchetype *currentPA = nullptr;
+  for (auto source = this; source; source = source->parent) {
+    switch (source->kind) {
+    case RequirementSource::Parent:
+      assocTypes.push_back(source->getAssociatedType());
+      break;
+
+    case RequirementSource::NestedTypeNameMatch:
+      return false;
+
+    case RequirementSource::Explicit:
+    case RequirementSource::Inferred:
+    case RequirementSource::RequirementSignatureSelf:
+      currentPA = source->getRootPotentialArchetype();
+      break;
+
+    case RequirementSource::Concrete:
+    case RequirementSource::ProtocolRequirement:
+    case RequirementSource::Superclass:
+      break;
+    }
+  }
+
+  assert(currentPA && "Missing root potential archetype");
+
+  // Check whether anything of the potential archetypes in the path are
+  // equivalent to the end of the path.
+  auto rep = pa->getRepresentative();
+  for (auto assocType : reversed(assocTypes)) {
+    // Check whether this potential archetype is in the same equivalence class.
+    if (currentPA->getRepresentative() == rep) return true;
+
+    // Get the next nested type, but only if we've seen it before.
+    // FIXME: Feels hacky.
+    auto knownNested = currentPA->NestedTypes.find(assocType->getName());
+    if (knownNested == currentPA->NestedTypes.end()) return false;
+    currentPA = knownNested->second.front();
+  }
+
+  // FIXME: currentPA == pa?
+  return false;
+}
+
 #define REQUIREMENT_SOURCE_FACTORY_BODY(                                   \
           SourceKind, Parent, Storage, ExtraStorage,                       \
           NumPotentialArchetypes)                                          \
@@ -2836,10 +2885,18 @@ void GenericSignatureBuilder::checkRedundantConcreteTypeConstraints(
   Type concreteType = representative->getConcreteType();
   assert(concreteType && "No concrete type to check");
 
-  // Sort the concrete constraints, so we get a deterministic ordering of
-  // diagnostics.
+  // Remove any self-derived constraints.
   auto equivClass = representative->getOrCreateEquivalenceClass();
   auto &concreteConstraints = equivClass->concreteTypeConstraints;
+  concreteConstraints.erase(
+    std::remove_if(concreteConstraints.begin(), concreteConstraints.end(),
+                   [&](const ConcreteConstraint &constraint) {
+      return constraint.source->isSelfDerivedSource(constraint.archetype);
+    }),
+    concreteConstraints.end());
+
+  // Sort the concrete constraints, so we get a deterministic ordering of
+  // diagnostics.
   llvm::array_pod_sort(concreteConstraints.begin(), concreteConstraints.end());
 
   // Find a representative constraint to use for diagnostics.
@@ -2893,6 +2950,9 @@ void GenericSignatureBuilder::checkRedundantConcreteTypeConstraints(
                    representativeConstraint->archetype->
                      getDependentType(genericParams, /*allowUnresolved=*/true),
                    representativeConstraint->concreteType);
+
+    (void)representativeConstraint->source->isSelfDerivedSource(
+                                          representativeConstraint->archetype);
   };
 
   // Go through the concrete constraints looking for redundancies.

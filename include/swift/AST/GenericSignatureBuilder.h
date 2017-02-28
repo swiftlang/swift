@@ -698,6 +698,13 @@ public:
   /// to a protocol.
   bool isDerivedViaConcreteConformance() const;
 
+  /// Determine whether the given derived requirement \c source, when rooted at
+  /// the potential archetype \c pa, is actually derived from the same
+  /// requirement. Such "self-derived" requirements do not make the original
+  /// requirement redundant, because without said original requirement, the
+  /// derived requirement ceases to hold.
+  bool isSelfDerivedSource(PotentialArchetype *pa) const;
+
   /// Retrieve a source location that corresponds to the requirement.
   SourceLoc getLoc() const;
 
