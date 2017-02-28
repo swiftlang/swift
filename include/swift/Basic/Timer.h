@@ -33,8 +33,7 @@ namespace swift {
   public:
     explicit SharedTimer(StringRef name) {
       if (CompilationTimersEnabled == State::Enabled)
-        Timer.emplace(name, StringRef("Swift compilation"), StringRef("swift"),
-                      StringRef("swift related timers"));
+        Timer.emplace(name, name, "swift", "Swift compilation");
       else
         CompilationTimersEnabled = State::Skipped;
     }
