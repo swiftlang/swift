@@ -21,6 +21,7 @@ static void getExpressionFrom(ReturnStmtSyntax Return,
 // - Only one thread inserts the realized child into the parent
 // - Both threads get the exact same child (by identity)
 TEST(ThreadSafeCachingTests, ReturnGetExpression) {
+#if 0
   auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
   auto Minus = SyntaxFactory::makePrefixOpereator("-", {});
   auto One = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
@@ -50,5 +51,6 @@ TEST(ThreadSafeCachingTests, ReturnGetExpression) {
       break;
     }
   }
+#endif
 }
 
