@@ -255,9 +255,9 @@ TEST(TriviaTests, back) {
 }
 
 TEST(TriviaTests, size) {
-  ASSERT_EQ(Trivia().size(), 0);
-  ASSERT_EQ(Trivia::spaces(1).size(), 1);
+  ASSERT_EQ(Trivia().size(), size_t(0));
+  ASSERT_EQ(Trivia::spaces(1).size(), size_t(1));
 
   // Trivia doesn't currently coalesce on its own.
-  ASSERT_EQ((Trivia::spaces(1) + Trivia::spaces(1)).size(), 2);
+  ASSERT_EQ((Trivia::spaces(1) + Trivia::spaces(1)).size(), size_t(2));
 }
