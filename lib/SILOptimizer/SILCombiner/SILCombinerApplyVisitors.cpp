@@ -981,6 +981,101 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI) {
   return propagateConcreteTypeOfInitExistential(AI, PD, PropagateIntoOperand);
 }
 
+/// Optimize thin_func_to_ptr->ptr_to_thin_func casts into a type substituted
+/// apply.
+/// This kind of code arises in generic materializeForSet code that was
+/// specialized for a concrete type.
+///
+/// Note: this is not as general as it should be. The general solution is the
+/// introduction of a partial_apply_thin_recoverable (an instruction that
+/// partially applies a type and returns a thin_function) as suggested in
+/// SILGenBuiltin.cpp.
+///
+/// %208 = thin_function_to_pointer %207 :
+///  $@convention(thin) <τ_0_0> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer,
+///                  @inout UnsafeMutableBufferPointer<τ_0_0>,
+///                  @thick UnsafeMutableBufferPointer<τ_0_0>.Type) -> ()
+///                  to $Builtin.RawPointer
+/// %209 = pointer_to_thin_function %217 : $Builtin.RawPointer to
+///  $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer,
+///          @inout UnsafeMutableBufferPointer<Int>,
+///          @thick UnsafeMutableBufferPointer<Int>.Type) -> ()
+/// apply %209(%227, %200#1, %0, %224) : $@convention(thin) (Builtin.RawPointer,
+///  @inout Builtin.UnsafeValueBuffer, @inout UnsafeMutableBufferPointer<Int>,
+///  @thick UnsafeMutableBufferPointer<Int>.Type) -> ()
+///
+///  => apply %207<Int>(%227, ...)
+static ApplyInst *optimizeCastThroughThinFunctionPointer(
+    SILBuilder &Builder, ApplyInst *AI, FunctionRefInst *OrigThinFun,
+    PointerToThinFunctionInst *CastedThinFun) {
+
+  // The original function type needs to be polymorphic.
+  auto ConvertCalleeTy = OrigThinFun->getType().castTo<SILFunctionType>();
+  assert(ConvertCalleeTy);
+  if (!ConvertCalleeTy->isPolymorphic())
+    return nullptr;
+
+  // Need to have four parameters.
+  auto OrigParams = ConvertCalleeTy->getParameters();
+  if (OrigParams.size() != 4)
+    return nullptr;
+
+  // There must only be one parameter to substitute.
+  auto *ReferencedFunction = OrigThinFun->getReferencedFunction();
+  assert(ReferencedFunction);
+  if (ReferencedFunction->isExternalDeclaration())
+    return nullptr;
+  auto Params = ReferencedFunction->getContextGenericParams()->getParams();
+  if (Params.size() != 1)
+    return nullptr;
+
+  // Get the concrete type from the casted to function.
+  auto CastedFunTy = CastedThinFun->getType().castTo<SILFunctionType>();
+  auto CastedParams = CastedFunTy->getParameters();
+  if (CastedParams.size() != 4)
+    return nullptr;
+
+  // The fourth parameter is a metatype of a bound generic type. Use it to
+  // obtain the type substitutions to apply.
+  auto MetaTy = dyn_cast<MetatypeType>(CastedParams[3].getType());
+  if (!MetaTy)
+    return nullptr;
+
+  // Get the bound generic type from the metatype.
+  auto BoundGenericInstTy = dyn_cast_or_null<BoundGenericType>(
+      MetaTy->getInstanceType().getCanonicalTypeOrNull());
+  if (!BoundGenericInstTy)
+    return nullptr;
+
+  // The bound generic type will carry the substitutions to apply.
+  auto Subs = BoundGenericInstTy->getSubstitutions(
+      AI->getModule().getSwiftModule(), nullptr);
+
+  if (Subs.size() == 0)
+    return nullptr;
+
+  // If the generic signature of the function doesn't match the generic
+  // signature of the type, don't try to continue.
+  if (BoundGenericInstTy->getDecl()->getGenericSignature()
+        ->getCanonicalSignature() != ConvertCalleeTy->getGenericSignature())
+    return nullptr;
+
+  SmallVector<SILValue, 16> Args;
+  for (auto Arg : AI->getArguments())
+    Args.push_back(Arg);
+
+  auto NewSubstCalleeType =
+      SILType::getPrimitiveObjectType(ConvertCalleeTy->substGenericArgs(
+          AI->getModule(), AI->getModule().getSwiftModule(), Subs));
+
+  Builder.setCurrentDebugScope(AI->getDebugScope());
+  ApplyInst *NewApply = Builder.createApply(
+      AI->getLoc(), OrigThinFun, NewSubstCalleeType, AI->getType(), Subs, Args,
+                                             AI->isNonThrowing());
+
+  return NewApply;
+}
+
 /// \brief Check that all users of the apply are retain/release ignoring one
 /// user.
 static bool
@@ -1137,6 +1232,18 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(AI->getCallee()))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);
+
+  if (auto *CastedThinFun =
+          dyn_cast<PointerToThinFunctionInst>(AI->getCallee()))
+    if (auto *Ptr =
+            dyn_cast<ThinFunctionToPointerInst>(CastedThinFun->getOperand()))
+      if (auto *OrigThinFun = dyn_cast<FunctionRefInst>(Ptr->getOperand()))
+        if (auto *NewAI = optimizeCastThroughThinFunctionPointer(
+                Builder, AI, OrigThinFun, CastedThinFun)) {
+          replaceInstUsesWith(*AI, NewAI);
+          eraseInstFromFunction(*AI);
+          return nullptr;
+        }
 
   // Optimize readonly functions with no meaningful users.
   SILFunction *SF = AI->getReferencedFunction();
