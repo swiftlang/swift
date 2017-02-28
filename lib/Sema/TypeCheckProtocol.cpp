@@ -1779,6 +1779,7 @@ namespace {
                         llvm::SmallPtrSetImpl<ProtocolConformance *> &visited);
     void addUsedConformances(ProtocolConformance *conformance);
 
+    void diagnoseMissingWitness();
   public:
     /// Emit any diagnostics that have been delayed.
     void emitDelayedDiags();
@@ -2390,13 +2391,10 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
   return true;
 }
 
-
 /// Generates a note for a protocol requirement for which no witness was found
 /// and provides a fixit to add a stub to the adopter
-static void diagnoseNoWitness(ArrayRef<std::pair<ValueDecl*, Type>>
-                                RequirementsAndTypes,
-                              NormalProtocolConformance *Conformance) {
-  if (RequirementsAndTypes.empty())
+void ConformanceChecker::diagnoseMissingWitness() {
+  if (MissingWitnessesAndTypes.empty())
     return;
   DeclContext *Adopter = Conformance->getDeclContext();
 
@@ -2413,24 +2411,26 @@ static void diagnoseNoWitness(ArrayRef<std::pair<ValueDecl*, Type>>
   }
 
   ASTContext &Ctx = Conformance->getDeclContext()->getASTContext();
-  auto &Diags = Ctx.Diags;
   std::string FixitString;
   llvm::raw_string_ostream FixitStream(FixitString);
 
   bool AddFixit = false;
-  std::for_each(RequirementsAndTypes.begin(), RequirementsAndTypes.end(),
-                [&](std::pair<ValueDecl*, Type> Pair) {
-                  AddFixit |= printRequirementStub(Pair.first, Adopter,
-                                                   Conformance->getType(),
-                                                   TypeLoc,
-                                                   FixitStream);
-                });
+  std::for_each(MissingWitnessesAndTypes.begin(), MissingWitnessesAndTypes.end(),
+    [&](std::pair<ValueDecl*, Type> Pair) {
+      AddFixit |= printRequirementStub(Pair.first, Adopter,
+                                       Conformance->getType(), TypeLoc,
+                                       FixitStream);
+  });
 
-  // Point out the requirement that wasn't met.
-  auto diag = Diags.diagnose(TypeLoc, diag::no_witnesses_general);
-  if (AddFixit) {
-    diag.fixItInsertAfter(FixitLocation, FixitStream.str());
-  }
+
+  diagnoseOrDefer(MissingWitnessesAndTypes.front().first, true,
+    [AddFixit, FixitString, TypeLoc, FixitLocation](ProtocolConformance *Conf) {
+      auto diag = Conf->getDeclContext()->getASTContext().Diags.
+        diagnose(TypeLoc, diag::no_witnesses_general);
+      if (AddFixit) {
+        diag.fixItInsertAfter(FixitLocation, FixitString);
+      }
+  });
 }
 
 ResolveWitnessResult
@@ -4629,11 +4629,9 @@ void ConformanceChecker::checkConformance() {
       break;
     }
   }
-  if (!MissingWitnessesAndTypes.empty()) {
-    diagnoseNoWitness(MissingWitnessesAndTypes, Conformance);
-    AlreadyComplained = true;
-    Conformance->setInvalid();
-  }
+
+  diagnoseMissingWitness();
+
   emitDelayedDiags();
 
   // Except in specific whitelisted cases for Foundation/Swift
