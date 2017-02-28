@@ -2410,7 +2410,6 @@ void ConformanceChecker::diagnoseMissingWitness() {
     llvm_unreachable("Unknown adopter kind");
   }
 
-  ASTContext &Ctx = Conformance->getDeclContext()->getASTContext();
   std::string FixitString;
   llvm::raw_string_ostream FixitStream(FixitString);
 
@@ -4457,6 +4456,9 @@ void ConformanceChecker::checkConformance() {
   // Resolve all of the type witnesses.
   resolveTypeWitnesses();
 
+  // Diagnose to see if any type witnesses are missing.
+  diagnoseMissingWitness();
+
   // Ensure the conforming type is used.
   //
   // FIXME: This feels like the wrong place for this, but if we don't put
@@ -4630,6 +4632,7 @@ void ConformanceChecker::checkConformance() {
     }
   }
 
+  // Diagnose missing value witnesses.
   diagnoseMissingWitness();
 
   emitDelayedDiags();
