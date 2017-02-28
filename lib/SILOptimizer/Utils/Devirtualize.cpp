@@ -84,6 +84,17 @@ static void getAllSubclasses(ClassHierarchyAnalysis *CHA,
   }
 }
 
+static ClassDecl *getClassDecl(SILType ClassType) {
+  ClassDecl *CD = nullptr;
+  if (auto AT = ClassType.getAs<ArchetypeType>()) {
+    if (auto Super = AT->getSuperclass())
+      CD = Super->getClassOrBoundGenericClass();
+  } else {
+    CD = ClassType.getClassOrBoundGenericClass();
+  }
+  return CD;
+}
+
 /// \brief Returns true, if a method implementation corresponding to
 /// the class_method applied to an instance of the class CD is
 /// effectively final, i.e. it is statically known to be not overridden
@@ -91,13 +102,14 @@ static void getAllSubclasses(ClassHierarchyAnalysis *CHA,
 ///
 /// \p AI  invocation instruction
 /// \p ClassType type of the instance
-/// \p CD  static class of the instance whose method is being invoked
 /// \p CHA class hierarchy analysis
-bool isEffectivelyFinalMethod(FullApplySite AI,
-                              SILType ClassType,
-                              ClassDecl *CD,
-                              ClassHierarchyAnalysis *CHA) {
-  if (CD && CD->isFinal())
+static bool isEffectivelyFinalMethod(FullApplySite AI,
+                                     SILType ClassType,
+                                     ClassHierarchyAnalysis *CHA) {
+  auto *CD = getClassDecl(ClassType);
+  assert(CD != nullptr);
+
+  if (CD->isFinal())
     return true;
 
   const DeclContext *DC = AI.getModule().getAssociatedContext();
@@ -120,12 +132,6 @@ bool isEffectivelyFinalMethod(FullApplySite AI,
   // there is no other implementation.
   if (!Method->isOverridden())
     return true;
-
-  // Class declaration may be nullptr, e.g. for cases like:
-  // func foo<C:Base>(c: C) {}, where C is a class, but
-  // it does not have a class decl.
-  if (!CD)
-    return false;
 
   if (!CHA)
     return false;
@@ -248,7 +254,7 @@ SILValue swift::getInstanceWithExactDynamicType(SILValue S, SILModule &M,
     if (!SinglePred) {
       if (!isa<SILFunctionArgument>(Arg))
         break;
-      auto *CD = Arg->getType().getClassOrBoundGenericClass();
+      auto *CD = getClassDecl(Arg->getType());
       // Check if this class is effectively final.
       if (!CD || !isKnownFinalClass(CD, M, CHA))
         break;
@@ -343,10 +349,10 @@ SILType swift::getExactDynamicType(SILValue S, SILModule &M,
 
     if (auto *FArg = dyn_cast<SILFunctionArgument>(Arg)) {
       // Bail on metatypes for now.
-      if (FArg->getType().getSwiftRValueType()->is<AnyMetatypeType>()) {
+      if (FArg->getType().is<AnyMetatypeType>()) {
         return SILType();
       }
-      auto *CD = FArg->getType().getClassOrBoundGenericClass();
+      auto *CD = getClassDecl(FArg->getType());
       // If it is not class and it is a trivial type, then it
       // should be the exact type.
       if (!CD && FArg->getType().isTrivial(M)) {
@@ -490,7 +496,8 @@ SILFunction *swift::getTargetClassMethod(SILModule &M,
   if (ClassOrMetatypeType.is<MetatypeType>())
     ClassOrMetatypeType = ClassOrMetatypeType.getMetatypeInstanceType(M);
 
-  auto *CD = ClassOrMetatypeType.getClassOrBoundGenericClass();
+  auto *CD = getClassDecl(ClassOrMetatypeType);
+  assert(CD != nullptr);
   return M.lookUpFunctionInVTable(CD, Member);
 }
 
@@ -999,9 +1006,7 @@ swift::tryDevirtualizeApply(ApplySite AI, ClassHierarchyAnalysis *CHA) {
     if (ClassType.is<MetatypeType>())
       ClassType = ClassType.getMetatypeInstanceType(M);
 
-    auto *CD = ClassType.getClassOrBoundGenericClass();
-
-    if (isEffectivelyFinalMethod(FAS, ClassType, CD, CHA))
+    if (isEffectivelyFinalMethod(FAS, ClassType, CHA))
       return tryDevirtualizeClassMethod(FAS, Instance);
 
     // Try to check if the exact dynamic type of the instance is statically
@@ -1065,9 +1070,7 @@ bool swift::canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) 
     if (ClassType.is<MetatypeType>())
       ClassType = ClassType.getMetatypeInstanceType(M);
 
-    auto *CD = ClassType.getClassOrBoundGenericClass();
-
-    if (isEffectivelyFinalMethod(AI, ClassType, CD, CHA))
+    if (isEffectivelyFinalMethod(AI, ClassType, CHA))
       return canDevirtualizeClassMethod(AI, Instance->getType());
 
     // Try to check if the exact dynamic type of the instance is statically
