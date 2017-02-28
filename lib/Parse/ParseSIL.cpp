@@ -3764,7 +3764,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     SourceLoc TyLoc;
 
     if (parseTypedValueRef(Val, B) ||
-        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
         parseASTType(FormalConcreteTy, TyLoc) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||

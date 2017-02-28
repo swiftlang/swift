@@ -581,7 +581,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       break;
     }
     case ValueKind::InitExistentialOpaqueInst: {
-      auto &IEOI = cast<InitExistentialRefInst>(SI);
+      auto &IEOI = cast<InitExistentialOpaqueInst>(SI);
       operand = IEOI.getOperand();
       Ty = IEOI.getType();
       FormalConcreteType = IEOI.getFormalConcreteType();
