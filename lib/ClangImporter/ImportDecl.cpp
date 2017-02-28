@@ -3877,7 +3877,7 @@ namespace {
       SmallVector<TypeLoc, 4> inheritedTypes;
       importObjCProtocols(result, decl->getReferencedProtocols(),
                           inheritedTypes);
-      result->setValidated();
+      result->setValidationStarted();
       result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
       result->setCheckedInheritanceClause();
       result->setMemberLoader(&Impl, 0);
@@ -7204,7 +7204,7 @@ ClangImporter::Implementation::importDeclContextOf(
   auto swiftTyLoc = TypeLoc::withoutLoc(nominal->getDeclaredType());
   auto ext = ExtensionDecl::create(SwiftContext, SourceLoc(), swiftTyLoc, {},
                                    getClangModuleForDecl(decl), nullptr);
-  ext->setValidated();
+  ext->setValidationStarted();
   ext->setCheckedInheritanceClause();
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
 

@@ -622,6 +622,20 @@ GenericSignature *GenericContext::getGenericSignature() const {
   if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
     return genericSig;
 
+  // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
+  // it.
+  if (auto PD = dyn_cast<ProtocolDecl>(this)) {
+    auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
+    auto req =
+        Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
+    GenericTypeParamType *params[] = {self};
+    Requirement reqs[] = {req};
+
+    auto &ctx = getASTContext();
+    return GenericSignature::get(ctx.AllocateCopy(params),
+                                 ctx.AllocateCopy(reqs));
+  }
+
   return nullptr;
 }
 
@@ -808,7 +822,6 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
     ExtendedType(extendedType),
     Inherited(inherited)
 {
-  ExtensionDeclBits.Validated = false;
   ExtensionDeclBits.CheckedInheritanceClause = false;
   ExtensionDeclBits.DefaultAndMaxAccessLevel = 0;
   ExtensionDeclBits.HasLazyConformances = false;
@@ -2006,7 +2019,7 @@ Type TypeDecl::getDeclaredInterfaceType() const {
         selfTy, const_cast<AssociatedTypeDecl *>(ATD));
   }
 
-  Type interfaceType = getInterfaceType();
+  Type interfaceType = hasInterfaceType() ? getInterfaceType() : nullptr;
   if (interfaceType.isNull() || interfaceType->is<ErrorType>())
     return interfaceType;
 
@@ -2261,10 +2274,7 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, SourceLoc EqualLoc,
                              Identifier Name, SourceLoc NameLoc,
                              GenericParamList *GenericParams, DeclContext *DC)
   : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
-    TypeAliasLoc(TypeAliasLoc),
-    EqualLoc(EqualLoc) {
-  TypeAliasDeclBits.HasCompletedValidation = false;
-}
+    TypeAliasLoc(TypeAliasLoc), EqualLoc(EqualLoc) {}
 
 SourceRange TypeAliasDecl::getSourceRange() const {
   if (UnderlyingTy.hasLocation())
@@ -2273,7 +2283,7 @@ SourceRange TypeAliasDecl::getSourceRange() const {
 }
 
 void TypeAliasDecl::setUnderlyingType(Type underlying) {
-  setHasCompletedValidation();
+  setValidationStarted();
 
   // lldb creates global typealiases containing archetypes
   // sometimes...
@@ -2342,19 +2352,20 @@ SourceRange GenericTypeParamDecl::getSourceRange() const {
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
-                                       TypeLoc defaultDefinition)
-  : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
-    KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition)
-{ }
+                                       TypeLoc defaultDefinition,
+                                       TrailingWhereClause *trailingWhere)
+    : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
+      KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition),
+      TrailingWhere(trailingWhere) {}
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
+                                       TrailingWhereClause *trailingWhere,
                                        LazyMemberLoader *definitionResolver,
                                        uint64_t resolverData)
-  : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
-    KeywordLoc(keywordLoc), Resolver(definitionResolver),
-    ResolverContextData(resolverData)
-{
+    : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
+      KeywordLoc(keywordLoc), TrailingWhere(trailingWhere),
+      Resolver(definitionResolver), ResolverContextData(resolverData) {
   assert(Resolver && "missing resolver");
 }
 

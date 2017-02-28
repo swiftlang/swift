@@ -979,20 +979,13 @@ static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
   return true;
 }
 
-/// Validate the given pattern binding declaration.
-static void validatePatternBindingDecl(TypeChecker &tc,
-                                       PatternBindingDecl *binding,
-                                       unsigned entryNumber) {
+/// Validate the \c entryNumber'th entry in \c binding.
+static void validatePatternBindingEntry(TypeChecker &tc,
+                                        PatternBindingDecl *binding,
+                                        unsigned entryNumber) {
   // If the pattern already has a type, we're done.
-  if (binding->getPattern(entryNumber)->hasType() ||
-      binding->isBeingValidated())
+  if (binding->getPattern(entryNumber)->hasType())
     return;
-
-  binding->setIsBeingValidated();
-
-  // On any path out of this function, make sure to mark the binding as done
-  // being type checked.
-  SWIFT_DEFER { binding->setIsBeingValidated(false); };
 
   // Resolve the pattern.
   auto *pattern = tc.resolvePattern(binding->getPattern(entryNumber),
@@ -1076,6 +1069,19 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   if (binding->getPattern(entryNumber)->hasType())
     if (auto var = binding->getSingleVar())
       tc.checkTypeModifyingDeclAttributes(var);
+}
+
+/// Validate the entries in the given pattern binding declaration.
+static void validatePatternBindingEntries(TypeChecker &tc,
+                                          PatternBindingDecl *binding) {
+  if (binding->hasValidationStarted())
+    return;
+
+  binding->setIsBeingValidated();
+  SWIFT_DEFER { binding->setIsBeingValidated(false); };
+
+  for (unsigned i = 0, e = binding->getNumPatternEntries(); i != e; ++i)
+    validatePatternBindingEntry(tc, binding, i);
 }
 
 void swift::makeFinal(ASTContext &ctx, ValueDecl *D) {
@@ -1256,7 +1262,9 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
   if (!ED->getExtendedType().isNull() &&
       !ED->getExtendedType()->hasError()) {
     if (NominalTypeDecl *nominal = ED->getExtendedType()->getAnyNominal()) {
-      validateDecl(nominal);
+      validateDeclForNameLookup(nominal);
+      if (ED->hasDefaultAccessibility())
+        return;
       maxAccess = std::max(nominal->getFormalAccess(),
                            Accessibility::FilePrivate);
     }
@@ -3430,7 +3438,7 @@ void TypeChecker::validateDecl(PrecedenceGroupDecl *PGD) {
   checkDeclAttributesEarly(PGD);
   checkDeclAttributes(PGD);
 
-  if (PGD->isInvalid() || PGD->isBeingValidated())
+  if (PGD->isInvalid() || PGD->hasValidationStarted())
     return;
   PGD->setIsBeingValidated();
   SWIFT_DEFER { PGD->setIsBeingValidated(false); };
@@ -3753,8 +3761,7 @@ public:
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     // Check all the pattern/init pairs in the PBD.
-    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i)
-      validatePatternBindingDecl(TC, PBD, i);
+    validatePatternBindingEntries(TC, PBD);
 
     if (PBD->isBeingValidated())
       return;
@@ -3982,7 +3989,7 @@ public:
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
-    if (!assocType->hasInterfaceType())
+    if (!assocType->hasValidationStarted())
       TC.validateDecl(assocType);
   }
 
@@ -4334,8 +4341,27 @@ public:
     TC.checkDeclAttributesEarly(PD);
     TC.computeAccessibility(PD);
 
-    if (!IsSecondPass)
+    if (!IsSecondPass) {
       checkUnsupportedNestedType(PD);
+
+      for (auto member : PD->getMembers()) {
+        if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+          if (auto whereClause = assocType->getTrailingWhereClause()) {
+            DeclContext *lookupDC = assocType->getDeclContext();
+
+            ProtocolRequirementTypeResolver resolver(PD);
+            TypeResolutionOptions options;
+
+            for (auto &req : whereClause->getRequirements()) {
+              if (!TC.validateRequirement(whereClause->getWhereLoc(), req,
+                                          lookupDC, options, &resolver))
+                // FIXME handle error?
+                continue;
+            }
+          }
+        }
+      }
+    }
 
     if (IsSecondPass) {
       checkAccessibility(TC, PD);
@@ -6912,8 +6938,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   // Handling validation failure due to re-entrancy is left
   // up to the caller, who must call hasValidSignature() to
   // check that validateDecl() returned a fully-formed decl.
-  if (D->isBeingValidated())
+  if (D->hasValidationStarted()) {
+    // If this isn't reentrant (i.e. D has already been validated), the
+    // signature better be valid.
+    assert(D->isBeingValidated() || D->hasValidSignature());
     return;
+  }
 
   PrettyStackTraceDecl StackTrace("validating", D);
 
@@ -6956,40 +6986,48 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     llvm_unreachable("handled above");
 
   case DeclKind::AssociatedType: {
-    if (D->hasInterfaceType())
-      return;
-
     auto assocType = cast<AssociatedTypeDecl>(D);
 
     assocType->setIsBeingValidated();
     SWIFT_DEFER { assocType->setIsBeingValidated(false); };
+
+    validateAccessibility(assocType);
 
     checkDeclAttributesEarly(assocType);
     checkInheritanceClause(assocType);
 
     // Check the default definition, if there is one.
     TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
-    if (!defaultDefinition.isNull() &&
-        validateType(defaultDefinition, assocType->getDeclContext())) {
-      defaultDefinition.setInvalidType(Context);
-    }
+    if (!defaultDefinition.isNull()) {
+      if (validateType(defaultDefinition, assocType->getDeclContext())) {
+        defaultDefinition.setInvalidType(Context);
+      } else {
+        // associatedtype X = X is invalid
+        auto mentionsItself =
+            defaultDefinition.getType().findIf([&](Type type) {
+              if (auto DMT = type->getAs<ArchetypeType>()) {
+                return DMT->getAssocType() == assocType;
+              }
+              return false;
+            });
 
+        if (mentionsItself) {
+          diagnose(defaultDefinition.getLoc(), diag::recursive_type_reference,
+                   assocType->getDescriptiveKind(), assocType->getName());
+          diagnose(assocType, diag::type_declared_here);
+        }
+      }
+    }
     // Finally, set the interface type.
-    assocType->computeType();
+    if (!assocType->hasInterfaceType())
+      assocType->computeType();
 
     checkDeclAttributes(assocType);
     break;
   }
 
   case DeclKind::TypeAlias: {
-    // Type aliases may not have an underlying type yet.
     auto typeAlias = cast<TypeAliasDecl>(D);
-
-    if (typeAlias->hasCompletedValidation())
-      return;
-
-    typeAlias->setHasCompletedValidation();
-
     // Check generic parameters, if needed.
     typeAlias->setIsBeingValidated();
     SWIFT_DEFER { typeAlias->setIsBeingValidated(false); };
@@ -7021,8 +7059,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Struct:
   case DeclKind::Class: {
     auto nominal = cast<NominalTypeDecl>(D);
-    if (nominal->hasInterfaceType())
-      return;
     nominal->computeType();
 
     // Check generic parameters, if needed.
@@ -7060,9 +7096,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
-    if (proto->hasInterfaceType())
-      return;
-    proto->computeType();
+    if (!proto->hasInterfaceType())
+      proto->computeType();
 
     // Validate the generic type signature, which is just <Self : P>.
     proto->setIsBeingValidated();
@@ -7114,8 +7149,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           diagnose(VD, diag::pattern_used_in_type, VD->getName());
 
         } else {
-          for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i)
-            validatePatternBindingDecl(*this, PBD, i);
+          validatePatternBindingEntries(*this, PBD);
         }
 
         auto parentPattern = VD->getParentPattern();
@@ -7225,23 +7259,17 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
       
   case DeclKind::Func: {
-    if (D->hasInterfaceType())
-      return;
     typeCheckDecl(D, true);
     break;
   }
 
   case DeclKind::Subscript:
   case DeclKind::Constructor:
-    if (D->hasInterfaceType())
-      return;
     typeCheckDecl(D, true);
     break;
 
   case DeclKind::Destructor:
   case DeclKind::EnumElement: {
-    if (D->hasInterfaceType())
-      return;
     if (auto container = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
       validateDecl(container);
       typeCheckDecl(D, true);
@@ -7255,6 +7283,40 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   assert(D->hasValidSignature());
 }
 
+void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
+  switch (D->getKind()) {
+  case DeclKind::Protocol: {
+    auto proto = cast<ProtocolDecl>(D);
+    if (proto->hasInterfaceType())
+      return;
+    proto->computeType();
+
+    validateAccessibility(proto);
+
+    // Record inherited protocols.
+    resolveInheritedProtocols(proto);
+
+    for (auto member : proto->getMembers()) {
+      if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
+        validateDeclForNameLookup(ATD);
+      }
+    }
+    break;
+  }
+  case DeclKind::AssociatedType: {
+    auto assocType = cast<AssociatedTypeDecl>(D);
+    if (assocType->hasInterfaceType())
+      return;
+    assocType->computeType();
+    validateAccessibility(assocType);
+    break;
+  }
+
+  default:
+    validateDecl(D);
+    break;
+  }
+}
 
 void TypeChecker::validateAccessibility(ValueDecl *D) {
   if (D->hasAccessibility())
@@ -7432,11 +7494,10 @@ GenericParamList *cloneGenericParams(ASTContext &ctx,
 } // namespace swift
 
 void TypeChecker::validateExtension(ExtensionDecl *ext) {
-  // If we already validated this extension, there's nothing more to do.
-  if (ext->validated())
+  // If we're currently validating, or have already validated this extension,
+  // there's nothing more to do now.
+  if (ext->hasValidationStarted())
     return;
-
-  ext->setValidated();
 
   ext->setIsBeingValidated();
   SWIFT_DEFER { ext->setIsBeingValidated(false); };

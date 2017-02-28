@@ -50,6 +50,7 @@ class Requirement;
 class RequirementRepr;
 class SILModule;
 class SourceLoc;
+class SubstitutionMap;
 class Type;
 class TypeRepr;
 class ASTContext;
@@ -587,7 +588,9 @@ public:
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  bool addRequirement(const RequirementRepr *Req);
+  bool addRequirement(const RequirementRepr *Req,
+                      const RequirementSource *source = nullptr,
+                      const SubstitutionMap *subMap = nullptr);
 
   /// \brief Add an already-checked requirement.
   ///
