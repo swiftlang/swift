@@ -60,7 +60,7 @@ ManagedValue ManagedValue::formalAccessCopy(SILGenFunction &gen,
 void ManagedValue::copyInto(SILGenFunction &gen, SILValue dest,
                             SILLocation loc) {
   auto &lowering = gen.getTypeLowering(getType());
-  if (lowering.isAddressOnly()) {
+  if (lowering.isAddressOnly() && gen.silConv.useLoweredAddresses()) {
     gen.B.createCopyAddr(loc, getValue(), dest, IsNotTake, IsInitialization);
     return;
   }
