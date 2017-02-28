@@ -16,8 +16,8 @@ class B: A {}
 sil_vtable A {}
 sil_vtable B {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %C5casts1B* @unchecked_addr_cast(%C5casts1A** noalias nocapture dereferenceable({{.*}})) {{.*}} {
-// CHECK:         bitcast %C5casts1A** %0 to %C5casts1B**
+// CHECK-LABEL: define{{( protected)?}} swiftcc %T5casts1BC* @unchecked_addr_cast(%T5casts1AC** noalias nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK:         bitcast %T5casts1AC** %0 to %T5casts1BC**
 sil @unchecked_addr_cast : $(@in A) -> B {
 entry(%a : $*A):
   %b = unchecked_addr_cast %a : $*A to $*B
@@ -207,7 +207,7 @@ nay:
   unreachable
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %objc_object* @checked_upcast(%C5casts1A*) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc %objc_object* @checked_upcast(%T5casts1AC*) {{.*}} {
 // -- Don't need to check conformance of an object to AnyObject.
 // CHECK-NOT:     call %objc_object* @swift_dynamicCastObjCProtocolConditional
 // CHECK:         phi %objc_object*
@@ -220,14 +220,14 @@ nay:
   unreachable
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %C5casts1A* @checked_downcast_optional({{(i32|i64)}}) {{.*}} {
-// CHECK:         [[T0:%.*]] = inttoptr {{(i32|i64)}} %0 to %C5casts1A*
-// CHECK:         [[OBJ_PTR:%.*]] = bitcast %C5casts1A* [[T0]] to i8*
+// CHECK-LABEL: define{{( protected)?}} swiftcc %T5casts1AC* @checked_downcast_optional({{(i32|i64)}}) {{.*}} {
+// CHECK:         [[T0:%.*]] = inttoptr {{(i32|i64)}} %0 to %T5casts1AC*
+// CHECK:         [[OBJ_PTR:%.*]] = bitcast %T5casts1AC* [[T0]] to i8*
 // CHECK:         [[METADATA:%.*]] = call %swift.type* @_T05casts1ACMa()
 // CHECK:         [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
 // CHECK:         [[RESULT_PTR:%.*]] = call i8* @swift_rt_swift_dynamicCastClass(i8* [[OBJ_PTR]], i8* [[METADATA_PTR]])
-// CHECK:         [[RESULT:%.*]] = bitcast i8* [[RESULT_PTR]] to %C5casts1A*
-// CHECK:         [[COND:%.*]] = icmp ne %C5casts1A* [[RESULT]], null
+// CHECK:         [[RESULT:%.*]] = bitcast i8* [[RESULT_PTR]] to %T5casts1AC*
+// CHECK:         [[COND:%.*]] = icmp ne %T5casts1AC* [[RESULT]], null
 // CHECK:         br i1 [[COND]]
 sil @checked_downcast_optional : $@convention(thin) (Optional<A>) -> @owned A {
 entry(%a : $Optional<A>):
@@ -317,7 +317,7 @@ entry(%x : $OB):
   return %x : $OB
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %C5casts1B* @checked_object_to_object_casts(%C5casts1A*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc %T5casts1BC* @checked_object_to_object_casts(%T5casts1AC*)
 // CHECK:         @swift_dynamicCastClassUnconditional
 sil @checked_object_to_object_casts : $@convention(thin) (A) -> B {
 entry(%a : $A):
@@ -325,7 +325,7 @@ entry(%a : $A):
   return %b : $B
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %C5casts2OB* @checked_objc_object_to_object_casts(%C5casts2OA*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc %T5casts2OBC* @checked_objc_object_to_object_casts(%T5casts2OAC*)
 // CHECK:         @swift_dynamicCastClassUnconditional
 sil @checked_objc_object_to_object_casts : $@convention(thin) (OA) -> OB {
 entry(%a : $OA):

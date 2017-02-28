@@ -60,14 +60,14 @@ struct SyncUp<Deliverable> : Synergy {
   }
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @testGenericWitnessMethod(%swift.opaque* noalias nocapture sret, %V14witness_method6SyncUp* noalias nocapture, %swift.type* %T)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testGenericWitnessMethod(%swift.opaque* noalias nocapture sret, %T14witness_method6SyncUpV* noalias nocapture, %swift.type* %T)
 // CHECK: entry:
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @_T014witness_method6SyncUpVMa(%swift.type* %T)
 // CHECK:   [[WTABLE:%.*]] = call i8** @_T014witness_method6SyncUpVyxGAA7SynergyAAlWa(%swift.type* [[METADATA]])
 // CHECK:   [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[WTABLE]], i32 1
 // CHECK:   [[WITNESS_FN:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK:   [[WITNESS:%.*]] = bitcast i8* [[WITNESS_FN]] to void (%swift.opaque*, %swift.opaque*, %swift.type*, i8**)*
-// CHECK:   [[ARG:%.*]] = bitcast %V14witness_method6SyncUp* %1 to %swift.opaque*
+// CHECK:   [[ARG:%.*]] = bitcast %T14witness_method6SyncUpV* %1 to %swift.opaque*
 // CHECK:   call swiftcc void [[WITNESS]](%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture swiftself [[ARG]], %swift.type* [[METADATA]], i8** [[WTABLE]])
 // CHECK:   ret void
 

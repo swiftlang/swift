@@ -68,8 +68,8 @@ entry(%m : $@objc_metatype SomeClassProtocol.Type):
 class OtherClass : SomeClass {}
 sil_vtable OtherClass {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @value_metatype_cast(%C14metatype_casts9SomeClass*)
-// CHECK:         [[T0:%.*]] = bitcast %C14metatype_casts9SomeClass* %0 to %swift.type**
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @value_metatype_cast(%T14metatype_casts9SomeClassC*)
+// CHECK:         [[T0:%.*]] = bitcast %T14metatype_casts9SomeClassC* %0 to %swift.type**
 // CHECK:         [[T1:%.*]] = load %swift.type*, %swift.type** [[T0]]
 // CHECK:         [[T2:%.*]] = icmp eq %swift.type* [[T1]], {{.*}} @_T014metatype_casts10OtherClassCMf
 sil @value_metatype_cast : $@convention(thin) (SomeClass) -> () {
