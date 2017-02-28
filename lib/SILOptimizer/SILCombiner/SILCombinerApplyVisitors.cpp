@@ -1007,8 +1007,55 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI) {
 ///  => apply %207<Int>(%227, ...)
 static ApplyInst *optimizeCastThroughThinFunctionPointer(
     SILBuilder &Builder, ApplyInst *AI, FunctionRefInst *OrigThinFun,
-    PointerToThinFunctionInst *CastedThinFun) {
+    PointerToThinFunctionInst *SubstThinFun) {
 
+  auto OrigCalleeTy = OrigThinFun->getType().castTo<SILFunctionType>();
+  auto SubstCalleeTy = SubstThinFun->getType().castTo<SILFunctionType>();
+
+  if (!OrigCalleeTy->isPolymorphic() &&
+      SubstCalleeTy->isPolymorphic()) {
+    OrigCalleeTy->dump();
+    SubstCalleeTy->dump();
+
+    auto ConcreteCalleeTy = SubstCalleeTy->substGenericArgs(
+      AI->getModule(), AI->getSubstitutions());
+
+    /*ConcreteCalleeTy = SILFunctionType::get(nullptr,
+                                            ConcreteCalleeTy->getExtInfo().withRepresentation(OrigCalleeTy->getExtInfo().getRepresentation()),
+                                            ConcreteCalleeTy->getCalleeConvention(),
+                                            ConcreteCalleeTy->getParameters(),
+                                            ConcreteCalleeTy->getResults(),
+                                            ConcreteCalleeTy->getErrorResult(),
+                                            AI->getModule().getASTContext());
+                                            ConcreteCalleeTy->dump();*/
+    Builder.setCurrentDebugScope(AI->getDebugScope());
+
+    SILInstruction *NewCallee = OrigThinFun;
+    if (OrigCalleeTy != ConcreteCalleeTy) {
+      NewCallee = Builder.createConvertFunction(
+        AI->getLoc(), OrigThinFun,
+        SILType::getPrimitiveObjectType(ConcreteCalleeTy));
+    }
+
+    SmallVector<SILValue, 16> Args;
+    for (auto Arg : AI->getArguments())
+      Args.push_back(Arg);
+
+    ApplyInst *NewApply = Builder.createApply(
+      AI->getLoc(), NewCallee,
+      SILType::getPrimitiveObjectType(ConcreteCalleeTy),
+      AI->getType(), { }, Args, AI->isNonThrowing());
+    
+    return NewApply;
+    /*
+    ApplyInst *NewApply = Builder.createApply(
+      AI->getLoc(), OrigThinFun, NewSubstCalleeType, AI->getType(), Subs, Args,
+                                             AI->isNonThrowing());
+    */
+  }
+
+  return nullptr;
+  /*
   // The original function type needs to be polymorphic.
   auto ConvertCalleeTy = OrigThinFun->getType().castTo<SILFunctionType>();
   assert(ConvertCalleeTy);
@@ -1025,7 +1072,8 @@ static ApplyInst *optimizeCastThroughThinFunctionPointer(
   assert(ReferencedFunction);
   if (ReferencedFunction->isExternalDeclaration())
     return nullptr;
-  auto Params = ReferencedFunction->getContextGenericParams()->getParams();
+  auto Params = ReferencedFunction->getLoweredFunctionType()->getGenericSignature()
+    ->getGenericParams();
   if (Params.size() != 1)
     return nullptr;
 
@@ -1043,7 +1091,7 @@ static ApplyInst *optimizeCastThroughThinFunctionPointer(
 
   // Get the bound generic type from the metatype.
   auto BoundGenericInstTy = dyn_cast_or_null<BoundGenericType>(
-      MetaTy->getInstanceType().getCanonicalTypeOrNull());
+      MetaTy->getInstanceType()->getCanonicalTypeOrNull());
   if (!BoundGenericInstTy)
     return nullptr;
 
@@ -1074,6 +1122,7 @@ static ApplyInst *optimizeCastThroughThinFunctionPointer(
                                              AI->isNonThrowing());
 
   return NewApply;
+  */
 }
 
 /// \brief Check that all users of the apply are retain/release ignoring one
