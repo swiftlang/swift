@@ -27,6 +27,7 @@
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/AST/Witness.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/OptionalEnum.h"
@@ -3412,6 +3413,19 @@ public:
 
   /// Retrieve the set of protocols inherited from this protocol.
   llvm::TinyPtrVector<ProtocolDecl *> getInheritedProtocols() const;
+
+  /// Walk all of the protocols inherited by this protocol, transitively,
+  /// invoking the callback function for each protocol.
+  ///
+  /// \param fn The callback function that will be invoked for each inherited
+  /// protocol. It can return \c Continue to continue the traversal,
+  /// \c SkipChildren to avoid visiting the children of the given protocol
+  /// but continue the search, and \c Stop to halt the search.
+  ///
+  /// \returns \c true if \c fn returned \c Stop for any protocol, \c false
+  /// otherwise.
+  bool walkInheritedProtocols(
+               llvm::function_ref<TypeWalker::Action(ProtocolDecl *)> fn) const;
 
   /// \brief Determine whether this protocol inherits from the given ("super")
   /// protocol.
