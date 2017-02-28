@@ -622,7 +622,7 @@ public:
 
   /// Retrieve a requirement source for nested type name matches.
   static const RequirementSource *forNestedTypeNameMatch(
-                                              GenericSignatureBuilder &builder);
+                                     PotentialArchetype *root);
 
   /// A requirement source that describes that a requirement comes from a
   /// requirement of the given protocol described by the parent.

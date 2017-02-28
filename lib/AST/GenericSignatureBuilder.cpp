@@ -284,7 +284,9 @@ const RequirementSource *RequirementSource::forRequirementSignature(
 }
 
 const RequirementSource *RequirementSource::forNestedTypeNameMatch(
-                                             GenericSignatureBuilder &builder) {
+                                             PotentialArchetype *root) {
+  auto &builder = *root->getBuilder();
+  // FIXME: Store the root
   REQUIREMENT_SOURCE_FACTORY_BODY_NOSTORAGE(NestedTypeNameMatch, nullptr);
 }
 
@@ -724,7 +726,8 @@ bool GenericSignatureBuilder::PotentialArchetype::addConformance(
     // and make it equivalent to the first potential archetype we encountered.
     auto otherPA = new PotentialArchetype(this, assocType);
     known->second.push_back(otherPA);
-    auto sameNamedSource = RequirementSource::forNestedTypeNameMatch(builder);
+    auto sameNamedSource = RequirementSource::forNestedTypeNameMatch(
+                                                        known->second.front());
     builder.addSameTypeRequirement(known->second.front(), otherPA,
                                    sameNamedSource);
 
@@ -980,9 +983,6 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
   if (rep != this)
     repNested = rep->getNestedType(nestedName, builder);
 
-  auto sameNestedTypeSource =
-    RequirementSource::forNestedTypeNameMatch(builder);
-
   // Attempt to resolve this nested type to an associated type
   // of one of the protocols to which the parent potential
   // archetype conforms.
@@ -1048,9 +1048,11 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
           ProtocolConformanceRef(proto));
         type = type.subst(subMap, SubstFlags::UseErrorType);
 
-        builder.addSameTypeRequirement(ResolvedType::forNewTypeAlias(pa),
-                                       builder.resolve(type),
-                                       sameNestedTypeSource, diagnoseMismatch);
+        builder.addSameTypeRequirement(
+                                 ResolvedType::forNewTypeAlias(pa),
+                                 builder.resolve(type),
+                                 RequirementSource::forNestedTypeNameMatch(pa),
+                                 diagnoseMismatch);
       } else
         continue;
 
@@ -1063,14 +1065,18 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
 
         // Produce a same-type constraint between the two same-named
         // potential archetypes.
-        builder.addSameTypeRequirement(pa, nested.front(), sameNestedTypeSource,
-                                       diagnoseMismatch);
+        builder.addSameTypeRequirement(
+                                 pa, nested.front(),
+                                 RequirementSource::forNestedTypeNameMatch(pa),
+                                 diagnoseMismatch);
       } else {
         nested.push_back(pa);
 
         if (repNested) {
-          builder.addSameTypeRequirement(pa, repNested, sameNestedTypeSource,
-                                         diagnoseMismatch);
+          builder.addSameTypeRequirement(
+                                 pa, repNested,
+                                 RequirementSource::forNestedTypeNameMatch(pa),
+                                 diagnoseMismatch);
         }
       }
 
@@ -1097,7 +1103,8 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
   if (isConcreteType()) {
     for (auto equivT : rep->getEquivalenceClassMembers()) {
       concretizeNestedTypeFromConcreteParent(
-          equivT, sameNestedTypeSource, nestedPA, builder,
+          equivT, RequirementSource::forNestedTypeNameMatch(nestedPA),
+          nestedPA, builder,
           [&](ProtocolDecl *proto) -> ProtocolConformanceRef {
             auto depTy = nestedPA->getDependentType({},
                                                     /*allowUnresolved=*/true)
@@ -1936,13 +1943,13 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   }
 
   // Recursively merge the associated types of T2 into T1.
-  auto sameNestedTypeSource = RequirementSource::forNestedTypeNameMatch(*this);
   for (auto equivT2 : equivClass2Members) {
     for (auto T2Nested : equivT2->NestedTypes) {
       auto T1Nested = T1->getNestedType(T2Nested.first, *this);
-      if (addSameTypeRequirement(T1Nested, T2Nested.second.front(),
-                                 sameNestedTypeSource,
-                                 [&](Type type1, Type type2) {
+      if (addSameTypeRequirement(
+                           T1Nested, T2Nested.second.front(),
+                           RequirementSource::forNestedTypeNameMatch(T1Nested),
+                           [&](Type type1, Type type2) {
             Diags.diagnose(Source->getLoc(),
                            diag::requires_same_type_conflict,
                            T1Nested->isGenericParam(),
@@ -2695,7 +2702,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
                                 *this);
       addSameTypeRequirement(
           pa, replacement,
-          RequirementSource::forNestedTypeNameMatch(*this));
+          RequirementSource::forNestedTypeNameMatch(pa));
     });
   }
 }
