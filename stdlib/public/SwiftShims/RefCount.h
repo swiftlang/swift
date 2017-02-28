@@ -1158,7 +1158,7 @@ class RefCounts {
       newbits = oldbits;
       newbits.decrementUnownedRefCount(dec);
       if (newbits.getUnownedRefCount() == 0) {
-        // DEINITED -> FREED  or  DEINITED -> DEAD
+        // DEINITED -> FREED, or DEINITED -> DEAD
         // Caller will free the object. Weak decrement is handled by
         // HeapObjectSideTableEntry::decrementUnownedShouldFree.
         assert(newbits.getIsDeiniting());
@@ -1182,7 +1182,7 @@ class RefCounts {
     auto newbits = oldbits;
     newbits.decrementUnownedRefCount(dec);
     if (newbits.getUnownedRefCount() == 0) {
-      // DEINITED -> FREED  or  DEINITED -> DEAD
+      // DEINITED -> FREED, or DEINITED -> DEAD
       // Caller will free the object. Weak decrement is handled by
       // HeapObjectSideTableEntry::decrementUnownedShouldFreeNonAtomic.
       assert(newbits.getIsDeiniting());
