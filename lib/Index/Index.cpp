@@ -400,7 +400,8 @@ private:
   }
 
   bool isLocal(ValueDecl *D) const {
-    return D->getDeclContext()->getLocalContext();
+    return D->getDeclContext()->getLocalContext() &&
+      (!isa<ParamDecl>(D) || cast<ParamDecl>(D)->getArgumentNameLoc().isValid());
   }
 
   void getModuleHash(SourceFileOrModule SFOrMod, llvm::raw_ostream &OS);
