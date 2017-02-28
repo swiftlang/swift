@@ -1262,7 +1262,7 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
   if (!ED->getExtendedType().isNull() &&
       !ED->getExtendedType()->hasError()) {
     if (NominalTypeDecl *nominal = ED->getExtendedType()->getAnyNominal()) {
-      validateDecl(nominal);
+      validateDeclForNameLookup(nominal);
       if (ED->hasDefaultAccessibility())
         return;
       maxAccess = std::max(nominal->getFormalAccess(),
@@ -7285,10 +7285,11 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
     if (proto->hasInterfaceType())
       return;
     proto->computeType();
-    // Record inherited protocols.
-    resolveInheritedProtocols(proto);
 
     validateAccessibility(proto);
+
+    // Record inherited protocols.
+    resolveInheritedProtocols(proto);
 
     for (auto member : proto->getMembers()) {
       if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
