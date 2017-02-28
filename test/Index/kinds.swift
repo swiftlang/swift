@@ -43,10 +43,14 @@ struct AStruct {
 class AClass {
   // CHECK: [[@LINE-1]]:7 | class/Swift | AClass | s:14swift_ide_test6AClassC | Def | rel: 0
 
-  // InstanceMethod
-  func instanceMethod() {}
-  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | instanceMethod() | s:14swift_ide_test6AClassC14instanceMethodyyF | Def,RelChild | rel: 1
-  // CHECK-NEXT:  RelChild | AClass | s:14swift_ide_test6AClassC
+  // InstanceMethod + Parameters
+  func instanceMethod(a: Int, b b: Int, _ c: Int) {}
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | instanceMethod(a:b:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bSitF | Def,RelChild | rel: 1
+  // CHECK-NEXT: RelChild | AClass | s:14swift_ide_test6AClassC
+  // CHECK: [[@LINE-3]]:23 | param/Swift | a | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bSitFAEL_Siv | Def,RelChild | rel: 1
+  // CHECK-NEXT: RelChild | instanceMethod(a:b:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bSitF
+  // CHECK-NOT: [[@LINE-5]]:31 | param/Swift | b | s:{{.*}} | Def,RelChild | rel: 1
+  // CHECK-NOT: [[@LINE-6]]:43 | param/Swift | c | s:{{.*}} | Def,RelChild | rel: 1
 
   // ClassMethod
   class func classMethod() {}
