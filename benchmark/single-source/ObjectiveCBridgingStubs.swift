@@ -12,8 +12,11 @@
 
 import TestsUtils
 import Foundation
+#if _runtime(_ObjC)
 import ObjectiveCTests
+#endif
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubFromNSString() {
    let b = BridgeTester()
@@ -23,17 +26,21 @@ func testObjectiveCBridgeStubFromNSString() {
    }
    CheckResults(str != "" && str == "Default string value no tagged pointer", "Wrong value returned")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubFromNSString(_ N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubFromNSString()
     }
   }
+#endif
 }
 
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubToNSString() {
    let b = BridgeTester()
@@ -42,15 +49,19 @@ func testObjectiveCBridgeStubToNSString() {
      b.test(from: str)
    }
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubToNSString(_ N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubToNSString()
     }
   }
+#endif
 }
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubFromArrayOfNSString() {
    let b = BridgeTester()
@@ -62,15 +73,19 @@ func testObjectiveCBridgeStubFromArrayOfNSString() {
    }
    CheckResults(str != "" && str == "Default string value no tagged pointer", "Wrong value returned")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubFromArrayOfNSString(_ N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubFromArrayOfNSString()
     }
   }
+#endif
 }
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubToArrayOfNSString() {
    let b = BridgeTester()
@@ -80,16 +95,20 @@ func testObjectiveCBridgeStubToArrayOfNSString() {
      b.test(fromArrayOf: arr)
    }
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubToArrayOfNSString(_ N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubToArrayOfNSString()
     }
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubFromNSDate() {
   let b = BridgeTester()
@@ -100,16 +119,20 @@ func testObjectiveCBridgeStubFromNSDate() {
     let _ = bridgedEnd.timeIntervalSince(bridgedBegin)
   }
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubFromNSDate(N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubFromNSDate()
     }
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 public func testObjectiveCBridgeStubToNSDate() {
   let b = BridgeTester()
@@ -118,16 +141,20 @@ public func testObjectiveCBridgeStubToNSDate() {
     b.use(d)
   }
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubToNSDate(N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubToNSDate()
     }
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubDateAccess() {
   var remainders = 0.0
@@ -136,16 +163,20 @@ func testObjectiveCBridgeStubDateAccess() {
     remainders += d.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 10)
   }
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubDateAccess(N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubDateAccess()
     }
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubDateMutation() {
   var d = Date()
@@ -153,16 +184,20 @@ func testObjectiveCBridgeStubDateMutation() {
       d += 1
   }
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubDateMutation(N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubDateMutation()
     }
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubURLAppendPath() {
   let startUrl = URL(string: "/")!
@@ -173,16 +208,20 @@ func testObjectiveCBridgeStubURLAppendPath() {
     }
   }
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubURLAppendPath(N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubURLAppendPath()
     }
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubDataAppend() {
   let proto = Data()
@@ -194,12 +233,15 @@ func testObjectiveCBridgeStubDataAppend() {
     }
   }
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubDataAppend(N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubDataAppend()
     }
   }
+#endif
 }

@@ -133,7 +133,7 @@ public func run_MapReduceShortString(_ N: Int) {
 
 @inline(never)
 public func run_MapReduceClass(_ N: Int) {
-  let numbers = (0..<1000).map { NSDecimalNumber(value: $0) }
+  let numbers = (0..<1000).map { NSDecimalNumber(integerLiteral: $0) }
 
   var c = 0
   for _ in 1...N*100 {
@@ -145,7 +145,7 @@ public func run_MapReduceClass(_ N: Int) {
 
 @inline(never)
 public func run_MapReduceClassShort(_ N: Int) {
-  let numbers = (0..<10).map { NSDecimalNumber(value: $0) }
+  let numbers = (0..<10).map { NSDecimalNumber(integerLiteral: $0) }
 
   var c = 0
   for _ in 1...N*10000 {
