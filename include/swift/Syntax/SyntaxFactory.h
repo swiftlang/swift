@@ -129,6 +129,43 @@ struct SyntaxFactory {
   /// as missing.
   static IntegerLiteralExprSyntax makeBlankIntegerLiteralExpr();
 
+  /// Make a symbolic reference with the given identifier and optionally a
+  /// generic argument clause.
+  static SymbolicReferenceExprSyntax
+  makeSymbolicReferenceExpr(RC<TokenSyntax> Identifier,
+    llvm::Optional<GenericArgumentClauseSyntax> GenericArgs);
+
+  /// Make a symbolic reference expression with the identifier and
+  /// generic argument clause marked as missing.
+  static SymbolicReferenceExprSyntax makeBlankSymbolicReferenceExpr();
+
+  /// Make a function call argument with all elements marked as missing.
+  static FunctionCallArgumentSyntax makeBlankFunctionCallArgument();
+
+  /// Make a function call argument based on an expression with the
+  /// given elements.
+  static FunctionCallArgumentSyntax
+  makeFunctionCallArgument(RC<TokenSyntax> Label, RC<TokenSyntax> Colon,
+                           ExprSyntax ExpressionArgument,
+                           RC<TokenSyntax> TrailingComma);
+
+  /// Make a function call argument list with the given arguments.
+  static FunctionCallArgumentListSyntax
+  makeFunctionCallArgumentList(
+    std::vector<FunctionCallArgumentSyntax> &Arguments);
+
+  /// Make a function call argument list with no arguments.
+  static FunctionCallArgumentListSyntax makeBlankFunctionCallArgumentList();
+
+  /// Make a function call expression with the given elements.
+  static FunctionCallExprSyntax
+  makeFunctionCallExpr(ExprSyntax CalledExpr, RC<TokenSyntax> LeftParen,
+                       FunctionCallArgumentListSyntax Arguments,
+                       RC<TokenSyntax> RightParen);
+
+  /// Make a function call expression with all elements marked as missing.
+  static FunctionCallExprSyntax makeBlankFunctionCallExpr();
+
 #pragma mark - Tokens
 
   /// Make a 'fallthrough' keyword with the specified leading and

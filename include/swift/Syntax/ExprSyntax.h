@@ -29,6 +29,9 @@ using llvm::Optional;
 namespace swift {
 namespace syntax {
 
+class GenericArgumentClauseSyntax;
+class GenericArgumentClauseSyntaxData;
+
 class ExprSyntaxData : public SyntaxData {
 protected:
   ExprSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
@@ -142,6 +145,328 @@ public:
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::IntegerLiteralExpr;
   }
+};
+
+#pragma mark - symbolic-reference Data
+
+class SymbolicReferenceExprSyntaxData : public ExprSyntaxData {
+  friend class SymbolicReferenceExprSyntax;
+  friend class SyntaxData;
+  friend struct SyntaxFactory;
+
+  RC<GenericArgumentClauseSyntaxData> CachedGenericArgClause;
+
+  SymbolicReferenceExprSyntaxData(RC<RawSyntax> Raw,
+                                  const SyntaxData *Parent = nullptr,
+                                  CursorIndex IndexInParent = 0);
+
+  static RC<SymbolicReferenceExprSyntaxData>
+  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
+       CursorIndex IndexInParent = 0);
+
+  static RC<SymbolicReferenceExprSyntaxData> makeBlank();
+
+public:
+  static bool classof(const SyntaxData *S) {
+    return S->getKind() == SyntaxKind::SymbolicReferenceExpr;
+  }
+};
+
+#pragma mark - symbolic-reference API
+
+/// symbolic-reference-expression -> identifier generic-argument-clause?
+///
+/// This is shown as primary-expression -> identifier generic-argument-clause?
+/// in the grammar. It can be just an identifier referring to some
+/// declaration, or it could perhaps be a constructor call to `Array<Int>`.
+class SymbolicReferenceExprSyntax : public ExprSyntax {
+
+  using DataType = SymbolicReferenceExprSyntaxData;
+
+  friend struct SyntaxFactory;
+  friend class SyntaxData;
+  friend class Syntax;
+  friend class SymbolicReferenceExprSyntaxData;
+
+  enum class Cursor : CursorIndex {
+    Identifier,
+    GenericArgumentClause
+  };
+
+  SymbolicReferenceExprSyntax(const RC<SyntaxData> Root,
+                              const DataType *Data);
+
+public:
+
+  /// Get the identifier for the symbol to which this expression refers.
+  RC<TokenSyntax> getIdentifier() const;
+
+  /// Return a new `SymbolicReferenceExprSyntax` with the given identifier.
+  SymbolicReferenceExprSyntax
+  withIdentifier(RC<TokenSyntax> NewIdentifier) const;
+
+  /// Return the generic arguments this symbolic reference has, if it has one.
+  llvm::Optional<GenericArgumentClauseSyntax> getGenericArgumentClause() const;
+
+  /// Return a new `SymbolicReferenceExprSyntax` with the given generic
+  /// arguments.
+  SymbolicReferenceExprSyntax
+  withGenericArgumentClause(GenericArgumentClauseSyntax NewGenericArgs) const;
+
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::SymbolicReferenceExpr;
+  }
+};
+
+#pragma mark - function-call-argument Data
+
+class FunctionCallArgumentSyntaxData : public SyntaxData {
+  friend struct SyntaxFactory;
+  friend class FunctionCallArgumentSyntax;
+  friend class SyntaxData;
+
+  RC<ExprSyntaxData> CachedExpression;
+
+  FunctionCallArgumentSyntaxData(RC<RawSyntax> Raw,
+                           const SyntaxData *Parent = nullptr,
+                           CursorIndex IndexInParent = 0);
+
+  static RC<FunctionCallArgumentSyntaxData>
+  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
+       CursorIndex IndexInParent = 0);
+
+  static RC<FunctionCallArgumentSyntaxData> makeBlank();
+
+public:
+  static bool classof(const SyntaxData *S) {
+    return S->getKind() == SyntaxKind::FunctionCallArgument;
+  }
+};
+
+#pragma mark - function-call-argument API
+
+/// function-call-argument -> label? ':'? (expression | operator) ','?
+class FunctionCallArgumentSyntax : public Syntax {
+
+  using DataType = FunctionCallArgumentSyntaxData;
+
+  friend struct SyntaxFactory;
+  friend class SyntaxData;
+  friend class Syntax;
+  friend class FunctionCallArgumentSyntaxData;
+  friend class FunctionCallArgumentListSyntax;
+
+  enum class Cursor {
+    Label,
+    Colon,
+    Expression,
+    Comma,
+  };
+
+  FunctionCallArgumentSyntax(const RC<SyntaxData> Root,
+                             const DataType *Data);
+
+public:
+
+  /// Return the label identifier for this argument, if it has one.
+  RC<TokenSyntax> getLabel() const;
+
+  /// Return a new `FunctionCallArgumentSyntax` with the given label.
+  FunctionCallArgumentSyntax withLabel(RC<TokenSyntax> NewLabel) const;
+
+  /// Get the colon ':' token in between the label and argument,
+  /// if there is one.
+  RC<TokenSyntax> getColonToken() const;
+
+  /// Return a new `FunctionCallArgumentSyntax` with the given colon ':' token.
+  FunctionCallArgumentSyntax withColonToken(RC<TokenSyntax> NewColon) const;
+
+  /// Returns the expression of the argument.
+  llvm::Optional<ExprSyntax> getExpression() const;
+
+  /// Return a new `FunctionCallArgumentSyntax` with the given expression
+  /// argument.
+  FunctionCallArgumentSyntax withExpression(ExprSyntax NewExpression) const;
+
+  /// Get the comma ',' token immediately following this argument, if there
+  /// is one.
+  RC<TokenSyntax> getTrailingComma() const;
+
+  /// Return a new `FunctionCallArgumentSyntax` with the given comma attached
+  /// to the end of the argument.
+  FunctionCallArgumentSyntax
+  withTrailingComma(RC<TokenSyntax> NewTrailingComma) const;
+
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::FunctionCallArgument;
+  }
+};
+
+#pragma mark - function-call-argument-list Data
+
+class FunctionCallArgumentListSyntaxData : public SyntaxData {
+  friend struct SyntaxFactory;
+  friend class FunctionCallArgumentListSyntax;
+  friend class FunctionCallExprSyntaxBuilder;
+  friend class SyntaxData;
+
+  std::vector<RC<FunctionCallArgumentSyntaxData>> CachedArguments;
+
+  FunctionCallArgumentListSyntaxData(const RC<RawSyntax> Raw,
+                                     const SyntaxData *Parent = nullptr,
+                                     CursorIndex IndexInParent = 0);
+
+  static RC<FunctionCallArgumentListSyntaxData>
+  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
+       CursorIndex IndexInParent = 0);
+
+  static RC<FunctionCallArgumentListSyntaxData> makeBlank();
+
+public:
+  static bool classof(const SyntaxData *S) {
+    return S->getKind() == SyntaxKind::FunctionCallArgumentList;
+  }
+};
+
+#pragma mark - function-call-argument-list API
+
+/// function-call-argument-list -> function-call-argument
+///                                function-call-argument-list?
+class FunctionCallArgumentListSyntax : public Syntax {
+  using DataType = FunctionCallArgumentListSyntaxData;
+  friend struct SyntaxFactory;
+  friend class FunctionCallArgumentListSyntaxData;
+  friend class FunctionCallExprSyntax;
+  friend class Syntax;
+  friend class SyntaxData;
+
+  FunctionCallArgumentListSyntax(const RC<SyntaxData> Root,
+                                 const DataType *Data);
+
+public:
+  /// Return the number of arguments in this list.
+  size_t getNumArguments() const;
+
+  /// Get the argument at the given Index.
+  FunctionCallArgumentSyntax getArgument(size_t n) const;
+
+  /// Returns a new `FunctionCallArgumentListSyntax` with the given
+  /// argument added to the end.
+  FunctionCallArgumentListSyntax
+  withAdditionalArgument(FunctionCallArgumentSyntax AdditionalArgument) const;
+
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::FunctionCallExpr;
+  }
+};
+
+#pragma mark - function-call-expression Data
+
+class FunctionCallExprSyntaxData : public ExprSyntaxData {
+  friend struct SyntaxFactory;
+  friend class FunctionCallExprSyntax;
+  friend class FunctionCallExprSyntaxBuilder;
+  friend class SyntaxData;
+
+  RC<ExprSyntaxData> CachedCalledExpression;
+  RC<FunctionCallArgumentListSyntaxData> CachedArgumentList;
+
+  FunctionCallExprSyntaxData(RC<RawSyntax> Raw,
+                                 const SyntaxData *Parent = nullptr,
+                                 CursorIndex IndexInParent = 0);
+
+  static RC<FunctionCallExprSyntaxData>
+  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
+       CursorIndex IndexInParent = 0);
+
+  static RC<FunctionCallExprSyntaxData> makeBlank();
+
+public:
+  static bool classof(const SyntaxData *S) {
+    return S->getKind() == SyntaxKind::FunctionCallExpr;
+  }
+};
+
+#pragma mark - function-call-expression API
+
+class FunctionCallExprSyntax : public ExprSyntax {
+  using DataType = FunctionCallExprSyntaxData;
+  friend struct SyntaxFactory;
+  friend class FunctionCallExprSyntaxData;
+  friend class FunctionCallExprSyntaxBuilder;
+  friend class Syntax;
+  friend class SyntaxData;
+
+  enum class Cursor: CursorIndex {
+    CalledExpression,
+    LeftParen,
+    ArgumentList,
+    RightParen,
+  };
+
+  FunctionCallExprSyntax(const RC<SyntaxData> Root, const DataType *Data);
+
+public:
+
+  /// Get the base expression getting called.
+  ExprSyntax getCalledExpression() const;
+
+  /// Return a new `FunctionCallExprSyntax` with the given base expression
+  /// to be called.
+  FunctionCallExprSyntax
+  withCalledExpression(ExprSyntax NewBaseExpression) const;
+
+  /// Return the left parenthesis '(' token in this call.
+  RC<TokenSyntax> getLeftParen() const;
+
+  /// Return a new `FunctionCallExprSyntax` with the given left parenthesis '('
+  /// token.
+  FunctionCallExprSyntax withLeftParen(RC<TokenSyntax> NewLeftParen) const;
+
+  /// Get the list of arguments in this call expression.
+  FunctionCallArgumentListSyntax getArgumentList() const;
+
+  /// Return a new `FunctionCallExprSyntax` with the given argument list.
+  FunctionCallExprSyntax
+  withArgumentList(FunctionCallArgumentListSyntax NewArgumentList) const;
+
+  /// Return the right parenthesis ')' token in this call.
+  RC<TokenSyntax> getRightParen() const;
+
+  /// Return a new `FunctionCallExprSyntax` with the given right parenthesis ')'
+  /// token.
+  FunctionCallExprSyntax withRightParen(RC<TokenSyntax> NewLeftParen) const;
+
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::FunctionCallExpr;
+  }
+};
+
+#pragma mark - function-call-argument-list-builder
+class FunctionCallExprSyntaxBuilder {
+  RawSyntax::LayoutList CallLayout;
+  RawSyntax::LayoutList ListLayout;
+public:
+
+  /// Start the builder with all elements marked as missing or empty.
+  FunctionCallExprSyntaxBuilder();
+
+  /// Use the given expression as the call target.
+  FunctionCallExprSyntaxBuilder &
+  useCalledExpression(ExprSyntax CalledExpression);
+
+  /// Use the given left parenthesis '(' token in the function call.
+  FunctionCallExprSyntaxBuilder &useLeftParen(RC<TokenSyntax> LeftParen);
+
+  /// Add an additional argument to the layout.
+  FunctionCallExprSyntaxBuilder &
+  appendArgument(FunctionCallArgumentSyntax AdditionalArgument);
+
+  /// Use the given right parenthesis ')' token in the function call.
+  FunctionCallExprSyntaxBuilder &useRightParen(RC<TokenSyntax> RightParen);
+
+  /// Return a `FunctionCallExprSyntax` with the arguments added so far.
+  FunctionCallExprSyntax build() const;
 };
 
 } // end namespace syntax

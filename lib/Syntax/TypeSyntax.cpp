@@ -118,6 +118,19 @@ TypeAttributeSyntaxData::make(RC<RawSyntax> Raw,
   };
 }
 
+RC<TypeAttributeSyntaxData> TypeAttributeSyntaxData::makeBlank() {
+  auto Raw = RawSyntax::make(SyntaxKind::TypeAttribute,
+                             {
+                               TokenSyntax::missingToken(tok::at_sign, "@"),
+                               TokenSyntax::missingToken(tok::identifier, ""),
+                               TokenSyntax::missingToken(tok::l_paren, "("),
+                               RawSyntax::missing(SyntaxKind::BalancedTokens),
+                               TokenSyntax::missingToken(tok::r_paren, ")"),
+                             },
+                             SourcePresence::Present);
+  return make(Raw);
+}
+
 #pragma mark - type-attribute API
 
 TypeAttributeSyntax::TypeAttributeSyntax(RC<SyntaxData> Root,
