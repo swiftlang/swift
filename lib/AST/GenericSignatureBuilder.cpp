@@ -39,6 +39,9 @@ using namespace swift;
 using llvm::DenseMap;
 
 namespace {
+  typedef GenericSignatureBuilder::RequirementSource RequirementSource;
+  typedef GenericSignatureBuilder::FloatingRequirementSource
+    FloatingRequirementSource;
   typedef GenericSignatureBuilder::PotentialArchetype PotentialArchetype;
   typedef GenericSignatureBuilder::ConcreteConstraint ConcreteConstraint;
   typedef GenericSignatureBuilder::EquivalenceClass EquivalenceClass;
@@ -79,34 +82,49 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
   switch (kind) {
   case Explicit:
     switch (storageKind) {
-    case StorageKind::None:
+    case StorageKind::RootArchetype:
     case StorageKind::TypeRepr:
     case StorageKind::RequirementRepr:
       return true;
 
     case StorageKind::ProtocolDecl:
     case StorageKind::ProtocolConformance:
+    case StorageKind::AssociatedTypeDecl:
       return false;
     }
 
   case Inferred:
     switch (storageKind) {
-    case StorageKind::None:
+    case StorageKind::RootArchetype:
     case StorageKind::TypeRepr:
       return true;
 
     case StorageKind::ProtocolDecl:
     case StorageKind::ProtocolConformance:
     case StorageKind::RequirementRepr:
+    case StorageKind::AssociatedTypeDecl:
       return false;
     }
 
   case NestedTypeNameMatch:
-  case Parent:
     switch (storageKind) {
-    case StorageKind::None:
+    case StorageKind::RootArchetype:
         return true;
 
+    case StorageKind::TypeRepr:
+    case StorageKind::ProtocolDecl:
+    case StorageKind::ProtocolConformance:
+    case StorageKind::RequirementRepr:
+    case StorageKind::AssociatedTypeDecl:
+      return false;
+    }
+
+  case Parent:
+    switch (storageKind) {
+    case StorageKind::AssociatedTypeDecl:
+        return true;
+
+    case StorageKind::RootArchetype:
     case StorageKind::TypeRepr:
     case StorageKind::ProtocolDecl:
     case StorageKind::ProtocolConformance:
@@ -120,10 +138,11 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
     case StorageKind::ProtocolDecl:
       return true;
 
-    case StorageKind::None:
+    case StorageKind::RootArchetype:
     case StorageKind::TypeRepr:
     case StorageKind::ProtocolConformance:
     case StorageKind::RequirementRepr:
+    case StorageKind::AssociatedTypeDecl:
       return false;
     }
 
@@ -133,10 +152,11 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
     case StorageKind::ProtocolConformance:
       return true;
 
-    case StorageKind::None:
+    case StorageKind::RootArchetype:
     case StorageKind::ProtocolDecl:
     case StorageKind::TypeRepr:
     case StorageKind::RequirementRepr:
+    case StorageKind::AssociatedTypeDecl:
       return false;
     }
   }
@@ -144,9 +164,8 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
 
 const void *RequirementSource::getOpaqueStorage() const {
   switch (storageKind) {
-  case StorageKind::None:
-    // Note: always null.
-    return storage.typeRepr;
+  case StorageKind::RootArchetype:
+    return storage.rootArchetype;
 
   case StorageKind::TypeRepr:
     return storage.typeRepr;
@@ -159,7 +178,17 @@ const void *RequirementSource::getOpaqueStorage() const {
 
   case StorageKind::ProtocolDecl:
     return storage.protocol;
+
+  case StorageKind::AssociatedTypeDecl:
+    return storage.assocType;
   }
+}
+
+const void *RequirementSource::getExtraOpaqueStorage() const {
+  if (numTrailingObjects(OverloadToken<PotentialArchetype *>()) == 1)
+    return getTrailingObjects<PotentialArchetype *>()[0];
+
+  return nullptr;
 }
 
 bool RequirementSource::isDerivedRequirement() const {
@@ -205,23 +234,60 @@ bool RequirementSource::isDerivedViaConcreteConformance() const {
   return false;
 }
 
-#define REQUIREMENT_SOURCE_FACTORY_BODY(SourceKind, Parent, Storage)       \
-  llvm::FoldingSetNodeID nodeID;                                           \
-  Profile(nodeID, Kind::SourceKind, Parent, Storage);                      \
-                                                                           \
-  void *insertPos = nullptr;                                               \
-  if (auto known =                                                         \
-        builder.Impl->RequirementSources.FindNodeOrInsertPos(nodeID,       \
-                                                            insertPos))    \
-    return known;                                                          \
-                                                                           \
-  auto result = new RequirementSource(Kind::SourceKind, Parent, Storage);  \
-  builder.Impl->RequirementSources.InsertNode(result, insertPos);          \
-  return result
+bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa) const {
+  // If it's not a derived requirement, it's not self-derived.
+  if (!isDerivedRequirement()) return false;
 
-#define REQUIREMENT_SOURCE_FACTORY_BODY_NOSTORAGE(SourceKind, Parent)      \
+  // Collect the path of associated types from the root pa.
+  SmallVector<AssociatedTypeDecl *, 4> assocTypes;
+  PotentialArchetype *currentPA = nullptr;
+  for (auto source = this; source; source = source->parent) {
+    switch (source->kind) {
+    case RequirementSource::Parent:
+      assocTypes.push_back(source->getAssociatedType());
+      break;
+
+    case RequirementSource::NestedTypeNameMatch:
+      return false;
+
+    case RequirementSource::Explicit:
+    case RequirementSource::Inferred:
+    case RequirementSource::RequirementSignatureSelf:
+      currentPA = source->getRootPotentialArchetype();
+      break;
+
+    case RequirementSource::Concrete:
+    case RequirementSource::ProtocolRequirement:
+    case RequirementSource::Superclass:
+      break;
+    }
+  }
+
+  assert(currentPA && "Missing root potential archetype");
+
+  // Check whether anything of the potential archetypes in the path are
+  // equivalent to the end of the path.
+  auto rep = pa->getRepresentative();
+  for (auto assocType : reversed(assocTypes)) {
+    // Check whether this potential archetype is in the same equivalence class.
+    if (currentPA->getRepresentative() == rep) return true;
+
+    // Get the next nested type, but only if we've seen it before.
+    // FIXME: Feels hacky.
+    auto knownNested = currentPA->NestedTypes.find(assocType->getName());
+    if (knownNested == currentPA->NestedTypes.end()) return false;
+    currentPA = knownNested->second.front();
+  }
+
+  // FIXME: currentPA == pa?
+  return false;
+}
+
+#define REQUIREMENT_SOURCE_FACTORY_BODY(                                   \
+          SourceKind, Parent, Storage, ExtraStorage,                       \
+          NumPotentialArchetypes)                                          \
   llvm::FoldingSetNodeID nodeID;                                           \
-  Profile(nodeID, Kind::SourceKind, Parent, nullptr);                      \
+  Profile(nodeID, Kind::SourceKind, Parent, Storage, ExtraStorage);        \
                                                                            \
   void *insertPos = nullptr;                                               \
   if (auto known =                                                         \
@@ -229,73 +295,114 @@ bool RequirementSource::isDerivedViaConcreteConformance() const {
                                                             insertPos))    \
     return known;                                                          \
                                                                            \
-  auto result = new RequirementSource(Kind::SourceKind, Parent);           \
+  unsigned size =                                                          \
+    totalSizeToAlloc<PotentialArchetype *>(NumPotentialArchetypes);        \
+  void *mem = malloc(size);                                                \
+  auto result = new (mem) RequirementSource(Kind::SourceKind, Parent,      \
+                                            Storage);                      \
+  if (NumPotentialArchetypes > 0)                                          \
+    result->getTrailingObjects<PotentialArchetype *>()[0] = ExtraStorage;  \
   builder.Impl->RequirementSources.InsertNode(result, insertPos);          \
   return result
 
 const RequirementSource *RequirementSource::forAbstract(
-                                             GenericSignatureBuilder &builder) {
-  REQUIREMENT_SOURCE_FACTORY_BODY_NOSTORAGE(Explicit, nullptr);
+                                                    PotentialArchetype *root) {
+  auto &builder = *root->getBuilder();
+  REQUIREMENT_SOURCE_FACTORY_BODY(Explicit, nullptr, root, nullptr, 0);
 }
 
 const RequirementSource *RequirementSource::forExplicit(
-                                             GenericSignatureBuilder &builder,
+                                             PotentialArchetype *root,
                                              const TypeRepr *typeRepr) {
-  REQUIREMENT_SOURCE_FACTORY_BODY(Explicit, nullptr, typeRepr);
+  // If the type representation is NULL, we have an abstract requirement
+  // source.
+  if (!typeRepr)
+    return forAbstract(root);
+
+  auto &builder = *root->getBuilder();
+  // FIXME: Store the root
+  REQUIREMENT_SOURCE_FACTORY_BODY(Explicit, nullptr, typeRepr, root, 1);
 }
 
 const RequirementSource *RequirementSource::forExplicit(
-                                      GenericSignatureBuilder &builder,
+                                      PotentialArchetype *root,
                                       const RequirementRepr *requirementRepr) {
-  REQUIREMENT_SOURCE_FACTORY_BODY(Explicit, nullptr, requirementRepr);
+  // If the requirement representation is NULL, we have an abstract requirement
+  // source.
+  if (!requirementRepr)
+    return forAbstract(root);
+
+  auto &builder = *root->getBuilder();
+  REQUIREMENT_SOURCE_FACTORY_BODY(Explicit, nullptr, requirementRepr, root, 1);
 }
 
 const RequirementSource *RequirementSource::forInferred(
-                                              GenericSignatureBuilder &builder,
+                                              PotentialArchetype *root,
                                               const TypeRepr *typeRepr) {
-  REQUIREMENT_SOURCE_FACTORY_BODY(Inferred, nullptr, typeRepr);
+  auto &builder = *root->getBuilder();
+  REQUIREMENT_SOURCE_FACTORY_BODY(Inferred, nullptr, typeRepr, root, 1);
 }
 
 const RequirementSource *RequirementSource::forRequirementSignature(
-                                              GenericSignatureBuilder &builder,
+                                              PotentialArchetype *root,
                                               ProtocolDecl *protocol) {
-  REQUIREMENT_SOURCE_FACTORY_BODY(RequirementSignatureSelf, nullptr, protocol);
+  auto &builder = *root->getBuilder();
+  REQUIREMENT_SOURCE_FACTORY_BODY(RequirementSignatureSelf, nullptr, protocol,
+                                  root, 1);
 }
 
 const RequirementSource *RequirementSource::forNestedTypeNameMatch(
-                                             GenericSignatureBuilder &builder) {
-  REQUIREMENT_SOURCE_FACTORY_BODY_NOSTORAGE(NestedTypeNameMatch, nullptr);
+                                             PotentialArchetype *root) {
+  auto &builder = *root->getBuilder();
+  REQUIREMENT_SOURCE_FACTORY_BODY(NestedTypeNameMatch, nullptr, root, nullptr,
+                                  0);
 }
 
 const RequirementSource *RequirementSource::viaAbstractProtocolRequirement(
                                                GenericSignatureBuilder &builder,
                                                ProtocolDecl *protocol) const {
-  REQUIREMENT_SOURCE_FACTORY_BODY(ProtocolRequirement, this, protocol);
+  REQUIREMENT_SOURCE_FACTORY_BODY(ProtocolRequirement, this, protocol,
+                                  nullptr, 0);
 }
 
 const RequirementSource *RequirementSource::viaSuperclass(
                                       GenericSignatureBuilder &builder,
                                       ProtocolConformance *conformance) const {
-  REQUIREMENT_SOURCE_FACTORY_BODY(Superclass, this, conformance);
+  REQUIREMENT_SOURCE_FACTORY_BODY(Superclass, this, conformance, nullptr, 0);
 }
 
 const RequirementSource *RequirementSource::viaConcrete(
                                       GenericSignatureBuilder &builder,
                                       ProtocolConformance *conformance) const {
-  REQUIREMENT_SOURCE_FACTORY_BODY(Concrete, this, conformance);
+  REQUIREMENT_SOURCE_FACTORY_BODY(Concrete, this, conformance, nullptr, 0);
 }
 
 const RequirementSource *RequirementSource::viaParent(
-                                      GenericSignatureBuilder &builder) const {
-  REQUIREMENT_SOURCE_FACTORY_BODY_NOSTORAGE(Parent, this);
+                                      GenericSignatureBuilder &builder,
+                                      AssociatedTypeDecl *assocType) const {
+  REQUIREMENT_SOURCE_FACTORY_BODY(Parent, this, assocType, nullptr, 0);
 }
 
-#undef REQUIREMENT_SOURCE_FACTORY_BODY_NOSTORAGE
 #undef REQUIREMENT_SOURCE_FACTORY_BODY
+
+PotentialArchetype *RequirementSource::getRootPotentialArchetype() const {
+  /// Find the root.
+  auto root = this;
+  while (auto parent = root->parent)
+    root = parent;
+
+  // If the root archetype is in extra storage, grab it from there.
+  if (root->numTrailingObjects(OverloadToken<PotentialArchetype *>()) == 1)
+    return root->getTrailingObjects<PotentialArchetype *>()[0];
+
+  // Otherwise, it's in inline storage.
+  assert(storageKind == StorageKind::RootArchetype);
+  return storage.rootArchetype;
+}
 
 ProtocolDecl *RequirementSource::getProtocolDecl() const {
   switch (storageKind) {
-  case StorageKind::None:
+  case StorageKind::RootArchetype:
   case StorageKind::TypeRepr:
   case StorageKind::RequirementRepr:
     return nullptr;
@@ -308,6 +415,9 @@ ProtocolDecl *RequirementSource::getProtocolDecl() const {
       return storage.conformance->getProtocol();
 
     return nullptr;
+
+  case StorageKind::AssociatedTypeDecl:
+    return storage.assocType->getProtocol();
   }
 }
 
@@ -366,6 +476,9 @@ void RequirementSource::print(llvm::raw_ostream &out,
   if (parent) {
     parent->print(out, srcMgr);
     out << " -> ";
+  } else {
+    auto pa = getRootPotentialArchetype();
+    out << pa->getDebugName() << ": ";
   }
 
   switch (kind) {
@@ -414,7 +527,7 @@ void RequirementSource::print(llvm::raw_ostream &out,
   };
 
   switch (storageKind) {
-  case StorageKind::None:
+  case StorageKind::RootArchetype:
     break;
 
   case StorageKind::TypeRepr:
@@ -433,7 +546,51 @@ void RequirementSource::print(llvm::raw_ostream &out,
           << storage.conformance->getProtocol()->getName() << ")";
     }
     break;
+
+  case StorageKind::AssociatedTypeDecl:
+    out << " (" << storage.assocType->getProtocol()->getName()
+        << "::" << storage.assocType->getName() << ")";
+    break;
   }
+}
+
+const RequirementSource *FloatingRequirementSource::getSource(
+                                                PotentialArchetype *pa) const {
+  switch (kind) {
+  case Resolved:
+      return storage.get<const RequirementSource *>();
+
+  case Explicit:
+    if (auto requirementRepr = storage.dyn_cast<const RequirementRepr *>())
+      return RequirementSource::forExplicit(pa, requirementRepr);
+    if (auto typeRepr = storage.dyn_cast<const TypeRepr *>())
+      return RequirementSource::forExplicit(pa, typeRepr);
+    return RequirementSource::forAbstract(pa);
+
+  case Inferred:
+    return RequirementSource::forInferred(pa, storage.get<const TypeRepr *>());
+  }
+}
+
+SourceLoc FloatingRequirementSource::getLoc() const {
+  if (auto source = storage.dyn_cast<const RequirementSource *>())
+    return source->getLoc();
+
+  if (auto typeRepr = storage.dyn_cast<const TypeRepr *>())
+    return typeRepr->getLoc();
+
+  if (auto requirementRepr = storage.dyn_cast<const RequirementRepr *>()) {
+    switch (requirementRepr->getKind()) {
+    case RequirementReprKind::LayoutConstraint:
+    case RequirementReprKind::TypeConstraint:
+      return requirementRepr->getColonLoc();
+
+    case RequirementReprKind::SameType:
+      return requirementRepr->getEqualLoc();
+    }
+  }
+
+  return SourceLoc();
 }
 
 GenericSignatureBuilder::PotentialArchetype::~PotentialArchetype() {
@@ -620,7 +777,7 @@ static void maybeAddSameTypeRequirementForNestedType(
   if (!concreteType) return;
 
   // Add the same-type constraint.
-  auto nestedSource = superSource->viaParent(builder);
+  auto nestedSource = superSource->viaParent(builder, assocType);
   concreteType = superConformance->getDeclContext()
       ->mapTypeOutOfContext(concreteType);
 
@@ -694,7 +851,8 @@ bool GenericSignatureBuilder::PotentialArchetype::addConformance(
     // and make it equivalent to the first potential archetype we encountered.
     auto otherPA = new PotentialArchetype(this, assocType);
     known->second.push_back(otherPA);
-    auto sameNamedSource = RequirementSource::forNestedTypeNameMatch(builder);
+    auto sameNamedSource = RequirementSource::forNestedTypeNameMatch(
+                                                        known->second.front());
     builder.addSameTypeRequirement(known->second.front(), otherPA,
                                    sameNamedSource);
 
@@ -906,10 +1064,11 @@ static void concretizeNestedTypeFromConcreteParent(
 
   // These requirements are all implied based on the parent's concrete
   // conformance.
-  auto source = parentConcreteSource->viaConcrete(builder, /*FIXME: */nullptr)
-    ->viaParent(builder);
   auto assocType = nestedPA->getResolvedAssociatedType();
   if (!assocType) return;
+
+  auto source = parentConcreteSource->viaConcrete(builder, /*FIXME: */nullptr)
+    ->viaParent(builder, assocType);
 
   // FIXME: Get the conformance from the parent.
   auto conformance = lookupConformance(assocType->getProtocol());
@@ -948,9 +1107,6 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
   auto rep = getRepresentative();
   if (rep != this)
     repNested = rep->getNestedType(nestedName, builder);
-
-  auto sameNestedTypeSource =
-    RequirementSource::forNestedTypeNameMatch(builder);
 
   // Attempt to resolve this nested type to an associated type
   // of one of the protocols to which the parent potential
@@ -1017,9 +1173,11 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
           ProtocolConformanceRef(proto));
         type = type.subst(subMap, SubstFlags::UseErrorType);
 
-        builder.addSameTypeRequirement(ResolvedType::forNewTypeAlias(pa),
-                                       builder.resolve(type),
-                                       sameNestedTypeSource, diagnoseMismatch);
+        builder.addSameTypeRequirement(
+                                 ResolvedType::forNewTypeAlias(pa),
+                                 builder.resolve(type),
+                                 RequirementSource::forNestedTypeNameMatch(pa),
+                                 diagnoseMismatch);
       } else
         continue;
 
@@ -1032,14 +1190,18 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
 
         // Produce a same-type constraint between the two same-named
         // potential archetypes.
-        builder.addSameTypeRequirement(pa, nested.front(), sameNestedTypeSource,
-                                       diagnoseMismatch);
+        builder.addSameTypeRequirement(
+                                 pa, nested.front(),
+                                 RequirementSource::forNestedTypeNameMatch(pa),
+                                 diagnoseMismatch);
       } else {
         nested.push_back(pa);
 
         if (repNested) {
-          builder.addSameTypeRequirement(pa, repNested, sameNestedTypeSource,
-                                         diagnoseMismatch);
+          builder.addSameTypeRequirement(
+                                 pa, repNested,
+                                 RequirementSource::forNestedTypeNameMatch(pa),
+                                 diagnoseMismatch);
         }
       }
 
@@ -1066,7 +1228,8 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
   if (isConcreteType()) {
     for (auto equivT : rep->getEquivalenceClassMembers()) {
       concretizeNestedTypeFromConcreteParent(
-          equivT, sameNestedTypeSource, nestedPA, builder,
+          equivT, RequirementSource::forNestedTypeNameMatch(nestedPA),
+          nestedPA, builder,
           [&](ProtocolDecl *proto) -> ProtocolConformanceRef {
             auto depTy = nestedPA->getDependentType({},
                                                     /*allowUnresolved=*/true)
@@ -1094,7 +1257,7 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
   // somewhere else.
   bool failed = builder.addConformanceRequirement(
                   this, assocType->getProtocol(),
-                  RequirementSource::forInferred(builder, nullptr));
+                  RequirementSource::forInferred(this, nullptr));
   (void)failed;
 
   // Trigger the construction of nested types with this name.
@@ -1905,13 +2068,13 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   }
 
   // Recursively merge the associated types of T2 into T1.
-  auto sameNestedTypeSource = RequirementSource::forNestedTypeNameMatch(*this);
   for (auto equivT2 : equivClass2Members) {
     for (auto T2Nested : equivT2->NestedTypes) {
       auto T1Nested = T1->getNestedType(T2Nested.first, *this);
-      if (addSameTypeRequirement(T1Nested, T2Nested.second.front(),
-                                 sameNestedTypeSource,
-                                 [&](Type type1, Type type2) {
+      if (addSameTypeRequirement(
+                           T1Nested, T2Nested.second.front(),
+                           RequirementSource::forNestedTypeNameMatch(T1Nested),
+                           [&](Type type1, Type type2) {
             Diags.diagnose(Source->getLoc(),
                            diag::requires_same_type_conflict,
                            T1Nested->isGenericParam(),
@@ -2024,17 +2187,18 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
 }
 
 bool GenericSignatureBuilder::addSameTypeRequirementBetweenConcrete(
-    Type type1, Type type2, const RequirementSource *source,
+    Type type1, Type type2, FloatingRequirementSource source,
     llvm::function_ref<void(Type, Type)> diagnoseMismatch) {
   // Local class to handle matching the two sides of the same-type constraint.
   class ReqTypeMatcher : public TypeMatcher<ReqTypeMatcher> {
     GenericSignatureBuilder &builder;
-    const RequirementSource *source;
+    FloatingRequirementSource source;
     Type outerType1, outerType2;
     llvm::function_ref<void(Type, Type)> diagnoseMismatch;
 
   public:
-    ReqTypeMatcher(GenericSignatureBuilder &builder, const RequirementSource *source,
+    ReqTypeMatcher(GenericSignatureBuilder &builder,
+                   FloatingRequirementSource source,
                    Type outerType1, Type outerType2,
                    llvm::function_ref<void(Type, Type)> diagnoseMismatch)
         : builder(builder), source(source), outerType1(outerType1),
@@ -2060,29 +2224,31 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenConcrete(
   return !matcher.match(type1, type2);
 }
 
-bool GenericSignatureBuilder::addSameTypeRequirement(UnresolvedType paOrT1,
-                                                     UnresolvedType paOrT2,
-                                                     const RequirementSource *source) {
+bool GenericSignatureBuilder::addSameTypeRequirement(
+                                             UnresolvedType paOrT1,
+                                             UnresolvedType paOrT2,
+                                             FloatingRequirementSource source) {
   return addSameTypeRequirement(resolve(paOrT1), resolve(paOrT2), source);
 }
 bool GenericSignatureBuilder::addSameTypeRequirement(
-    UnresolvedType paOrT1, UnresolvedType paOrT2, const RequirementSource *source,
+    UnresolvedType paOrT1, UnresolvedType paOrT2,
+    FloatingRequirementSource source,
     llvm::function_ref<void(Type, Type)> diagnoseMismatch) {
   return addSameTypeRequirement(resolve(paOrT1), resolve(paOrT2), source,
                                 diagnoseMismatch);
 }
 bool GenericSignatureBuilder::addSameTypeRequirement(ResolvedType paOrT1,
                                                      ResolvedType paOrT2,
-                                                     const RequirementSource *source) {
+                                                     FloatingRequirementSource source) {
   return addSameTypeRequirement(paOrT1, paOrT2, source,
                                 [&](Type type1, Type type2) {
-    Diags.diagnose(source->getLoc(), diag::requires_same_concrete_type,
+    Diags.diagnose(source.getLoc(), diag::requires_same_concrete_type,
                    type1, type2);
   });
 }
 
 bool GenericSignatureBuilder::addSameTypeRequirement(
-    ResolvedType paOrT1, ResolvedType paOrT2, const RequirementSource *source,
+    ResolvedType paOrT1, ResolvedType paOrT2, FloatingRequirementSource source,
     llvm::function_ref<void(Type, Type)> diagnoseMismatch) {
   auto pa1 = paOrT1.getPotentialArchetype();
   auto pa2 = paOrT2.getPotentialArchetype();
@@ -2091,12 +2257,13 @@ bool GenericSignatureBuilder::addSameTypeRequirement(
 
   // If both sides of the requirement are type parameters, equate them.
   if (pa1 && pa2) {
-    return addSameTypeRequirementBetweenArchetypes(pa1, pa2, source);
+    return addSameTypeRequirementBetweenArchetypes(pa1, pa2,
+                                                   source.getSource(pa1));
     // If just one side is a type parameter, map it to a concrete type.
   } else if (pa1) {
-    return addSameTypeRequirementToConcrete(pa1, t2, source);
+    return addSameTypeRequirementToConcrete(pa1, t2, source.getSource(pa1));
   } else if (pa2) {
-    return addSameTypeRequirementToConcrete(pa2, t1, source);
+    return addSameTypeRequirementToConcrete(pa2, t1, source.getSource(pa2));
   } else {
     return addSameTypeRequirementBetweenConcrete(t1, t2, source,
                                                  diagnoseMismatch);
@@ -2159,10 +2326,10 @@ bool GenericSignatureBuilder::addInheritedRequirements(
 
       // Explicit requirement.
       if (typeRepr)
-        return RequirementSource::forExplicit(*this, typeRepr);
+        return RequirementSource::forExplicit(pa, typeRepr);
 
       // An abstract explicit requirement.
-      return RequirementSource::forAbstract(*this);
+      return RequirementSource::forAbstract(pa);
     };
 
     // Protocol requirement.
@@ -2191,8 +2358,8 @@ bool GenericSignatureBuilder::addInheritedRequirements(
 bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
                                              const RequirementSource *source,
                                              const SubstitutionMap *subMap) {
-  if (!source)
-    source = RequirementSource::forExplicit(*this, Req);
+  auto localSource = source ? FloatingRequirementSource(source)
+                            : FloatingRequirementSource::forExplicit(Req);
 
   auto subst = [&](Type t) {
     if (subMap)
@@ -2213,7 +2380,8 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
       return true;
     }
 
-    if (addLayoutRequirement(PA, Req->getLayoutConstraint(), source))
+    if (addLayoutRequirement(PA, Req->getLayoutConstraint(),
+                             localSource.getSource(PA)))
       return true;
 
     return false;
@@ -2231,7 +2399,8 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
 
     // Check whether this is a supertype requirement.
     if (Req->getConstraint()->getClassOrBoundGenericClass()) {
-      return addSuperclassRequirement(PA, Req->getConstraint(), source);
+      return addSuperclassRequirement(PA, Req->getConstraint(),
+                                      localSource.getSource(PA));
     }
 
     SmallVector<ProtocolDecl *, 4> ConformsTo;
@@ -2242,7 +2411,7 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
 
     // Add each of the protocols.
     for (auto Proto : ConformsTo)
-      if (addConformanceRequirement(PA, Proto, source))
+      if (addConformanceRequirement(PA, Proto, localSource.getSource(PA)))
         return true;
 
     return false;
@@ -2262,20 +2431,20 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
     return addRequirement(Requirement(RequirementKind::SameType,
                                       subst(Req->getFirstType()),
                                       subst(Req->getSecondType())),
-                          source);
+                          localSource);
   }
 
   llvm_unreachable("Unhandled requirement?");
 }
 
 bool GenericSignatureBuilder::addRequirement(const Requirement &req,
-                                      const RequirementSource *source) {
+                                             FloatingRequirementSource source) {
   llvm::SmallPtrSet<ProtocolDecl *, 8> Visited;
   return addRequirement(req, source, Visited);
 }
 
 bool GenericSignatureBuilder::addRequirement(
-    const Requirement &req, const RequirementSource *source,
+    const Requirement &req, FloatingRequirementSource source,
     llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited) {
   switch (req.getKind()) {
   case RequirementKind::Superclass: {
@@ -2284,7 +2453,8 @@ bool GenericSignatureBuilder::addRequirement(
     if (!pa) return false;
 
     assert(req.getSecondType()->getClassOrBoundGenericClass());
-    return addSuperclassRequirement(pa, req.getSecondType(), source);
+    return addSuperclassRequirement(pa, req.getSecondType(),
+                                    source.getSource(pa));
   }
 
   case RequirementKind::Layout: {
@@ -2292,7 +2462,8 @@ bool GenericSignatureBuilder::addRequirement(
     PotentialArchetype *pa = resolveArchetype(req.getFirstType());
     if (!pa) return false;
 
-    return addLayoutRequirement(pa, req.getLayoutConstraint(), source);
+    return addLayoutRequirement(pa, req.getLayoutConstraint(),
+                                source.getSource(pa));
   }
 
   case RequirementKind::Conformance: {
@@ -2306,10 +2477,11 @@ bool GenericSignatureBuilder::addRequirement(
     // Add each of the protocols.
     for (auto proto : conformsTo) {
       if (Visited.count(proto)) {
-        markPotentialArchetypeRecursive(pa, proto, source);
+        markPotentialArchetypeRecursive(pa, proto, source.getSource(pa));
         continue;
       }
-      if (addConformanceRequirement(pa, proto, source, Visited)) return true;
+      if (addConformanceRequirement(pa, proto, source.getSource(pa), Visited))
+        return true;
     }
 
     return false;
@@ -2319,8 +2491,8 @@ bool GenericSignatureBuilder::addRequirement(
     return addSameTypeRequirement(
         req.getFirstType(), req.getSecondType(), source,
         [&](Type type1, Type type2) {
-          if (source->getLoc().isValid())
-            Diags.diagnose(source->getLoc(), diag::requires_same_concrete_type,
+          if (source.getLoc().isValid())
+            Diags.diagnose(source.getLoc(), diag::requires_same_concrete_type,
                            type1, type2);
         });
   }
@@ -2364,7 +2536,7 @@ public:
 
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.
-    auto source = RequirementSource::forInferred(Builder, typeRepr);
+    auto source = FloatingRequirementSource::forInferred(typeRepr);
     for (const auto &rawReq : genericSig->getRequirements()) {
       if (auto req = rawReq.subst(getTypeSubstitution,
                                   Builder.getLookupConformanceFn()))
@@ -2664,7 +2836,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
                                 *this);
       addSameTypeRequirement(
           pa, replacement,
-          RequirementSource::forNestedTypeNameMatch(*this));
+          RequirementSource::forNestedTypeNameMatch(pa));
     });
   }
 }
@@ -2713,10 +2885,18 @@ void GenericSignatureBuilder::checkRedundantConcreteTypeConstraints(
   Type concreteType = representative->getConcreteType();
   assert(concreteType && "No concrete type to check");
 
-  // Sort the concrete constraints, so we get a deterministic ordering of
-  // diagnostics.
+  // Remove any self-derived constraints.
   auto equivClass = representative->getOrCreateEquivalenceClass();
   auto &concreteConstraints = equivClass->concreteTypeConstraints;
+  concreteConstraints.erase(
+    std::remove_if(concreteConstraints.begin(), concreteConstraints.end(),
+                   [&](const ConcreteConstraint &constraint) {
+      return constraint.source->isSelfDerivedSource(constraint.archetype);
+    }),
+    concreteConstraints.end());
+
+  // Sort the concrete constraints, so we get a deterministic ordering of
+  // diagnostics.
   llvm::array_pod_sort(concreteConstraints.begin(), concreteConstraints.end());
 
   // Find a representative constraint to use for diagnostics.
@@ -2770,6 +2950,9 @@ void GenericSignatureBuilder::checkRedundantConcreteTypeConstraints(
                    representativeConstraint->archetype->
                      getDependentType(genericParams, /*allowUnresolved=*/true),
                    representativeConstraint->concreteType);
+
+    (void)representativeConstraint->source->isSelfDerivedSource(
+                                          representativeConstraint->archetype);
   };
 
   // Go through the concrete constraints looking for redundancies.
@@ -3029,7 +3212,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
         auto source =
           knownAnchor->concreteTypeSource
             ? knownAnchor->concreteTypeSource
-            : RequirementSource::forAbstract(*this);
+            : RequirementSource::forAbstract(archetype);
 
         f(RequirementKind::SameType, archetype, concreteType, source);
         continue;
@@ -3045,7 +3228,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
         auto otherPA = nextAnchor->anchor;
         deferredSameTypeRequirement = [&f, archetype, otherPA, this] {
           f(RequirementKind::SameType, archetype, otherPA,
-            RequirementSource::forAbstract(*this));
+            RequirementSource::forAbstract(archetype));
         };
       }
     }
@@ -3148,9 +3331,8 @@ void GenericSignatureBuilder::addGenericSignature(GenericSignature *sig) {
   for (auto param : sig->getGenericParams())
     addGenericParameter(param);
 
-  auto source = RequirementSource::forAbstract(*this);
   for (auto &reqt : sig->getRequirements()) {
-    addRequirement(reqt, source);
+    addRequirement(reqt, FloatingRequirementSource::forAbstract());
   }
 }
 

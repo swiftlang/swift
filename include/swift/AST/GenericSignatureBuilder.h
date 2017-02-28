@@ -31,6 +31,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/TrailingObjects.h"
 #include <functional>
 #include <memory>
 
@@ -56,313 +57,6 @@ class TypeRepr;
 class ASTContext;
 class DiagnosticEngine;
 
-/// Describes how a generic signature determines a requirement, from its origin
-/// in some requirement written in the source, inferred through a path of
-/// other implications (e.g., introduced by a particular protocol).
-///
-/// Requirement sources are uniqued within a generic signature builder.
-class RequirementSource : public llvm::FoldingSetNode {
-public:
-  enum Kind : uint8_t {
-    /// A requirement stated explicitly, e.g., in a where clause or type
-    /// parameter declaration.
-    ///
-    /// Explicitly-stated requirement can be tied to a specific requirement
-    /// in a 'where' clause (which stores a \c RequirementRepr), a type in an
-    /// 'inheritance' clause (which stores a \c TypeRepr), or can be 'abstract',
-    /// , e.g., due to canonicalization, deserialization, or other
-    /// source-independent formulation.
-    ///
-    /// This is a root requirement source.
-    Explicit,
-
-    /// A requirement inferred from part of the signature of a declaration,
-    /// e.g., the type of a generic function. For example:
-    ///
-    /// func f<T>(_: Set<T>) { } // infers T: Hashable
-    ///
-    /// This is a root requirement source, which can be described by a
-    /// \c TypeRepr.
-    Inferred,
-
-    /// A requirement for the creation of the requirement signature of a
-    /// protocol.
-    ///
-    /// This is a root requirement source, which is described by the protocol
-    /// whose requirement signature is being computed.
-    RequirementSignatureSelf,
-
-    /// The requirement came from two nested types of the equivalent types whose
-    /// names match.
-    ///
-    /// This is a root requirement source.
-    NestedTypeNameMatch,
-
-    /// The requirement is a protocol requirement.
-    ///
-    /// This stores the protocol that introduced the requirement.
-    ProtocolRequirement,
-
-    /// A requirement that was resolved via a superclass requirement.
-    ///
-    /// This stores the \c ProtocolConformance* used to resolve the
-    /// requirement.
-    Superclass,
-
-    /// A requirement that was resolved for a nested type via its parent
-    /// type.
-    Parent,
-
-    /// A requirement that was resolved for a nested type via a same-type-to-
-    /// concrete constraint.
-    ///
-    /// This stores the \c ProtocolConformance* used to resolve the
-    /// requirement.
-    Concrete,
-  };
-
-  /// The kind of requirement source.
-  const Kind kind;
-
-private:
-  /// The kind of storage we have.
-  enum class StorageKind : uint8_t {
-    None,
-    TypeRepr,
-    RequirementRepr,
-    ProtocolDecl,
-    ProtocolConformance,
-  };
-
-  /// The kind of storage we have.
-  const StorageKind storageKind;
-
-  /// The actual storage, described by \c storageKind.
-  union {
-    /// The type representation describing where the requirement came from.
-    const TypeRepr *typeRepr;
-
-    /// Where a requirement came from.
-    const RequirementRepr *requirementRepr;
-
-    /// The protocol being described.
-    ProtocolDecl *protocol;
-
-    /// A protocol conformance used to satisfy the requirement.
-    ProtocolConformance *conformance;
-  } storage;
-
-  /// Determines whether we have been provided with an acceptable storage kind
-  /// for the given requirement source kind.
-  static bool isAcceptableStorageKind(Kind kind, StorageKind storageKind);
-
-  /// Retrieve the opaque storage as a single pointer, for use in uniquing.
-  const void *getOpaqueStorage() const;
-
-  /// Whether this kind of requirement source is a root.
-  static bool isRootKind(Kind kind) {
-    switch (kind) {
-    case Explicit:
-    case Inferred:
-    case RequirementSignatureSelf:
-    case NestedTypeNameMatch:
-      return true;
-
-    case ProtocolRequirement:
-    case Superclass:
-    case Parent:
-    case Concrete:
-      return false;
-    }
-  }
-
-public:
-  /// The "parent" of this requirement source.
-  ///
-  /// The chain of parent requirement sources will eventually terminate in a
-  /// requirement source with one of the "root" kinds.
-  const RequirementSource * const parent;
-
-  RequirementSource(Kind kind, const RequirementSource *parent)
-    : kind(kind), storageKind(StorageKind::None), parent(parent) {
-    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
-           "Root RequirementSource should not have parent (or vice versa)");
-    assert(isAcceptableStorageKind(kind, storageKind) &&
-           "RequirementSource kind/storageKind mismatch");
-
-    // Prevent uninitialized memory.
-    storage.typeRepr = nullptr;
-  }
-
-  RequirementSource(Kind kind, const RequirementSource *parent,
-                    const TypeRepr *typeRepr)
-    : kind(kind), storageKind(StorageKind::TypeRepr), parent(parent) {
-    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
-           "Root RequirementSource should not have parent (or vice versa)");
-    assert(isAcceptableStorageKind(kind, storageKind) &&
-           "RequirementSource kind/storageKind mismatch");
-
-    storage.typeRepr = typeRepr;
-  }
-
-  RequirementSource(Kind kind, const RequirementSource *parent,
-                    const RequirementRepr *requirementRepr)
-    : kind(kind), storageKind(StorageKind::RequirementRepr), parent(parent) {
-    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
-           "Root RequirementSource should not have parent (or vice versa)");
-    assert(isAcceptableStorageKind(kind, storageKind) &&
-           "RequirementSource kind/storageKind mismatch");
-
-    storage.requirementRepr = requirementRepr;
-  }
-
-  RequirementSource(Kind kind, const RequirementSource *parent,
-                   ProtocolDecl *protocol)
-    : kind(kind), storageKind(StorageKind::ProtocolDecl), parent(parent) {
-    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
-           "Root RequirementSource should not have parent (or vice versa)");
-    assert(isAcceptableStorageKind(kind, storageKind) &&
-           "RequirementSource kind/storageKind mismatch");
-
-    storage.protocol = protocol;
-  }
-
-  RequirementSource(Kind kind, const RequirementSource *parent,
-                   ProtocolConformance *conformance)
-    : kind(kind), storageKind(StorageKind::ProtocolConformance),
-      parent(parent) {
-    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
-           "Root RequirementSource should not have parent (or vice versa)");
-    assert(isAcceptableStorageKind(kind, storageKind) &&
-           "RequirementSource kind/storageKind mismatch");
-
-    storage.conformance = conformance;
-  }
-
-public:
-  /// Retrieve an abstract requirement source.
-  static const RequirementSource *forAbstract(GenericSignatureBuilder &builder);
-
-  /// Retrieve a requirement source representing an explicit requirement
-  /// stated in an 'inheritance' clause.
-  static const RequirementSource *forExplicit(GenericSignatureBuilder &builder,
-                                              const TypeRepr *typeRepr);
-
-  /// Retrieve a requirement source representing an explicit requirement
-  /// stated in an 'where' clause.
-  static const RequirementSource *forExplicit(GenericSignatureBuilder &builder,
-                                        const RequirementRepr *requirementRepr);
-
-  /// Retrieve a requirement source representing a requirement that is
-  /// inferred from some part of a generic declaration's signature, e.g., the
-  /// parameter or result type of a generic function.
-  static const RequirementSource *forInferred(GenericSignatureBuilder &builder,
-                                              const TypeRepr *typeRepr);
-
-  /// Retrieve a requirement source representing the requirement signature
-  /// computation for a protocol.
-  static const RequirementSource *forRequirementSignature(
-                                              GenericSignatureBuilder &builder,
-                                              ProtocolDecl *protocol);
-
-  /// Retrieve a requirement source for nested type name matches.
-  static const RequirementSource *forNestedTypeNameMatch(
-                                              GenericSignatureBuilder &builder);
-
-  /// A requirement source that describes that a requirement comes from a
-  /// requirement of the given protocol described by the parent.
-  const RequirementSource *viaAbstractProtocolRequirement(
-                             GenericSignatureBuilder &builder,
-                             ProtocolDecl *protocol) const;
-
-  /// A requirement source that describes that a requirement that is resolved
-  /// via a superclass requirement.
-  const RequirementSource *viaSuperclass(
-                                        GenericSignatureBuilder &builder,
-                                        ProtocolConformance *conformance) const;
-
-  /// A requirement source that describes that a requirement that is resolved
-  /// via a same-type-to-concrete requirement.
-  const RequirementSource *viaConcrete(GenericSignatureBuilder &builder,
-                                       ProtocolConformance *conformance) const;
-
-  /// A constraint source that describes that a constraint that is resolved
-  /// for a nested type via a constraint on its parent.
-  const RequirementSource *viaParent(GenericSignatureBuilder &builder) const;
-
-  /// Whether the requirement can be derived from something in its path.
-  ///
-  /// Derived requirements will not be recorded in a minimized generic
-  /// signature, because the information can be re-derived by following the
-  /// path.
-  bool isDerivedRequirement() const;
-
-  /// Whether the requirement is derived via some concrete conformance, e.g.,
-  /// a concrete type's conformance to a protocol or a superclass's conformance
-  /// to a protocol.
-  bool isDerivedViaConcreteConformance() const;
-
-  /// Retrieve a source location that corresponds to the requirement.
-  SourceLoc getLoc() const;
-
-  /// Compare two requirement sources to determine which has the more
-  /// optimal path.
-  ///
-  /// \returns -1 if the \c this is better, 1 if the \c other is better, and 0
-  /// if they are equivalent in length.
-  int compare(const RequirementSource *other) const;
-
-  /// Retrieve the type representation for this requirement, if there is one.
-  const TypeRepr *getTypeRepr() const {
-    if (storageKind != StorageKind::TypeRepr) return nullptr;
-    return storage.typeRepr;
-  }
-
-  /// Retrieve the requirement representation for this requirement, if there is
-  /// one.
-  const RequirementRepr *getRequirementRepr() const {
-    if (storageKind != StorageKind::RequirementRepr) return nullptr;
-    return storage.requirementRepr;
-  }
-
-  /// Retrieve the protocol for this requirement, if there is one.
-  ProtocolDecl *getProtocolDecl() const;
-
-  /// Retrieve the protocol conformance for this requirement, if there is one.
-  ProtocolConformance *getProtocolConformance() const {
-    if (storageKind != StorageKind::ProtocolConformance) return nullptr;
-    return storage.conformance;
-  }
-
-  /// Profiling support for \c FoldingSet.
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, kind, parent, getOpaqueStorage());
-  }
-
-  /// Profiling support for \c FoldingSet.
-  static void Profile(llvm::FoldingSetNodeID &ID, Kind kind,
-                      const RequirementSource *parent, const void *storage) {
-    ID.AddInteger(kind);
-    ID.AddPointer(parent);
-    ID.AddPointer(storage);
-  }
-
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const,
-      "only for use within the debugger");
-
-  /// Dump the requirement source.
-  void dump(llvm::raw_ostream &out, SourceManager *SrcMgr,
-            unsigned indent) const;
-
-  LLVM_ATTRIBUTE_DEPRECATED(
-    void print() const,
-    "only for use within the debugger");
-
-  /// Print the requirement source (shorter form)
-  void print(llvm::raw_ostream &out, SourceManager *SrcMgr) const;
-};
-
 /// \brief Collects a set of requirements of generic parameters, both explicitly
 /// stated and inferred, and determines the set of archetypes for each of
 /// the generic parameters.
@@ -377,6 +71,10 @@ public:
 
   using RequirementRHS =
       llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
+
+  class RequirementSource;
+
+  class FloatingRequirementSource;
 
   /// Describes a constraint that is bounded on one side by a concrete type.
   struct ConcreteConstraint {
@@ -471,7 +169,7 @@ public:
   /// previous example).
   bool
   addSameTypeRequirement(ResolvedType paOrT1, ResolvedType paOrT2,
-                         const RequirementSource *Source,
+                         FloatingRequirementSource Source,
                          llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
   /// \brief Add a new same-type requirement between two fully resolved types
@@ -479,14 +177,14 @@ public:
   ///
   /// The two types must not be incompatible concrete types.
   bool addSameTypeRequirement(ResolvedType paOrT1, ResolvedType paOrT2,
-                              const RequirementSource *Source);
+                              FloatingRequirementSource Source);
 
   /// \brief Add a new same-type requirement between two unresolved types.
   ///
   /// The types are resolved with \c GenericSignatureBuilder::resolve, and must
   /// not be incompatible concrete types.
   bool addSameTypeRequirement(UnresolvedType paOrT1, UnresolvedType paOrT2,
-                              const RequirementSource *Source);
+                              FloatingRequirementSource Source);
 
   /// \brief Add a new same-type requirement between two unresolved types.
   ///
@@ -495,7 +193,7 @@ public:
   /// types.
   bool
   addSameTypeRequirement(UnresolvedType paOrT1, UnresolvedType paOrT2,
-                         const RequirementSource *Source,
+                         FloatingRequirementSource Source,
                          llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
 private:
@@ -523,7 +221,7 @@ private:
   /// \param diagnoseMismatch Callback invoked when the types in the same-type
   /// requirement mismatch.
   bool addSameTypeRequirementBetweenConcrete(
-      Type T1, Type T2, const RequirementSource *Source,
+      Type T1, Type T2, FloatingRequirementSource Source,
       llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
   /// Add the requirements placed on the given type parameter
@@ -599,10 +297,15 @@ public:
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  bool addRequirement(const Requirement &req, const RequirementSource *source);
+  bool addRequirement(const Requirement &req, FloatingRequirementSource source);
 
-  bool addRequirement(const Requirement &req, const RequirementSource *source,
+  bool addRequirement(const Requirement &req, FloatingRequirementSource source,
                       llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
+
+  /// \brief Add a new requirement.
+  ///
+  /// \returns true if this requirement makes the set of requirements
+  /// inconsistent, in which case a diagnostic will have been issued.
 
   bool addLayoutRequirement(PotentialArchetype *PAT,
                             LayoutConstraint Layout,
@@ -693,6 +396,435 @@ public:
 
   /// Dump all of the requirements to the given output stream.
   void dump(llvm::raw_ostream &out);
+};
+
+/// Describes how a generic signature determines a requirement, from its origin
+/// in some requirement written in the source, inferred through a path of
+/// other implications (e.g., introduced by a particular protocol).
+///
+/// Requirement sources are uniqued within a generic signature builder.
+class GenericSignatureBuilder::RequirementSource final
+  : public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<RequirementSource, PotentialArchetype *> {
+
+public:
+  enum Kind : uint8_t {
+    /// A requirement stated explicitly, e.g., in a where clause or type
+    /// parameter declaration.
+    ///
+    /// Explicitly-stated requirement can be tied to a specific requirement
+    /// in a 'where' clause (which stores a \c RequirementRepr), a type in an
+    /// 'inheritance' clause (which stores a \c TypeRepr), or can be 'abstract',
+    /// , e.g., due to canonicalization, deserialization, or other
+    /// source-independent formulation.
+    ///
+    /// This is a root requirement source.
+    Explicit,
+
+    /// A requirement inferred from part of the signature of a declaration,
+    /// e.g., the type of a generic function. For example:
+    ///
+    /// func f<T>(_: Set<T>) { } // infers T: Hashable
+    ///
+    /// This is a root requirement source, which can be described by a
+    /// \c TypeRepr.
+    Inferred,
+
+    /// A requirement for the creation of the requirement signature of a
+    /// protocol.
+    ///
+    /// This is a root requirement source, which is described by the protocol
+    /// whose requirement signature is being computed.
+    RequirementSignatureSelf,
+
+    /// The requirement came from two nested types of the equivalent types whose
+    /// names match.
+    ///
+    /// This is a root requirement source.
+    NestedTypeNameMatch,
+
+    /// The requirement is a protocol requirement.
+    ///
+    /// This stores the protocol that introduced the requirement.
+    ProtocolRequirement,
+
+    /// A requirement that was resolved via a superclass requirement.
+    ///
+    /// This stores the \c ProtocolConformance* used to resolve the
+    /// requirement.
+    Superclass,
+
+    /// A requirement that was resolved for a nested type via its parent
+    /// type.
+    Parent,
+
+    /// A requirement that was resolved for a nested type via a same-type-to-
+    /// concrete constraint.
+    ///
+    /// This stores the \c ProtocolConformance* used to resolve the
+    /// requirement.
+    Concrete,
+  };
+
+  /// The kind of requirement source.
+  const Kind kind;
+
+private:
+  /// The kind of storage we have.
+  enum class StorageKind : uint8_t {
+    RootArchetype,
+    TypeRepr,
+    RequirementRepr,
+    ProtocolDecl,
+    ProtocolConformance,
+    AssociatedTypeDecl,
+  };
+
+  /// The kind of storage we have.
+  const StorageKind storageKind;
+
+  /// The actual storage, described by \c storageKind.
+  union {
+    /// The root archetype.
+    PotentialArchetype *rootArchetype;
+
+    /// The type representation describing where the requirement came from.
+    const TypeRepr *typeRepr;
+
+    /// Where a requirement came from.
+    const RequirementRepr *requirementRepr;
+
+    /// The protocol being described.
+    ProtocolDecl *protocol;
+
+    /// A protocol conformance used to satisfy the requirement.
+    ProtocolConformance *conformance;
+
+    /// An associated type to which a requirement is being applied.
+    AssociatedTypeDecl *assocType;
+  } storage;
+
+  friend TrailingObjects;
+
+  /// The trailing potential archetype, for
+  size_t numTrailingObjects(OverloadToken<PotentialArchetype *>) const {
+    switch (kind) {
+    case RequirementSignatureSelf:
+      return 1;
+
+    case Explicit:
+    case Inferred:
+      return storageKind == StorageKind::RootArchetype ? 0 : 1;
+
+    case NestedTypeNameMatch:
+    case ProtocolRequirement:
+    case Superclass:
+    case Parent:
+    case Concrete:
+      return 0;
+    }
+  }
+
+  /// Determines whether we have been provided with an acceptable storage kind
+  /// for the given requirement source kind.
+  static bool isAcceptableStorageKind(Kind kind, StorageKind storageKind);
+
+  /// Retrieve the opaque storage as a single pointer, for use in uniquing.
+  const void *getOpaqueStorage() const;
+
+  /// Retrieve the extra opaque storage as a single pointer, for use in
+  /// uniquing.
+  const void *getExtraOpaqueStorage() const;
+
+  /// Whether this kind of requirement source is a root.
+  static bool isRootKind(Kind kind) {
+    switch (kind) {
+    case Explicit:
+    case Inferred:
+    case RequirementSignatureSelf:
+    case NestedTypeNameMatch:
+      return true;
+
+    case ProtocolRequirement:
+    case Superclass:
+    case Parent:
+    case Concrete:
+      return false;
+    }
+  }
+
+public:
+  /// The "parent" of this requirement source.
+  ///
+  /// The chain of parent requirement sources will eventually terminate in a
+  /// requirement source with one of the "root" kinds.
+  const RequirementSource * const parent;
+
+  RequirementSource(Kind kind, const RequirementSource *parent,
+                    PotentialArchetype *rootArchetype)
+    : kind(kind), storageKind(StorageKind::RootArchetype), parent(parent) {
+    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
+           "Root RequirementSource should not have parent (or vice versa)");
+    assert(isAcceptableStorageKind(kind, storageKind) &&
+           "RequirementSource kind/storageKind mismatch");
+
+    storage.rootArchetype = rootArchetype;
+  }
+
+  RequirementSource(Kind kind, const RequirementSource *parent,
+                    const TypeRepr *typeRepr)
+    : kind(kind), storageKind(StorageKind::TypeRepr), parent(parent) {
+    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
+           "Root RequirementSource should not have parent (or vice versa)");
+    assert(isAcceptableStorageKind(kind, storageKind) &&
+           "RequirementSource kind/storageKind mismatch");
+
+    storage.typeRepr = typeRepr;
+  }
+
+  RequirementSource(Kind kind, const RequirementSource *parent,
+                    const RequirementRepr *requirementRepr)
+    : kind(kind), storageKind(StorageKind::RequirementRepr), parent(parent) {
+    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
+           "Root RequirementSource should not have parent (or vice versa)");
+    assert(isAcceptableStorageKind(kind, storageKind) &&
+           "RequirementSource kind/storageKind mismatch");
+
+    storage.requirementRepr = requirementRepr;
+  }
+
+  RequirementSource(Kind kind, const RequirementSource *parent,
+                    ProtocolDecl *protocol)
+    : kind(kind), storageKind(StorageKind::ProtocolDecl), parent(parent) {
+    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
+           "Root RequirementSource should not have parent (or vice versa)");
+    assert(isAcceptableStorageKind(kind, storageKind) &&
+           "RequirementSource kind/storageKind mismatch");
+
+    storage.protocol = protocol;
+  }
+
+  RequirementSource(Kind kind, const RequirementSource *parent,
+                    ProtocolConformance *conformance)
+    : kind(kind), storageKind(StorageKind::ProtocolConformance),
+      parent(parent) {
+    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
+           "Root RequirementSource should not have parent (or vice versa)");
+    assert(isAcceptableStorageKind(kind, storageKind) &&
+           "RequirementSource kind/storageKind mismatch");
+
+    storage.conformance = conformance;
+  }
+
+  RequirementSource(Kind kind, const RequirementSource *parent,
+                    AssociatedTypeDecl *assocType)
+    : kind(kind), storageKind(StorageKind::AssociatedTypeDecl),
+      parent(parent) {
+    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
+           "Root RequirementSource should not have parent (or vice versa)");
+    assert(isAcceptableStorageKind(kind, storageKind) &&
+           "RequirementSource kind/storageKind mismatch");
+
+    storage.assocType = assocType;
+  }
+
+public:
+  /// Retrieve an abstract requirement source.
+  static const RequirementSource *forAbstract(PotentialArchetype *root);
+
+  /// Retrieve a requirement source representing an explicit requirement
+  /// stated in an 'inheritance' clause.
+  static const RequirementSource *forExplicit(PotentialArchetype *root,
+                                              const TypeRepr *typeRepr);
+
+  /// Retrieve a requirement source representing an explicit requirement
+  /// stated in an 'where' clause.
+  static const RequirementSource *forExplicit(
+                                        PotentialArchetype *root,
+                                        const RequirementRepr *requirementRepr);
+
+  /// Retrieve a requirement source representing a requirement that is
+  /// inferred from some part of a generic declaration's signature, e.g., the
+  /// parameter or result type of a generic function.
+  static const RequirementSource *forInferred(PotentialArchetype *root,
+                                              const TypeRepr *typeRepr);
+
+  /// Retrieve a requirement source representing the requirement signature
+  /// computation for a protocol.
+  static const RequirementSource *forRequirementSignature(
+                                                      PotentialArchetype *root,
+                                                      ProtocolDecl *protocol);
+
+  /// Retrieve a requirement source for nested type name matches.
+  static const RequirementSource *forNestedTypeNameMatch(
+                                     PotentialArchetype *root);
+
+  /// A requirement source that describes that a requirement comes from a
+  /// requirement of the given protocol described by the parent.
+  const RequirementSource *viaAbstractProtocolRequirement(
+                             GenericSignatureBuilder &builder,
+                             ProtocolDecl *protocol) const;
+
+  /// A requirement source that describes that a requirement that is resolved
+  /// via a superclass requirement.
+  const RequirementSource *viaSuperclass(
+                                        GenericSignatureBuilder &builder,
+                                        ProtocolConformance *conformance) const;
+
+  /// A requirement source that describes that a requirement that is resolved
+  /// via a same-type-to-concrete requirement.
+  const RequirementSource *viaConcrete(GenericSignatureBuilder &builder,
+                                       ProtocolConformance *conformance) const;
+
+  /// A constraint source that describes that a constraint that is resolved
+  /// for a nested type via a constraint on its parent.
+  ///
+  /// \param assocType the associated type that
+  const RequirementSource *viaParent(GenericSignatureBuilder &builder,
+                                     AssociatedTypeDecl *assocType) const;
+
+  /// Retrieve the potential archetype at the root.
+  PotentialArchetype *getRootPotentialArchetype() const;
+
+  /// Whether the requirement can be derived from something in its path.
+  ///
+  /// Derived requirements will not be recorded in a minimized generic
+  /// signature, because the information can be re-derived by following the
+  /// path.
+  bool isDerivedRequirement() const;
+
+  /// Whether the requirement is derived via some concrete conformance, e.g.,
+  /// a concrete type's conformance to a protocol or a superclass's conformance
+  /// to a protocol.
+  bool isDerivedViaConcreteConformance() const;
+
+  /// Determine whether the given derived requirement \c source, when rooted at
+  /// the potential archetype \c pa, is actually derived from the same
+  /// requirement. Such "self-derived" requirements do not make the original
+  /// requirement redundant, because without said original requirement, the
+  /// derived requirement ceases to hold.
+  bool isSelfDerivedSource(PotentialArchetype *pa) const;
+
+  /// Retrieve a source location that corresponds to the requirement.
+  SourceLoc getLoc() const;
+
+  /// Compare two requirement sources to determine which has the more
+  /// optimal path.
+  ///
+  /// \returns -1 if the \c this is better, 1 if the \c other is better, and 0
+  /// if they are equivalent in length.
+  int compare(const RequirementSource *other) const;
+
+  /// Retrieve the type representation for this requirement, if there is one.
+  const TypeRepr *getTypeRepr() const {
+    if (storageKind != StorageKind::TypeRepr) return nullptr;
+    return storage.typeRepr;
+  }
+
+  /// Retrieve the requirement representation for this requirement, if there is
+  /// one.
+  const RequirementRepr *getRequirementRepr() const {
+    if (storageKind != StorageKind::RequirementRepr) return nullptr;
+    return storage.requirementRepr;
+  }
+
+  /// Retrieve the protocol for this requirement, if there is one.
+  ProtocolDecl *getProtocolDecl() const;
+
+  /// Retrieve the protocol conformance for this requirement, if there is one.
+  ProtocolConformance *getProtocolConformance() const {
+    if (storageKind != StorageKind::ProtocolConformance) return nullptr;
+    return storage.conformance;
+  }
+
+  /// Retrieve the associated type declaration for this requirement, if there
+  /// is one.
+  AssociatedTypeDecl *getAssociatedType() const {
+    if (storageKind != StorageKind::AssociatedTypeDecl) return nullptr;
+    return storage.assocType;
+  }
+
+  /// Profiling support for \c FoldingSet.
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, kind, parent, getOpaqueStorage(), getExtraOpaqueStorage());
+  }
+
+  /// Profiling support for \c FoldingSet.
+  static void Profile(llvm::FoldingSetNodeID &ID, Kind kind,
+                      const RequirementSource *parent, const void *storage,
+                      const void *extraStorage) {
+    ID.AddInteger(kind);
+    ID.AddPointer(parent);
+    ID.AddPointer(storage);
+    ID.AddPointer(extraStorage);
+  }
+
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump() const,
+      "only for use within the debugger");
+
+  /// Dump the requirement source.
+  void dump(llvm::raw_ostream &out, SourceManager *SrcMgr,
+            unsigned indent) const;
+
+  LLVM_ATTRIBUTE_DEPRECATED(
+    void print() const,
+    "only for use within the debugger");
+
+  /// Print the requirement source (shorter form)
+  void print(llvm::raw_ostream &out, SourceManager *SrcMgr) const;
+};
+
+/// A requirement source that potentially lacks a root \c PotentialArchetype.
+/// The root will be supplied as soon as the appropriate dependent type is
+/// resolved.
+class GenericSignatureBuilder::FloatingRequirementSource {
+  enum Kind {
+    /// A fully-resolved requirement source, which does not need a root.
+    Resolved,
+    /// An explicit requirement source lacking a root.
+    Explicit,
+    /// An inferred requirement source lacking a root.
+    Inferred
+  } kind;
+
+  using Storage =
+    llvm::PointerUnion3<const RequirementSource *, const TypeRepr *,
+                        const RequirementRepr *>;
+
+  Storage storage;
+
+  FloatingRequirementSource(Kind kind, Storage storage)
+    : kind(kind), storage(storage) { }
+
+public:
+  /// Implicit conversion from a resolved requirement source.
+  FloatingRequirementSource(const RequirementSource *source)
+    : FloatingRequirementSource(Resolved, source) { }
+
+  static FloatingRequirementSource forAbstract() {
+    return { Explicit, Storage() };
+  }
+
+  static FloatingRequirementSource forExplicit(const TypeRepr *typeRepr) {
+    return { Explicit, typeRepr };
+  }
+
+  static FloatingRequirementSource forExplicit(
+                                     const RequirementRepr *requirementRepr) {
+    return { Explicit, requirementRepr };
+  }
+
+  static FloatingRequirementSource forInferred(const TypeRepr *typeRepr) {
+    return { Inferred, typeRepr };
+  }
+
+  /// Retrieve the complete requirement source rooted at the given potential
+  /// archetype.
+  const RequirementSource *getSource(PotentialArchetype *pa) const;
+
+  /// Retrieve the source location for this requirement.
+  SourceLoc getLoc() const;
 };
 
 class GenericSignatureBuilder::PotentialArchetype {

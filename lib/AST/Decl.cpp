@@ -3104,9 +3104,10 @@ void ProtocolDecl::computeRequirementSignature() {
   GenericSignatureBuilder builder(getASTContext(),
                                   LookUpConformanceInModule(module));
   builder.addGenericParameter(selfType);
-  builder.addRequirement(requirement,
-                         RequirementSource::forRequirementSignature(builder,
-                                                                    this));
+  builder.addRequirement(
+         requirement,
+         GenericSignatureBuilder::RequirementSource
+          ::forRequirementSignature(builder.resolveArchetype(selfType), this));
   builder.finalize(SourceLoc(), { selfType });
   
   RequirementSignature = builder.getGenericSignature();
