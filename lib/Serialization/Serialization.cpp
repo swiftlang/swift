@@ -1803,18 +1803,17 @@ void Serializer::writeCrossReference(const Decl *D) {
     return;
   }
 
+  bool isProtocolExt = D->getDeclContext()->getAsProtocolExtensionContext();
   if (auto type = dyn_cast<TypeDecl>(D)) {
     abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
     XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                         addIdentifierRef(type->getName()),
-                                        isa<ProtocolDecl>(
-                                          type->getDeclContext()));
+                                        isProtocolExt);
     return;
   }
 
   auto val = cast<ValueDecl>(D);
   auto ty = val->getInterfaceType()->getCanonicalType();
-  bool isProtocolExt = D->getDeclContext()->getAsProtocolExtensionContext();
   abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
   XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                        addTypeRef(ty),
