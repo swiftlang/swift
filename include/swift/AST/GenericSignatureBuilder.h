@@ -31,6 +31,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/TrailingObjects.h"
 #include <functional>
 #include <memory>
 
@@ -402,7 +403,10 @@ public:
 /// other implications (e.g., introduced by a particular protocol).
 ///
 /// Requirement sources are uniqued within a generic signature builder.
-class GenericSignatureBuilder::RequirementSource : public llvm::FoldingSetNode {
+class GenericSignatureBuilder::RequirementSource final
+  : public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<RequirementSource, PotentialArchetype *> {
+
 public:
   enum Kind : uint8_t {
     /// A requirement stated explicitly, e.g., in a where clause or type
@@ -468,7 +472,7 @@ public:
 private:
   /// The kind of storage we have.
   enum class StorageKind : uint8_t {
-    None,
+    RootArchetype,
     TypeRepr,
     RequirementRepr,
     ProtocolDecl,
@@ -481,6 +485,9 @@ private:
 
   /// The actual storage, described by \c storageKind.
   union {
+    /// The root archetype.
+    PotentialArchetype *rootArchetype;
+
     /// The type representation describing where the requirement came from.
     const TypeRepr *typeRepr;
 
@@ -497,12 +504,37 @@ private:
     AssociatedTypeDecl *assocType;
   } storage;
 
+  friend TrailingObjects;
+
+  /// The trailing potential archetype, for
+  size_t numTrailingObjects(OverloadToken<PotentialArchetype *>) const {
+    switch (kind) {
+    case RequirementSignatureSelf:
+      return 1;
+
+    case Explicit:
+    case Inferred:
+      return storageKind == StorageKind::RootArchetype ? 0 : 1;
+
+    case NestedTypeNameMatch:
+    case ProtocolRequirement:
+    case Superclass:
+    case Parent:
+    case Concrete:
+      return 0;
+    }
+  }
+
   /// Determines whether we have been provided with an acceptable storage kind
   /// for the given requirement source kind.
   static bool isAcceptableStorageKind(Kind kind, StorageKind storageKind);
 
   /// Retrieve the opaque storage as a single pointer, for use in uniquing.
   const void *getOpaqueStorage() const;
+
+  /// Retrieve the extra opaque storage as a single pointer, for use in
+  /// uniquing.
+  const void *getExtraOpaqueStorage() const;
 
   /// Whether this kind of requirement source is a root.
   static bool isRootKind(Kind kind) {
@@ -528,15 +560,15 @@ public:
   /// requirement source with one of the "root" kinds.
   const RequirementSource * const parent;
 
-  RequirementSource(Kind kind, const RequirementSource *parent)
-    : kind(kind), storageKind(StorageKind::None), parent(parent) {
+  RequirementSource(Kind kind, const RequirementSource *parent,
+                    PotentialArchetype *rootArchetype)
+    : kind(kind), storageKind(StorageKind::RootArchetype), parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
     assert(isAcceptableStorageKind(kind, storageKind) &&
            "RequirementSource kind/storageKind mismatch");
 
-    // Prevent uninitialized memory.
-    storage.typeRepr = nullptr;
+    storage.rootArchetype = rootArchetype;
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
@@ -651,6 +683,9 @@ public:
   const RequirementSource *viaParent(GenericSignatureBuilder &builder,
                                      AssociatedTypeDecl *assocType) const;
 
+  /// Retrieve the potential archetype at the root.
+  PotentialArchetype *getRootPotentialArchetype() const;
+
   /// Whether the requirement can be derived from something in its path.
   ///
   /// Derived requirements will not be recorded in a minimized generic
@@ -704,15 +739,17 @@ public:
 
   /// Profiling support for \c FoldingSet.
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, kind, parent, getOpaqueStorage());
+    Profile(ID, kind, parent, getOpaqueStorage(), getExtraOpaqueStorage());
   }
 
   /// Profiling support for \c FoldingSet.
   static void Profile(llvm::FoldingSetNodeID &ID, Kind kind,
-                      const RequirementSource *parent, const void *storage) {
+                      const RequirementSource *parent, const void *storage,
+                      const void *extraStorage) {
     ID.AddInteger(kind);
     ID.AddPointer(parent);
     ID.AddPointer(storage);
+    ID.AddPointer(extraStorage);
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(

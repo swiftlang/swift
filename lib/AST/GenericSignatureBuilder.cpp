@@ -82,7 +82,7 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
   switch (kind) {
   case Explicit:
     switch (storageKind) {
-    case StorageKind::None:
+    case StorageKind::RootArchetype:
     case StorageKind::TypeRepr:
     case StorageKind::RequirementRepr:
       return true;
@@ -95,7 +95,7 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
 
   case Inferred:
     switch (storageKind) {
-    case StorageKind::None:
+    case StorageKind::RootArchetype:
     case StorageKind::TypeRepr:
       return true;
 
@@ -108,7 +108,7 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
 
   case NestedTypeNameMatch:
     switch (storageKind) {
-    case StorageKind::None:
+    case StorageKind::RootArchetype:
         return true;
 
     case StorageKind::TypeRepr:
@@ -124,7 +124,7 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
     case StorageKind::AssociatedTypeDecl:
         return true;
 
-    case StorageKind::None:
+    case StorageKind::RootArchetype:
     case StorageKind::TypeRepr:
     case StorageKind::ProtocolDecl:
     case StorageKind::ProtocolConformance:
@@ -138,7 +138,7 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
     case StorageKind::ProtocolDecl:
       return true;
 
-    case StorageKind::None:
+    case StorageKind::RootArchetype:
     case StorageKind::TypeRepr:
     case StorageKind::ProtocolConformance:
     case StorageKind::RequirementRepr:
@@ -152,7 +152,7 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
     case StorageKind::ProtocolConformance:
       return true;
 
-    case StorageKind::None:
+    case StorageKind::RootArchetype:
     case StorageKind::ProtocolDecl:
     case StorageKind::TypeRepr:
     case StorageKind::RequirementRepr:
@@ -164,9 +164,8 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
 
 const void *RequirementSource::getOpaqueStorage() const {
   switch (storageKind) {
-  case StorageKind::None:
-    // Note: always null.
-    return storage.typeRepr;
+  case StorageKind::RootArchetype:
+    return storage.rootArchetype;
 
   case StorageKind::TypeRepr:
     return storage.typeRepr;
@@ -183,6 +182,13 @@ const void *RequirementSource::getOpaqueStorage() const {
   case StorageKind::AssociatedTypeDecl:
     return storage.assocType;
   }
+}
+
+const void *RequirementSource::getExtraOpaqueStorage() const {
+  if (numTrailingObjects(OverloadToken<PotentialArchetype *>()) == 1)
+    return getTrailingObjects<PotentialArchetype *>()[0];
+
+  return nullptr;
 }
 
 bool RequirementSource::isDerivedRequirement() const {
@@ -228,9 +234,11 @@ bool RequirementSource::isDerivedViaConcreteConformance() const {
   return false;
 }
 
-#define REQUIREMENT_SOURCE_FACTORY_BODY(SourceKind, Parent, Storage)       \
+#define REQUIREMENT_SOURCE_FACTORY_BODY(                                   \
+          SourceKind, Parent, Storage, ExtraStorage,                       \
+          NumPotentialArchetypes)                                          \
   llvm::FoldingSetNodeID nodeID;                                           \
-  Profile(nodeID, Kind::SourceKind, Parent, Storage);                      \
+  Profile(nodeID, Kind::SourceKind, Parent, Storage, ExtraStorage);        \
                                                                            \
   void *insertPos = nullptr;                                               \
   if (auto known =                                                         \
@@ -238,100 +246,114 @@ bool RequirementSource::isDerivedViaConcreteConformance() const {
                                                             insertPos))    \
     return known;                                                          \
                                                                            \
-  auto result = new RequirementSource(Kind::SourceKind, Parent, Storage);  \
-  builder.Impl->RequirementSources.InsertNode(result, insertPos);          \
-  return result
-
-#define REQUIREMENT_SOURCE_FACTORY_BODY_NOSTORAGE(SourceKind, Parent)      \
-  llvm::FoldingSetNodeID nodeID;                                           \
-  Profile(nodeID, Kind::SourceKind, Parent, nullptr);                      \
-                                                                           \
-  void *insertPos = nullptr;                                               \
-  if (auto known =                                                         \
-        builder.Impl->RequirementSources.FindNodeOrInsertPos(nodeID,       \
-                                                            insertPos))    \
-    return known;                                                          \
-                                                                           \
-  auto result = new RequirementSource(Kind::SourceKind, Parent);           \
+  unsigned size =                                                          \
+    totalSizeToAlloc<PotentialArchetype *>(NumPotentialArchetypes);        \
+  void *mem = malloc(size);                                                \
+  auto result = new (mem) RequirementSource(Kind::SourceKind, Parent,      \
+                                            Storage);                      \
+  if (NumPotentialArchetypes > 0)                                          \
+    result->getTrailingObjects<PotentialArchetype *>()[0] = ExtraStorage;  \
   builder.Impl->RequirementSources.InsertNode(result, insertPos);          \
   return result
 
 const RequirementSource *RequirementSource::forAbstract(
                                                     PotentialArchetype *root) {
   auto &builder = *root->getBuilder();
-  // FIXME: Store the root
-  REQUIREMENT_SOURCE_FACTORY_BODY_NOSTORAGE(Explicit, nullptr);
+  REQUIREMENT_SOURCE_FACTORY_BODY(Explicit, nullptr, root, nullptr, 0);
 }
 
 const RequirementSource *RequirementSource::forExplicit(
                                              PotentialArchetype *root,
                                              const TypeRepr *typeRepr) {
+  // If the type representation is NULL, we have an abstract requirement
+  // source.
+  if (!typeRepr)
+    return forAbstract(root);
+
   auto &builder = *root->getBuilder();
   // FIXME: Store the root
-  REQUIREMENT_SOURCE_FACTORY_BODY(Explicit, nullptr, typeRepr);
+  REQUIREMENT_SOURCE_FACTORY_BODY(Explicit, nullptr, typeRepr, root, 1);
 }
 
 const RequirementSource *RequirementSource::forExplicit(
                                       PotentialArchetype *root,
                                       const RequirementRepr *requirementRepr) {
+  // If the requirement representation is NULL, we have an abstract requirement
+  // source.
+  if (!requirementRepr)
+    return forAbstract(root);
+
   auto &builder = *root->getBuilder();
-  // FIXME: Store the root
-  REQUIREMENT_SOURCE_FACTORY_BODY(Explicit, nullptr, requirementRepr);
+  REQUIREMENT_SOURCE_FACTORY_BODY(Explicit, nullptr, requirementRepr, root, 1);
 }
 
 const RequirementSource *RequirementSource::forInferred(
                                               PotentialArchetype *root,
                                               const TypeRepr *typeRepr) {
   auto &builder = *root->getBuilder();
-  // FIXME: Store the root
-  REQUIREMENT_SOURCE_FACTORY_BODY(Inferred, nullptr, typeRepr);
+  REQUIREMENT_SOURCE_FACTORY_BODY(Inferred, nullptr, typeRepr, root, 1);
 }
 
 const RequirementSource *RequirementSource::forRequirementSignature(
                                               PotentialArchetype *root,
                                               ProtocolDecl *protocol) {
   auto &builder = *root->getBuilder();
-  // FIXME: Store the root
-  REQUIREMENT_SOURCE_FACTORY_BODY(RequirementSignatureSelf, nullptr, protocol);
+  REQUIREMENT_SOURCE_FACTORY_BODY(RequirementSignatureSelf, nullptr, protocol,
+                                  root, 1);
 }
 
 const RequirementSource *RequirementSource::forNestedTypeNameMatch(
                                              PotentialArchetype *root) {
   auto &builder = *root->getBuilder();
-  // FIXME: Store the root
-  REQUIREMENT_SOURCE_FACTORY_BODY_NOSTORAGE(NestedTypeNameMatch, nullptr);
+  REQUIREMENT_SOURCE_FACTORY_BODY(NestedTypeNameMatch, nullptr, root, nullptr,
+                                  0);
 }
 
 const RequirementSource *RequirementSource::viaAbstractProtocolRequirement(
                                                GenericSignatureBuilder &builder,
                                                ProtocolDecl *protocol) const {
-  REQUIREMENT_SOURCE_FACTORY_BODY(ProtocolRequirement, this, protocol);
+  REQUIREMENT_SOURCE_FACTORY_BODY(ProtocolRequirement, this, protocol,
+                                  nullptr, 0);
 }
 
 const RequirementSource *RequirementSource::viaSuperclass(
                                       GenericSignatureBuilder &builder,
                                       ProtocolConformance *conformance) const {
-  REQUIREMENT_SOURCE_FACTORY_BODY(Superclass, this, conformance);
+  REQUIREMENT_SOURCE_FACTORY_BODY(Superclass, this, conformance, nullptr, 0);
 }
 
 const RequirementSource *RequirementSource::viaConcrete(
                                       GenericSignatureBuilder &builder,
                                       ProtocolConformance *conformance) const {
-  REQUIREMENT_SOURCE_FACTORY_BODY(Concrete, this, conformance);
+  REQUIREMENT_SOURCE_FACTORY_BODY(Concrete, this, conformance, nullptr, 0);
 }
 
 const RequirementSource *RequirementSource::viaParent(
                                       GenericSignatureBuilder &builder,
                                       AssociatedTypeDecl *assocType) const {
-  REQUIREMENT_SOURCE_FACTORY_BODY(Parent, this, assocType);
+  REQUIREMENT_SOURCE_FACTORY_BODY(Parent, this, assocType, nullptr, 0);
 }
 
-#undef REQUIREMENT_SOURCE_FACTORY_BODY_NOSTORAGE
 #undef REQUIREMENT_SOURCE_FACTORY_BODY
+
+PotentialArchetype *RequirementSource::getRootPotentialArchetype() const {
+  /// Find the root.
+  auto root = this;
+  while (auto parent = root->parent)
+    root = parent;
+
+  // If the root archetype is in extra storage, grab it from there.
+  if (root->numTrailingObjects(OverloadToken<PotentialArchetype *>()) == 1)
+    return root->getTrailingObjects<PotentialArchetype *>()[0];
+
+  // Otherwise, it's in inline storage.
+  assert(storageKind == StorageKind::RootArchetype);
+  return storage.rootArchetype;
+}
 
 ProtocolDecl *RequirementSource::getProtocolDecl() const {
   switch (storageKind) {
-  case StorageKind::None:
+  case StorageKind::RootArchetype:
   case StorageKind::TypeRepr:
   case StorageKind::RequirementRepr:
     return nullptr;
@@ -405,6 +427,9 @@ void RequirementSource::print(llvm::raw_ostream &out,
   if (parent) {
     parent->print(out, srcMgr);
     out << " -> ";
+  } else {
+    auto pa = getRootPotentialArchetype();
+    out << pa->getDebugName() << ": ";
   }
 
   switch (kind) {
@@ -453,7 +478,7 @@ void RequirementSource::print(llvm::raw_ostream &out,
   };
 
   switch (storageKind) {
-  case StorageKind::None:
+  case StorageKind::RootArchetype:
     break;
 
   case StorageKind::TypeRepr:
