@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -emit-ir -module-name clang_inline | %FileCheck %s
 
-// REQUIRES: CPU=i386 || CPU=x86_64
+// REQUIRES: CPU=i386_or_x86_64
 // XFAIL: linux
 
 import gizmo

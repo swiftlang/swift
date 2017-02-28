@@ -3,7 +3,7 @@
 // FIXME: rdar://30765842 redundant call to protocol witness table accessor
 // REQUIRES: rdar30765842
 
-// REQUIRES: CPU=i386 || CPU=x86_64
+// REQUIRES: CPU=i386_or_x86_64
 
 sil_stage canonical
 
