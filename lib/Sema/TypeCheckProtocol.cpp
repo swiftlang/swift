@@ -1073,7 +1073,8 @@ RequirementEnvironment::RequirementEnvironment(
 
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
-  auto source = RequirementSource::forAbstract(builder);
+  auto source =
+    GenericSignatureBuilder::RequirementSource::forAbstract(builder);
   for (auto &reqReq : reqSig->getRequirements()) {
     switch (reqReq.getKind()) {
     case RequirementKind::Conformance: {

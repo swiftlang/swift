@@ -56,12 +56,351 @@ class TypeRepr;
 class ASTContext;
 class DiagnosticEngine;
 
+/// \brief Collects a set of requirements of generic parameters, both explicitly
+/// stated and inferred, and determines the set of archetypes for each of
+/// the generic parameters.
+class GenericSignatureBuilder {
+public:
+  /// Describes a potential archetype, which stands in for a generic parameter
+  /// type or some type derived from it.
+  class PotentialArchetype;
+
+  using UnresolvedType = llvm::PointerUnion<PotentialArchetype *, Type>;
+  struct ResolvedType;
+
+  using RequirementRHS =
+      llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
+
+  class RequirementSource;
+
+  /// Describes a constraint that is bounded on one side by a concrete type.
+  struct ConcreteConstraint {
+    PotentialArchetype *archetype;
+    Type concreteType;
+    const RequirementSource *source;
+  };
+
+  /// Describes an equivalence class of potential archetypes.
+  struct EquivalenceClass {
+    /// Concrete type to which this equivalence class is equal.
+    ///
+    /// This is the semantic concrete type; the constraints as written
+    /// (or implied) are stored in \c concreteTypeConstraints;
+    Type concreteType;
+
+    /// The same-type-to-concrete constraints written within this
+    /// equivalence class.
+    std::vector<ConcreteConstraint> concreteTypeConstraints;
+
+    /// The members of the equivalence class.
+    TinyPtrVector<PotentialArchetype *> members;
+
+    /// Construct a new equivalence class containing only the given
+    /// potential archetype (which represents itself).
+    EquivalenceClass(PotentialArchetype *representative);
+
+    /// Find a source of the same-type constraint that maps a potential
+    /// archetype in this equivalence class to a concrete type along with
+    /// that concrete type as written.
+    Optional<ConcreteConstraint>
+    findAnyConcreteConstraintAsWritten(
+                              PotentialArchetype *preferredPA = nullptr) const;
+  };
+
+  friend class RequirementSource;
+
+private:
+  class InferRequirementsWalker;
+  friend class InferRequirementsWalker;
+  friend class GenericSignature;
+
+  ASTContext &Context;
+  DiagnosticEngine &Diags;
+  struct Implementation;
+  std::unique_ptr<Implementation> Impl;
+
+  GenericSignatureBuilder(const GenericSignatureBuilder &) = delete;
+  GenericSignatureBuilder &operator=(const GenericSignatureBuilder &) = delete;
+
+  /// Update an existing constraint source reference when another constraint
+  /// source was found to produce the same constraint. Only the better
+  /// constraint source will be kept.
+  ///
+  /// \returns true if the new constraint source was better, false otherwise.
+  bool updateRequirementSource(const RequirementSource *&existingSource,
+                               const RequirementSource *newSource);
+
+  /// Retrieve the constraint source conformance for the superclass constraint
+  /// of the given potential archetype (if present) to the given protocol.
+  ///
+  /// \param pa The potential archetype whose superclass constraint is being
+  /// queried.
+  ///
+  /// \param proto The protocol to which we are establishing conformance.
+  ///
+  /// \param protoSource The requirement source for the conformance to the
+  /// given protocol.
+  const RequirementSource *resolveSuperConformance(
+                            GenericSignatureBuilder::PotentialArchetype *pa,
+                            ProtocolDecl *proto,
+                            const RequirementSource *&protoSource);
+
+  /// \brief Add a new conformance requirement specifying that the given
+  /// potential archetype conforms to the given protocol.
+  bool addConformanceRequirement(PotentialArchetype *T,
+                                 ProtocolDecl *Proto,
+                                 const RequirementSource *Source);
+
+  bool addConformanceRequirement(PotentialArchetype *T,
+                                 ProtocolDecl *Proto,
+                                 const RequirementSource *Source,
+                                llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
+
+public:
+  /// \brief Add a new same-type requirement between two fully resolved types
+  /// (output of \c GenericSignatureBuilder::resolve).
+  ///
+  /// If the types refer to two concrete types that are fundamentally
+  /// incompatible (e.g. \c Foo<Bar<T>> and \c Foo<Baz>), \c diagnoseMismatch is
+  /// called with the two types that don't match (\c Bar<T> and \c Baz for the
+  /// previous example).
+  bool
+  addSameTypeRequirement(ResolvedType paOrT1, ResolvedType paOrT2,
+                         const RequirementSource *Source,
+                         llvm::function_ref<void(Type, Type)> diagnoseMismatch);
+
+  /// \brief Add a new same-type requirement between two fully resolved types
+  /// (output of GenericSignatureBuilder::resolve).
+  ///
+  /// The two types must not be incompatible concrete types.
+  bool addSameTypeRequirement(ResolvedType paOrT1, ResolvedType paOrT2,
+                              const RequirementSource *Source);
+
+  /// \brief Add a new same-type requirement between two unresolved types.
+  ///
+  /// The types are resolved with \c GenericSignatureBuilder::resolve, and must
+  /// not be incompatible concrete types.
+  bool addSameTypeRequirement(UnresolvedType paOrT1, UnresolvedType paOrT2,
+                              const RequirementSource *Source);
+
+  /// \brief Add a new same-type requirement between two unresolved types.
+  ///
+  /// The types are resolved with \c GenericSignatureBuilder::resolve. \c
+  /// diagnoseMismatch is called if the two types refer to incompatible concrete
+  /// types.
+  bool
+  addSameTypeRequirement(UnresolvedType paOrT1, UnresolvedType paOrT2,
+                         const RequirementSource *Source,
+                         llvm::function_ref<void(Type, Type)> diagnoseMismatch);
+
+private:
+  /// \brief Add a new superclass requirement specifying that the given
+  /// potential archetype has the given type as an ancestor.
+  bool addSuperclassRequirement(PotentialArchetype *T,
+                                Type Superclass,
+                                const RequirementSource *Source);
+
+  /// \brief Add a new conformance requirement specifying that the given
+  /// potential archetypes are equivalent.
+  bool addSameTypeRequirementBetweenArchetypes(PotentialArchetype *T1,
+                                               PotentialArchetype *T2,
+                                               const RequirementSource *Source);
+  
+  /// \brief Add a new conformance requirement specifying that the given
+  /// potential archetype is bound to a concrete type.
+  bool addSameTypeRequirementToConcrete(PotentialArchetype *T,
+                                        Type Concrete,
+                                        const RequirementSource *Source);
+
+  /// \brief Add a new same-type requirement specifying that the given two
+  /// types should be the same.
+  ///
+  /// \param diagnoseMismatch Callback invoked when the types in the same-type
+  /// requirement mismatch.
+  bool addSameTypeRequirementBetweenConcrete(
+      Type T1, Type T2, const RequirementSource *Source,
+      llvm::function_ref<void(Type, Type)> diagnoseMismatch);
+
+  /// Add the requirements placed on the given type parameter
+  /// to the given potential archetype.
+  bool addInheritedRequirements(TypeDecl *decl, PotentialArchetype *pa,
+                                const RequirementSource *parentSource,
+                                llvm::SmallPtrSetImpl<ProtocolDecl *> &visited);
+
+  /// Visit all of the potential archetypes.
+  template<typename F>
+  void visitPotentialArchetypes(F f);
+
+  void markPotentialArchetypeRecursive(PotentialArchetype *pa,
+                                       ProtocolDecl *proto,
+                                       const RequirementSource *source);
+
+public:
+  /// Construct a new generic signature builder.
+  ///
+  /// \param lookupConformance Conformance-lookup routine that will be used
+  /// to satisfy conformance requirements for concrete types.
+  explicit GenericSignatureBuilder(ASTContext &ctx,
+                            std::function<GenericFunction> lookupConformance);
+
+  GenericSignatureBuilder(GenericSignatureBuilder &&);
+  ~GenericSignatureBuilder();
+
+  /// Retrieve the AST context.
+  ASTContext &getASTContext() const { return Context; }
+
+  /// Retrieve the conformance-lookup function used by this generic signature builder.
+  std::function<GenericFunction> getLookupConformanceFn() const;
+
+  /// Retrieve the lazy resolver, if there is one.
+  LazyResolver *getLazyResolver() const;
+
+  /// Enumerate the requirements that describe the signature of this
+  /// generic signature builder.
+  ///
+  /// \param f A function object that will be passed each requirement
+  /// and requirement source.
+  void enumerateRequirements(llvm::function_ref<
+                      void (RequirementKind kind,
+                            PotentialArchetype *archetype,
+                            RequirementRHS constraint,
+                            const RequirementSource *source)> f);
+
+public:
+  /// \brief Add a new generic parameter for which there may be requirements.
+  void addGenericParameter(GenericTypeParamDecl *GenericParam);
+
+  /// Add the requirements placed on the given abstract type parameter
+  /// to the given potential archetype.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool addGenericParameterRequirements(GenericTypeParamDecl *GenericParam);
+
+  /// \brief Add a new generic parameter for which there may be requirements.
+  void addGenericParameter(GenericTypeParamType *GenericParam);
+  
+  /// \brief Add a new requirement.
+  ///
+  /// \returns true if this requirement makes the set of requirements
+  /// inconsistent, in which case a diagnostic will have been issued.
+  bool addRequirement(const RequirementRepr *Req,
+                      const RequirementSource *source = nullptr,
+                      const SubstitutionMap *subMap = nullptr);
+
+  /// \brief Add an already-checked requirement.
+  ///
+  /// Adding an already-checked requirement cannot fail. This is used to
+  /// re-inject requirements from outer contexts.
+  ///
+  /// \returns true if this requirement makes the set of requirements
+  /// inconsistent, in which case a diagnostic will have been issued.
+  bool addRequirement(const Requirement &req, const RequirementSource *source);
+
+  bool addRequirement(const Requirement &req, const RequirementSource *source,
+                      llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
+
+  /// \brief Add a new requirement.
+  ///
+  /// \returns true if this requirement makes the set of requirements
+  /// inconsistent, in which case a diagnostic will have been issued.
+
+  bool addLayoutRequirement(PotentialArchetype *PAT,
+                            LayoutConstraint Layout,
+                            const RequirementSource *Source);
+
+  /// \brief Add all of a generic signature's parameters and requirements.
+  void addGenericSignature(GenericSignature *sig);
+
+  /// \brief Build the generic signature.
+  GenericSignature *getGenericSignature();
+
+  /// Infer requirements from the given type, recursively.
+  ///
+  /// This routine infers requirements from a type that occurs within the
+  /// signature of a generic function. For example, given:
+  ///
+  /// \code
+  /// func f<K, V>(dict : Dictionary<K, V>) { ... }
+  /// \endcode
+  ///
+  /// where \c Dictionary requires that its key type be \c Hashable,
+  /// the requirement \c K : Hashable is inferred from the parameter type,
+  /// because the type \c Dictionary<K,V> cannot be formed without it.
+  void inferRequirements(TypeLoc type);
+
+  /// Infer requirements from the given pattern, recursively.
+  ///
+  /// This routine infers requirements from a type that occurs within the
+  /// signature of a generic function. For example, given:
+  ///
+  /// \code
+  /// func f<K, V>(dict : Dictionary<K, V>) { ... }
+  /// \endcode
+  ///
+  /// where \c Dictionary requires that its key type be \c Hashable,
+  /// the requirement \c K : Hashable is inferred from the parameter type,
+  /// because the type \c Dictionary<K,V> cannot be formed without it.
+  void inferRequirements(ParameterList *params,GenericParamList *genericParams);
+
+  /// Finalize the set of requirements, performing any remaining checking
+  /// required before generating archetypes.
+  ///
+  /// \param allowConcreteGenericParams If true, allow generic parameters to
+  /// be made concrete.
+  void finalize(SourceLoc loc,
+                ArrayRef<GenericTypeParamType *> genericParams,
+                bool allowConcreteGenericParams=false);
+
+  /// Diagnose any remaining renames.
+  ///
+  /// \returns \c true if there were any remaining renames to diagnose.
+  bool diagnoseRemainingRenames(SourceLoc loc,
+                                ArrayRef<GenericTypeParamType *> genericParams);
+
+private:
+  /// Check for redundant concrete type constraints within the equivalence
+  /// class of the given potential archetype.
+  void checkRedundantConcreteTypeConstraints(
+                            ArrayRef<GenericTypeParamType *> genericParams,
+                            PotentialArchetype *pa);
+
+public:
+  /// \brief Resolve the given type to the potential archetype it names.
+  ///
+  /// This routine will synthesize nested types as required to refer to a
+  /// potential archetype, even in cases where no requirement specifies the
+  /// requirement for such an archetype. FIXME: The failure to include such a
+  /// requirement will be diagnosed at some point later (when the types in the
+  /// signature are fully resolved).
+  ///
+  /// For any type that cannot refer to an archetype, this routine returns null.
+  PotentialArchetype *resolveArchetype(Type type);
+
+  /// \brief Resolve the given type as far as this Builder knows how.
+  ///
+  /// This returns either a non-typealias potential archetype or a Type, if \c
+  /// type is concrete.
+  // FIXME: the hackTypeFromGenericTypeAlias is just temporarily patching over
+  // problems with generic typealiases (see the comment on the ResolvedType
+  // function)
+  ResolvedType resolve(UnresolvedType type,
+                       bool hackTypeFromGenericTypeAlias = false);
+
+  /// \brief Dump all of the requirements, both specified and inferred.
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump(),
+      "only for use within the debugger");
+
+  /// Dump all of the requirements to the given output stream.
+  void dump(llvm::raw_ostream &out);
+};
+
 /// Describes how a generic signature determines a requirement, from its origin
 /// in some requirement written in the source, inferred through a path of
 /// other implications (e.g., introduced by a particular protocol).
 ///
 /// Requirement sources are uniqued within a generic signature builder.
-class RequirementSource : public llvm::FoldingSetNode {
+class GenericSignatureBuilder::RequirementSource : public llvm::FoldingSetNode {
 public:
   enum Kind : uint8_t {
     /// A requirement stated explicitly, e.g., in a where clause or type
@@ -387,338 +726,6 @@ public:
 
   /// Print the requirement source (shorter form)
   void print(llvm::raw_ostream &out, SourceManager *SrcMgr) const;
-};
-
-/// \brief Collects a set of requirements of generic parameters, both explicitly
-/// stated and inferred, and determines the set of archetypes for each of
-/// the generic parameters.
-class GenericSignatureBuilder {
-public:
-  /// Describes a potential archetype, which stands in for a generic parameter
-  /// type or some type derived from it.
-  class PotentialArchetype;
-
-  using UnresolvedType = llvm::PointerUnion<PotentialArchetype *, Type>;
-  struct ResolvedType;
-
-  using RequirementRHS =
-      llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
-
-  /// Describes a constraint that is bounded on one side by a concrete type.
-  struct ConcreteConstraint {
-    PotentialArchetype *archetype;
-    Type concreteType;
-    const RequirementSource *source;
-  };
-
-  /// Describes an equivalence class of potential archetypes.
-  struct EquivalenceClass {
-    /// Concrete type to which this equivalence class is equal.
-    ///
-    /// This is the semantic concrete type; the constraints as written
-    /// (or implied) are stored in \c concreteTypeConstraints;
-    Type concreteType;
-
-    /// The same-type-to-concrete constraints written within this
-    /// equivalence class.
-    std::vector<ConcreteConstraint> concreteTypeConstraints;
-
-    /// The members of the equivalence class.
-    TinyPtrVector<PotentialArchetype *> members;
-
-    /// Construct a new equivalence class containing only the given
-    /// potential archetype (which represents itself).
-    EquivalenceClass(PotentialArchetype *representative);
-
-    /// Find a source of the same-type constraint that maps a potential
-    /// archetype in this equivalence class to a concrete type along with
-    /// that concrete type as written.
-    Optional<ConcreteConstraint>
-    findAnyConcreteConstraintAsWritten(
-                              PotentialArchetype *preferredPA = nullptr) const;
-  };
-
-  friend class RequirementSource;
-
-private:
-  class InferRequirementsWalker;
-  friend class InferRequirementsWalker;
-  friend class GenericSignature;
-
-  ASTContext &Context;
-  DiagnosticEngine &Diags;
-  struct Implementation;
-  std::unique_ptr<Implementation> Impl;
-
-  GenericSignatureBuilder(const GenericSignatureBuilder &) = delete;
-  GenericSignatureBuilder &operator=(const GenericSignatureBuilder &) = delete;
-
-  /// Update an existing constraint source reference when another constraint
-  /// source was found to produce the same constraint. Only the better
-  /// constraint source will be kept.
-  ///
-  /// \returns true if the new constraint source was better, false otherwise.
-  bool updateRequirementSource(const RequirementSource *&existingSource,
-                               const RequirementSource *newSource);
-
-  /// Retrieve the constraint source conformance for the superclass constraint
-  /// of the given potential archetype (if present) to the given protocol.
-  ///
-  /// \param pa The potential archetype whose superclass constraint is being
-  /// queried.
-  ///
-  /// \param proto The protocol to which we are establishing conformance.
-  ///
-  /// \param protoSource The requirement source for the conformance to the
-  /// given protocol.
-  const RequirementSource *resolveSuperConformance(
-                            GenericSignatureBuilder::PotentialArchetype *pa,
-                            ProtocolDecl *proto,
-                            const RequirementSource *&protoSource);
-
-  /// \brief Add a new conformance requirement specifying that the given
-  /// potential archetype conforms to the given protocol.
-  bool addConformanceRequirement(PotentialArchetype *T,
-                                 ProtocolDecl *Proto,
-                                 const RequirementSource *Source);
-
-  bool addConformanceRequirement(PotentialArchetype *T,
-                                 ProtocolDecl *Proto,
-                                 const RequirementSource *Source,
-                                llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
-
-public:
-  /// \brief Add a new same-type requirement between two fully resolved types
-  /// (output of \c GenericSignatureBuilder::resolve).
-  ///
-  /// If the types refer to two concrete types that are fundamentally
-  /// incompatible (e.g. \c Foo<Bar<T>> and \c Foo<Baz>), \c diagnoseMismatch is
-  /// called with the two types that don't match (\c Bar<T> and \c Baz for the
-  /// previous example).
-  bool
-  addSameTypeRequirement(ResolvedType paOrT1, ResolvedType paOrT2,
-                         const RequirementSource *Source,
-                         llvm::function_ref<void(Type, Type)> diagnoseMismatch);
-
-  /// \brief Add a new same-type requirement between two fully resolved types
-  /// (output of GenericSignatureBuilder::resolve).
-  ///
-  /// The two types must not be incompatible concrete types.
-  bool addSameTypeRequirement(ResolvedType paOrT1, ResolvedType paOrT2,
-                              const RequirementSource *Source);
-
-  /// \brief Add a new same-type requirement between two unresolved types.
-  ///
-  /// The types are resolved with \c GenericSignatureBuilder::resolve, and must
-  /// not be incompatible concrete types.
-  bool addSameTypeRequirement(UnresolvedType paOrT1, UnresolvedType paOrT2,
-                              const RequirementSource *Source);
-
-  /// \brief Add a new same-type requirement between two unresolved types.
-  ///
-  /// The types are resolved with \c GenericSignatureBuilder::resolve. \c
-  /// diagnoseMismatch is called if the two types refer to incompatible concrete
-  /// types.
-  bool
-  addSameTypeRequirement(UnresolvedType paOrT1, UnresolvedType paOrT2,
-                         const RequirementSource *Source,
-                         llvm::function_ref<void(Type, Type)> diagnoseMismatch);
-
-private:
-  /// \brief Add a new superclass requirement specifying that the given
-  /// potential archetype has the given type as an ancestor.
-  bool addSuperclassRequirement(PotentialArchetype *T,
-                                Type Superclass,
-                                const RequirementSource *Source);
-
-  /// \brief Add a new conformance requirement specifying that the given
-  /// potential archetypes are equivalent.
-  bool addSameTypeRequirementBetweenArchetypes(PotentialArchetype *T1,
-                                               PotentialArchetype *T2,
-                                               const RequirementSource *Source);
-  
-  /// \brief Add a new conformance requirement specifying that the given
-  /// potential archetype is bound to a concrete type.
-  bool addSameTypeRequirementToConcrete(PotentialArchetype *T,
-                                        Type Concrete,
-                                        const RequirementSource *Source);
-
-  /// \brief Add a new same-type requirement specifying that the given two
-  /// types should be the same.
-  ///
-  /// \param diagnoseMismatch Callback invoked when the types in the same-type
-  /// requirement mismatch.
-  bool addSameTypeRequirementBetweenConcrete(
-      Type T1, Type T2, const RequirementSource *Source,
-      llvm::function_ref<void(Type, Type)> diagnoseMismatch);
-
-  /// Add the requirements placed on the given type parameter
-  /// to the given potential archetype.
-  bool addInheritedRequirements(TypeDecl *decl, PotentialArchetype *pa,
-                                const RequirementSource *parentSource,
-                                llvm::SmallPtrSetImpl<ProtocolDecl *> &visited);
-
-  /// Visit all of the potential archetypes.
-  template<typename F>
-  void visitPotentialArchetypes(F f);
-
-  void markPotentialArchetypeRecursive(PotentialArchetype *pa,
-                                       ProtocolDecl *proto,
-                                       const RequirementSource *source);
-
-public:
-  /// Construct a new generic signature builder.
-  ///
-  /// \param lookupConformance Conformance-lookup routine that will be used
-  /// to satisfy conformance requirements for concrete types.
-  explicit GenericSignatureBuilder(ASTContext &ctx,
-                            std::function<GenericFunction> lookupConformance);
-
-  GenericSignatureBuilder(GenericSignatureBuilder &&);
-  ~GenericSignatureBuilder();
-
-  /// Retrieve the AST context.
-  ASTContext &getASTContext() const { return Context; }
-
-  /// Retrieve the conformance-lookup function used by this generic signature builder.
-  std::function<GenericFunction> getLookupConformanceFn() const;
-
-  /// Retrieve the lazy resolver, if there is one.
-  LazyResolver *getLazyResolver() const;
-
-  /// Enumerate the requirements that describe the signature of this
-  /// generic signature builder.
-  ///
-  /// \param f A function object that will be passed each requirement
-  /// and requirement source.
-  void enumerateRequirements(llvm::function_ref<
-                      void (RequirementKind kind,
-                            PotentialArchetype *archetype,
-                            RequirementRHS constraint,
-                            const RequirementSource *source)> f);
-
-public:
-  /// \brief Add a new generic parameter for which there may be requirements.
-  void addGenericParameter(GenericTypeParamDecl *GenericParam);
-
-  /// Add the requirements placed on the given abstract type parameter
-  /// to the given potential archetype.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool addGenericParameterRequirements(GenericTypeParamDecl *GenericParam);
-
-  /// \brief Add a new generic parameter for which there may be requirements.
-  void addGenericParameter(GenericTypeParamType *GenericParam);
-  
-  /// \brief Add a new requirement.
-  ///
-  /// \returns true if this requirement makes the set of requirements
-  /// inconsistent, in which case a diagnostic will have been issued.
-  bool addRequirement(const RequirementRepr *Req,
-                      const RequirementSource *source = nullptr,
-                      const SubstitutionMap *subMap = nullptr);
-
-  /// \brief Add an already-checked requirement.
-  ///
-  /// Adding an already-checked requirement cannot fail. This is used to
-  /// re-inject requirements from outer contexts.
-  ///
-  /// \returns true if this requirement makes the set of requirements
-  /// inconsistent, in which case a diagnostic will have been issued.
-  bool addRequirement(const Requirement &req, const RequirementSource *source);
-
-  bool addRequirement(const Requirement &req, const RequirementSource *source,
-                      llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
-
-  bool addLayoutRequirement(PotentialArchetype *PAT,
-                            LayoutConstraint Layout,
-                            const RequirementSource *Source);
-
-  /// \brief Add all of a generic signature's parameters and requirements.
-  void addGenericSignature(GenericSignature *sig);
-
-  /// \brief Build the generic signature.
-  GenericSignature *getGenericSignature();
-
-  /// Infer requirements from the given type, recursively.
-  ///
-  /// This routine infers requirements from a type that occurs within the
-  /// signature of a generic function. For example, given:
-  ///
-  /// \code
-  /// func f<K, V>(dict : Dictionary<K, V>) { ... }
-  /// \endcode
-  ///
-  /// where \c Dictionary requires that its key type be \c Hashable,
-  /// the requirement \c K : Hashable is inferred from the parameter type,
-  /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(TypeLoc type);
-
-  /// Infer requirements from the given pattern, recursively.
-  ///
-  /// This routine infers requirements from a type that occurs within the
-  /// signature of a generic function. For example, given:
-  ///
-  /// \code
-  /// func f<K, V>(dict : Dictionary<K, V>) { ... }
-  /// \endcode
-  ///
-  /// where \c Dictionary requires that its key type be \c Hashable,
-  /// the requirement \c K : Hashable is inferred from the parameter type,
-  /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(ParameterList *params,GenericParamList *genericParams);
-
-  /// Finalize the set of requirements, performing any remaining checking
-  /// required before generating archetypes.
-  ///
-  /// \param allowConcreteGenericParams If true, allow generic parameters to
-  /// be made concrete.
-  void finalize(SourceLoc loc,
-                ArrayRef<GenericTypeParamType *> genericParams,
-                bool allowConcreteGenericParams=false);
-
-  /// Diagnose any remaining renames.
-  ///
-  /// \returns \c true if there were any remaining renames to diagnose.
-  bool diagnoseRemainingRenames(SourceLoc loc,
-                                ArrayRef<GenericTypeParamType *> genericParams);
-
-private:
-  /// Check for redundant concrete type constraints within the equivalence
-  /// class of the given potential archetype.
-  void checkRedundantConcreteTypeConstraints(
-                            ArrayRef<GenericTypeParamType *> genericParams,
-                            PotentialArchetype *pa);
-
-public:
-  /// \brief Resolve the given type to the potential archetype it names.
-  ///
-  /// This routine will synthesize nested types as required to refer to a
-  /// potential archetype, even in cases where no requirement specifies the
-  /// requirement for such an archetype. FIXME: The failure to include such a
-  /// requirement will be diagnosed at some point later (when the types in the
-  /// signature are fully resolved).
-  ///
-  /// For any type that cannot refer to an archetype, this routine returns null.
-  PotentialArchetype *resolveArchetype(Type type);
-
-  /// \brief Resolve the given type as far as this Builder knows how.
-  ///
-  /// This returns either a non-typealias potential archetype or a Type, if \c
-  /// type is concrete.
-  // FIXME: the hackTypeFromGenericTypeAlias is just temporarily patching over
-  // problems with generic typealiases (see the comment on the ResolvedType
-  // function)
-  ResolvedType resolve(UnresolvedType type,
-                       bool hackTypeFromGenericTypeAlias = false);
-
-  /// \brief Dump all of the requirements, both specified and inferred.
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(),
-      "only for use within the debugger");
-
-  /// Dump all of the requirements to the given output stream.
-  void dump(llvm::raw_ostream &out);
 };
 
 class GenericSignatureBuilder::PotentialArchetype {

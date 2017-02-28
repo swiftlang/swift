@@ -3105,8 +3105,8 @@ void ProtocolDecl::computeRequirementSignature() {
                                   LookUpConformanceInModule(module));
   builder.addGenericParameter(selfType);
   builder.addRequirement(requirement,
-                         RequirementSource::forRequirementSignature(builder,
-                                                                    this));
+                         GenericSignatureBuilder::RequirementSource
+                          ::forRequirementSignature(builder, this));
   builder.finalize(SourceLoc(), { selfType });
   
   RequirementSignature = builder.getGenericSignature();

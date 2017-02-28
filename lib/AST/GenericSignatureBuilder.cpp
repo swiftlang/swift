@@ -39,6 +39,7 @@ using namespace swift;
 using llvm::DenseMap;
 
 namespace {
+  typedef GenericSignatureBuilder::RequirementSource RequirementSource;
   typedef GenericSignatureBuilder::PotentialArchetype PotentialArchetype;
   typedef GenericSignatureBuilder::ConcreteConstraint ConcreteConstraint;
   typedef GenericSignatureBuilder::EquivalenceClass EquivalenceClass;
