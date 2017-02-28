@@ -1586,7 +1586,7 @@ ERROR(protocol_typealias_conflict, none,
       (Identifier, Type, Type))
 WARNING(redundant_same_type_to_concrete,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
-NOTE(redundancy_here,none,
+NOTE(same_type_redundancy_here,none,
      "same-type constraint %1 == %2 %select{written here|implied here}0",
      (bool, Type, Type))
 

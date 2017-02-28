@@ -2879,29 +2879,34 @@ namespace swift {
   }
 }
 
-void GenericSignatureBuilder::checkRedundantConcreteTypeConstraints(
-                                 ArrayRef<GenericTypeParamType *> genericParams,
-                                 PotentialArchetype *representative) {
-  Type concreteType = representative->getConcreteType();
-  assert(concreteType && "No concrete type to check");
-
-  // Remove any self-derived constraints.
-  auto equivClass = representative->getOrCreateEquivalenceClass();
-  auto &concreteConstraints = equivClass->concreteTypeConstraints;
-  concreteConstraints.erase(
-    std::remove_if(concreteConstraints.begin(), concreteConstraints.end(),
+void GenericSignatureBuilder::checkConstraintList(
+                           ArrayRef<GenericTypeParamType *> genericParams,
+                           std::vector<ConcreteConstraint> &constraints,
+                           llvm::function_ref<bool(const ConcreteConstraint &)>
+                             isSuitableRepresentative,
+                           llvm::function_ref<ConstraintRelation(Type)>
+                             checkConstraint,
+                           Diag<Type, Type> redundancyDiag,
+                           Diag<bool, Type, Type> otherNoteDiag) {
+  // Remove self-derived constraints.
+  constraints.erase(
+    std::remove_if(constraints.begin(), constraints.end(),
                    [&](const ConcreteConstraint &constraint) {
-      return constraint.source->isSelfDerivedSource(constraint.archetype);
-    }),
-    concreteConstraints.end());
+                     return constraint.source->isSelfDerivedSource(
+                              constraint.archetype);
+                   }),
+    constraints.end());
 
-  // Sort the concrete constraints, so we get a deterministic ordering of
-  // diagnostics.
-  llvm::array_pod_sort(concreteConstraints.begin(), concreteConstraints.end());
+  // Sort the constraints, so we get a deterministic ordering of diagnostics.
+  llvm::array_pod_sort(constraints.begin(), constraints.end());
 
-  // Find a representative constraint to use for diagnostics.
+  // Find a representative constraint.
   Optional<ConcreteConstraint> representativeConstraint;
-  for (const auto &constraint : concreteConstraints) {
+  for (const auto &constraint : constraints) {
+    // If this isn't a suitable representative constraint, ignore it.
+    if (!isSuitableRepresentative(constraint))
+      continue;
+
     // Check whether this constraint is better than the best we've seen so far
     // at being the representative constraint against which others will be
     // compared.
@@ -2937,47 +2942,99 @@ void GenericSignatureBuilder::checkRedundantConcreteTypeConstraints(
       representativeConstraint = constraint;
   }
 
-  // Sort the concrete constraints, so we get deterministic ordering of
-  // diagnostics.
-
   // Local function to provide a note describing the representative constraint.
   auto noteRepresentativeConstraint = [&] {
     if (representativeConstraint->source->getLoc().isInvalid()) return;
 
     Diags.diagnose(representativeConstraint->source->getLoc(),
-                   diag::redundancy_here,
+                   otherNoteDiag,
                    representativeConstraint->source->isDerivedRequirement(),
                    representativeConstraint->archetype->
                      getDependentType(genericParams, /*allowUnresolved=*/true),
                    representativeConstraint->concreteType);
-
-    (void)representativeConstraint->source->isSelfDerivedSource(
-                                          representativeConstraint->archetype);
   };
 
   // Go through the concrete constraints looking for redundancies.
-  for (const auto &constraint : concreteConstraints) {
+  for (const auto &constraint : constraints) {
     // Leave the representative alone.
     if (constraint == *representativeConstraint) continue;
 
-    // Note: this is conservative. There might be redundant constraints that
-    // don't get diagnosed here.
-    if (!concreteType->isEqual(constraint.concreteType)) continue;
+    switch (checkConstraint(constraint.concreteType)) {
+    case ConstraintRelation::Unrelated:
+      continue;
 
-    // If this requirement is not derived (but has a useful location),
-    // complain that it is redundant.
-    if (!constraint.source->isDerivedRequirement() &&
-        constraint.source->getLoc().isValid()) {
-      Diags.diagnose(constraint.source->getLoc(),
-                     diag::redundant_same_type_to_concrete,
-                     constraint.archetype->getDependentType(
-                                                  /*FIXME:*/{ },
-                                                  /*allowUnresolved=*/true),
-                     constraint.concreteType);
+    case ConstraintRelation::Conflicting:
+      // FIXME: Currently unused.
+      break;
 
-      noteRepresentativeConstraint();
+    case ConstraintRelation::Redundant:
+      // If this requirement is not derived (but has a useful location),
+      // complain that it is redundant.
+      if (!constraint.source->isDerivedRequirement() &&
+          constraint.source->getLoc().isValid()) {
+        Diags.diagnose(constraint.source->getLoc(),
+                       redundancyDiag,
+                       constraint.archetype->getDependentType(
+                                                    /*FIXME:*/{ },
+                                                    /*allowUnresolved=*/true),
+                       constraint.concreteType);
+
+        noteRepresentativeConstraint();
+      }
+      break;
     }
   }
+}
+
+void GenericSignatureBuilder::checkRedundantConcreteTypeConstraints(
+                                 ArrayRef<GenericTypeParamType *> genericParams,
+                                 PotentialArchetype *representative) {
+  auto equivClass = representative->getOrCreateEquivalenceClass();
+  assert(equivClass->concreteType && "No concrete type to check");
+
+  checkConstraintList(
+    genericParams, equivClass->concreteTypeConstraints,
+    [](const ConcreteConstraint &constraint) {
+      return true;
+    },
+    [&](Type concreteType) {
+      // If the concrete type is equivalent, the constraint is redundant.
+      // FIXME: Should check this constraint after substituting in the
+      // archetype anchors for each dependent type.
+      if (concreteType->isEqual(equivClass->concreteType))
+        return ConstraintRelation::Redundant;
+
+      // Call this unrelated.
+      return ConstraintRelation::Unrelated;
+    },
+    diag::redundant_same_type_to_concrete,
+    diag::same_type_redundancy_here);
+}
+
+void GenericSignatureBuilder::checkRedundantSuperclassConstraints(
+                                 ArrayRef<GenericTypeParamType *> genericParams,
+                                 PotentialArchetype *representative) {
+  auto equivClass = representative->getOrCreateEquivalenceClass();
+  assert(equivClass->superclass && "No superclass constraint?");
+
+  checkConstraintList(
+    genericParams, equivClass->superclassConstraints,
+    [&](const ConcreteConstraint &constraint) {
+      return constraint.concreteType->isEqual(equivClass->superclass);
+    },
+    [&](Type superclass) {
+      // If this class is a superclass of the "best"
+      if (superclass->isExactSuperclassOf(equivClass->superclass, nullptr))
+        return ConstraintRelation::Redundant;
+
+      // Otherwise, it conflicts.
+      return ConstraintRelation::Conflicting;
+    },
+    diag::redundant_superclass_constraint,
+    diag::superclass_redundancy_here);
+
+  // FIXME: Diagnose redundancy of any superclass constraint if there is a
+  // concrete constraint.
 }
 
 template<typename F>

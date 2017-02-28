@@ -21,6 +21,7 @@
 #define SWIFT_GENERICSIGNATUREBUILDER_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeLoc.h"
@@ -361,6 +362,39 @@ public:
                                 ArrayRef<GenericTypeParamType *> genericParams);
 
 private:
+  /// Describes the relationship between a given constraint and
+  /// the canonical constraint of the equivalence class.
+  enum class ConstraintRelation {
+    /// The constraint is unrelated.
+    ///
+    /// This is a conservative result that can be used when, for example,
+    /// we have incomplete information to make a determination.
+    Unrelated,
+    /// The constraint is redundant and can be removed without affecting the
+    /// semantics.
+    Redundant,
+    /// The constraint conflicts, meaning that the signature is erroneous.
+    Conflicting,
+  };
+
+  /// Check a list of concrete constraints, removing self-derived constraints
+  /// and diagnosing redundant constraints.
+  ///
+  /// \param isSuitableRepresentative Determines whether the given constraint
+  /// is a suitable representative.
+  ///
+  /// \param checkConstraint Checks the given constraint against the
+  /// canonical constraint to determine which diagnostics (if any) should be
+  /// emitted.
+  void checkConstraintList(ArrayRef<GenericTypeParamType *> genericParams,
+                           std::vector<ConcreteConstraint> &constraints,
+                           llvm::function_ref<bool(const ConcreteConstraint &)>
+                             isSuitableRepresentative,
+                           llvm::function_ref<ConstraintRelation(Type)>
+                             checkConstraint,
+                           Diag<Type, Type> redundancyDiag,
+                           Diag<bool, Type, Type> otherNoteDiag);
+
   /// Check for redundant concrete type constraints within the equivalence
   /// class of the given potential archetype.
   void checkRedundantConcreteTypeConstraints(
