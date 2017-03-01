@@ -2780,16 +2780,12 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     return ResolveWitnessResult::ExplicitFailed;
   }
 
-  auto dc = Conformance->getDeclContext();
-
-  // Determine the type that the requirement is expected to have.
-  Type reqType = getRequirementTypeForDisplay(dc->getParentModule(),
-                                              Conformance, requirement);
 
   if (!numViable) {
     MissingWitnesses.push_back(requirement);
     diagnoseOrDefer(requirement, true,
-      [requirement, matches, dc](NormalProtocolConformance *conformance) {
+      [requirement, matches](NormalProtocolConformance *conformance) {
+        auto dc = conformance->getDeclContext();
         // Diagnose each of the matches.
         for (const auto &match : matches)
           diagnoseMatch(dc->getParentModule(), conformance, requirement, match);
@@ -2798,8 +2794,12 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   }
 
   diagnoseOrDefer(requirement, true,
-    [requirement, matches, ignoringNames, numViable, reqType, dc](
+    [requirement, matches, ignoringNames](
       NormalProtocolConformance *conformance) {
+      auto dc = conformance->getDeclContext();
+      // Determine the type that the requirement is expected to have.
+      Type reqType = getRequirementTypeForDisplay(dc->getParentModule(),
+                                                  conformance, requirement);
       auto &diags = dc->getASTContext().Diags;
       auto diagnosticMessage = diag::ambiguous_witnesses;
       if (ignoringNames) {
