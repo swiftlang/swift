@@ -433,7 +433,9 @@ public:
 class GenericArgumentClauseSyntax : public Syntax {
   friend struct SyntaxFactory;
   friend class GenericArgumentClauseBuilder;
+  friend class SymbolicReferenceExprSyntax;
   friend class SyntaxData;
+  friend class Syntax;
 
   using DataType = GenericArgumentClauseSyntaxData;
 

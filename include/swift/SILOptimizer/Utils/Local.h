@@ -110,22 +110,10 @@ SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
 /// - a type of the return value is a subclass of the expected return type.
 /// - actual return type and expected return type differ in optionality.
 /// - both types are tuple-types and some of the elements need to be casted.
-///
-/// If CheckOnly flag is set, then this function only checks if the
-/// required casting is possible. If it is not possible, then None
-/// is returned.
-/// If CheckOnly is not set, then a casting code is generated and the final
-/// casted value is returned.
-Optional<SILValue> castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
-                                                SILValue Value,
-                                                SILType SrcTy,
-                                                SILType DestTy,
-                                                bool CheckOnly = false);
-
-/// Check if the optimizer can cast a value into the expected,
-/// ABI compatible type if necessary.
-bool canCastValueToABICompatibleType(SILModule &M,
-                                     SILType SrcTy, SILType DestTy);
+SILValue castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
+                                      SILValue Value,
+                                      SILType SrcTy,
+                                      SILType DestTy);
 
 /// Returns a project_box if it is the next instruction after \p ABI and
 /// and has \p ABI as operand. Otherwise it creates a new project_box right

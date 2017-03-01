@@ -27,6 +27,7 @@
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/AST/Witness.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/OptionalEnum.h"
@@ -238,11 +239,15 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// \brief Whether this declaration is currently being validated.
     unsigned BeingValidated : 1;
 
+    /// \brief Whether we have started validating the declaration; this *isn't*
+    /// reset after finishing it.
+    unsigned ValidationStarted : 1;
+
     /// \brief Whether this declaration was added to the surrounding
     /// DeclContext of an active #if config clause.
     unsigned EscapedFromIfConfig : 1;
   };
-  enum { NumDeclBits = 12 };
+  enum { NumDeclBits = 13 };
   static_assert(NumDeclBits <= 32, "fits in an unsigned");
 
   class PatternBindingDeclBitfields {
@@ -423,13 +428,8 @@ class alignas(1 << DeclAlignInBits) Decl {
   class TypeAliasDeclBitfields {
     friend class TypeAliasDecl;
     unsigned : NumGenericTypeDeclBits;
-
-    /// Whether we have completed validation of the typealias.
-    /// This is necessary because unlike other declarations, a
-    /// typealias will not get an interface type right away.
-    unsigned HasCompletedValidation : 1;
   };
-  enum { NumTypeAliasDeclBits = NumGenericTypeDeclBits + 1 };
+  enum { NumTypeAliasDeclBits = NumGenericTypeDeclBits };
   static_assert(NumTypeAliasDeclBits <= 32, "fits in an unsigned");
 
   class NominalTypeDeclBitFields {
@@ -577,9 +577,6 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// FIXME: Is this too fine-grained?
     unsigned CheckedInheritanceClause : 1;
 
-    /// Whether this extension has already been validated.
-    unsigned Validated : 1;
-
     /// An encoding of the default and maximum access level for this extension.
     ///
     /// This is encoded as (1 << (maxAccess-1)) | (1 << (defaultAccess-1)),
@@ -590,7 +587,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether there is are lazily-loaded conformances for this extension.
     unsigned HasLazyConformances : 1;
   };
-  enum { NumExtensionDeclBits = NumDeclBits + 6 };
+  enum { NumExtensionDeclBits = NumDeclBits + 5 };
   static_assert(NumExtensionDeclBits <= 32, "fits in an unsigned");
 
   class IfConfigDeclBitfields {
@@ -659,6 +656,7 @@ protected:
     DeclBits.FromClang = false;
     DeclBits.EarlyAttrValidation = false;
     DeclBits.BeingValidated = false;
+    DeclBits.ValidationStarted = false;
     DeclBits.EscapedFromIfConfig = false;
   }
 
@@ -815,7 +813,18 @@ public:
   void setIsBeingValidated(bool ibv = true) {
     assert(DeclBits.BeingValidated != ibv);
     DeclBits.BeingValidated = ibv;
+    if (ibv) {
+      DeclBits.ValidationStarted = true;
+    }
   }
+
+  bool hasValidationStarted() const { return DeclBits.ValidationStarted; }
+
+  /// Manually indicate that validation has started for the declaration.
+  ///
+  /// This is implied by setIsBeingValidated(true) (i.e. starting validation)
+  /// and so rarely needs to be called directly.
+  void setValidationStarted() { DeclBits.ValidationStarted = true; }
 
   bool escapedFromIfConfig() const {
     return DeclBits.EscapedFromIfConfig;
@@ -1644,19 +1653,9 @@ public:
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
 
-  /// Whether we started validating this extension.
-  bool validated() const {
-    return ExtensionDeclBits.Validated;
-  }
-
-  /// Set whether we have validated this extension.
-  void setValidated(bool validated = true) {
-    ExtensionDeclBits.Validated = validated;
-  }
-
   /// Whether we have fully checked the extension.
   bool hasValidSignature() const {
-    return validated() && !isBeingValidated();
+    return hasValidationStarted() && !isBeingValidated();
   }
 
   /// Whether we already type-checked the inheritance clause.
@@ -2442,14 +2441,6 @@ public:
   /// aliases.
   void setUnderlyingType(Type type);
 
-  bool hasCompletedValidation() const {
-    return TypeAliasDeclBits.HasCompletedValidation;
-  }
-
-  void setHasCompletedValidation() {
-    TypeAliasDeclBits.HasCompletedValidation = 1;
-  }
-
   /// For generic typealiases, return the unbound generic type.
   UnboundGenericType *getUnboundGenericType() const;
 
@@ -2583,14 +2574,19 @@ class AssociatedTypeDecl : public AbstractTypeParamDecl {
   /// The default definition.
   TypeLoc DefaultDefinition;
 
+  /// The where clause attached to the associated type.
+  TrailingWhereClause *TrailingWhere;
+
   LazyMemberLoader *Resolver = nullptr;
   uint64_t ResolverContextData;
 
 public:
   AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
-                     SourceLoc nameLoc, TypeLoc defaultDefinition);
+                     SourceLoc nameLoc, TypeLoc defaultDefinition,
+                     TrailingWhereClause *trailingWhere);
   AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
-                     SourceLoc nameLoc, LazyMemberLoader *definitionResolver,
+                     SourceLoc nameLoc, TrailingWhereClause *trailingWhere,
+                     LazyMemberLoader *definitionResolver,
                      uint64_t resolverData);
 
   /// Get the protocol in which this associated type is declared.
@@ -2606,6 +2602,14 @@ public:
   TypeLoc &getDefaultDefinitionLoc();
   const TypeLoc &getDefaultDefinitionLoc() const {
     return const_cast<AssociatedTypeDecl *>(this)->getDefaultDefinitionLoc();
+  }
+
+  /// Retrieve the trailing where clause for this associated type, if any.
+  TrailingWhereClause *getTrailingWhereClause() const { return TrailingWhere; }
+
+  /// Set the trailing where clause for this associated type.
+  void setTrailingWhereClause(TrailingWhereClause *trailingWhereClause) {
+    TrailingWhere = trailingWhereClause;
   }
 
   /// computeType - Compute the type (and declared type) of this associated
@@ -3412,6 +3416,19 @@ public:
 
   /// Retrieve the set of protocols inherited from this protocol.
   llvm::TinyPtrVector<ProtocolDecl *> getInheritedProtocols() const;
+
+  /// Walk all of the protocols inherited by this protocol, transitively,
+  /// invoking the callback function for each protocol.
+  ///
+  /// \param fn The callback function that will be invoked for each inherited
+  /// protocol. It can return \c Continue to continue the traversal,
+  /// \c SkipChildren to avoid visiting the children of the given protocol
+  /// but continue the search, and \c Stop to halt the search.
+  ///
+  /// \returns \c true if \c fn returned \c Stop for any protocol, \c false
+  /// otherwise.
+  bool walkInheritedProtocols(
+               llvm::function_ref<TypeWalker::Action(ProtocolDecl *)> fn) const;
 
   /// \brief Determine whether this protocol inherits from the given ("super")
   /// protocol.

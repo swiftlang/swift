@@ -15,6 +15,7 @@
 #include "swift/Syntax/GenericSyntax.h"
 #include "swift/Syntax/TypeSyntax.h"
 #include "swift/Syntax/StmtSyntax.h"
+#include "swift/Syntax/UnknownSyntax.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -61,21 +62,10 @@ bool SyntaxData::isExpr() const {
   return Raw->isExpr();
 }
 
+bool SyntaxData::isUnknown() const {
+  return Raw->isUnknown();
+}
+
 void SyntaxData::dump(llvm::raw_ostream &OS) const {
   Raw->dump(OS, 0);
 }
-
-#pragma mark - unknown-syntax Data
-
-RC<UnknownSyntaxData> UnknownSyntaxData::make(RC<RawSyntax> Raw,
-                                              const SyntaxData *Parent,
-                                              CursorIndex IndexInParent) {
-  return RC<UnknownSyntaxData> {
-    new UnknownSyntaxData { Raw, Parent, IndexInParent }
-  };
-}
-
-bool UnknownSyntaxData::classof(const SyntaxData *SD) {
-  return SD->getKind() == SyntaxKind::Unknown;
-}
-

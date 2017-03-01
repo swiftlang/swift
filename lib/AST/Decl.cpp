@@ -622,6 +622,20 @@ GenericSignature *GenericContext::getGenericSignature() const {
   if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
     return genericSig;
 
+  // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
+  // it.
+  if (auto PD = dyn_cast<ProtocolDecl>(this)) {
+    auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
+    auto req =
+        Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
+    GenericTypeParamType *params[] = {self};
+    Requirement reqs[] = {req};
+
+    auto &ctx = getASTContext();
+    return GenericSignature::get(ctx.AllocateCopy(params),
+                                 ctx.AllocateCopy(reqs));
+  }
+
   return nullptr;
 }
 
@@ -808,7 +822,6 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
     ExtendedType(extendedType),
     Inherited(inherited)
 {
-  ExtensionDeclBits.Validated = false;
   ExtensionDeclBits.CheckedInheritanceClause = false;
   ExtensionDeclBits.DefaultAndMaxAccessLevel = 0;
   ExtensionDeclBits.HasLazyConformances = false;
@@ -2006,7 +2019,7 @@ Type TypeDecl::getDeclaredInterfaceType() const {
         selfTy, const_cast<AssociatedTypeDecl *>(ATD));
   }
 
-  Type interfaceType = getInterfaceType();
+  Type interfaceType = hasInterfaceType() ? getInterfaceType() : nullptr;
   if (interfaceType.isNull() || interfaceType->is<ErrorType>())
     return interfaceType;
 
@@ -2261,10 +2274,7 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, SourceLoc EqualLoc,
                              Identifier Name, SourceLoc NameLoc,
                              GenericParamList *GenericParams, DeclContext *DC)
   : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
-    TypeAliasLoc(TypeAliasLoc),
-    EqualLoc(EqualLoc) {
-  TypeAliasDeclBits.HasCompletedValidation = false;
-}
+    TypeAliasLoc(TypeAliasLoc), EqualLoc(EqualLoc) {}
 
 SourceRange TypeAliasDecl::getSourceRange() const {
   if (UnderlyingTy.hasLocation())
@@ -2273,7 +2283,7 @@ SourceRange TypeAliasDecl::getSourceRange() const {
 }
 
 void TypeAliasDecl::setUnderlyingType(Type underlying) {
-  setHasCompletedValidation();
+  setValidationStarted();
 
   // lldb creates global typealiases containing archetypes
   // sometimes...
@@ -2342,19 +2352,20 @@ SourceRange GenericTypeParamDecl::getSourceRange() const {
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
-                                       TypeLoc defaultDefinition)
-  : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
-    KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition)
-{ }
+                                       TypeLoc defaultDefinition,
+                                       TrailingWhereClause *trailingWhere)
+    : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
+      KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition),
+      TrailingWhere(trailingWhere) {}
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
+                                       TrailingWhereClause *trailingWhere,
                                        LazyMemberLoader *definitionResolver,
                                        uint64_t resolverData)
-  : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
-    KeywordLoc(keywordLoc), Resolver(definitionResolver),
-    ResolverContextData(resolverData)
-{
+    : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
+      KeywordLoc(keywordLoc), TrailingWhere(trailingWhere),
+      Resolver(definitionResolver), ResolverContextData(resolverData) {
   assert(Resolver && "missing resolver");
 }
 
@@ -2725,6 +2736,41 @@ ProtocolDecl::getInheritedProtocols() const {
   return result;
 }
 
+bool ProtocolDecl::walkInheritedProtocols(
+              llvm::function_ref<TypeWalker::Action(ProtocolDecl *)> fn) const {
+  auto self = const_cast<ProtocolDecl *>(this);
+
+  // Visit all of the inherited protocols.
+  SmallPtrSet<ProtocolDecl *, 8> visited;
+  SmallVector<ProtocolDecl *, 4> stack;
+  stack.push_back(self);
+  visited.insert(self);
+  while (!stack.empty()) {
+    // Pull the next protocol off the stack.
+    auto proto = stack.back();
+    stack.pop_back();
+
+    switch (fn(proto)) {
+    case TypeWalker::Action::Stop:
+      return true;
+
+    case TypeWalker::Action::Continue:
+      // Add inherited protocols to the stack.
+      for (auto inherited : proto->getInheritedProtocols()) {
+        if (visited.insert(inherited).second)
+          stack.push_back(inherited);
+      }
+      break;
+
+    case TypeWalker::Action::SkipChildren:
+      break;
+    }
+  }
+
+  return false;
+
+}
+
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
   if (this == super)
     return false;
@@ -2735,26 +2781,27 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
 }
 
 bool ProtocolDecl::requiresClassSlow() {
-  if (!isRequirementSignatureComputed()) return false;
+  ProtocolDeclBits.RequiresClass =
+    walkInheritedProtocols([&](ProtocolDecl *proto) {
+      // If the 'requires class' bit is valid, we don't need to search any
+      // further.
+      if (proto->ProtocolDeclBits.RequiresClassValid) {
+        // If this protocol has a class requirement, we're done.
+        if (proto->ProtocolDeclBits.RequiresClass)
+          return TypeWalker::Action::Stop;
 
-  ProtocolDeclBits.RequiresClass = false;
+        return TypeWalker::Action::SkipChildren;
+      }
 
-  // Ensure that the result cannot change in future.
+      // Quick check: @objc indicates that it requires a class.
+      if (proto->getAttrs().hasAttribute<ObjCAttr>() || proto->isObjC())
+        return TypeWalker::Action::Stop;
 
-  if (getAttrs().hasAttribute<ObjCAttr>() || isObjC()) {
-    ProtocolDeclBits.RequiresClass = true;
-    return true;
-  }
+      // Keep looking.
+      return TypeWalker::Action::Continue;
+    });
 
-  // Check inherited protocols for class-ness.
-  for (auto *proto : getInheritedProtocols()) {
-    if (proto->requiresClass()) {
-      ProtocolDeclBits.RequiresClass = true;
-      return true;
-    }
-  }
-
-  return false;
+  return ProtocolDeclBits.RequiresClass;
 }
 
 bool ProtocolDecl::existentialConformsToSelfSlow() {
@@ -2787,7 +2834,6 @@ bool ProtocolDecl::existentialConformsToSelfSlow() {
 
   // Check whether any of the inherited protocols fail to conform to
   // themselves.
-  // FIXME: does this need a resolver?
   for (auto proto : getInheritedProtocols()) {
     if (!proto->existentialConformsToSelf()) {
       ProtocolDeclBits.ExistentialConformsToSelf = false;
@@ -3058,9 +3104,10 @@ void ProtocolDecl::computeRequirementSignature() {
   GenericSignatureBuilder builder(getASTContext(),
                                   LookUpConformanceInModule(module));
   builder.addGenericParameter(selfType);
-  builder.addRequirement(requirement,
-                         RequirementSource::forRequirementSignature(builder,
-                                                                    this));
+  builder.addRequirement(
+         requirement,
+         GenericSignatureBuilder::RequirementSource
+          ::forRequirementSignature(builder.resolveArchetype(selfType), this));
   builder.finalize(SourceLoc(), { selfType });
   
   RequirementSignature = builder.getGenericSignature();

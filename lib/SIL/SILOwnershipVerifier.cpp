@@ -457,6 +457,7 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, DeallocValueBuffer)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, CheckedCastBranch)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, SwitchEnum)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, InitExistentialOpaque)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, DeinitExistentialOpaque)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 #define ACCEPTS_ANY_OWNERSHIP_INST(INST)                                       \
@@ -1785,6 +1786,12 @@ void SILInstruction::verifyOperandOwnership() const {
   // If SILOwnership is not enabled, do not perform verification.
   if (!getModule().getOptions().EnableSILOwnership)
     return;
+
+  // If the given function has unqualified ownership, there is nothing to
+  // verify.
+  if (getFunction()->hasUnqualifiedOwnership())
+    return;
+
   // If we are testing the verifier, bail so we only print errors once when
   // performing a full verification, instead of additionally in the SILBuilder.
   if (IsSILOwnershipVerifierTestingEnabled)
@@ -1808,6 +1815,21 @@ void SILInstruction::verifyOperandOwnership() const {
 void SILValue::verifyOwnership(SILModule &Mod,
                                TransitivelyUnreachableBlocksInfo *TUB) const {
 #ifndef NDEBUG
+  // If we are SILUndef, just bail. SILUndef can pair with anything. Any uses of
+  // the SILUndef will make sure that the matching checks out.
+  if (isa<SILUndef>(*this))
+    return;
+
+  // Since we do not have SILUndef, we now know that getFunction() should return
+  // a real function. Assert in case this assumption is no longer true.
+  SILFunction *F = (*this)->getFunction();
+  assert(F && "Instructions and arguments should have a function");
+
+  // If the given function has unqualified ownership, there is nothing further
+  // to verify.
+  if (F->hasUnqualifiedOwnership())
+    return;
+
   if (TUB) {
     SILValueOwnershipChecker(Mod, *TUB, *this).check();
   } else {

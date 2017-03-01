@@ -112,10 +112,10 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
       info.SubKind = SymbolSubKind::SwiftSubscript;
       break;
     case DeclKind::Constructor:      info.Kind = SymbolKind::Constructor; break;
-    case DeclKind::Destructor:       info.Kind = SymbolKind::Destructor; break;;
+    case DeclKind::Destructor:       info.Kind = SymbolKind::Destructor; break;
     case DeclKind::Param:
-      llvm_unreachable("unexpected parameter seen while indexing");
-
+      info.Kind = SymbolKind::Parameter;
+      break;
     case DeclKind::Func:
       setFuncSymbolInfo(cast<FuncDecl>(D), info);
       break;

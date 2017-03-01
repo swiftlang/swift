@@ -245,7 +245,7 @@ SILBuilder::emitStrongRelease(SILLocation Loc, SILValue Operand) {
   }
 
   // If we didn't find a retain to fold this into, emit the release.
-  return createStrongRelease(Loc, Operand, Atomicity::Atomic);
+  return createStrongRelease(Loc, Operand, getDefaultAtomicity());
 }
 
 /// Emit a release_value instruction at the current location, attempting to
@@ -272,7 +272,7 @@ SILBuilder::emitReleaseValue(SILLocation Loc, SILValue Operand) {
   }
 
   // If we didn't find a retain to fold this into, emit the release.
-  return createReleaseValue(Loc, Operand, Atomicity::Atomic);
+  return createReleaseValue(Loc, Operand, getDefaultAtomicity());
 }
 
 PointerUnion<CopyValueInst *, DestroyValueInst *>

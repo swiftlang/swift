@@ -628,11 +628,13 @@ private:
 
 /// TODO: This is an atrocity. Come up with a shorter name.
 #define FUNCSIGSPEC_CREATE_PARAM_KIND(kind)                                    \
-  Factory.createNode(Node::Kind::FunctionSignatureSpecializationParamKind,    \
-                      uint64_t(FunctionSigSpecializationParamKind::kind))
+  Factory.createNode(                                                          \
+      Node::Kind::FunctionSignatureSpecializationParamKind,                    \
+      Node::IndexType(FunctionSigSpecializationParamKind::kind))
+
 #define FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(payload)                              \
-  Factory.createNode(Node::Kind::FunctionSignatureSpecializationParamPayload, \
-                      payload)
+  Factory.createNode(Node::Kind::FunctionSignatureSpecializationParamPayload,  \
+                     payload)
 
   bool demangleFuncSigSpecializationConstantProp(NodePointer parent) {
     // Then figure out what was actually constant propagated. First check if
@@ -3413,7 +3415,8 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::ReabstractionThunk:
   case Node::Kind::ReabstractionThunkHelper: {
     if (Options.ShortenThunk) {
-      Printer << "thunk";
+      Printer << "thunk for ";
+      print(pointer->getChild(pointer->getNumChildren() - 2));
       return;
     }
     Printer << "reabstraction thunk ";

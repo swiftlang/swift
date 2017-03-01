@@ -26,3 +26,8 @@ public struct Base {
   }
 }
 public typealias BaseAlias = Base
+
+public protocol ProtoWrapper {}
+extension ProtoWrapper {
+  public typealias Boolean = Bool
+}

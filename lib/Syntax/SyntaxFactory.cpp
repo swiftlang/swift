@@ -18,6 +18,7 @@
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/UnknownSyntax.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -324,6 +325,8 @@ ReturnStmtSyntax SyntaxFactory::makeBlankReturnStmt() {
 
 #pragma mark - Expressions
 
+#pragma mark - integer-literal-expression
+
 IntegerLiteralExprSyntax
 SyntaxFactory::makeIntegerLiteralExpr(RC<TokenSyntax> Sign,
                                       RC<TokenSyntax> Digits) {
@@ -345,6 +348,101 @@ IntegerLiteralExprSyntax SyntaxFactory::makeBlankIntegerLiteralExpr() {
     },
     SourcePresence::Present);
   auto Data = IntegerLiteralExprSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+#pragma mark - symbolic-reference
+
+SymbolicReferenceExprSyntax
+SyntaxFactory::makeSymbolicReferenceExpr(RC<TokenSyntax> Identifier,
+  llvm::Optional<GenericArgumentClauseSyntax> GenericArgs) {
+  auto Raw = RawSyntax::make(SyntaxKind::SymbolicReferenceExpr,
+    {
+      Identifier,
+      GenericArgs.hasValue()
+        ? GenericArgs.getValue().getRaw()
+        : RawSyntax::missing(SyntaxKind::GenericArgumentClause)
+    },
+    SourcePresence::Present);
+  auto Data = SymbolicReferenceExprSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+SymbolicReferenceExprSyntax SyntaxFactory::makeBlankSymbolicReferenceExpr() {
+  auto Data = SymbolicReferenceExprSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
+#pragma mark - function-call-argument
+
+FunctionCallArgumentSyntax SyntaxFactory::makeBlankFunctionCallArgument() {
+  auto Data = FunctionCallArgumentSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
+FunctionCallArgumentSyntax
+SyntaxFactory::makeFunctionCallArgument(RC<TokenSyntax> Label,
+                                        RC<TokenSyntax> Colon,
+                                        ExprSyntax ExpressionArgument,
+                                        RC<TokenSyntax> TrailingComma) {
+  auto Raw = RawSyntax::make(SyntaxKind::FunctionCallArgument,
+                             {
+                               Label,
+                               Colon,
+                               ExpressionArgument.getRaw(),
+                               TrailingComma
+                             },
+                             SourcePresence::Present);
+  auto Data = FunctionCallArgumentSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+#pragma mark - function-call-argument-list
+
+/// Make a function call argument list with the given arguments.
+FunctionCallArgumentListSyntax
+SyntaxFactory::makeFunctionCallArgumentList(
+  std::vector<FunctionCallArgumentSyntax> Arguments) {
+  RawSyntax::LayoutList Layout;
+  for (const auto &Arg : Arguments) {
+    Layout.push_back(Arg.getRaw());
+  }
+
+  auto Raw = RawSyntax::make(SyntaxKind::FunctionCallArgumentList, Layout,
+                             SourcePresence::Present);
+  auto Data = FunctionCallArgumentListSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+
+FunctionCallArgumentListSyntax
+SyntaxFactory::makeBlankFunctionCallArgumentList() {
+  auto Data = FunctionCallArgumentListSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
+#pragma mark - function-call-expression
+
+FunctionCallExprSyntax
+SyntaxFactory::makeFunctionCallExpr(ExprSyntax CalledExpr,
+                                    RC<TokenSyntax> LeftParen,
+                                    FunctionCallArgumentListSyntax Arguments,
+                                    RC<TokenSyntax> RightParen) {
+  auto Raw = RawSyntax::make(SyntaxKind::FunctionCallExpr,
+                             {
+                               CalledExpr.getRaw(),
+                               LeftParen,
+                               Arguments.getRaw(),
+                               RightParen
+                             },
+                             SourcePresence::Present);
+  auto Data = FunctionCallExprSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+
+FunctionCallExprSyntax SyntaxFactory::makeBlankFunctionCallExpr() {
+  auto Data = FunctionCallExprSyntaxData::makeBlank();
   return { Data, Data.get() };
 }
 
@@ -771,16 +869,7 @@ SyntaxFactory::makeTypeAttribute(RC<TokenSyntax> AtSignToken,
 }
 
 TypeAttributeSyntax SyntaxFactory::makeBlankTypeAttribute() {
-  auto Raw = RawSyntax::make(SyntaxKind::TypeAttribute,
-                             {
-                               TokenSyntax::missingToken(tok::at_sign, "@"),
-                               TokenSyntax::missingToken(tok::identifier, ""),
-                               TokenSyntax::missingToken(tok::l_paren, "("),
-                               RawSyntax::missing(SyntaxKind::BalancedTokens),
-                               TokenSyntax::missingToken(tok::r_paren, ")"),
-                             },
-                             SourcePresence::Present);
-  auto Data = TypeAttributeSyntaxData::make(Raw);
+  auto Data = TypeAttributeSyntaxData::makeBlank();
   return TypeAttributeSyntax { Data, Data.get() };
 }
 
@@ -798,10 +887,7 @@ SyntaxFactory::makeBalancedTokens(RawSyntax::LayoutList Tokens) {
 }
 
 BalancedTokensSyntax SyntaxFactory::makeBlankBalancedTokens() {
-  auto Raw = RawSyntax::make(SyntaxKind::BalancedTokens,
-                             {},
-                             SourcePresence::Present);
-  auto Data = BalancedTokensSyntaxData::make(Raw);
+  auto Data = BalancedTokensSyntaxData::makeBlank();
   return BalancedTokensSyntax { Data, Data.get() };
 }
 

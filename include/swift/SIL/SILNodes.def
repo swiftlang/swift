@@ -227,6 +227,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(InitExistentialOpaqueInst, SILInstruction, init_existential_opaque, MayWrite, DoesNotRelease)
   INST(DeinitExistentialAddrInst, SILInstruction, deinit_existential_addr, MayHaveSideEffects,
        DoesNotRelease)
+  INST(DeinitExistentialOpaqueInst, SILInstruction, deinit_existential_opaque, MayHaveSideEffects,
+       DoesNotRelease)
   INST(OpenExistentialAddrInst, SILInstruction, open_existential_addr, MayRead, DoesNotRelease)
   INST(InitExistentialRefInst, SILInstruction, init_existential_ref, None, DoesNotRelease)
   INST(OpenExistentialRefInst, SILInstruction, open_existential_ref, None, DoesNotRelease)

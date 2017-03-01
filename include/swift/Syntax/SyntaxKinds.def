@@ -86,13 +86,18 @@ ABSTRACT_SYNTAX(ExprSyntax, Syntax)
   MISSING_SYNTAX(MissingExpr, ExprSyntax)
   SYNTAX(UnknownExpr, ExprSyntax)
   SYNTAX(IntegerLiteralExpr, ExprSyntax)
-SYNTAX_RANGE(Expr, MissingExpr, IntegerLiteralExpr)
+  SYNTAX(FunctionCallExpr, ExprSyntax)
+  SYNTAX(SymbolicReferenceExpr, ExprSyntax)
+SYNTAX_RANGE(Expr, MissingExpr, SymbolicReferenceExpr)
 
+// Other stuff
 SYNTAX(BalancedTokens, Syntax)
 SYNTAX(TypeAttribute, Syntax)
 SYNTAX(TypeAttributes, Syntax)
 SYNTAX(TupleTypeElement, Syntax)
 SYNTAX(FunctionTypeArgument, Syntax)
+SYNTAX(FunctionCallArgumentList, Syntax)
+SYNTAX(FunctionCallArgument, Syntax)
 
 #undef ABSTRACT_SYNTAX
 #undef DECL

@@ -437,6 +437,11 @@ enum TypeResolutionFlags : unsigned {
 
   /// Whether we are checking the outermost type of a computed property setter's newValue
   TR_ImmediateSetterNewValue = 0x1000000,
+
+  /// Whether we are checking the outermost layer of types in an inheritance
+  /// clause on something other than an enum (i.e. V, but not U or W, in class
+  /// T: U.V<W>)
+  TR_NonEnumInheritanceClauseOuterLayer = 0x2000000,
 };
 
 /// Option set describing how type resolution should work.
@@ -838,6 +843,9 @@ public:
   void validateDecl(OperatorDecl *decl);
   void validateDecl(PrecedenceGroupDecl *decl);
 
+  /// Perform just enough validation for looking up names using the Decl.
+  void validateDeclForNameLookup(ValueDecl *D);
+
   /// Resolves the accessibility of the given declaration.
   void validateAccessibility(ValueDecl *D);
 
@@ -1065,7 +1073,7 @@ public:
   }
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
-    validateDecl(VD);
+    validateDeclForNameLookup(VD);
   }
 
   virtual void bindExtension(ExtensionDecl *ext) override;
@@ -1185,6 +1193,11 @@ public:
   /// \param nominal The generic type.
   void validateGenericTypeSignature(GenericTypeDecl *nominal);
 
+  bool validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
+                           DeclContext *lookupDC,
+                           TypeResolutionOptions options = None,
+                           GenericTypeResolver *resolver = nullptr);
+
   /// Check the given set of generic arguments against the requirements in a
   /// generic signature.
   ///
@@ -1207,7 +1220,8 @@ public:
   /// - (false, false) on failure
   std::pair<bool, bool> checkGenericArguments(
       DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
-      GenericSignature *genericSig, const TypeSubstitutionMap &substitutions,
+      GenericSignature *genericSig, TypeSubstitutionFn substitutions,
+      LookupConformanceFn conformances,
       UnsatisfiedDependency *unsatisfiedDependency,
       ConformanceCheckOptions conformanceOptions = ConformanceCheckFlags::Used,
       GenericRequirementsCheckListener *listener = nullptr);

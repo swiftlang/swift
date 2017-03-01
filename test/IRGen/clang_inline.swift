@@ -12,7 +12,7 @@
 // RUN: %FileCheck %s < %t.ll
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.ll
 
-// REQUIRES: CPU=i386 || CPU=x86_64
+// REQUIRES: CPU=i386_or_x86_64
 // XFAIL: linux
 
 #if IMPORT_EMPTY
@@ -21,7 +21,7 @@ import Empty
 
 import gizmo
 
-// CHECK-LABEL: define hidden swiftcc i64 @_T012clang_inline16CallStaticInlineC10ReturnZeros5Int64VyF(%C12clang_inline16CallStaticInline* swiftself) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc i64 @_T012clang_inline16CallStaticInlineC10ReturnZeros5Int64VyF(%T12clang_inline16CallStaticInlineC* swiftself) {{.*}} {
 class CallStaticInline {
   func ReturnZero() -> Int64 { return Int64(zero()) }
 }
@@ -29,7 +29,7 @@ class CallStaticInline {
 // CHECK-LABEL: define internal i32 @zero()
 // CHECK:         [[INLINEHINT_SSP_UWTABLE:#[0-9]+]] {
 
-// CHECK-LABEL: define hidden swiftcc i64 @_T012clang_inline17CallStaticInline2C10ReturnZeros5Int64VyF(%C12clang_inline17CallStaticInline2* swiftself) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc i64 @_T012clang_inline17CallStaticInline2C10ReturnZeros5Int64VyF(%T12clang_inline17CallStaticInline2C* swiftself) {{.*}} {
 class CallStaticInline2 {
   func ReturnZero() -> Int64 { return Int64(wrappedZero()) }
 }

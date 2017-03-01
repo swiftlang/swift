@@ -83,7 +83,7 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
   // A scalar value is being copied into the tuple, break it into elements
   // and assign/init each element in turn.
   SILValue value = valueMV.forward(SGF);
-  auto sourceType = cast<TupleType>(valueMV.getSwiftType());
+  auto sourceType = valueMV.getType().castTo<TupleType>();
   auto sourceSILType = value->getType();
   for (unsigned i = 0, e = sourceType->getNumElements(); i != e; ++i) {
     SILType fieldTy = sourceSILType.getTupleElementType(i);
@@ -813,9 +813,10 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   
   // Reabstract to the substituted type, if needed.
   CanType substEltTy =
-    value.getSwiftType()->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
-                                      ElementDecl,
-                                      ElementDecl->getArgumentInterfaceType())
+    value.getType().getSwiftRValueType()
+      ->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
+                        ElementDecl,
+                        ElementDecl->getArgumentInterfaceType())
       ->getCanonicalType();
 
   AbstractionPattern origEltTy =
@@ -1233,7 +1234,11 @@ namespace {
       case ExistentialRepresentation::Metatype:
         llvm_unreachable("cannot cleanup existential");
       case ExistentialRepresentation::Opaque:
-        gen.B.createDeinitExistentialAddr(l, existentialAddr);
+        if (gen.silConv.useLoweredAddresses()) {
+          gen.B.createDeinitExistentialAddr(l, existentialAddr);
+        } else {
+          gen.B.createDeinitExistentialOpaque(l, existentialAddr);
+        }
         break;
       case ExistentialRepresentation::Boxed:
         gen.B.createDeallocExistentialBox(l, concreteFormalType,

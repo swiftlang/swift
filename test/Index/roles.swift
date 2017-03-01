@@ -54,22 +54,36 @@ z = z + 1
 // CHECK: [[@LINE-4]]:5 | function/acc-get/Swift | getter:z | s:14swift_ide_test1zSifg | Ref,Call,Impl | rel: 0
 
 // Call
-func aCalledFunction() {}
-// CHECK: [[@LINE-1]]:6 | function/Swift | aCalledFunction() | s:14swift_ide_test15aCalledFunctionyyF | Def | rel: 0
+func aCalledFunction(a: Int, b: inout Int) {
+// CHECK: [[@LINE-1]]:6 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF | Def | rel: 0
+// CHECK: [[@LINE-2]]:22 | param/Swift | a | s:{{.*}} | Def,RelChild | rel: 1
+// CHECK-NEXT: RelChild | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF
+// CHECK: [[@LINE-4]]:30 | param/Swift | b | s:{{.*}} | Def,RelChild | rel: 1
+// CHECK-NEXT: RelChild | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF
 
-aCalledFunction()
-// CHECK: [[@LINE-1]]:1 | function/Swift | aCalledFunction() | s:14swift_ide_test15aCalledFunctionyyF | Ref,Call | rel: 0
+  var _ = a + b
+  // CHECK: [[@LINE-1]]:11 | param/Swift | a | s:{{.*}} | Ref,Read | rel: 0
+  // CHECK: [[@LINE-2]]:15 | param/Swift | b | s:{{.*}} | Ref,Read | rel: 0
+
+  b = a + 1
+  // CHECK: [[@LINE-1]]:3 | param/Swift | b | s:{{.*}} | Ref,Writ | rel: 0
+  // CHECK: [[@LINE-2]]:7 | param/Swift | a | s:{{.*}} | Ref,Read | rel: 0
+}
+
+aCalledFunction(a: 1, b: &z)
+// CHECK: [[@LINE-1]]:1 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF | Ref,Call | rel: 0
+// CHECK: [[@LINE-2]]:27 | variable/Swift | z | s:14swift_ide_test1zSiv | Ref,Read,Writ | rel: 0
 
 func aCaller() {
   // CHECK: [[@LINE-1]]:6 | function/Swift | aCaller() | s:14swift_ide_test7aCalleryyF | Def | rel: 0
 
-  aCalledFunction()
-  // CHECK: [[@LINE-1]]:3 | function/Swift | aCalledFunction() | s:14swift_ide_test15aCalledFunctionyyF | Ref,Call,RelCall | rel: 1
+  aCalledFunction(a: 1, b: &z)
+  // CHECK: [[@LINE-1]]:3 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF | Ref,Call,RelCall | rel: 1
   // CHECK-NEXT: RelCall | aCaller() | s:14swift_ide_test7aCalleryyF
 }
 
 let _ = aCalledFunction
-// CHECK: [[@LINE-1]]:9 | function/Swift | aCalledFunction() | s:14swift_ide_test15aCalledFunctionyyF | Ref | rel: 0
+// CHECK: [[@LINE-1]]:9 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunctionySi1a_Siz1btF | Ref | rel: 0
 
 // RelationChildOf, Implicit
 struct AStruct {

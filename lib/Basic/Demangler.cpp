@@ -1417,14 +1417,19 @@ NodePointer Demangler::demangleFuncSpecParam(Node::IndexType ParamIdx) {
       switch (nextChar()) {
         case 'f':
           // Consumes an identifier parameter, which will be added later.
-          return addChild(Param, createNode(
-            Node::Kind::FunctionSignatureSpecializationParamKind,
-            uint64_t(FunctionSigSpecializationParamKind::ConstantPropFunction)));
+          return addChild(
+              Param,
+              createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
+                         Node::IndexType(FunctionSigSpecializationParamKind::
+                                             ConstantPropFunction)));
         case 'g':
           // Consumes an identifier parameter, which will be added later.
-          return addChild(Param, createNode(
-            Node::Kind::FunctionSignatureSpecializationParamKind,
-            uint64_t(FunctionSigSpecializationParamKind::ConstantPropGlobal)));
+          return addChild(
+              Param,
+              createNode(
+                  Node::Kind::FunctionSignatureSpecializationParamKind,
+                  Node::IndexType(
+                      FunctionSigSpecializationParamKind::ConstantPropGlobal)));
         case 'i':
           return addFuncSpecParamNumber(Param,
                     FunctionSigSpecializationParamKind::ConstantPropInteger);
@@ -1441,10 +1446,12 @@ NodePointer Demangler::demangleFuncSpecParam(Node::IndexType ParamIdx) {
             case 'c': Encoding = "objc"; break;
             default: return nullptr;
           }
-          addChild(Param, createNode(
-                  Node::Kind::FunctionSignatureSpecializationParamKind,
-                  unsigned(swift::Demangle::FunctionSigSpecializationParamKind::
-                           ConstantPropString)));
+          addChild(Param,
+                   createNode(
+                       Node::Kind::FunctionSignatureSpecializationParamKind,
+                       Node::IndexType(
+                           swift::Demangle::FunctionSigSpecializationParamKind::
+                               ConstantPropString)));
           return addChild(Param, createNode(
                   Node::Kind::FunctionSignatureSpecializationParamPayload,
                   Encoding));

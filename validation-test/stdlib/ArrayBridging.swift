@@ -9,6 +9,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// UNSUPPORTED: nonatomic_rc
 
 import StdlibUnittest
 import Foundation

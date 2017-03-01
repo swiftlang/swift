@@ -42,7 +42,7 @@ static CanAnyFunctionType getDynamicMethodFormalType(SILGenModule &SGM,
   if (member->isInstanceMember()) {
     selfTy = ctx.TheUnknownObjectType;
   } else {
-    selfTy = proto->getType().getSwiftType();
+    selfTy = proto->getType().getSwiftRValueType();
   }
   auto extInfo = FunctionType::ExtInfo()
                    .withRepresentation(FunctionType::Representation::Thin);
@@ -99,7 +99,7 @@ static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
     selfTy = proto->getType().getSwiftRValueType();
     assert(selfTy->is<ArchetypeType>() && "Dynamic lookup needs an archetype");
   } else {
-    selfTy = proto->getType().getSwiftType();
+    selfTy = proto->getType().getSwiftRValueType();
   }
 
   // Replace the 'self' parameter type in the method type with it.
@@ -1367,8 +1367,7 @@ public:
 
         // If the 'self' value is a metatype, update the target type
         // accordingly.
-        if (auto selfMetaTy
-                    = selfValue.getSwiftType()->getAs<AnyMetatypeType>()) {
+        if (auto selfMetaTy = selfValue.getType().getAs<AnyMetatypeType>()) {
           resultTy = CanMetatypeType::get(resultTy,
                                           selfMetaTy->getRepresentation());
         }
@@ -1809,9 +1808,9 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
   };
 
   TupleTypeElt TypeEltsArray[] = {
-    EltsArray[0].getSwiftType(),
-    EltsArray[1].getSwiftType(),
-    EltsArray[2].getSwiftType()
+    EltsArray[0].getType().getSwiftRValueType(),
+    EltsArray[1].getType().getSwiftRValueType(),
+    EltsArray[2].getType().getSwiftRValueType()
   };
 
   ArrayRef<ManagedValue> Elts;
@@ -2486,7 +2485,7 @@ RValue SILGenFunction::emitApply(
       assert(lifetimeExtendedSelf
              && "did not save lifetime-extended self param");
       if (!hasAlreadyLifetimeExtendedSelf) {
-        B.createAutoreleaseValue(loc, lifetimeExtendedSelf, Atomicity::Atomic);
+        B.createAutoreleaseValue(loc, lifetimeExtendedSelf, B.getDefaultAtomicity());
         hasAlreadyLifetimeExtendedSelf = true;
       }
       LLVM_FALLTHROUGH;
@@ -3453,7 +3452,7 @@ namespace {
           emittedArg = ManagedValue(erased, emittedArg.getCleanup());
         }
         
-        assert(isAnyObjectType(emittedArg.getSwiftType()));
+        assert(isAnyObjectType(emittedArg.getType().getSwiftRValueType()));
         return emittedArg;
       };
       

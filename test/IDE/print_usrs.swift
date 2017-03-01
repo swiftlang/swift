@@ -173,9 +173,9 @@ class ObjCClass1 {
     set {}
   }
 
-  // CHECK: [[@LINE+1]]:3 c:objc(cs)ObjCClass1(cm)initWithX:{{$}}
+  // CHECK: [[@LINE+1]]:3 c:objc(cs)ObjCClass1(im)initWithX:{{$}}
   init(x: Int) {}
-  // CHECK: [[@LINE+1]]:3 c:objc(cs)ObjCClass1(cm)init{{$}}
+  // CHECK: [[@LINE+1]]:3 c:objc(cs)ObjCClass1(im)init{{$}}
   init() {}
 
   // CHECK: [[@LINE+1]]:8 c:objc(cs)ObjCClass1(im)instanceFunc1:{{$}}

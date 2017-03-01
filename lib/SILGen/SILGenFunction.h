@@ -1408,11 +1408,22 @@ public:
   ///                     terminated.
   /// \param handleFalse  A callback to invoke in the failure path.  The
   ///                     current BB should be terminated.
-  void emitCheckedCastBranch(SILLocation loc, ConsumableManagedValue src,
-                             Type sourceType, CanType targetType,
-                             SGFContext C,
-                             std::function<void(ManagedValue)> handleTrue,
-                             std::function<void()> handleFalse);
+  void emitCheckedCastBranch(
+      SILLocation loc, ConsumableManagedValue src, Type sourceType,
+      CanType targetType, SGFContext C,
+      std::function<void(ManagedValue)> handleTrue,
+      std::function<void(Optional<ManagedValue>)> handleFalse);
+
+  /// A form of checked cast branch that uses the old non-ownership preserving
+  /// semantics.
+  ///
+  /// The main difference is that this code does not pass the old argument as a
+  /// block argument in the failure case. This causes values to be double
+  /// consumed.
+  void emitCheckedCastBranchOld(SILLocation loc, Expr *source, Type targetType,
+                                SGFContext ctx,
+                                std::function<void(ManagedValue)> handleTrue,
+                                std::function<void()> handleFalse);
 
   /// \brief Emit a conditional checked cast branch, starting from an
   /// expression.  Terminates the current BB.
@@ -1426,10 +1437,22 @@ public:
   ///                     terminated.
   /// \param handleFalse  A callback to invoke in the failure path.  The
   ///                     current BB should be terminated.
-  void emitCheckedCastBranch(SILLocation loc, Expr *src,
-                             Type targetType, SGFContext C,
-                             std::function<void(ManagedValue)> handleTrue,
-                             std::function<void()> handleFalse);
+  void emitCheckedCastBranch(
+      SILLocation loc, Expr *src, Type targetType, SGFContext C,
+      std::function<void(ManagedValue)> handleTrue,
+      std::function<void(Optional<ManagedValue>)> handleFalse);
+
+  /// A form of checked cast branch that uses the old non-ownership preserving
+  /// semantics.
+  ///
+  /// The main difference is that this code does not pass the old argument as a
+  /// block argument in the failure case. This causes values to be double
+  /// consumed.
+  void emitCheckedCastBranchOld(SILLocation loc, ConsumableManagedValue src,
+                                Type sourceType, CanType targetType,
+                                SGFContext ctx,
+                                std::function<void(ManagedValue)> handleTrue,
+                                std::function<void()> handleFalse);
 
   /// Emit the control flow for an optional 'bind' operation, branching to the
   /// active failure destination if the optional value addressed by optionalAddr

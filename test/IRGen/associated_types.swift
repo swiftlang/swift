@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s | %FileCheck %s
 
-// REQUIRES: CPU=i386 || CPU=x86_64
+// REQUIRES: CPU=i386_or_x86_64
 
 protocol Runcer {
   associatedtype Runcee
@@ -30,7 +30,7 @@ struct Owl<T : Runcible, U> {
 class Pussycat<T : Runcible, U> {
   init() {} 
 
-  // CHECK: define hidden swiftcc void @_T016associated_types8PussycatC3eat{{[_0-9a-zA-Z]*}}F(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %C16associated_types8Pussycat* swiftself)
+  // CHECK: define hidden swiftcc void @_T016associated_types8PussycatC3eat{{[_0-9a-zA-Z]*}}F(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %T16associated_types8PussycatC* swiftself)
   func eat(_ what: T.RuncerType.Runcee, and: T.RuncerType, with: T) { }
 }
 

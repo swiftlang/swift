@@ -745,6 +745,9 @@ class RefCounts {
   LLVM_ATTRIBUTE_NOINLINE
   bool tryIncrementSlow(RefCountBits oldbits);
 
+  LLVM_ATTRIBUTE_NOINLINE
+  bool tryIncrementNonAtomicSlow(RefCountBits oldbits);
+
   public:
   enum Initialized_t { Initialized };
 
@@ -859,6 +862,19 @@ class RefCounts {
     return true;
   }
 
+  bool tryIncrementNonAtomic() {
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    if (!oldbits.hasSideTable() && oldbits.getIsDeiniting())
+      return false;
+
+    auto newbits = oldbits;
+    bool fast = newbits.incrementStrongExtraRefCount(1);
+    if (!fast)
+      return tryIncrementNonAtomicSlow(oldbits);
+    refCounts.store(newbits, std::memory_order_relaxed);
+    return true;
+  }
+
   // Simultaneously clear the pinned flag and decrement the reference
   // count. Call _swift_release_dealloc() if the reference count goes to zero.
   //
@@ -878,6 +894,11 @@ class RefCounts {
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool decrementShouldDeinit(uint32_t dec) {
     return doDecrement<DontClearPinnedFlag, DontPerformDeinit>(dec);
+  }
+
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  bool decrementShouldDeinitNonAtomic(uint32_t dec) {
+    return doDecrementNonAtomic<DontClearPinnedFlag, DontPerformDeinit>(dec);
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -979,7 +1000,12 @@ class RefCounts {
   // object may have a side table entry.
   template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
   bool doDecrementSideTable(RefCountBits oldbits, uint32_t dec);
-  
+
+  // Second slow path of doDecrementNonAtomic, where the
+  // object may have a side table entry.
+  template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+  bool doDecrementNonAtomicSideTable(RefCountBits oldbits, uint32_t dec);
+
   // First slow path of doDecrement, where the object may need to be deinited.
   // Side table is handled in the second slow path, doDecrementSideTable().
   template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
@@ -1021,6 +1047,42 @@ class RefCounts {
 
     return deinitNow;
   }
+
+  // First slow path of doDecrementNonAtomic, where the object may need to be deinited.
+  // Side table is handled in the second slow path, doDecrementNonAtomicSideTable().
+  template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+  bool doDecrementNonAtomicSlow(RefCountBits oldbits, uint32_t dec) {
+    bool deinitNow;
+    auto newbits = oldbits;
+
+    bool fast = newbits.decrementStrongExtraRefCount(dec, clearPinnedFlag);
+    if (fast) {
+      // Decrement completed normally. New refcount is not zero.
+      deinitNow = false;
+    }
+    else if (oldbits.hasSideTable()) {
+      // Decrement failed because we're on some other slow path.
+      return doDecrementNonAtomicSideTable<clearPinnedFlag,
+                                           performDeinit>(oldbits, dec);
+    }
+    else {
+      // Decrement underflowed. Begin deinit.
+      // LIVE -> DEINITING
+      deinitNow = true;
+      assert(!oldbits.getIsDeiniting());  // FIXME: make this an error?
+      newbits = oldbits;  // Undo failed decrement of newbits.
+      newbits.setStrongExtraRefCount(0);
+      newbits.setIsDeiniting(true);
+      if (clearPinnedFlag)
+        newbits.setIsPinned(false);
+    }
+    refCounts.store(newbits, std::memory_order_relaxed);
+    if (performDeinit && deinitNow) {
+      _swift_release_dealloc(getHeapObject());
+    }
+
+    return deinitNow;
+  }
   
   public:  // FIXME: access control hack
 
@@ -1045,8 +1107,6 @@ class RefCounts {
 
     return false;  // don't deinit
   }
-  
-  private:
 
   // This is independently specialized below for inline and out-of-line use.
   template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
@@ -1072,6 +1132,18 @@ class RefCounts {
                                               std::memory_order_relaxed));
   }
 
+  void incrementUnownedNonAtomic(uint32_t inc) {
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    if (oldbits.hasSideTable())
+      return oldbits.getSideTable()->incrementUnownedNonAtomic(inc);
+
+    auto newbits = oldbits;
+    assert(newbits.getUnownedRefCount() != 0);
+    newbits.incrementUnownedRefCount(inc);
+    // FIXME: overflow check?
+    refCounts.store(newbits, std::memory_order_relaxed);
+  }
+
   // Decrement the unowned reference count.
   // Return true if the caller should free the object.
   bool decrementUnownedShouldFree(uint32_t dec) {
@@ -1086,7 +1158,7 @@ class RefCounts {
       newbits = oldbits;
       newbits.decrementUnownedRefCount(dec);
       if (newbits.getUnownedRefCount() == 0) {
-        // DEINITED -> FREED  or  DEINITED -> DEAD
+        // DEINITED -> FREED, or DEINITED -> DEAD
         // Caller will free the object. Weak decrement is handled by
         // HeapObjectSideTableEntry::decrementUnownedShouldFree.
         assert(newbits.getIsDeiniting());
@@ -1097,6 +1169,29 @@ class RefCounts {
       // FIXME: underflow check?
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
+    return performFree;
+  }
+
+  bool decrementUnownedShouldFreeNonAtomic(uint32_t dec) {
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+
+    if (oldbits.hasSideTable())
+      return oldbits.getSideTable()->decrementUnownedShouldFreeNonAtomic(dec);
+
+    bool performFree;
+    auto newbits = oldbits;
+    newbits.decrementUnownedRefCount(dec);
+    if (newbits.getUnownedRefCount() == 0) {
+      // DEINITED -> FREED, or DEINITED -> DEAD
+      // Caller will free the object. Weak decrement is handled by
+      // HeapObjectSideTableEntry::decrementUnownedShouldFreeNonAtomic.
+      assert(newbits.getIsDeiniting());
+      performFree = true;
+    } else {
+      performFree = false;
+    }
+    // FIXME: underflow check?
+    refCounts.store(newbits, std::memory_order_relaxed);
     return performFree;
   }
 
@@ -1143,6 +1238,16 @@ class RefCounts {
       performFree = newbits.decrementWeakRefCount();
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
+
+    return performFree;
+  }
+
+  bool decrementWeakShouldCleanUpNonAtomic() {
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+
+    auto newbits = oldbits;
+    auto performFree = newbits.decrementWeakRefCount();
+    refCounts.store(newbits, std::memory_order_relaxed);
 
     return performFree;
   }
@@ -1226,9 +1331,13 @@ class HeapObjectSideTableEntry {
     return refCounts.doDecrement<clearPinnedFlag, performDeinit>(dec);
   }
 
+  template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+  bool decrementNonAtomicStrong(uint32_t dec) {
+    return refCounts.doDecrementNonAtomic<clearPinnedFlag, performDeinit>(dec);
+  }
+
   void decrementFromOneNonAtomic() {
-    // FIXME: can there be a non-atomic implementation?
-    decrementStrong<DontClearPinnedFlag, DontPerformDeinit>(1);
+    decrementNonAtomicStrong<DontClearPinnedFlag, DontPerformDeinit>(1);
   }
   
   bool isDeiniting() const {
@@ -1243,6 +1352,16 @@ class HeapObjectSideTableEntry {
     return refCounts.tryIncrementAndPin();
   }
 
+  bool tryIncrementNonAtomic() {
+    return refCounts.tryIncrementNonAtomic();
+  }
+
+  bool tryIncrementAndPinNonAtomic() {
+    return refCounts.tryIncrementAndPinNonAtomic();
+  }
+
+  // Return weak reference count.
+  // Note that this is not equal to the number of outstanding weak pointers.
   uint32_t getCount() const {
     return refCounts.getCount();
   }
@@ -1257,12 +1376,27 @@ class HeapObjectSideTableEntry {
     return refCounts.incrementUnowned(inc);
   }
 
+  void incrementUnownedNonAtomic(uint32_t inc) {
+    return refCounts.incrementUnownedNonAtomic(inc);
+  }
+
   bool decrementUnownedShouldFree(uint32_t dec) {
     bool shouldFree = refCounts.decrementUnownedShouldFree(dec);
     if (shouldFree) {
       // DEINITED -> FREED
       // Caller will free the object.
       decrementWeak();
+    }
+
+    return shouldFree;
+  }
+
+  bool decrementUnownedShouldFreeNonAtomic(uint32_t dec) {
+    bool shouldFree = refCounts.decrementUnownedShouldFreeNonAtomic(dec);
+    if (shouldFree) {
+      // DEINITED -> FREED
+      // Caller will free the object.
+      decrementWeakNonAtomic();
     }
 
     return shouldFree;
@@ -1301,6 +1435,19 @@ class HeapObjectSideTableEntry {
     delete this;
   }
 
+  void decrementWeakNonAtomic() {
+    // FIXME: assertions
+    // FIXME: optimize barriers
+    bool cleanup = refCounts.decrementWeakShouldCleanUpNonAtomic();
+    if (!cleanup)
+      return;
+
+    // Weak ref count is now zero. Delete the side table entry.
+    // FREED -> DEAD
+    assert(refCounts.getUnownedCount() == 0);
+    delete this;
+  }
+
   uint32_t getWeakCount() const {
     return refCounts.getWeakCount();
   }
@@ -1327,12 +1474,12 @@ inline bool RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
 
   // Use slow path if we can't guarantee atomicity.
   if (oldbits.hasSideTable() || oldbits.getUnownedRefCount() != 1)
-    return doDecrementSlow<clearPinnedFlag, performDeinit>(oldbits, dec);
+    return doDecrementNonAtomicSlow<clearPinnedFlag, performDeinit>(oldbits, dec);
 
   auto newbits = oldbits;
   bool fast = newbits.decrementStrongExtraRefCount(dec, clearPinnedFlag);
   if (!fast)
-    return doDecrementSlow<clearPinnedFlag, performDeinit>(oldbits, dec);
+    return doDecrementNonAtomicSlow<clearPinnedFlag, performDeinit>(oldbits, dec);
 
   refCounts.store(newbits, std::memory_order_relaxed);
   return false;  // don't deinit
@@ -1359,8 +1506,24 @@ doDecrementSideTable(InlineRefCountBits oldbits, uint32_t dec) {
 
 template <>
 template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+inline bool RefCounts<InlineRefCountBits>::
+doDecrementNonAtomicSideTable(InlineRefCountBits oldbits, uint32_t dec) {
+  auto side = oldbits.getSideTable();
+  return side->decrementNonAtomicStrong<clearPinnedFlag, performDeinit>(dec);
+}
+
+template <>
+template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
 inline bool RefCounts<SideTableRefCountBits>::
 doDecrementSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
+  swift::crash("side table refcount must not have "
+               "a side table entry of its own");
+}
+
+template <>
+template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+inline bool RefCounts<SideTableRefCountBits>::
+doDecrementNonAtomicSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
   swift::crash("side table refcount must not have "
                "a side table entry of its own");
 }

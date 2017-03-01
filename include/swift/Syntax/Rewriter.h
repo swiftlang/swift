@@ -27,6 +27,7 @@
 #include "swift/Syntax/ExprSyntax.h"
 #include "swift/Syntax/StmtSyntax.h"
 #include "swift/Syntax/Syntax.h"
+#include "swift/Syntax/UnknownSyntax.h"
 
 namespace swift {
 namespace syntax {

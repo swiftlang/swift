@@ -27,7 +27,7 @@ StmtSyntax::StmtSyntax(const RC<SyntaxData> Root, const StmtSyntaxData *Data)
 UnknownStmtSyntaxData::UnknownStmtSyntaxData(RC<RawSyntax> Raw,
                                              const SyntaxData *Parent,
                                              CursorIndex IndexInParent)
-  : StmtSyntaxData(Raw, Parent, IndexInParent) {
+  : UnknownSyntaxData(Raw, Parent, IndexInParent) {
   assert(Raw->Kind == SyntaxKind::UnknownStmt);
 }
 
@@ -35,9 +35,11 @@ RC<UnknownStmtSyntaxData>
 UnknownStmtSyntaxData::make(RC<RawSyntax> Raw,
                             const SyntaxData *Parent,
                             CursorIndex IndexInParent) {
+  auto UnknownRaw = RawSyntax::make(SyntaxKind::UnknownStmt, Raw->Layout,
+                                    Raw->Presence);
   return RC<UnknownStmtSyntaxData> {
     new UnknownStmtSyntaxData {
-      Raw, Parent, IndexInParent
+      UnknownRaw, Parent, IndexInParent
     }
   };
 }
@@ -46,7 +48,7 @@ UnknownStmtSyntaxData::make(RC<RawSyntax> Raw,
 
 UnknownStmtSyntax::UnknownStmtSyntax(const RC<SyntaxData> Root,
                                      const UnknownStmtSyntaxData *Data)
-  : StmtSyntax(Root, Data) {}
+  : UnknownSyntax(Root, Data) {}
 
 #pragma mark fallthrough-statement Data
 

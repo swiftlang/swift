@@ -49,20 +49,24 @@ public:
 
   /// Strongly retains a value that has come from a safe [unowned] reference.
   /// This operation is not supported for all reference types.
-  virtual void strongRetainUnowned(IRGenFunction &IGF, Explosion &in) const = 0;
+  virtual void strongRetainUnowned(IRGenFunction &IGF, Explosion &in,
+                                   Atomicity atomicity) const = 0;
 
   /// Strongly retains a value that has come from a safe [unowned] reference.
   /// This operation is not supported for all reference types.
   virtual void strongRetainUnownedRelease(IRGenFunction &IGF,
-                                          Explosion &in) const = 0;
+                                          Explosion &in,
+                                          Atomicity atomicity) const = 0;
 
   /// Weakly retains a value in the manner of a safe [unowned] reference.
   /// This operation is not supported for all reference types.
-  virtual void unownedRetain(IRGenFunction &IGF, Explosion &in) const = 0;
+  virtual void unownedRetain(IRGenFunction &IGF, Explosion &in,
+                             Atomicity atomicity) const = 0;
 
   /// Weakly releases a value in the manner of a safe [unowned] reference.
   /// This operation is not supported for all reference types.
-  virtual void unownedRelease(IRGenFunction &IGF, Explosion &in) const = 0;
+  virtual void unownedRelease(IRGenFunction &IGF, Explosion &in,
+                              Atomicity atomicity) const = 0;
 
   /// Load a reference from a safe [unowned] reference in memory and
   /// destroy the [unowned] location.

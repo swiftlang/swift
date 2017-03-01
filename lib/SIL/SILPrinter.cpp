@@ -1522,6 +1522,9 @@ public:
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *DEI) {
     *this << getIDAndType(DEI->getOperand());
   }
+  void visitDeinitExistentialOpaqueInst(DeinitExistentialOpaqueInst *DEI) {
+    *this << getIDAndType(DEI->getOperand());
+  }
   void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *DEI) {
     *this << getIDAndType(DEI->getOperand()) << ", $" << DEI->getConcreteType();
   }
