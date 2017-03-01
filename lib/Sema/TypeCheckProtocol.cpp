@@ -2399,20 +2399,19 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
   return true;
 }
 
-static bool
-printFixitString(SourceLoc TypeLoc,
-                 ProtocolConformance *Conf,
-                 ArrayRef<ValueDecl*> MissingWitnesses,
-                 std::string &FixitString) {
-  bool Result = false;
+static void
+printProtocolStubFixitString(SourceLoc TypeLoc, ProtocolConformance *Conf,
+                             ArrayRef<ValueDecl*> MissingWitnesses,
+                             std::string &FixitString,
+                             llvm::SetVector<ValueDecl*> &NoStubRequirements) {
   llvm::raw_string_ostream FixitStream(FixitString);
   std::for_each(MissingWitnesses.begin(), MissingWitnesses.end(),
     [&](ValueDecl* VD) {
-      Result |= printRequirementStub(VD, Conf->getDeclContext(), Conf->getType(),
-                                     TypeLoc, FixitStream);
+      if (!printRequirementStub(VD, Conf->getDeclContext(), Conf->getType(),
+                                TypeLoc, FixitStream)) {
+        NoStubRequirements.insert(VD);
+      }
     });
-
-  return Result;
 }
 
 /// Generates a note for a protocol requirement for which no witness was found
@@ -2437,8 +2436,9 @@ void ConformanceChecker::diagnoseMissingWitnesses() {
         llvm_unreachable("Unknown adopter kind");
       }
       std::string FixIt;
-      bool AddFixit = printFixitString(TypeLoc, Conf,
-                                       MissingWitnesses.getArrayRef(), FixIt);
+      llvm::SetVector<ValueDecl*> NoStubRequirements;
+      printProtocolStubFixitString(TypeLoc, Conf, MissingWitnesses.getArrayRef(),
+                                   FixIt, NoStubRequirements);
       auto &Diags = DC->getASTContext().Diags;
       for (auto VD : MissingWitnesses) {
         if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(VD)) {
@@ -2447,6 +2447,7 @@ void ConformanceChecker::diagnoseMissingWitnesses() {
           fixItInsertAfter(FixitLocation, FixIt);
           continue;
         }
+        bool AddFixit = !NoStubRequirements.count(VD);
         Type RequirementType =
           getRequirementTypeForDisplay(DC->getParentModule(), Conf, VD);
         auto Diag = Diags.diagnose(VD, diag::no_witnesses,
