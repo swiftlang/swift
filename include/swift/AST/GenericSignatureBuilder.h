@@ -96,6 +96,14 @@ public:
     /// equivalence class.
     std::vector<ConcreteConstraint> concreteTypeConstraints;
 
+    /// Superclass constraint, which requires that the type fulfilling the
+    /// requirements of this equivalence class to be the same as or a subtype
+    /// of this superclass.
+    Type superclass;
+
+    /// Superclass constraints written within this equivalence class.
+    std::vector<ConcreteConstraint> superclassConstraints;
+
     /// The members of the equivalence class.
     TinyPtrVector<PotentialArchetype *> members;
 
@@ -109,7 +117,14 @@ public:
     Optional<ConcreteConstraint>
     findAnyConcreteConstraintAsWritten(
                               PotentialArchetype *preferredPA = nullptr) const;
-  };
+
+    /// Find a source of the superclass constraint in this equivalence class
+    /// that has a type equivalence to \c superclass, along with that
+    /// superclass type as written.
+    Optional<ConcreteConstraint>
+    findAnySuperclassConstraintAsWritten(
+                              PotentialArchetype *preferredPA = nullptr) const;
+};
 
   friend class RequirementSource;
 
@@ -196,6 +211,13 @@ public:
   addSameTypeRequirement(UnresolvedType paOrT1, UnresolvedType paOrT2,
                          FloatingRequirementSource Source,
                          llvm::function_ref<void(Type, Type)> diagnoseMismatch);
+
+  /// Update the superclass for the equivalence class of \c T.
+  ///
+  /// This assumes that the constraint has already been recorded
+  bool updateSuperclass(PotentialArchetype *T,
+                        Type superclass,
+                        const RequirementSource *source);
 
 private:
   /// \brief Add a new superclass requirement specifying that the given
@@ -392,12 +414,20 @@ private:
                              isSuitableRepresentative,
                            llvm::function_ref<ConstraintRelation(Type)>
                              checkConstraint,
+                           Optional<Diag<unsigned, Type, Type, Type>>
+                             conflictingDiag,
                            Diag<Type, Type> redundancyDiag,
                            Diag<bool, Type, Type> otherNoteDiag);
 
   /// Check for redundant concrete type constraints within the equivalence
   /// class of the given potential archetype.
   void checkRedundantConcreteTypeConstraints(
+                            ArrayRef<GenericTypeParamType *> genericParams,
+                            PotentialArchetype *pa);
+
+  /// Check for redundant superclass constraints within the equivalence
+  /// class of the given potential archetype.
+  void checkRedundantSuperclassConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
                             PotentialArchetype *pa);
 
@@ -903,12 +933,6 @@ class GenericSignatureBuilder::PotentialArchetype {
   llvm::MapVector<PotentialArchetype *, const RequirementSource *>
     SameTypeConstraints;
 
-  /// \brief The superclass of this archetype, if specified.
-  Type Superclass;
-
-  /// The source of the superclass requirement.
-  const RequirementSource *SuperclassSource = nullptr;
-
   /// \brief The list of protocols to which this archetype will conform.
   llvm::MapVector<ProtocolDecl *, const RequirementSource *> ConformsTo;
 
@@ -1090,12 +1114,12 @@ public:
                       GenericSignatureBuilder &builder);
 
   /// Retrieve the superclass of this archetype.
-  Type getSuperclass() const { return Superclass; }
-
-  /// Retrieve the requirement source for the superclass requirement.
-  const RequirementSource *getSuperclassSource() const {
-    return SuperclassSource;
-  } 
+  Type getSuperclass() const {
+    if (auto equiv = getEquivalenceClassIfPresent())
+      return equiv->superclass;
+    
+    return nullptr;
+  }
 
   /// Retrieve the layout constraint of this archetype.
   LayoutConstraint getLayout() const { return Layout; }

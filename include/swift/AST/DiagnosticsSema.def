@@ -1562,9 +1562,6 @@ ERROR(requires_generic_params_made_equal,none,
 ERROR(requires_generic_param_made_equal_to_concrete,none,
       "same-type requirement makes generic parameter %0 non-generic",
       (Type))
-ERROR(requires_superclass_conflict,none,
-      "%select{generic parameter |protocol |}0%1 cannot be a subclass of both "
-      "%2 and %3", (unsigned, Type, Type, Type))
 ERROR(recursive_type_reference,none,
       "%0 %1 references itself", (DescriptiveDeclKind, Identifier))
 ERROR(recursive_requirement_reference,none,
@@ -1588,6 +1585,14 @@ WARNING(redundant_same_type_to_concrete,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
 NOTE(same_type_redundancy_here,none,
      "same-type constraint %1 == %2 %select{written here|implied here}0",
+     (bool, Type, Type))
+ERROR(requires_superclass_conflict,none,
+      "%select{generic parameter |protocol |}0%1 cannot be a subclass of both "
+      "%2 and %3", (unsigned, Type, Type, Type))
+WARNING(redundant_superclass_constraint,none,
+        "redundant superclass constraint %0 : %1", (Type, Type))
+NOTE(superclass_redundancy_here,none,
+     "superclass constraint %1 : %2 %select{written here|implied here}0",
      (bool, Type, Type))
 
 ERROR(mutiple_layout_constraints,none,
