@@ -213,9 +213,7 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
   auto OrigFnTy = OrigF->getLoweredFunctionType();
 
   // First substitute concrete types into the existing function type.
-  auto FnTy = OrigFnTy->substGenericArgs(
-      M, QuerySubstitutionMap{SubstMap},
-        LookUpConformanceInSubstitutionMap(SubstMap));
+  auto FnTy = OrigFnTy->substGenericArgs(M, SubstMap);
 
   if ((SpecializedGenericSig &&
        SpecializedGenericSig->areAllParamsConcrete()) ||
