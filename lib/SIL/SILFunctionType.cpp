@@ -2143,10 +2143,17 @@ namespace {
 
     // SIL type lowering only does special things to tuples and functions.
 
-    /// Functions need to preserve their abstraction structure.
-    CanSILFunctionType visitSILFunctionType(CanSILFunctionType origType,
-                                            bool dropGenerics = false)
-    {
+    // When a function appears inside of another type, we only perform
+    // substitutions if it does not have a generic signature.
+    CanSILFunctionType visitSILFunctionType(CanSILFunctionType origType) {
+      if (origType->getGenericSignature())
+        return origType;
+
+      return substSILFunctionType(origType);
+    }
+
+    // Entry point for use by SILType::substGenericArgs().
+    CanSILFunctionType substSILFunctionType(CanSILFunctionType origType) {
       GenericContextScope scope(TheSILModule.Types,
                                 origType->getGenericSignature());
 
@@ -2167,10 +2174,7 @@ namespace {
         substParams.push_back(subst(origParam));
       }
 
-      auto genericSig
-        = (dropGenerics ? nullptr : origType->getGenericSignature());
-
-      return SILFunctionType::get(genericSig,
+      return SILFunctionType::get(nullptr,
                                   origType->getExtInfo(),
                                   origType->getCalleeConvention(),
                                   substParams, substResults,
@@ -2304,8 +2308,7 @@ SILFunctionType::substGenericArgs(SILModule &silModule,
                                   LookupConformanceFn conformances) {
   if (!isPolymorphic()) return CanSILFunctionType(this);
   SILTypeSubstituter substituter(silModule, subs, conformances);
-  return substituter.visitSILFunctionType(CanSILFunctionType(this),
-                                          /*dropGenerics*/ true);
+  return substituter.substSILFunctionType(CanSILFunctionType(this));
 }
 
 /// Fast path for bridging types in a function type without uncurrying.
