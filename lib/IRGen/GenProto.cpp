@@ -2259,10 +2259,23 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   if (concreteConformance->getProtocol() != proto) {
     concreteConformance = concreteConformance->getInheritedConformance(proto);
   }
+
+  // Check immediately for an existing cache entry.
+  auto wtable = IGF.tryGetLocalTypeData(
+    srcType,
+    LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance));
+  if (wtable) return wtable;
+
   auto &protoI = IGF.IGM.getProtocolInfo(proto);
   auto &conformanceI =
     protoI.getConformance(IGF.IGM, proto, concreteConformance);
-  return conformanceI.getTable(IGF, srcType, srcMetadataCache);
+  wtable = conformanceI.getTable(IGF, srcType, srcMetadataCache);
+
+  IGF.setScopedLocalTypeData(
+    srcType,
+    LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance),
+    wtable);
+  return wtable;
 }
 
 /// Emit the witness table references required for the given type
