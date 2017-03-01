@@ -2414,7 +2414,7 @@ void ConformanceChecker::diagnoseMissingWitnesses() {
     return;
   llvm::SetVector<ValueDecl*> MissingWitnesses = this->MissingWitnesses;
   diagnoseOrDefer(MissingWitnesses[0], true,
-    [MissingWitnesses](ProtocolConformance *Conf) {
+    [MissingWitnesses](NormalProtocolConformance *Conf) {
       DeclContext *DC = Conf->getDeclContext();
       SourceLoc FixitLocation;
       SourceLoc TypeLoc;
@@ -2439,8 +2439,7 @@ void ConformanceChecker::diagnoseMissingWitnesses() {
           continue;
         }
         Type RequirementType =
-          getRequirementTypeForDisplay(DC->getParentModule(),
-            static_cast<NormalProtocolConformance*>(Conf), VD);
+          getRequirementTypeForDisplay(DC->getParentModule(), Conf, VD);
         auto Diag = Diags.diagnose(VD, diag::no_witnesses,
                                    getRequirementKind(VD), VD->getFullName(),
                                    RequirementType, AddFixit);
