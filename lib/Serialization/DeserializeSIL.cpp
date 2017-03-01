@@ -2388,13 +2388,14 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
         proto, conformance.getConcrete()
       });
     } else if (kind == SIL_WITNESS_ASSOC_PROTOCOL) {
-      DeclID assocId, protoId;
+      TypeID assocId;
+      DeclID protoId;
       WitnessAssocProtocolLayout::readRecord(scratch, assocId, protoId);
+      CanType type = MF->getType(assocId)->getCanonicalType();
       ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
       auto conformance = MF->readConformance(SILCursor);
       witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
-        cast<AssociatedTypeDecl>(MF->getDecl(assocId)), proto,
-        conformance
+        type, proto, conformance
       });
     } else if (kind == SIL_WITNESS_ASSOC_ENTRY) {
       DeclID assocId;

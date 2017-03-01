@@ -591,6 +591,8 @@ ERROR(sil_witness_protocol_not_found,none,
       "sil protocol not found %0", (Identifier))
 ERROR(sil_witness_assoc_not_found,none,
       "sil associated type decl not found %0", (Identifier))
+ERROR(sil_witness_assoc_conf_not_found,none,
+      "sil associated type path for conformance not found %0", (StringRef))
 ERROR(sil_witness_protocol_conformance_not_found,none,
       "sil protocol conformance not found", ())
 

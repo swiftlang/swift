@@ -80,6 +80,15 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   buffer.write(Result.data(), Result.size());
 }
 
+static void mangleAssociatedTypePath(Mangler &mangler, CanType assocType) {
+  if (auto memberType = dyn_cast<DependentMemberType>(assocType)) {
+    mangleAssociatedTypePath(mangler, memberType.getBase());
+    mangler.mangleIdentifier(memberType->getName().str());
+  } else {
+    assert(isa<GenericTypeParamType>(assocType));
+  }
+}
+
 /// Mangle this entity into the given stream.
 std::string LinkEntity::mangleOld() const {
   // Almost everything below gets the common prefix:
@@ -209,13 +218,15 @@ std::string LinkEntity::mangleOld() const {
     mangler.mangleIdentifier(getAssociatedType()->getNameStr());
     return mangler.finalize();
 
-  //   global ::= 'WT' protocol-conformance identifier nominal-type
-  case Kind::AssociatedTypeWitnessTableAccessFunction:
+  //   global ::= 'WT' protocol-conformance identifier+ nominal-type
+  case Kind::AssociatedTypeWitnessTableAccessFunction: {
     mangler.append("_TWT");
     mangler.mangleProtocolConformance(getProtocolConformance());
-    mangler.mangleIdentifier(getAssociatedType()->getNameStr());
-    mangler.mangleProtocolDecl(getAssociatedProtocol());
+    auto assocConf = getAssociatedConformance();
+    mangleAssociatedTypePath(mangler, assocConf.first);
+    mangler.mangleProtocolDecl(assocConf.second);
     return mangler.finalize();
+  }
 
   // For all the following, this rule was imposed above:
   //   global ::= local-marker? entity            // some identifiable thing
@@ -412,11 +423,12 @@ std::string LinkEntity::mangleNew() const {
       return mangler.mangleAssociatedTypeMetadataAccessFunction(
                   getProtocolConformance(), getAssociatedType()->getNameStr());
 
-      //   global ::= 'WT' protocol-conformance identifier nominal-type
-    case Kind::AssociatedTypeWitnessTableAccessFunction:
+      //   global ::= protocol-conformance identifier+ nominal-type 'WT'
+    case Kind::AssociatedTypeWitnessTableAccessFunction: {
+      auto assocConf = getAssociatedConformance();
       return mangler.mangleAssociatedTypeWitnessTableAccessFunction(
-                  getProtocolConformance(), getAssociatedType()->getNameStr(),
-                  getAssociatedProtocol());
+                  getProtocolConformance(), assocConf.first, assocConf.second);
+    }
 
       // For all the following, this rule was imposed above:
       //   global ::= local-marker? entity            // some identifiable thing
