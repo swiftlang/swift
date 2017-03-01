@@ -1779,7 +1779,7 @@ namespace {
                         llvm::SmallPtrSetImpl<ProtocolConformance *> &visited);
     void addUsedConformances(ProtocolConformance *conformance);
 
-    void diagnoseMissingWitness();
+    void diagnoseMissingWitnesses();
   public:
     /// Emit any diagnostics that have been delayed.
     void emitDelayedDiags();
@@ -2409,7 +2409,7 @@ printFixitString(SourceLoc TypeLoc,
 
 /// Generates a note for a protocol requirement for which no witness was found
 /// and provides a fixit to add a stub to the adopter
-void ConformanceChecker::diagnoseMissingWitness() {
+void ConformanceChecker::diagnoseMissingWitnesses() {
   if (MissingWitnesses.empty())
     return;
   llvm::SetVector<ValueDecl*> MissingWitnesses = this->MissingWitnesses;
@@ -4297,6 +4297,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
 void ConformanceChecker::resolveSingleTypeWitness(
        AssociatedTypeDecl *assocType) {
+  SWIFT_DEFER { diagnoseMissingWitnesses(); };
   switch (resolveTypeWitnessViaLookup(assocType)) {
   case ResolveWitnessResult::Success:
   case ResolveWitnessResult::ExplicitFailed:
@@ -4465,8 +4466,8 @@ void ConformanceChecker::checkConformance() {
   // Resolve all of the type witnesses.
   resolveTypeWitnesses();
 
-  diagnoseMissingWitness();
-  SWIFT_DEFER { diagnoseMissingWitness(); };
+  diagnoseMissingWitnesses();
+  SWIFT_DEFER { diagnoseMissingWitnesses(); };
 
   // Ensure the conforming type is used.
   //
