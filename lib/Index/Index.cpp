@@ -191,6 +191,14 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
 
   bool addRelation(IndexSymbol &Info, SymbolRoleSet RelationRoles, Decl *D) {
     assert(D);
+    auto Match = std::find_if(Info.Relations.begin(), Info.Relations.end(),
+                              [D](IndexRelation R) { return R.decl == D; });
+    if (Match != Info.Relations.end()) {
+      Match->roles |= RelationRoles;
+      Info.roles |= RelationRoles;
+      return false;
+    }
+
     StringRef Name, USR;
     SymbolInfo SymInfo = getSymbolInfoForDecl(D);
 
@@ -867,10 +875,14 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
 
   // Cannot be extension, which is not a ValueDecl.
 
-  if (IsRef)
+  if (IsRef) {
     Info.roles |= (unsigned)SymbolRole::Reference;
-  else
+    auto Parent = getParentDecl();
+    if (Parent && isa<AbstractFunctionDecl>(Parent))
+      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Parent);
+  } else {
     Info.roles |= (unsigned)SymbolRole::Definition;
+  }
 
   if (getNameAndUSR(D, /*ExtD=*/nullptr, Info.name, Info.USR))
     return true;
