@@ -676,13 +676,6 @@ public:
   SILConstantInfo getConstantOverrideInfo(SILDeclRef constant,
                                           SILDeclRef base);
 
-  /// Substitute the given function type so that it implements the
-  /// given substituted type.
-  CanSILFunctionType substFunctionType(CanSILFunctionType origFnType,
-                                 CanAnyFunctionType origLoweredType,
-                                 CanAnyFunctionType substLoweredInterfaceType,
-                         const Optional<ForeignErrorConvention> &foreignError);
-  
   /// Get the empty tuple type as a SILType.
   SILType getEmptyTupleType() {
     return getLoweredType(TupleType::getEmpty(Context));
