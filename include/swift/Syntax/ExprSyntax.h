@@ -22,6 +22,8 @@
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/SyntaxData.h"
+#include "swift/Syntax/SyntaxCollection.h"
+#include "swift/Syntax/SyntaxCollectionData.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "swift/Syntax/UnknownSyntax.h"
 
@@ -249,7 +251,6 @@ public:
 
 /// function-call-argument -> label? ':'? (expression | operator) ','?
 class FunctionCallArgumentSyntax : public Syntax {
-
   using DataType = FunctionCallArgumentSyntaxData;
 
   friend struct SyntaxFactory;
@@ -257,6 +258,12 @@ class FunctionCallArgumentSyntax : public Syntax {
   friend class Syntax;
   friend class FunctionCallArgumentSyntaxData;
   friend class FunctionCallArgumentListSyntax;
+  friend class SyntaxCollectionData<SyntaxKind::FunctionCallArgumentList,
+                                    FunctionCallArgumentSyntax>;
+  friend class SyntaxCollection<SyntaxKind::FunctionCallArgumentList,
+                                FunctionCallArgumentSyntax>;
+
+  static constexpr SyntaxKind Kind = SyntaxKind::FunctionCallArgument;
 
   enum class Cursor {
     Label,
@@ -306,37 +313,18 @@ public:
 
 #pragma mark - function-call-argument-list Data
 
-class FunctionCallArgumentListSyntaxData : public SyntaxData {
-  friend struct SyntaxFactory;
-  friend class FunctionCallArgumentListSyntax;
-  friend class FunctionCallExprSyntaxBuilder;
-  friend class SyntaxData;
-
-  std::vector<RC<FunctionCallArgumentSyntaxData>> CachedArguments;
-
-  FunctionCallArgumentListSyntaxData(const RC<RawSyntax> Raw,
-                                     const SyntaxData *Parent = nullptr,
-                                     CursorIndex IndexInParent = 0);
-
-  static RC<FunctionCallArgumentListSyntaxData>
-  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
-       CursorIndex IndexInParent = 0);
-
-  static RC<FunctionCallArgumentListSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::FunctionCallArgumentList;
-  }
-};
+using FunctionCallArgumentListSyntaxData =
+  SyntaxCollectionData<SyntaxKind::FunctionCallArgumentList,
+    FunctionCallArgumentSyntax>;
 
 #pragma mark - function-call-argument-list API
 
 /// function-call-argument-list -> function-call-argument
 ///                                function-call-argument-list?
-class FunctionCallArgumentListSyntax : public Syntax {
+class FunctionCallArgumentListSyntax
+  : public SyntaxCollection<SyntaxKind::FunctionCallArgumentList,
+                            FunctionCallArgumentSyntax> {
   friend struct SyntaxFactory;
-  friend class FunctionCallArgumentListSyntaxData;
   friend class FunctionCallExprSyntax;
   friend class Syntax;
   friend class SyntaxData;
@@ -347,17 +335,6 @@ class FunctionCallArgumentListSyntax : public Syntax {
                                  const DataType *Data);
 
 public:
-  /// Return the number of arguments in this list.
-  size_t getNumArguments() const;
-
-  /// Get the argument at the given Index.
-  FunctionCallArgumentSyntax getArgument(size_t n) const;
-
-  /// Returns a new `FunctionCallArgumentListSyntax` with the given
-  /// argument added to the end.
-  FunctionCallArgumentListSyntax
-  withAdditionalArgument(FunctionCallArgumentSyntax AdditionalArgument) const;
-
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::FunctionCallArgumentList;
   }

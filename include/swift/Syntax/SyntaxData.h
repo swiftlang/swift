@@ -77,7 +77,7 @@ public:
   ///
   /// If there is no parent, this is 0.
   const CursorIndex IndexInParent;
-protected:
+
   SyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
              CursorIndex IndexInParent = 0)
     : Raw(Raw), Parent(Parent), IndexInParent(IndexInParent) {}
