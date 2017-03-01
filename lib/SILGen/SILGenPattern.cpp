@@ -1527,16 +1527,16 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
     innerFailure = &specializedFailure;
   
   // Perform a conditional cast branch.
-  SGF.emitCheckedCastBranch(loc, castOperand,
-                            sourceType, targetType, SGFContext(),
-    // Success block: recurse.
-    [&](ManagedValue castValue) {
-      handleCase(ConsumableManagedValue::forOwned(castValue),
-                 specializedRows, *innerFailure);
-      assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
-    },
-    // Failure block: branch out to the continuation block.
-    [&] { (*innerFailure)(loc); });
+  SGF.emitCheckedCastBranchOld(
+      loc, castOperand, sourceType, targetType, SGFContext(),
+      // Success block: recurse.
+      [&](ManagedValue castValue) {
+        handleCase(ConsumableManagedValue::forOwned(castValue), specializedRows,
+                   *innerFailure);
+        assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
+      },
+      // Failure block: branch out to the continuation block.
+      [&] { (*innerFailure)(loc); });
 }
 
 /// Perform specialized dispatch for a sequence of EnumElementPattern or an

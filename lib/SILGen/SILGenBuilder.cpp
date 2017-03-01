@@ -489,3 +489,25 @@ ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
   return gen.emitManagedRValueWithCleanup(result);
 }
 
+ManagedValue SILGenBuilder::createUnconditionalCheckedCastOpaque(
+    SILLocation loc, ManagedValue operand, SILType type) {
+  SILValue result = SILBuilder::createUnconditionalCheckedCastOpaque(
+      loc, operand.forward(gen), type);
+  return gen.emitManagedRValueWithCleanup(result);
+}
+
+ManagedValue SILGenBuilder::createUnconditionalCheckedCast(SILLocation loc,
+                                                           ManagedValue operand,
+                                                           SILType type) {
+  SILValue result = SILBuilder::createUnconditionalCheckedCast(
+      loc, operand.forward(gen), type);
+  return gen.emitManagedRValueWithCleanup(result);
+}
+
+void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
+                                            ManagedValue operand, SILType type,
+                                            SILBasicBlock *trueBlock,
+                                            SILBasicBlock *falseBlock) {
+  SILBuilder::createCheckedCastBranch(loc, isExact, operand.forward(gen), type,
+                                      trueBlock, falseBlock);
+}

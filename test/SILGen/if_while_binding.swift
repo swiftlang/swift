@@ -309,8 +309,8 @@ func testAsPatternInIfLet(_ a : BaseClass?) {
   // CHECK:   [[DERIVED_CLS_SOME:%.*]] = enum $Optional<DerivedClass>, #Optional.some!enumelt.1, [[DERIVED_CLS]] : $DerivedClass
   // CHECK:   br [[MERGE:bb[0-9]+]]([[DERIVED_CLS_SOME]] : $Optional<DerivedClass>)
 
-  // CHECK: [[ISBASEBB]]:
-  // CHECK:   destroy_value [[CLS]] : $BaseClass
+  // CHECK: [[ISBASEBB]]([[BASECLASS:%.*]] : $BaseClass):
+  // CHECK:   destroy_value [[BASECLASS]] : $BaseClass
   // CHECK:   = enum $Optional<DerivedClass>, #Optional.none!enumelt
   // CHECK:   br [[MERGE]](
 
