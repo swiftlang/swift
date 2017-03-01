@@ -528,17 +528,18 @@ bb1(%1 : @owned $SuperKlass):
   destroy_value %1 : $SuperKlass
   br bb3
 
-bb2:
+bb2(%2 : @owned $Builtin.NativeObject):
+  destroy_value %2 : $Builtin.NativeObject
   br bb3
 
 bb3:
-  %2 = metatype $@thick SuperKlass.Type
-  checked_cast_br %2 : $@thick SuperKlass.Type to $@thick SubKlass.Type, bb4, bb5
+  %3 = metatype $@thick SuperKlass.Type
+  checked_cast_br %3 : $@thick SuperKlass.Type to $@thick SubKlass.Type, bb4, bb5
 
-bb4(%3 : @trivial $@thick SubKlass.Type):
+bb4(%4 : @trivial $@thick SubKlass.Type):
   br bb6
 
-bb5:
+bb5(%5 : @trivial $@thick SuperKlass.Type):
   br bb6
 
 bb6:
