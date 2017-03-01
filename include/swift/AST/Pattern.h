@@ -492,7 +492,7 @@ class EnumElementPattern : public Pattern {
   SourceLoc DotLoc;
   SourceLoc NameLoc;
   Identifier Name;
-  EnumElementDecl *ElementDecl;
+  PointerUnion<EnumElementDecl *, Expr*> ElementDeclOrUnresolvedOriginalExpr;
   Pattern /*nullable*/ *SubPattern;
   
 public:
@@ -501,9 +501,24 @@ public:
                      Pattern *SubPattern, Optional<bool> Implicit = None)
     : Pattern(PatternKind::EnumElement),
       ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
-      ElementDecl(Element), SubPattern(SubPattern) {
+      ElementDeclOrUnresolvedOriginalExpr(Element),
+      SubPattern(SubPattern) {
     if (Implicit.hasValue() && *Implicit)
       setImplicit();
+  }
+  
+  /// Create an unresolved EnumElementPattern for a `.foo` pattern relying on
+  /// contextual type.
+  EnumElementPattern(SourceLoc DotLoc,
+                     SourceLoc NameLoc,
+                     Identifier Name,
+                     Pattern *SubPattern,
+                     Expr *UnresolvedOriginalExpr)
+    : Pattern(PatternKind::EnumElement),
+      ParentType(), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
+      ElementDeclOrUnresolvedOriginalExpr(UnresolvedOriginalExpr),
+      SubPattern(SubPattern) {
+    
   }
 
   bool hasSubPattern() const { return SubPattern; }
@@ -524,8 +539,19 @@ public:
   
   Identifier getName() const { return Name; }
   
-  EnumElementDecl *getElementDecl() const { return ElementDecl; }
-  void setElementDecl(EnumElementDecl *d) { ElementDecl = d; }
+  EnumElementDecl *getElementDecl() const {
+    return ElementDeclOrUnresolvedOriginalExpr.dyn_cast<EnumElementDecl*>();
+  }
+  void setElementDecl(EnumElementDecl *d) {
+    ElementDeclOrUnresolvedOriginalExpr = d;
+  }
+  
+  Expr *getUnresolvedOriginalExpr() const {
+    return ElementDeclOrUnresolvedOriginalExpr.get<Expr*>();
+  }
+  bool hasUnresolvedOriginalExpr() const {
+    return ElementDeclOrUnresolvedOriginalExpr.is<Expr*>();
+  }
   
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }

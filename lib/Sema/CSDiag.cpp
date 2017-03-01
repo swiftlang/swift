@@ -6086,9 +6086,13 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
     if (callExpr->isImplicit() && overloadName == "~=") {
       // This binop was synthesized when typechecking an expression pattern.
-      auto diag = diagnose(lhsExpr->getLoc(),
-                    diag::cannot_match_expr_pattern_with_value,
-                           lhsType, rhsType);
+      auto diag = lhsType->is<UnresolvedType>()
+        ? diagnose(lhsExpr->getLoc(),
+                   diag::cannot_match_unresolved_expr_pattern_with_value,
+                   rhsType)
+        : diagnose(lhsExpr->getLoc(),
+                   diag::cannot_match_expr_pattern_with_value,
+                   lhsType, rhsType);
       diag.highlight(lhsExpr->getSourceRange());
       diag.highlight(rhsExpr->getSourceRange());
       if (auto optUnwrappedType = rhsType->getOptionalObjectType()) {
