@@ -247,6 +247,20 @@ extension Substring : ExpressibleByStringLiteral {
 }
 
 extension String {
+  // Now that String conforms to Collection, we need to disambiguate between:
+  // - init<T>(_ value: T) where T : LosslessStringConvertible
+  // - init<S>(_ characters: S) where S : Sequence, S.Iterator.Element == Character
+  // Cannot simply do init(_: String) as that would itself be ambiguous with
+  // init?(_ description: String)
+  public init<
+    T : LosslessStringConvertible & Sequence
+  >(_ other: T)
+  where T.Iterator.Element == Character {
+    self = other.description
+  }
+}
+
+extension String {
   //@available(swift, obsoleted: 4)
   @available(*, unavailable, message: "")
   public subscript(bounds: Range<Index>) -> String {
