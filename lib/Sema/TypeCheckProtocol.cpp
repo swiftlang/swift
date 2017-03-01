@@ -1705,7 +1705,7 @@ namespace {
     /// Whether we've already complained about problems with this conformance.
     bool AlreadyComplained = false;
 
-    /// Keep track of missing witnesses, either type of value, for later
+    /// Keep track of missing witnesses, either type or value, for later
     /// diagnosis emits.
     llvm::SetVector<ValueDecl*> MissingWitnesses;
 
