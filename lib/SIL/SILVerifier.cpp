@@ -1649,14 +1649,8 @@ public:
   }
 
   // Is a SIL type a potential lowering of a formal type?
-  static bool isLoweringOf(SILType loweredType,
-                           CanType formalType) {
-    
-    
-    // Dynamic self has the same lowering as its contained type.
-    if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalType))
-      formalType = CanType(dynamicSelf->getSelfType());
-
+  bool isLoweringOf(SILType loweredType,
+                    CanType formalType) {
     // Optional lowers its contained type. The difference between Optional
     // and IUO is lowered away.
     SILType loweredObjectType = loweredType
@@ -1672,7 +1666,8 @@ public:
     // Metatypes preserve their instance type through lowering.
     if (auto loweredMT = loweredType.getAs<MetatypeType>()) {
       if (auto formalMT = dyn_cast<MetatypeType>(formalType)) {
-        return loweredMT.getInstanceType() == formalMT.getInstanceType();
+        return isLoweringOf(loweredType.getMetatypeInstanceType(F.getModule()),
+                            formalMT.getInstanceType());
       }
     }
     if (auto loweredEMT = loweredType.getAs<ExistentialMetatypeType>()) {
@@ -1701,7 +1696,11 @@ public:
         }
         return true;
       }
-    
+
+    // Dynamic self has the same lowering as its contained type.
+    if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalType))
+      formalType = dynamicSelf.getSelfType();
+
     // Other types are preserved through lowering.
     return loweredType.getSwiftRValueType() == formalType;
   }
