@@ -98,9 +98,8 @@ ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *OrigF,
   }
 
   SILModule &M = OrigF->getModule();
-  SubstitutedType = SILType::substFuncType(M, InterfaceSubs,
-                                           OrigF->getLoweredFunctionType(),
-                                           /*dropGenerics = */ true);
+  SubstitutedType = OrigF->getLoweredFunctionType()->substGenericArgs(
+    M, InterfaceSubs);
 
   NumFormalIndirectResults = SubstitutedType->getNumIndirectFormalResults();
   Conversions.resize(NumFormalIndirectResults
