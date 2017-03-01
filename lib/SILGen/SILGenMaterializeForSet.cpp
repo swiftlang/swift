@@ -927,7 +927,7 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
       // ownership of it.
       SILValue indicesV =
         gen.B.createProjectValueBuffer(loc, indicesTy, callbackBuffer);
-      if (indicesTL->isLoadable())
+      if (indicesTL->isLoadable() || !gen.silConv.useLoweredAddresses())
         indicesV = indicesTL->emitLoad(gen.B, loc, indicesV,
                                        LoadOwnershipQualifier::Take);
       ManagedValue mIndices =
@@ -948,7 +948,7 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
     auto &valueTL = gen.getTypeLowering(lvalue.getTypeOfRValue());
     value = gen.B.createPointerToAddress(
       loc, value, valueTL.getLoweredType().getAddressType(), /*isStrict*/ true);
-    if (valueTL.isLoadable())
+    if (valueTL.isLoadable() || !gen.silConv.useLoweredAddresses())
       value = valueTL.emitLoad(gen.B, loc, value, LoadOwnershipQualifier::Take);
     ManagedValue mValue = gen.emitManagedRValueWithCleanup(value, valueTL);
     RValue rvalue(gen, loc, lvalue.getSubstFormalType(), mValue);
