@@ -51,6 +51,7 @@ public:
 };
 
 class ExprSyntax : public Syntax {
+  friend class FunctionParameterSyntax;
 public:
   using DataType = ExprSyntaxData;
 

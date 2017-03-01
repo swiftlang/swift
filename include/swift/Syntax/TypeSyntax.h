@@ -235,6 +235,7 @@ public:
 class TypeSyntax : public Syntax {
   using DataType = TypeSyntaxData;
   friend class SyntaxData;
+  friend class FunctionParameterSyntax;
 protected:
   TypeSyntax(const RC<SyntaxData> Root, const TypeSyntaxData *Data);
 public:

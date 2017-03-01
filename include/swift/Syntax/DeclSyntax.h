@@ -32,6 +32,9 @@
 namespace swift {
 namespace syntax {
 
+class ExprSyntax;
+class ExprSyntaxData;
+
 #pragma mark declaration Data
 
 class DeclSyntaxData : public SyntaxData {
@@ -378,6 +381,245 @@ public:
   TypeAliasDeclSyntaxBuilder &useType(TypeSyntax ReferentType);
 
   TypeAliasDeclSyntax build() const;
+};
+
+#pragma mark - function-parameter Data
+
+class FunctionParameterSyntaxData final : public SyntaxData {
+
+  friend struct SyntaxFactory;
+  friend class Syntax;
+  friend class SyntaxData;
+  friend class FunctionParameterSyntax;
+
+  RC<TypeSyntaxData> CachedTypeSyntax;
+  RC<ExprSyntaxData> CachedDefaultValue;
+
+  FunctionParameterSyntaxData(RC<RawSyntax> Raw,
+                              const SyntaxData *Parent = nullptr,
+                              CursorIndex IndexInParent = 0);
+  static RC<FunctionParameterSyntaxData>
+  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
+       CursorIndex IndexInParent = 0);
+  static RC<FunctionParameterSyntaxData> makeBlank();
+
+public:
+  static bool classof(const SyntaxData *SD) {
+    return SD->getKind() == SyntaxKind::FunctionParameter;
+  }
+};
+
+#pragma mark - function-parameter API
+
+/// parameter ->
+/// external-parameter-name? local-parameter-name ':'
+///   type '...'? '='? expression? ','?
+class FunctionParameterSyntax final : public Syntax {
+  friend struct SyntaxFactory;
+  friend class Syntax;
+  friend class SyntaxData;
+  friend class FunctionParameterSyntaxData;
+
+  using DataType = FunctionParameterSyntaxData;
+
+  enum class Cursor : CursorIndex {
+    ExternalName,
+    LocalName,
+    Colon,
+    Type,
+    Ellipsis,
+    DefaultEqual,
+    DefaultExpression,
+    TrailingComma,
+  };
+
+  FunctionParameterSyntax(const RC<SyntaxData> Root,
+                          const DataType *Data);
+
+public:
+  /// Get the external name of the parameter, if there is one.
+  RC<TokenSyntax> getExternalName() const;
+
+  /// Return a FunctionParameterSyntax with the given external name.
+  FunctionParameterSyntax
+  withExternalName(RC<TokenSyntax> NewExternalName) const;
+
+  /// Return the local name of the parameter.
+  RC<TokenSyntax> getLocalName() const;
+
+  /// Return a FunctionParameterSyntax with the given local name.
+  FunctionParameterSyntax
+  withLocalName(RC<TokenSyntax> NewLocalName) const;
+
+  /// Return the colon ':' token between the local name and type of the
+  /// parameter.
+  RC<TokenSyntax> getColonToken() const;
+
+  /// Return a FunctionParameterSyntax with the given colon token between
+  /// the local name and type.
+  FunctionParameterSyntax
+  withColonToken(RC<TokenSyntax> NewColonToken) const;
+
+  /// Return the syntax for the type of this parameter.
+  llvm::Optional<TypeSyntax> getTypeSyntax() const;
+
+  /// Return a FunctionParameterSyntax with the given parameter type syntax.
+  FunctionParameterSyntax
+  withTypeSyntax(llvm::Optional<TypeSyntax> NewType) const;
+
+  /// Return the equal '=' token in between the parameter type and the default
+  /// value, if there is one.
+  RC<TokenSyntax> getEqualToken() const;
+
+  /// Return a FunctionParameterSyntax with the given equal '=' token in
+  /// between the parameter type and the default value.
+  FunctionParameterSyntax withEqualToken(RC<TokenSyntax> NewEqualToken) const;
+
+  /// Return the expresion for the default value of the parameter, if there
+  /// is one.
+  llvm::Optional<ExprSyntax> getDefaultValue() const;
+
+  /// Return a FunctionParameterSyntax with the given default value. To remove
+  /// the default value, pass llvm::None.
+  FunctionParameterSyntax
+  withDefaultValue(llvm::Optional<ExprSyntax> NewDefaultValue) const;
+
+  /// Return the trailing comma on the parameter, if there is one.
+  RC<TokenSyntax> getTrailingComma() const;
+
+  /// Return a FunctionParameterSyntax with the given trailing comma.
+  FunctionParameterSyntax
+  withTrailingComma(RC<TokenSyntax> NewTrailingComma) const;
+
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::FunctionParameter;
+  }
+};
+
+#pragma mark - function-parameter-list Data
+
+class FunctionParameterListSyntaxData final : public SyntaxData {
+
+  std::vector<RC<FunctionParameterSyntaxData>> CachedParameters;
+
+public:
+  static bool classof(const SyntaxData *SD) {
+    return SD->getKind() == SyntaxKind::FunctionParameterList;
+  }
+};
+
+#pragma mark - function-parameter-list API
+
+/// parameter-list -> parameteter | parameter ',' parameter-list
+class FunctionParameterListSyntax final : public Syntax {
+  friend struct SyntaxBuilder;
+  friend class Syntax;
+  friend class SyntaxData;
+  friend class FunctionParameterListSyntaxData;
+
+  using DataType = FunctionParameterListSyntaxData;
+
+public:
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::FunctionParameterList;
+  }
+};
+
+#pragma mark - function-signature Data
+
+class FunctionSignatureSyntaxData final : public SyntaxData {
+
+  RC<FunctionParameterListSyntaxData> CachedParameterList;
+  RC<TypeAttributesSyntaxData> CachedReturnTypeAttributes;
+  RC<TypeSyntaxData> CachedReturnTypeSyntax;
+
+public:
+  static bool classof(const SyntaxData *SD) {
+    return SD->getKind() == SyntaxKind::FunctionSignature;
+  }
+};
+
+#pragma mark - function-signature API
+
+/// function-signature ->
+///   '(' parameter-list? ')' (throws | rethrows)? '->' attributes? type
+class FunctionSignatureSyntax final : public Syntax {
+  friend struct SyntaxBuilder;
+  friend class Syntax;
+  friend class SyntaxData;
+  friend class FunctionSignatureSyntaxData;
+
+  using DataType = FunctionSignatureSyntaxData;
+
+  enum class Cursor : CursorIndex {
+    LeftParen,
+    ParameterList,
+    RightParen,
+    ThrowsOrRethrows,
+    Arrow,
+    ReturnTypeAttributes,
+    ReturnType,
+  };
+
+public:
+  /// Return the left parenthesis '(' token enclosing the parameter list.
+  RC<TokenSyntax> getLeftParenToken() const;
+
+  /// Return a FunctionSignatureSyntax with the given left parentesis '(' token
+  /// enclosing the parameter list.
+  FunctionSignatureSyntax
+  withLeftParenToken(RC<TokenSyntax> NewLeftParen) const;
+
+  /// Return the parameter list for this signature.
+  FunctionParameterListSyntax getParameterList() const;
+
+  /// Return the parameter list for this signature.
+  FunctionSignatureSyntax
+  withParameterList(FunctionParameterListSyntax NewParameterList) const;
+
+  /// Return the 'throws' token in this signature if it exists.
+  RC<TokenSyntax> getThrowsToken() const;
+
+  /// Return a FunctionSignatureSyntax with the given 'throws' token.
+  FunctionSignatureSyntax withThrowsToken(RC<TokenSyntax> NewThrowsToken) const;
+
+  /// Return the 'rethrows' token in this signature if it exists;
+  RC<TokenSyntax> getRethrowsToken() const;
+
+  /// Return a FunctionSignatureSyntax with the given 'rethrows' token.
+  FunctionSignatureSyntax
+  withRethrowsToken(RC<TokenSyntax> NewRethrowsToken) const;
+
+  /// Return the arrow '->' token for the signature.
+  RC<TokenSyntax> getArrowToken() const;
+
+  /// Return a FunctionSignatureSyntax with the given arrow token
+  FunctionSignatureSyntax withArrowToken(RC<TokenSyntax> NewArrowToken) const;
+
+  /// Return the return type attributes for the signature.
+  TypeAttributesSyntax getReturnTypeAttributes() const;
+
+  /// Return a FunctionSignatureSyntax with the given return type attributes.
+  FunctionSignatureSyntax
+  withReturnTypeAttributes(TypeAttributesSyntax NewReturnTypeAttributes) const;
+
+  /// Return the syntax for the return type of the signature.
+  TypeSyntax getReturnTypeSyntax() const;
+
+  /// Return a FunctionSignatureSyntax with the given return type.
+  FunctionSignatureSyntax withReturnTypeSyntax(TypeSyntax NewReturnType) const;
+
+  /// Return the right parenthesis ')' token enclosing the parameter list.
+  RC<TokenSyntax> getRightParenToken() const;
+
+  /// Return a FunctionSignatureSyntax with the given right parentesis ')' token
+  /// enclosing the parameter list.
+  FunctionSignatureSyntax
+  withRightParenToken(RC<TokenSyntax> NewLeftParen) const;
+
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::FunctionSignature;
+  }
 };
 
 } // end namespace syntax

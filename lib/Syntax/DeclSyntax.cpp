@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Syntax/DeclSyntax.h"
+#include "swift/Syntax/ExprSyntax.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
 
@@ -363,4 +364,183 @@ TypeAliasDeclSyntax TypeAliasDeclSyntaxBuilder::build() const {
                              SourcePresence::Present);
   auto Data = TypeAliasDeclSyntaxData::make(Raw);
   return { Data, Data.get() };
+}
+
+#pragma mark - function-parameter Data
+
+FunctionParameterSyntaxData::FunctionParameterSyntaxData(RC<RawSyntax> Raw,
+                            const SyntaxData *Parent,
+                            CursorIndex IndexInParent)
+  : SyntaxData(Raw, Parent, IndexInParent) {
+  assert(Raw->Layout.size() == 8);
+  syntax_assert_child_token(Raw, FunctionParameterSyntax::Cursor::ExternalName,
+                            tok::identifier);
+  syntax_assert_child_token(Raw, FunctionParameterSyntax::Cursor::LocalName,
+                            tok::identifier);
+  syntax_assert_child_token_text(Raw, FunctionParameterSyntax::Cursor::Colon,
+                                 tok::colon, ":");
+  assert(Raw->getChild(FunctionParameterSyntax::Cursor::Type)->isType());
+  syntax_assert_child_token_text(Raw, FunctionParameterSyntax::Cursor::Ellipsis,
+                                 tok::identifier, "...");
+  syntax_assert_child_token_text(Raw,
+                                 FunctionParameterSyntax::Cursor::DefaultEqual,
+                                 tok::equal, "=");
+  assert(Raw->getChild(
+    FunctionParameterSyntax::Cursor::DefaultExpression)->isExpr());
+  syntax_assert_child_token_text(Raw,
+                                 FunctionParameterSyntax::Cursor::TrailingComma,
+                                 tok::comma, ",");
+}
+
+RC<FunctionParameterSyntaxData>
+FunctionParameterSyntaxData::make(RC<RawSyntax> Raw, const SyntaxData *Parent,
+     CursorIndex IndexInParent) {
+  return RC<FunctionParameterSyntaxData> {
+    new FunctionParameterSyntaxData {
+      Raw, Parent, IndexInParent
+    }
+  };
+}
+
+RC<FunctionParameterSyntaxData> FunctionParameterSyntaxData::makeBlank() {
+  auto Raw = RawSyntax::make(SyntaxKind::FunctionParameter,
+  {
+    TokenSyntax::missingToken(tok::identifier, ""),
+    TokenSyntax::missingToken(tok::identifier, ""),
+    TokenSyntax::missingToken(tok::colon, ":"),
+    RawSyntax::missing(SyntaxKind::MissingType),
+    TokenSyntax::missingToken(tok::identifier, "..."),
+    TokenSyntax::missingToken(tok::equal, "="),
+    RawSyntax::missing(SyntaxKind::MissingExpr),
+    TokenSyntax::missingToken(tok::comma, ","),
+  },
+  SourcePresence::Present);
+  return make(Raw);
+}
+
+
+#pragma mark - function-parameter API
+
+FunctionParameterSyntax::FunctionParameterSyntax(const RC<SyntaxData> Root,
+                                                 const DataType *Data)
+  : Syntax(Root, Data) {}
+
+RC<TokenSyntax> FunctionParameterSyntax::getExternalName() const {
+  return cast<TokenSyntax>(getRaw()->getChild(Cursor::ExternalName));
+}
+
+FunctionParameterSyntax FunctionParameterSyntax::
+withExternalName(RC<TokenSyntax> NewExternalName) const {
+  assert(NewExternalName->getTokenKind() == tok::identifier);
+  return Data->replaceChild<FunctionParameterSyntax>(NewExternalName,
+                                                     Cursor::ExternalName);
+}
+
+RC<TokenSyntax> FunctionParameterSyntax::getLocalName() const {
+  return cast<TokenSyntax>(getRaw()->getChild(Cursor::LocalName));
+}
+
+FunctionParameterSyntax FunctionParameterSyntax::
+withLocalName(RC<TokenSyntax> NewLocalName) const {
+  assert(NewLocalName->getTokenKind() == tok::identifier);
+  return Data->replaceChild<FunctionParameterSyntax>(NewLocalName,
+                                                     Cursor::LocalName);
+}
+
+RC<TokenSyntax> FunctionParameterSyntax::getColonToken() const {
+  return cast<TokenSyntax>(getRaw()->getChild(Cursor::Colon));
+}
+
+FunctionParameterSyntax FunctionParameterSyntax::
+withColonToken(RC<TokenSyntax> NewColonToken) const {
+  syntax_assert_token_is(NewColonToken, tok::colon, ":");
+  return Data->replaceChild<FunctionParameterSyntax>(NewColonToken,
+                                                     Cursor::Colon);
+}
+
+llvm::Optional<TypeSyntax> FunctionParameterSyntax::getTypeSyntax() const {
+  auto RawType = getRaw()->getChild(Cursor::Type);
+  if (RawType->isMissing()) {
+    return llvm::None;
+  }
+
+  auto *MyData = getUnsafeData<FunctionParameterSyntax>();
+
+  if (MyData->CachedTypeSyntax) {
+    return TypeSyntax { Root, MyData->CachedTypeSyntax.get() };
+  }
+
+  auto &ChildPtr = *reinterpret_cast<std::atomic<uintptr_t>*>(
+    &MyData->CachedTypeSyntax);
+
+  SyntaxData::realizeSyntaxNode<TypeSyntax>(ChildPtr, RawType, MyData,
+                                            cursorIndex(Cursor::Type));
+
+  return TypeSyntax { Root, MyData->CachedTypeSyntax.get() };
+}
+
+FunctionParameterSyntax FunctionParameterSyntax::
+withTypeSyntax(llvm::Optional<TypeSyntax> NewType) const {
+  if (!NewType.hasValue()) {
+    auto RawType = RawSyntax::missing(SyntaxKind::MissingType);
+    return Data->replaceChild<FunctionParameterSyntax>(RawType, Cursor::Type);
+  }
+
+  return Data->replaceChild<FunctionParameterSyntax>(
+    NewType.getValue().getRaw(), Cursor::Type);
+}
+
+RC<TokenSyntax> FunctionParameterSyntax::getEqualToken() const {
+  return cast<TokenSyntax>(getRaw()->getChild(Cursor::DefaultEqual));
+}
+
+FunctionParameterSyntax FunctionParameterSyntax::
+withEqualToken(RC<TokenSyntax> NewEqualToken) const {
+  assert(NewEqualToken->getTokenKind() == tok::equal);
+  return Data->replaceChild<FunctionParameterSyntax>(NewEqualToken,
+                                                     Cursor::DefaultEqual);
+}
+
+llvm::Optional<ExprSyntax> FunctionParameterSyntax::getDefaultValue() const {
+    auto RawExpr = getRaw()->getChild(Cursor::DefaultExpression);
+    if (RawExpr->isMissing()) {
+      return llvm::None;
+    }
+
+    auto *MyData = getUnsafeData<FunctionParameterSyntax>();
+
+    if (MyData->CachedTypeSyntax) {
+      return ExprSyntax { Root, MyData->CachedDefaultValue.get() };
+    }
+
+    auto &ChildPtr = *reinterpret_cast<std::atomic<uintptr_t>*>(
+      &MyData->CachedDefaultValue);
+
+    SyntaxData::realizeSyntaxNode<TypeSyntax>(ChildPtr, RawExpr, MyData,
+      cursorIndex(Cursor::DefaultExpression));
+    
+    return ExprSyntax { Root, MyData->CachedDefaultValue.get() };
+}
+
+FunctionParameterSyntax FunctionParameterSyntax::
+withDefaultValue(llvm::Optional<ExprSyntax> NewDefaultValue) const {
+  if (!NewDefaultValue.hasValue()) {
+    auto RawType = RawSyntax::missing(SyntaxKind::MissingExpr);
+    return Data->replaceChild<FunctionParameterSyntax>(RawType,
+      Cursor::DefaultExpression);
+  }
+
+  return Data->replaceChild<FunctionParameterSyntax>(
+    NewDefaultValue.getValue().getRaw(), Cursor::DefaultExpression);
+}
+
+RC<TokenSyntax> FunctionParameterSyntax::getTrailingComma() const {
+  return cast<TokenSyntax>(getRaw()->getChild(Cursor::TrailingComma));
+}
+
+FunctionParameterSyntax FunctionParameterSyntax::
+withTrailingComma(RC<TokenSyntax> NewTrailingComma) const {
+  syntax_assert_token_is(NewTrailingComma, tok::comma, ",");
+  return Data->replaceChild<FunctionParameterSyntax>(NewTrailingComma,
+                                                     Cursor::TrailingComma);
 }

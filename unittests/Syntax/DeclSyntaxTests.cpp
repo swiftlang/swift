@@ -1,5 +1,6 @@
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/DeclSyntax.h"
+#include "swift/Syntax/ExprSyntax.h"
 #include "llvm/ADT/SmallString.h"
 #include "gtest/gtest.h"
 
@@ -8,6 +9,8 @@ using llvm::SmallString;
 
 using namespace swift;
 using namespace swift::syntax;
+
+#pragma mark - typealias-decl
 
 TEST(DeclSyntaxTests, TypealiasMakeAPIs) {
   {
@@ -137,3 +140,157 @@ TEST(DeclSyntaxTests, TypealiasBuilderAPIs) {
   ASSERT_EQ(OS.str().str(),
             "typealias MyCollection<Element> = Array<Element>");
 }
+
+#pragma mark - parameter
+
+FunctionParameterSyntax getCannedFunctionParameter() {
+  auto ExternalName = SyntaxFactory::makeIdentifier("with", {},
+                                                    Trivia::spaces(1));
+  auto LocalName = SyntaxFactory::makeIdentifier("radius", {}, {});
+  auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
+  auto Int = SyntaxFactory::makeTypeIdentifier("Int", {},
+                                               Trivia::spaces(1));
+  auto NoEllipsis = TokenSyntax::missingToken(tok::identifier, "...");
+  auto Equal = SyntaxFactory::makeEqualToken({}, Trivia::spaces(1));
+
+  auto Sign = SyntaxFactory::makePrefixOpereator("-", {});
+  auto OneDigits = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
+  auto One = SyntaxFactory::makeIntegerLiteralExpr(Sign, OneDigits);
+  auto Comma = SyntaxFactory::makeCommaToken({}, {});
+
+  return SyntaxFactory::makeFunctionParameter(ExternalName, LocalName, Colon,
+                                              Int, NoEllipsis, Equal, One,
+                                              Comma);
+}
+
+TEST(DeclSyntaxTests, FunctionParameterMakeAPIs) {
+  {
+    SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    getCannedFunctionParameter().print(OS);
+    ASSERT_EQ(OS.str().str(), "with radius: Int = -1,");
+  }
+  {
+    SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    SyntaxFactory::makeBlankFunctionParameter().print(OS);
+    ASSERT_EQ(OS.str().str(), "");
+  }
+}
+
+TEST(DeclSyntaxTests, FunctionParameterGetAPIs) {
+  auto ExternalName = SyntaxFactory::makeIdentifier("with", {},
+                                                    Trivia::spaces(1));
+  auto LocalName = SyntaxFactory::makeIdentifier("radius", {}, {});
+  auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
+  auto Int = SyntaxFactory::makeTypeIdentifier("Int", {},
+                                                  Trivia::spaces(1));
+  auto NoEllipsis = TokenSyntax::missingToken(tok::identifier, "...");
+  auto Equal = SyntaxFactory::makeEqualToken({}, Trivia::spaces(1));
+
+  auto Sign = SyntaxFactory::makePrefixOpereator("-", {});
+  auto OneDigits = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
+  auto One = SyntaxFactory::makeIntegerLiteralExpr(Sign, OneDigits);
+  auto Comma = SyntaxFactory::makeCommaToken({}, {});
+
+  auto Param = SyntaxFactory::makeFunctionParameter(ExternalName, LocalName,
+                                                    Colon, Int, NoEllipsis,
+                                                    Equal, One, Comma);
+
+  ASSERT_EQ(ExternalName, Param.getExternalName());
+  ASSERT_EQ(LocalName, Param.getLocalName());
+  ASSERT_EQ(Colon, Param.getColonToken());
+
+  auto GottenType = Param.getTypeSyntax().getValue();
+  auto GottenType2 = Param.getTypeSyntax().getValue();
+  ASSERT_TRUE(GottenType.hasSameIdentityAs(GottenType2));
+
+  ASSERT_EQ(Equal, Param.getEqualToken());
+
+  auto GottenDefaultValue = Param.getDefaultValue().getValue();
+  auto GottenDefaultValue2 = Param.getDefaultValue().getValue();
+  ASSERT_TRUE(GottenDefaultValue.hasSameIdentityAs(GottenDefaultValue2));
+
+  ASSERT_EQ(Comma, Param.getTrailingComma());
+
+  // Test that llvm::None is returned for non-token missing children:
+  auto Decimated = Param
+    .withTypeSyntax(llvm::None)
+    .withDefaultValue(llvm::None);
+
+  ASSERT_FALSE(Decimated.getTypeSyntax().hasValue());
+  ASSERT_FALSE(Decimated.getDefaultValue().hasValue());
+}
+
+TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
+  auto ExternalName = SyntaxFactory::makeIdentifier("for", {},
+                                                    Trivia::spaces(1));
+  auto LocalName = SyntaxFactory::makeIdentifier("integer", {}, {});
+  auto Colon = SyntaxFactory::makeColonToken(Trivia::spaces(1),
+                                             Trivia::spaces(1));
+  auto Int = SyntaxFactory::makeTypeIdentifier("Int", {},
+                                                  Trivia::spaces(1));
+  auto Equal = SyntaxFactory::makeEqualToken({}, Trivia::spaces(1));
+
+  auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "");
+  auto OneDigits = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
+  auto One = SyntaxFactory::makeIntegerLiteralExpr(NoSign, OneDigits);
+  auto Comma = SyntaxFactory::makeCommaToken({}, {});
+
+  {
+    SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    getCannedFunctionParameter()
+      .withExternalName(ExternalName)
+      .withLocalName(LocalName)
+      .withColonToken(Colon)
+      .withTypeSyntax(Int)
+      .withEqualToken(Equal)
+      .withDefaultValue(One)
+      .withTrailingComma(Comma)
+      .print(OS);
+    ASSERT_EQ(OS.str().str(), "for integer : Int = 1,");
+  }
+  {
+    SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    getCannedFunctionParameter()
+      .withTypeSyntax(llvm::None)
+      .withDefaultValue(llvm::None)
+      .print(OS);
+    ASSERT_EQ(OS.str().str(), "with radius: = ,");
+  }
+}
+
+#pragma mark - parameter-list
+
+TEST(DeclSyntaxTests, FunctionParameterListMakeAPIs) {
+
+}
+
+TEST(DeclSyntaxTests, FunctionParameterListGetAPIs) {
+
+}
+
+TEST(DeclSyntaxTests, FunctionParameterListWithAPIs) {
+  
+}
+
+#pragma mark - function-signature
+
+TEST(DeclSyntaxTests, FunctionSignatureMakeAPIs) {
+
+}
+
+TEST(DeclSyntaxTests, FunctionSignatureGetAPIs) {
+
+}
+
+TEST(DeclSyntaxTests, FunctionSignatureWithAPIs) {
+
+}
+
+#pragma mark - function-declaration
+
+// TODO: Nodes
+// TODO: Tests
