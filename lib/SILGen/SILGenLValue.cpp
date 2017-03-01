@@ -227,7 +227,8 @@ void LogicalPathComponent::writeback(SILGenFunction &gen, SILLocation loc,
 
   assert(temporary.getType().isAddress());
   auto &tempTL = gen.getTypeLowering(temporary.getType());
-  if (!tempTL.isAddressOnly() || !isFinal) {
+  if (!tempTL.isAddressOnly() || !isFinal ||
+      !gen.silConv.useLoweredAddresses()) {
     if (isFinal) temporary.forward(gen);
     temporary = gen.emitLoad(loc, temporary.getValue(), tempTL,
                              SGFContext(), IsTake_t(isFinal));
