@@ -421,9 +421,14 @@ public:
   SILType substGenericArgs(SILModule &M,
                            SubstitutionList Subs) const;
 
+  /// If the original type is generic, pass the signature as genericSig.
+  ///
+  /// If the replacement types are generic, you must push a generic context
+  /// first.
   SILType subst(SILModule &silModule,
                 TypeSubstitutionFn subs,
-                LookupConformanceFn conformances) const;
+                LookupConformanceFn conformances,
+                CanGenericSignature genericSig=CanGenericSignature()) const;
 
   SILType subst(SILModule &silModule, const SubstitutionMap &subs) const;
 

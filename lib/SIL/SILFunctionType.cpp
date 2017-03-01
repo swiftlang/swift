@@ -1867,16 +1867,23 @@ namespace {
     SILModule &TheSILModule;
     TypeSubstitutionFn Subst;
     LookupConformanceFn Conformances;
+    // The signature for the original type.
+    //
+    // Replacement types are lowered with respect to the current
+    // context signature.
+    CanGenericSignature Sig;
 
     ASTContext &getASTContext() { return TheSILModule.getASTContext(); }
 
   public:
     SILTypeSubstituter(SILModule &silModule,
                        TypeSubstitutionFn Subst,
-                       LookupConformanceFn Conformances)
+                       LookupConformanceFn Conformances,
+                       CanGenericSignature Sig)
       : TheSILModule(silModule),
         Subst(Subst),
-        Conformances(Conformances)
+        Conformances(Conformances),
+        Sig(Sig)
     {}
 
     // SIL type lowering only does special things to tuples and functions.
@@ -1892,9 +1899,6 @@ namespace {
 
     // Entry point for use by SILType::substGenericArgs().
     CanSILFunctionType substSILFunctionType(CanSILFunctionType origType) {
-      GenericContextScope scope(TheSILModule.Types,
-                                origType->getGenericSignature());
-
       SmallVector<SILResultInfo, 8> substResults;
       substResults.reserve(origType->getNumResults());
       for (auto origResult : origType->getResults()) {
@@ -1972,16 +1976,7 @@ namespace {
     CanType visitType(CanType origType) {
       assert(!isa<AnyFunctionType>(origType));
       assert(!isa<LValueType>(origType) && !isa<InOutType>(origType));
-
-      CanGenericSignature genericSig =
-          TheSILModule.Types.getCurGenericContext();
-      AbstractionPattern abstraction(genericSig, origType);
-
-      assert(TheSILModule.Types.getLoweredType(abstraction, origType)
-               .getSwiftRValueType() == origType);
-
-      CanType substType =
-        origType.subst(Subst, Conformances, None)->getCanonicalType();
+      auto substType = origType.subst(Subst, Conformances)->getCanonicalType();
 
       // If the substitution didn't change anything, we know that the
       // original type was a lowered type, so we're good.
@@ -1989,6 +1984,7 @@ namespace {
         return origType;
       }
 
+      AbstractionPattern abstraction(Sig, origType);
       return TheSILModule.Types.getLoweredType(abstraction, substType)
                .getSwiftRValueType();
     }
@@ -1997,8 +1993,15 @@ namespace {
 
 SILType SILType::subst(SILModule &silModule,
                        TypeSubstitutionFn subs,
-                       LookupConformanceFn conformances) const {
-  SILTypeSubstituter STST(silModule, subs, conformances);
+                       LookupConformanceFn conformances,
+                       CanGenericSignature genericSig) const {
+  if (!hasArchetype() && !hasTypeParameter())
+    return *this;
+
+  if (!genericSig)
+    genericSig = silModule.Types.getCurGenericContext();
+  SILTypeSubstituter STST(silModule, subs, conformances,
+                          genericSig);
   return STST.subst(*this);
 }
 
@@ -2045,7 +2048,8 @@ SILFunctionType::substGenericArgs(SILModule &silModule,
                                   TypeSubstitutionFn subs,
                                   LookupConformanceFn conformances) {
   if (!isPolymorphic()) return CanSILFunctionType(this);
-  SILTypeSubstituter substituter(silModule, subs, conformances);
+  SILTypeSubstituter substituter(silModule, subs, conformances,
+                                 getGenericSignature());
   return substituter.substSILFunctionType(CanSILFunctionType(this));
 }
 
