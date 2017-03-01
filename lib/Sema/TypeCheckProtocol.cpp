@@ -2400,13 +2400,11 @@ printFixitString(SourceLoc TypeLoc,
                  std::string &FixitString) {
   bool Result = false;
   llvm::raw_string_ostream FixitStream(FixitString);
-  std::for_each(MissingWitnesses.begin(),
-                MissingWitnesses.end(),
-                [&](ValueDecl* VD) {
-                  Result |= printRequirementStub(VD, Conf->getDeclContext(),
-                                                 Conf->getType(),
-                                                 TypeLoc, FixitStream);
-                });
+  std::for_each(MissingWitnesses.begin(), MissingWitnesses.end(),
+    [&](ValueDecl* VD) {
+      Result |= printRequirementStub(VD, Conf->getDeclContext(), Conf->getType(),
+                                     TypeLoc, FixitStream);
+    });
 
   return Result;
 }
