@@ -127,12 +127,6 @@ public:
     return SILType(T, SILValueCategory::Address);
   }
 
-  ///  Apply a substitution to the function type.
-  static CanSILFunctionType substFuncType(SILModule &silModule,
-                                          const SubstitutionMap &subs,
-                                          CanSILFunctionType SrcTy,
-                                          bool dropGenerics);
-
   bool isNull() const { return value.getPointer() == nullptr; }
   explicit operator bool() const { return bool(value.getPointer()); }
 

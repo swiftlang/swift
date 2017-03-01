@@ -2266,16 +2266,6 @@ SILType SILType::subst(SILModule &silModule, const SubstitutionMap &subs) const{
                LookUpConformanceInSubstitutionMap(subs));
 }
 
-CanSILFunctionType SILType::substFuncType(SILModule &silModule,
-                                          const SubstitutionMap &subs,
-                                          CanSILFunctionType SrcTy,
-                                          bool dropGenerics) {
-  auto subFn = QuerySubstitutionMap{subs};
-  auto lookupFn = LookUpConformanceInSubstitutionMap(subs);
-  SILTypeSubstituter STST(silModule, subFn, lookupFn);
-  return STST.visitSILFunctionType(SrcTy, dropGenerics);
-}
-
 /// Apply a substitution to this polymorphic SILFunctionType so that
 /// it has the form of the normal SILFunctionType for the substituted
 /// type, except using the original conventions.
