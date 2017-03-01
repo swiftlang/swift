@@ -208,7 +208,31 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
   }
   return false;
 }
-  
+
+bool Context::hasSwiftCallingConvention(llvm::StringRef MangledName) {
+  Node *Global = demangleSymbolAsNode(MangledName);
+  if (!Global || Global->getKind() != Node::Kind::Global ||
+      Global->getNumChildren() == 0)
+    return false;
+
+  Node *TopLevel = Global->getFirstChild();
+  switch (TopLevel->getKind()) {
+    // Functions, which don't have the swift calling conventions:
+    case Node::Kind::TypeMetadataAccessFunction:
+    case Node::Kind::ValueWitness:
+    case Node::Kind::ProtocolWitnessTableAccessor:
+    case Node::Kind::GenericProtocolWitnessTableInstantiationFunction:
+    case Node::Kind::LazyProtocolWitnessTableAccessor:
+    case Node::Kind::AssociatedTypeMetadataAccessor:
+    case Node::Kind::AssociatedTypeWitnessTableAccessor:
+    case Node::Kind::ObjCAttribute:
+      return false;
+    default:
+      break;
+  }
+  return true;
+}
+
 NodePointer Context::createNode(Node::Kind K) {
   return D->createNode(K);
 }

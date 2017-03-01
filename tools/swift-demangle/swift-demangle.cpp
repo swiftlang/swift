@@ -132,6 +132,8 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         Classifications += 'N';
       if (DCtx.isThunkSymbol(name))
         Classifications += 'T';
+      if (pointer && !DCtx.hasSwiftCallingConvention(name))
+        Classifications += 'C';
       if (!Classifications.empty())
         llvm::outs() << '{' << Classifications << "} ";
     }
