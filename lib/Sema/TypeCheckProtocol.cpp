@@ -2420,6 +2420,7 @@ printFixitString(SourceLoc TypeLoc,
 void ConformanceChecker::diagnoseMissingWitnesses() {
   if (MissingWitnesses.empty())
     return;
+  SWIFT_DEFER { MissingWitnesses.clear(); };
   llvm::SetVector<ValueDecl*> MissingWitnesses = this->MissingWitnesses;
   diagnoseOrDefer(MissingWitnesses[0], true,
     [MissingWitnesses](NormalProtocolConformance *Conf) {
@@ -2455,7 +2456,6 @@ void ConformanceChecker::diagnoseMissingWitnesses() {
           Diag.fixItInsertAfter(FixitLocation, FixIt);
       }
   });
-  MissingWitnesses.clear();
 }
 
 ResolveWitnessResult
