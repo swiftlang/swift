@@ -12,10 +12,10 @@ import StdlibUnittest
 // end up not existing in the new String
 //
 struct Latin1String<Base : RandomAccessCollection> : Unicode
-where Base.Iterator.Element == UInt8, Base.Index == Base.SubSequence.Index,
+where Base.Iterator.Element == UInt8, 
+Base.Index == Base.SubSequence.Index,
 Base.SubSequence.SubSequence == Base.SubSequence,
 Base.SubSequence : RandomAccessCollection,
-Base.Iterator.Element == UInt8,
 Base.SubSequence.Iterator.Element == Base.Iterator.Element {
   typealias Encoding = Latin1
   typealias CodeUnits = Base

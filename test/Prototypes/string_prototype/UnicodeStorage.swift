@@ -9,8 +9,7 @@ extension UnicodeStorage {
     return type(of: self).TranscodedView(self.codeUnits, to: otherEncoding)
   }
 
-  typealias Characters = CharacterView<CodeUnits, Encoding>
-  var characters: Characters {
-    return Characters(codeUnits, Encoding.self)
+  var characters: CharacterView {
+    return CharacterView(codeUnits, Encoding.self)
   }
 }

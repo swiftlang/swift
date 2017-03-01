@@ -398,15 +398,7 @@ extension UnicodeStorage {
 
 extension UnicodeStorage {
   
-  public struct CharacterView<
-    CodeUnits : RandomAccessCollection,
-    Encoding : UnicodeEncoding
-  > : BidirectionalCollection
-  where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
-    CodeUnits.SubSequence : RandomAccessCollection,
-    CodeUnits.SubSequence.Index == CodeUnits.Index,
-    CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
-    CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+  public struct CharacterView : BidirectionalCollection {
 
     public init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
       self.storage = UnicodeStorage<CodeUnits,Encoding>(codeUnits)

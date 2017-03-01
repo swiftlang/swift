@@ -95,7 +95,7 @@ extension SwiftCanonicalString : Unicode {
   //   return storage.scalars
   // }
 
-  typealias Characters = Storage.Characters
+  typealias Characters = Storage.CharacterView
   var characters: Characters {
     return storage.characters
   }
