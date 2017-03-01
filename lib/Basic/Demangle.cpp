@@ -3415,7 +3415,8 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::ReabstractionThunk:
   case Node::Kind::ReabstractionThunkHelper: {
     if (Options.ShortenThunk) {
-      Printer << "thunk";
+      Printer << "thunk for ";
+      print(pointer->getChild(pointer->getNumChildren() - 2));
       return;
     }
     Printer << "reabstraction thunk ";

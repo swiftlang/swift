@@ -3,7 +3,7 @@
 // FIXME: this test only passes on platforms which have Float80.
 // <rdar://problem/19508460> Floating point enum raw values are not portable
 
-// REQUIRES: CPU=i386 || CPU=x86_64
+// REQUIRES: CPU=i386_or_x86_64
 
 enum Empty {}
 
