@@ -2414,23 +2414,21 @@ printFixitString(SourceLoc TypeLoc,
 void ConformanceChecker::diagnoseMissingWitness() {
   if (MissingWitnesses.empty() || AlreadyComplained)
     return;
-  DeclContext *Adopter = Conformance->getDeclContext();
-
-  SourceLoc FixitLocation;
-  SourceLoc TypeLoc;
-  if (auto Extension = dyn_cast<ExtensionDecl>(Adopter)) {
-    FixitLocation = Extension->getBraces().Start;
-    TypeLoc = Extension->getStartLoc();
-  } else if (auto Nominal = dyn_cast<NominalTypeDecl>(Adopter)) {
-    FixitLocation = Nominal->getBraces().Start;
-    TypeLoc = Nominal->getStartLoc();
-  } else {
-    llvm_unreachable("Unknown adopter kind");
-  }
-
   SmallVector<ValueDecl*, 4> MissingWitnesses = this->MissingWitnesses;
   diagnoseOrDefer(MissingWitnesses.front(), true,
-    [MissingWitnesses, FixitLocation, TypeLoc](ProtocolConformance *Conf) {
+    [MissingWitnesses](ProtocolConformance *Conf) {
+      DeclContext *Adopter = Conf->getDeclContext();
+      SourceLoc FixitLocation;
+      SourceLoc TypeLoc;
+      if (auto Extension = dyn_cast<ExtensionDecl>(Adopter)) {
+        FixitLocation = Extension->getBraces().Start;
+        TypeLoc = Extension->getStartLoc();
+      } else if (auto Nominal = dyn_cast<NominalTypeDecl>(Adopter)) {
+        FixitLocation = Nominal->getBraces().Start;
+        TypeLoc = Nominal->getStartLoc();
+      } else {
+        llvm_unreachable("Unknown adopter kind");
+      }
       auto *DC = Conf->getDeclContext();
       std::string FixIt;
       bool AddFixit = printFixitString(TypeLoc, Conf, MissingWitnesses, FixIt);
