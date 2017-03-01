@@ -2428,42 +2428,29 @@ void ConformanceChecker::diagnoseMissingWitness() {
     llvm_unreachable("Unknown adopter kind");
   }
 
-  ValueDecl *Requirement = MissingWitnesses.front();
   SmallVector<ValueDecl*, 4> MissingWitnesses = this->MissingWitnesses;
-  if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)){
-    diagnoseOrDefer(Requirement, true,
-      [MissingWitnesses, MissingTypeWitness, FixitLocation, TypeLoc]
-                    (ProtocolConformance *Conf) {
-        std::string FixIt;
-        printFixitString(TypeLoc, Conf, llvm::makeArrayRef(MissingWitnesses),
-                         FixIt);
-        Conf->getDeclContext()->getASTContext().Diags.diagnose(
-          MissingTypeWitness,
-          diag::no_witnesses_type,
-          MissingTypeWitness->getName()).fixItInsertAfter(FixitLocation, FixIt);
-      });
-    return;
-  }
-
-  diagnoseOrDefer(Requirement, true,
-    [TypeLoc, MissingWitnesses, FixitLocation, Requirement]
-    (ProtocolConformance *Conf) {
+  diagnoseOrDefer(MissingWitnesses.front(), true,
+    [MissingWitnesses, FixitLocation, TypeLoc](ProtocolConformance *Conf) {
       auto *DC = Conf->getDeclContext();
-      // Determine the type that the requirement is expected to have.
-      Type RequirementType =
-        getRequirementTypeForDisplay(DC->getParentModule(),
-          static_cast<NormalProtocolConformance*>(Conf), Requirement);
       std::string FixIt;
-      bool AddFixit = printFixitString(TypeLoc, Conf,
-                                       llvm::makeArrayRef(MissingWitnesses),
-                                       FixIt);
-      auto Diag = DC->getASTContext().Diags.diagnose(Requirement,
-                                                     diag::no_witnesses,
-                                                getRequirementKind(Requirement),
-                                                     Requirement->getFullName(),
-                                                     RequirementType, AddFixit);
-      if (AddFixit)
-        Diag.fixItInsertAfter(FixitLocation, FixIt);
+      bool AddFixit = printFixitString(TypeLoc, Conf, MissingWitnesses, FixIt);
+      auto &Diags = DC->getASTContext().Diags;
+      for (auto VD : MissingWitnesses) {
+        if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(VD)) {
+          Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
+                         MissingTypeWitness->getName()).
+          fixItInsertAfter(FixitLocation, FixIt);
+          continue;
+        }
+        Type RequirementType =
+          getRequirementTypeForDisplay(DC->getParentModule(),
+            static_cast<NormalProtocolConformance*>(Conf), VD);
+        auto Diag = Diags.diagnose(VD, diag::no_witnesses,
+                                   getRequirementKind(VD), VD->getFullName(),
+                                   RequirementType, AddFixit);
+        if (AddFixit)
+          Diag.fixItInsertAfter(FixitLocation, FixIt);
+      }
   });
 }
 
