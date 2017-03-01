@@ -442,6 +442,7 @@ public:
     llvm::PointerType *WitnessTablePtrTy;
   };
   llvm::StructType *RefCountedStructTy;/// %swift.refcounted = type { ... }
+  Size RefCountedStructSize; /// sizeof(%swift.refcounted)
   llvm::PointerType *RefCountedPtrTy;  /// %swift.refcounted*
   llvm::PointerType *WeakReferencePtrTy;/// %swift.weak_reference*
   llvm::PointerType *UnownedReferencePtrTy;/// %swift.unowned_reference*

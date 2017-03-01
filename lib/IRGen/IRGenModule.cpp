@@ -261,9 +261,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   });
   FullBoxMetadataPtrTy = FullBoxMetadataStructTy->getPointerTo(DefaultAS);
 
-
-  llvm::Type *refCountedElts[] = { TypeMetadataPtrTy, Int32Ty, Int32Ty };
+  // This must match struct HeapObject in the runtime.
+  llvm::Type *refCountedElts[] = { TypeMetadataPtrTy, IntPtrTy };
   RefCountedStructTy->setBody(refCountedElts);
+  RefCountedStructSize =
+    Size(DataLayout.getStructLayout(RefCountedStructTy)->getSizeInBytes());
 
   PtrSize = Size(DataLayout.getPointerSize(DefaultAS));
 

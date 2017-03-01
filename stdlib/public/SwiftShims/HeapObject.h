@@ -34,12 +34,12 @@ typedef struct HeapMetadata HeapMetadata;
   InlineRefCounts refCounts
 
 /// The Swift heap-object header.
+/// This must match RefCountedStructTy in IRGen.
 struct HeapObject {
   /// This is always a valid pointer to a metadata object.
   HeapMetadata const *metadata;
 
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
-  // FIXME: allocate two words of metadata on 32-bit platforms
 
 #ifdef __cplusplus
   HeapObject() = default;
@@ -57,9 +57,8 @@ static_assert(swift::IsTriviallyConstructible<HeapObject>::value,
               "HeapObject must be trivially initializable");
 static_assert(std::is_trivially_destructible<HeapObject>::value,
               "HeapObject must be trivially destructible");
-// FIXME: small header for 32-bit
-//static_assert(sizeof(HeapObject) == 2*sizeof(void*),
-//              "HeapObject must be two pointers long");
+static_assert(sizeof(HeapObject) == 2*sizeof(void*),
+              "HeapObject must be two pointers long");
 static_assert(alignof(HeapObject) == alignof(void*),
               "HeapObject must be pointer-aligned");
 
