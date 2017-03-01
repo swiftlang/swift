@@ -20,13 +20,14 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Type.h"
-#include "swift/AST/ProtocolConformance.h"
 
 namespace llvm {
   class raw_ostream;
 }
 
 namespace swift {
+
+class ProtocolConformance;
 
 /// A ProtocolConformanceRef is a handle to a protocol conformance which
 /// may be either concrete or abstract.
