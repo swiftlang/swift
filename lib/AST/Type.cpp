@@ -53,7 +53,7 @@ Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
 
 bool TypeLoc::isError() const {
   assert(wasValidated() && "Type not yet validated");
-  return getType()->hasError() || getType()->getCanonicalType()->hasError();
+  return getType()->hasError();
 }
 
 SourceRange TypeLoc::getSourceRange() const {
