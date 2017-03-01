@@ -408,7 +408,10 @@ private:
   /// \param checkConstraint Checks the given constraint against the
   /// canonical constraint to determine which diagnostics (if any) should be
   /// emitted.
-  void checkConstraintList(ArrayRef<GenericTypeParamType *> genericParams,
+  ///
+  /// \returns the representative constraint.
+  ConcreteConstraint checkConstraintList(
+                           ArrayRef<GenericTypeParamType *> genericParams,
                            std::vector<ConcreteConstraint> &constraints,
                            llvm::function_ref<bool(const ConcreteConstraint &)>
                              isSuitableRepresentative,

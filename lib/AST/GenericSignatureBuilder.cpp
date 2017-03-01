@@ -1870,24 +1870,7 @@ bool GenericSignatureBuilder::updateSuperclass(
                                            PotentialArchetype *T,
                                            Type superclass,
                                            const RequirementSource *source) {
-  // Make sure the concrete type fulfills the superclass requirement
-  // of the archetype.
-  // FIXME: Check this later, in finalize().
   auto equivClass = T->getOrCreateEquivalenceClass();
-  if (auto concrete = equivClass->concreteType) {
-    if (!superclass->isExactSuperclassOf(concrete, getLazyResolver())) {
-      if (auto existing = equivClass->findAnyConcreteConstraintAsWritten(T)) {
-        Diags.diagnose(existing->source->getLoc(), diag::type_does_not_inherit,
-                       T->getDependentType(/*FIXME:*/{ },
-                                           /*allowUnresolved=*/true),
-                       existing->concreteType, superclass)
-          .highlight(source->getLoc());
-      }
-      return true;
-    }
-
-    return false;
-  }
 
   // Local function to handle the update of superclass conformances
   // when the superclass constraint changes.
@@ -2170,25 +2153,6 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
                                                 ? conformance->getConcrete()
                                                 : nullptr);
     updateRequirementSource(conforms.second, concreteSource);
-  }
-
-  // Make sure the concrete type fulfills the superclass requirement
-  // of the archetype.
-  // FIXME: Delay until finalize() so we don't have to repeat this code.
-  if (auto superclass = equivClass->superclass) {
-    if (!superclass->isExactSuperclassOf(Concrete, getLazyResolver())) {
-      auto diag = Diags.diagnose(Source->getLoc(), diag::type_does_not_inherit,
-                                 rep->getDependentType(
-                                                   /*FIXME: */{ },
-                                                   /*allowUnresolved=*/true),
-                                 Concrete, superclass);
-
-      if (auto existingSource = equivClass->findAnySuperclassConstraintAsWritten(T)) {
-        diag.highlight(existingSource->source->getLoc());
-      }
-
-      return true;
-    }
   }
 
   // Eagerly resolve any existing nested types to their concrete forms (others
@@ -2903,7 +2867,7 @@ namespace swift {
   }
 }
 
-void GenericSignatureBuilder::checkConstraintList(
+ConcreteConstraint GenericSignatureBuilder::checkConstraintList(
                            ArrayRef<GenericTypeParamType *> genericParams,
                            std::vector<ConcreteConstraint> &constraints,
                            llvm::function_ref<bool(const ConcreteConstraint &)>
@@ -3060,6 +3024,8 @@ void GenericSignatureBuilder::checkConstraintList(
       break;
     }
   }
+
+  return *representativeConstraint;
 }
 
 void GenericSignatureBuilder::checkRedundantConcreteTypeConstraints(
@@ -3106,25 +3072,68 @@ void GenericSignatureBuilder::checkRedundantSuperclassConstraints(
   // constraint, and we will need to perform that substitution for this final
   // check.
 
-  checkConstraintList(
-    genericParams, equivClass->superclassConstraints,
-    [&](const ConcreteConstraint &constraint) {
-      return constraint.concreteType->isEqual(equivClass->superclass);
-    },
-    [&](Type superclass) {
-      // If this class is a superclass of the "best"
-      if (superclass->isExactSuperclassOf(equivClass->superclass, nullptr))
-        return ConstraintRelation::Redundant;
+  auto representativeConstraint =
+    checkConstraintList(
+      genericParams, equivClass->superclassConstraints,
+      [&](const ConcreteConstraint &constraint) {
+        return constraint.concreteType->isEqual(equivClass->superclass);
+      },
+      [&](Type superclass) {
+        // If this class is a superclass of the "best"
+        if (superclass->isExactSuperclassOf(equivClass->superclass, nullptr))
+          return ConstraintRelation::Redundant;
 
-      // Otherwise, it conflicts.
-      return ConstraintRelation::Conflicting;
-    },
-    diag::requires_superclass_conflict,
-    diag::redundant_superclass_constraint,
-    diag::superclass_redundancy_here);
+        // Otherwise, it conflicts.
+        return ConstraintRelation::Conflicting;
+      },
+      diag::requires_superclass_conflict,
+      diag::redundant_superclass_constraint,
+      diag::superclass_redundancy_here);
 
-  // FIXME: Diagnose redundancy of any superclass constraint if there is a
-  // concrete constraint.
+  // If we have a concrete type, check it.
+  // FIXME: Substitute into the concrete type.
+  if (equivClass->concreteType) {
+    // Make sure the concrete type fulfills the superclass requirement.
+    if (!equivClass->superclass->isExactSuperclassOf(equivClass->concreteType,
+                                                     nullptr)) {
+      if (auto existing = equivClass->findAnyConcreteConstraintAsWritten(
+                            representativeConstraint.archetype)) {
+        Diags.diagnose(existing->source->getLoc(), diag::type_does_not_inherit,
+                       existing->archetype->getDependentType(
+                                                   genericParams,
+                                                   /*allowUnresolved=*/true),
+                       existing->concreteType, equivClass->superclass);
+
+        // FIXME: Note the representative constraint.
+      } else if (representativeConstraint.source->getLoc().isValid()) {
+        Diags.diagnose(representativeConstraint.source->getLoc(),
+                       diag::type_does_not_inherit,
+                       representativeConstraint.archetype->getDependentType(
+                                                    genericParams,
+                                                    /*allowUnresolved=*/true),
+                       equivClass->concreteType, equivClass->superclass);
+      }
+    } else if (representativeConstraint.source->getLoc().isValid()) {
+      // It does fulfill the requirement; diagnose the redundancy.
+      Diags.diagnose(representativeConstraint.source->getLoc(),
+                     diag::redundant_superclass_constraint,
+                     representativeConstraint.archetype->getDependentType(
+                                                  genericParams,
+                                                  /*allowUnresolved=*/true),
+                     representativeConstraint.concreteType);
+
+      if (auto existing = equivClass->findAnyConcreteConstraintAsWritten(
+                            representativeConstraint.archetype)) {
+        Diags.diagnose(existing->source->getLoc(),
+                       diag::same_type_redundancy_here,
+                       existing->source->isDerivedRequirement(),
+                       existing->archetype->getDependentType(
+                                                   genericParams,
+                                                   /*allowUnresolved=*/true),
+                       existing->concreteType);
+      }
+    }
+  }
 }
 
 template<typename F>
