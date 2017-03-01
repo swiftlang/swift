@@ -163,109 +163,24 @@ Type SILFunction::mapTypeIntoContext(Type type) const {
       getGenericEnvironment(), type);
 }
 
-namespace {
-template<typename SubstFn>
-struct SubstDependentSILType
-  : CanTypeVisitor<SubstDependentSILType<SubstFn>, CanType>
-{
-  SILModule &M;
-  SubstFn Subst;
-  
-  SubstDependentSILType(SILModule &M, SubstFn Subst)
-    : M(M), Subst(std::move(Subst))
-  {}
-  
-  using super = CanTypeVisitor<SubstDependentSILType<SubstFn>, CanType>;
-  using super::visit;
-  
-  CanType visitDependentMemberType(CanDependentMemberType t) {
-    // If a dependent member type appears in lowered position, we need to lower
-    // its context substitution against the associated type's abstraction
-    // pattern.
-    CanType astTy = Subst(t);
-    auto origTy = AbstractionPattern::getOpaque();
-    
-    return M.Types.getLoweredType(origTy, astTy)
-      .getSwiftRValueType();
-  }
-  
-  CanType visitTupleType(CanTupleType t) {
-    // Dependent members can appear in lowered position inside tuples.
-    
-    SmallVector<TupleTypeElt, 4> elements;
-    
-    for (auto &elt : t->getElements())
-      elements.push_back(elt.getWithType(visit(CanType(elt.getType()))));
-    
-    return TupleType::get(elements, t->getASTContext())
-      ->getCanonicalType();
-  }
-  
-  CanType visitSILFunctionType(CanSILFunctionType t) {
-    // Dependent members can appear in lowered position inside SIL functions.
-    
-    SmallVector<SILParameterInfo, 4> params;
-    for (auto &param : t->getParameters())
-      params.push_back(param.map([&](CanType pt) -> CanType {
-        return visit(pt);
-      }));
-
-    SmallVector<SILResultInfo, 4> results;
-    for (auto &result : t->getResults())
-      results.push_back(result.map([&](CanType pt) -> CanType {
-        return visit(pt);
-      }));
-    
-    Optional<SILResultInfo> errorResult;
-    if (t->hasErrorResult()) {
-      errorResult = t->getErrorResult().map([&](CanType elt) -> CanType {
-          return visit(elt);
-      });
-    }
-    
-    return SILFunctionType::get(t->getGenericSignature(),
-                                t->getExtInfo(),
-                                t->getCalleeConvention(),
-                                params, results, errorResult,
-                                t->getASTContext());
-  }
-  
-  CanType visitType(CanType t) {
-    // Other types get substituted into context normally.
-    return Subst(t);
-  }
-};
-
-template<typename SubstFn>
-SILType doSubstDependentSILType(SILModule &M,
-                                SubstFn Subst,
-                                SILType t) {
-  CanType result = SubstDependentSILType<SubstFn>(M, std::move(Subst))
-    .visit(t.getSwiftRValueType());
-  return SILType::getPrimitiveType(result, t.getCategory());
-}
-  
-} // end anonymous namespace
-
 SILType SILFunction::mapTypeIntoContext(SILType type) const {
-  return doSubstDependentSILType(getModule(),
-    [&](CanType t) { return mapTypeIntoContext(t)->getCanonicalType(); },
-    type);
+  if (auto *genericEnv = getGenericEnvironment())
+    return genericEnv->mapTypeIntoContext(getModule(), type);
+  return type;
 }
 
 SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
                                                SILType type) const {
-  return doSubstDependentSILType(M,
-    [&](CanType t) {
-      return mapTypeIntoContext(t)->getCanonicalType();
-    },
-    type);
+  auto genericSig = getGenericSignature()->getCanonicalSignature();
+  return type.subst(M,
+                    QueryInterfaceTypeSubstitutions(this),
+                    LookUpConformanceInSignature(*genericSig),
+                    genericSig);
 }
 
 Type SILFunction::mapTypeOutOfContext(Type type) const {
   return GenericEnvironment::mapTypeOutOfContext(
-      getGenericEnvironment(),
-      type);
+      getGenericEnvironment(), type);
 }
 
 bool SILFunction::isNoReturnFunction() const {
