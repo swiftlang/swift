@@ -339,6 +339,10 @@ class NormalProtocolConformance : public ProtocolConformance,
   /// the requirements of those protocols.
   InheritedConformanceMap InheritedMapping;
 
+  /// Conformances that satisfy each of conformance requirements of the
+  /// requirement signature of the protocol.
+  ArrayRef<ProtocolConformanceRef> SignatureConformances;
+
   LazyMemberLoader *Resolver = nullptr;
   uint64_t ResolverContextData;
 
@@ -480,6 +484,17 @@ public:
     assert(!isComplete() && "Conformance already complete?");
     InheritedMapping[proto] = conformance;
   }
+
+  /// Retrieve the protocol conformances that satisfy the requirements of the
+  /// protocol, which line up with the conformance constraints in the
+  /// protocol's requirement signature.
+  ArrayRef<ProtocolConformanceRef> getSignatureConformances() const {
+    return SignatureConformances;
+  }
+
+  /// Copy the given protocol conformances for the requirement signature into
+  /// the normal conformance.
+  void setSignatureConformances(ArrayRef<ProtocolConformanceRef> conformances);
 
   /// Determine whether the witness for the given type requirement
   /// is the default definition.

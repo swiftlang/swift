@@ -715,6 +715,15 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   dc->getAsNominalTypeOrNominalTypeExtensionContext()
     ->registerProtocolConformance(conformance);
 
+  // Read requirement signature conformances.
+  SmallVector<ProtocolConformanceRef, 4> reqConformances;
+  for (auto req : proto->getRequirementSignature()->getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance) {
+      auto reqConformance = readConformance(DeclTypeCursor);
+      reqConformances.push_back(reqConformance);
+    }
+  }
+  conformance->setSignatureConformances(reqConformances);
 
   // Read inherited conformances.
   InheritedConformanceMap inheritedConformances;
@@ -4335,6 +4344,14 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
                                               contextID, valueCount,
                                               typeCount, inheritedCount,
                                               rawIDs);
+
+  // Skip requirement signature conformances.
+  auto proto = conformance->getProtocol();
+  for (auto req : proto->getRequirementSignature()->getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance) {
+      (void)readConformance(DeclTypeCursor);
+    }
+  }
 
   // Skip trailing inherited conformances.
   while (inheritedCount--)

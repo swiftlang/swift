@@ -252,6 +252,25 @@ AbstractStorageDecl *ProtocolConformance::getBehaviorDecl() const {
   return getRootNormalConformance()->getBehaviorDecl();
 }
 
+void NormalProtocolConformance::setSignatureConformances(
+                               ArrayRef<ProtocolConformanceRef> conformances) {
+  auto &ctx = getProtocol()->getASTContext();
+  SignatureConformances = ctx.AllocateCopy(conformances);
+
+#if !NDEBUG
+  unsigned idx = 0;
+  for (auto req : getProtocol()->getRequirementSignature()->getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance) {
+      assert(idx < conformances.size());
+      assert(conformances[idx].getRequirement() ==
+               req.getSecondType()->castTo<ProtocolType>()->getDecl());
+      ++idx;
+    }
+  }
+  assert(idx == conformances.size() && "Too many conformances");
+#endif
+}
+
 void NormalProtocolConformance::resolveLazyInfo() const {
   assert(Resolver);
   assert(isComplete());
