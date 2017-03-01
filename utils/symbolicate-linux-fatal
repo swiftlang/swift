@@ -30,12 +30,16 @@ import subprocess
 import lldb
 
 
+def bstr(byts):
+    # Converting byte arry to string in a way that works for Python 2 & 3
+    return str(byts.decode("ascii"))
+
 def process_ldd(lddoutput):
     dyn_libs = {}
     for line in lddoutput.splitlines():
         ldd_tokens = line.split()
         if len(ldd_tokens) >= 3:
-            dyn_libs[ldd_tokens[0].decode("utf-8")] = ldd_tokens[2].decode("utf-8")
+            dyn_libs[bstr(ldd_tokens[0])] = str(bstr(ldd_tokens[2]))
     return dyn_libs
 
 
