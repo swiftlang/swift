@@ -77,8 +77,10 @@ _TF3foolp3barSi ---> foo.bar.nativePinningAddressor : Swift.Int
 _TF3foog3barSi ---> foo.bar.getter : Swift.Int
 _TF3foos3barSi ---> foo.bar.setter : Swift.Int
 _TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas (zim : foo.zim) -> ()
-_TToFC3foo3bar3basfT3zimCS_3zim_T_ ---> @objc foo.bar.bas (zim : foo.zim) -> ()
+_TToFC3foo3bar3basfT3zimCS_3zim_T_ ---> {C} @objc foo.bar.bas (zim : foo.zim) -> ()
 _TTOFSC3fooFTSdSd_Sd ---> @nonobjc __C.foo (Swift.Double, Swift.Double) -> Swift.Double
+_T03foo3barC3basyAA3zimCAE_tFTo ---> {C} @objc foo.bar.bas (zim : foo.zim) -> ()
+_T0SC3fooSdSd_SdtFTO ---> @nonobjc __C.foo (Swift.Double, Swift.Double) -> Swift.Double
 _TTDFC3foo3bar3basfT3zimCS_3zim_T_ ---> dynamic foo.bar.bas (zim : foo.zim) -> ()
 _TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas (zim : foo.zim) -> ()
 _TF3foooi1pFTCS_3barVS_3bas_OS_3zim ---> foo.+ infix (foo.bar, foo.bas) -> foo.zim
@@ -92,31 +94,31 @@ _TMnC3foo3bar ---> nominal type descriptor for foo.bar
 _TMmC3foo3bar ---> metaclass for foo.bar
 _TMC3foo3bar ---> type metadata for foo.bar
 _TMfC3foo3bar ---> full type metadata for foo.bar
-_TwalC3foo3bar ---> allocateBuffer value witness for foo.bar
-_TwcaC3foo3bar ---> assignWithCopy value witness for foo.bar
-_TwtaC3foo3bar ---> assignWithTake value witness for foo.bar
-_TwdeC3foo3bar ---> deallocateBuffer value witness for foo.bar
-_TwxxC3foo3bar ---> destroy value witness for foo.bar
-_TwXXC3foo3bar ---> destroyBuffer value witness for foo.bar
-_TwCPC3foo3bar ---> initializeBufferWithCopyOfBuffer value witness for foo.bar
-_TwCpC3foo3bar ---> initializeBufferWithCopy value witness for foo.bar
-_TwcpC3foo3bar ---> initializeWithCopy value witness for foo.bar
-_TwTKC3foo3bar ---> initializeBufferWithTakeOfBuffer value witness for foo.bar
-_TwTkC3foo3bar ---> initializeBufferWithTake value witness for foo.bar
-_TwtkC3foo3bar ---> initializeWithTake value witness for foo.bar
-_TwprC3foo3bar ---> projectBuffer value witness for foo.bar
+_TwalC3foo3bar ---> {C} allocateBuffer value witness for foo.bar
+_TwcaC3foo3bar ---> {C} assignWithCopy value witness for foo.bar
+_TwtaC3foo3bar ---> {C} assignWithTake value witness for foo.bar
+_TwdeC3foo3bar ---> {C} deallocateBuffer value witness for foo.bar
+_TwxxC3foo3bar ---> {C} destroy value witness for foo.bar
+_TwXXC3foo3bar ---> {C} destroyBuffer value witness for foo.bar
+_TwCPC3foo3bar ---> {C} initializeBufferWithCopyOfBuffer value witness for foo.bar
+_TwCpC3foo3bar ---> {C} initializeBufferWithCopy value witness for foo.bar
+_TwcpC3foo3bar ---> {C} initializeWithCopy value witness for foo.bar
+_TwTKC3foo3bar ---> {C} initializeBufferWithTakeOfBuffer value witness for foo.bar
+_TwTkC3foo3bar ---> {C} initializeBufferWithTake value witness for foo.bar
+_TwtkC3foo3bar ---> {C} initializeWithTake value witness for foo.bar
+_TwprC3foo3bar ---> {C} projectBuffer value witness for foo.bar
 _TWVC3foo3bar ---> value witness table for foo.bar
 _TWoFC3foo3bar3basFSiSi ---> witness table offset for foo.bar.bas (Swift.Int) -> Swift.Int
 _TWvdvC3foo3bar3basSi ---> direct field offset for foo.bar.bas : Swift.Int
 _TWvivC3foo3bar3basSi ---> indirect field offset for foo.bar.bas : Swift.Int
 _TWPC3foo3barS_8barrables ---> protocol witness table for foo.bar : foo.barrable in Swift
-_TWaC3foo3barS_8barrableS_ ---> protocol witness table accessor for foo.bar : foo.barrable in foo
-_TWlC3foo3barS0_S_8barrableS_ ---> lazy protocol witness table accessor for type foo.bar and conformance foo.bar : foo.barrable in foo
+_TWaC3foo3barS_8barrableS_ ---> {C} protocol witness table accessor for foo.bar : foo.barrable in foo
+_TWlC3foo3barS0_S_8barrableS_ ---> {C} lazy protocol witness table accessor for type foo.bar and conformance foo.bar : foo.barrable in foo
 _TWLC3foo3barS0_S_8barrableS_ ---> lazy protocol witness table cache variable for type foo.bar and conformance foo.bar : foo.barrable in foo
 _TWGC3foo3barS_8barrableS_ ---> generic protocol witness table for foo.bar : foo.barrable in foo
-_TWIC3foo3barS_8barrableS_ ---> instantiation function for generic protocol witness table for foo.bar : foo.barrable in foo
-_TWtC3foo3barS_8barrableS_4fred ---> associated type metadata accessor for fred in foo.bar : foo.barrable in foo
-_TWTC3foo3barS_8barrableS_4fredS_6thomas ---> associated type witness table accessor for fred : foo.thomas in foo.bar : foo.barrable in foo
+_TWIC3foo3barS_8barrableS_ ---> {C} instantiation function for generic protocol witness table for foo.bar : foo.barrable in foo
+_TWtC3foo3barS_8barrableS_4fred ---> {C} associated type metadata accessor for fred in foo.bar : foo.barrable in foo
+_TWTC3foo3barS_8barrableS_4fredS_6thomas ---> {C} associated type witness table accessor for fred : foo.thomas in foo.bar : foo.barrable in foo
 _TFSCg5greenVSC5Color ---> __C.green.getter : __C.Color
 _TIF1t1fFT1iSi1sSS_T_A_ ---> t.(f (i : Swift.Int, s : Swift.String) -> ()).(default argument 0)
 _TIF1t1fFT1iSi1sSS_T_A0_ ---> t.(f (i : Swift.Int, s : Swift.String) -> ()).(default argument 1)

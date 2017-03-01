@@ -226,6 +226,13 @@ NodePointer
 demangleSymbolAsNode(const char *mangledName, size_t mangledNameLength,
                      const DemangleOptions &options = DemangleOptions());
 
+/// Returns true if the \p mangledName refers to a function which conforms to
+/// the Swift calling convention.
+///
+/// The return value is unspecified if the \p MangledName does not refer to a
+/// function symbol.
+bool hasSwiftCallingConvention(llvm::StringRef MangledName);
+
 inline NodePointer
 demangleSymbolAsNode(const std::string &mangledName,
                      const DemangleOptions &options = DemangleOptions()) {

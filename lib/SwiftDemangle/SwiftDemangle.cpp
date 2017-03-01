@@ -61,6 +61,12 @@ size_t swift_demangle_getSimplifiedDemangledName(const char *MangledName,
                                                  Length, Opts);
 }
 
+int swift_demangle_hasSwiftCallingConvention(const char *MangledName) {
+  if (swift::Demangle::hasSwiftCallingConvention(llvm::StringRef(MangledName)))
+    return 1;
+  return 0;
+}
+
 size_t fnd_get_demangled_name(const char *MangledName, char *OutputBuffer,
                               size_t Length) {
   return swift_demangle_getDemangledName(MangledName, OutputBuffer, Length);
