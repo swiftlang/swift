@@ -163,6 +163,7 @@ static int numLarger = 0;
 static int totalOldSize = 0;
 static int totalNewSize = 0;
 static int mergedSubsts = 0;
+static int numLargeSubsts = 0;
 
 struct OpStatEntry {
   OpStatEntry() : num(0), size(0) { }
@@ -307,7 +308,8 @@ void NewMangling::printManglingStats() {
     llvm::outs() << "  " << E->getKey() << ": num = " << E->getValue().num
                  << ", size = " << E->getValue().size << '\n';
   }
-  llvm::outs() << "  merged substitutions: " << mergedSubsts << '\n';
+  llvm::outs() << "  merged substitutions: " << mergedSubsts << "\n"
+                  "  large substitutions: " << numLargeSubsts << "\n";
 #endif
 }
 
@@ -358,8 +360,12 @@ bool Mangler::tryMangleSubstitution(const void *ptr) {
 }
 
 void Mangler::mangleSubstitution(unsigned Idx) {
-  if (Idx >= 26)
+  if (Idx >= 26) {
+#ifndef NDEBUG
+    numLargeSubsts++;
+#endif
     return appendOperator("A", Index(Idx - 26));
+  }
 
   char c = Idx + 'A';
   if (lastSubstIdx == (int)Storage.size() - 1) {
