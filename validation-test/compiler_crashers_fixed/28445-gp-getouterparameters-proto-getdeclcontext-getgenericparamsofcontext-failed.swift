@@ -8,6 +8,7 @@
 // RUN: not %target-swift-frontend %s -emit-ir
 // FIXME(huonw): where clauses on associatedtypes broke this
 // XFAIL: *
+// REQUIRES: asserts
 class A{let f= <c
 protocol A{
 typealias e:A{}
