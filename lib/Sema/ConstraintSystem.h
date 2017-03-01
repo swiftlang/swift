@@ -1047,8 +1047,10 @@ private:
     /// \param scope The scope to associate with current solver state.
     void registerScope(SolverScope *scope) {
       CS.incrementScopeCounter();
-      scopes.insert({ scope, std::make_pair(retiredConstraints.begin(),
-                                            generatedConstraints.size()) });
+      auto scopeInfo =
+        std::make_tuple(scope, retiredConstraints.begin(),
+                        generatedConstraints.size());
+      scopes.push_back(scopeInfo);
     }
 
     /// \brief Check whether there are any retired constraints present.
@@ -1113,18 +1115,16 @@ private:
     ///
     /// \param scope The solver scope to rollback.
     void rollback(SolverScope *scope) {
-      auto entry = scopes.find(scope);
-      assert(entry != scopes.end() && "Unknown solver scope");
-
-      // Remove given scope from the circulation.
-      scopes.erase(scope);
-
+      SolverScope *savedScope;
       // The position of last retired constraint before given scope.
       ConstraintList::iterator lastRetiredPos;
       // The original number of generated constraints before given scope.
       unsigned numGenerated;
 
-      std::tie(lastRetiredPos, numGenerated) = entry->getSecond();
+      std::tie(savedScope, lastRetiredPos, numGenerated) =
+        scopes.pop_back_val();
+
+      assert(savedScope == scope && "Scope rollback not in LIFO order!");
 
       // Restore all of the retired constraints.
       CS.InactiveConstraints.splice(CS.InactiveConstraints.end(),
@@ -1155,9 +1155,8 @@ private:
     /// constraints generated before registration of given scope,
     /// this helps to rollback all of the constraints retired/generated
     /// each of the registered scopes correct (LIFO) order.
-    llvm::SmallDenseMap<SolverScope *,
-                        std::pair<ConstraintList::iterator, unsigned>>
-        scopes;
+    llvm::SmallVector<
+      std::tuple<SolverScope *, ConstraintList::iterator, unsigned>, 4> scopes;
   };
 
   class CacheExprTypes : public ASTWalker {
