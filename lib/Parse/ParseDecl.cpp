@@ -2727,32 +2727,31 @@ void Parser::diagnoseConsecutiveIDs(StringRef First, SourceLoc FirstLoc,
 }
 
 /// Parse a Decl item in decl list.
-static ParserStatus parseDeclItem(Parser &P,
-                                  bool &PreviousHadSemi,
-                                  Parser::ParseDeclOptions Options,
-                                  llvm::function_ref<void(Decl*)> handler) {
-  if (P.Tok.is(tok::semi)) {
+ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
+                                   Parser::ParseDeclOptions Options,
+                                   llvm::function_ref<void(Decl*)> handler) {
+  if (Tok.is(tok::semi)) {
     // Consume ';' without preceding decl.
-    P.diagnose(P.Tok, diag::unexpected_separator, ";")
-      .fixItRemove(P.Tok.getLoc());
-    P.consumeToken();
+    diagnose(Tok, diag::unexpected_separator, ";")
+      .fixItRemove(Tok.getLoc());
+    consumeToken();
     // Return success because we already recovered.
     return makeParserSuccess();
   }
 
   // If the previous declaration didn't have a semicolon and this new
   // declaration doesn't start a line, complain.
-  if (!PreviousHadSemi && !P.Tok.isAtStartOfLine() && !P.Tok.is(tok::unknown)) {
-    auto endOfPrevious = P.getEndOfPreviousLoc();
-    P.diagnose(endOfPrevious, diag::declaration_same_line_without_semi)
+  if (!PreviousHadSemi && !Tok.isAtStartOfLine() && !Tok.is(tok::unknown)) {
+    auto endOfPrevious = getEndOfPreviousLoc();
+    diagnose(endOfPrevious, diag::declaration_same_line_without_semi)
       .fixItInsert(endOfPrevious, ";");
   }
 
-  auto Result = P.parseDecl(Options, handler);
+  auto Result = parseDecl(Options, handler);
   if (Result.isParseError())
-    P.skipUntilDeclRBrace(tok::semi, tok::pound_endif);
+    skipUntilDeclRBrace(tok::semi, tok::pound_endif);
   SourceLoc SemiLoc;
-  PreviousHadSemi = P.consumeIf(tok::semi, SemiLoc);
+  PreviousHadSemi = consumeIf(tok::semi, SemiLoc);
   if (PreviousHadSemi && Result.isNonNull())
     Result.get()->TrailingSemiLoc = SemiLoc;
   return Result;
@@ -2769,7 +2768,7 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
   ParserStatus Status;
   bool PreviousHadSemi = true;
   while (Tok.isNot(tok::r_brace)) {
-    Status |= parseDeclItem(*this, PreviousHadSemi, Options, handler);
+    Status |= parseDeclItem(PreviousHadSemi, Options, handler);
     if (Tok.isAny(tok::eof, tok::pound_endif, tok::pound_else,
                   tok::pound_elseif)) {
       IsInputIncomplete = true;
@@ -2997,94 +2996,6 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
 
   InPoundLineEnvironment = true;
   return makeParserSuccess();
-}
-
-ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
-  StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
-                                  StructureMarkerKind::IfConfig);
-
-  SmallVector<IfConfigDeclClause, 4> Clauses;
-
-  bool foundActive = false;
-  ConditionalCompilationExprState ConfigState;
-  while (1) {
-    bool isElse = Tok.is(tok::pound_else);
-    SourceLoc ClauseLoc = consumeToken();
-    Expr *Condition = nullptr;
-
-    if (isElse) {
-      ConfigState.setConditionActive(!foundActive);
-    } else {
-      // Evaluate the condition.
-      llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
-      ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
-                                                    /*isBasic*/true,
-                                                    /*isForDirective*/true);
-      if (Result.isNull())
-        return makeParserError();
-
-      Condition = Result.get();
-
-      // Evaluate the condition, to validate it.
-      ConfigState = classifyConditionalCompilationExpr(Condition, Context,
-                                                       Diags);
-      if (foundActive)
-        ConfigState.setConditionActive(false);
-    }
-
-    foundActive |= ConfigState.isConditionActive();
-
-    if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof)) {
-      diagnose(Tok.getLoc(),
-               diag::extra_tokens_conditional_compilation_directive);
-    }
-
-    Optional<Scope> scope;
-    if (!ConfigState.isConditionActive())
-      scope.emplace(this, getScopeInfo().getCurrentScope()->getKind(),
-                    /*inactiveConfigBlock=*/true);
-
-    SmallVector<Decl*, 8> Decls;
-    if (ConfigState.shouldParse()) {
-      ParserStatus Status;
-      bool PreviousHadSemi = true;
-      while (Tok.isNot(tok::pound_else, tok::pound_endif, tok::pound_elseif,
-                       tok::eof)) {
-        if (Tok.is(tok::r_brace)) {
-          diagnose(Tok.getLoc(),
-                   diag::unexpected_rbrace_in_conditional_compilation_block);
-          // If we see '}', following declarations don't look like belong to
-          // the current decl context; skip them.
-          skipUntilConditionalBlockClose();
-          break;
-        }
-        Status |= parseDeclItem(*this, PreviousHadSemi, Flags,
-                                [&](Decl *D) {Decls.push_back(D);});
-      }
-    } else {
-      DiagnosticTransaction DT(Diags);
-      skipUntilConditionalBlockClose();
-      DT.abort();
-    }
-
-    Clauses.push_back(IfConfigDeclClause(ClauseLoc, Condition,
-                                         Context.AllocateCopy(Decls),
-                                         ConfigState.isConditionActive()));
-
-    if (Tok.isNot(tok::pound_elseif) && Tok.isNot(tok::pound_else))
-      break;
-
-    if (isElse)
-      diagnose(Tok, diag::expected_close_after_else_directive);
-  }
-
-  SourceLoc EndLoc;
-  bool HadMissingEnd = parseEndIfDirective(EndLoc);
-
-  IfConfigDecl *ICD = new (Context) IfConfigDecl(CurDeclContext,
-                                                 Context.AllocateCopy(Clauses),
-                                                 EndLoc, HadMissingEnd);
-  return makeParserResult(ICD);
 }
 
 /// \brief Parse a typealias decl.
