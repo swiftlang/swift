@@ -18,6 +18,7 @@ public func run_StringWithCString(_ N: Int) {
   }
 }
 
+// FIXME(string)
 public func run_StringHasPrefix(_ N: Int) {
 #if _runtime(_ObjC)
   let prefix = "prefix"
@@ -32,6 +33,7 @@ public func run_StringHasPrefix(_ N: Int) {
 #endif
 }
 
+// FIXME(string)
 public func run_StringHasSuffix(_ N: Int) {
 #if _runtime(_ObjC)
   let suffix = "Suffixed"
@@ -46,6 +48,7 @@ public func run_StringHasSuffix(_ N: Int) {
 #endif
 }
 
+// FIXME(string)
 public func run_StringHasPrefixUnicode(_ N: Int) {
 #if _runtime(_ObjC)
   let prefix = "❄️prefix"
@@ -60,6 +63,7 @@ public func run_StringHasPrefixUnicode(_ N: Int) {
 #endif
 }
 
+// FIXME(string)
 public func run_StringHasSuffixUnicode(_ N: Int) {
 #if _runtime(_ObjC)
   let suffix = "❄️Suffixed"
