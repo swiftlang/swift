@@ -191,7 +191,7 @@ namespace driver {
     /// its inputs are in FinishedCommands.
     void scheduleCommandIfNecessaryAndPossible(const Job *Cmd) {
       if (ScheduledCommands.count(Cmd)) {
-        if (Comp.ShowIncrementalBuildDecisions) {
+        if (Comp.ShowJobLifecycle) {
           llvm::outs() << "Already scheduled: " << LogJob(Cmd) << "\n";
         }
         return;
@@ -199,7 +199,7 @@ namespace driver {
 
       if (auto Blocking = findUnfinishedJob(Cmd->getInputs())) {
         BlockingCommands[Blocking].push_back(Cmd);
-        if (Comp.ShowIncrementalBuildDecisions) {
+        if (Comp.ShowJobLifecycle) {
           llvm::outs() << "Blocked by: " << LogJob(Blocking)
                        << ", now blocking jobs: "
                        << LogJobArray(BlockingCommands[Blocking]) << "\n";
@@ -215,7 +215,7 @@ namespace driver {
       assert(Cmd->getExtraEnvironment().empty() &&
              "not implemented for compilations with multiple jobs");
       ScheduledCommands.insert(Cmd);
-      if (Comp.ShowIncrementalBuildDecisions)
+      if (Comp.ShowJobLifecycle)
         llvm::outs() << "Added to TaskQueue: " << LogJob(Cmd) << "\n";
       TQ->addTask(Cmd->getExecutable(), Cmd->getArguments(), llvm::None,
                   (void *)Cmd);
@@ -223,7 +223,7 @@ namespace driver {
 
     /// When a task finishes, check other Jobs that may be blocked.
     void markFinished(const Job *Cmd, bool Skipped=false) {
-      if (Comp.ShowIncrementalBuildDecisions) {
+      if (Comp.ShowJobLifecycle) {
         llvm::outs() << "Job "
                      << (Skipped ? "skipped" : "finished")
                      << ": " << LogJob(Cmd) << "\n";
@@ -233,7 +233,7 @@ namespace driver {
       auto BlockedIter = BlockingCommands.find(Cmd);
       if (BlockedIter != BlockingCommands.end()) {
         auto AllBlocked = std::move(BlockedIter->second);
-        if (Comp.ShowIncrementalBuildDecisions) {
+        if (Comp.ShowJobLifecycle) {
           llvm::outs() << "Scheduling maybe-unblocked jobs: "
                        << LogJobArray(AllBlocked) << "\n";
         }

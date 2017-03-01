@@ -138,6 +138,10 @@ private:
   /// rebuilt.
   bool ShowIncrementalBuildDecisions = false;
 
+  /// When true, traces the lifecycle of each driver job. Provides finer
+  /// detail than ShowIncrementalBuildDecisions.
+  bool ShowJobLifecycle = false;
+
   static const Job *unwrap(const std::unique_ptr<const Job> &p) {
     return p.get();
   }
@@ -194,6 +198,10 @@ public:
 
   void setShowsIncrementalBuildDecisions(bool value = true) {
     ShowIncrementalBuildDecisions = value;
+  }
+
+  void setShowJobLifecycle(bool value = true) {
+    ShowJobLifecycle = value;
   }
 
   void setCompilationRecordPath(StringRef path) {
