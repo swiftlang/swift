@@ -137,7 +137,10 @@ void Context::clear() {
 
 NodePointer Context::demangleSymbolAsNode(llvm::StringRef MangledName) {
 #ifndef NO_NEW_DEMANGLING
-  if (MangledName.startswith(MANGLING_PREFIX_STR)) {
+  if (MangledName.startswith(MANGLING_PREFIX_STR)
+      // Also accept the future mangling prefix.
+      // TODO: remove this line as soon as MANGLING_PREFIX_STR gets "_S".
+      || MangledName.startswith("_S")) {
     return D->demangleSymbol(MangledName);
   }
 #endif
@@ -171,7 +174,10 @@ std::string Context::demangleTypeAsString(llvm::StringRef MangledName,
 }
 
 bool Context::isThunkSymbol(llvm::StringRef MangledName) {
-  if (MangledName.startswith(MANGLING_PREFIX_STR)) {
+  if (MangledName.startswith(MANGLING_PREFIX_STR)
+      // Also accept the future mangling prefix.
+      // TODO: remove this line as soon as MANGLING_PREFIX_STR gets "_S".
+      || MangledName.startswith("_S")) {
     // First do a quick check
     if (MangledName.endswith("TA") ||  // partial application forwarder
         MangledName.endswith("Ta") ||  // ObjC partial application forwarder
@@ -341,7 +347,10 @@ void Demangler::init(StringRef MangledName) {
 NodePointer Demangler::demangleSymbol(StringRef MangledName) {
   init(MangledName);
 
-  if (!nextIf(MANGLING_PREFIX_STR))
+  if (!nextIf(MANGLING_PREFIX_STR)
+      // Also accept the future mangling prefix.
+      // TODO: remove this line as soon as MANGLING_PREFIX_STR gets "_S".
+      && !nextIf("_S"))
     return nullptr;
 
   NodePointer topLevel = createNode(Node::Kind::Global);

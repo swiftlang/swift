@@ -81,6 +81,8 @@ _TToFC3foo3bar3basfT3zimCS_3zim_T_ ---> {TC} @objc foo.bar.bas (zim : foo.zim) -
 _TTOFSC3fooFTSdSd_Sd ---> {T} @nonobjc __C.foo (Swift.Double, Swift.Double) -> Swift.Double
 _T03foo3barC3basyAA3zimCAE_tFTo ---> {TC} @objc foo.bar.bas (zim : foo.zim) -> ()
 _T0SC3fooSdSd_SdtFTO ---> {T} @nonobjc __C.foo (Swift.Double, Swift.Double) -> Swift.Double
+_S3foo3barC3basyAA3zimCAE_tFTo ---> {TC} @objc foo.bar.bas (zim : foo.zim) -> ()
+_SSC3fooSdSd_SdtFTO ---> {T} @nonobjc __C.foo (Swift.Double, Swift.Double) -> Swift.Double
 _TTDFC3foo3bar3basfT3zimCS_3zim_T_ ---> dynamic foo.bar.bas (zim : foo.zim) -> ()
 _TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas (zim : foo.zim) -> ()
 _TF3foooi1pFTCS_3barVS_3bas_OS_3zim ---> foo.+ infix (foo.bar, foo.bas) -> foo.zim
