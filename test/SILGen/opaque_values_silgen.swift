@@ -340,3 +340,25 @@ func s210______compErasure(_ x: Foo & Error) -> Error {
 func s220_____openExistBox(_ x: Error) -> String {
   return x._domain
 }
+
+// Tests materializeForSet's createSetterCallback for opaque values
+// ---
+// CHECK-LABEL: sil [transparent] [fragile] @_T0s10DictionaryV20opaque_values_silgenE9subscriptq_Sgq_cfmytfU_ : $@convention(method) <Key, Value where Key : Hashable> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Dictionary<Key, Value>, @thick Dictionary<Key, Value>.Type) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $Builtin.RawPointer, [[ARG1:%.*]] : $*Builtin.UnsafeValueBuffer, [[ARG2:%.*]] : $*Dictionary<Key, Value>, [[ARG3:%.*]] : $@thick Dictionary<Key, Value>.Type):
+// CHECK:   [[PROJ_VAL1:%.*]] = project_value_buffer $Value in [[ARG1]] : $*Builtin.UnsafeValueBuffer
+// CHECK:   [[LOAD_VAL1:%.*]] = load [take] [[PROJ_VAL1]] : $*Value
+// CHECK:   [[ADDR_VAL0:%.*]] = pointer_to_address [[ARG0]] : $Builtin.RawPointer to [strict] $*Optional<Value>
+// CHECK:   [[LOAD_VAL0:%.*]] = load [take] [[ADDR_VAL0]] : $*Optional<Value>
+// CHECK:   apply {{.*}}<Key, Value>([[LOAD_VAL0]], [[LOAD_VAL1]], [[ARG2]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_1, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T0s10DictionaryV20opaque_values_silgenE9subscriptq_Sgq_cfmytfU_'
+extension Dictionary {
+  public subscript(key: Value) -> Value? {
+    @inline(__always)
+    get {
+      return key
+    }
+    set(newValue) {
+    }
+  }
+}
