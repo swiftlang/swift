@@ -511,3 +511,12 @@ void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
   SILBuilder::createCheckedCastBranch(loc, isExact, operand.forward(gen), type,
                                       trueBlock, falseBlock);
 }
+
+void SILGenBuilder::createCheckedCastValueBranch(SILLocation loc,
+                                                 ManagedValue operand,
+                                                 SILType type,
+                                                 SILBasicBlock *trueBlock,
+                                                 SILBasicBlock *falseBlock) {
+  SILBuilder::createCheckedCastValueBranch(loc, operand.forward(gen), type,
+                                           trueBlock, falseBlock);
+}

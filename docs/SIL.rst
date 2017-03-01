@@ -4448,7 +4448,7 @@ Some user-level cast operations can fail and thus require runtime checking.
 
 The `unconditional_checked_cast_addr`_, `unconditional_checked_cast_opaque`_ and `unconditional_checked_cast`_
 instructions performs an unconditional checked cast; it is a runtime failure
-if the cast fails. The `checked_cast_addr_br`_ and `checked_cast_br`_
+if the cast fails. The `checked_cast_addr_br`_, `checked_cast_value_br`_ and `checked_cast_br`_
 terminator instruction performs a conditional checked cast; it branches to one
 of two destinations based on whether the cast succeeds or not.
 
@@ -4827,6 +4827,26 @@ transferred to ``bb2``.
 An exact cast checks whether the dynamic type is exactly the target
 type, not any possible subtype of it.  The source and target types
 must be class types.
+
+checked_cast_value_br
+`````````````````````
+::
+
+  sil-terminator ::= 'checked_cast_value_br'
+                      sil-operand 'to' sil-type ','
+                      sil-identifier ',' sil-identifier
+  sil-checked-cast-exact ::= '[' 'exact' ']'
+
+  checked_cast_value_br %0 : $A to $B, bb1, bb2
+  // $A must be not be an address
+  // $B must be an opaque value
+  // bb1 must take a single argument of type $B
+  // bb2 must take no arguments
+
+Performs a checked opaque conversion from ``$A`` to ``$B``. If the conversion
+succeeds, control is transferred to ``bb1``, and the result of the cast is
+passed into ``bb1`` as an argument. If the conversion fails, control is
+transferred to ``bb2``.
 
 checked_cast_addr_br
 ````````````````````

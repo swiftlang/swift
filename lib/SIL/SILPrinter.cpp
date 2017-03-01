@@ -1210,6 +1210,12 @@ public:
        << getID(CI->getSuccessBB()) << ", " << getID(CI->getFailureBB());
   }
 
+  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CI) {
+    *this << getIDAndType(CI->getOperand()) << " to " << CI->getCastType()
+          << ", " << getID(CI->getSuccessBB()) << ", "
+          << getID(CI->getFailureBB());
+  }
+
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
     *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
           << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())

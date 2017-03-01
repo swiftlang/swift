@@ -296,9 +296,10 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     TERMINATOR(CheckedCastBranchInst, TermInst, checked_cast_br, None, DoesNotRelease)
     TERMINATOR(CheckedCastAddrBranchInst, TermInst, checked_cast_addr_br, MayHaveSideEffects,
                MayRelease)
-    VALUE_RANGE(TermInst, UnreachableInst, CheckedCastAddrBranchInst)
+    TERMINATOR(CheckedCastValueBranchInst, TermInst, checked_cast_value_br, None, DoesNotRelease)
+    VALUE_RANGE(TermInst, UnreachableInst, CheckedCastValueBranchInst)
 
-  VALUE_RANGE(SILInstruction, AllocStackInst, CheckedCastAddrBranchInst)
+  VALUE_RANGE(SILInstruction, AllocStackInst, CheckedCastValueBranchInst)
 
 #undef VALUE_RANGE
 #undef ABSTRACT_VALUE

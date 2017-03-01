@@ -226,6 +226,11 @@ public:
                                ManagedValue operand, SILType type,
                                SILBasicBlock *trueBlock,
                                SILBasicBlock *falseBlock);
+
+  using SILBuilder::createCheckedCastValueBranch;
+  void createCheckedCastValueBranch(SILLocation loc, ManagedValue operand,
+                                    SILType type, SILBasicBlock *trueBlock,
+                                    SILBasicBlock *falseBlock);
 };
 
 } // namespace Lowering
