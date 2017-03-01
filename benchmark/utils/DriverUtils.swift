@@ -230,41 +230,29 @@ func stopTrackingObjects(_: UnsafeMutableRawPointer) -> Int
 
 #endif
 
-class SampleRunner {
-#if !os(Linux)
-  var info = mach_timebase_info_data_t(numer: 0, denom: 0)
-#endif
-  init() {
-#if !os(Linux)
-    mach_timebase_info(&info)
-#endif
-  }
+protocol SampleRunner {
+  func run(_ name: String, fn: (Int) -> Void, num_iters: UInt) -> UInt64
+}
+
+#if os(Linux)
+class POSIXSampleRunner: SampleRunner {
   func run(_ name: String, fn: (Int) -> Void, num_iters: UInt) -> UInt64 {
     // Start the timer.
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     var str = name
     startTrackingObjects(UnsafeMutableRawPointer(str._core.startASCII))
 #endif
-#if os(Linux)
     var start_ticks = timespec(tv_sec: 0, tv_nsec: 0)
     clock_gettime(CLOCK_REALTIME, &start_ticks)
-#else
-    let start_ticks = mach_absolute_time()
-#endif
     fn(Int(num_iters))
     // Stop the timer.
-#if os(Linux)
     var end_ticks = timespec(tv_sec: 0, tv_nsec: 0)
     clock_gettime(CLOCK_REALTIME, &end_ticks)
-#else
-    let end_ticks = mach_absolute_time()
-#endif
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     stopTrackingObjects(UnsafeMutableRawPointer(str._core.startASCII))
 #endif
 
     // Compute the spent time and the scaling factor.
-#if os(Linux)
     var elapsed_ticks = timespec(tv_sec: 0, tv_nsec: 0)
     if end_ticks.tv_nsec - start_ticks.tv_nsec < 0 {
       elapsed_ticks.tv_sec = end_ticks.tv_sec - start_ticks.tv_sec - 1
@@ -274,12 +262,34 @@ class SampleRunner {
       elapsed_ticks.tv_nsec = end_ticks.tv_nsec - start_ticks.tv_nsec
     }
     return UInt64(elapsed_ticks.tv_sec) * UInt64(1000000000) + UInt64(elapsed_ticks.tv_nsec)
-#else
-    let elapsed_ticks = end_ticks - start_ticks
-    return elapsed_ticks * UInt64(info.numer) / UInt64(info.denom)
-#endif
   }
 }
+#else
+class DarwinSampleRunner: SampleRunner {
+  var info = mach_timebase_info_data_t(numer: 0, denom: 0)
+  init() {
+    mach_timebase_info(&info)
+  }
+  func run(_ name: String, fn: (Int) -> Void, num_iters: UInt) -> UInt64 {
+    // Start the timer.
+#if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
+    var str = name
+    startTrackingObjects(UnsafeMutableRawPointer(str._core.startASCII))
+#endif
+    let start_ticks = mach_absolute_time()
+    fn(Int(num_iters))
+    // Stop the timer.
+    let end_ticks = mach_absolute_time()
+#if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
+    stopTrackingObjects(UnsafeMutableRawPointer(str._core.startASCII))
+#endif
+
+    // Compute the spent time and the scaling factor.
+    let elapsed_ticks = end_ticks - start_ticks
+    return elapsed_ticks * UInt64(info.numer) / UInt64(info.denom)
+  }
+}
+#endif
 
 /// Invoke the benchmark entry point and return the run time in milliseconds.
 func runBench(_ name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResults {
@@ -290,7 +300,11 @@ func runBench(_ name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResu
     print("Running \(name) for \(c.numSamples) samples.")
   }
 
-  let sampler = SampleRunner()
+#if os(Linux)
+  let sampler:SampleRunner = POSIXSampleRunner()
+#else
+  let sampler:SampleRunner = DarwinSampleRunner()
+#endif
   for s in 0..<c.numSamples {
     let time_per_sample: UInt64 = 1_000_000_000 * UInt64(c.iterationScale)
 
