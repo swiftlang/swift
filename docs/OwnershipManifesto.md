@@ -975,7 +975,7 @@ cases to be spelled explicitly:
   It's important to allow temporary values to be shared for
   function arguments because many function parameters will be
   marked as `shared` simply because the functions don't
-  actually from owning that parameter, not because it's in
+  actually benefit from owning that parameter, not because it's in
   any way semantically important that they be passed a
   reference to an existing variable.  For example, we expect
   to change things like comparison operators to take their
