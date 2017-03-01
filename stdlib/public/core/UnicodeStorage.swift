@@ -22,7 +22,13 @@ public func _debugLog(_ arg0: @autoclosure ()->Any, _ arg1: @autoclosure ()->Any
   print(arg0(), arg1())
 }
 
-/// A collection of `CodeUnit`s to be interpreted by some `Encoding`
+/// A collection of `CodeUnit`s to be interpreted by some `Encoding`.
+///
+/// View types nested in UnicodeStorage may be suitable *generic* implementation
+/// guts for views for models of Unicode, but specific models may want to
+/// provide their own implementations.  For example, the UTF16 view of a
+/// Latin1String would might be a simple lazy zero-extended mapping, rather than
+/// something that goes through the transcoding machinery.
 public struct UnicodeStorage<
   CodeUnits : RandomAccessCollection,
   Encoding : UnicodeEncoding
