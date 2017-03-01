@@ -270,7 +270,7 @@ namespace driver {
 
     void
     dependencyLoadFailed(StringRef DependenciesFile, bool Warn=true) {
-      if (Warn)
+      if (Warn && Comp.ShowIncrementalBuildDecisions)
         Comp.Diags.diagnose(SourceLoc(),
                             diag::warn_unable_to_load_dependencies,
                             DependenciesFile);
