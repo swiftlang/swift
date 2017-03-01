@@ -2455,6 +2455,7 @@ void ConformanceChecker::diagnoseMissingWitnesses() {
           Diag.fixItInsertAfter(FixitLocation, FixIt);
       }
   });
+  MissingWitnesses.clear();
 }
 
 ResolveWitnessResult
