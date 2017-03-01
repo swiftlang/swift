@@ -16,7 +16,6 @@ Represent toolchain - the versioned executables.
 
 from __future__ import absolute_import
 
-import os
 import platform
 
 from . import cache_util
@@ -46,8 +45,13 @@ def _register(name, *tool):
     setattr(Toolchain, name, cache_util.reify(_getter))
 
 
-_register("cc", "clang")
-_register("cxx", "clang++")
+if platform.system() == 'Windows':
+    _register("cc", "clang-cl")
+    _register("cxx", "clang-cl")
+else:
+    _register("cc", "clang")
+    _register("cxx", "clang++")
+
 _register("ninja", "ninja", "ninja-build")
 _register("cmake", "cmake")
 _register("distcc", "distcc")
