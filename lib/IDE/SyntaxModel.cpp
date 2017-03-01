@@ -916,7 +916,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
         return false;
 
-      for (auto *D : Clause.Members)
+      for (auto *D : Clause.Elements)
         if (D->walk(*this))
           return false;
     }
