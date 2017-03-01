@@ -1705,6 +1705,8 @@ namespace {
     /// Whether we've already complained about problems with this conformance.
     bool AlreadyComplained = false;
 
+    /// Keep track of missing witnesses, either type of value, for later
+    /// diagnosis emits.
     llvm::SetVector<ValueDecl*> MissingWitnesses;
 
     /// Retrieve the associated types that are referenced by the given
@@ -1780,6 +1782,7 @@ namespace {
                         llvm::SmallPtrSetImpl<ProtocolConformance *> &visited);
     void addUsedConformances(ProtocolConformance *conformance);
 
+    /// Call this to diagnose currently known missing witnesses.
     void diagnoseMissingWitnesses();
   public:
     /// Emit any diagnostics that have been delayed.
@@ -2399,6 +2402,9 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
   return true;
 }
 
+/// Print the stubs for an array of witnesses, either type or value, to
+/// FixitString. If for a witness we cannot have stub printed, insert it to
+/// NoStubRequirements.
 static void
 printProtocolStubFixitString(SourceLoc TypeLoc, ProtocolConformance *Conf,
                              ArrayRef<ValueDecl*> MissingWitnesses,
@@ -2414,17 +2420,20 @@ printProtocolStubFixitString(SourceLoc TypeLoc, ProtocolConformance *Conf,
     });
 }
 
-/// Generates a note for a protocol requirement for which no witness was found
-/// and provides a fixit to add a stub to the adopter
 void ConformanceChecker::diagnoseMissingWitnesses() {
   if (MissingWitnesses.empty())
     return;
+
+  // Make sure we clear the missing witness bucket when exiting.
   SWIFT_DEFER { MissingWitnesses.clear(); };
   llvm::SetVector<ValueDecl*> MissingWitnesses = this->MissingWitnesses;
   diagnoseOrDefer(MissingWitnesses[0], true,
     [MissingWitnesses](NormalProtocolConformance *Conf) {
       DeclContext *DC = Conf->getDeclContext();
+      // The location where to insert stubs.
       SourceLoc FixitLocation;
+
+      // The location where the type starts.
       SourceLoc TypeLoc;
       if (auto Extension = dyn_cast<ExtensionDecl>(DC)) {
         FixitLocation = Extension->getBraces().Start;
@@ -2437,17 +2446,24 @@ void ConformanceChecker::diagnoseMissingWitnesses() {
       }
       std::string FixIt;
       llvm::SetVector<ValueDecl*> NoStubRequirements;
-      printProtocolStubFixitString(TypeLoc, Conf, MissingWitnesses.getArrayRef(),
+
+      // Print stubs for all known missing witnesses.
+      printProtocolStubFixitString(TypeLoc, Conf,
+                                   MissingWitnesses.getArrayRef(),
                                    FixIt, NoStubRequirements);
       auto &Diags = DC->getASTContext().Diags;
       for (auto VD : MissingWitnesses) {
+        // Whether this VD has a stub printed.
+        bool AddFixit = !NoStubRequirements.count(VD);
+
+        // Issue diagnostics for witness types.
         if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(VD)) {
           Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
                          MissingTypeWitness->getName()).
           fixItInsertAfter(FixitLocation, FixIt);
           continue;
         }
-        bool AddFixit = !NoStubRequirements.count(VD);
+        // Issue diagnostics for witness values.
         Type RequirementType =
           getRequirementTypeForDisplay(DC->getParentModule(), Conf, VD);
         auto Diag = Diags.diagnose(VD, diag::no_witnesses,
@@ -2772,6 +2788,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
 
   if (!numViable) {
+    // Save the missing requirement for later diagnosis.
     MissingWitnesses.insert(requirement);
     diagnoseOrDefer(requirement, true,
       [requirement, matches](NormalProtocolConformance *conformance) {
@@ -2862,6 +2879,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
     recordOptionalWitness(requirement);
     return ResolveWitnessResult::Success;
   }
+  // Save the missing requirement for later diagnosis.
   MissingWitnesses.insert(requirement);
   return ResolveWitnessResult::ExplicitFailed;
 }
@@ -2956,8 +2974,9 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
     return ResolveWitnessResult::ExplicitFailed;
   }
-
+  // Save the missing type witness for later diagnosis.
   MissingWitnesses.insert(assocType);
+
   // None of the candidates were viable.
   diagnoseOrDefer(assocType, true,
     [nonViable](NormalProtocolConformance *conformance) {
@@ -4230,9 +4249,9 @@ void ConformanceChecker::resolveTypeWitnesses() {
       return;
     }
 
-    for (auto missingTypeWitness : unresolvedAssocTypes) {
-      MissingWitnesses.insert(missingTypeWitness);
-    }
+    // Save the missing type witnesses for later diagnosis.
+    MissingWitnesses.insert(unresolvedAssocTypes.begin(),
+                            unresolvedAssocTypes.end());
 
     return;
   }
@@ -4306,6 +4325,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
 void ConformanceChecker::resolveSingleTypeWitness(
        AssociatedTypeDecl *assocType) {
+  // Ensure we diagnose if the witness is missing.
   SWIFT_DEFER { diagnoseMissingWitnesses(); };
   switch (resolveTypeWitnessViaLookup(assocType)) {
   case ResolveWitnessResult::Success:
@@ -4497,8 +4517,9 @@ void ConformanceChecker::checkConformance() {
   // Resolve all of the type witnesses.
   resolveTypeWitnesses();
 
-
+  // Diagnose missing type witnesses for now.
   diagnoseMissingWitnesses();
+  // Diagnose missing value witnesses later.
   SWIFT_DEFER { diagnoseMissingWitnesses(); };
 
   // Resolution attempts to have the witnesses be correct by construction, but
