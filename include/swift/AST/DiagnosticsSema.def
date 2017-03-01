@@ -164,6 +164,9 @@ ERROR(value_type_comparison_with_nil_illegal,none,
 ERROR(cannot_match_expr_pattern_with_value,none,
       "expression pattern of type %0 cannot match values of type %1",
       (Type, Type))
+ERROR(cannot_match_unresolved_expr_pattern_with_value,none,
+      "pattern cannot match values of type %0",
+      (Type))
 
 ERROR(cannot_reference_compare_types,none,
       "cannot check reference equality of functions; operands here have types "
