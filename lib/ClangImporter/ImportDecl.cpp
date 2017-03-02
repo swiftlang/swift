@@ -6952,6 +6952,7 @@ void ClangImporter::Implementation::finishProtocolConformance(
     };
     return getDeclName(*left).compare(getDeclName(*right));
   });
+
   // Schedule any that aren't complete.
   for (auto *inherited : inheritedProtos) {
     ModuleDecl *M = conformance->getDeclContext()->getParentModule();
@@ -6963,6 +6964,24 @@ void ClangImporter::Implementation::finishProtocolConformance(
     conformance->setInheritedConformance(inherited,
                                          inheritedConformance->getConcrete());
   }
+
+  // Collect conformances for the requirement signature.
+  SmallVector<ProtocolConformanceRef, 4> reqConformances;
+  for (auto req : proto->getRequirementSignature()->getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+
+    assert(req.getFirstType()->isEqual(proto->getSelfInterfaceType()));
+    auto reqProto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+
+    ModuleDecl *M = conformance->getDeclContext()->getParentModule();
+    auto reqConformance = M->lookupConformance(conformance->getType(),
+                                               reqProto, /*resolver=*/nullptr);
+    assert(reqConformance && reqConformance->isConcrete() &&
+           "required conformance not found");
+    reqConformances.push_back(*reqConformance);
+  }
+  conformance->setSignatureConformances(reqConformances);
 
   conformance->setState(ProtocolConformanceState::Complete);
 }

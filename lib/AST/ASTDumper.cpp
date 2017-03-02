@@ -2615,10 +2615,18 @@ void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   };
 
   switch (getKind()) {
-  case ProtocolConformanceKind::Normal:
+  case ProtocolConformanceKind::Normal: {
+    auto normal = cast<NormalProtocolConformance>(this);
+
     printCommon("normal");
     // Maybe print information about the conforming context?
+
+    for (auto conformance : normal->getSignatureConformances()) {
+      out << '\n';
+      conformance.dump(out, indent + 2);
+    }
     break;
+  }
 
   case ProtocolConformanceKind::Inherited: {
     auto conf = cast<InheritedProtocolConformance>(this);

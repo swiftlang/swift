@@ -28,6 +28,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeWalker.h"
@@ -4458,23 +4459,40 @@ void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
 void ConformanceChecker::ensureRequirementsAreSatisfied() {
   auto proto = Conformance->getProtocol();
   // Some other problem stopped the signature being computed.
-  if (!proto->isRequirementSignatureComputed())
+  if (!proto->isRequirementSignatureComputed()) {
+    Conformance->setInvalid();
     return;
+  }
 
   auto reqSig = proto->getRequirementSignature();
 
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
       proto, Conformance->getType(), ProtocolConformanceRef(Conformance));
 
+  class GatherConformancesListener : public GenericRequirementsCheckListener {
+  public:
+    SmallVector<ProtocolConformanceRef, 4> conformances;
+
+    void satisfiedConformance(Type depTy, Type replacementTy,
+                              ProtocolConformanceRef conformance) override {
+      conformances.push_back(conformance);
+    }
+  } listener;
+
   auto result = TC.checkGenericArguments(
       Conformance->getDeclContext(), Loc, Loc,
       // FIXME: maybe this should be the conformance's type
       proto->getDeclaredInterfaceType(), reqSig,
       QuerySubstitutionMap{substitutions},
-      LookUpConformanceInSubstitutionMap{substitutions}, nullptr);
+      LookUpConformanceInSubstitutionMap{substitutions}, nullptr,
+      ConformanceCheckFlags::Used, &listener);
 
-  // Errors are emitted inside the checker.
-  (void)result;
+  // If there were no errors, record the conformances.
+  if (result.second) {
+    Conformance->setSignatureConformances(listener.conformances);
+  } else {
+    Conformance->setInvalid();
+  }
 }
 
 #pragma mark Protocol conformance checking
