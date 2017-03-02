@@ -201,6 +201,12 @@ extension UnicodeStorage {
     }
     public typealias SubSequence = BidirectionalSlice<TranscodedView>
   }
+  
+  public func transcoded<OtherEncoding: UnicodeEncoding>(
+    to otherEncoding: OtherEncoding.Type
+  ) -> TranscodedView<OtherEncoding> {
+    return type(of: self).TranscodedView(self.codeUnits, to: otherEncoding)
+  }
 }
 
 extension UnicodeStorage : _UTextable {
@@ -480,5 +486,9 @@ extension UnicodeStorage {
         return body(bi)
       }
     }  
+  }
+
+  public var characters: CharacterView {
+    return CharacterView(codeUnits, Encoding.self)
   }
 }
