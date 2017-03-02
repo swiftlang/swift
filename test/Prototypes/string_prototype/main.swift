@@ -297,4 +297,32 @@ testSuite.test("string-compare") {
   expectEqual(.same, s4u16.ordered(with: s3u16))
 }
 
+testSuite.test("replaceSubrange") {
+  let initial: String = "hello world!"
+
+  let cases: [(Int, String, String, String)] = 
+    [(0, "hello", "goodbye", "goodbye world!"),        // Edit start
+     (8, "world!", "moon?", "goodbye moon?"),          // Edit end
+     (4, "bye", " night", "good night moon?"),         // Edit middle
+     (4, "", " 🦊🦊🦊", "good 🦊🦊🦊 night moon?")]  // wide Characters
+
+  // TODO: String subrange search impl to eliminate need for `start`
+  func findSubrange(start: Int, haystack: String, needle: String) -> Range<Int> {
+    let start = start // haystack.index(of: needle)
+    let end = start.advanced(by: needle.count)
+    return start..<end
+  }
+
+  print(unsafeBitCast(initial.codeUnits, to: Int.self))
+  var testSubject = initial;
+  for (start, needle, replacement, result) in cases {
+    let subrange = findSubrange(start: start, haystack: testSubject, needle: needle)
+    testSubject.replaceSubrange(subrange, with: replacement)
+    expectEqual(testSubject, result)
+  }
+
+  // Make sure the initial value wasn't mutated
+  expectEqual(initial, "hello world!")
+}
+
 runAllTests()
