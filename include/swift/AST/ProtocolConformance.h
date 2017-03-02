@@ -719,6 +719,53 @@ inline bool ProtocolConformance::hasWitness(ValueDecl *requirement) const {
   return getRootNormalConformance()->hasWitness(requirement);
 }
 
+/// The conformance of an archetype to a protocol.
+class alignas(1 << DeclAlignInBits) ArchetypeProtocolConformance
+    : public llvm::FoldingSetNode {
+  ArchetypeType *ConformingType;
+  ProtocolDecl *Protocol;
+
+  friend class ASTContext;
+
+  ArchetypeProtocolConformance(ArchetypeType *ConformingType,
+                               ProtocolDecl *Protocol)
+    : ConformingType(ConformingType), Protocol(Protocol) { }
+
+public:
+  ProtocolDecl *getProtocol() const {
+    return Protocol;
+  }
+
+  ArchetypeType *getType() const {
+    return ConformingType;
+  }
+
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    Profile(ID, getType(), getProtocol());
+  }
+
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      ArchetypeType *type,
+                      ProtocolDecl *protocol) {
+    ID.AddPointer(type);
+    ID.AddPointer(protocol);
+  }
+
+  // Make vanilla new/delete illegal for protocol conformances.
+  void *operator new(size_t bytes) = delete;
+  void operator delete(void *data) SWIFT_DELETE_OPERATOR_DELETED;
+
+  // Only allow allocation of protocol conformances using the allocator in
+  // ASTContext or by doing a placement new.
+  void *operator new(size_t bytes, ASTContext &context,
+                     AllocationArena arena,
+                    unsigned alignment = alignof(ArchetypeProtocolConformance));
+  void *operator new(size_t bytes, void *mem) {
+    assert(mem);
+    return mem;
+  }
+};
+
 } // end namespace swift
 
 #endif // LLVM_SWIFT_AST_PROTOCOLCONFORMANCE_H

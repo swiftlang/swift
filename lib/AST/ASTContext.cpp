@@ -274,6 +274,9 @@ struct ASTContext::Implementation {
     /// The set of inherited protocol conformances.
     llvm::FoldingSet<InheritedProtocolConformance> InheritedConformances;
 
+    /// The set of archetype protocol conformances.
+    llvm::FoldingSet<ArchetypeProtocolConformance> ArchetypeConformances;
+
     ~Arena() {
       for (auto &conformance : SpecializedConformances)
         conformance.~SpecializedProtocolConformance();
@@ -292,6 +295,9 @@ struct ASTContext::Implementation {
       // referenced by the other conformance types.
       for (auto &conformance : NormalConformances)
         conformance.~NormalProtocolConformance();
+
+      for (auto &conformance : ArchetypeConformances)
+        conformance.~ArchetypeProtocolConformance();
     }
 
     size_t getTotalMemory() const;
@@ -1259,6 +1265,8 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
   builder->finalize(SourceLoc(), sig->getGenericParams(),
                     /*allowConcreteGenericParams=*/true);
 
+  assert(builder->getGenericSignature()->getCanonicalSignature() == sig);
+
   // Store this generic signature builder (no generic environment yet).
   Impl.GenericSignatureBuilders[{sig, mod}] =
     std::unique_ptr<GenericSignatureBuilder>(builder);
@@ -1473,6 +1481,26 @@ ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
   // Build a new normal protocol conformance.
   auto result = new (*this, arena) InheritedProtocolConformance(type, inherited);
   inheritedConformances.InsertNode(result, insertPos);
+  return result;
+}
+
+ArchetypeProtocolConformance *
+ASTContext::getArchetypeConformance(ArchetypeType *type,
+                                    ProtocolDecl *protocol) {
+  llvm::FoldingSetNodeID id;
+  ArchetypeProtocolConformance::Profile(id, type, protocol);
+
+  // Did we already record the archetype protocol conformance?
+  void *insertPos;
+  auto &arena = Impl.getArena(AllocationArena::Permanent);
+  auto &archetypeConformances = arena.ArchetypeConformances;
+  if (auto result = archetypeConformances.FindNodeOrInsertPos(id, insertPos))
+    return result;
+
+  // Build a new archetype protocol conformance.
+  auto result = new (*this, AllocationArena::Permanent)
+      ArchetypeProtocolConformance(type, protocol);
+  archetypeConformances.InsertNode(result, insertPos);
   return result;
 }
 

@@ -63,6 +63,17 @@ ProtocolConformanceRef::ProtocolConformanceRef(ProtocolDecl *protocol,
   }
 }
 
+ArchetypeType *ProtocolConformanceRef::getArchetype() const {
+  if (auto *conf = Union.dyn_cast<ArchetypeProtocolConformance*>())
+    return conf->getType();
+  return nullptr;
+}
+ProtocolDecl *ProtocolConformanceRef::getAbstract() const {
+  if (auto *conf = Union.dyn_cast<ArchetypeProtocolConformance*>())
+    return conf->getProtocol();
+  return Union.get<ProtocolDecl*>();
+}
+
 ProtocolDecl *ProtocolConformanceRef::getRequirement() const {
   if (isConcrete()) {
     return getConcrete()->getProtocol();
@@ -777,4 +788,11 @@ DeclContext::getLocalConformances(
   }
 
   return result;
+}
+
+void *ArchetypeProtocolConformance::operator new(
+    size_t bytes, ASTContext &context,
+    AllocationArena arena,
+    unsigned alignment) {
+  return context.Allocate(bytes, alignment, arena);
 }

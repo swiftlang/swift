@@ -85,6 +85,7 @@ namespace swift {
   class InheritedProtocolConformance;
   class SpecializedProtocolConformance;
   enum class ProtocolConformanceState;
+  class ArchetypeProtocolConformance;
   class Pattern;
   enum PointerTypeKind : unsigned;
   class PrecedenceGroupDecl;
@@ -704,6 +705,16 @@ public:
   /// \param inherited The inherited conformance.
   InheritedProtocolConformance *
   getInheritedConformance(Type type, ProtocolConformance *inherited);
+
+  /// \brief Produce an archetype conformance, representing a future
+  /// conformance that will be provided when the archetype is substituted
+  /// for a concrete type.
+  ///
+  /// \param type The type for which we are retrieving the conformance.
+  ///
+  /// \param protocol The protocol the type conforms to.
+  ArchetypeProtocolConformance *
+  getArchetypeConformance(ArchetypeType *type, ProtocolDecl *protocol);
 
   /// \brief Create trivial substitutions for the given bound generic type.
   Optional<SubstitutionList>

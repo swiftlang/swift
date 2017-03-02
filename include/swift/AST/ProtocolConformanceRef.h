@@ -28,6 +28,10 @@ namespace llvm {
 
 namespace swift {
 
+class ProtocolDecl;
+class ProtocolConformance;
+class ArchetypeProtocolConformance;
+
 /// A ProtocolConformanceRef is a handle to a protocol conformance which
 /// may be either concrete or abstract.
 ///
@@ -42,7 +46,9 @@ namespace swift {
 /// ProtocolConformanceRef allows the efficient recovery of the protocol
 /// even when the conformance is abstract.
 class ProtocolConformanceRef {
-  using UnionType = llvm::PointerUnion<ProtocolDecl*, ProtocolConformance*>;
+  using UnionType = llvm::PointerUnion3<ProtocolDecl*,
+                                        ArchetypeProtocolConformance*,
+                                        ProtocolConformance*>;
   UnionType Union;
 
   explicit ProtocolConformanceRef(UnionType value) : Union(value) {
@@ -52,6 +58,13 @@ public:
   /// Create an abstract protocol conformance reference.
   explicit ProtocolConformanceRef(ProtocolDecl *proto) : Union(proto) {
     assert(proto != nullptr &&
+           "cannot construct ProtocolConformanceRef with null");
+  }
+
+  /// Create an abstract protocol conformance reference with an archetype.
+  explicit ProtocolConformanceRef(ArchetypeProtocolConformance *conf)
+      : Union(conf) {
+    assert(conf != nullptr &&
            "cannot construct ProtocolConformanceRef with null");
   }
 
@@ -71,10 +84,9 @@ public:
     return Union.get<ProtocolConformance*>();
   }
 
-  bool isAbstract() const { return Union.is<ProtocolDecl*>(); }
-  ProtocolDecl *getAbstract() const {
-    return Union.get<ProtocolDecl*>();
-  }
+  bool isAbstract() const { return !Union.is<ProtocolConformance*>(); }
+  ArchetypeType *getArchetype() const;
+  ProtocolDecl *getAbstract() const;
 
   using OpaqueValue = void*;
   OpaqueValue getOpaqueValue() const { return Union.getOpaqueValue(); }
@@ -94,10 +106,10 @@ public:
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
 
   bool operator==(ProtocolConformanceRef other) const {
-    return Union == other.Union;
+    return Union.getOpaqueValue() == other.Union.getOpaqueValue();
   }
   bool operator!=(ProtocolConformanceRef other) const {
-    return Union != other.Union;
+    return Union.getOpaqueValue() != other.Union.getOpaqueValue();
   }
 
   friend llvm::hash_code hash_value(ProtocolConformanceRef conformance) {

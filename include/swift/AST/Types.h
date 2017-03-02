@@ -22,6 +22,7 @@
 #include "swift/AST/Ownership.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SILLayout.h"
+#include "swift/AST/Substitution.h"
 #include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
