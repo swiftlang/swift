@@ -3303,16 +3303,15 @@ IRGenModule::getAddrOfAssociatedTypeMetadataAccessFunction(
 llvm::Function *
 IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
                                   const NormalProtocolConformance *conformance,
-                                  AssociatedTypeDecl *associate,
-                                  ProtocolDecl *associateProtocol) {
+                                  CanType associatedType,
+                                  ProtocolDecl *associatedProtocol) {
   checkEligibleConf(conformance);
   auto forDefinition = ForDefinition;
 
-  assert(conformance->getProtocol() == associate->getProtocol());
   LinkEntity entity =
     LinkEntity::forAssociatedTypeWitnessTableAccessFunction(conformance,
-                                                            associate,
-                                                            associateProtocol);
+                                                            associatedType,
+                                                            associatedProtocol);
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) {
     if (forDefinition) updateLinkageForDefinition(*this, entry, entity);

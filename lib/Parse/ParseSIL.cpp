@@ -4567,7 +4567,7 @@ static ProtocolDecl *parseProtocolDecl(Parser &P, SILParser &SP) {
 }
 
 static AssociatedTypeDecl *parseAssociatedTypeDecl(Parser &P, SILParser &SP,
-           ProtocolDecl *proto) {
+                                                   ProtocolDecl *proto) {
   Identifier DeclName;
   SourceLoc DeclLoc;
   if (SP.parseSILIdentifier(DeclName, DeclLoc, diag::expected_sil_value_name))
@@ -4583,6 +4583,59 @@ static AssociatedTypeDecl *parseAssociatedTypeDecl(Parser &P, SILParser &SP,
     return nullptr;
   }
   return dyn_cast<AssociatedTypeDecl>(VD);
+}
+
+static bool parseAssociatedTypePath(SILParser &SP,
+                                    SmallVectorImpl<Identifier> &path) {
+  do {
+    Identifier name;
+    SourceLoc loc;
+    if (SP.parseSILIdentifier(name, loc, diag::expected_sil_value_name))
+      return false;
+    path.push_back(name);
+  } while (SP.P.consumeIf(tok::period));
+
+  return true;
+}
+
+static bool matchesAssociatedTypePath(CanType assocType,
+                                      ArrayRef<Identifier> path) {
+  if (auto memberType = dyn_cast<DependentMemberType>(assocType)) {
+    return (!path.empty() &&
+            memberType->getName() == path.back() &&
+            matchesAssociatedTypePath(memberType.getBase(), path.drop_back()));
+  } else {
+    assert(isa<GenericTypeParamType>(assocType));
+    return path.empty();
+  }
+}
+
+static CanType parseAssociatedTypePath(Parser &P, SILParser &SP,
+                                       ProtocolDecl *proto) {
+  SourceLoc loc = SP.P.Tok.getLoc();
+  SmallVector<Identifier, 4> path;
+  if (!parseAssociatedTypePath(SP, path))
+    return CanType();
+
+  // This is only used for parsing associated conformances, so we can
+  // go ahead and just search the requirement signature for something that
+  // matches the path.
+  for (auto &reqt : proto->getRequirementSignature()->getRequirements()) {
+    if (reqt.getKind() != RequirementKind::Conformance)
+      continue;
+    CanType assocType = reqt.getFirstType()->getCanonicalType();
+    if (matchesAssociatedTypePath(assocType, path))
+      return assocType;
+  }
+
+  SmallString<128> name;
+  name += path[0].str();
+  for (auto elt : makeArrayRef(path).slice(1)) {
+    name += '.';
+    name += elt.str();
+  }
+  P.diagnose(loc, diag::sil_witness_assoc_conf_not_found, name);
+  return CanType();
 }
 
 static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
@@ -4828,8 +4881,7 @@ bool Parser::parseSILWitnessTable() {
       if (EntryKeyword.str() == "associated_type_protocol") {
         if (parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
           return true;
-        AssociatedTypeDecl *assoc = parseAssociatedTypeDecl(*this,
-                                        WitnessState, proto);
+        CanType assoc = parseAssociatedTypePath(*this, WitnessState, proto);
         if (!assoc)
           return true;
         if (parseToken(tok::colon, diag::expected_sil_witness_colon))
@@ -4852,7 +4904,7 @@ bool Parser::parseSILWitnessTable() {
         }
 
         witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
-          assoc, proto, ProtocolConformanceRef(conformance)
+          assoc, proto, conformance
         });
         continue;
       }
