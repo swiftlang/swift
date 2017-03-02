@@ -4048,7 +4048,7 @@ public:
 
       TC.validateDecl(ED);
 
-      TC.ValidatedTypes.remove(ED);
+      TC.TypesToFinalize.remove(ED);
 
       {
         // Check for circular inheritance of the raw type.
@@ -4104,7 +4104,7 @@ public:
       checkUnsupportedNestedType(SD);
 
       TC.validateDecl(SD);
-      TC.ValidatedTypes.remove(SD);
+      TC.TypesToFinalize.remove(SD);
       TC.addImplicitConstructors(SD);
     }
 
@@ -4236,7 +4236,7 @@ public:
       if (!CD->hasValidSignature())
         return;
 
-      TC.ValidatedTypes.remove(CD);
+      TC.TypesToFinalize.remove(CD);
 
       {
         // Check for circular inheritance.
@@ -7091,7 +7091,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         checkEnumRawValues(*this, ED);
     }
 
-    ValidatedTypes.insert(nominal);
+    TypesToFinalize.insert(nominal);
     break;
   }
 
@@ -7131,7 +7131,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       markAsObjC(*this, proto, isObjC);
     }
 
-    ValidatedTypes.insert(proto);
+    TypesToFinalize.insert(proto);
     break;
   }
 

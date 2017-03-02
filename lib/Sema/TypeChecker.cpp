@@ -410,7 +410,8 @@ void TypeChecker::bindExtension(ExtensionDecl *ext) {
   ::bindExtensionDecl(ext, *this);
 }
 
-static bool shouldValidateDeclForLayout(NominalTypeDecl *nominal, ValueDecl *VD) {
+static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
+                                                   ValueDecl *VD) {
   // For enums, we only need to validate enum elements to know
   // the layout.
   if (isa<EnumDecl>(nominal) &&
@@ -440,7 +441,7 @@ static bool shouldValidateDeclForLayout(NominalTypeDecl *nominal, ValueDecl *VD)
   return false;
 }
 
-static void validateDeclForLayout(TypeChecker &TC, NominalTypeDecl *nominal) {
+static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
   Optional<bool> lazyVarsAlreadyHaveImplementation;
 
   for (auto *D : nominal->getMembers()) {
@@ -448,7 +449,7 @@ static void validateDeclForLayout(TypeChecker &TC, NominalTypeDecl *nominal) {
     if (!VD)
       continue;
 
-    if (!shouldValidateDeclForLayout(nominal, VD))
+    if (!shouldValidateMemberDuringFinalization(nominal, VD))
       continue;
 
     TC.validateDecl(VD);
@@ -541,12 +542,12 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
     // Note: if we ever start putting extension members in vtables, we'll need
     // to validate those members too.
     // FIXME: If we're not planning to run SILGen, this is wasted effort.
-    while (!TC.ValidatedTypes.empty()) {
-      auto nominal = TC.ValidatedTypes.pop_back_val();
+    while (!TC.TypesToFinalize.empty()) {
+      auto nominal = TC.TypesToFinalize.pop_back_val();
       if (nominal->isInvalid() || TC.Context.hadError())
         continue;
 
-      validateDeclForLayout(TC, nominal);
+      finalizeType(TC, nominal);
     }
 
     // Complete any conformances that we used.
@@ -559,7 +560,7 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
-           !TC.ValidatedTypes.empty() ||
+           !TC.TypesToFinalize.empty() ||
            !TC.UsedConformances.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.

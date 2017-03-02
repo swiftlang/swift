@@ -551,9 +551,10 @@ public:
   /// completed before type checking is considered complete.
   llvm::SetVector<NormalProtocolConformance *> UsedConformances;
 
-  /// The list of nominal type declarations that have been validated
-  /// during type checking.
-  llvm::SetVector<NominalTypeDecl *> ValidatedTypes;
+  /// The list of nominal type declarations that we've done at least
+  /// partial validation of during type-checking and which will need
+  /// to be finalized before we can hand off to SILGen etc.
+  llvm::SetVector<NominalTypeDecl *> TypesToFinalize;
 
   using TypeAccessScopeCacheMap = llvm::DenseMap<const ValueDecl *, AccessScope>;
 
