@@ -470,6 +470,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     ArgList->hasArg(options::OPT_driver_skip_execution);
   bool ShowIncrementalBuildDecisions =
     ArgList->hasArg(options::OPT_driver_show_incremental);
+  bool ShowJobLifecycle =
+    ArgList->hasArg(options::OPT_driver_show_job_lifecycle);
 
   bool Incremental = ArgList->hasArg(options::OPT_incremental);
   if (ArgList->hasArg(options::OPT_whole_module_optimization)) {
@@ -642,8 +644,11 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
       ContinueBuildingAfterErrors)
     C->setContinueBuildingAfterErrors();
 
-  if (ShowIncrementalBuildDecisions)
+  if (ShowIncrementalBuildDecisions || ShowJobLifecycle)
     C->setShowsIncrementalBuildDecisions();
+
+  if (ShowJobLifecycle)
+    C->setShowJobLifecycle();
 
   // This has to happen after building jobs, because otherwise we won't even
   // emit .swiftdeps files for the next build.

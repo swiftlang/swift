@@ -137,7 +137,10 @@ void Context::clear() {
 
 NodePointer Context::demangleSymbolAsNode(llvm::StringRef MangledName) {
 #ifndef NO_NEW_DEMANGLING
-  if (MangledName.startswith(MANGLING_PREFIX_STR)) {
+  if (MangledName.startswith(MANGLING_PREFIX_STR)
+      // Also accept the future mangling prefix.
+      // TODO: remove this line as soon as MANGLING_PREFIX_STR gets "_S".
+      || MangledName.startswith("_S")) {
     return D->demangleSymbol(MangledName);
   }
 #endif
@@ -171,7 +174,10 @@ std::string Context::demangleTypeAsString(llvm::StringRef MangledName,
 }
 
 bool Context::isThunkSymbol(llvm::StringRef MangledName) {
-  if (MangledName.startswith(MANGLING_PREFIX_STR)) {
+  if (MangledName.startswith(MANGLING_PREFIX_STR)
+      // Also accept the future mangling prefix.
+      // TODO: remove this line as soon as MANGLING_PREFIX_STR gets "_S".
+      || MangledName.startswith("_S")) {
     // First do a quick check
     if (MangledName.endswith("TA") ||  // partial application forwarder
         MangledName.endswith("Ta") ||  // ObjC partial application forwarder
@@ -208,7 +214,31 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
   }
   return false;
 }
-  
+
+bool Context::hasSwiftCallingConvention(llvm::StringRef MangledName) {
+  Node *Global = demangleSymbolAsNode(MangledName);
+  if (!Global || Global->getKind() != Node::Kind::Global ||
+      Global->getNumChildren() == 0)
+    return false;
+
+  Node *TopLevel = Global->getFirstChild();
+  switch (TopLevel->getKind()) {
+    // Functions, which don't have the swift calling conventions:
+    case Node::Kind::TypeMetadataAccessFunction:
+    case Node::Kind::ValueWitness:
+    case Node::Kind::ProtocolWitnessTableAccessor:
+    case Node::Kind::GenericProtocolWitnessTableInstantiationFunction:
+    case Node::Kind::LazyProtocolWitnessTableAccessor:
+    case Node::Kind::AssociatedTypeMetadataAccessor:
+    case Node::Kind::AssociatedTypeWitnessTableAccessor:
+    case Node::Kind::ObjCAttribute:
+      return false;
+    default:
+      break;
+  }
+  return true;
+}
+
 NodePointer Context::createNode(Node::Kind K) {
   return D->createNode(K);
 }
@@ -317,7 +347,10 @@ void Demangler::init(StringRef MangledName) {
 NodePointer Demangler::demangleSymbol(StringRef MangledName) {
   init(MangledName);
 
-  if (!nextIf(MANGLING_PREFIX_STR))
+  if (!nextIf(MANGLING_PREFIX_STR)
+      // Also accept the future mangling prefix.
+      // TODO: remove this line as soon as MANGLING_PREFIX_STR gets "_S".
+      && !nextIf("_S"))
     return nullptr;
 
   NodePointer topLevel = createNode(Node::Kind::Global);

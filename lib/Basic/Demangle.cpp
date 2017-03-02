@@ -2331,7 +2331,9 @@ private:
 bool
 swift::Demangle::isSwiftSymbol(const char *mangledName) {
   // The old mangling.
-  if (mangledName[0] == '_' && mangledName[1] == 'T')
+  if (mangledName[0] == '_'
+      // Also accept the future mangling prefix.
+      && (mangledName[1] == 'T' || mangledName[1] == 'S'))
     return true;
 
   // The new mangling.

@@ -3496,11 +3496,13 @@ namespace {
     Expr *visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
       // If we end up here, we should have diagnosed somewhere else
       // already.
-      if (!SuppressDiagnostics) {
-        cs.TC.diagnose(expr->getLoc(), diag::pattern_in_expr,
+      Expr *simplified = simplifyExprType(expr);
+      if (!SuppressDiagnostics
+          && !simplified->getType()->is<UnresolvedType>()) {
+        cs.TC.diagnose(simplified->getLoc(), diag::pattern_in_expr,
                        expr->getSubPattern()->getKind());
       }
-      return expr;
+      return simplified;
     }
     
     Expr *visitBindOptionalExpr(BindOptionalExpr *expr) {

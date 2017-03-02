@@ -13,7 +13,9 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Driver/Job.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Option/Arg.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -105,4 +107,43 @@ void Job::printCommandLine(raw_ostream &os, StringRef Terminator) const {
   os << ' ';
   printArguments(os, Arguments);
   os << Terminator;
+}
+
+void Job::printSummary(raw_ostream &os) const {
+  // Deciding how to describe our inputs is a bit subtle; if we are a Job built
+  // from a JobAction that itself has InputActions sources, then we collect
+  // those up. Otherwise it's more correct to talk about our inputs as the
+  // outputs of our input-jobs.
+  SmallVector<std::string, 4> Inputs;
+
+  for (const Action *A : getSource().getInputs())
+    if (const InputAction *IA = dyn_cast<InputAction>(A))
+      Inputs.push_back(IA->getInputArg().getValue());
+
+  for (const Job *J : getInputs())
+    for (const std::string &f : J->getOutput().getPrimaryOutputFilenames())
+      Inputs.push_back(f);
+
+  size_t limit = 3;
+  size_t actual = Inputs.size();
+  if (actual > limit) {
+    Inputs.erase(Inputs.begin() + limit, Inputs.end());
+  }
+
+  os << "{" << getSource().getClassName() << ": ";
+  interleave(getOutput().getPrimaryOutputFilenames(),
+             [&](const std::string &Arg) {
+               os << llvm::sys::path::filename(Arg);
+             },
+             [&] { os << ' '; });
+  os << " <= ";
+  interleave(Inputs,
+             [&](const std::string &Arg) {
+               os << llvm::sys::path::filename(Arg);
+             },
+             [&] { os << ' '; });
+  if (actual > limit) {
+    os << " ... " << (actual-limit) << " more";
+  }
+  os << "}";
 }

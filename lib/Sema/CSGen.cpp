@@ -2670,8 +2670,13 @@ namespace {
     
     Type visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
       // If there are UnresolvedPatterns floating around after name binding,
-      // they are pattern productions in invalid positions.
-      return ErrorType::get(CS.getASTContext());
+      // they are pattern productions in invalid positions. However, we will
+      // diagnose that condition elsewhere; to avoid unnecessary noise errors,
+      // just plop an open type variable here.
+      
+      auto locator = CS.getConstraintLocator(expr);
+      auto typeVar = CS.createTypeVariable(locator, TVO_CanBindToLValue);
+      return typeVar;
     }
 
     /// Get the type T?
@@ -3362,9 +3367,11 @@ void swift::collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                     llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap) {
   Type BaseTy = PD->getDeclaredInterfaceType();
   DeclContext *DC = PD->getDeclContext();
+  std::unique_ptr<TypeChecker> CreatedTC;
   auto *TC = static_cast<TypeChecker*>(DC->getASTContext().getLazyResolver());
   if (!TC) {
-    TC = new TypeChecker(DC->getASTContext());
+    CreatedTC.reset(new TypeChecker(DC->getASTContext()));
+    TC = CreatedTC.get();
   }
   for (Decl *D : PD->getMembers()) {
     ValueDecl *VD = dyn_cast<ValueDecl>(D);

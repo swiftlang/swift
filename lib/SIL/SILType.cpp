@@ -376,7 +376,6 @@ SILType SILType::getMetatypeInstanceType(SILModule &M) const {
   assert(MetatypeType->is<AnyMetatypeType>() &&
          "This method should only be called on SILTypes with an underlying "
          "metatype type.");
-  assert(isObject() && "Should only be called on object types.");
   Type instanceType =
     MetatypeType->castTo<AnyMetatypeType>()->getInstanceType();
 

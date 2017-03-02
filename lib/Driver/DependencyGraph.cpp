@@ -425,10 +425,15 @@ void DependencyGraphImpl::MarkTracerImpl::printPath(
       }
       StringRef memberPart = name.str().substr(splitPoint+1);
 
-      out << " provides member '" << memberPart << "' of type '"
-          << swift::Demangle::demangleTypeAsString(typePart)
-          << "'\n";
-
+      if (memberPart.empty()) {
+        out << " provides non-private members of type '"
+            << swift::Demangle::demangleTypeAsString(typePart)
+            << "'\n";
+      } else {
+        out << " provides member '" << memberPart << "' of type '"
+            << swift::Demangle::demangleTypeAsString(typePart)
+            << "'\n";
+      }
     } else if (entry.KindMask.contains(DependencyKind::DynamicLookupName)) {
       out << " provides AnyObject member '" << entry.Name << "'\n";
 

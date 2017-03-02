@@ -16,8 +16,10 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/Lexer.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -356,51 +358,46 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
         // tolerate extra parens).
         auto argumentIdent = UDRE->getName().getBaseName();
         auto argument = argumentIdent.str();
-
-        // Error for values that don't make sense if there's a clear definition
-        // of the possible values (as there is for _runtime).
-        if (fnName.equals("_runtime") &&
-            !argument.equals("_ObjC") && !argument.equals("_Native")) {
-          D.diagnose(CE->getLoc(),
-                     diag::unsupported_platform_runtime_condition_argument);
-          return ConditionalCompilationExprState::error();
-        }
-
-        std::vector<StringRef> suggestions;
-        SWIFT_DEFER {
-          for (const StringRef& suggestion : suggestions) {
-            D.diagnose(UDRE->getLoc(), diag::note_typo_candidate,
-                       suggestion)
-            .fixItReplace(UDRE->getSourceRange(), suggestion);
-          }
-        };
-        if (fnName == "os") {
-          if (!LangOptions::checkPlatformConditionOS(argument,
-                                                     suggestions)) {
-            D.diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
-                       "operating system", fnName);
-            return ConditionalCompilationExprState::error();
-          }
-        } else if (fnName == "arch") {
-          if (!LangOptions::isPlatformConditionArchSupported(argument,
-                                                             suggestions)) {
-            D.diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
-                       "architecture", fnName);
-            return ConditionalCompilationExprState::error();
-          }
-        } else if (fnName == "_endian") {
-          if (!LangOptions::isPlatformConditionEndiannessSupported(argument,
-                                                                   suggestions)) {
-            D.diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
-                       "endianness", fnName);
-          }
-        }
+        PlatformConditionKind Kind =
+          llvm::StringSwitch<PlatformConditionKind>(fnName)
+          .Case("os", PlatformConditionKind::OS)
+          .Case("arch", PlatformConditionKind::Arch)
+          .Case("_endian", PlatformConditionKind::Endianness)
+          .Case("_runtime", PlatformConditionKind::Runtime);
 
         // FIXME: Perform the replacement macOS -> OSX elsewhere.
-        if (fnName == "os" && argument == "macOS")
+        if (Kind == PlatformConditionKind::OS && argument == "macOS")
           argument = "OSX";
 
-        auto target = Context.LangOpts.getPlatformConditionValue(fnName);
+        std::vector<StringRef> suggestions;
+        if (!LangOptions::checkPlatformConditionSupported(Kind, argument,
+                                                          suggestions)) {
+          if (Kind == PlatformConditionKind::Runtime) {
+            // Error for _runtime()
+            D.diagnose(UDRE->getLoc(),
+                       diag::unsupported_platform_runtime_condition_argument);
+            return ConditionalCompilationExprState::error();
+          }
+          StringRef DiagName;
+          switch (Kind) {
+          case PlatformConditionKind::OS:
+            DiagName = "operating system"; break;
+          case PlatformConditionKind::Arch:
+            DiagName = "architecture"; break;
+          case PlatformConditionKind::Endianness:
+            DiagName = "endianness"; break;
+          case PlatformConditionKind::Runtime:
+            llvm_unreachable("handled above");
+          }
+          D.diagnose(UDRE->getLoc(), diag::unknown_platform_condition_argument,
+                     DiagName, fnName);
+          for (const StringRef &suggestion : suggestions) {
+            D.diagnose(UDRE->getLoc(), diag::note_typo_candidate, suggestion)
+              .fixItReplace(UDRE->getSourceRange(), suggestion);
+          }
+        }
+
+        auto target = Context.LangOpts.getPlatformConditionValue(Kind);
         return {target == argument, ConditionalCompilationExprKind::DeclRef};
       } else {
         D.diagnose(CE->getLoc(), diag::unsupported_platform_condition_argument,

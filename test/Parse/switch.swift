@@ -264,7 +264,7 @@ Gronk:
 
 func enumElementSyntaxOnTuple() {
   switch (1, 1) {
-  case .Bar: // expected-error {{enum case 'Bar' not found in type '(Int, Int)'}}
+  case .Bar: // expected-error {{pattern cannot match values of type '(Int, Int)'}}
     break
   default:
     break

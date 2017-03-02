@@ -333,6 +333,7 @@ NO_RESULT_OWNERSHIP_INST(InjectEnumAddr)
 NO_RESULT_OWNERSHIP_INST(DeinitExistentialAddr)
 NO_RESULT_OWNERSHIP_INST(DeinitExistentialOpaque)
 NO_RESULT_OWNERSHIP_INST(CondFail)
+NO_RESULT_OWNERSHIP_INST(EndLifetime)
 
 // Terminators. These do not produce SILValue, so they do not have a
 // ValueOwnershipKind. They do have ownership implications in terms of the

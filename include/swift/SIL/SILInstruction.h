@@ -4337,6 +4337,28 @@ class FixLifetimeInst :
       : UnaryInstructionBase(DebugLoc, Operand) {}
 };
 
+/// EndLifetimeInst - An artificial end lifetime use of a value for the purpose
+/// of working around verification problems.
+///
+/// Specifically, the signature of destroying deinit takes self at +0 and
+/// returns self at +1. This is an issue since a deallocating deinit takes in
+/// self at +1. Previously, we could rely on the deallocating bit being set in
+/// the object header to allow SILGen to statically balance the +1 from the
+/// deallocating deinit. This is because deallocating values used to be
+/// immortal. The runtime now asserts if we release a deallocating value,
+/// meaning such an approach does not work. This instruction acts as a "fake"
+/// lifetime ending use allowing for static verification of deallocating
+/// destroyers, without an actual release being emitted (avoiding the runtime
+/// assert).
+class EndLifetimeInst
+    : public UnaryInstructionBase<ValueKind::EndLifetimeInst, SILInstruction,
+                                  /*HAS_RESULT*/ false> {
+  friend SILBuilder;
+
+  EndLifetimeInst(SILDebugLocation DebugLoc, SILValue Operand)
+      : UnaryInstructionBase(DebugLoc, Operand) {}
+};
+
 /// MarkDependenceInst - Marks that one value depends on another for
 /// validity in a non-obvious way.
 class MarkDependenceInst : public SILInstruction {

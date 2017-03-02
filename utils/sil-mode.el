@@ -83,6 +83,7 @@
                     "load_weak" "store_weak"
                     "load_unowned" "store_unowned"
                     "fix_lifetime" "mark_dependence"
+                    "end_lifetime"
                     "is_unique" "is_unique_or_pinned"
                     "copy_block"
                     "strong_unpin" "strong_pin" "is_unique" "is_unique_or_pinned")
