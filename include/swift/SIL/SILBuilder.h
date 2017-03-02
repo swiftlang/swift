@@ -1280,6 +1280,11 @@ public:
         getSILDebugLocation(Loc), Operand, atomicity));
   }
 
+  EndLifetimeInst *createEndLifetime(SILLocation Loc, SILValue Operand) {
+    return insert(new (F.getModule())
+                      EndLifetimeInst(getSILDebugLocation(Loc), Operand));
+  }
+
   FixLifetimeInst *createFixLifetime(SILLocation Loc, SILValue Operand) {
     return insert(new (F.getModule())
                       FixLifetimeInst(getSILDebugLocation(Loc), Operand));
