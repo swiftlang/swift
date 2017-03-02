@@ -1100,12 +1100,6 @@ case SDKNodeKind::X:                                                           \
 // Recursively construct a node that represents a type, for instance,
 // representing the return value type of a function decl.
 static SDKNode *constructTypeNode(SDKContext &Ctx, Type T) {
-  // For generic function type, build from its canonical version.
-  if (auto GFT = dyn_cast<GenericFunctionType>(T.getPointer())) {
-    if (!GFT->isCanonical())
-      return constructTypeNode(Ctx, GFT->getCanonicalType());
-  }
-
   SDKNode* Root = SDKNodeInitInfo(Ctx, T).createSDKNode(SDKNodeKind::TypeNominal);
 
   if (auto NAT = dyn_cast<NameAliasType>(T.getPointer())) {
