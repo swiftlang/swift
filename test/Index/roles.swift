@@ -134,27 +134,18 @@ struct AStruct {
   }
 }
 
-class AClass {
+class AClass { // used for references only
   var y: AStruct;
   var z: [Int]
-
   init(x: Int) {
     y = AStruct(x: x)
     self.z = [1, 2, 3]
   }
-
   subscript(index: Int) -> Int {
-    get {
-      return z[0]
-    }
-    set {
-      z[0] = newValue
-    }
+    get { return z[0] }
+    set { z[0] = newValue }
   }
-
-  func foo() -> Int {
-    return z[0]
-  }
+  func foo() -> Int { return z[0] }
 }
 
 let _ = AClass.foo
@@ -168,20 +159,37 @@ let _ = AClass(x: 1)[1] = 2
 // CHECK: [[@LINE-1]]:21 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test6AClassC9subscriptSiSici | Ref,Writ | rel: 0
 // CHECK: [[@LINE-2]]:21 | function/acc-set/Swift | setter:subscript(_:) | s:14swift_ide_test6AClassC9subscriptSiSicfs | Ref,Call,Dyn,Impl,RelRec | rel: 1
 
+// RelationBaseOf, RelationOverrideOf
+
+protocol X {}
+// CHECK: [[@LINE-1]]:10 | protocol/Swift | X | [[X_USR:.*]] | Def | rel: 0
+
+class ImplementsX : X {}
+// CHECK: [[@LINE-1]]:7 | class/Swift | ImplementsX | [[ImplementsX_USR:.*]] | Def | rel: 0
+// CHECK: [[@LINE-2]]:21 | protocol/Swift | X | [[X_USR]] | Ref,RelBase | rel: 1
+// CHECK-NEXT: RelBase | ImplementsX | [[ImplementsX_USR]]
+
 protocol AProtocol {
   // CHECK: [[@LINE-1]]:10 | protocol/Swift | AProtocol | [[AProtocol_USR:.*]] | Def | rel: 0
+
+  associatedtype T : X
+  // CHECK: [[@LINE-1]]:18 | type-alias/associated-type/Swift | T | s:14swift_ide_test9AProtocolP1T | Def,RelChild | rel: 1
+  // CHECK-NEXT: RelChild | AProtocol | [[AProtocol_USR]]
+  // CHECK: [[@LINE-3]]:22 | protocol/Swift | X | [[X_USR]] | Ref | rel: 0
+
   func foo() -> Int
   // CHECK: [[@LINE-1]]:8 | instance-method/Swift | foo() | s:14swift_ide_test9AProtocolP3fooSiyF | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | AProtocol | s:14swift_ide_test9AProtocolP
 }
 
-// RelationBaseOf, RelationOverrideOf
 class ASubClass : AClass, AProtocol {
 // CHECK: [[@LINE-1]]:7 | class/Swift | ASubClass | s:14swift_ide_test9ASubClassC | Def | rel: 0
 // CHECK: [[@LINE-2]]:19 | class/Swift | AClass | s:14swift_ide_test6AClassC | Ref,RelBase | rel: 1
 // CHECK-NEXT: RelBase | ASubClass | s:14swift_ide_test9ASubClassC
 // CHECK: [[@LINE-4]]:27 | protocol/Swift | AProtocol | s:14swift_ide_test9AProtocolP | Ref,RelBase | rel: 1
 // CHECK-NEXT: RelBase | ASubClass | s:14swift_ide_test9ASubClassC
+
+  typealias T = ImplementsX
 
   override func foo() -> Int {
     // CHECK: [[@LINE-1]]:17 | instance-method/Swift | foo() | s:14swift_ide_test9ASubClassC3fooSiyF | Def,RelChild,RelOver | rel: 3
@@ -216,7 +224,9 @@ extension OuterS.InnerS : AProtocol {
   // CHECK: [[@LINE-4]]:27 | protocol/Swift | AProtocol | [[AProtocol_USR]] | Ref,RelBase | rel: 1
   // CHECK-NEXT: RelBase | InnerS | [[EXT_INNERS_USR]]
   // CHECK: [[@LINE-6]]:11 | struct/Swift | OuterS | [[OUTERS_USR]] | Ref | rel: 0
-  func foo() {}
+
+  typealias T = ImplementsX
+  func foo() -> Int { return 1 }
 }
 
 var anInstance = AClass(x: 1)
