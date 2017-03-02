@@ -3367,9 +3367,11 @@ void swift::collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                     llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap) {
   Type BaseTy = PD->getDeclaredInterfaceType();
   DeclContext *DC = PD->getDeclContext();
+  std::unique_ptr<TypeChecker> CreatedTC;
   auto *TC = static_cast<TypeChecker*>(DC->getASTContext().getLazyResolver());
   if (!TC) {
-    TC = new TypeChecker(DC->getASTContext());
+    CreatedTC.reset(new TypeChecker(DC->getASTContext()));
+    TC = CreatedTC.get();
   }
   for (Decl *D : PD->getMembers()) {
     ValueDecl *VD = dyn_cast<ValueDecl>(D);
