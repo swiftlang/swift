@@ -1549,6 +1549,11 @@ public:
   void visitFixLifetimeInst(FixLifetimeInst *RI) {
     *this << getIDAndType(RI->getOperand());
   }
+
+  void visitEndLifetimeInst(EndLifetimeInst *ELI) {
+    *this << getIDAndType(ELI->getOperand());
+  }
+
   void visitMarkDependenceInst(MarkDependenceInst *MDI) {
     *this << getIDAndType(MDI->getValue()) << " on "
           << getIDAndType(MDI->getBase());
