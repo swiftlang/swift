@@ -422,7 +422,7 @@ protocol P2 {
 struct X3<T : P1> where T.Assoc : P2 {}
 
 struct X4 : P1 { // expected-error{{type 'X4' does not conform to protocol 'P1'}}
-  func getX1() -> X3<X4> { return X3() } // expected-error{{cannot convert return expression of type 'X3<_>' to return type 'X3<X4>'}}
+  func getX1() -> X3<X4> { return X3() }
 }
 
 protocol ShouldntCrash {

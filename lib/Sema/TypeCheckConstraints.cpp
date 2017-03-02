@@ -1388,6 +1388,11 @@ bool GenericRequirementsCheckListener::shouldCheck(RequirementKind kind,
   return true;
 }
 
+void GenericRequirementsCheckListener::satisfiedConformance(
+                                          Type depTy, Type replacementTy,
+                                          ProtocolConformanceRef conformance) {
+}
+
 bool TypeChecker::
 solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
                    FreeTypeVariableBinding allowFreeTypeVariables,

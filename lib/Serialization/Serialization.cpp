@@ -1318,6 +1318,10 @@ void Serializer::writeNormalConformance(
                                               numInheritedConformances,
                                               data);
 
+  // Write requirement signature conformances.
+  for (auto reqConformance : conformance->getSignatureConformances())
+    writeConformance(reqConformance, DeclTypeAbbrCodes);
+  
   // Write inherited conformances.
   for (auto inheritedProto : inheritedProtos) {
     writeConformance(conformance->getInheritedConformance(inheritedProto),

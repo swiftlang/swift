@@ -351,6 +351,14 @@ public:
   ///
   /// \returns true if it's ok to validate requirement, false otherwise.
   virtual bool shouldCheck(RequirementKind kind, Type first, Type second);
+
+  /// Callback to report the result of a satisfied conformance requirement.
+  ///
+  /// \param depTy The dependent type, from the signature.
+  /// \param replacementTy The type \c depTy was replaced with.
+  /// \param conformance The conformance itself.
+  virtual void satisfiedConformance(Type depTy, Type replacementTy,
+                                    ProtocolConformanceRef conformance);
 };
 
 /// Flags that describe the context of type checking a pattern or
