@@ -461,6 +461,10 @@ SILType SILType::unwrapAnyOptionalType() const {
 /// Error existentials.
 static bool isBridgedErrorClass(SILModule &M,
                                 Type t) {
+  // There's no bridging if ObjC interop is disabled.
+  if (!M.getASTContext().LangOpts.EnableObjCInterop)
+    return false;
+
   if (!t)
     return false;
 
