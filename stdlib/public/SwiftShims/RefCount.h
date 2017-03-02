@@ -12,22 +12,20 @@
 #ifndef SWIFT_STDLIB_SHIMS_REFCOUNT_H
 #define SWIFT_STDLIB_SHIMS_REFCOUNT_H
 
+#include "SwiftStdint.h"
 #include "Visibility.h"
+
+// This definition is a placeholder for importing into Swift.
+// It provides size and alignment but cannot be manipulated safely there.
+typedef struct {
+  __swift_uintptr_t refCounts SWIFT_ATTRIBUTE_UNAVAILABLE;
+} InlineRefCountsPlaceholder;
 
 #if !defined(__cplusplus)
 
-// These definitions are placeholders for importing into Swift.
-// They provide size and alignment but cannot be manipulated safely there.
+typedef InlineRefCountsPlaceholder InlineRefCounts;
 
-#include "SwiftStdint.h"
-
-typedef struct {
-  __swift_uint64_t refCounts SWIFT_ATTRIBUTE_UNAVAILABLE;
-} InlineRefCounts;
-
-// not __cplusplus
 #else
-// __cplusplus
 
 #include <type_traits>
 #include <atomic>
@@ -1283,12 +1281,12 @@ static_assert(swift::IsTriviallyConstructible<InlineRefCounts>::value,
 static_assert(std::is_trivially_destructible<InlineRefCounts>::value,
               "InlineRefCounts must be trivially destructible");
 
-/* FIXME: small header for 32-bit
+static_assert(sizeof(InlineRefCounts) == sizeof(InlineRefCountsPlaceholder),
+             "InlineRefCounts and InlineRefCountsPlaceholder must match");
 static_assert(sizeof(InlineRefCounts) == sizeof(uintptr_t),
-  "InlineRefCounts must be pointer-sized");
+              "InlineRefCounts must be pointer-sized");
 static_assert(alignof(InlineRefCounts) == alignof(uintptr_t),
-"InlineRefCounts must be pointer-aligned");
-*/
+              "InlineRefCounts must be pointer-aligned");
 
 
 class HeapObjectSideTableEntry {
