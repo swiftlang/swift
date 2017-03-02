@@ -62,8 +62,9 @@ public:
   /// A witness table entry describing the witness for an associated type's
   /// protocol requirement.
   struct AssociatedTypeProtocolWitness {
-    /// The associated type required.
-    AssociatedTypeDecl *Requirement;
+    /// The associated type required.  A dependent type in the protocol's
+    /// context.
+    CanType Requirement;
     /// The protocol requirement on the type.
     ProtocolDecl *Protocol;
     /// The ProtocolConformance satisfying the requirement. Null if the

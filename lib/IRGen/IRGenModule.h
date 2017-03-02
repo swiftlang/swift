@@ -968,7 +968,7 @@ public:
                                            AssociatedTypeDecl *associatedType);
   llvm::Function *getAddrOfAssociatedTypeWitnessTableAccessFunction(
                                            const NormalProtocolConformance *C,
-                                           AssociatedTypeDecl *associatedType,
+                                           CanType depAssociatedType,
                                            ProtocolDecl *requiredProtocol);
 
   Address getAddrOfObjCISAMask();
