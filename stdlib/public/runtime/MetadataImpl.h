@@ -881,6 +881,7 @@ struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
 
   static OpaqueValue *projectBuffer(ValueBuffer *buffer, const Metadata *self) {
     auto vwtable = self->getValueWitnesses();
+    (void)vwtable;
     if (!IsKnownAllocated && vwtable->isValueInline()) {
       return reinterpret_cast<OpaqueValue*>(buffer);
     } else {
@@ -900,6 +901,7 @@ struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
                                                        ValueBuffer *src,
                                                        const Metadata *self) {
     auto vwtable = self->getValueWitnesses();
+    (void)vwtable;
     if (!IsKnownAllocated && !vwtable->isValueInline()) {
       return Impl::initializeWithTake(reinterpret_cast<OpaqueValue*>(dest),
                                       reinterpret_cast<OpaqueValue*>(src),
