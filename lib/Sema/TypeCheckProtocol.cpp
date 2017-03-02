@@ -38,6 +38,9 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
+#define DEBUG_TYPE "protocol-conformance-checking"
+#include "llvm/Support/Debug.h"
+
 using namespace swift;
 
 namespace {
@@ -3029,6 +3032,9 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
   };
 
   for (auto witness : lookupValueWitnesses(req, /*ignoringNames=*/nullptr)) {
+    DEBUG(llvm::dbgs() << "Inferring associated types from decl:\n";
+          witness->dump(llvm::dbgs()));
+  
     // If the potential witness came from an extension, and our `Self`
     // type can't use it regardless of what associated types we end up
     // inferring, skip the witness.
@@ -3049,18 +3055,27 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
 }
       auto &result = witnessResult.Inferred[i];
 
+      DEBUG(llvm::dbgs() << "Considering whether " << result.first->getName()
+                         << " can infer to:\n";
+            result.second->dump(llvm::dbgs()));
+
       // Filter out errors.
-      if (result.second->hasError())
+      if (result.second->hasError()) {
+        DEBUG(llvm::dbgs() << "-- has error type\n");
         REJECT;
+      }
 
       // Filter out duplicates.
       if (!known.insert({result.first, result.second->getCanonicalType()})
-                .second)
+                .second) {
+        DEBUG(llvm::dbgs() << "-- duplicate\n");
         REJECT;
+      }
      
       // Filter out circular possibilities, e.g. that
       // AssocType == S.AssocType or
       // AssocType == Foo<S.AssocType>.
+      bool canInferFromOtherAssociatedType = false;
       bool containsTautologicalType =
         result.second.findIf([&](Type t) -> bool {
           auto dmt = t->getAs<DependentMemberType>();
@@ -3072,11 +3087,63 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
           if (!dmt->getBase()->isEqual(Conformance->getType()))
             return false;
           
+          // If this associated type is same-typed to another associated type
+          // on `Self`, then it may still be an interesting candidate if we find
+          // an answer for that other type.
+          auto witnessContext = witness->getDeclContext();
+          if (witnessContext->getAsProtocolExtensionContext()
+              && witnessContext->getGenericSignatureOfContext()) {
+            auto selfTy = witnessContext->getSelfInterfaceType();
+            auto selfAssocTy = DependentMemberType::get(selfTy,
+                                                        dmt->getAssocType());
+            for (auto &reqt : witnessContext->getGenericSignatureOfContext()
+                                            ->getRequirements()) {
+              switch (reqt.getKind()) {
+              case RequirementKind::Conformance:
+              case RequirementKind::Superclass:
+              case RequirementKind::Layout:
+                break;
+              
+              case RequirementKind::SameType:
+                Type other;
+                if (reqt.getFirstType()->isEqual(selfAssocTy)) {
+                  other = reqt.getSecondType();
+                } else if (reqt.getSecondType()->isEqual(selfAssocTy)) {
+                  other = reqt.getFirstType();
+                } else {
+                  break;
+                }
+                
+                if (auto otherAssoc = other->getAs<DependentMemberType>()) {
+                  if (otherAssoc->getBase()->isEqual(selfTy)) {
+                    auto otherDMT = DependentMemberType::get(dmt->getBase(),
+                                                    otherAssoc->getAssocType());
+                    
+                    // We may be able to infer one associated type from the
+                    // other.
+                    result.second = result.second.transform([&](Type t) -> Type{
+                      if (t->isEqual(dmt))
+                        return otherDMT;
+                      return t;
+                    });
+                    canInferFromOtherAssociatedType = true;
+                    DEBUG(llvm::dbgs() << "++ we can same-type to:\n";
+                          result.second->dump(llvm::dbgs()));
+                    return false;
+                  }
+                }
+                break;
+              }
+            }
+          }
+          
           return true;
         });
       
-      if (containsTautologicalType)
+      if (containsTautologicalType) {
+        DEBUG(llvm::dbgs() << "-- tautological\n");
         REJECT;
+      }
       
       // Check that the type witness doesn't contradict an
       // explicitly-given type witness. If it does contradict, throw out the
@@ -3093,19 +3160,27 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
         auto newWitness = result.second->getCanonicalType();
         if (!newWitness->hasTypeParameter()
             && !existingWitness->isEqual(newWitness)) {
+          DEBUG(llvm::dbgs() << "** contradicts explicit type witness, "
+                                "rejecting inference from this decl\n");
           goto next_witness;
         }
       }
       
-      // Check that the type witness meets the
-      // requirements on the associated type.
-      if (auto failed = checkTypeWitness(TC, DC, result.first,
-                                         result.second)) {
-        witnessResult.NonViable.push_back(
-                            std::make_tuple(result.first,result.second,failed));
-        REJECT;
+      // If we same-typed to another unresolved associated type, we won't
+      // be able to check conformances yet.
+      if (!canInferFromOtherAssociatedType) {
+        // Check that the type witness meets the
+        // requirements on the associated type.
+        if (auto failed = checkTypeWitness(TC, DC, result.first,
+                                           result.second)) {
+          witnessResult.NonViable.push_back(
+                              std::make_tuple(result.first,result.second,failed));
+          DEBUG(llvm::dbgs() << "-- doesn't fulfill requirements\n");
+          REJECT;
+        }
       }
       
+      DEBUG(llvm::dbgs() << "++ seems legit\n");
       ++i;
     }
 #undef REJECT
@@ -3622,6 +3697,8 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
   // Infer type witnesses from value witnesses.
   auto inferred = inferTypeWitnessesViaValueWitnesses(unresolvedAssocTypes);
+  DEBUG(llvm::dbgs() << "Candidates for inference:\n";
+        dumpInferredAssociatedTypes(inferred));
 
   // Compute the set of solutions.
   SmallVector<std::pair<ValueDecl *, ValueDecl *>, 4> valueWitnesses;
@@ -3811,6 +3888,9 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
         Type replaced = known->first.transform(foldDependentMemberTypes);
         if (replaced.isNull())
+          return true;
+        
+        if (checkTypeWitness(TC, DC, assocType, replaced))
           return true;
 
         known->first = replaced;
