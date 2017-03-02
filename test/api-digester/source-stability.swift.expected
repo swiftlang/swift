@@ -1,7 +1,10 @@
+/* FIXME: Bogus */
 TypeAlias Dictionary.Index has been removed
 TypeAlias Set.Index has been removed
 Struct DictionaryIndex has been removed
 Struct SetIndex has been removed
+
+/* Removed declarations */
 Protocol BidirectionalIndexable has been removed (deprecated)
 Protocol ExpressibleByStringInterpolation has been removed (deprecated)
 Protocol Indexable has been removed (deprecated)
@@ -13,8 +16,12 @@ Constructor String.init(stringInterpolationSegment:) has been removed
 Func Array.append(contentsOf:) has been removed
 Func ArraySlice.append(contentsOf:) has been removed
 Func ContiguousArray.append(contentsOf:) has been removed
+
+/* Unnecessary overload -- no functional change */
 Func Dictionary.removeValue(forKey:) has been removed
 Func Dictionary.updateValue(_:forKey:) has been removed
+
+/* FIXME: Bogus */
 Var Dictionary.endIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
 Var Dictionary.startIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
 Var Set.endIndex has declared type change from SetIndex<Element> to Set<Element>.Index
@@ -204,6 +211,10 @@ Func Slice.distance(from:to:) has return type change from Base.IndexDistance to 
 Func Slice.index(_:offsetBy:) has return type change from Base.Index to Slice.Index
 Func Slice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to Slice.Index?
 Func Slice.index(after:) has return type change from Base.Index to Slice.Index
+
+/* Function type change */
 Func UnsafePointer.withMemoryRebound(to:capacity:_:) has parameter 2 type change from (UnsafeMutablePointer<T>) throws -> Result to (UnsafePointer<T>) throws -> Result
+
+/* FIXME: Bogus */
 Func Zip2Iterator.next() has return type change from (Iterator1.Element, Iterator2.Element)? to Zip2Iterator.Element?
 Func Zip2Sequence.makeIterator() has return type change from Zip2Iterator<Sequence1.Iterator, Sequence2.Iterator> to Zip2Sequence.Iterator
