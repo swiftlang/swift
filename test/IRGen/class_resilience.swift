@@ -13,14 +13,14 @@
 // CHECK: @_T016class_resilience33ClassWithResilientlySizedPropertyC1r16resilient_struct9RectangleVvWvd = {{(protected )?}}global [[INT]] 0
 // CHECK: @_T016class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32VvWvd = {{(protected )?}}global [[INT]] 0
 
-// CHECK: @_T016class_resilience14ResilientChildC5fields5Int32VvWvd = {{(protected )?}}global [[INT]] {{12|16}}
+// CHECK: @_T016class_resilience14ResilientChildC5fields5Int32VvWvd = {{(protected )?}}global [[INT]] {{8|16}}
 // CHECK: @_T016class_resilience21ResilientGenericChildC5fields5Int32VvWvi = {{(protected )?}}global [[INT]] {{56|88}}
 
-// CHECK: @_T016class_resilience28ClassWithMyResilientPropertyC1rAA0eF6StructVvWvd = {{(protected )?}}constant [[INT]] {{12|16}}
-// CHECK: @_T016class_resilience28ClassWithMyResilientPropertyC5colors5Int32VvWvd = {{(protected )?}}constant [[INT]] {{16|20}}
+// CHECK: @_T016class_resilience28ClassWithMyResilientPropertyC1rAA0eF6StructVvWvd = {{(protected )?}}constant [[INT]] {{8|16}}
+// CHECK: @_T016class_resilience28ClassWithMyResilientPropertyC5colors5Int32VvWvd = {{(protected )?}}constant [[INT]] {{12|20}}
 
-// CHECK: @_T016class_resilience30ClassWithIndirectResilientEnumC1s14resilient_enum10FunnyShapeOvWvd = {{(protected )?}}constant [[INT]] {{12|16}}
-// CHECK: @_T016class_resilience30ClassWithIndirectResilientEnumC5colors5Int32VvWvd = {{(protected )?}}constant [[INT]] {{16|24}}
+// CHECK: @_T016class_resilience30ClassWithIndirectResilientEnumC1s14resilient_enum10FunnyShapeOvWvd = {{(protected )?}}constant [[INT]] {{8|16}}
+// CHECK: @_T016class_resilience30ClassWithIndirectResilientEnumC5colors5Int32VvWvd = {{(protected )?}}constant [[INT]] {{12|24}}
 
 import resilient_class
 import resilient_struct

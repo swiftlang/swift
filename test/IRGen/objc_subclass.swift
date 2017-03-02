@@ -12,7 +12,7 @@
 // CHECK: [[GIZMO:%TSo5GizmoC]] = type opaque
 // CHECK: [[OBJC:%objc_object]] = type opaque
 
-// CHECK-32: @_T013objc_subclass10SwiftGizmoC1xSivWvd = hidden global i32 12, align [[WORD_SIZE_IN_BYTES:4]]
+// CHECK-32: @_T013objc_subclass10SwiftGizmoC1xSivWvd = hidden global i32 8, align [[WORD_SIZE_IN_BYTES:4]]
 // CHECK-64: @_T013objc_subclass10SwiftGizmoC1xSivWvd = hidden global i64 16, align [[WORD_SIZE_IN_BYTES:8]]
 // CHECK: @"OBJC_METACLASS_$__TtC13objc_subclass10SwiftGizmo" = hidden global [[OBJC_CLASS]] { [[OBJC_CLASS]]* @"OBJC_METACLASS_$_NSObject", [[OBJC_CLASS]]* @"OBJC_METACLASS_$_Gizmo", [[OPAQUE]]* @_objc_empty_cache, [[OPAQUE]]* null, [[LLVM_PTRSIZE_INT]] ptrtoint ({{.*}} @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo to [[LLVM_PTRSIZE_INT]]) }
 
@@ -183,8 +183,8 @@
 
 // CHECK-32: @_DATA__TtC13objc_subclass10SwiftGizmo = private constant { {{.*}}* } {
 // CHECK-32:   i32 132,
+// CHECK-32:   i32 8,
 // CHECK-32:   i32 12,
-// CHECK-32:   i32 16,
 // CHECK-32:   i8* null,
 // CHECK-32:   i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* [[STRING_SWIFTGIZMO]], i32 0, i32 0),
 // CHECK-32:   @_INSTANCE_METHODS__TtC13objc_subclass10SwiftGizmo,
