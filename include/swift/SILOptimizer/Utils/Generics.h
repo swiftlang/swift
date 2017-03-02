@@ -123,6 +123,7 @@ class ReabstractionInfo {
   void specializeConcreteSubstitutions(ApplySite Apply, SILFunction *Callee,
                                        SubstitutionList ParamSubs);
 
+  ReabstractionInfo() {}
 public:
   /// Constructs the ReabstractionInfo for generic function \p Orig with
   /// substitutions \p ParamSubs.
@@ -227,6 +228,10 @@ public:
 
   /// Returns true if it is a partial generic specialization.
   bool isPartialSpecialization() const;
+
+  /// Returns true if a given apply can be specialized.
+  static bool canBeSpecialized(ApplySite Apply, SILFunction *Callee,
+                               SubstitutionList ParamSubs);
 };
 
 /// Helper class for specializing a generic function given a list of

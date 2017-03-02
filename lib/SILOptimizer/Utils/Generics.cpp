@@ -191,6 +191,12 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   return true;
 }
 
+bool ReabstractionInfo::canBeSpecialized(ApplySite Apply, SILFunction *Callee,
+                                         SubstitutionList ParamSubs) {
+  ReabstractionInfo ReInfo;
+  return ReInfo.prepareAndCheck(Apply, Callee, ParamSubs);
+}
+
 ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
                                      ArrayRef<Substitution> ParamSubs) {
   if (!prepareAndCheck(Apply, Callee, ParamSubs))
