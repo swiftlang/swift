@@ -92,20 +92,6 @@ public:
 
     return valueVector.back().second;
   }
-
-  // Replace entry for `oldValue` with an entry for `newValue` preserving the
-  // the mapped ValueStorage.
-  void replaceValue(SILValue oldValue, SILValue newValue) {
-    auto hashIter = valueHashMap.find(oldValue);
-    assert(hashIter != valueHashMap.end() && "Missing SILValue");
-    unsigned idx = hashIter->second;
-    valueHashMap.erase(hashIter);
-
-    valueVector[idx].first = newValue;
-    
-    auto hashResult = valueHashMap.insert(std::make_pair(newValue, idx));
-    assert(hashResult.second && "SILValue already mapped");
-  }
 };
 } // end anonymous namespace
 
