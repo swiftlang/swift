@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s
 
 // REQUIRES: objc_interop
+// REQUIRES: deterministic-behavior
 
 import blocks
 import Foundation
