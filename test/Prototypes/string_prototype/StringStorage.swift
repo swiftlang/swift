@@ -47,29 +47,6 @@ final class _StringStorage<Element: UnsignedInteger>
       Builtin.addressof(&_swiftEmptyStringStorage))
   }
 
-
-  @_versioned
-  internal func withUnsafeMutableBufferPointer<R>(
-    _ body: (UnsafeMutableBufferPointer<Element>)->R
-  ) -> R {
-    defer { _fixLifetime(self) }
-    return body(
-      UnsafeMutableBufferPointer(
-        start: UnsafeMutablePointer(
-          Builtin.projectTailElems(self, Element.self)),
-        count: count
-      )
-    )
-  }
-
-  @_versioned
-  internal func withUnsafeBufferPointer<R>(
-    _ body: (UnsafeBufferPointer<Element>)->R
-  ) -> R {
-    return withUnsafeMutableBufferPointer {
-      body(UnsafeBufferPointer(start: UnsafePointer($0.baseAddress), count: count))
-    }
-  }
 /*
 }
 // TODO: JIRA for error: @objc is not supported within extensions of generic classes
@@ -83,14 +60,16 @@ extension _StringStorage : _NSStringCore {
 
   @objc
   func characterAtIndex(_ index: Int) -> UInt16 {
-    return numericCast(withUnsafeBufferPointer { $0[index] })
+    return numericCast(self[index])
   }
 
   @objc
   func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>? {
     guard Element.self is UInt16.Type else { return nil }
-    return UnsafeMutablePointer<UInt16>(
-      Builtin.projectTailElems(self, Element.self))
+
+    // Need to do manual projection, because compiler can't prove
+    // firstElementAddress has the right type.
+    return UnsafeMutablePointer(Builtin.projectTailElems(self, Element.self))
   }
 
   @objc(copyWithZone:)
@@ -106,10 +85,10 @@ extension _StringStorage : RandomAccessCollection, MutableCollection {
   subscript(i: Int) -> Element {
     // FIXME: Add addressors
     get {
-      return withUnsafeBufferPointer { $0[i] }
+      return _StringBuffer(self)[i]
     }
     set {
-      withUnsafeMutableBufferPointer { $0[i] = newValue }
+      _StringBuffer(self)[i] = newValue
     }
   }
 }
@@ -117,53 +96,124 @@ extension _StringStorage : RandomAccessCollection, MutableCollection {
 /// - Requires: Element is trivial (UInt8/UInt16)
 struct _StringBuffer<Element: UnsignedInteger> {
   internal var _storage: _StringStorage<Element>
+
+  init(_ storage: _StringStorage<Element>) { self._storage = storage }
+
+  init() {
+    self.init(_StringStorage.empty)
+  }
+
+  init(_buffer source: Buffer, shiftedToStartIndex: Int) {
+    _sanityCheck(shiftedToStartIndex == 0, "shiftedToStartIndex must be 0")
+    self.init(source._storage)
+  }
+
+  init(_uninitializedCount: Int, minimumCapacity: Int) {
+    self.init(_StringStorage(count: _uninitializedCount, 
+      minimumCapacity: minimumCapacity))
+  }
+
 }
 
-extension _StringBuffer : RandomAccessCollection, MutableCollection {
-  init(_ storage: _StringStorage<Element>) { _storage = storage }
+extension _StringBuffer : _ArrayBufferProtocol, _ContiguousBufferProtocol {
+  var count: Int { 
+    get { return _storage.count }
+    nonmutating set { _storage.count = newValue }
+  }
 
+  var capacity: Int { return _storage.capacity }
+  var owner: AnyObject { return _storage }
+  
+  var firstElementAddress: UnsafeMutablePointer<Element> {
+    return UnsafeMutablePointer(Builtin.projectTailElems(_storage, Element.self))
+  }
+  
+  var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
+    return firstElementAddress
+  }
+  
+  var identity: UnsafeRawPointer { return UnsafeRawPointer(firstElementAddress) }
+
+  internal mutating func isUniquelyReferenced() -> Bool {
+    return _isUnique(&_storage)
+  }
+
+  internal mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
+  -> _StringBuffer? {
+    if _fastPath(isUniquelyReferenced()) {
+      if _fastPath(capacity >= minimumCapacity) {
+        return self
+      }
+    }
+    return nil
+  }
+
+  mutating func isMutableAndUniquelyReferenced() -> Bool {
+    return isUniquelyReferenced()
+  }
+
+  func requestNativeBuffer() -> _StringBuffer? {
+    return self
+  }
+
+  @_versioned
+  internal func withUnsafeMutableBufferPointer<R>(
+    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R {
+    defer { _fixLifetime(self) }
+    return try body(
+      UnsafeMutableBufferPointer(
+        start: firstElementAddress,
+        count: count
+      )
+    )
+  }
+
+  @_versioned
+  internal func withUnsafeBufferPointer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R {
+    defer { _fixLifetime(self) }
+    return try body(
+      UnsafeBufferPointer(
+        start: firstElementAddress,
+        count: count
+      )
+    )
+  }
+
+  @discardableResult
+  internal func _copyContents(
+    subRange bounds: Range<Int>,
+    initializing target: UnsafeMutablePointer<Element>
+  ) -> UnsafeMutablePointer<Element> {
+    _sanityCheck(bounds.lowerBound >= 0)
+    _sanityCheck(bounds.upperBound >= bounds.lowerBound)
+    _sanityCheck(bounds.upperBound <= count)
+
+    defer { _fixLifetime(self) }
+
+    let initializedCount = bounds.upperBound - bounds.lowerBound
+    target.initialize(
+      from: firstElementAddress + bounds.lowerBound, count: initializedCount)
+    
+    return target + initializedCount
+  }
+
+}
+
+extension _StringBuffer : RandomAccessCollection, MutableCollection, 
+    RangeReplaceableCollection {
   var startIndex : Int { return _storage.startIndex }
   var endIndex : Int { return _storage.endIndex }
 
   subscript(i: Int) -> Element {
     // FIXME: Add addressors
     get {
-      return _storage[i]
+      return withUnsafeBufferPointer { $0[i] }
     }
-    set {
-      _storage[i] = newValue
-    }
-  }
-}
-
-extension _StringBuffer : RangeReplaceableCollection {
-  init() {
-    self.init(_StringStorage.empty)
-  }
-
-  mutating func replaceSubrange<C: Collection>(
-    _ target: Range<Index>, with source: C
-  )
-  where C.Iterator.Element == Element
-  {
-    let growth = numericCast(source.count) -
-      distance(from: target.lowerBound, to: target.upperBound)
-
-    let newCount = count + growth
-
-    if _fastPath(newCount <= _storage.capacity) {
-      _storage.withUnsafeMutableBufferPointer { elements in
-        if growth > 0 {
-          fatalError("implement me!")
-        }
-        else {
-          fatalError("implement me!")
-        }
-      }
-      return
-    }
-    else {
-      fatalError("replace _storage with a new one that copies the elements")
+    nonmutating set {
+      withUnsafeMutableBufferPointer { $0[i] = newValue }
     }
   }
 }

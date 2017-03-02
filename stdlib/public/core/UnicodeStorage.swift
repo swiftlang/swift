@@ -43,7 +43,7 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
     self.codeUnits = codeUnits
   }
   
-  public let codeUnits: CodeUnits
+  public var codeUnits: CodeUnits
 }
 
 

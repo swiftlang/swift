@@ -5,7 +5,8 @@ import Swift
 // The preferred string format for Swift. In-memory UTF16 encoding in TODO-
 // normal-form.
 struct SwiftCanonicalString {
-  typealias CodeUnits = _StringBuffer<UInt16>
+  typealias Element = UInt16
+  typealias CodeUnits = _StringBuffer<Element>
   typealias Encoding = UTF16
   typealias Storage = UnicodeStorage<CodeUnits, Encoding>
   var storage: Storage
@@ -58,6 +59,14 @@ struct SwiftCanonicalString {
     self.isKnownASCII = true
     self.isKnownLatin1 = true
     self.storage = UnicodeStorage(CodeUnits(), Encoding.self)
+  }
+
+  init(uninitializedCount count: Int) {
+    self.isKnownASCII = true
+    self.isKnownLatin1 = true
+    self.storage = UnicodeStorage(
+      CodeUnits(_uninitializedCount: count, minimumCapacity: count), 
+      Encoding.self)
   }
 }
 
@@ -145,6 +154,25 @@ extension SwiftCanonicalString : Comparable {
     _ lhs: SwiftCanonicalString, rhs: SwiftCanonicalString
   ) -> Bool {
     return lhs.storage.ordered(with: rhs.storage) == .before
+  }
+}
+
+extension SwiftCanonicalString /* : RangeReplaceableCollection */ {
+  mutating func replaceSubrange<C: Collection>(
+    _ subrange: Range<Int>, with newValues: C
+  )
+  where C.Iterator.Element == Element
+  {
+    _precondition(subrange.lowerBound >= codeUnits.startIndex,
+      "String replace: subrange start is negative")
+    _precondition(subrange.upperBound <= codeUnits.endIndex,
+      "String replace: subrange extends past the end")
+
+    // TODO: update these properly (this is currently correct but bad)
+    isKnownASCII = false
+    isKnownLatin1 = false
+
+    storage.codeUnits.replaceSubrange(subrange, with: newValues)
   }
 }
 
@@ -339,6 +367,26 @@ extension String : BidirectionalCollection {
 
   func index(after idx: Index) -> Index {
     return characters.index(after: idx)
+  }
+}
+
+extension String /* : RangeReplaceableCollection */ {
+  mutating func replaceSubrange<C: Collection>(
+    _ subrange: Range<Int>, with newValues: C
+  )
+  where C.Iterator.Element == Character
+  {
+    switch contents {
+    case .canonical(var str):
+      // FIXME: the `str` var is a copy, and not a move, forcing CoW :(
+
+      // Squash the stream of characters into utf16 
+      str.replaceSubrange(subrange, with: newValues.lazy.flatMap { Swift.String($0).utf16 })
+      
+      self.contents = .canonical(str)
+    default: 
+      fatalError("TODO")
+    }
   }
 }
 
