@@ -12,6 +12,8 @@
 #ifndef SWIFT_STDLIB_SHIMS_REFCOUNT_H
 #define SWIFT_STDLIB_SHIMS_REFCOUNT_H
 
+#include "Visibility.h"
+
 #if !defined(__cplusplus)
 
 // These definitions are placeholders for importing into Swift.
@@ -20,7 +22,7 @@
 #include "SwiftStdint.h"
 
 typedef struct {
-  __swift_uint64_t refCounts __attribute__((__unavailable__));
+  __swift_uint64_t refCounts SWIFT_ATTRIBUTE_UNAVAILABLE;
 } InlineRefCounts;
 
 // not __cplusplus
@@ -191,10 +193,9 @@ namespace swift {
 }
 
 // FIXME: HACK: copied from HeapObject.cpp
-extern "C" LLVM_LIBRARY_VISIBILITY void
-_swift_release_dealloc(swift::HeapObject *object)
-  SWIFT_CC(RegisterPreservingCC_IMPL)
-    __attribute__((__noinline__, __used__));
+extern "C" LLVM_LIBRARY_VISIBILITY LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED
+void _swift_release_dealloc(swift::HeapObject *object)
+SWIFT_CC(RegisterPreservingCC_IMPL);
 
 namespace swift {
 

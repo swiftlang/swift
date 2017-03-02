@@ -56,6 +56,18 @@
 #define SWIFT_READNONE
 #endif
 
+#if __has_attribute(always_inline)
+#define SWIFT_ALWAYS_INLINE __attribute__((always_inline))
+#else
+#define SWIFT_ALWAYS_INLINE
+#endif
+
+#if __has_attribute(unavailable)
+#define SWIFT_ATTRIBUTE_UNAVAILABLE __attribute__((__unavailable__))
+#else
+#define SWIFT_ATTRIBUTE_UNAVAILABLE
+#endif
+
 // TODO: support using shims headers in overlays by parameterizing
 // SWIFT_RUNTIME_EXPORT on the library it's exported from, then setting
 // protected vs. default based on the current value of __SWIFT_CURRENT_DYLIB.
