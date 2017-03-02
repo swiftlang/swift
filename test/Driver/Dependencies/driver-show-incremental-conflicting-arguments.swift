@@ -14,18 +14,18 @@
 
 // RUN: cd %t && %swiftc_driver -driver-use-frontend-path %S/Inputs/update-dependencies.py -c ./main.swift ./other.swift -module-name main -incremental -v -driver-show-incremental -output-file-map %t/output.json | %FileCheck --check-prefix CHECK-INCREMENTAL %s
 // CHECK-INCREMENTAL-NOT: Incremental compilation has been disabled
-// CHECK-INCREMENTAL: Queuing main.swift (initial)
+// CHECK-INCREMENTAL: Queuing (initial): {compile: main.o <= main.swift}
 
 // RUN: cd %t && %swiftc_driver -driver-use-frontend-path %S/Inputs/update-dependencies.py -c ./main.swift ./other.swift -module-name main -incremental -v -driver-show-incremental -whole-module-optimization -output-file-map %t/output.json | %FileCheck --check-prefix CHECK-WMO %s
 // CHECK-WMO: Incremental compilation has been disabled{{.*}}whole module optimization
-// CHECK-WMO-NOT: Queuing main.swift (initial)
+// CHECK-WMO-NOT: Queuing (initial): {compile: main.o <= main.swift}
 
 // RUN: cd %t && %swiftc_driver -driver-use-frontend-path %S/Inputs/update-dependencies.py -c ./main.swift ./other.swift -module-name main -incremental -v -driver-show-incremental -embed-bitcode -output-file-map %t/output.json | %FileCheck --check-prefix CHECK-BITCODE %s
 // CHECK-BITCODE: Incremental compilation has been disabled{{.*}}LLVM IR bitcode
-// CHECK-BITCODE-NOT: Queuing main.swift (initial)
+// CHECK-BITCODE-NOT: Queuing (initial): {compile: main.o <= main.swift}
 
 // RUN: cd %t && %swiftc_driver -driver-use-frontend-path %S/Inputs/update-dependencies.py -c ./main.swift ./other.swift -module-name main -incremental -v -driver-show-incremental -whole-module-optimization -embed-bitcode -output-file-map %t/output.json | %FileCheck --check-prefix CHECK-WMO-AND-BITCODE %s
 // CHECK-WMO-AND-BITCODE: Incremental compilation has been disabled{{.*}}whole module optimization
 // CHECK-WMO-AND-BITCODE-NOT: Incremental compilation has been disabled
-// CHECK-WMO-AND-BITCODE-NOT: Queuing main.swift (initial)
+// CHECK-WMO-AND-BITCODE-NOT: Queuing (initial): {compile: main.o <= main.swift}
 
