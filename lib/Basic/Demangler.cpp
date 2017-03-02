@@ -560,7 +560,7 @@ NodePointer Demangler::demangleOperator() {
     case 'P': return demangleNominalType(Node::Kind::Protocol);
     case 'Q': return demangleArchetype();
     case 'R': return demangleGenericRequirement();
-    case 'S': return demangleKnownType();
+    case 'S': return demangleStandardSubstitution();
     case 'T': return demangleThunkOrSpecialization();
     case 'V': return demangleNominalType(Node::Kind::Structure);
     case 'W': return demangleWitness();
@@ -656,44 +656,12 @@ NodePointer Demangler::createSwiftType(Node::Kind typeKind, const char *name) {
     createNode(Node::Kind::Identifier, name)));
 }
 
-NodePointer Demangler::demangleKnownType() {
-  switch (nextChar()) {
+NodePointer Demangler::demangleStandardSubstitution() {
+  switch (char c = nextChar()) {
     case 'o':
       return createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
     case 'C':
       return createNode(Node::Kind::Module, MANGLING_MODULE_C);
-    case 'a':
-      return createSwiftType(Node::Kind::Structure, "Array");
-    case 'b':
-      return createSwiftType(Node::Kind::Structure, "Bool");
-    case 'c':
-      return createSwiftType(Node::Kind::Structure, "UnicodeScalar");
-    case 'd':
-      return createSwiftType(Node::Kind::Structure, "Double");
-    case 'f':
-      return createSwiftType(Node::Kind::Structure, "Float");
-    case 'i':
-      return createSwiftType(Node::Kind::Structure, "Int");
-    case 'V':
-      return createSwiftType(Node::Kind::Structure, "UnsafeRawPointer");
-    case 'v':
-      return createSwiftType(Node::Kind::Structure, "UnsafeMutableRawPointer");
-    case 'P':
-      return createSwiftType(Node::Kind::Structure, "UnsafePointer");
-    case 'p':
-      return createSwiftType(Node::Kind::Structure, "UnsafeMutablePointer");
-    case 'q':
-      return createSwiftType(Node::Kind::Enum, "Optional");
-    case 'Q':
-      return createSwiftType(Node::Kind::Enum, "ImplicitlyUnwrappedOptional");
-    case 'R':
-      return createSwiftType(Node::Kind::Structure, "UnsafeBufferPointer");
-    case 'r':
-      return createSwiftType(Node::Kind::Structure, "UnsafeMutableBufferPointer");
-    case 'S':
-      return createSwiftType(Node::Kind::Structure, "String");
-    case 'u':
-      return createSwiftType(Node::Kind::Structure, "UInt");
     case 'g': {
       NodePointer OptionalTy =
         createType(createWithChildren(Node::Kind::BoundGenericEnum,
@@ -703,6 +671,13 @@ NodePointer Demangler::demangleKnownType() {
       return OptionalTy;
     }
     default:
+#define STANDARD_TYPE(KIND, MANGLING, TYPENAME)                   \
+      if (c == #MANGLING[0]) {                                    \
+        return createSwiftType(Node::Kind::KIND, #TYPENAME);      \
+      }
+
+#include "swift/Basic/StandardTypesMangling.def"
+
       return nullptr;
   }
 }

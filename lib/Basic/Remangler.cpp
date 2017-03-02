@@ -260,6 +260,8 @@ class Remangler {
 
   void mangleIdentifierImpl(Node *node, bool isOperator);
 
+  bool mangleStandardSubstitution(Node *node);
+
   void mangleDependentGenericParamIndex(Node *node,
                                         const char *nonZeroPrefix = "",
                                         char zeroOp = 'z');
@@ -295,7 +297,7 @@ public:
 
 bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry,
                                 bool treatAsIdentifier) {
-  if (mangleStandardSubstitution(node, Buffer))
+  if (mangleStandardSubstitution(node))
     return true;
 
   // Go ahead and initialize the substitution entry.
@@ -352,6 +354,27 @@ void Remangler::mangleIdentifierImpl(Node *node, bool isOperator) {
   addSubstitution(entry);
 }
 
+bool Remangler::mangleStandardSubstitution(Node *node) {
+  if (node->getKind() != Node::Kind::Structure
+      && node->getKind() != Node::Kind::Enum)
+    return false;
+
+  Node *context = node->getFirstChild();
+  if (context->getKind() != Node::Kind::Module
+      || context->getText() != STDLIB_NAME)
+    return false;
+
+  Node *Nominal = node->getChild(1);
+#define STANDARD_TYPE(KIND, MANGLING, TYPENAME)      \
+  if (Nominal->getText() == #TYPENAME) {             \
+    Buffer << "S" #MANGLING;                         \
+    return true;                                     \
+  }
+
+#include "swift/Basic/StandardTypesMangling.def"
+
+  return false;
+}
 
 void Remangler::mangleDependentGenericParamIndex(Node *node,
                                                     const char *nonZeroPrefix,
@@ -1271,7 +1294,15 @@ void Remangler::mangleMetaclass(Node *node) {
 }
 
 void Remangler::mangleModule(Node *node) {
-  mangleIdentifier(node);
+  if (node->getText() == STDLIB_NAME) {
+    Buffer << 's';
+  } else if (node->getText() == MANGLING_MODULE_OBJC) {
+    Buffer << "So";
+  } else if (node->getText() == MANGLING_MODULE_C) {
+    Buffer << "SC";
+  } else {
+    mangleIdentifier(node);
+  }
 }
 
 void Remangler::mangleNativeOwningAddressor(Node *node) {
@@ -1708,67 +1739,6 @@ std::string Demangle::mangleNode(const NodePointer &node) {
   Remangler(printer).mangle(node);
 
   return std::move(printer).str();
-}
-
-static bool isInSwiftModule(Node *node) {
-  Node *context = node->getFirstChild();
-  return (context->getKind() == Node::Kind::Module &&
-          context->getText() == STDLIB_NAME);
-};
-
-bool Demangle::mangleStandardSubstitution(Node *node, DemanglerPrinter &Out) {
-  // Look for known substitutions.
-  switch (node->getKind()) {
-#define SUCCESS_IF_IS(VALUE, EXPECTED, SUBSTITUTION)            \
-do {                                                        \
-if ((VALUE) == (EXPECTED)) {                              \
-Out << SUBSTITUTION;                                    \
-return true;                                            \
-}                                                         \
-} while (0)
-#define SUCCESS_IF_TEXT_IS(EXPECTED, SUBSTITUTION)              \
-SUCCESS_IF_IS(node->getText(), EXPECTED, SUBSTITUTION)
-#define SUCCESS_IF_DECLNAME_IS(EXPECTED, SUBSTITUTION)          \
-SUCCESS_IF_IS(node->getChild(1)->getText(), EXPECTED, SUBSTITUTION)
-
-    case Node::Kind::Module:
-      SUCCESS_IF_TEXT_IS(STDLIB_NAME, "s");
-      SUCCESS_IF_TEXT_IS(MANGLING_MODULE_OBJC, "So");
-      SUCCESS_IF_TEXT_IS(MANGLING_MODULE_C, "SC");
-      break;
-    case Node::Kind::Structure:
-      if (isInSwiftModule(node)) {
-        SUCCESS_IF_DECLNAME_IS("Array", "Sa");
-        SUCCESS_IF_DECLNAME_IS("Bool", "Sb");
-        SUCCESS_IF_DECLNAME_IS("UnicodeScalar", "Sc");
-        SUCCESS_IF_DECLNAME_IS("Double", "Sd");
-        SUCCESS_IF_DECLNAME_IS("Float", "Sf");
-        SUCCESS_IF_DECLNAME_IS("Int", "Si");
-        SUCCESS_IF_DECLNAME_IS("UnsafeRawPointer", "SV");
-        SUCCESS_IF_DECLNAME_IS("UnsafeMutableRawPointer", "Sv");
-        SUCCESS_IF_DECLNAME_IS("UnsafePointer", "SP");
-        SUCCESS_IF_DECLNAME_IS("UnsafeMutablePointer", "Sp");
-        SUCCESS_IF_DECLNAME_IS("UnsafeBufferPointer", "SR");
-        SUCCESS_IF_DECLNAME_IS("UnsafeMutableBufferPointer", "Sr");
-        SUCCESS_IF_DECLNAME_IS("String", "SS");
-        SUCCESS_IF_DECLNAME_IS("UInt", "Su");
-      }
-      break;
-    case Node::Kind::Enum:
-      if (isInSwiftModule(node)) {
-        SUCCESS_IF_DECLNAME_IS("Optional", "Sq");
-        SUCCESS_IF_DECLNAME_IS("ImplicitlyUnwrappedOptional", "SQ");
-      }
-      break;
-
-    default:
-      break;
-
-#undef SUCCESS_IF_DECLNAME_IS
-#undef SUCCESS_IF_TEXT_IS
-#undef SUCCESS_IF_IS
-  }
-  return false;
 }
 
 bool Demangle::isSpecialized(Node *node) {

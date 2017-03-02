@@ -491,7 +491,6 @@ private:
   std::string Stream;
 };
 
-bool mangleStandardSubstitution(Node *node, DemanglerPrinter &Out);
 bool isSpecialized(Node *node);
 NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
 

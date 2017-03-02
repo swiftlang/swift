@@ -1584,55 +1584,15 @@ bool ASTMangler::tryAppendStandardSubstitution(const NominalTypeDecl *decl) {
     return false;
 
   StringRef name = decl->getName().str();
-  if (name == "Int") {
-    appendOperator("Si");
-    return true;
-  } else if (name == "UInt") {
-    appendOperator("Su");
-    return true;
-  } else if (name == "Bool") {
-    appendOperator("Sb");
-    return true;
-  } else if (name == "UnicodeScalar") {
-    appendOperator("Sc");
-    return true;
-  } else if (name == "Double") {
-    appendOperator("Sd");
-    return true;
-  } else if (name == "Float") {
-    appendOperator("Sf");
-    return true;
-  } else if (name == "UnsafeRawPointer") {
-    appendOperator("SV");
-    return true;
-  } else if (name == "UnsafeMutableRawPointer") {
-    appendOperator("Sv");
-    return true;
-  } else if (name == "UnsafePointer") {
-    appendOperator("SP");
-    return true;
-  } else if (name == "UnsafeMutablePointer") {
-    appendOperator("Sp");
-    return true;
-  } else if (name == "Optional") {
-    appendOperator("Sq");
-    return true;
-  } else if (name == "ImplicitlyUnwrappedOptional") {
-    appendOperator("SQ");
-    return true;
-  } else if (name == "UnsafeBufferPointer") {
-    appendOperator("SR");
-    return true;
-  } else if (name == "UnsafeMutableBufferPointer") {
-    appendOperator("Sr");
-    return true;
-  } else if (name == "Array") {
-    appendOperator("Sa");
-    return true;
-  } else if (name == "String") {
-    appendOperator("SS");
-    return true;
+
+#define STANDARD_TYPE(KIND, MANGLING, TYPENAME)      \
+  if (name == #TYPENAME) {                           \
+    appendOperator("S" #MANGLING);                   \
+    return true;                                     \
   }
+
+#include "swift/Basic/StandardTypesMangling.def"
+
   return false;
 }
 

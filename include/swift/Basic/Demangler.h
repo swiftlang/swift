@@ -396,7 +396,7 @@ private:
 
   NodePointer demangleMultiSubstitutions();
   NodePointer createSwiftType(Node::Kind typeKind, const char *name);
-  NodePointer demangleKnownType();
+  NodePointer demangleStandardSubstitution();
   NodePointer demangleLocalIdentifier();
 
   NodePointer popModule();
