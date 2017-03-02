@@ -6,7 +6,7 @@ indirect enum TreeA<T> {
   case Branch(left: TreeA<T>, right: TreeA<T>)
 }
 
-// CHECK-LABEL: sil hidden @_T013indirect_enum11TreeA_casesyx_AA0C1AOyxG1lADyxG1rtlF : $@convention(thin) <T> (@in T, @owned TreeA<T>, @owned TreeA<T>) -> () {
+// CHECK-LABEL: sil hidden @_T013indirect_enum11TreeA_casesyx_AA0C1AOyxG1lAE1rtlF : $@convention(thin) <T> (@in T, @owned TreeA<T>, @owned TreeA<T>) -> () {
 func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
 // CHECK: bb0([[ARG1:%.*]] : $*T, [[ARG2:%.*]] : $TreeA<T>, [[ARG3:%.*]] : $TreeA<T>):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<T>.Type
@@ -43,7 +43,7 @@ func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
   let _ = TreeA<T>.Branch(left: l, right: r)
 
 }
-// CHECK: // end sil function '_T013indirect_enum11TreeA_casesyx_AA0C1AOyxG1lADyxG1rtlF'
+// CHECK: // end sil function '_T013indirect_enum11TreeA_casesyx_AA0C1AOyxG1lAE1rtlF'
 
 
 // CHECK-LABEL: sil hidden @_T013indirect_enum16TreeA_reabstractySiSicF : $@convention(thin) (@owned @callee_owned (Int) -> Int) -> () {
@@ -72,7 +72,7 @@ enum TreeB<T> {
   indirect case Branch(left: TreeB<T>, right: TreeB<T>)
 }
 
-// CHECK-LABEL: sil hidden @_T013indirect_enum11TreeB_casesyx_AA0C1BOyxG1lADyxG1rtlF
+// CHECK-LABEL: sil hidden @_T013indirect_enum11TreeB_casesyx_AA0C1BOyxG1lAE1rtlF
 func TreeB_cases<T>(_ t: T, l: TreeB<T>, r: TreeB<T>) {
 
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeB<T>.Type

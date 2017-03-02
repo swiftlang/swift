@@ -90,7 +90,7 @@ func uses_clang_struct(r r: NSRect) {}
 func uses_optionals(x x: Int?) -> UnicodeScalar? { return nil }
 
 enum GenericUnion<T> {
-  // CHECK-LABEL: sil shared [transparent] @_T08mangling12GenericUnionO3FooACyxGSicACyxGmlF
+  // CHECK-LABEL: sil shared [transparent] @_T08mangling12GenericUnionO3FooACyxGSicAEmlF
   case Foo(Int)
 }
 

@@ -589,18 +589,24 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::BoundGenericEnum:
     case TypeKind::BoundGenericStruct:
       if (type->isSpecialized()) {
+        // Try to mangle the entire name as a substitution.
+        if (tryMangleSubstitution(type.getPointer()))
+          return;
+
         NominalTypeDecl *NDecl = type->getAnyNominal();
         if (isStdlibType(NDecl) && NDecl->getName().str() == "Optional") {
           auto GenArgs = type->castTo<BoundGenericType>()->getGenericArgs();
           assert(GenArgs.size() == 1);
           appendType(GenArgs[0]);
-          return appendOperator("Sg");
+          appendOperator("Sg");
+        } else {
+          appendNominalType(NDecl);
+          bool isFirstArgList = true;
+          appendBoundGenericArgs(type, isFirstArgList);
+          appendOperator("G");
         }
-
-        appendNominalType(NDecl);
-        bool isFirstArgList = true;
-        appendBoundGenericArgs(type, isFirstArgList);
-        return appendOperator("G");
+        addSubstitution(type.getPointer());
+        return;
       }
       appendNominalType(tybase->getAnyNominal());
       return;

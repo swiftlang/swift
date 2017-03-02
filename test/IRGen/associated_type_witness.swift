@@ -41,8 +41,8 @@ struct GenericWithUniversal<T> : Assocked {
 //   Witness table for Fulfilled : Assocked.
 // GLOBAL-LABEL: @_T023associated_type_witness9FulfilledVyxGAA8AssockedAaA1PRzAA1QRzlWP = hidden constant [3 x i8*] [
 // GLOBAL-SAME:    i8* bitcast (%swift.type* (%swift.type*, i8**)* @_T023associated_type_witness9FulfilledVyxGAA8AssockedAaA1PRzAA1QRzl5AssocWt to i8*)
-// GLOBAL-SAME:    i8* bitcast (i8** (%swift.type*, %swift.type*, i8**)* @_T023associated_type_witness9FulfilledVyxGAA8AssockedAaA1PRzAA1QRzl5AssocAaEPWT to i8*)
 // GLOBAL-SAME:    i8* bitcast (i8** (%swift.type*, %swift.type*, i8**)* @_T023associated_type_witness9FulfilledVyxGAA8AssockedAaA1PRzAA1QRzl5AssocAaFPWT to i8*)
+// GLOBAL-SAME:    i8* bitcast (i8** (%swift.type*, %swift.type*, i8**)* @_T023associated_type_witness9FulfilledVyxGAA8AssockedAaA1PRzAA1QRzl5AssocAaGPWT to i8*)
 // GLOBAL-SAME:  ]
 struct Fulfilled<T : P & Q> : Assocked {
   typealias Assoc = T
@@ -56,14 +56,14 @@ struct Fulfilled<T : P & Q> : Assocked {
 // CHECK-NEXT:    ret %swift.type* [[T2]]
 
 //   Associated type witness table access function for Fulfilled.Assoc : P.
-// CHECK-LABEL:  define internal i8** @_T023associated_type_witness9FulfilledVyxGAA8AssockedAaA1PRzAA1QRzl5AssocAaEPWT(%swift.type* %"Fulfilled<T>.Assoc", %swift.type* %"Fulfilled<T>", i8** %"Fulfilled<T>.Assocked")
+// CHECK-LABEL:  define internal i8** @_T023associated_type_witness9FulfilledVyxGAA8AssockedAaA1PRzAA1QRzl5AssocAaFPWT(%swift.type* %"Fulfilled<T>.Assoc", %swift.type* %"Fulfilled<T>", i8** %"Fulfilled<T>.Assocked")
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %"Fulfilled<T>" to i8***
 // CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 4
 // CHECK-NEXT:    [[T2:%.*]] = load i8**, i8*** [[T1]], align 8, !invariant.load
 // CHECK-NEXT:    ret i8** [[T2]]
 
 //   Associated type witness table access function for Fulfilled.Assoc : Q.
-// CHECK-LABEL:  define internal i8** @_T023associated_type_witness9FulfilledVyxGAA8AssockedAaA1PRzAA1QRzl5AssocAaFPWT(%swift.type* %"Fulfilled<T>.Assoc", %swift.type* %"Fulfilled<T>", i8** %"Fulfilled<T>.Assocked")
+// CHECK-LABEL:  define internal i8** @_T023associated_type_witness9FulfilledVyxGAA8AssockedAaA1PRzAA1QRzl5AssocAaGPWT(%swift.type* %"Fulfilled<T>.Assoc", %swift.type* %"Fulfilled<T>", i8** %"Fulfilled<T>.Assocked")
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %"Fulfilled<T>" to i8***
 // CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 5
 // CHECK-NEXT:    [[T2:%.*]] = load i8**, i8*** [[T1]], align 8, !invariant.load

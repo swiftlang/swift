@@ -38,12 +38,12 @@ import Foundation
     return f(x)
   }
 
-  // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3basSSSgSSSgSSSgc_SSSg1xtFTo : $@convention(objc_method) (@convention(block) (Optional<NSString>) -> @autoreleased Optional<NSString>, Optional<NSString>, Foo) -> @autoreleased Optional<NSString> {
+  // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3basSSSgAeEc_AE1xtFTo : $@convention(objc_method) (@convention(block) (Optional<NSString>) -> @autoreleased Optional<NSString>, Optional<NSString>, Foo) -> @autoreleased Optional<NSString> {
   // CHECK:       bb0([[BLOCK:%.*]] : $@convention(block) (Optional<NSString>) -> @autoreleased Optional<NSString>, [[OPT_STRING:%.*]] : $Optional<NSString>, [[SELF:%.*]] : $Foo):
   // CHECK:         [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK:         [[OPT_STRING_COPY:%.*]] = copy_value [[OPT_STRING]]
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
-  // CHECK:         [[THUNK:%.*]] = function_ref @_T0So8NSStringCSgABSgIyBya_SSSgSSSgIxxo_TR
+  // CHECK:         [[THUNK:%.*]] = function_ref @_T0So8NSStringCSgACIyBya_SSSgADIxxo_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[BLOCK_COPY]])
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @_T020objc_blocks_bridging3FooC3bas{{[_0-9a-zA-Z]*}}F : $@convention(method) (@owned @callee_owned (@owned Optional<String>) -> @owned Optional<String>, @owned Optional<String>, @guaranteed Foo) -> @owned Optional<String>
@@ -116,7 +116,7 @@ func callBlocks(_ x: Foo,
 
   // CHECK: [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
   // CHECK: [[BAS:%.*]] = class_method [volatile] [[BORROWED_ARG0]] : $Foo, #Foo.bas!1.foreign
-  // CHECK: [[H_BLOCK_INVOKE:%.*]] = function_ref @_T0SSSgSSSgIxxo_So8NSStringCSgABSgIyBya_TR
+  // CHECK: [[H_BLOCK_INVOKE:%.*]] = function_ref @_T0SSSgAAIxxo_So8NSStringCSgADIyBya_TR
   // CHECK: [[H_STACK_BLOCK:%.*]] = init_block_storage_header {{.*}}, invoke [[H_BLOCK_INVOKE]]
   // CHECK: [[H_BLOCK:%.*]] = copy_block [[H_STACK_BLOCK]]
   // CHECK: apply [[BAS]]([[H_BLOCK]]

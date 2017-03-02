@@ -19,7 +19,7 @@ struct Foo: Fooable {
 }
 
 // rdar://problem/19049566
-// CHECK-LABEL: sil [transparent] [thunk] @_T017witness_same_type14LazySequenceOfVyxq_Gs0E0AAsADRz8Iterator_7ElementQZRs_r0_lsADP04makeG0AEQzyFTW : $@convention(witness_method) <τ_0_0, τ_0_1 where τ_0_0 : Sequence, τ_0_1 == τ_0_0.Iterator.Element> (@in_guaranteed LazySequenceOf<τ_0_0, τ_0_1>) -> @out AnyIterator<τ_0_1>
+// CHECK-LABEL: sil [transparent] [thunk] @_T017witness_same_type14LazySequenceOfVyxq_Gs0E0AAsAERz8Iterator_7ElementQZRs_r0_lsAEP04makeG0AFQzyFTW : $@convention(witness_method) <τ_0_0, τ_0_1 where τ_0_0 : Sequence, τ_0_1 == τ_0_0.Iterator.Element> (@in_guaranteed LazySequenceOf<τ_0_0, τ_0_1>) -> @out AnyIterator<τ_0_1>
 public struct LazySequenceOf<SS : Sequence, A where SS.Iterator.Element == A> : Sequence {
   public func makeIterator() -> AnyIterator<A> { 
     var opt: AnyIterator<A>?

@@ -997,7 +997,7 @@ Types
   type ::= context decl-name 'a'             // Type alias (DWARF only)
   type ::= function-signature 'c'            // function type
   type ::= function-signature 'X' FUNCTION-KIND // special function type
-  type ::= type 'y' (type* '_')* type* 'G'   // bound generic type (one type-list per nesting level of type)
+  type ::= bound-generic-type
   type ::= type 'Sg'                         // optional type, shortcut for: type 'ySqG'
   type ::= type 'Xo'                         // @unowned type
   type ::= type 'Xu'                         // @unowned(unsafe) type
@@ -1013,7 +1013,9 @@ Types
   type ::= type 'Xp'                         // existential metatype without representation
   type ::= type 'Xm' METATYPE-REPR           // existential metatype with representation
   type ::= 'Xe'                              // error or unresolved type
-
+ 
+  bound-generic-type ::= type 'y' (type* '_')* type* 'G'   // one type-list per nesting level of type
+  bound-generic-type ::= substitution
 
   FUNCTION-KIND ::= 'f'                      // @thin function type
   FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used) 

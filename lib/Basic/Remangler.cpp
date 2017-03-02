@@ -410,11 +410,16 @@ void Remangler::mangleNominalType(Node *node, char TypeOp) {
 
 void Remangler::mangleAnyNominalType(Node *node) {
   if (isSpecialized(node)) {
+    SubstitutionEntry entry;
+    if (trySubstitution(node, entry))
+      return;
+
     NodePointer unboundType = getUnspecialized(node, Factory);
     mangleAnyNominalType(unboundType);
     char Separator = 'y';
     mangleGenericArgs(node, Separator);
     Buffer << 'G';
+    addSubstitution(entry);
     return;
   }
   switch (node->getKind()) {
@@ -510,8 +515,12 @@ void Remangler::mangleBoundGenericEnum(Node *node) {
   Node *Id = Enum->getChild(1);
   if (Mod->getKind() == Node::Kind::Module && Mod->getText() == STDLIB_NAME &&
       Id->getKind() == Node::Kind::Identifier && Id->getText() == "Optional") {
+    SubstitutionEntry entry;
+    if (trySubstitution(node, entry))
+      return;
     mangleSingleChildNode(node->getChild(1));
     Buffer << "Sg";
+    addSubstitution(entry);
     return;
   }
   mangleAnyNominalType(node);

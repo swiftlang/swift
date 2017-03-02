@@ -694,10 +694,14 @@ NodePointer Demangler::demangleKnownType() {
       return createSwiftType(Node::Kind::Structure, "String");
     case 'u':
       return createSwiftType(Node::Kind::Structure, "UInt");
-    case 'g':
-      return createType(createWithChildren(Node::Kind::BoundGenericEnum,
-              createSwiftType(Node::Kind::Enum, "Optional"),
-              createWithChild(Node::Kind::TypeList, popNode(Node::Kind::Type))));
+    case 'g': {
+      NodePointer OptionalTy =
+        createType(createWithChildren(Node::Kind::BoundGenericEnum,
+          createSwiftType(Node::Kind::Enum, "Optional"),
+          createWithChild(Node::Kind::TypeList, popNode(Node::Kind::Type))));
+      addSubstitution(OptionalTy);
+      return OptionalTy;
+    }
     default:
       return nullptr;
   }
@@ -1043,7 +1047,9 @@ NodePointer Demangler::demangleBoundGenericType() {
       return nullptr;
   }
   NodePointer Nominal = popTypeAndGetNominal();
-  return createType(demangleBoundGenericArgs(Nominal, TypeListList, 0));
+  NodePointer NTy = createType(demangleBoundGenericArgs(Nominal, TypeListList, 0));
+  addSubstitution(NTy);
+  return NTy;
 }
 
 NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,

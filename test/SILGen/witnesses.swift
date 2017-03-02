@@ -433,12 +433,12 @@ protocol GenericParameterNameCollisionProtocol {
 struct GenericParameterNameCollision<T: HasAssoc> :
     GenericParameterNameCollisionProtocol {
 
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T09witnesses29GenericParameterNameCollisionVyxGAA0bcdE8ProtocolAaA8HasAssocRzlAaDP3fooyqd__lFTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : HasAssoc><τ_1_0> (@in τ_1_0, @in_guaranteed GenericParameterNameCollision<τ_0_0>) -> () {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T09witnesses29GenericParameterNameCollisionVyxGAA0bcdE8ProtocolAaA8HasAssocRzlAaEP3fooyqd__lFTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : HasAssoc><τ_1_0> (@in τ_1_0, @in_guaranteed GenericParameterNameCollision<τ_0_0>) -> () {
   // CHECK:       bb0(%0 : $*τ_1_0, %1 : $*GenericParameterNameCollision<τ_0_0>):
   // CHECK:         apply {{%.*}}<τ_0_0, τ_1_0>
   func foo<U>(_ x: U) {}
 
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T09witnesses29GenericParameterNameCollisionVyxGAA0bcdE8ProtocolAaA8HasAssocRzlAaDP3bary6Assoc2Qzqd__clFTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : HasAssoc><τ_1_0> (@owned @callee_owned (@in τ_1_0) -> @out τ_0_0.Assoc, @in_guaranteed GenericParameterNameCollision<τ_0_0>) -> () {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_T09witnesses29GenericParameterNameCollisionVyxGAA0bcdE8ProtocolAaA8HasAssocRzlAaEP3bary6Assoc2Qzqd__clFTW : $@convention(witness_method) <τ_0_0 where τ_0_0 : HasAssoc><τ_1_0> (@owned @callee_owned (@in τ_1_0) -> @out τ_0_0.Assoc, @in_guaranteed GenericParameterNameCollision<τ_0_0>) -> () {
   // CHECK:       bb0(%0 : $@callee_owned (@in τ_1_0) -> @out τ_0_0.Assoc, %1 : $*GenericParameterNameCollision<τ_0_0>):
   // CHECK:         apply {{%.*}}<τ_0_0, τ_1_0>
   func bar<V>(_ x: (V) -> T.Assoc) {}
@@ -507,7 +507,7 @@ class CrashableBase {
   func crash() {}
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T09witnesses16GenericCrashableCyxGAA0C0AAlAaDP5crashyyFTW : $@convention(witness_method) <τ_0_0> (@in_guaranteed GenericCrashable<τ_0_0>) -> ()
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T09witnesses16GenericCrashableCyxGAA0C0AAlAaEP5crashyyFTW : $@convention(witness_method) <τ_0_0> (@in_guaranteed GenericCrashable<τ_0_0>) -> ()
 // CHECK:       bb0(%0 : $*GenericCrashable<τ_0_0>):
 // CHECK-NEXT: [[BOX:%.*]] = alloc_stack $GenericCrashable<τ_0_0>
 // CHECK-NEXT: copy_addr %0 to [initialization] [[BOX]] : $*GenericCrashable<τ_0_0>
