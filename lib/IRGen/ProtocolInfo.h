@@ -64,9 +64,20 @@ public:
 class WitnessTableEntry {
   Decl *Member;
   WitnessIndex BeginIndex;
+  /// The protocols (in the expected order) for the conformances an associated
+  /// type witness conforms to.
+  // FIXME: this is not needed once the requirement signature is used for laying
+  // out conformances in a witness table.
+  ArrayRef<ProtocolDecl *> CanonicalProtocols;
 
- WitnessTableEntry(Decl *member, WitnessIndex begin)
-   : Member(member), BeginIndex(begin) {}
+  WitnessTableEntry(Decl *member, WitnessIndex begin)
+      : Member(member), BeginIndex(begin) {}
+
+  WitnessTableEntry(Decl *member, WitnessIndex begin,
+                    ArrayRef<ProtocolDecl *> protocols)
+      : Member(member), BeginIndex(begin), CanonicalProtocols(protocols) {
+    assert(isAssociatedType());
+  }
 
 public:
   WitnessTableEntry() = default;
@@ -113,10 +124,13 @@ public:
     assert(isFunction());
     return BeginIndex;
   }
-  
-  static WitnessTableEntry forAssociatedType(AssociatedTypeDecl *ty,
-                                             WitnessIndex index) {
-    return WitnessTableEntry(ty, index);
+
+  /// The \c protocols array must live at least as long as the ProtocolInfo for
+  /// this Entry.
+  static WitnessTableEntry
+  forAssociatedType(AssociatedTypeDecl *ty, WitnessIndex index,
+                    ArrayRef<ProtocolDecl *> protocols) {
+    return WitnessTableEntry(ty, index, protocols);
   }
   
   bool isAssociatedType() const { return isa<AssociatedTypeDecl>(Member); }
@@ -130,8 +144,7 @@ public:
   getAssociatedTypeWitnessTableIndex(ProtocolDecl *target) const {
     assert(!BeginIndex.isPrefix());
     auto index = BeginIndex.getValue() + 1;
-    for (auto protocol :
-           cast<AssociatedTypeDecl>(Member)->getConformingProtocols()) {
+    for (auto protocol : CanonicalProtocols) {
       if (protocol == target) {
         return WitnessIndex(index, false);
       }

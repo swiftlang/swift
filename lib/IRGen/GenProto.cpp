@@ -641,12 +641,15 @@ namespace {
   class WitnessTableLayout : public SILWitnessVisitor<WitnessTableLayout> {
     unsigned NumWitnesses = 0;
     SmallVector<WitnessTableEntry, 16> Entries;
+    ASTContext &Context;
 
     WitnessIndex getNextIndex() {
       return WitnessIndex(NumWitnesses++, /*isPrefix=*/false);
     }
 
   public:
+    WitnessTableLayout(ASTContext &context) : Context(context) {}
+
     /// The next witness is an out-of-line base protocol.
     void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
       Entries.push_back(
@@ -665,9 +668,13 @@ namespace {
                            ArrayRef<ProtocolDecl *> protos) {
       // An associated type takes up a spot for the type metadata and for the
       // witnesses to all its conformances.
-      Entries.push_back(
-                      WitnessTableEntry::forAssociatedType(ty, getNextIndex()));
-      for (auto *proto : protos)
+
+      // The `protos` input is only valid for this call, but ProtocolInfo needs
+      // to do look ups with it later.
+      auto longLivedProtos = Context.AllocateCopy(protos);
+      Entries.push_back(WitnessTableEntry::forAssociatedType(ty, getNextIndex(),
+                                                             longLivedProtos));
+      for (auto *proto : longLivedProtos)
         if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
           ++NumWitnesses;
     }
@@ -1001,7 +1008,7 @@ public:
 };
 
   /// A class which lays out a specific conformance to a protocol.
-  class WitnessTableBuilder : public SILWitnessVisitor<WitnessTableBuilder> {
+  class WitnessTableBuilder {
     IRGenModule &IGM;
     SmallVectorImpl<llvm::Constant*> &Table;
     CanType ConcreteType;
@@ -1039,142 +1046,6 @@ public:
     /// Create the access function.
     void buildAccessFunction(llvm::Constant *wtable);
 
-    /// A base protocol is witnessed by a pointer to the conformance
-    /// of this type to that protocol.
-    void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
-#ifndef NDEBUG
-      auto &entry = SILEntries.front();
-      assert(entry.getKind() == SILWitnessTable::BaseProtocol
-             && "sil witness table does not match protocol");
-      assert(entry.getBaseProtocolWitness().Requirement == baseProto
-             && "sil witness table does not match protocol");
-      auto piEntry = PI.getWitnessEntry(baseProto);
-      assert(piEntry.getOutOfLineBaseIndex().getValue() == Table.size()
-             && "offset doesn't match ProtocolInfo layout");
-#endif
-      
-      SILEntries = SILEntries.slice(1);
-
-      // TODO: Use the witness entry instead of falling through here.
-
-      // Look for a protocol type info.
-      const ProtocolInfo &basePI = IGM.getProtocolInfo(baseProto);
-      const ProtocolConformance *astConf
-        = Conformance.getInheritedConformance(baseProto);
-      const ConformanceInfo &conf =
-        basePI.getConformance(IGM, baseProto, astConf);
-
-      // If we can emit the base witness table as a constant, do so.
-      llvm::Constant *baseWitness = conf.tryGetConstantTable(IGM, ConcreteType);
-      if (baseWitness) {
-        Table.push_back(baseWitness);
-        return;
-      }
-
-      // Otherwise, we'll need to derive it at instantiation time.
-      RequiresSpecialization = true;
-      SpecializedBaseConformances.push_back({Table.size(), &conf});
-      Table.push_back(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
-    }
-
-    void addMethodFromSILWitnessTable(AbstractFunctionDecl *requirement) {
-      auto &entry = SILEntries.front();
-      SILEntries = SILEntries.slice(1);
-
-      // Handle missing optional requirements.
-      if (entry.getKind() == SILWitnessTable::MissingOptional) {
-        Table.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
-        return;
-      }
-
-#ifndef NDEBUG
-      assert(entry.getKind() == SILWitnessTable::Method
-             && "sil witness table does not match protocol");
-      assert(entry.getMethodWitness().Requirement.getDecl() == requirement
-             && "sil witness table does not match protocol");
-      auto piEntry = PI.getWitnessEntry(requirement);
-      assert(piEntry.getFunctionIndex().getValue() == Table.size()
-             && "offset doesn't match ProtocolInfo layout");
-#endif
-
-      SILFunction *Func = entry.getMethodWitness().Witness;
-      llvm::Constant *witness = nullptr;
-      if (Func) {
-        witness = IGM.getAddrOfSILFunction(Func, NotForDefinition);
-      } else {
-        // The method is removed by dead method elimination.
-        // It should be never called. We add a pointer to an error function.
-        witness = IGM.getDeletedMethodErrorFn();
-      }
-      Table.push_back(witness);
-      return;
-    }
-
-    void addMethod(FuncDecl *requirement) {
-      return addMethodFromSILWitnessTable(requirement);
-    }
-
-    void addConstructor(ConstructorDecl *requirement) {
-      return addMethodFromSILWitnessTable(requirement);
-    }
-
-    void addAssociatedType(AssociatedTypeDecl *requirement,
-                           ArrayRef<ProtocolDecl *> protos) {
-#ifndef NDEBUG
-      auto &entry = SILEntries.front();
-      assert(entry.getKind() == SILWitnessTable::AssociatedType
-             && "sil witness table does not match protocol");
-      assert(entry.getAssociatedTypeWitness().Requirement == requirement
-             && "sil witness table does not match protocol");
-      auto piEntry = PI.getWitnessEntry(requirement);
-      assert(piEntry.getAssociatedTypeIndex().getValue() == Table.size()
-             && "offset doesn't match ProtocolInfo layout");
-#endif
-
-      SILEntries = SILEntries.slice(1);
-
-      const Substitution &sub =
-        Conformance.getTypeWitness(requirement, nullptr);
-      assert(protos.size() == sub.getConformances().size());
-
-      // This type will be expressed in terms of the archetypes
-      // of the conforming context.
-      CanType associate = sub.getReplacement()->getCanonicalType();
-      assert(!associate->hasTypeParameter());
-
-      llvm::Constant *metadataAccessFunction =
-        getAssociatedTypeMetadataAccessFunction(requirement, associate);
-      Table.push_back(metadataAccessFunction);
-
-      // FIXME: Add static witness tables for type conformances.
-      for (auto index : indices(protos)) {
-        ProtocolDecl *protocol = protos[index];
-        auto associatedConformance = sub.getConformances()[index];
-
-        if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
-          continue;
-
-#ifndef NDEBUG
-        auto &entry = SILEntries.front();
-        (void)entry;
-        assert(entry.getKind() == SILWitnessTable::AssociatedTypeProtocol
-               && "sil witness table does not match protocol");
-        auto associatedWitness = entry.getAssociatedTypeProtocolWitness();
-        assert(associatedWitness.Requirement == requirement
-               && "sil witness table does not match protocol");
-        assert(associatedWitness.Protocol == protocol
-               && "sil witness table does not match protocol");
-#endif
-
-        SILEntries = SILEntries.slice(1);
-
-        llvm::Constant *wtableAccessFunction = 
-          getAssociatedTypeWitnessTableAccessFunction(requirement, associate,
-                                            protocol, associatedConformance);
-        Table.push_back(wtableAccessFunction);
-      }
-    }
-
   private:
     llvm::Constant *buildInstantiationFunction();
 
@@ -1192,6 +1063,13 @@ public:
                                           Address destTable,
                                           llvm::Value *selfMetadata,
                                     llvm::function_ref<llvm::Value*()> body);
+
+    void pushWitness(llvm::Constant *witness) {
+      assert(witness && "adding invalid witness to witness table");
+      // TODO: the IR would be more legible if we made a struct instead of
+      // converting all entries to i8*.
+      Table.push_back(llvm::ConstantExpr::getBitCast(witness, IGM.Int8PtrTy));
+    }
 
     /// Allocate another word of private data storage in the conformance table.
     unsigned getNextCacheIndex() {
@@ -1240,13 +1118,115 @@ public:
 
 /// Build the witness table.
 void WitnessTableBuilder::build() {
-  visitProtocolDecl(Conformance.getProtocol());
+// Abbreviate the checks that ProtocolInfo and SILWitnessTable both have the
+// same layout for a witness table
+#define ASSERT_POSITION(witnessIndex)                                          \
+  assert((witnessIndex).getValue() == Table.size() &&                          \
+         "mismatch between SIL and IRGen witness table layout");
 
-  // Go through and convert all the entries to i8*.
-  // TODO: the IR would be more legible if we made a struct instead.
-  for (auto &entry : Table) {
-    entry = llvm::ConstantExpr::getBitCast(entry, IGM.Int8PtrTy);
+  auto entry = std::begin(SILEntries);
+  auto end = std::end(SILEntries);
+  while (entry != end) {
+    llvm::Constant *witness = nullptr;
+    switch (entry->getKind()) {
+    // An associated type has the type metadata followed by witness tables for
+    // any conformance requirements on the associated type.
+    case SILWitnessTable::AssociatedType: {
+      auto &assocTypeWitness = entry->getAssociatedTypeWitness();
+      auto assocType = assocTypeWitness.Requirement;
+      const auto &sub = Conformance.getTypeWitness(assocType, nullptr);
+      auto concreteType = sub.getReplacement()->getCanonicalType();
+
+#ifndef NDEBUG
+      auto piEntry = PI.getWitnessEntry(assocType);
+      ASSERT_POSITION(piEntry.getAssociatedTypeIndex());
+#endif
+
+      pushWitness(
+          getAssociatedTypeMetadataAccessFunction(assocType, concreteType));
+      entry++;
+
+      // Keep looking, to find the relevant conformances
+      while (entry != end &&
+             entry->getKind() == SILWitnessTable::AssociatedTypeProtocol) {
+        auto &assocTypeProtoWitness = entry->getAssociatedTypeProtocolWitness();
+        assert(assocTypeProtoWitness.Requirement == assocType &&
+               "AssociatedTypeProtocol requirement doesn't match its preceding "
+               "AssociatedType");
+
+        auto protocol = assocTypeProtoWitness.Protocol;
+        auto assocConformance = assocTypeProtoWitness.Witness;
+
+        ASSERT_POSITION(piEntry.getAssociatedTypeWitnessTableIndex(protocol));
+
+        pushWitness(getAssociatedTypeWitnessTableAccessFunction(
+            assocType, concreteType, protocol, assocConformance));
+        entry++;
+      }
+      continue;
+    }
+    case SILWitnessTable::AssociatedTypeProtocol:
+      llvm_unreachable(
+          "AssociatedTypeProtocol should be handled under AssociatedType");
+
+    // The other types of witness table entries are all "free standing", and can
+    // be processed in isolation.
+    case SILWitnessTable::BaseProtocol: {
+      auto &baseProtoWitness = entry->getBaseProtocolWitness();
+      auto baseProto = baseProtoWitness.Requirement;
+      ASSERT_POSITION(PI.getWitnessEntry(baseProto).getOutOfLineBaseIndex());
+
+      const ProtocolInfo &basePI = IGM.getProtocolInfo(baseProto);
+      const ProtocolConformance *astConf =
+          Conformance.getInheritedConformance(baseProto);
+      const ConformanceInfo &conf =
+          basePI.getConformance(IGM, baseProto, astConf);
+
+      // If we can emit the base witness table as a constant, do so.
+      llvm::Constant *baseWitness = conf.tryGetConstantTable(IGM, ConcreteType);
+      if (baseWitness) {
+        witness = baseWitness;
+      } else {
+        // Otherwise, we'll need to derive it at instantiation time.
+        RequiresSpecialization = true;
+        SpecializedBaseConformances.push_back({Table.size(), &conf});
+        witness = llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy);
+      }
+      break;
+    }
+
+    case SILWitnessTable::MissingOptional: {
+      ASSERT_POSITION(
+          PI.getWitnessEntry(entry->getMissingOptionalWitness().Witness)
+              .getFunctionIndex());
+      witness = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+      break;
+    }
+
+    case SILWitnessTable::Method: {
+      auto &methodWitness = entry->getMethodWitness();
+      ASSERT_POSITION(PI.getWitnessEntry(methodWitness.Requirement.getDecl())
+                          .getFunctionIndex());
+      SILFunction *Func = methodWitness.Witness;
+      if (Func) {
+        witness = IGM.getAddrOfSILFunction(Func, NotForDefinition);
+      } else {
+        // The method is removed by dead method elimination.
+        // It should be never called. We add a pointer to an error function.
+        witness = IGM.getDeletedMethodErrorFn();
+      }
+      break;
+    }
+    case SILWitnessTable::Invalid:
+      llvm_unreachable("invalid witness table entry in IRGen");
+    }
+
+    pushWitness(witness);
+    entry++;
   }
+  assert(SILEntries.size() == Table.size() &&
+         "mismatch between SIL and IRGen'd witness tables");
+#undef ASSERT_POSITION
 }
 
 /// Return the address of a function which will return the type metadata
@@ -1637,7 +1617,7 @@ const ProtocolInfo &TypeConverter::getProtocolInfo(ProtocolDecl *protocol) {
   if (it != Protocols.end()) return *it->second;
 
   // If not, lay out the protocol's witness table, if it needs one.
-  WitnessTableLayout layout;
+  WitnessTableLayout layout(IGM.Context);
   if (Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
     layout.visitProtocolDecl(protocol);
 
