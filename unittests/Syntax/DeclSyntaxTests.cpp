@@ -284,16 +284,128 @@ TEST(DeclSyntaxTests, FunctionParameterListMakeAPIs) {
 
 #pragma mark - function-signature
 
-TEST(DeclSyntaxTests, FunctionSignatureMakeAPIs) {
+FunctionSignatureSyntax getCannedFunctionSignature() {
+  auto LParen = SyntaxFactory::makeLeftParenToken({}, {});
+  auto Param = getCannedFunctionParameter();
+  auto List = SyntaxFactory::makeBlankFunctionParameterList()
+    .appending(Param)
+    .appending(Param)
+    .appending(Param)
+    .castTo<FunctionParameterListSyntax>();
+  auto RParen = SyntaxFactory::makeRightParenToken({}, Trivia::spaces(1));
+  auto Throws = SyntaxFactory::makeThrowsKeyword({}, Trivia::spaces(1));
+  auto Arrow = SyntaxFactory::makeArrow({}, Trivia::spaces(1));
+  auto NoAttributes = SyntaxFactory::makeBlankTypeAttributes();
+  auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
 
+  return SyntaxFactory::makeFunctionSignature(LParen, List, RParen, Throws,
+                                              Arrow, NoAttributes, Int);
+}
+
+TEST(DeclSyntaxTests, FunctionSignatureMakeAPIs) {
+  {
+    SmallString<1> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    SyntaxFactory::makeBlankFunctionSignature().print(OS);
+    ASSERT_EQ(OS.str().str(), "");
+  }
+  {
+    SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    getCannedFunctionSignature().print(OS);
+    ASSERT_EQ(OS.str().str(),
+      "(with radius: Int = -1, "
+      "with radius: Int = -1, "
+      "with radius: Int = -1, ) throws -> Int");
+  }
 }
 
 TEST(DeclSyntaxTests, FunctionSignatureGetAPIs) {
+  auto LParen = SyntaxFactory::makeLeftParenToken({}, {});
+  auto Param = getCannedFunctionParameter();
+  auto List = SyntaxFactory::makeBlankFunctionParameterList()
+    .appending(Param)
+    .appending(Param)
+    .appending(Param)
+    .castTo<FunctionParameterListSyntax>();
+  auto RParen = SyntaxFactory::makeRightParenToken({}, Trivia::spaces(1));
+  auto Throws = SyntaxFactory::makeThrowsKeyword({}, Trivia::spaces(1));
+  auto Arrow = SyntaxFactory::makeArrow({}, Trivia::spaces(1));
+  auto NoAttributes = SyntaxFactory::makeBlankTypeAttributes();
+  auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
 
+  auto Sig = SyntaxFactory::makeFunctionSignature(LParen, List, RParen, Throws,
+                                                  Arrow, NoAttributes, Int);
+
+  ASSERT_EQ(LParen, Sig.getLeftParenToken());
+
+  {
+    SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    auto GottenList1 = Sig.getParameterList();
+    auto GottenList2 = Sig.getParameterList();
+    ASSERT_TRUE(GottenList1.hasSameIdentityAs(GottenList2));
+    GottenList1.print(OS);
+    ASSERT_EQ(OS.str().str(),
+              "with radius: Int = -1, "
+              "with radius: Int = -1, "
+              "with radius: Int = -1, ");
+  }
+
+  ASSERT_EQ(RParen, Sig.getRightParenToken());
+  ASSERT_EQ(Throws, Sig.getThrowsToken());
+  ASSERT_TRUE(Sig.getRethrowsToken()->isMissing());
+  ASSERT_EQ(Arrow, Sig.getArrowToken());
+
+  {
+    SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    auto GottenAttrs1 = Sig.getReturnTypeAttributes();
+    auto GottenAttrs2 = Sig.getReturnTypeAttributes();
+    ASSERT_TRUE(GottenAttrs1.hasSameIdentityAs(GottenAttrs2));
+    ASSERT_EQ(OS.str().str(), "");
+  }
+
+  {
+    SmallString<3> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    auto GottenReturnType1 = Sig.getReturnTypeSyntax();
+    auto GottenReturnType2 = Sig.getReturnTypeSyntax();
+    ASSERT_TRUE(GottenReturnType1.hasSameIdentityAs(GottenReturnType2));
+    GottenReturnType1.print(OS);
+    ASSERT_EQ(OS.str().str(), "Int");
+  }
 }
 
 TEST(DeclSyntaxTests, FunctionSignatureWithAPIs) {
+  auto LParen = SyntaxFactory::makeLeftParenToken({}, {});
+  auto Param = getCannedFunctionParameter();
+  auto List = SyntaxFactory::makeBlankFunctionParameterList()
+    .appending(Param)
+    .appending(Param)
+    .appending(Param)
+    .castTo<FunctionParameterListSyntax>();
+  auto RParen = SyntaxFactory::makeRightParenToken({}, Trivia::spaces(1));
+  auto Throws = SyntaxFactory::makeThrowsKeyword({}, Trivia::spaces(1));
+  auto Arrow = SyntaxFactory::makeArrow({}, Trivia::spaces(1));
+  auto NoAttributes = SyntaxFactory::makeBlankTypeAttributes();
+  auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
 
+  SmallString<48> Scratch;
+  llvm::raw_svector_ostream OS(Scratch);
+  SyntaxFactory::makeBlankFunctionSignature()
+    .withLeftParenToken(LParen)
+    .withParameterList(List)
+    .withRightParenToken(RParen)
+    .withThrowsToken(Throws)
+    .withReturnTypeAttributes(NoAttributes)
+    .withArrowToken(Arrow)
+    .withReturnTypeSyntax(Int)
+    .print(OS);
+  ASSERT_EQ(OS.str().str(),
+            "(with radius: Int = -1, "
+            "with radius: Int = -1, "
+            "with radius: Int = -1, ) throws -> Int");
 }
 
 #pragma mark - function-declaration

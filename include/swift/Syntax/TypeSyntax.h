@@ -186,13 +186,15 @@ class TypeAttributesSyntax final : public Syntax {
   friend struct SyntaxFactory;
   friend class TypeAttributesSyntaxData;
   friend class SyntaxData;
+  friend class FunctionSignatureSyntax;
 
   using DataType = TypeAttributesSyntaxData;
 
   TypeAttributesSyntax(RC<SyntaxData> Root,
                        const TypeAttributesSyntaxData *Data);
 public:
-  // TODO: TODO: TypeAttributesSyntax::getAttribute
+  // TODO: Convert to SyntaxCollection
+  // 
 
   TypeAttributesSyntax
   addTypeAttribute(TypeAttributeSyntax NewTypeAttribute) const;
@@ -236,6 +238,7 @@ class TypeSyntax : public Syntax {
   using DataType = TypeSyntaxData;
   friend class SyntaxData;
   friend class FunctionParameterSyntax;
+  friend class FunctionSignatureSyntax;
 protected:
   TypeSyntax(const RC<SyntaxData> Root, const TypeSyntaxData *Data);
 public:

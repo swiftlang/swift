@@ -92,6 +92,8 @@ DeclMembersSyntax SyntaxFactory::makeBlankDeclMembers() {
   return DeclMembersSyntax { Data, Data.get() };
 }
 
+#pragma mark - function-parameter
+
 FunctionParameterSyntax SyntaxFactory::
 makeFunctionParameter(RC<TokenSyntax> ExternalName,
                       RC<TokenSyntax> LocalName,
@@ -126,7 +128,10 @@ FunctionParameterSyntax SyntaxFactory::makeBlankFunctionParameter() {
   return { Data, Data.get() };
 }
 
-FunctionParameterListSyntax SyntaxFactory::makeFunctionParameterList(const std::vector<FunctionParameterSyntax> &Parameters) {
+#pragma mark - function-parameter-list
+
+FunctionParameterListSyntax SyntaxFactory::makeFunctionParameterList(
+    const std::vector<FunctionParameterSyntax> &Parameters) {
   RawSyntax::LayoutList Layout;
   for (auto Param : Parameters) {
     Layout.push_back(Param.getRaw());
@@ -140,6 +145,36 @@ FunctionParameterListSyntax SyntaxFactory::makeFunctionParameterList(const std::
 
 FunctionParameterListSyntax SyntaxFactory::makeBlankFunctionParameterList() {
   auto Data = FunctionParameterListSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
+#pragma mark - function-signature
+
+FunctionSignatureSyntax
+SyntaxFactory::makeFunctionSignature(RC<TokenSyntax> LeftParen,
+                                     FunctionParameterListSyntax ParameterList,
+                                     RC<TokenSyntax> RightParen,
+                                     RC<TokenSyntax> ThrowsOrRethrows,
+                                     RC<TokenSyntax> Arrow,
+                                     TypeAttributesSyntax ReturnTypeAttributes,
+                                     TypeSyntax ReturnTypeSyntax) {
+  auto Raw = RawSyntax::make(SyntaxKind::FunctionSignature,
+                             {
+                               LeftParen,
+                               ParameterList.getRaw(),
+                               RightParen,
+                               ThrowsOrRethrows,
+                               Arrow,
+                               ReturnTypeAttributes.getRaw(),
+                               ReturnTypeSyntax.getRaw()
+                             },
+                             SourcePresence::Present);
+  auto Data = FunctionSignatureSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+FunctionSignatureSyntax SyntaxFactory::makeBlankFunctionSignature() {
+  auto Data = FunctionSignatureSyntaxData::makeBlank();
   return { Data, Data.get() };
 }
 

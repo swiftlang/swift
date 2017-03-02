@@ -73,6 +73,8 @@ struct SyntaxFactory {
   /// Make an empty list of declaration members.
   static DeclMembersSyntax makeBlankDeclMembers();
 
+#pragma mark - function-parameter
+
   /// Make a function parameter with the given elements.
   static FunctionParameterSyntax
   makeFunctionParameter(RC<TokenSyntax> ExternalName, RC<TokenSyntax> LocalName,
@@ -86,12 +88,16 @@ struct SyntaxFactory {
   /// Make a function parameter with all elements marked as missing.
   static FunctionParameterSyntax makeBlankFunctionParameter();
 
+#pragma mark - function-parameter-list
+
   /// Make a function parameter list with the given parameters.
   static FunctionParameterListSyntax makeFunctionParameterList(
     const std::vector<FunctionParameterSyntax> &Parameters);
 
   /// Make an empty function parameter list.
   static FunctionParameterListSyntax makeBlankFunctionParameterList();
+
+#pragma mark - function-signature
 
   /// Make a function signature with the given elements.
   static FunctionSignatureSyntax

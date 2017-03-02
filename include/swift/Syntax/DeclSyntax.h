@@ -510,6 +510,7 @@ class FunctionParameterListSyntax final : public
   friend struct SyntaxFactory;
   friend class Syntax;
   friend class SyntaxData;
+  friend class FunctionSignatureSyntax;
 
   using DataType = FunctionParameterListSyntaxData;
 
@@ -526,10 +527,22 @@ public:
 #pragma mark - function-signature Data
 
 class FunctionSignatureSyntaxData final : public SyntaxData {
+  friend struct SyntaxFactory;
+  friend class SyntaxData;
+  friend class FunctionSignatureSyntax;
 
   RC<FunctionParameterListSyntaxData> CachedParameterList;
   RC<TypeAttributesSyntaxData> CachedReturnTypeAttributes;
   RC<TypeSyntaxData> CachedReturnTypeSyntax;
+
+  FunctionSignatureSyntaxData(const RC<RawSyntax> Raw,
+                              const SyntaxData *Parent = nullptr,
+                              const CursorIndex IndexInParent = 0);
+
+  static RC<FunctionSignatureSyntaxData>
+  make(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
+       CursorIndex IndexInParent = 0);
+  static RC<FunctionSignatureSyntaxData> makeBlank();
 
 public:
   static bool classof(const SyntaxData *SD) {
@@ -547,8 +560,6 @@ class FunctionSignatureSyntax final : public Syntax {
   friend class SyntaxData;
   friend class FunctionSignatureSyntaxData;
 
-  using DataType = FunctionSignatureSyntaxData;
-
   enum class Cursor : CursorIndex {
     LeftParen,
     ParameterList,
@@ -560,6 +571,12 @@ class FunctionSignatureSyntax final : public Syntax {
   };
 
 public:
+  using DataType = FunctionSignatureSyntaxData;
+  static constexpr SyntaxKind Kind = SyntaxKind::FunctionSignature;
+
+  FunctionSignatureSyntax(const RC<SyntaxData> Root, const DataType *Data)
+    : Syntax(Root, Data) {}
+
   /// Return the left parenthesis '(' token enclosing the parameter list.
   RC<TokenSyntax> getLeftParenToken() const;
 
@@ -574,6 +591,14 @@ public:
   /// Return the parameter list for this signature.
   FunctionSignatureSyntax
   withParameterList(FunctionParameterListSyntax NewParameterList) const;
+
+  /// Return the right parenthesis ')' token enclosing the parameter list.
+  RC<TokenSyntax> getRightParenToken() const;
+
+  /// Return a FunctionSignatureSyntax with the given right parentesis ')' token
+  /// enclosing the parameter list.
+  FunctionSignatureSyntax
+  withRightParenToken(RC<TokenSyntax> NewRightParen) const;
 
   /// Return the 'throws' token in this signature if it exists.
   RC<TokenSyntax> getThrowsToken() const;
@@ -606,14 +631,6 @@ public:
 
   /// Return a FunctionSignatureSyntax with the given return type.
   FunctionSignatureSyntax withReturnTypeSyntax(TypeSyntax NewReturnType) const;
-
-  /// Return the right parenthesis ')' token enclosing the parameter list.
-  RC<TokenSyntax> getRightParenToken() const;
-
-  /// Return a FunctionSignatureSyntax with the given right parentesis ')' token
-  /// enclosing the parameter list.
-  FunctionSignatureSyntax
-  withRightParenToken(RC<TokenSyntax> NewLeftParen) const;
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::FunctionSignature;
