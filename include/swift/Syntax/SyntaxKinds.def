@@ -101,6 +101,8 @@ SYNTAX(FunctionCallArgument, Syntax)
 SYNTAX(FunctionSignature, Syntax)
 SYNTAX(FunctionParameterList, Syntax)
 SYNTAX(FunctionParameter, Syntax)
+SYNTAX(DeclModifier, Syntax)
+SYNTAX(DeclModifierList, Syntax)
 
 #undef ABSTRACT_SYNTAX
 #undef DECL

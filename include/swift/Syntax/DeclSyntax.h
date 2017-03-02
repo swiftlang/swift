@@ -36,6 +36,137 @@ namespace syntax {
 class ExprSyntax;
 class ExprSyntaxData;
 
+#pragma mark declaration-modifier Data
+
+class DeclModifierSyntaxData final : public SyntaxData {
+  friend struct SyntaxFactory;
+  friend class SyntaxData;
+  friend class Syntax;
+  friend class DeclModifierSyntax;
+
+  DeclModifierSyntaxData(const RC<RawSyntax> Raw,
+                         const SyntaxData *Parent = nullptr,
+                         const CursorIndex IndexInParent = 0);
+
+  static RC<DeclModifierSyntaxData> make(const RC<RawSyntax> Raw,
+                                         const SyntaxData *Parent = nullptr,
+                                         const CursorIndex IndexInParent = 0);
+
+  static RC<DeclModifierSyntaxData> makeBlank();
+
+public:
+  static bool classof(const SyntaxData *SD) {
+    return SD->getKind() == SyntaxKind::DeclModifier;
+  }
+};
+
+#pragma mark declaration-modifier API
+
+/// declaration-modifier -> access-level-modifier
+///                       | mutation-modifier
+///                       | 'class'
+///                       | 'convenience­'
+///                       | 'dynamic­'
+///                       | 'final­'
+///                       | 'infix­'
+///                       | 'lazy­'
+///                       | 'optional­'
+///                       | 'override'
+///                       | 'postfix'
+///                       | 'prefix'
+///                       | 'required'
+///                       | 'static'
+///                       | 'unowned­'
+///                       | 'unowned­(­safe­)­'
+///                       | 'unowned­(­unsafe­)­'
+///                       | 'weak­'
+/// access-level-modifier -> 'private' | 'private' '(' 'set' ')'
+///                        | 'fileprivate' | 'fileprivate' '(' 'set' ')'
+///                        | 'internal' | 'internal' '(' 'set' ')'
+///                        | 'public' | 'public' '(' 'set' ')'
+///                        | 'open' | 'open' '(' 'set' ')'
+/// mutation-modifier -> 'mutating' | 'nonmutating'
+class DeclModifierSyntax final : public Syntax {
+  friend struct SyntaxFactory;
+  friend class Syntax;
+  friend class SyntaxData;
+  friend class DeclModifierSyntaxData;
+
+  enum class Cursor : CursorIndex {
+    Name,
+    LeftParen,
+    Argument,
+    RightParen
+  };
+
+  DeclModifierSyntax(const RC<SyntaxData> Root, const DataType *Data)
+    : Syntax(Root, Data) {}
+
+public:
+  using DataType = DeclModifierSyntaxData;
+  static constexpr SyntaxKind Kind = SyntaxKind::DeclModifier;
+
+  /// Return the name of the modifier.
+  RC<TokenSyntax> getName() const;
+
+  /// Return a DeclModifierSyntax with the given name.
+  DeclModifierSyntax withName(RC<TokenSyntax> NewName) const;
+
+  /// Return the left parenthesis '(' token as a part of the argument clause,
+  /// if there is one.
+  RC<TokenSyntax> getLeftParenToken() const;
+
+  /// Return a DeclModifierSyntax with the given left parenthesis '(' token.
+  DeclModifierSyntax withLeftParenToken(RC<TokenSyntax> NewLeftParen) const;
+
+  /// Get the argument to the declaration modifier.
+  ///
+  /// This is either:
+  /// - 'set' for the access modifiers such as 'private' or 'public', or
+  /// - 'safe' / 'unsafe' for the 'unowned' modifier.
+  RC<TokenSyntax> getArgument() const;
+
+  /// Return a DeclModifierSyntax with the given argument.
+  DeclModifierSyntax withArgument(RC<TokenSyntax> NewArgument) const;
+
+  /// Return the right parenthesis ')' token as a part of the argument clause,
+  /// if there is one.
+  RC<TokenSyntax> getRightParenToken() const;
+
+  /// Return a DeclModifierSyntax with the given right parenthesis ')' token.
+  DeclModifierSyntax withRightParenToken(RC<TokenSyntax> NewRightParen) const;
+
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::DeclModifier;
+  }
+};
+
+#pragma mark declaration-modifiers Data
+
+using DeclModifierListSyntaxData =
+  SyntaxCollectionData<SyntaxKind::DeclModifierList, DeclModifierSyntax>;
+
+#pragma mark declaration-modifiers API
+
+class DeclModifierListSyntax final :
+  public SyntaxCollection<SyntaxKind::DeclModifierList, DeclModifierSyntax> {
+
+  friend struct SyntaxFactory;
+  friend class Syntax;
+  friend class SyntaxData;
+
+  using DataType = DeclModifierListSyntaxData;
+  static constexpr SyntaxKind Kind = SyntaxKind::DeclModifierList;
+
+  DeclModifierListSyntax(const RC<SyntaxData> Root, const DataType *Data)
+    : SyntaxCollection(Root, Data) {}
+
+public:
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::DeclModifierList;
+  }
+};
+
 #pragma mark declaration Data
 
 class DeclSyntaxData : public SyntaxData {
@@ -500,7 +631,9 @@ public:
 
 #pragma mark - function-parameter-list Data
 
-using FunctionParameterListSyntaxData = SyntaxCollectionData<SyntaxKind::FunctionParameterList, FunctionParameterSyntax>;
+using FunctionParameterListSyntaxData =
+  SyntaxCollectionData<SyntaxKind::FunctionParameterList,
+  FunctionParameterSyntax>;
 
 #pragma mark - function-parameter-list API
 

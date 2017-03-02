@@ -32,6 +32,91 @@ DeclSyntaxData::DeclSyntaxData(RC<RawSyntax> Raw,
 DeclSyntax::DeclSyntax(const RC<SyntaxData> Root, const DeclSyntaxData *Data)
   : Syntax(Root, Data) {}
 
+#pragma mark - declaration-modifier Data
+
+DeclModifierSyntaxData::
+DeclModifierSyntaxData(const RC<RawSyntax> Raw,
+                       const SyntaxData *Parent,
+                       const CursorIndex IndexInParent)
+  : SyntaxData(Raw, Parent, IndexInParent) {
+  assert(Raw->Kind == SyntaxKind::DeclModifier);
+  assert(Raw->Layout.size() == 4);
+  syntax_assert_child_token(Raw, DeclModifierSyntax::Cursor::Name,
+                           tok::identifier);
+  syntax_assert_child_token_text(Raw, DeclModifierSyntax::Cursor::LeftParen,
+                                 tok::l_paren, "(");
+  syntax_assert_child_token(Raw, DeclModifierSyntax::Cursor::Argument,
+                           tok::identifier);
+  syntax_assert_child_token_text(Raw, DeclModifierSyntax::Cursor::RightParen,
+                                 tok::r_paren, ")");
+}
+
+RC<DeclModifierSyntaxData>
+DeclModifierSyntaxData::make(const RC<RawSyntax> Raw,
+                             const SyntaxData *Parent,
+                             const CursorIndex IndexInParent) {
+  return RC<DeclModifierSyntaxData>{
+    new DeclModifierSyntaxData {
+      Raw, Parent, IndexInParent
+    }
+  };
+}
+
+RC<DeclModifierSyntaxData> DeclModifierSyntaxData::makeBlank() {
+  auto Raw = RawSyntax::make(SyntaxKind::DeclModifier,
+                             {
+                               TokenSyntax::missingToken(tok::identifier, ""),
+                               TokenSyntax::missingToken(tok::l_paren, "("),
+                               TokenSyntax::missingToken(tok::identifier, ""),
+                               TokenSyntax::missingToken(tok::r_paren, ")"),
+                             },
+                             SourcePresence::Present);
+  return make(Raw);
+}
+
+#pragma mark - declaration-modifier API
+
+RC<TokenSyntax> DeclModifierSyntax::getName() const {
+  return cast<TokenSyntax>(getRaw()->getChild(Cursor::Name));
+}
+
+DeclModifierSyntax DeclModifierSyntax::withName(RC<TokenSyntax> NewName) const {
+  assert(NewName->getTokenKind() == tok::identifier);
+  return Data->replaceChild<DeclModifierSyntax>(NewName, Cursor::Name);
+}
+
+RC<TokenSyntax> DeclModifierSyntax::getLeftParenToken() const {
+  return cast<TokenSyntax>(getRaw()->getChild(Cursor::LeftParen));
+}
+
+DeclModifierSyntax
+DeclModifierSyntax::withLeftParenToken(RC<TokenSyntax> NewLeftParen) const {
+  syntax_assert_token_is(NewLeftParen, tok::l_paren, "(");
+  return Data->replaceChild<DeclModifierSyntax>(NewLeftParen,
+                                                Cursor::LeftParen);
+}
+
+RC<TokenSyntax> DeclModifierSyntax::getArgument() const {
+  return cast<TokenSyntax>(getRaw()->getChild(Cursor::Argument));
+}
+
+DeclModifierSyntax
+DeclModifierSyntax::withArgument(RC<TokenSyntax> NewArgument) const {
+  assert(NewArgument->getTokenKind() == tok::identifier);
+  return Data->replaceChild<DeclModifierSyntax>(NewArgument, Cursor::Argument);
+}
+
+RC<TokenSyntax> DeclModifierSyntax::getRightParenToken() const {
+  return cast<TokenSyntax>(getRaw()->getChild(Cursor::RightParen));
+}
+
+DeclModifierSyntax
+DeclModifierSyntax::withRightParenToken(RC<TokenSyntax> NewRightParen) const {
+  syntax_assert_token_is(NewRightParen, tok::r_paren, ")");
+  return Data->replaceChild<DeclModifierSyntax>(NewRightParen,
+                                                Cursor::RightParen);
+}
+
 #pragma mark - unknown-statement Data
 
 UnknownDeclSyntaxData::UnknownDeclSyntaxData(RC<RawSyntax> Raw,

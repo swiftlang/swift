@@ -35,6 +35,49 @@ SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<RC<TokenSyntax>> Tokens) {
 
 #pragma mark - Declarations
 
+#pragma mark - declaration-modifier
+
+DeclModifierSyntax SyntaxFactory::makeDeclModifier(RC<TokenSyntax> Name,
+                                                   RC<TokenSyntax> LeftParen,
+                                                   RC<TokenSyntax> Argument,
+                                                   RC<TokenSyntax> RightParen) {
+  auto Raw = RawSyntax::make(SyntaxKind::DeclModifier,
+                             {
+                               Name,
+                               LeftParen,
+                               Argument,
+                               RightParen,
+                             },
+                             SourcePresence::Present);
+  auto Data = DeclModifierSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+DeclModifierSyntax SyntaxFactory::makeBlankDeclModifier() {
+  auto Data = DeclModifierSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
+#pragma mark - declaration-modifier-list
+
+DeclModifierListSyntax SyntaxFactory::
+makeDeclModifierList(const std::vector<DeclModifierSyntax> &Modifiers) {
+  RawSyntax::LayoutList Layout;
+  for (auto Modifier : Modifiers) {
+    Layout.push_back(Modifier.getRaw());
+  }
+
+  auto Raw = RawSyntax::make(SyntaxKind::DeclModifierList, Layout,
+                             SourcePresence::Present);
+  auto Data = DeclModifierListSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+DeclModifierListSyntax SyntaxFactory::makeBlankDeclModifierList() {
+  auto Data = DeclModifierListSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
 #pragma mark - struct-declaration
 
 StructDeclSyntax

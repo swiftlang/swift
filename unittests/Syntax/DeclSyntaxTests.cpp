@@ -10,6 +10,61 @@ using llvm::SmallString;
 using namespace swift;
 using namespace swift::syntax;
 
+#pragma mark - declaration-modifier
+
+DeclModifierSyntax getCannedDeclModifier() {
+  auto Private = SyntaxFactory::makeIdentifier("private", {}, {});
+  auto LParen = SyntaxFactory::makeLeftParenToken({}, {});
+  auto Set = SyntaxFactory::makeIdentifier("set", {}, {});
+  auto RParen = SyntaxFactory::makeRightParenToken({}, {});
+  return SyntaxFactory::makeDeclModifier(Private, LParen, Set, RParen);
+}
+
+TEST(DeclSyntaxTests, DeclModifierMakeAPIs) {
+  {
+    SmallString<1> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    SyntaxFactory::makeBlankDeclModifier().print(OS);
+    ASSERT_EQ(OS.str().str(), "");
+  }
+  {
+    SmallString<24> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    getCannedDeclModifier().print(OS);
+    ASSERT_EQ(OS.str().str(), "private(set)");
+  }
+}
+
+TEST(DeclSyntaxTests, DeclModifierGetAPIs) {
+  auto Private = SyntaxFactory::makeIdentifier("private", {}, {});
+  auto LParen = SyntaxFactory::makeLeftParenToken({}, {});
+  auto Set = SyntaxFactory::makeIdentifier("set", {}, {});
+  auto RParen = SyntaxFactory::makeRightParenToken({}, {});
+  auto Mod = SyntaxFactory::makeDeclModifier(Private, LParen, Set, RParen);
+
+  ASSERT_EQ(Private, Mod.getName());
+  ASSERT_EQ(LParen, Mod.getLeftParenToken());
+  ASSERT_EQ(Set, Mod.getArgument());
+  ASSERT_EQ(RParen, Mod.getRightParenToken());
+}
+
+TEST(DeclSyntaxTests, DeclModifierWithAPIs) {
+  auto Private = SyntaxFactory::makeIdentifier("private", {}, {});
+  auto LParen = SyntaxFactory::makeLeftParenToken({}, {});
+  auto Set = SyntaxFactory::makeIdentifier("set", {}, {});
+  auto RParen = SyntaxFactory::makeRightParenToken({}, {});
+
+  SmallString<24> Scratch;
+  llvm::raw_svector_ostream OS(Scratch);
+  SyntaxFactory::makeBlankDeclModifier()
+    .withName(Private)
+    .withLeftParenToken(LParen)
+    .withArgument(Set)
+    .withRightParenToken(RParen)
+    .print(OS);
+  ASSERT_EQ(OS.str().str(), "private(set)");
+}
+
 #pragma mark - typealias-decl
 
 TEST(DeclSyntaxTests, TypealiasMakeAPIs) {

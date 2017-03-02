@@ -51,6 +51,26 @@ struct SyntaxFactory {
   makeUnknownSyntax(llvm::ArrayRef<RC<TokenSyntax>> Tokens);
 
 #pragma mark - Declarations
+
+#pragma mark - declaration-modifier
+
+  /// Make a declaration modifier with the specified elements.
+  static DeclModifierSyntax
+  makeDeclModifier(RC<TokenSyntax> Name, RC<TokenSyntax> LeftParen,
+                   RC<TokenSyntax> Argument, RC<TokenSyntax> RightParen);
+
+  /// Make a declaration modifier with all missing elements.
+  static DeclModifierSyntax makeBlankDeclModifier();
+
+  /// Make a declaration modifier list with the specified modifiers.
+  static DeclModifierListSyntax
+  makeDeclModifierList(const std::vector<DeclModifierSyntax> &Modifiers);
+
+  /// Make an empty declaration modifier list.
+  static DeclModifierListSyntax makeBlankDeclModifierList();
+
+#pragma mark - struct-declaration
+
   /// Make a struct declaration with the specified elements.
   static StructDeclSyntax
   makeStructDecl(RC<TokenSyntax> StructToken, RC<TokenSyntax> Identifier,
