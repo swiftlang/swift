@@ -8258,34 +8258,34 @@
             {
               "kind": "TypeFunc",
               "name": "GenericFunction",
-              "printedName": "<Wrapped> (ImplicitlyUnwrappedOptional<Wrapped>.Type) -> ImplicitlyUnwrappedOptional<Wrapped>",
+              "printedName": "<τ_0_0> (ImplicitlyUnwrappedOptional<τ_0_0>.Type) -> ImplicitlyUnwrappedOptional<τ_0_0>",
               "children": [
                 {
                   "kind": "TypeNominal",
                   "name": "ImplicitlyUnwrappedOptional",
-                  "printedName": "ImplicitlyUnwrappedOptional<Wrapped>",
+                  "printedName": "ImplicitlyUnwrappedOptional<τ_0_0>",
                   "children": [
                     {
                       "kind": "TypeNominal",
-                      "name": "Substituted",
-                      "printedName": "Wrapped"
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
                     }
                   ]
                 },
                 {
                   "kind": "TypeNominal",
                   "name": "Metatype",
-                  "printedName": "ImplicitlyUnwrappedOptional<Wrapped>.Type",
+                  "printedName": "ImplicitlyUnwrappedOptional<τ_0_0>.Type",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "ImplicitlyUnwrappedOptional",
-                      "printedName": "ImplicitlyUnwrappedOptional<Wrapped>",
+                      "printedName": "ImplicitlyUnwrappedOptional<τ_0_0>",
                       "children": [
                         {
                           "kind": "TypeNominal",
-                          "name": "Substituted",
-                          "printedName": "Wrapped"
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
                         }
                       ]
                     }
@@ -8307,46 +8307,46 @@
             {
               "kind": "TypeFunc",
               "name": "GenericFunction",
-              "printedName": "<Wrapped> (ImplicitlyUnwrappedOptional<Wrapped>.Type) -> (Wrapped) -> ImplicitlyUnwrappedOptional<Wrapped>",
+              "printedName": "<τ_0_0> (ImplicitlyUnwrappedOptional<τ_0_0>.Type) -> (τ_0_0) -> ImplicitlyUnwrappedOptional<τ_0_0>",
               "children": [
                 {
                   "kind": "TypeFunc",
                   "name": "Function",
-                  "printedName": "(Wrapped) -> ImplicitlyUnwrappedOptional<Wrapped>",
+                  "printedName": "(τ_0_0) -> ImplicitlyUnwrappedOptional<τ_0_0>",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "ImplicitlyUnwrappedOptional",
-                      "printedName": "ImplicitlyUnwrappedOptional<Wrapped>",
+                      "printedName": "ImplicitlyUnwrappedOptional<τ_0_0>",
                       "children": [
                         {
                           "kind": "TypeNominal",
-                          "name": "Substituted",
-                          "printedName": "Wrapped"
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
                         }
                       ]
                     },
                     {
                       "kind": "TypeNominal",
-                      "name": "Substituted",
-                      "printedName": "Wrapped"
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
                     }
                   ]
                 },
                 {
                   "kind": "TypeNominal",
                   "name": "Metatype",
-                  "printedName": "ImplicitlyUnwrappedOptional<Wrapped>.Type",
+                  "printedName": "ImplicitlyUnwrappedOptional<τ_0_0>.Type",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "ImplicitlyUnwrappedOptional",
-                      "printedName": "ImplicitlyUnwrappedOptional<Wrapped>",
+                      "printedName": "ImplicitlyUnwrappedOptional<τ_0_0>",
                       "children": [
                         {
                           "kind": "TypeNominal",
-                          "name": "Substituted",
-                          "printedName": "Wrapped"
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
                         }
                       ]
                     }
@@ -32200,34 +32200,34 @@
             {
               "kind": "TypeFunc",
               "name": "GenericFunction",
-              "printedName": "<Wrapped> (Optional<Wrapped>.Type) -> Optional<Wrapped>",
+              "printedName": "<τ_0_0> (Optional<τ_0_0>.Type) -> Optional<τ_0_0>",
               "children": [
                 {
                   "kind": "TypeNominal",
                   "name": "Optional",
-                  "printedName": "Optional<Wrapped>",
+                  "printedName": "Optional<τ_0_0>",
                   "children": [
                     {
                       "kind": "TypeNominal",
-                      "name": "Substituted",
-                      "printedName": "Wrapped"
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
                     }
                   ]
                 },
                 {
                   "kind": "TypeNominal",
                   "name": "Metatype",
-                  "printedName": "Optional<Wrapped>.Type",
+                  "printedName": "Optional<τ_0_0>.Type",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "Optional",
-                      "printedName": "Optional<Wrapped>",
+                      "printedName": "Optional<τ_0_0>",
                       "children": [
                         {
                           "kind": "TypeNominal",
-                          "name": "Substituted",
-                          "printedName": "Wrapped"
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
                         }
                       ]
                     }
@@ -32249,46 +32249,46 @@
             {
               "kind": "TypeFunc",
               "name": "GenericFunction",
-              "printedName": "<Wrapped> (Optional<Wrapped>.Type) -> (Wrapped) -> Optional<Wrapped>",
+              "printedName": "<τ_0_0> (Optional<τ_0_0>.Type) -> (τ_0_0) -> Optional<τ_0_0>",
               "children": [
                 {
                   "kind": "TypeFunc",
                   "name": "Function",
-                  "printedName": "(Wrapped) -> Optional<Wrapped>",
+                  "printedName": "(τ_0_0) -> Optional<τ_0_0>",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "Optional",
-                      "printedName": "Optional<Wrapped>",
+                      "printedName": "Optional<τ_0_0>",
                       "children": [
                         {
                           "kind": "TypeNominal",
-                          "name": "Substituted",
-                          "printedName": "Wrapped"
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
                         }
                       ]
                     },
                     {
                       "kind": "TypeNominal",
-                      "name": "Substituted",
-                      "printedName": "Wrapped"
+                      "name": "GenericTypeParam",
+                      "printedName": "τ_0_0"
                     }
                   ]
                 },
                 {
                   "kind": "TypeNominal",
                   "name": "Metatype",
-                  "printedName": "Optional<Wrapped>.Type",
+                  "printedName": "Optional<τ_0_0>.Type",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "Optional",
-                      "printedName": "Optional<Wrapped>",
+                      "printedName": "Optional<τ_0_0>",
                       "children": [
                         {
                           "kind": "TypeNominal",
-                          "name": "Substituted",
-                          "printedName": "Wrapped"
+                          "name": "GenericTypeParam",
+                          "printedName": "τ_0_0"
                         }
                       ]
                     }
