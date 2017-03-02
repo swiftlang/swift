@@ -226,3 +226,35 @@ TEST(SyntaxCollectionTests, cleared) {
   ASSERT_TRUE(List.empty());
   ASSERT_EQ(List.size(), size_t(0));
 }
+
+TEST(SyntaxCollectionTests, Iteration) {
+  auto Arg = getCannedArgument();
+  auto List = SyntaxFactory::makeBlankFunctionCallArgumentList()
+    .appending(Arg)
+    .appending(Arg)
+    .appending(Arg);
+
+  auto Element0 = List[0];
+  auto Element1 = List[1];
+  auto Element2 = List[2];
+
+  SmallString<48> IteratedScratch;
+  llvm::raw_svector_ostream IteratedOS(IteratedScratch);
+  for (auto Element : List) {
+    Element.print(IteratedOS);
+  }
+  ASSERT_EQ(IteratedOS.str().str(), "x: foo, x: foo, x: foo, ");
+
+  auto IteratedElement0 = List[0];
+  auto IteratedElement1 = List[1];
+  auto IteratedElement2 = List[2];
+
+  ASSERT_TRUE(Element0.hasSameIdentityAs(IteratedElement0));
+  ASSERT_TRUE(Element1.hasSameIdentityAs(IteratedElement1));
+  ASSERT_TRUE(Element2.hasSameIdentityAs(IteratedElement2));
+
+  SmallString<48> Scratch;
+  llvm::raw_svector_ostream OS(Scratch);
+  List.print(OS);
+  ASSERT_EQ(OS.str().str(), IteratedOS.str().str());
+}

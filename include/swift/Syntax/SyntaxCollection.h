@@ -7,6 +7,33 @@
 namespace swift {
 namespace syntax {
 
+template <SyntaxKind CollectionKind, typename Element>
+struct SyntaxCollectionIterator {
+  const SyntaxCollection<CollectionKind, Element> &Collection;
+  size_t Index;
+
+  Element operator*() {
+    return Collection[Index];
+  }
+
+  SyntaxCollectionIterator<CollectionKind, Element> &operator++() {
+    ++Index;
+    return *this;
+  }
+
+  bool
+  operator==(const SyntaxCollectionIterator<CollectionKind, Element> &Other) {
+    return Collection.hasSameIdentityAs(Other.Collection) &&
+    Index == Other.Index;
+  }
+
+  bool
+  operator!=(const SyntaxCollectionIterator<CollectionKind, Element> &Other) {
+    return !operator==(Other);
+
+  }
+};
+
 /// A generic unbounded collection of syntax nodes
 template <SyntaxKind CollectionKind, typename Element>
 class SyntaxCollection : public Syntax {
@@ -31,11 +58,25 @@ public:
     return getRaw()->Layout.size();
   }
 
+  SyntaxCollectionIterator<CollectionKind, Element> begin() const {
+    return SyntaxCollectionIterator<CollectionKind, Element> {
+      *this,
+      0,
+    };
+  }
+
+  SyntaxCollectionIterator<CollectionKind, Element> end() const {
+    return SyntaxCollectionIterator<CollectionKind, Element> {
+      *this,
+      getRaw()->Layout.size(),
+    };
+  }
+
   /// Return the element at the given Index.
   ///
   /// Precondition: Index < size()
   /// Precondition: !empty()
-  Element operator[](const size_t Index) {
+  Element operator[](const size_t Index) const {
     assert(Index < size());
     assert(!empty());
 
