@@ -17,6 +17,7 @@
 #ifndef SWIFT_RUNTIME_CONFIG_H
 #define SWIFT_RUNTIME_CONFIG_H
 
+// Bring in visibility attribute macros for library visibility.
 #include "llvm/Support/Compiler.h"
 
 /// Does the current Swift platform support "unbridged" interoperation
@@ -186,9 +187,6 @@
 #define SWIFT_CC_RegisterPreservingCC_IMPL SWIFT_CC_c
 
 #endif
-
-// Bring in visibility attribute macros for library visibility.
-#include "llvm/Support/Compiler.h"
 
 // Generates a name of the runtime entry's implementation by
 // adding an underscore as a prefix and a suffix.
