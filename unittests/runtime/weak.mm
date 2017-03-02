@@ -14,7 +14,6 @@
 #include <objc/runtime.h>
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Metadata.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
