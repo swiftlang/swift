@@ -17,6 +17,8 @@
 #ifndef SWIFT_RUNTIME_CONFIG_H
 #define SWIFT_RUNTIME_CONFIG_H
 
+#include "llvm/Support/Compiler.h"
+
 /// Does the current Swift platform support "unbridged" interoperation
 /// with Objective-C?  If so, the implementations of various types must
 /// implicitly handle Objective-C pointers.
