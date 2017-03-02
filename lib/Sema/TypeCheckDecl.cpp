@@ -7302,6 +7302,9 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
         validateDeclForNameLookup(ATD);
       }
     }
+
+    // Make sure the protocol is fully validated by the end of Sema.
+    TypesToFinalize.insert(proto);
     break;
   }
   case DeclKind::AssociatedType: {

@@ -490,6 +490,15 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     TC.addImplicitConstructors(CD);
     TC.addImplicitDestructor(CD);
   }
+
+  // validateDeclForNameLookup will not trigger an immediate full
+  // validation of protocols, but clients will assume that things
+  // like the requirement signature have been set.
+  if (auto PD = dyn_cast<ProtocolDecl>(nominal)) {
+    if (!PD->isRequirementSignatureComputed()) {
+      TC.validateDecl(PD);
+    }
+  }
 }
 
 static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
