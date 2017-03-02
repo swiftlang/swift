@@ -156,7 +156,7 @@ FunctionParameterSyntax getCannedFunctionParameter() {
   auto Sign = SyntaxFactory::makePrefixOpereator("-", {});
   auto OneDigits = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
   auto One = SyntaxFactory::makeIntegerLiteralExpr(Sign, OneDigits);
-  auto Comma = SyntaxFactory::makeCommaToken({}, {});
+  auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
 
   return SyntaxFactory::makeFunctionParameter(ExternalName, LocalName, Colon,
                                               Int, NoEllipsis, Equal, One,
@@ -168,7 +168,7 @@ TEST(DeclSyntaxTests, FunctionParameterMakeAPIs) {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     getCannedFunctionParameter().print(OS);
-    ASSERT_EQ(OS.str().str(), "with radius: Int = -1,");
+    ASSERT_EQ(OS.str().str(), "with radius: Int = -1, ");
   }
   {
     SmallString<48> Scratch;
@@ -258,22 +258,28 @@ TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
       .withTypeSyntax(llvm::None)
       .withDefaultValue(llvm::None)
       .print(OS);
-    ASSERT_EQ(OS.str().str(), "with radius: = ,");
+    ASSERT_EQ(OS.str().str(), "with radius: = , ");
   }
 }
 
 #pragma mark - parameter-list
 
 TEST(DeclSyntaxTests, FunctionParameterListMakeAPIs) {
-
-}
-
-TEST(DeclSyntaxTests, FunctionParameterListGetAPIs) {
-
-}
-
-TEST(DeclSyntaxTests, FunctionParameterListWithAPIs) {
-  
+  {
+    SmallString<1> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    SyntaxFactory::makeBlankFunctionParameterList().print(OS);
+    ASSERT_EQ(OS.str().str(), "");
+  }
+  {
+    SmallString<48> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    auto Param = getCannedFunctionParameter();
+    std::vector<FunctionParameterSyntax> Params { Param, Param, Param };
+    SyntaxFactory::makeFunctionParameterList(Params).print(OS);
+    ASSERT_EQ(OS.str().str(),
+      "with radius: Int = -1, with radius: Int = -1, with radius: Int = -1, ");
+  }
 }
 
 #pragma mark - function-signature

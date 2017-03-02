@@ -22,6 +22,7 @@
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/Syntax.h"
+#include "swift/Syntax/SyntaxCollection.h"
 #include "swift/Syntax/SyntaxData.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "swift/Syntax/TypeSyntax.h"
@@ -420,8 +421,6 @@ class FunctionParameterSyntax final : public Syntax {
   friend class SyntaxData;
   friend class FunctionParameterSyntaxData;
 
-  using DataType = FunctionParameterSyntaxData;
-
   enum class Cursor : CursorIndex {
     ExternalName,
     LocalName,
@@ -433,10 +432,13 @@ class FunctionParameterSyntax final : public Syntax {
     TrailingComma,
   };
 
-  FunctionParameterSyntax(const RC<SyntaxData> Root,
-                          const DataType *Data);
-
 public:
+  using DataType = FunctionParameterSyntaxData;
+  static constexpr SyntaxKind Kind = SyntaxKind::FunctionParameter;
+
+  FunctionParameterSyntax(const RC<SyntaxData> Root, const DataType *Data)
+    : Syntax(Root, Data) {}
+
   /// Get the external name of the parameter, if there is one.
   RC<TokenSyntax> getExternalName() const;
 
@@ -498,26 +500,22 @@ public:
 
 #pragma mark - function-parameter-list Data
 
-class FunctionParameterListSyntaxData final : public SyntaxData {
-
-  std::vector<RC<FunctionParameterSyntaxData>> CachedParameters;
-
-public:
-  static bool classof(const SyntaxData *SD) {
-    return SD->getKind() == SyntaxKind::FunctionParameterList;
-  }
-};
+using FunctionParameterListSyntaxData = SyntaxCollectionData<SyntaxKind::FunctionParameterList, FunctionParameterSyntax>;
 
 #pragma mark - function-parameter-list API
 
 /// parameter-list -> parameteter | parameter ',' parameter-list
-class FunctionParameterListSyntax final : public Syntax {
-  friend struct SyntaxBuilder;
+class FunctionParameterListSyntax final : public
+  SyntaxCollection<SyntaxKind::FunctionParameterList, FunctionParameterSyntax> {
+  friend struct SyntaxFactory;
   friend class Syntax;
   friend class SyntaxData;
-  friend class FunctionParameterListSyntaxData;
 
   using DataType = FunctionParameterListSyntaxData;
+
+  FunctionParameterListSyntax(const RC<SyntaxData> Root,
+                              const DataType *Data)
+    : SyntaxCollection(Root, Data) {}
 
 public:
   static bool classof(const Syntax *S) {

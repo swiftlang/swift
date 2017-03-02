@@ -126,6 +126,23 @@ FunctionParameterSyntax SyntaxFactory::makeBlankFunctionParameter() {
   return { Data, Data.get() };
 }
 
+FunctionParameterListSyntax SyntaxFactory::makeFunctionParameterList(const std::vector<FunctionParameterSyntax> &Parameters) {
+  RawSyntax::LayoutList Layout;
+  for (auto Param : Parameters) {
+    Layout.push_back(Param.getRaw());
+  }
+
+  auto Raw = RawSyntax::make(SyntaxKind::FunctionParameterList, Layout,
+                             SourcePresence::Present);
+  auto Data = FunctionParameterListSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+FunctionParameterListSyntax SyntaxFactory::makeBlankFunctionParameterList() {
+  auto Data = FunctionParameterListSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
 #pragma mark - Statements
 
 CodeBlockStmtSyntax

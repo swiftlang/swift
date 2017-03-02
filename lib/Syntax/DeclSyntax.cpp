@@ -421,10 +421,6 @@ RC<FunctionParameterSyntaxData> FunctionParameterSyntaxData::makeBlank() {
 
 #pragma mark - function-parameter API
 
-FunctionParameterSyntax::FunctionParameterSyntax(const RC<SyntaxData> Root,
-                                                 const DataType *Data)
-  : Syntax(Root, Data) {}
-
 RC<TokenSyntax> FunctionParameterSyntax::getExternalName() const {
   return cast<TokenSyntax>(getRaw()->getChild(Cursor::ExternalName));
 }
