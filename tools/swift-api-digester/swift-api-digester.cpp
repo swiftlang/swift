@@ -737,16 +737,10 @@ StringRef SDKNodeAbstractFunc::getTypeRoleDescription(SDKContext &Ctx,
                                                       unsigned Index) {
   if (Index == 0) {
     return Ctx.buffer("return");
-  } else if (Index == 1) {
-    return Ctx.buffer("1st parameter");
-  } else if (Index == 2) {
-    return Ctx.buffer("2nd parameter");
-  } else if (Index == 3) {
-    return Ctx.buffer("3rd parameter");
   } else {
     llvm::SmallString<4> Buffer;
-    Buffer += std::to_string(Index);
-    Buffer += "th parameter";
+    Buffer += "parameter ";
+    Buffer += std::to_string(Index - 1);
     return Ctx.buffer(Buffer.str());
   }
 }
