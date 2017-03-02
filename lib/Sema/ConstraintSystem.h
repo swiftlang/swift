@@ -1086,22 +1086,15 @@ private:
     ///
     /// \param constraint The constraint to erase.
     void removeGeneratedConstraint(Constraint *constraint) {
-      size_t index = 0;
-      for (auto generated : generatedConstraints) {
+      for (auto *&generated : generatedConstraints) {
+        // When we find the constraint we're erasing, overwrite its
+        // value with the last element in the generated constraints
+        // vector and then pop that element from the vector.
         if (generated == constraint) {
-          unsigned last = generatedConstraints.size() - 1;
-          auto lastConstraint = generatedConstraints[last];
-          if (lastConstraint == generated) {
-            generatedConstraints.pop_back();
-            break;
-          } else {
-            generatedConstraints[index] = lastConstraint;
-            generatedConstraints[last] = constraint;
-            generatedConstraints.pop_back();
-            break;
-          }
+          generated = generatedConstraints.back();
+          generatedConstraints.pop_back();
+          return;
         }
-        index++;
       }
     }
 
