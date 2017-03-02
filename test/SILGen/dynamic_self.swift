@@ -249,6 +249,20 @@ func partialApplySelfReturn(c: Factory, t: Factory.Type) {
   _ = Factory.staticNewInstance
 }
 
+class FactoryFactory {
+
+  // CHECK-LABEL: sil hidden @_T012dynamic_self07FactoryC0C11newInstanceACXDyFZ : $@convention(method) (@thick FactoryFactory.Type) -> @owned FactoryFactory
+  static func newInstance() -> Self {
+    // CHECK: bb0(%0 : $@thick FactoryFactory.Type):
+
+    // CHECK: [[METATYPE:%.*]] = value_metatype $@thick @dynamic_self FactoryFactory.Type.Type, %0 : $@thick FactoryFactory.Type
+    // CHECK: [[ANY:%.*]] = init_existential_metatype [[METATYPE]] : $@thick @dynamic_self FactoryFactory.Type.Type, $@thick Any.Type
+    let _: Any.Type = type(of: self)
+
+    // CHECK: unreachable
+  }
+}
+
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {
 // CHECK: method #P.f!1: {{.*}} : @_T012dynamic_self1XCAA1PAaaDP1f{{[_0-9a-zA-Z]*}}FTW
 
