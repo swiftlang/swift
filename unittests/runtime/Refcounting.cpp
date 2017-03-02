@@ -180,7 +180,7 @@ TEST(RefcountingTest, isUniquelyReferencedOrPinned) {
   // RC big, unpinned
   EXPECT_FALSE(swift_isUniquelyReferencedOrPinned_nonNull_native(object));
 
-  auto pinResult = swift_tryPin(object);
+  swift_tryPin(object);
   // RC big, pinned
   EXPECT_TRUE(swift_isUniquelyReferencedOrPinned_nonNull_native(object));
 

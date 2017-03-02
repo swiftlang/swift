@@ -1,4 +1,4 @@
-//===--- UnknownSyntax.h - Swift Unknown Syntax Interface -----------------===//
+//===--- UnknownSyntax.h - Swift Unknown Syntax Interface -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
