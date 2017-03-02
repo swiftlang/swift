@@ -130,6 +130,7 @@ class CodeBlockStmtSyntax : public StmtSyntax {
   };
   friend struct SyntaxFactory;
   friend class CodeBlockStmtSyntaxData;
+  friend class FunctionDeclSyntax;
 
   CodeBlockStmtSyntax(const RC<SyntaxData> Root, CodeBlockStmtSyntaxData *Data);
 

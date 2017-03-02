@@ -1,6 +1,7 @@
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/DeclSyntax.h"
 #include "swift/Syntax/ExprSyntax.h"
+#include "swift/Syntax/StmtSyntax.h"
 #include "llvm/ADT/SmallString.h"
 #include "gtest/gtest.h"
 
@@ -465,5 +466,109 @@ TEST(DeclSyntaxTests, FunctionSignatureWithAPIs) {
 
 #pragma mark - function-declaration
 
-// TODO: Nodes
-// TODO: Tests
+DeclModifierListSyntax getCannedModifiers() {
+  auto PublicID = SyntaxFactory::makePublicKeyword({}, Trivia::spaces(1));
+  auto NoLParen = TokenSyntax::missingToken(tok::l_paren, "(");
+  auto NoArgument = TokenSyntax::missingToken(tok::identifier, "");
+  auto NoRParen = TokenSyntax::missingToken(tok::r_paren, ")");
+  auto Public = SyntaxFactory::makeDeclModifier(PublicID, NoLParen, NoArgument,
+                                                NoRParen);
+
+  auto StaticKW = SyntaxFactory::makeStaticKeyword({}, Trivia::spaces(1));
+  auto Static = SyntaxFactory::makeDeclModifier(StaticKW, NoLParen, NoArgument,
+                                                NoRParen);
+
+  return SyntaxFactory::makeBlankDeclModifierList()
+    .appending(Public)
+    .appending(Static)
+    .castTo<DeclModifierListSyntax>();
+}
+
+GenericParameterClauseSyntax getCannedGenericParams() {
+  GenericParameterClauseBuilder GB;
+
+  auto LAngle = SyntaxFactory::makeLeftAngleToken({}, {});
+  auto RAngle = SyntaxFactory::makeLeftAngleToken({}, Trivia::spaces(1));
+
+  auto T = SyntaxFactory::makeGenericParameter("T", {}, {});
+  auto U = SyntaxFactory::makeGenericParameter("U", {}, {});
+
+  auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
+
+  GB.addParameter(llvm::None, T);
+  GB.addParameter(Comma, U);
+  GB.useLeftAngleBracket(LAngle);
+  GB.useLeftAngleBracket(RAngle);
+
+  return GB.build();
+}
+
+CodeBlockStmtSyntax getCannedBody() {
+  auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "-");
+  auto OneDigits = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
+  auto One = SyntaxFactory::makeIntegerLiteralExpr(NoSign, OneDigits);
+  auto ReturnKW =
+    SyntaxFactory::makeReturnKeyword(Trivia::newlines(1) + Trivia::spaces(1),
+                                     {});
+  auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, One);
+
+  auto Stmts = SyntaxFactory::makeBlankStmtList()
+    .appending(Return)
+    .castTo<StmtListSyntax>();
+
+  auto LBrace = SyntaxFactory::makeLeftBrace({}, {});
+  auto RBrace = SyntaxFactory::makeRightBrace(Trivia::newlines(1), {});
+
+  return SyntaxFactory::makeCodeBlock(LBrace, Stmts, RBrace);
+}
+
+FunctionDeclSyntax getCannedFunctionDecl() {
+  auto NoAttributes = SyntaxFactory::makeBlankTypeAttributes();
+  auto Foo = SyntaxFactory::makeIdentifier("foo", {}, {});
+  auto FuncKW = SyntaxFactory::makeFuncKeyword({}, Trivia::spaces(1));
+  auto Modifiers = getCannedModifiers();
+  auto GenericParams = getCannedGenericParams();
+  auto Signature = getCannedFunctionSignature();
+  auto Body = getCannedBody();
+
+  return SyntaxFactory::makeFunctionDecl(NoAttributes, Modifiers, FuncKW, Foo,
+                                         GenericParams, Signature, Body);
+}
+
+TEST(DeclSyntaxTests, FunctionDeclMakeAPIs) {
+  {
+    SmallString<1> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    SyntaxFactory::makeBlankFunctionDecl().print(OS);
+    ASSERT_EQ(OS.str().str(), "");
+  }
+  {
+    SmallString<64> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    getCannedFunctionDecl().print(OS);
+    ASSERT_EQ(OS.str().str(),
+              "public static func foo(x: Int, y: Int) throws -> Int {\n"
+              "  return 1\n"
+              "}");
+  }
+}
+
+TEST(DeclSyntaxTests, FunctionDeclGetAPIs) {
+  {
+    SmallString<1> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    SyntaxFactory::makeBlankFunctionDecl().print(OS);
+    ASSERT_EQ(OS.str().str(), "");
+  }
+  {
+
+  }
+}
+
+TEST(DeclSyntaxTests, FunctionDeclWithAPIs) {
+
+}
+
+TEST(DeclSyntaxTests, FunctionDeclBuilderAPIs) {
+
+}

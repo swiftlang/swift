@@ -18,7 +18,6 @@
 #ifndef SWIFT_SYNTAX_DECLSYNTAX_H
 #define SWIFT_SYNTAX_DECLSYNTAX_H
 
-#include "swift/Syntax/GenericSyntax.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/Syntax.h"
@@ -35,6 +34,15 @@ namespace syntax {
 
 class ExprSyntax;
 class ExprSyntaxData;
+class CodeBlockStmtSyntax;
+class CodeBlockStmtSyntaxData;
+class TypeAttributesSyntax;
+class TypeAttributesSyntaxData;
+class DeclModifierListSyntax;
+class GenericWhereClauseSyntax;
+class GenericWhereClauseSyntaxData;
+class GenericParameterListSyntax;
+class GenericParameterListSyntaxData;
 
 #pragma mark declaration-modifier Data
 
@@ -154,6 +162,7 @@ class DeclModifierListSyntax final :
   friend struct SyntaxFactory;
   friend class Syntax;
   friend class SyntaxData;
+  friend class FunctionDeclSyntax;
 
   using DataType = DeclModifierListSyntaxData;
   static constexpr SyntaxKind Kind = SyntaxKind::DeclModifierList;
@@ -767,6 +776,115 @@ public:
 
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::FunctionSignature;
+  }
+};
+
+#pragma mark - function-declaration Data
+
+class FunctionDeclSyntaxData final : public SyntaxData {
+  friend struct SyntaxFactory;
+  friend class SyntaxData;
+  friend class FunctionDeclSyntax;
+
+  RC<TypeAttributesSyntaxData> CachedAttributes;
+  RC<DeclModifierListSyntaxData> CachedModifiers;
+  RC<GenericParameterClauseSyntaxData> CachedGenericParams;
+  RC<FunctionSignatureSyntaxData> CachedSignature;
+  RC<GenericWhereClauseSyntaxData> CachedGenericWhereClause;
+  RC<CodeBlockStmtSyntaxData> CachedBody;
+
+  FunctionDeclSyntaxData(const RC<RawSyntax> Raw,
+                         const SyntaxData *Parent = nullptr,
+                         const CursorIndex IndexInParent = 0);
+
+  static RC<FunctionDeclSyntaxData> make(const RC<RawSyntax> Raw,
+                                         const SyntaxData *Parent = nullptr,
+                                         const CursorIndex IndexInParent = 0);
+  static RC<FunctionDeclSyntaxData> makeBlank();
+
+public:
+  static bool classof(const SyntaxData *SD) {
+    return SD->getKind() == SyntaxKind::FunctionDecl;
+  }
+};
+
+#pragma mark - function-declaration API
+
+class FunctionDeclSyntax final : public Syntax {
+  friend struct SyntaxFactory;
+  friend class Syntax;
+  friend class SyntaxData;
+  friend class FunctionDeclSyntaxData;
+
+  enum class Cursor : CursorIndex {
+    Attributes,
+    Modifiers,
+    FuncKeyword,
+    Identifier,
+    GenericParameterClause,
+    Signature,
+    GenericWhereClause,
+    Body
+  };
+
+  using DataType = FunctionDeclSyntaxData;
+
+  FunctionDeclSyntax(const RC<SyntaxData> Root, const DataType *Data)
+    : Syntax(Root, Data) {}
+
+public:
+  /// Get the attributes of this function declaration.
+  TypeAttributesSyntax getAttributes() const;
+
+  /// Return a FunctionDeclSyntax with the given attributes.
+  FunctionDeclSyntax withAttributes(TypeAttributesSyntax NewAttributes) const;
+
+  /// Get the modifiers of this function declaration.
+  DeclModifierListSyntax getModifiers() const;
+
+  /// Return a FunctionDeclSyntax with the given modifiers.
+  FunctionDeclSyntax withModifiers(DeclModifierListSyntax NewModifiers) const;
+
+  /// Return the 'func' keyword of tis function declaration.
+  RC<TokenSyntax> getFuncKeyword() const;
+
+  /// Return a FunctionDeclSyntax with the given 'func' keyword.
+  FunctionDeclSyntax withFuncKeyword(RC<TokenSyntax> NewFuncKeyword) const;
+
+  /// Return the identifier of the function declaration.
+  RC<TokenSyntax> getIdentifier() const;
+
+  /// Return a FunctionDeclSyntax with the given identifier.
+  FunctionDeclSyntax withIdentifier(RC<TokenSyntax> NewIdentifier) const;
+
+  /// Return the generic parameter clause of the function declaration, if
+  /// there is one. Otherwise, return llvm::None.
+  llvm::Optional<GenericParameterClauseSyntax>
+  getGenericParameterClause() const;
+
+  /// Return a FunctionDeclSyntax with the given generic parameter clause.
+  /// To remove the generic parameters, pass in llvm::None.
+  FunctionDeclSyntax withGenericParameterClause(
+    llvm::Optional<GenericParameterClauseSyntax> NewGenericParams) const;
+
+  /// Return the signature of the function declaration.
+  FunctionSignatureSyntax getSignature() const;
+
+  /// Return a FunctionDeclSyntax with the given function signature.
+  FunctionDeclSyntax withSignature(FunctionSignatureSyntax NewSignature) const;
+
+  /// Return the body of the function declaration, if there is one.
+  ///
+  /// As an example, function declarations in protocols have no body.
+  llvm::Optional<CodeBlockStmtSyntax> getBody() const;
+
+  /// Return a FunctionDeclSyntax with the given body. To remove the body,
+  /// pass in llvm::None.
+  FunctionDeclSyntax
+  withBody(llvm::Optional<CodeBlockStmtSyntax> NewBody) const;
+
+  static bool classof(const Syntax *S) {
+    return S->getKind() == SyntaxKind::FunctionDecl;
   }
 };
 

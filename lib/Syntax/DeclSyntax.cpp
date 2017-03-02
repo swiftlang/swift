@@ -12,8 +12,11 @@
 
 #include "swift/Syntax/DeclSyntax.h"
 #include "swift/Syntax/ExprSyntax.h"
+#include "swift/Syntax/GenericSyntax.h"
 #include "swift/Syntax/RawSyntax.h"
+#include "swift/Syntax/StmtSyntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
+#include "swift/Syntax/TypeSyntax.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -816,4 +819,207 @@ FunctionSignatureSyntax FunctionSignatureSyntax::
 withReturnTypeSyntax(TypeSyntax NewReturnTypeSyntax) const {
   return Data->replaceChild<FunctionSignatureSyntax>(
     NewReturnTypeSyntax.getRaw(), Cursor::ReturnType);
+}
+
+#pragma mark - function-declaration-data
+
+FunctionDeclSyntaxData::
+FunctionDeclSyntaxData(const RC<RawSyntax> Raw,
+                       const SyntaxData *Parent,
+                       const CursorIndex IndexInParent)
+  : SyntaxData(Raw, Parent, IndexInParent) {
+  assert(Raw->Kind == SyntaxKind::FunctionDecl);
+  assert(Raw->Layout.size() == 8);
+  syntax_assert_child_kind(Raw, FunctionDeclSyntax::Cursor::Attributes,
+                           SyntaxKind::TypeAttributes);
+  syntax_assert_child_kind(Raw, FunctionDeclSyntax::Cursor::Modifiers,
+                           SyntaxKind::DeclModifierList);
+  syntax_assert_child_token_text(Raw, FunctionDeclSyntax::Cursor::FuncKeyword,
+                                 tok::kw_func, "func");
+  syntax_assert_child_token(Raw, FunctionDeclSyntax::Cursor::Identifier,
+                            tok::identifier);
+  syntax_assert_child_kind(Raw,
+                           FunctionDeclSyntax::Cursor::GenericParameterClause,
+                           SyntaxKind::GenericParameterClause);
+  syntax_assert_child_kind(Raw, FunctionDeclSyntax::Cursor::Signature,
+                           SyntaxKind::FunctionSignature);
+  syntax_assert_child_kind(Raw, FunctionDeclSyntax::Cursor::GenericWhereClause,
+                           SyntaxKind::GenericWhereClause);
+  syntax_assert_child_kind(Raw, FunctionDeclSyntax::Cursor::Body,
+                           SyntaxKind::CodeBlockStmt);
+}
+
+RC<FunctionDeclSyntaxData> FunctionDeclSyntaxData::make(const RC<RawSyntax> Raw,
+                                       const SyntaxData *Parent,
+                                       const CursorIndex IndexInParent) {
+  return RC<FunctionDeclSyntaxData> {
+    new FunctionDeclSyntaxData {
+      Raw, Parent, IndexInParent
+    }
+  };
+}
+
+RC<FunctionDeclSyntaxData> FunctionDeclSyntaxData::makeBlank() {
+  auto Raw = RawSyntax::make(SyntaxKind::FunctionDecl,
+    {
+      RawSyntax::missing(SyntaxKind::TypeAttributes),
+      RawSyntax::missing(SyntaxKind::DeclModifierList),
+      TokenSyntax::missingToken(tok::kw_func, "func"),
+      TokenSyntax::missingToken(tok::identifier, ""),
+      RawSyntax::missing(SyntaxKind::GenericParameterClause),
+      RawSyntax::missing(SyntaxKind::FunctionSignature),
+      RawSyntax::missing(SyntaxKind::GenericWhereClause),
+      RawSyntax::missing(SyntaxKind::CodeBlockStmt),
+    },
+    SourcePresence::Present);
+  return make(Raw);
+}
+
+#pragma mark - function-declaration-API
+
+TypeAttributesSyntax FunctionDeclSyntax::getAttributes() const {
+  auto RawAttrs = getRaw()->getChild(Cursor::Attributes);
+
+  auto *MyData = getUnsafeData<FunctionDeclSyntax>();
+
+  auto &ChildPtr = *reinterpret_cast<std::atomic<uintptr_t>*>(
+    &MyData->CachedAttributes);
+
+  SyntaxData::realizeSyntaxNode<ExprSyntax>(ChildPtr, RawAttrs, MyData,
+                                            cursorIndex(Cursor::Attributes));
+  
+  return { Root, MyData->CachedAttributes.get() };
+}
+
+FunctionDeclSyntax
+FunctionDeclSyntax::withAttributes(TypeAttributesSyntax NewAttributes) const {
+  return Data->replaceChild<FunctionDeclSyntax>(NewAttributes.getRaw(),
+                                                Cursor::Attributes);
+}
+
+DeclModifierListSyntax FunctionDeclSyntax::getModifiers() const {
+  auto RawModifiers = getRaw()->getChild(Cursor::Attributes);
+
+  auto *MyData = getUnsafeData<FunctionDeclSyntax>();
+
+  auto &ChildPtr = *reinterpret_cast<std::atomic<uintptr_t>*>(
+    &MyData->CachedModifiers);
+
+  SyntaxData::realizeSyntaxNode<DeclModifierListSyntax>(ChildPtr, RawModifiers,
+    MyData, cursorIndex(Cursor::Modifiers));
+  
+  return { Root, MyData->CachedModifiers.get() };
+}
+
+FunctionDeclSyntax
+FunctionDeclSyntax::withModifiers(DeclModifierListSyntax NewModifiers) const {
+  return Data->replaceChild<FunctionDeclSyntax>(NewModifiers.getRaw(),
+                                                Cursor::Modifiers);
+}
+
+RC<TokenSyntax> FunctionDeclSyntax::getFuncKeyword() const {
+  return cast<TokenSyntax>(getRaw()->getChild(Cursor::FuncKeyword));
+}
+
+FunctionDeclSyntax
+FunctionDeclSyntax::withFuncKeyword(RC<TokenSyntax> NewFuncKeyword) const {
+  syntax_assert_token_is(NewFuncKeyword, tok::kw_func, "func");
+  return Data->replaceChild<FunctionDeclSyntax>(NewFuncKeyword,
+                                                Cursor::FuncKeyword);
+
+}
+
+RC<TokenSyntax> FunctionDeclSyntax::getIdentifier() const {
+  return cast<TokenSyntax>(getRaw()->getChild(Cursor::Identifier));
+}
+
+FunctionDeclSyntax
+FunctionDeclSyntax::withIdentifier(RC<TokenSyntax> NewIdentifier) const {
+  assert(NewIdentifier->getTokenKind() == tok::identifier);
+  return Data->replaceChild<FunctionDeclSyntax>(NewIdentifier,
+                                                Cursor::Identifier);
+}
+
+llvm::Optional<GenericParameterClauseSyntax>
+FunctionDeclSyntax::getGenericParameterClause() const {
+  auto RawGenericParams = getRaw()->getChild(Cursor::Attributes);
+  if (RawGenericParams->isMissing()) {
+    return llvm::None;
+  }
+
+  auto *MyData = getUnsafeData<FunctionDeclSyntax>();
+
+  auto &ChildPtr = *reinterpret_cast<std::atomic<uintptr_t>*>(
+    &MyData->CachedGenericParams);
+
+  SyntaxData::realizeSyntaxNode<DeclModifierListSyntax>(ChildPtr,
+    RawGenericParams, MyData, cursorIndex(Cursor::GenericParameterClause));
+
+  GenericParameterClauseSyntax Params {
+    Root,
+    MyData->CachedGenericParams.get()
+  };
+  
+  return Params;
+}
+
+FunctionDeclSyntax FunctionDeclSyntax::withGenericParameterClause(
+    llvm::Optional<GenericParameterClauseSyntax> NewGenericParams) const {
+  auto RawParams = NewGenericParams.hasValue()
+    ? NewGenericParams->getRaw()
+    : SyntaxFactory::makeBlankGenericParameterClause().getRaw();
+  return Data->replaceChild<FunctionDeclSyntax>(RawParams,
+                                                Cursor::GenericParameterClause);
+
+}
+
+FunctionSignatureSyntax FunctionDeclSyntax::getSignature() const {
+  auto RawSig = getRaw()->getChild(Cursor::Attributes);
+
+  auto *MyData = getUnsafeData<FunctionDeclSyntax>();
+
+  auto &ChildPtr = *reinterpret_cast<std::atomic<uintptr_t>*>(
+    &MyData->CachedSignature);
+
+  SyntaxData::realizeSyntaxNode<FunctionSignatureSyntax>(ChildPtr, RawSig,
+    MyData, cursorIndex(Cursor::Signature));
+
+  return { Root, MyData->CachedSignature.get() };
+}
+
+FunctionDeclSyntax
+FunctionDeclSyntax::withSignature(FunctionSignatureSyntax NewSignature) const {
+  return Data->replaceChild<FunctionDeclSyntax>(NewSignature.getRaw(),
+                                                Cursor::Signature);
+}
+
+llvm::Optional<CodeBlockStmtSyntax> FunctionDeclSyntax::getBody() const {
+  auto RawBody = getRaw()->getChild(Cursor::Body);
+  if (RawBody->isMissing()) {
+    return llvm::None;
+  }
+
+  auto *MyData = getUnsafeData<FunctionDeclSyntax>();
+
+  auto &ChildPtr = *reinterpret_cast<std::atomic<uintptr_t>*>(
+    &MyData->CachedBody);
+
+  SyntaxData::realizeSyntaxNode<CodeBlockStmtSyntax>(ChildPtr,
+    RawBody, MyData, cursorIndex(Cursor::Body));
+  
+  CodeBlockStmtSyntax Body {
+    Root,
+    MyData->CachedBody.get()
+  };
+  
+  return Body;
+}
+
+FunctionDeclSyntax FunctionDeclSyntax::
+withBody(llvm::Optional<CodeBlockStmtSyntax> NewBody) const {
+  auto RawBody = NewBody.hasValue()
+    ? NewBody->getRaw()
+    : SyntaxFactory::makeBlankCodeBlock().getRaw();
+  return Data->replaceChild<FunctionDeclSyntax>(RawBody,
+                                                Cursor::Body);
 }

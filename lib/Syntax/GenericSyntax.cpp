@@ -149,9 +149,9 @@ GenericParameterClauseSyntaxData(RC<RawSyntax> Raw,
 }
 
 RC<GenericParameterClauseSyntaxData>
-GenericParameterClauseSyntaxData::make(RC<RawSyntax> Raw,
+GenericParameterClauseSyntaxData::make(const RC<RawSyntax> Raw,
                                        const SyntaxData *Parent,
-                                       CursorIndex IndexInParent) {
+                                       const CursorIndex IndexInParent) {
   return RC<GenericParameterClauseSyntaxData> {
     new GenericParameterClauseSyntaxData {
       Raw, Parent, IndexInParent,
@@ -173,7 +173,7 @@ GenericParameterClauseSyntaxData::makeBlank() {
 #pragma mark - generic-parameter-clause API
 
 GenericParameterClauseSyntax::
-GenericParameterClauseSyntax(RC<SyntaxData> Root,
+GenericParameterClauseSyntax(const RC<SyntaxData> Root,
                              const GenericParameterClauseSyntaxData *Data)
   : Syntax(Root, Data) {}
 

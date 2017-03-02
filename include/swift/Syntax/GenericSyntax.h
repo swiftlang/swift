@@ -277,9 +277,9 @@ class GenericParameterClauseSyntaxData final : public SyntaxData {
 
   RC<GenericParameterListSyntaxData> CachedGenericParameterList;
 
-  GenericParameterClauseSyntaxData(RC<RawSyntax> Raw,
+  GenericParameterClauseSyntaxData(const RC<RawSyntax> Raw,
                                    const SyntaxData *Parent = nullptr,
-                                   CursorIndex IndexInParent = 0);
+                                   const CursorIndex IndexInParent = 0);
   static RC<GenericParameterClauseSyntaxData>
   make(RC<RawSyntax> Raw,
        const SyntaxData *Parent = nullptr,
@@ -299,6 +299,8 @@ class GenericParameterClauseSyntax final : public Syntax {
   friend struct SyntaxFactory;
   friend class GenericParameterClauseSyntaxData;
   friend class GenericParameterClauseBuilder;
+  friend class FunctionDeclSyntax;
+
   enum class Cursor : CursorIndex {
     LeftAngleBracketToken,
     GenericParameterList,

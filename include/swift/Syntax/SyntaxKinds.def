@@ -40,8 +40,9 @@ ABSTRACT_SYNTAX(DeclSyntax, Syntax)
   SYNTAX(UnknownDecl, DeclSyntax)
   SYNTAX(StructDecl, DeclSyntax)
   SYNTAX(TypeAliasDecl, DeclSyntax)
+  SYNTAX(FunctionDecl, DeclSyntax)
 
-SYNTAX_RANGE(Decl, MissingDecl, TypeAliasDecl)
+SYNTAX_RANGE(Decl, MissingDecl, FunctionDecl)
 
 SYNTAX(DeclMembers, Syntax)
 SYNTAX(GenericParameter, Syntax)

@@ -456,6 +456,30 @@ FunctionCallExprSyntax SyntaxFactory::makeBlankFunctionCallExpr() {
 #pragma mark - Tokens
 
 RC<TokenSyntax>
+SyntaxFactory::makeStaticKeyword(const Trivia &LeadingTrivia,
+                                 const Trivia &TrailingTrivia) {
+  return TokenSyntax::make(tok::kw_static, "static",
+                           SourcePresence::Present,
+                           LeadingTrivia, TrailingTrivia);
+}
+
+RC<TokenSyntax>
+SyntaxFactory::makePublicKeyword(const Trivia &LeadingTrivia,
+                                 const Trivia &TrailingTrivia) {
+  return TokenSyntax::make(tok::kw_public, "public",
+                           SourcePresence::Present,
+                           LeadingTrivia, TrailingTrivia);
+}
+
+RC<TokenSyntax>
+SyntaxFactory::makeFuncKeyword(const Trivia &LeadingTrivia,
+                                      const Trivia &TrailingTrivia) {
+  return TokenSyntax::make(tok::kw_func, "func",
+                           SourcePresence::Present,
+                           LeadingTrivia, TrailingTrivia);
+}
+
+RC<TokenSyntax>
 SyntaxFactory::makeFallthroughKeyword(const Trivia &LeadingTrivia,
                                       const Trivia &TrailingTrivia) {
   return TokenSyntax::make(tok::kw_fallthrough, "fallthrough",

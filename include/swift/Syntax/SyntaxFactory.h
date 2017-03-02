@@ -93,6 +93,19 @@ struct SyntaxFactory {
   /// Make an empty list of declaration members.
   static DeclMembersSyntax makeBlankDeclMembers();
 
+  /// Make a function declaration with the specified elements.
+  static FunctionDeclSyntax
+  makeFunctionDecl(TypeAttributesSyntax Attributes,
+                   DeclModifierListSyntax Modifiers,
+                   RC<TokenSyntax> FuncKeyword,
+                   RC<TokenSyntax> Identifier,
+                   llvm::Optional<GenericParameterClauseSyntax> GenericParams,
+                   FunctionSignatureSyntax Signature,
+                   llvm::Optional<CodeBlockStmtSyntax> Body);
+
+  /// Make a function declaration with all missing elements.
+  static FunctionDeclSyntax makeBlankFunctionDecl();
+
 #pragma mark - function-parameter
 
   /// Make a function parameter with the given elements.
@@ -232,6 +245,19 @@ struct SyntaxFactory {
   static FunctionCallExprSyntax makeBlankFunctionCallExpr();
 
 #pragma mark - Tokens
+
+  /// Make a 'static' keyword with the specified leading and trailing trivia.
+  static RC<TokenSyntax> makeStaticKeyword(const Trivia &LeadingTrivia,
+                                           const Trivia &TrailingTrivia);
+
+
+  /// Make a 'public' keyword with the specified leading and trailing trivia.
+  static RC<TokenSyntax> makePublicKeyword(const Trivia &LeadingTrivia,
+                                           const Trivia &TrailingTrivia);
+
+  /// Make a 'func' keyword with the specified leading and trailing trivia.
+  static RC<TokenSyntax> makeFuncKeyword(const Trivia &LeadingTrivia,
+                                         const Trivia &TrailingTrivia);
 
   /// Make a 'fallthrough' keyword with the specified leading and
   /// trailing trivia.

@@ -187,6 +187,7 @@ class TypeAttributesSyntax final : public Syntax {
   friend class TypeAttributesSyntaxData;
   friend class SyntaxData;
   friend class FunctionSignatureSyntax;
+  friend class FunctionDeclSyntax;
 
   using DataType = TypeAttributesSyntaxData;
 
