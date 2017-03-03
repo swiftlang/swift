@@ -207,6 +207,9 @@ public:
 
   // Only to be used by the demangler parsers.
   void addChild(NodePointer Child, NodeFactory &Factory);
+
+  // Reverses the order of children.
+  void reverseChildren(size_t StartingAt = 0);
 };
 
 /// Returns true if the mangledName starts with the swift mangling prefix.
