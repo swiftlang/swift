@@ -2349,12 +2349,15 @@ bool GenericSignatureBuilder::addInheritedRequirements(
   });
 }
 
-bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
-                                             const RequirementSource *source,
-                                             const SubstitutionMap *subMap) {
-  auto localSource = source ? FloatingRequirementSource(source)
-                            : FloatingRequirementSource::forExplicit(Req);
+bool GenericSignatureBuilder::addRequirement(const RequirementRepr *req) {
+  return addRequirement(req,
+                        FloatingRequirementSource::forExplicit(req),
+                        nullptr);
+}
 
+bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
+                                             FloatingRequirementSource source,
+                                             const SubstitutionMap *subMap) {
   auto subst = [&](Type t) {
     if (subMap)
       return t.subst(*subMap);
@@ -2375,7 +2378,7 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
     }
 
     if (addLayoutRequirement(PA, Req->getLayoutConstraint(),
-                             localSource.getSource(PA)))
+                             source.getSource(PA)))
       return true;
 
     return false;
@@ -2394,7 +2397,7 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
     // Check whether this is a supertype requirement.
     if (Req->getConstraint()->getClassOrBoundGenericClass()) {
       return addSuperclassRequirement(PA, Req->getConstraint(),
-                                      localSource.getSource(PA));
+                                      source.getSource(PA));
     }
 
     SmallVector<ProtocolDecl *, 4> ConformsTo;
@@ -2405,7 +2408,7 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
 
     // Add each of the protocols.
     for (auto Proto : ConformsTo)
-      if (addConformanceRequirement(PA, Proto, localSource.getSource(PA)))
+      if (addConformanceRequirement(PA, Proto, source.getSource(PA)))
         return true;
 
     return false;
@@ -2425,7 +2428,7 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
     return addRequirement(Requirement(RequirementKind::SameType,
                                       subst(Req->getFirstType()),
                                       subst(Req->getSecondType())),
-                          localSource);
+                          source);
   }
 
   llvm_unreachable("Unhandled requirement?");

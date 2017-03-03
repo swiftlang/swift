@@ -310,9 +310,15 @@ public:
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
+  bool addRequirement(const RequirementRepr *req);
+
+  /// \brief Add a new requirement.
+  ///
+  /// \returns true if this requirement makes the set of requirements
+  /// inconsistent, in which case a diagnostic will have been issued.
   bool addRequirement(const RequirementRepr *Req,
-                      const RequirementSource *source = nullptr,
-                      const SubstitutionMap *subMap = nullptr);
+                      FloatingRequirementSource source,
+                      const SubstitutionMap *subMap);
 
   /// \brief Add an already-checked requirement.
   ///
