@@ -310,6 +310,11 @@ void Node::addChild(NodePointer Child, Context &Ctx) {
   addChild(Child, *Ctx.D);
 }
 
+void Node::reverseChildren(size_t StartingAt) {
+  assert(StartingAt <= NumChildren);
+  std::reverse(Children + StartingAt, Children + NumChildren);
+}
+
 //////////////////////////////////
 // NodeFactory member functions //
 //////////////////////////////////
@@ -350,18 +355,49 @@ NodePointer NodeFactory::createNode(Node::Kind K, Node::IndexType Index) {
 NodePointer NodeFactory::createNode(Node::Kind K, llvm::StringRef Text) {
   return new (Allocate<Node>()) Node(K, Text.copy(*this));
 }
+NodePointer NodeFactory::createNode(Node::Kind K, const CharVector &Text) {
+  return new (Allocate<Node>()) Node(K, Text.str());
+}
 NodePointer NodeFactory::createNode(Node::Kind K, const char *Text) {
   return new (Allocate<Node>()) Node(K, llvm::StringRef(Text));
+}
+
+//////////////////////////////////
+// CharVector member functions  //
+//////////////////////////////////
+
+void CharVector::append(StringRef Rhs, NodeFactory &Factory) {
+  if (NumElems + Rhs.size() > Capacity)
+    Factory.Reallocate(Elems, Capacity, /*Growth*/ Rhs.size());
+  memcpy(Elems + NumElems, Rhs.data(), Rhs.size());
+  NumElems += Rhs.size();
+  assert(NumElems <= Capacity);
+}
+
+void CharVector::append(int Number, NodeFactory &Factory) {
+  const int MaxIntPrintSize = 8;
+  if (NumElems + MaxIntPrintSize > Capacity)
+    Factory.Reallocate(Elems, Capacity, /*Growth*/ MaxIntPrintSize);
+  int Length = snprintf(Elems + NumElems, MaxIntPrintSize, "%d", Number);
+  assert(Length > 0 && Length < MaxIntPrintSize);
+  NumElems += Length;
 }
 
 //////////////////////////////////
 // Demangler member functions   //
 //////////////////////////////////
 
+void Demangler::clear() {
+  NodeStack.free();
+  Substitutions.free();
+  PendingSubstitutions.free();
+  NodeFactory::clear();
+}
+
 void Demangler::init(StringRef MangledName) {
-  NodeStack.clear();
-  Substitutions.clear();
-  PendingSubstitutions.clear();
+  NodeStack.init(*this, 16);
+  Substitutions.init(*this, 16);
+  PendingSubstitutions.init(*this, 4);
   NumWords = 0;
   Text = MangledName;
   Pos = 0;
@@ -681,7 +717,7 @@ NodePointer Demangler::demangleIdentifier() {
       hasWordSubsts = true;
     }
   }
-  std::string Identifier;
+  CharVector Identifier;
   do {
     while (hasWordSubsts && isLetter(peekChar())) {
       char c = nextChar();
@@ -697,7 +733,7 @@ NodePointer Demangler::demangleIdentifier() {
         return nullptr;
       assert(WordIdx < MaxNumWords);
       StringRef Slice = Words[WordIdx];
-      Identifier.append(Slice.data(), Slice.size());
+      Identifier.append(Slice, *this);
     }
     if (nextIf('0'))
       break;
@@ -710,10 +746,12 @@ NodePointer Demangler::demangleIdentifier() {
       return nullptr;
     StringRef Slice = StringRef(Text.data() + Pos, numChars);
     if (isPunycoded) {
-      if (!Punycode::decodePunycodeUTF8(Slice, Identifier))
+      std::string PunycodedString;
+      if (!Punycode::decodePunycodeUTF8(Slice, PunycodedString))
         return nullptr;
+      Identifier.append(StringRef(PunycodedString), *this);
     } else {
-      Identifier.append(Slice.data(), Slice.size());
+      Identifier.append(Slice, *this);
       int wordStartPos = -1;
       for (int Idx = 0, End = (int)Slice.size(); Idx <= End; ++Idx) {
         char c = (Idx < End ? Slice[Idx] : 0);
@@ -744,12 +782,11 @@ NodePointer Demangler::demangleOperatorIdentifier() {
 
   static const char op_char_table[] = "& @/= >    <*!|+?%-~   ^ .";
 
-  std::string OpStr;
-  OpStr.reserve(Ident->getText().size());
+  CharVector OpStr;
   for (signed char c : Ident->getText()) {
     if (c < 0) {
       // Pass through Unicode characters.
-      OpStr.push_back(c);
+      OpStr.push_back(c, *this);
       continue;
     }
     if (!isLowerLetter(c))
@@ -757,7 +794,7 @@ NodePointer Demangler::demangleOperatorIdentifier() {
     char o = op_char_table[c - 'a'];
     if (o == ' ')
       return nullptr;
-    OpStr.push_back(o);
+    OpStr.push_back(o, *this);
   }
   switch (nextChar()) {
     case 'i': return createNode(Node::Kind::InfixOperator, OpStr);
@@ -828,16 +865,20 @@ NodePointer Demangler::demangleBuiltinType() {
       int size = demangleIndex() - 1;
       if (size <= 0)
         return nullptr;
-      Ty = createNode(Node::Kind::BuiltinTypeName,
-               std::move(DemanglerPrinter() << "Builtin.Float" << size).str());
+      CharVector name;
+      name.append("Builtin.Float", *this);
+      name.append(size, *this);
+      Ty = createNode(Node::Kind::BuiltinTypeName, name);
       break;
     }
     case 'i': {
       int size = demangleIndex() - 1;
       if (size <= 0)
         return nullptr;
-      Ty = createNode(Node::Kind::BuiltinTypeName,
-                          (DemanglerPrinter() << "Builtin.Int" << size).str());
+      CharVector name;
+      name.append("Builtin.Int", *this);
+      name.append(size, *this);
+      Ty = createNode(Node::Kind::BuiltinTypeName, name);
       break;
     }
     case 'v': {
@@ -848,9 +889,12 @@ NodePointer Demangler::demangleBuiltinType() {
       if (!EltType || EltType->getKind() != Node::Kind::BuiltinTypeName ||
           !EltType->getText().startswith("Builtin."))
         return nullptr;
-      Ty = createNode(Node::Kind::BuiltinTypeName,
-                      (DemanglerPrinter() << "Builtin.Vec" << elts << "x" <<
-                      EltType->getText().substr(sizeof("Builtin.") - 1)).str());
+      CharVector name;
+      name.append("Builtin.Vec", *this);
+      name.append(elts, *this);
+      name.push_back('x', *this);
+      name.append(EltType->getText().substr(sizeof("Builtin.") - 1), *this);
+      Ty = createNode(Node::Kind::BuiltinTypeName, name);
       break;
     }
     case 'O':
@@ -936,7 +980,6 @@ NodePointer Demangler::popTuple() {
                                          Node::Kind::NonVariadicTuple);
 
   if (!popNode(Node::Kind::EmptyList)) {
-    std::vector<NodePointer> Nodes;
     bool firstElem = false;
     do {
       firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
@@ -949,12 +992,10 @@ NodePointer Demangler::popTuple() {
       if (!Ty)
         return nullptr;
       TupleElmt->addChild(Ty, *this);
-      Nodes.push_back(TupleElmt);
+      Root->addChild(TupleElmt, *this);
     } while (!firstElem);
 
-    while (NodePointer TupleElmt = pop_back_val(Nodes)) {
-      Root->addChild(TupleElmt, *this);
-    }
+    Root->reverseChildren();
   }
   return createType(Root);
 }
@@ -963,18 +1004,16 @@ NodePointer Demangler::popTypeList() {
   NodePointer Root = createNode(Node::Kind::TypeList);
 
   if (!popNode(Node::Kind::EmptyList)) {
-    std::vector<NodePointer> Nodes;
     bool firstElem = false;
     do {
       firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
       NodePointer Ty = popNode(Node::Kind::Type);
       if (!Ty)
         return nullptr;
-      Nodes.push_back(Ty);
-    } while (!firstElem);
-    while (NodePointer Ty = pop_back_val(Nodes)) {
       Root->addChild(Ty, *this);
-    }
+    } while (!firstElem);
+    
+    Root->reverseChildren();
   }
   return Root;
 }
@@ -987,17 +1026,15 @@ NodePointer Demangler::popProtocol() {
 }
 
 NodePointer Demangler::demangleBoundGenericType() {
-  std::vector<NodePointer> TypeListList;
-  std::vector<NodePointer> Types;
+  Vector<NodePointer> TypeListList(*this, 4);
   for (;;) {
     NodePointer TList = createNode(Node::Kind::TypeList);
-    TypeListList.push_back(TList);
+    TypeListList.push_back(TList, *this);
     while (NodePointer Ty = popNode(Node::Kind::Type)) {
-      Types.push_back(Ty);
-    }
-    while (NodePointer Ty = pop_back_val(Types)) {
       TList->addChild(Ty, *this);
     }
+    TList->reverseChildren();
+
     if (popNode(Node::Kind::EmptyList))
       break;
     if (!popNode(Node::Kind::FirstElementMarker))
@@ -1008,7 +1045,7 @@ NodePointer Demangler::demangleBoundGenericType() {
 }
 
 NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
-                                    const std::vector<NodePointer> &TypeLists,
+                                    const Vector<NodePointer> &TypeLists,
                                     size_t TypeListIdx) {
   if (!Nominal || Nominal->getNumChildren() < 2)
     return nullptr;
@@ -1057,7 +1094,7 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
 }
 
 NodePointer Demangler::demangleImplParamConvention() {
-  StringRef attr;
+  const char *attr = nullptr;
   switch (nextChar()) {
     case 'i': attr = "@in"; break;
     case 'l': attr = "@inout"; break;
@@ -1076,7 +1113,7 @@ NodePointer Demangler::demangleImplParamConvention() {
 }
 
 NodePointer Demangler::demangleImplResultConvention(Node::Kind ConvKind) {
-  StringRef attr;
+  const char *attr = nullptr;
   switch (nextChar()) {
     case 'r': attr = "@out"; break;
     case 'o': attr = "@owned"; break;
@@ -1192,19 +1229,6 @@ NodePointer Demangler::demangleMetatype() {
   }
 }
 
-static std::string getArchetypeName(Node::IndexType index,
-                                    Node::IndexType depth) {
-  DemanglerPrinter name;
-  do {
-    name << (char)('A' + (index % 26));
-    index /= 26;
-  } while (index);
-  if (depth != 0)
-    name << depth;
-  return std::move(name).str();
-}
-
-
 NodePointer Demangler::demangleArchetype() {
   switch (nextChar()) {
     case 'a': {
@@ -1257,19 +1281,19 @@ NodePointer Demangler::demangleAssociatedTypeSimple(
 
 NodePointer Demangler::demangleAssociatedTypeCompound(
                                                   NodePointer GenericParamIdx) {
-  std::vector<NodePointer> AssocTyNames;
+  Vector<NodePointer> AssocTyNames(*this, 4);
   bool firstElem = false;
   do {
     firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
     NodePointer AssocTyName = popAssocTypeName();
     if (!AssocTyName)
       return nullptr;
-    AssocTyNames.push_back(AssocTyName);
+    AssocTyNames.push_back(AssocTyName, *this);
   } while (!firstElem);
 
   NodePointer Base = GenericParamIdx;
 
-  while (NodePointer AssocTy = pop_back_val(AssocTyNames)) {
+  while (NodePointer AssocTy = AssocTyNames.pop_back_val()) {
     NodePointer depTy = createNode(Node::Kind::DependentMemberType);
     depTy = addChild(depTy, createType(Base));
     Base = addChild(depTy, AssocTy);
@@ -1291,11 +1315,17 @@ NodePointer Demangler::popAssocTypeName() {
 NodePointer Demangler::getDependentGenericParamType(int depth, int index) {
   if (depth < 0 || index < 0)
     return nullptr;
-  DemanglerPrinter PrintName;
-  PrintName << getArchetypeName(index, depth);
-  
-  auto paramTy = createNode(Node::Kind::DependentGenericParamType,
-                                     std::move(PrintName).str());
+
+  CharVector name;
+  int idxChar = index;
+  do {
+    name.push_back((char)('A' + (idxChar % 26)), *this);
+    idxChar /= 26;
+  } while (idxChar);
+  if (depth != 0)
+    name.append(depth, *this);
+
+  auto paramTy = createNode(Node::Kind::DependentGenericParamType, name);
   paramTy->addChild(createNode(Node::Kind::Index, depth), *this);
   paramTy->addChild(createNode(Node::Kind::Index, index), *this);
   return paramTy;
@@ -1428,10 +1458,10 @@ NodePointer Demangler::demangleFunctionSpecialization() {
       case FunctionSigSpecializationParamKind::ConstantPropGlobal:
       case FunctionSigSpecializationParamKind::ConstantPropString:
       case FunctionSigSpecializationParamKind::ClosureProp: {
-        std::vector<NodePointer> Types;
+        size_t FixedChildren = Param->getNumChildren();
         while (NodePointer Ty = popNode(Node::Kind::Type)) {
           assert(ParamKind == FunctionSigSpecializationParamKind::ClosureProp);
-          Types.push_back(Ty);
+          Param = addChild(Param, Ty);
         }
         NodePointer Name = popNode(Node::Kind::Identifier);
         if (!Name)
@@ -1445,9 +1475,7 @@ NodePointer Demangler::demangleFunctionSpecialization() {
         }
         addChild(Param, createNode(
           Node::Kind::FunctionSignatureSpecializationParamPayload, Text));
-        while (NodePointer Ty = pop_back_val(Types)) {
-          Param = addChild(Param, Ty);
-        }
+        Param->reverseChildren(FixedChildren);
         break;
       }
       default:
@@ -1555,9 +1583,9 @@ NodePointer Demangler::addFuncSpecParamNumber(NodePointer Param,
   Param->addChild(createNode(
         Node::Kind::FunctionSignatureSpecializationParamKind, unsigned(Kind)),
         *this);
-  std::string Str;
+  CharVector Str;
   while (isDigit(peekChar())) {
-    Str += nextChar();
+    Str.push_back(nextChar(), *this);
   }
   if (Str.empty())
     return nullptr;
@@ -1857,28 +1885,21 @@ NodePointer Demangler::demangleProtocolListType() {
   NodePointer TypeList = createNode(Node::Kind::TypeList);
   NodePointer ProtoList = createWithChild(Node::Kind::ProtocolList, TypeList);
   if (!popNode(Node::Kind::EmptyList)) {
-    std::vector<NodePointer> ProtoNames;
     bool firstElem = false;
     do {
       firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
       NodePointer Proto = popProtocol();
       if (!Proto)
         return nullptr;
-      ProtoNames.push_back(Proto);
+      TypeList->addChild(Proto, *this);
     } while (!firstElem);
 
-    while (NodePointer Proto = pop_back_val(ProtoNames)) {
-      TypeList->addChild(Proto, *this);
-    }
+    TypeList->reverseChildren();
   }
   return createType(ProtoList);
 }
 
 NodePointer Demangler::demangleGenericSignature(bool hasParamCounts) {
-  std::vector<NodePointer> Requirements;
-  while (NodePointer Req = popNode(isRequirement)) {
-    Requirements.push_back(Req);
-  }
   NodePointer Sig = createNode(Node::Kind::DependentGenericSignature);
   if (hasParamCounts) {
     while (!nextIf('l')) {
@@ -1896,9 +1917,11 @@ NodePointer Demangler::demangleGenericSignature(bool hasParamCounts) {
   }
   if (Sig->getNumChildren() == 0)
     return nullptr;
-  while (NodePointer Req = pop_back_val(Requirements)) {
+  size_t NumCounts = Sig->getNumChildren();
+  while (NodePointer Req = popNode(isRequirement)) {
     Sig->addChild(Req, *this);
   }
+  Sig->reverseChildren(NumCounts);
   return Sig;
 }
 
@@ -1961,7 +1984,7 @@ NodePointer Demangler::demangleGenericRequirement() {
     auto c = nextChar();
     NodePointer size = nullptr;
     NodePointer alignment = nullptr;
-    StringRef name;
+    const char *name = nullptr;
     if (c == 'U') {
       name = "U";
     } else if (c == 'R') {
