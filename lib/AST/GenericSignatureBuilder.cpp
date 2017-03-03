@@ -160,6 +160,8 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
       return false;
     }
   }
+
+  llvm_unreachable("Unhandled RequirementSourceKind in switch.");
 }
 
 const void *RequirementSource::getOpaqueStorage() const {
@@ -182,6 +184,8 @@ const void *RequirementSource::getOpaqueStorage() const {
   case StorageKind::AssociatedTypeDecl:
     return storage.assocType;
   }
+
+  llvm_unreachable("Unhandled StorageKind in switch.");
 }
 
 const void *RequirementSource::getExtraOpaqueStorage() const {
@@ -210,6 +214,8 @@ bool RequirementSource::isDerivedRequirement() const {
     // need to keep them for the requirement signature.
     return parent->kind != RequirementSignatureSelf;
   }
+
+  llvm_unreachable("Unhandled RequirementSourceKind in switch.");
 }
 
 bool RequirementSource::isDerivedViaConcreteConformance() const {
@@ -418,6 +424,8 @@ ProtocolDecl *RequirementSource::getProtocolDecl() const {
   case StorageKind::AssociatedTypeDecl:
     return storage.assocType->getProtocol();
   }
+
+  llvm_unreachable("Unhandled StorageKind in switch.");
 }
 
 SourceLoc RequirementSource::getLoc() const {
@@ -569,6 +577,8 @@ const RequirementSource *FloatingRequirementSource::getSource(
   case Inferred:
     return RequirementSource::forInferred(pa, storage.get<const TypeRepr *>());
   }
+
+  llvm_unreachable("Unhandled FloatingPointRequirementSourceKind in switch.");
 }
 
 SourceLoc FloatingRequirementSource::getLoc() const {
