@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 
@@ -70,7 +71,8 @@ SubstitutionMap::lookupConformance(CanType type,
   }
 
   // Check if we have substitutions from one of our parent types.
-  return forEachParent(type, [&](CanType parent, AssociatedTypeDecl *assocType)
+  auto result = forEachParent(type,
+    [&](CanType parent, AssociatedTypeDecl *assocType)
       -> Optional<ProtocolConformanceRef> {
 
     auto *parentProto = assocType->getProtocol();
@@ -87,6 +89,18 @@ SubstitutionMap::lookupConformance(CanType type,
 
     return lookupConformance(proto, sub.getConformances());
   });
+
+  // FIXME: Narrow fix for broken conformance lookup
+  if (!result || result->isAbstract()) {
+    auto substTy = type.subst(*this);
+    if (!substTy)
+      return result;
+
+    auto *M = proto->getParentModule();
+    return M->lookupConformance(substTy, proto, nullptr);
+  }
+
+  return result;
 }
 
 void SubstitutionMap::
