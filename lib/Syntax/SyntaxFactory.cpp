@@ -330,6 +330,27 @@ ReturnStmtSyntax SyntaxFactory::makeBlankReturnStmt() {
   return { Data, Data.get() };
 }
 
+/// Make a statement list from a loosely connected list of statements.
+StmtListSyntax
+SyntaxFactory::makeStmtList(const std::vector<StmtSyntax> &Statements) {
+  RawSyntax::LayoutList Layout;
+  for (auto Stmt : Statements) {
+    Layout.push_back(Stmt.getRaw());
+  }
+
+  auto Raw = RawSyntax::make(SyntaxKind::StmtList, Layout,
+                             SourcePresence::Present);
+  auto Data = StmtListSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+/// Make an empty statement list.
+StmtListSyntax SyntaxFactory::makeBlankStmtList() {
+  auto Raw = RawSyntax::make(SyntaxKind::StmtList, {}, SourcePresence::Present);
+  auto Data = StmtListSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
 #pragma mark - Expressions
 
 #pragma mark - integer-literal-expression
@@ -542,6 +563,19 @@ RC<TokenSyntax>
 SyntaxFactory::makeRightParenToken(const Trivia &LeadingTrivia,
                                    const Trivia &TrailingTrivia) {
   return TokenSyntax::make(tok::r_paren, ")", SourcePresence::Present,
+                           LeadingTrivia, TrailingTrivia);
+}
+RC<TokenSyntax>
+SyntaxFactory::makeLeftBraceToken(const Trivia &LeadingTrivia,
+                                  const Trivia &TrailingTrivia) {
+  return TokenSyntax::make(tok::l_brace, "{", SourcePresence::Present,
+                           LeadingTrivia, TrailingTrivia);
+}
+
+RC<TokenSyntax>
+SyntaxFactory::makeRightBraceToken(const Trivia &LeadingTrivia,
+                                   const Trivia &TrailingTrivia) {
+  return TokenSyntax::make(tok::r_brace, "}", SourcePresence::Present,
                            LeadingTrivia, TrailingTrivia);
 }
 

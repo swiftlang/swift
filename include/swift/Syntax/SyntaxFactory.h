@@ -197,6 +197,12 @@ struct SyntaxFactory {
   /// marked as missing.
   static ReturnStmtSyntax makeBlankReturnStmt();
 
+  /// Make a statement list from a loosely connected list of statements.
+  static StmtListSyntax makeStmtList(const std::vector<StmtSyntax> &Statements);
+
+  /// Make an empty statement list.
+  static StmtListSyntax makeBlankStmtList();
+
 #pragma mark - Expressions
 
   /// Make an integer literal with the given '+'/'-' sign and string of digits.
@@ -303,6 +309,17 @@ struct SyntaxFactory {
   /// trailing trivia.
   static RC<TokenSyntax> makeRightParenToken(const Trivia &LeadingTrivia,
                                             const Trivia &TrailingTrivia);
+
+  /// Make a left brace '{' token with the specified leading and
+  /// trailing trivia.
+  static RC<TokenSyntax> makeLeftBraceToken(const Trivia &LeadingTrivia,
+                                            const Trivia &TrailingTrivia);
+
+  /// Make a right brace '}' token with the specified leading and
+  /// trailing trivia.
+  static RC<TokenSyntax> makeRightBraceToken(const Trivia &LeadingTrivia,
+                                             const Trivia &TrailingTrivia);
+
 
   /// Make a left square bracket '[' token with the specified leading and
   /// trailing trivia.

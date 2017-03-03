@@ -263,8 +263,6 @@ class FunctionCallArgumentSyntax : public Syntax {
   friend class SyntaxCollection<SyntaxKind::FunctionCallArgumentList,
                                 FunctionCallArgumentSyntax>;
 
-  static constexpr SyntaxKind Kind = SyntaxKind::FunctionCallArgument;
-
   enum class Cursor {
     Label,
     Colon,

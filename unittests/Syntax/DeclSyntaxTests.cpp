@@ -516,8 +516,8 @@ CodeBlockStmtSyntax getCannedBody() {
     .appending(Return)
     .castTo<StmtListSyntax>();
 
-  auto LBrace = SyntaxFactory::makeLeftBrace({}, {});
-  auto RBrace = SyntaxFactory::makeRightBrace(Trivia::newlines(1), {});
+  auto LBrace = SyntaxFactory::makeLeftBraceToken({}, {});
+  auto RBrace = SyntaxFactory::makeRightBraceToken(Trivia::newlines(1), {});
 
   return SyntaxFactory::makeCodeBlock(LBrace, Stmts, RBrace);
 }

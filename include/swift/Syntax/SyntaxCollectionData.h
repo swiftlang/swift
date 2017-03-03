@@ -24,7 +24,6 @@ class SyntaxCollectionData : public SyntaxData {
     assert(Raw->Kind == CollectionKind);
 #ifndef NDEBUG
     for (auto Child : Raw->Layout) {
-      assert(Child->Kind == ElementType::Kind);
       CachedElements.push_back(nullptr);
     }
 #endif

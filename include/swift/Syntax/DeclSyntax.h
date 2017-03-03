@@ -112,7 +112,6 @@ class DeclModifierSyntax final : public Syntax {
 
 public:
   using DataType = DeclModifierSyntaxData;
-  static constexpr SyntaxKind Kind = SyntaxKind::DeclModifier;
 
   /// Return the name of the modifier.
   RC<TokenSyntax> getName() const;
@@ -165,7 +164,6 @@ class DeclModifierListSyntax final :
   friend class FunctionDeclSyntax;
 
   using DataType = DeclModifierListSyntaxData;
-  static constexpr SyntaxKind Kind = SyntaxKind::DeclModifierList;
 
   DeclModifierListSyntax(const RC<SyntaxData> Root, const DataType *Data)
     : SyntaxCollection(Root, Data) {}
@@ -574,7 +572,6 @@ class FunctionParameterSyntax final : public Syntax {
 
 public:
   using DataType = FunctionParameterSyntaxData;
-  static constexpr SyntaxKind Kind = SyntaxKind::FunctionParameter;
 
   FunctionParameterSyntax(const RC<SyntaxData> Root, const DataType *Data)
     : Syntax(Root, Data) {}
@@ -714,7 +711,6 @@ class FunctionSignatureSyntax final : public Syntax {
 
 public:
   using DataType = FunctionSignatureSyntaxData;
-  static constexpr SyntaxKind Kind = SyntaxKind::FunctionSignature;
 
   FunctionSignatureSyntax(const RC<SyntaxData> Root, const DataType *Data)
     : Syntax(Root, Data) {}
