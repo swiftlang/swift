@@ -308,6 +308,9 @@ func runBench(_ name: String, _ fn: (Int) -> Void, _ c: TestConfig) -> BenchResu
       if elapsed_time > 0 {
         scale = UInt(time_per_sample / elapsed_time)
       } else {
+        if c.verbose {
+          print("    Warning: elapsed_time was 0. You can safely ignore the result if the body is empty.")
+        }
         scale = 1
       }
     } else {
