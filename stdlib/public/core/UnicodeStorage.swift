@@ -22,6 +22,14 @@ public func _debugLog(_ arg0: @autoclosure ()->Any, _ arg1: @autoclosure ()->Any
   print(arg0(), arg1())
 }
 
+internal func __swift_stdlib_U_SUCCESS(_ x: __swift_stdlib_UErrorCode) -> Bool {
+ return x.rawValue <= __swift_stdlib_U_ZERO_ERROR.rawValue
+}
+
+internal func __swift_stdlib_U_FAILURE(_ x: __swift_stdlib_UErrorCode) -> Bool {
+ return x.rawValue > __swift_stdlib_U_ZERO_ERROR.rawValue
+}
+
 /// A collection of `CodeUnit`s to be interpreted by some `Encoding`.
 ///
 /// View types nested in UnicodeStorage may be suitable *generic* implementation
@@ -491,5 +499,55 @@ extension UnicodeStorage {
 
   public var characters: CharacterView {
     return CharacterView(codeUnits, Encoding.self)
+  }
+}
+
+extension UnicodeStorage {
+  
+  public typealias NFCNormalizedUTF16View = [UInt16]
+
+  /// Invokes `body` on a contiguous buffer of our UTF16.
+  ///
+  /// - Note: `body` should be prepared to deal with invalid UTF16.
+  internal func _withContiguousUTF16<R>(
+    _ body: (UnsafeBufferPointer<UTF16.CodeUnit>)->R
+  ) -> R {
+    if Encoding.EncodedScalar.self is UTF16.EncodedScalar.Type {
+      // It's a UTF16 encoding
+      let r: R? = codeUnits.withUnsafeElementStorage {
+        if $0 == nil { return nil }
+        return ($0! as Any as? UnsafeBufferPointer<UTF16.CodeUnit>).map (body)
+      }
+      if r != nil { return r! }
+    }
+    return Array(self.transcoded(to: UTF16.self)).withUnsafeBufferPointer(body)
+  }
+
+  public var nfcNormalizedUTF16: NFCNormalizedUTF16View {
+    var error = __swift_stdlib_U_ZERO_ERROR
+    let nfc = __swift_stdlib_unorm2_getNFCInstance(&error)
+    _sanityCheck(__swift_stdlib_U_SUCCESS(error), "Couldn't get NFC normalizer")
+    
+    return _withContiguousUTF16 {
+      // Start by assuming we need no more storage than we started with for the
+      // result.
+      var result  = NFCNormalizedUTF16View(repeating: 0, count: $0.count)
+      while true {
+        let usedCount = __swift_stdlib_unorm2_normalize(
+          nfc, $0.baseAddress!, numericCast($0.count),
+          &result, numericCast(result.count), &error)
+        if __swift_stdlib_U_SUCCESS(error) {
+          result.removeLast(result.count - numericCast(usedCount))
+          return result
+        }
+        _sanityCheck(
+          error == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR,
+          "Unknown normalization error")
+        
+        // extend result storage by 25%
+        result.append(
+          contentsOf: repeatElement(0, count: (result.count + 3) >> 2))
+      }
+    }
   }
 }
