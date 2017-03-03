@@ -50,6 +50,7 @@ def split_lines(s):
     """
     return [l + '\n' for l in s.split('\n')]
 
+
 # text on a line up to the first '$$', '${', or '%%'
 literalText = r'(?: [^$\n%] | \$(?![${]) | %(?!%) )*'
 
@@ -1147,6 +1148,7 @@ def main():
     sys.path = [os.path.split(args.file.name)[0] or '.'] + sys.path
 
     args.target.write(execute_template(ast, args.line_directive, **bindings))
+
 
 if __name__ == '__main__':
     main()

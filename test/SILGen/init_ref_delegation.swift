@@ -95,7 +95,7 @@ class C1 {
     // CHECK:   [[PB:%.*]] = project_box [[SELF_BOX]]
     // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*C1
     // CHECK:   store [[ORIG_SELF]] to [init] [[SELF]] : $*C1
-    // CHECK:   [[SELF_FROM_BOX:%[0-9]+]] = load_borrow [[SELF]] : $*C1
+    // CHECK:   [[SELF_FROM_BOX:%[0-9]+]] = load [take] [[SELF]] : $*C1
 
     // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF_FROM_BOX]] : $C1, #C1.init!initializer.1 : (C1.Type) -> (X, X) -> C1, $@convention(method) (X, X, @owned C1) -> @owned C1
     // CHECK:   [[SELFP:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF_FROM_BOX]]) : $@convention(method) (X, X, @owned C1) -> @owned C1
@@ -119,10 +119,7 @@ class C1 {
     // CHECK:   [[PB:%.*]] = project_box [[SELF_BOX]]
     // CHECK:   [[UNINIT_SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]] : $*C2
     // CHECK:   store [[ORIG_SELF]] to [init] [[UNINIT_SELF]] : $*C2
-    // SEMANTIC ARC TODO: Another case of us doing a borrow and passing
-    // something in @owned. I think we will need some special help for
-    // definite-initialization.
-    // CHECK:   [[SELF:%[0-9]+]] = load_borrow [[UNINIT_SELF]] : $*C2
+    // CHECK:   [[SELF:%[0-9]+]] = load [take] [[UNINIT_SELF]] : $*C2
 
     // CHECK:   [[DELEG_INIT:%[0-9]+]] = class_method [[SELF]] : $C2, #C2.init!initializer.1 : (C2.Type) -> (X, X) -> C2, $@convention(method) (X, X, @owned C2) -> @owned C2
     // CHECK:   [[REPLACE_SELF:%[0-9]+]] = apply [[DELEG_INIT]]([[X]], [[X]], [[SELF]]) : $@convention(method) (X, X, @owned C2) -> @owned C2

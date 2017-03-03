@@ -58,13 +58,13 @@ namespace swift {
   class ExtensionDecl;
   class ForeignRepresentationInfo;
   class FuncDecl;
+  class GenericContext;
   class InFlightDiagnostic;
   class IterableDeclContext;
-  class LazyAbstractFunctionData;
-  class LazyGenericTypeData;
   class LazyContextData;
-  class LazyMemberLoader;
+  class LazyGenericContextData;
   class LazyIterableDeclContextData;
+  class LazyMemberLoader;
   class LazyResolver;
   class PatternBindingDecl;
   class PatternBindingInitializer;
@@ -74,7 +74,7 @@ namespace swift {
   class TypeVariableType;
   class TupleType;
   class FunctionType;
-  class ArchetypeBuilder;
+  class GenericSignatureBuilder;
   class ArchetypeType;
   class Identifier;
   class InheritedNameSet;
@@ -537,7 +537,7 @@ public:
   /// Adds a search path to SearchPathOpts, unless it is already present.
   ///
   /// Does any proper bookkeeping to keep all module loaders up to date as well.
-  void addSearchPath(StringRef searchPath, bool isFramework);
+  void addSearchPath(StringRef searchPath, bool isFramework, bool isSystem);
 
   /// \brief Adds a module loader to this AST context.
   ///
@@ -722,25 +722,16 @@ public:
   /// \param lazyLoader If non-null, the lazy loader to use when creating the
   /// lazy data. The pointer must either be null or be consistent
   /// across all calls for the same \p func.
-  LazyContextData *getOrCreateLazyContextData(const Decl *decl,
+  LazyContextData *getOrCreateLazyContextData(const DeclContext *decl,
                                               LazyMemberLoader *lazyLoader);
 
-  /// Get the lazy function data for the given generic type.
-  ///
-  /// \param lazyLoader If non-null, the lazy loader to use when creating the
-  /// generic type data. The pointer must either be null or be consistent
-  /// across all calls for the same \p type.
-  LazyGenericTypeData *getOrCreateLazyGenericTypeData(
-                                                  const GenericTypeDecl *type,
-                                                  LazyMemberLoader *lazyLoader);
-
-  /// Get the lazy function data for the given abstract function.
+  /// Get the lazy function data for the given generic context.
   ///
   /// \param lazyLoader If non-null, the lazy loader to use when creating the
   /// function data. The pointer must either be null or be consistent
   /// across all calls for the same \p func.
-  LazyAbstractFunctionData *getOrCreateLazyFunctionContextData(
-                                              const AbstractFunctionDecl *func,
+  LazyGenericContextData *getOrCreateLazyGenericContextData(
+                                              const GenericContext *dc,
                                               LazyMemberLoader *lazyLoader);
 
   /// Get the lazy iterable context for the given iterable declaration context.
@@ -806,15 +797,15 @@ public:
   /// not necessarily loaded.
   void getVisibleTopLevelClangModules(SmallVectorImpl<clang::Module*> &Modules) const;
 
-  /// Retrieve or create the stored archetype builder for the given
+  /// Retrieve or create the stored generic signature builder for the given
   /// canonical generic signature and module.
-  ArchetypeBuilder *getOrCreateArchetypeBuilder(CanGenericSignature sig,
+  GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(CanGenericSignature sig,
                                                 ModuleDecl *mod);
 
   /// Retrieve or create the canonical generic environment of a canonical
-  /// archetype builder.
+  /// generic signature builder.
   GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
-                                                     ArchetypeBuilder *builder,
+                                                     GenericSignatureBuilder *builder,
                                                      ModuleDecl &module);
 
   /// Retrieve the inherited name set for the given class.

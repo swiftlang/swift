@@ -479,7 +479,8 @@ public:
   /// non-address values.
   SILValue emitLoadValueOperation(SILLocation Loc, SILValue LV,
                                   LoadOwnershipQualifier Qualifier) {
-    assert(LV->getType().isLoadable(F.getModule()));
+    assert(!SILModuleConventions(F.getModule()).useLoweredAddresses()
+           || LV->getType().isLoadable(F.getModule()));
     const auto &lowering = getTypeLowering(LV->getType());
     return lowering.emitLoad(*this, Loc, LV, Qualifier);
   }
@@ -797,6 +798,13 @@ public:
         targetType));
   }
 
+  UnconditionalCheckedCastOpaqueInst *
+  createUnconditionalCheckedCastOpaque(SILLocation Loc, SILValue op,
+                                       SILType destTy) {
+    return insert(UnconditionalCheckedCastOpaqueInst::create(
+        getSILDebugLocation(Loc), op, destTy, F, OpenedArchetypes));
+  }
+
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,
                                      Atomicity atomicity) {
     assert(isParsing || F.hasUnqualifiedOwnership());
@@ -812,17 +820,19 @@ public:
   }
 
   UnmanagedRetainValueInst *createUnmanagedRetainValue(SILLocation Loc,
-                                                       SILValue operand) {
+                                                       SILValue operand,
+                                                       Atomicity atomicity) {
     assert(F.hasQualifiedOwnership());
     return insert(new (F.getModule()) UnmanagedRetainValueInst(
-        getSILDebugLocation(Loc), operand));
+        getSILDebugLocation(Loc), operand, atomicity));
   }
 
   UnmanagedReleaseValueInst *createUnmanagedReleaseValue(SILLocation Loc,
-                                                         SILValue operand) {
+                                                         SILValue operand,
+                                                         Atomicity atomicity) {
     assert(F.hasQualifiedOwnership());
     return insert(new (F.getModule()) UnmanagedReleaseValueInst(
-        getSILDebugLocation(Loc), operand));
+        getSILDebugLocation(Loc), operand, atomicity));
   }
 
   CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand) {
@@ -849,9 +859,10 @@ public:
   }
 
   UnmanagedAutoreleaseValueInst *
-  createUnmanagedAutoreleaseValue(SILLocation Loc, SILValue operand) {
+  createUnmanagedAutoreleaseValue(SILLocation Loc, SILValue operand,
+                                  Atomicity atomicity) {
     return insert(new (F.getModule()) UnmanagedAutoreleaseValueInst(
-                      getSILDebugLocation(Loc), operand));
+                      getSILDebugLocation(Loc), operand, atomicity));
   }
 
   SetDeallocatingInst *createSetDeallocating(SILLocation Loc,
@@ -1078,9 +1089,10 @@ public:
   }
 
   OpenExistentialAddrInst *
-  createOpenExistentialAddr(SILLocation Loc, SILValue Operand, SILType SelfTy) {
+  createOpenExistentialAddr(SILLocation Loc, SILValue Operand, SILType SelfTy,
+                            OpenedExistentialAccess ForAccess) {
     auto *I = insert(new (F.getModule()) OpenExistentialAddrInst(
-        getSILDebugLocation(Loc), Operand, SelfTy));
+        getSILDebugLocation(Loc), Operand, SelfTy, ForAccess));
     if (OpenedArchetypesTracker)
       OpenedArchetypesTracker->registerOpenedArchetypes(I);
     return I;
@@ -1134,6 +1146,15 @@ public:
         LoweredConcreteType, Conformances, &F, OpenedArchetypes));
   }
 
+  InitExistentialOpaqueInst *
+  createInitExistentialOpaque(SILLocation Loc, SILType ExistentialType,
+                              CanType FormalConcreteType, SILValue Concrete,
+                              ArrayRef<ProtocolConformanceRef> Conformances) {
+    return insert(InitExistentialOpaqueInst::create(
+        getSILDebugLocation(Loc), ExistentialType, FormalConcreteType, Concrete,
+        Conformances, &F, OpenedArchetypes));
+  }
+
   InitExistentialMetatypeInst *
   createInitExistentialMetatype(SILLocation Loc, SILValue metatype,
                                 SILType existentialType,
@@ -1155,6 +1176,12 @@ public:
   DeinitExistentialAddrInst *createDeinitExistentialAddr(SILLocation Loc,
                                                          SILValue Existential) {
     return insert(new (F.getModule()) DeinitExistentialAddrInst(
+        getSILDebugLocation(Loc), Existential));
+  }
+
+  DeinitExistentialOpaqueInst *
+  createDeinitExistentialOpaque(SILLocation Loc, SILValue Existential) {
+    return insert(new (F.getModule()) DeinitExistentialOpaqueInst(
         getSILDebugLocation(Loc), Existential));
   }
 
@@ -1251,6 +1278,18 @@ public:
                                            Atomicity atomicity) {
     return insert(new (F.getModule()) UnownedReleaseInst(
         getSILDebugLocation(Loc), Operand, atomicity));
+  }
+
+  EndLifetimeInst *createEndLifetime(SILLocation Loc, SILValue Operand) {
+    return insert(new (F.getModule())
+                      EndLifetimeInst(getSILDebugLocation(Loc), Operand));
+  }
+
+  UncheckedOwnershipConversionInst *
+  createUncheckedOwnershipConversion(SILLocation Loc, SILValue Operand,
+                                     ValueOwnershipKind Kind) {
+    return insert(new (F.getModule()) UncheckedOwnershipConversionInst(
+        getSILDebugLocation(Loc), Operand, Kind));
   }
 
   FixLifetimeInst *createFixLifetime(SILLocation Loc, SILValue Operand) {
@@ -1511,6 +1550,11 @@ public:
   //===--------------------------------------------------------------------===//
   // Memory management helpers
   //===--------------------------------------------------------------------===//
+
+  /// Returns the default atomicity of the module.
+  Atomicity getDefaultAtomicity() {
+    return getModule().isDefaultAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
+  }
 
   /// Try to fold a destroy_addr operation into the previous instructions, or
   /// generate an explicit one if that fails.  If this inserts a new

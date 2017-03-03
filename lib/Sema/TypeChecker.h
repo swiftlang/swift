@@ -27,7 +27,6 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
@@ -36,7 +35,7 @@
 
 namespace swift {
 
-class ArchetypeBuilder;
+class GenericSignatureBuilder;
 class GenericTypeResolver;
 class NominalTypeDecl;
 class NormalProtocolConformance;
@@ -352,6 +351,14 @@ public:
   ///
   /// \returns true if it's ok to validate requirement, false otherwise.
   virtual bool shouldCheck(RequirementKind kind, Type first, Type second);
+
+  /// Callback to report the result of a satisfied conformance requirement.
+  ///
+  /// \param depTy The dependent type, from the signature.
+  /// \param replacementTy The type \c depTy was replaced with.
+  /// \param conformance The conformance itself.
+  virtual void satisfiedConformance(Type depTy, Type replacementTy,
+                                    ProtocolConformanceRef conformance);
 };
 
 /// Flags that describe the context of type checking a pattern or
@@ -438,6 +445,11 @@ enum TypeResolutionFlags : unsigned {
 
   /// Whether we are checking the outermost type of a computed property setter's newValue
   TR_ImmediateSetterNewValue = 0x1000000,
+
+  /// Whether we are checking the outermost layer of types in an inheritance
+  /// clause on something other than an enum (i.e. V, but not U or W, in class
+  /// T: U.V<W>)
+  TR_NonEnumInheritanceClauseOuterLayer = 0x2000000,
 };
 
 /// Option set describing how type resolution should work.
@@ -539,9 +551,10 @@ public:
   /// completed before type checking is considered complete.
   llvm::SetVector<NormalProtocolConformance *> UsedConformances;
 
-  /// The list of nominal type declarations that have been validated
-  /// during type checking.
-  llvm::SetVector<NominalTypeDecl *> ValidatedTypes;
+  /// The list of nominal type declarations that we've done at least
+  /// partial validation of during type-checking and which will need
+  /// to be finalized before we can hand off to SILGen etc.
+  llvm::SetVector<NominalTypeDecl *> TypesToFinalize;
 
   using TypeAccessScopeCacheMap = llvm::DenseMap<const ValueDecl *, AccessScope>;
 
@@ -839,6 +852,9 @@ public:
   void validateDecl(OperatorDecl *decl);
   void validateDecl(PrecedenceGroupDecl *decl);
 
+  /// Perform just enough validation for looking up names using the Decl.
+  void validateDeclForNameLookup(ValueDecl *D);
+
   /// Resolves the accessibility of the given declaration.
   void validateAccessibility(ValueDecl *D);
 
@@ -1066,7 +1082,7 @@ public:
   }
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
-    validateDecl(VD);
+    validateDeclForNameLookup(VD);
   }
 
   virtual void bindExtension(ExtensionDecl *ext) override;
@@ -1088,9 +1104,6 @@ public:
   /// Introduce the accessors for a 'lazy' variable.
   void introduceLazyVarAccessors(VarDecl *var) override;
 
-  // Not all protocol members are requirements.
-  bool isRequirement(const ValueDecl *requirement);
-
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);
 
@@ -1102,6 +1115,9 @@ public:
   /// Perform semantic checks on the given generic parameter list.
   void prepareGenericParamList(GenericParamList *genericParams,
                                DeclContext *dc);
+
+  /// Revert the dependent types within the given generic parameter list.
+  void revertGenericParamList(GenericParamList *genericParams);
 
   /// Configure the interface type of a function declaration.
   void configureInterfaceType(AbstractFunctionDecl *func,
@@ -1117,8 +1133,26 @@ public:
   /// parameters.
   void revertGenericFuncSignature(AbstractFunctionDecl *func);
 
-  /// Revert the dependent types within the given generic parameter list.
-  void revertGenericParamList(GenericParamList *genericParams);
+  /// Check the generic parameters in the given generic parameter list (and its
+  /// parent generic parameter lists) according to the given resolver.
+  void checkGenericParamList(GenericSignatureBuilder *builder,
+                             GenericParamList *genericParams,
+                             GenericSignature *parentSig,
+                             GenericTypeResolver *resolver);
+
+  /// Validate the signature of a generic subscript.
+  ///
+  /// \param subscript The generic subscript.
+  GenericSignature *validateGenericSubscriptSignature(SubscriptDecl *subscript);
+
+  /// Revert the signature of a generic function to its pre-type-checked state,
+  /// so that it can be type checked again when we have resolved its generic
+  /// parameters.
+  void revertGenericSubscriptSignature(SubscriptDecl *subscript);
+
+  /// Configure the interface type of a subscript declaration.
+  void configureInterfaceType(SubscriptDecl *subscript,
+                              GenericSignature *sig);
 
   /// Construct a new generic environment for the given declaration context.
   ///
@@ -1140,7 +1174,7 @@ public:
                         DeclContext *dc,
                         GenericSignature *outerSignature,
                         bool allowConcreteGenericParams,
-                        llvm::function_ref<void(ArchetypeBuilder &)>
+                        llvm::function_ref<void(GenericSignatureBuilder &)>
                           inferRequirements);
 
   /// Construct a new generic environment for the given declaration context.
@@ -1160,7 +1194,7 @@ public:
                         bool allowConcreteGenericParams) {
     return checkGenericEnvironment(genericParams, dc, outerSignature,
                                    allowConcreteGenericParams,
-                                   [&](ArchetypeBuilder &) { });
+                                   [&](GenericSignatureBuilder &) { });
   }
 
   /// Validate the signature of a generic type.
@@ -1168,12 +1202,10 @@ public:
   /// \param nominal The generic type.
   void validateGenericTypeSignature(GenericTypeDecl *nominal);
 
-  /// Check the generic parameters in the given generic parameter list (and its
-  /// parent generic parameter lists) according to the given resolver.
-  void checkGenericParamList(ArchetypeBuilder *builder,
-                             GenericParamList *genericParams,
-                             GenericSignature *parentSig,
-                             GenericTypeResolver *resolver);
+  bool validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
+                           DeclContext *lookupDC,
+                           TypeResolutionOptions options = None,
+                           GenericTypeResolver *resolver = nullptr);
 
   /// Check the given set of generic arguments against the requirements in a
   /// generic signature.
@@ -1197,7 +1229,8 @@ public:
   /// - (false, false) on failure
   std::pair<bool, bool> checkGenericArguments(
       DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
-      GenericSignature *genericSig, const TypeSubstitutionMap &substitutions,
+      GenericSignature *genericSig, TypeSubstitutionFn substitutions,
+      LookupConformanceFn conformances,
       UnsatisfiedDependency *unsatisfiedDependency,
       ConformanceCheckOptions conformanceOptions = ConformanceCheckFlags::Used,
       GenericRequirementsCheckListener *listener = nullptr);
@@ -1222,7 +1255,7 @@ public:
                               GenericTypeResolver *resolver = nullptr);
 
   /// Retrieve the set of inherited protocols for this protocol type.
-  ArrayRef<ProtocolDecl *> getDirectConformsTo(ProtocolDecl *proto);
+  llvm::TinyPtrVector<ProtocolDecl *> getDirectConformsTo(ProtocolDecl *proto);
 
   /// \brief Add any implicitly-defined constructors required for the given
   /// struct or class.
@@ -1935,7 +1968,7 @@ public:
   bool diagnoseInlineableDeclRef(SourceLoc loc, const ValueDecl *D,
                                  const DeclContext *DC);
 
-  void diagnoseResilientValueConstructor(ConstructorDecl *ctor);
+  void diagnoseResilientConstructor(ConstructorDecl *ctor);
 
   /// \name Availability checking
   ///

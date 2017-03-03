@@ -27,6 +27,8 @@ namespace llvm {
 
 namespace swift {
 
+class ProtocolConformance;
+
 /// A ProtocolConformanceRef is a handle to a protocol conformance which
 /// may be either concrete or abstract.
 ///

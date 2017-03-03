@@ -6,6 +6,7 @@ CHANGELOG
 
 | Contents               |
 | :--------------------- |
+| [Swift 4.0](#swift-40) |
 | [Swift 3.1](#swift-31) |
 | [Swift 3.0](#swift-30) |
 | [Swift 2.2](#swift-22) |
@@ -16,6 +17,28 @@ CHANGELOG
 | [Swift 1.0](#swift-10) |
 
 </details>
+
+Swift 4.0
+---------
+
+* [SE-0148][]:
+
+  Subscript declarations can now be defined to have generic parameter lists.
+  Example:
+
+  ```
+  extension JSON {
+    subscript<T>(key: String) -> T?
+        where T : JSONConvertible {
+      // ...
+    }
+  }
+  ```
+
+* [SE-0110][]:
+
+  In Swift 4 mode, Swift's type system properly distinguishes between functions that
+  take one tuple argument, and functions that take multiple arguments.
 
 * More types of C macros which define integer constants are supported by the
   importer. Specifically the `+, -, *, /, ^, >>, ==, <, <=, >, >=` operators
@@ -6408,3 +6431,11 @@ Swift 1.0
 [SE-0145]: <https://github.com/apple/swift-evolution/blob/master/proposals/0145-package-manager-version-pinning.md>
 [SE-0146]: <https://github.com/apple/swift-evolution/blob/master/proposals/0146-package-manager-product-definitions.md>
 [SE-0147]: <https://github.com/apple/swift-evolution/blob/master/proposals/0147-move-unsafe-initialize-from.md>
+[SE-0148]: <https://github.com/apple/swift-evolution/blob/master/proposals/0148-generic-subscripts.md>
+[SE-0149]: <https://github.com/apple/swift-evolution/blob/master/proposals/0149-package-manager-top-of-tree.md>
+[SE-0150]: <https://github.com/apple/swift-evolution/blob/master/proposals/0150-package-manager-branch-support.md>
+[SE-0151]: <https://github.com/apple/swift-evolution/blob/master/proposals/0151-package-manager-swift-language-compatibility-version.md>
+[SE-0152]: <https://github.com/apple/swift-evolution/blob/master/proposals/0152-package-manager-tools-version.md>
+[SE-0153]: <https://github.com/apple/swift-evolution/blob/master/proposals/0153-compensate-for-the-inconsistency-of-nscopyings-behaviour.md>
+[SE-0154]: <https://github.com/apple/swift-evolution/blob/master/proposals/0154-dictionary-key-and-value-collections.md>
+[SE-0155]: <https://github.com/apple/swift-evolution/blob/master/proposals/0155-normalize-enum-case-representation.md>

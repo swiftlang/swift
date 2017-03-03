@@ -17,12 +17,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Initialization.h"
 #include "RValue.h"
+#include "Initialization.h"
+#include "SILGenFunction.h"
+#include "swift/AST/CanTypeVisitor.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/AST/CanTypeVisitor.h"
-#include "swift/Basic/Fallthrough.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -96,7 +96,7 @@ public:
       // Project the element.
       SILValue elt;
       if (tuple->getType().isObject()) {
-        assert(eltTI.isLoadable());
+        assert(eltTI.isLoadable() || !gen.silConv.useLoweredAddresses());
         elt = gen.B.createTupleExtract(loc, tuple, i, eltTy);
       } else {
         elt = gen.B.createTupleElementAddr(loc, tuple, i, eltTy);

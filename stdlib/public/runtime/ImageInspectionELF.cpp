@@ -88,13 +88,13 @@ static int iteratePHDRCallback(struct dl_phdr_info *info,
   // While dl_iterate_phdr() is in progress it holds a lock to prevent other
   // images being loaded. The initialize flag is set here inside the callback so
   // that addNewDSOImage() sees a consistent state. If it was set outside the
-  // dl_interate_phdr() call then it could result in images being missed or
+  // dl_iterate_phdr() call then it could result in images being missed or
   // added twice.
   inspectArgs->didInitializeLookup = true;
 
   if (fname == nullptr || fname[0] == '\0') {
     // The filename may be null for both the dynamic loader and main executable.
-    // So ignore null image name here and explictly add the main executable
+    // So ignore null image name here and explicitly add the main executable
     // in initialize*Lookup() to avoid adding the data twice.
     return 0;
   }
@@ -142,7 +142,7 @@ void swift::initializeTypeMetadataRecordLookup() {
 
 // As ELF images are loaded, ImageInspectionInit:sectionDataInit() will call
 // addNewDSOImage() with an address in the image that can later be used via
-// dladdr() to dlopen() the image after the appropiate initialize*Lookup()
+// dladdr() to dlopen() the image after the appropriate initialize*Lookup()
 // function has been called.
 SWIFT_RUNTIME_EXPORT
 void swift_addNewDSOImage(const void *addr) {

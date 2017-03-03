@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/AST.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -472,7 +472,7 @@ namespace {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
                                              GenericTypeParams);
 
-      ArchetypeBuilder Builder(ctx,
+      GenericSignatureBuilder Builder(ctx,
                                LookUpConformanceInModule(ctx.TheBuiltinModule));
       SmallVector<GenericTypeParamType *, 2> GenericTypeParamTypes;
       for (auto gp : GenericTypeParams) {

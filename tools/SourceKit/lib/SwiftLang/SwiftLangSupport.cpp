@@ -19,7 +19,6 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Config.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CodeCompletionCache.h"
@@ -30,10 +29,17 @@
 #include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
+#if !defined(_WIN32)
 #include <sys/param.h>
+#else
+#define WIN32_MEAN_AND_LEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 using namespace SourceKit;
 using namespace swift;
@@ -162,6 +168,10 @@ static UIdent KindRangeSingleDeclaration("source.lang.swift.range.singledeclarat
 static UIdent KindRangeMultiStatement("source.lang.swift.range.multistatement");
 
 static UIdent KindRangeInvalid("source.lang.swift.range.invalid");
+
+static UIdent KindNameObjc("source.lang.name.kind.objc");
+static UIdent KindNameSwift("source.lang.name.kind.swift");
+
 
 std::unique_ptr<LangSupport>
 SourceKit::createSwiftLangSupport(SourceKit::Context &SKCtx) {
@@ -335,6 +345,8 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
     return IsRef ? KindRefAccessorMutableAddress
                  : KindDeclAccessorMutableAddress;
   }
+
+  llvm_unreachable("Unhandled AccessorKind in switch.");
 }
 
 SourceKit::UIdent SwiftLangSupport::getUIDForModuleRef() {
@@ -399,6 +411,8 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
   case CodeCompletionDeclKind::LocalVar: return KindDeclVarLocal;
   case CodeCompletionDeclKind::GlobalVar: return KindDeclVarGlobal;
   }
+
+  llvm_unreachable("Unhandled CodeCompletionDeclKind in switch.");
 }
 
 UIdent SwiftLangSupport::getUIDForSyntaxNodeKind(SyntaxNodeKind SC) {
@@ -460,6 +474,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxNodeKind(SyntaxNodeKind SC) {
   case SyntaxNodeKind::ObjectLiteral:
     return KindObjectLiteral;
   }
+
+  llvm_unreachable("Unhandled SyntaxNodeKind in switch.");
 }
 
 UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
@@ -526,6 +542,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
     case SyntaxStructureKind::Argument:
       return KindExprArg;
   }
+
+  llvm_unreachable("Unhandled SyntaxStructureKind in switch.");
 }
 
 UIdent SwiftLangSupport::getUIDForSyntaxStructureElementKind(
@@ -538,7 +556,10 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureElementKind(
     case SyntaxStructureElementKind::Pattern: return KindStructureElemPattern;
     case SyntaxStructureElementKind::TypeRef: return KindStructureElemTypeRef;
   }
+
+  llvm_unreachable("Unhandled SyntaxStructureElementKind in switch.");
 }
+
 SourceKit::UIdent SwiftLangSupport::
 getUIDForRangeKind(swift::ide::RangeKind Kind) {
   switch (Kind) {
@@ -548,6 +569,8 @@ getUIDForRangeKind(swift::ide::RangeKind Kind) {
     case swift::ide::RangeKind::MultiStatement: return KindRangeMultiStatement;
     case swift::ide::RangeKind::Invalid: return KindRangeInvalid;
   }
+
+  llvm_unreachable("Unhandled RangeKind in switch.");
 }
 
 UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
@@ -632,6 +655,22 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
 
 #undef SIMPLE_CASE
 #undef UID_FOR
+}
+
+SourceKit::UIdent SwiftLangSupport::getUIDForNameKind(swift::ide::NameKind Kind) {
+  switch(Kind) {
+  case swift::ide::NameKind::ObjC: return KindNameObjc;
+  case swift::ide::NameKind::Swift: return KindNameSwift;
+  }
+
+  llvm_unreachable("Unhandled NameKind in switch.");
+}
+
+swift::ide::NameKind SwiftLangSupport::getNameKindForUID(SourceKit::UIdent Id) {
+  if (Id == KindNameObjc)
+    return swift::ide::NameKind::ObjC;
+  assert(Id == KindNameSwift);
+  return swift::ide::NameKind::Swift;
 }
 
 std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttributes &Attrs) {
@@ -739,10 +778,26 @@ bool SwiftLangSupport::printAccessorUSR(const AbstractStorageDecl *D,
 
 std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
   std::string InputPath = FilePath;
+#if !defined(_WIN32)
   char full_path[MAXPATHLEN];
   if (const char *path = realpath(InputPath.c_str(), full_path))
     return path;
+
   return InputPath;
+#else
+  char full_path[MAX_PATH];
+
+  HANDLE fileHandle = CreateFileA(
+      InputPath.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING,
+      FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+
+  if (fileHandle == INVALID_HANDLE_VALUE)
+    return InputPath;
+
+  DWORD success = GetFinalPathNameByHandleA(
+      fileHandle, full_path, sizeof(full_path), FILE_NAME_NORMALIZED);
+  return (success ? full_path : InputPath);
+#endif
 }
 
 CloseClangModuleFiles::~CloseClangModuleFiles() {

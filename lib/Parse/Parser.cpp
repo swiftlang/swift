@@ -24,6 +24,8 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
+#include "swift/Syntax/TokenSyntax.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -237,6 +239,7 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
   Lexer L(LangOpts, SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
           KeepComments ? CommentRetentionMode::ReturnAsTokens
                        : CommentRetentionMode::AttachToNextToken,
+          TriviaRetentionMode::WithoutTrivia,
           Offset, EndOffset);
 
   auto TokComp = [&] (const Token &A, const Token &B) {
@@ -273,6 +276,33 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
     }
   } while (Tokens.back().isNot(tok::eof));
   Tokens.pop_back(); // Remove EOF.
+  return Tokens;
+}
+
+// TODO: Refactor into common implementation with swift::tokenize.
+std::vector<std::pair<syntax::RC<syntax::TokenSyntax>,
+                                 syntax::AbsolutePosition>>
+swift::tokenizeWithTrivia(const LangOptions &LangOpts,
+                          const SourceManager &SM,
+                          unsigned BufferID,
+                          unsigned Offset,
+                          unsigned EndOffset) {
+  if (Offset == 0 && EndOffset == 0)
+    EndOffset = SM.getRangeForBuffer(BufferID).getByteLength();
+
+  Lexer L(LangOpts, SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+          CommentRetentionMode::AttachToNextToken,
+          TriviaRetentionMode::WithTrivia,
+          Offset, EndOffset);
+  std::vector<std::pair<syntax::RC<syntax::TokenSyntax>,
+                        syntax::AbsolutePosition>> Tokens;
+  syntax::AbsolutePosition RunningPos;
+  do {
+    auto ThisToken = L.fullLex();
+    auto ThisTokenPos = ThisToken->accumulateAbsolutePosition(RunningPos);
+    Tokens.push_back({ThisToken, ThisTokenPos});
+  } while (Tokens.back().first->isNot(tok::eof));
+
   return Tokens;
 }
 
@@ -451,7 +481,7 @@ SourceLoc Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
 
 #define KEYWORD(X) case tok::kw_##X:
 #define POUND_KEYWORD(X) case tok::pound_##X:
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
     // 'Self' can appear in types, skip it.
     if (Tok.is(tok::kw_Self))
       break;
@@ -566,7 +596,7 @@ bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
     if (!Context.isSwiftVersion3())
       break;
     // Swift3 accepts 'throws' and 'rethrows'
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case tok::kw_self:
   case tok::kw_Self:
   case tok::identifier:
@@ -589,7 +619,6 @@ bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,
   loc = consumeToken(tok::identifier);
   return false;
 }
-
 
 /// parseAnyIdentifier - Consume an identifier or operator if present and return
 /// its name in Result.  Otherwise, emit an error and return true.
@@ -782,6 +811,7 @@ ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID,
                       BufferID, &Impl.Diags,
                       /*InSILMode=*/false,
                       CommentRetentionMode::None,
+                      TriviaRetentionMode::WithoutTrivia,
                       Offset, EndOffset));
   Impl.TheParser.reset(new Parser(std::move(Lex), *Impl.SF));
 }

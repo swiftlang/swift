@@ -16,7 +16,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
-#include "swift/Basic/Demangle.h"
+#include "swift/Basic/Demangler.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
@@ -198,14 +198,15 @@ _classByName(const llvm::StringRef typeName) {
   if (typeName.find('.', DotPos + 1) != llvm::StringRef::npos)
     return nullptr;
 
-  using namespace Demangle;
+  Demangle::NodeFactory Factory;
 
-  NodePointer ClassNd = NodeFactory::create(Node::Kind::Class);
-  NodePointer ModuleNd = NodeFactory::create(Node::Kind::Module,
-                                             typeName.substr(0, DotPos));
-  NodePointer NameNd = NodeFactory::create(Node::Kind::Identifier,
-                                           typeName.substr(DotPos + 1));
-  ClassNd->addChildren(ModuleNd, NameNd);
+  NodePointer ClassNd = Factory.createNode(Node::Kind::Class);
+  NodePointer ModuleNd = Factory.createNode(Node::Kind::Module,
+                                            typeName.substr(0, DotPos));
+  NodePointer NameNd = Factory.createNode(Node::Kind::Identifier,
+                                          typeName.substr(DotPos + 1));
+  ClassNd->addChild(ModuleNd, Factory);
+  ClassNd->addChild(NameNd, Factory);
 
   std::string Mangled = mangleNode(ClassNd);
   StringRef MangledName = Mangled;
@@ -253,6 +254,7 @@ _classByName(const llvm::StringRef typeName) {
 
 /// \param typeName The name of a class in the form: <module>.<class>
 /// \return Returns the metadata of the type, if found.
+SWIFT_CC(swift)
 SWIFT_RUNTIME_EXPORT
 const Metadata *
 swift_getTypeByName(const char *typeName, size_t typeNameLength) {

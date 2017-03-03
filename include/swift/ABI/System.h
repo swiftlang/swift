@@ -56,15 +56,35 @@
 /// ``pointer & SWIFT_ABI_XXX_OBJC_RESERVED_BITS_MASK == 0 && 
 /// pointer & SWIFT_ABI_XXX_SWIFT_SPARE_BITS_MASK != 0``.
 
+// Weak references use a marker to tell when they are controlled by
+// the ObjC runtime and when they are controlled by the Swift runtime.
+// Non-ObjC platforms don't use this marker.
+#define SWIFT_ABI_DEFAULT_OBJC_WEAK_REFERENCE_MARKER_MASK  0
+#define SWIFT_ABI_DEFAULT_OBJC_WEAK_REFERENCE_MARKER_VALUE 0
+
 /*********************************** i386 *************************************/
 
 // Heap objects are pointer-aligned, so the low two bits are unused.
 #define SWIFT_ABI_I386_SWIFT_SPARE_BITS_MASK 0x00000003U
 
+// ObjC weak reference discriminator is the LSB.
+#define SWIFT_ABI_I386_OBJC_WEAK_REFERENCE_MARKER_MASK  \
+  (SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK |          \
+   1<<SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS)
+#define SWIFT_ABI_I386_OBJC_WEAK_REFERENCE_MARKER_VALUE \
+  (1<<SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS)
+
 /*********************************** arm **************************************/
 
 // Heap objects are pointer-aligned, so the low two bits are unused.
 #define SWIFT_ABI_ARM_SWIFT_SPARE_BITS_MASK 0x00000003U
+
+// ObjC weak reference discriminator is the LSB.
+#define SWIFT_ABI_ARM_OBJC_WEAK_REFERENCE_MARKER_MASK  \
+  (SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK |          \
+   1<<SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS)
+#define SWIFT_ABI_ARM_OBJC_WEAK_REFERENCE_MARKER_VALUE \
+  (1<<SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS)
 
 /*********************************** x86-64 ***********************************/
 
@@ -79,6 +99,14 @@
 #define SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK 0x8000000000000001ULL
 #define SWIFT_ABI_X86_64_OBJC_NUM_RESERVED_LOW_BITS 1
 
+// ObjC weak reference discriminator is the two bits
+// reserved for ObjC tagged pointers plus one more low bit.
+#define SWIFT_ABI_X86_64_OBJC_WEAK_REFERENCE_MARKER_MASK  \
+  (SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK |          \
+   1<<SWIFT_ABI_X86_64_OBJC_NUM_RESERVED_LOW_BITS)
+#define SWIFT_ABI_X86_64_OBJC_WEAK_REFERENCE_MARKER_VALUE \
+  (1<<SWIFT_ABI_X86_64_OBJC_NUM_RESERVED_LOW_BITS)
+
 /*********************************** arm64 ************************************/
 
 /// Darwin reserves the low 4GB of address space.
@@ -91,6 +119,14 @@
 // Objective-C reserves just the high bit for tagged pointers.
 #define SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK 0x8000000000000000ULL
 #define SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS 0
+
+// ObjC weak reference discriminator is the high bit
+// reserved for ObjC tagged pointers plus the LSB.
+#define SWIFT_ABI_ARM64_OBJC_WEAK_REFERENCE_MARKER_MASK  \
+  (SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK |          \
+   1<<SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS)
+#define SWIFT_ABI_ARM64_OBJC_WEAK_REFERENCE_MARKER_VALUE \
+  (1<<SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS)
 
 /*********************************** powerpc64 ********************************/
 

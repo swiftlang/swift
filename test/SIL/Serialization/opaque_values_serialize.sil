@@ -9,6 +9,51 @@
 sil_stage canonical
 
 import Builtin
+import Swift
+
+protocol Foo {
+  func foo()
+}
+
+struct S : Foo {
+  func foo()
+  init()
+}
+
+// CHECK-LABEL: sil @castOpaque : $@convention(thin) (Int) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Int):
+// CHECK:  unconditional_checked_cast_opaque [[ARG]] : $Int to $Foo
+// CHECK-LABEL: } // end sil function 'castOpaque'
+sil @castOpaque : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %c = unconditional_checked_cast_opaque %0 : $Int to $Foo
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @initDeinitExistentialOpaque : $@convention(thin) <T> (@in T) -> () {
+// CHECK: bb0([[ARG:%.*]] : $T):
+// CHECK:  [[IE:%.*]] = init_existential_opaque [[ARG]] : $T, $T, $Any
+// CHECK:  deinit_existential_opaque [[IE]] : $Any
+// CHECK-LABEL: } // end sil function 'initDeinitExistentialOpaque'
+sil @initDeinitExistentialOpaque : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $T):
+  %i = init_existential_opaque %0 : $T, $T, $Any
+  %d = deinit_existential_opaque %i : $Any
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @openExistentialOpaque : $@convention(thin) (@in Foo) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Foo):
+// CHECK:  open_existential_opaque [[ARG]] : $Foo to $@opened({{.*}}) Foo
+// CHECK-LABEL: } // end sil function 'openExistentialOpaque'
+sil @openExistentialOpaque : $@convention(thin) (@in Foo) -> () {
+bb0(%0 : $Foo):
+  %o = open_existential_opaque %0 : $Foo to $@opened("2E9EACA6-FD59-11E6-B016-685B3593C496") Foo
+  %t = tuple ()
+  return %t : $()
+}
 
 // Test @in/@out serialization.
 // ----
@@ -24,15 +69,6 @@ bb0(%0 : $T):
 
 // Test @in_guaranteed serialization.
 // ----
-
-protocol Foo {
-  func foo()
-}
-
-struct S : Foo {
-  func foo()
-  init()
-}
 
 sil @doWithS : $@convention(method) (S) -> ()
 

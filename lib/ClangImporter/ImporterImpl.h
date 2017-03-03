@@ -275,6 +275,7 @@ public:
 
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
+  llvm::SmallVector<const clang::Module*, 2> DeferredHeaderImports;
 
   const Version CurrentVersion;
 
@@ -607,8 +608,10 @@ public:
   ///
   /// \param D The Clang declaration whose name should be imported.
   importer::ImportedName importFullName(const clang::NamedDecl *D,
-                                        Version version) {
-    return getNameImporter().importName(D, version);
+                                        Version version,
+                                        clang::DeclarationName givenName =
+                                          clang::DeclarationName()) {
+    return getNameImporter().importName(D, version, givenName);
   }
 
   /// Print an imported name as a string suitable for the swift_name attribute,
@@ -813,13 +816,15 @@ public:
 
   /// \brief Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.
-  ClangModuleUnit *getWrapperForModule(ClangImporter &importer,
-                                       const clang::Module *underlying);
+  ClangModuleUnit *getWrapperForModule(const clang::Module *underlying);
 
   /// \brief Constructs a Swift module for the given Clang module.
-  ModuleDecl *finishLoadingClangModule(ClangImporter &importer,
-                                   const clang::Module *clangModule,
-                                   bool preferAdapter);
+  ModuleDecl *finishLoadingClangModule(const clang::Module *clangModule,
+                                       bool preferAdapter);
+
+  /// \brief Call finishLoadingClangModule on each deferred import collected
+  /// while scanning a bridging header or PCH.
+  void handleDeferredImports();
 
   /// \brief Retrieve the named Swift type, e.g., Int32.
   ///
@@ -1103,6 +1108,8 @@ public:
     D->setAccessibility(access);
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
       ASD->setSetterAccessibility(access);
+    // All imported decls are constructed fully validated.
+    D->setValidationStarted();
     return D;
   }
 

@@ -57,6 +57,8 @@
 #     ]
 # }
 
+from __future__ import print_function
+
 import json
 import re
 import sys

@@ -45,6 +45,22 @@ def confirm_tag_in_repo(tag, repo_name):
     return tag
 
 
+def find_rev_by_timestamp(timestamp, repo_name, refspec):
+    base_args = ["git", "log", "-1", "--format=%H",
+                 '--before=' + timestamp]
+    # Prefer the most-recent change _made by swift-ci_ before the timestamp,
+    # falling back to most-recent in general if there is none by swift-ci.
+    rev = shell.capture(base_args + ['--author', 'swift-ci', refspec]).strip()
+    if rev:
+        return rev
+    rev = shell.capture(base_args + [refspec]).strip()
+    if rev:
+        return rev
+    else:
+        raise RuntimeError('No rev in %s before timestamp %s' %
+                           (repo_name, timestamp))
+
+
 def get_branch_for_repo(config, repo_name, scheme_name, scheme_map,
                         cross_repos_pr):
     cross_repo = False
@@ -68,8 +84,8 @@ def get_branch_for_repo(config, repo_name, scheme_name, scheme_map,
 
 
 def update_single_repository(args):
-    config, repo_name, scheme_name, scheme_map, tag, reset_to_remote, \
-        should_clean, cross_repos_pr = args
+    config, repo_name, scheme_name, scheme_map, tag, timestamp, \
+        reset_to_remote, should_clean, cross_repos_pr = args
     repo_path = os.path.join(SWIFT_SOURCE_ROOT, repo_name)
     if not os.path.isdir(repo_path):
         return
@@ -84,6 +100,13 @@ def update_single_repository(args):
             elif scheme_name:
                 checkout_target, cross_repo = get_branch_for_repo(
                     config, repo_name, scheme_name, scheme_map, cross_repos_pr)
+                if timestamp:
+                    checkout_target = find_rev_by_timestamp(timestamp,
+                                                            repo_name,
+                                                            checkout_target)
+            elif timestamp:
+                checkout_target = find_rev_by_timestamp(timestamp, repo_name,
+                                                        "HEAD")
 
             # The clean option restores a repository to pristine condition.
             if should_clean:
@@ -153,6 +176,15 @@ def update_single_repository(args):
         return value
 
 
+def get_timestamp_to_match(args):
+    if not args.match_timestamp:
+        return None
+    with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, "swift"),
+                     dry_run=False, echo=False):
+        return shell.capture(["git", "log", "-1", "--format=%cI"],
+                             echo=False).strip()
+
+
 def update_all_repositories(args, config, scheme_name, cross_repos_pr):
     scheme_map = None
     if scheme_name:
@@ -165,6 +197,7 @@ def update_all_repositories(args, config, scheme_name, cross_repos_pr):
                 scheme_map = v['repos']
                 break
     pool_args = []
+    timestamp = get_timestamp_to_match(args)
     for repo_name in config['repos'].keys():
         if repo_name in args.skip_repository_list:
             print("Skipping update of '" + repo_name + "', requested by user")
@@ -174,6 +207,7 @@ def update_all_repositories(args, config, scheme_name, cross_repos_pr):
                    scheme_name,
                    scheme_map,
                    args.tag,
+                   timestamp,
                    args.reset_to_remote,
                    args.clean,
                    cross_repos_pr]
@@ -385,6 +419,11 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         "--tag",
         help="""Check out each repository to the specified tag.""",
         metavar='TAG-NAME')
+    parser.add_argument(
+        "--match-timestamp",
+        help='Check out adjacent repositories to match timestamp of '
+        ' current swift checkout.',
+        action='store_true')
     parser.add_argument(
         "-j", "--jobs",
         type=int,

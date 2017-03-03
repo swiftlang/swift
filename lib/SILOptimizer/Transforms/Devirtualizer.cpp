@@ -55,14 +55,14 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
   llvm::SmallVector<SILInstruction *, 8> DeadApplies;
   llvm::SmallVector<ApplySite, 8> NewApplies;
 
-  SmallVector<FullApplySite, 16> Applies;
+  SmallVector<ApplySite, 16> Applies;
   for (auto &BB : F) {
     for (auto It = BB.begin(), End = BB.end(); It != End;) {
       auto &I = *It++;
 
       // Skip non-apply instructions.
 
-      auto Apply = FullApplySite::isa(&I);
+      auto Apply = ApplySite::isa(&I);
       if (!Apply)
         continue;
       Applies.push_back(Apply);
@@ -102,11 +102,12 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
     auto *CalleeFn = Apply.getReferencedFunction();
     assert(CalleeFn && "Expected devirtualized callee!");
 
-    // FIXME: Until we link everything in up front we need to ensure
-    // that we link after devirtualizing in order to pull in
-    // everything we reference from the stdlib. After we do that we
-    // can move the notification code below back into the main loop
-    // above.
+    // We need to ensure that we link after devirtualizing in order to pull in
+    // everything we reference from another module. This is especially important
+    // for transparent functions, because if transparent functions are not
+    // inlined for some reason, we need to generate code for them.
+    // Note that functions, which are only referenced from witness/vtables, are
+    // not linked upfront by the SILLinker.
     if (!CalleeFn->isDefinition())
       F.getModule().linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll);
 

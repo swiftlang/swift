@@ -21,13 +21,13 @@
 namespace SourceKit {
 namespace CodeCompletion {
 
-using CodeCompletionDeclKind = swift::ide::CodeCompletionDeclKind;
-using CodeCompletionKeywordKind = swift::ide::CodeCompletionKeywordKind;
-using CodeCompletionLiteralKind = swift::ide::CodeCompletionLiteralKind;
-using SemanticContextKind = swift::ide::SemanticContextKind;
-using CodeCompletionString = swift::ide::CodeCompletionString;
+using swift::ide::CodeCompletionDeclKind;
+using swift::ide::CodeCompletionKeywordKind;
+using swift::ide::CodeCompletionLiteralKind;
+using swift::ide::SemanticContextKind;
+using swift::ide::CodeCompletionString;
 using SwiftResult = swift::ide::CodeCompletionResult;
-using CompletionKind = swift::ide::CompletionKind;
+using swift::ide::CompletionKind;
 
 struct Group;
 class CodeCompletionOrganizer;

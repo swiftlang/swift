@@ -89,7 +89,7 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
 }
 
 SILPassPipelinePlan
-SILPassPipelinePlan::getDiagnosticPassPipeline(SILOptions Options) {
+SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P;
 
   if (SILViewSILGenCFG) {
@@ -319,8 +319,8 @@ static void addMidLevelPassPipeline(SILPassPipelinePlan &P) {
   P.addDeadArgSignatureOpt();
 }
 
-static void addLoweringPassPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline("Lower");
+static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
+  P.startPipeline("ClosureSpecialize");
   P.addDeadFunctionElimination();
   P.addDeadObjectElimination();
 
@@ -401,6 +401,18 @@ static void addSILDebugInfoGeneratorPipeline(SILPassPipelinePlan &P) {
   P.addSILDebugInfoGenerator();
 }
 
+/// Mandatory IRGen preparation. It is the caller's job to set the set stage to
+/// "lowered" after running this pipeline.
+SILPassPipelinePlan
+SILPassPipelinePlan::getLoweringPassPipeline() {
+  SILPassPipelinePlan P;
+  P.startPipeline("Address Lowering");
+  P.addSILCleanup();
+  P.addAddressLowering();
+
+  return P;
+}
+
 /// Non-mandatory passes that should run as preparation for IRGen.
 static void addIRGenPreparePipeline(SILPassPipelinePlan &P) {
   P.startPipeline("IRGen Preparation");
@@ -417,7 +429,7 @@ SILPassPipelinePlan SILPassPipelinePlan::getIRGenPreparePassPipeline() {
 }
 
 SILPassPipelinePlan
-SILPassPipelinePlan::getPerformancePassPipeline(SILOptions Options) {
+SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P;
 
   if (Options.DebugSerialization) {
@@ -436,8 +448,8 @@ SILPassPipelinePlan::getPerformancePassPipeline(SILOptions Options) {
   // Run an iteration of the mid-level SSA passes.
   addMidLevelPassPipeline(P);
 
-  // Perform lowering optimizations.
-  addLoweringPassPipeline(P);
+  // Perform optimizations that specialize.
+  addClosureSpecializePassPipeline(P);
 
   // Run another iteration of the SSA optimizations to optimize the
   // devirtualized inline caches and constants propagated into closures

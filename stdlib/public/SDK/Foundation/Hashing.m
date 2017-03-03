@@ -13,17 +13,27 @@
 // THIS IS JUST TEMPORARY TO AVOID LOCKSTEP ISSUES WITH COREFOUNDATION
 
 #import <CoreFoundation/CoreFoundation.h>
+#include "swift/Runtime/Config.h"
 
 #define HASHFACTOR 2654435761U
 
+SWIFT_CC(swift)
 CFHashCode __CFHashInt(long i) {
     return ((i > 0) ? (CFHashCode)(i) : (CFHashCode)(-i)) * HASHFACTOR;
 }
 
+SWIFT_CC(swift)
 CFHashCode __CFHashDouble(double d) {
     double dInt;
     if (d < 0) d = -d;
     dInt = floor(d+0.5);
     CFHashCode integralHash = HASHFACTOR * (CFHashCode)fmod(dInt, (double)ULONG_MAX);
     return (CFHashCode)(integralHash + (CFHashCode)((d - dInt) * ULONG_MAX));
+}
+
+extern CFHashCode CFHashBytes(uint8_t *bytes, long len);
+
+SWIFT_CC(swift)
+CFHashCode __CFHashBytes(uint8_t *bytes, long len) {
+  return CFHashBytes(bytes, len);
 }

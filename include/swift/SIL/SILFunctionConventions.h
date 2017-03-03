@@ -19,7 +19,7 @@
 // The primary purpose of this API is mapping the formal SIL parameter and
 // result conventions onto the SIL argument types. The "formal" conventions are
 // immutably associated with a SILFunctionType--a SIL function's type
-// information never changes. The SIL convenentions determine how those formal
+// information never changes. The SIL conventions determine how those formal
 // conventions will be represented in the body of SIL functions and at call
 // sites.
 //
@@ -56,8 +56,15 @@ public:
 
   static bool isReturnedIndirectlyInSIL(SILType type, SILModule &M);
 
+  static SILModuleConventions getLoweredAddressConventions() {
+    return SILModuleConventions(true);
+  }
+
 private:
   bool loweredAddresses;
+
+  SILModuleConventions(bool loweredAddresses)
+      : loweredAddresses(loweredAddresses) {}
 
 public:
   SILModuleConventions(const SILModule &M);
@@ -140,6 +147,12 @@ public:
 
   /// Get the error result type.
   SILType getSILErrorType() { return getSILType(funcTy->getErrorResult()); }
+
+  /// Returns an array of result info.
+  /// Provides convenient access to the underlying SILFunctionType.
+  ArrayRef<SILResultInfo> getResults() const {
+    return funcTy->getResults();
+  }
 
   /// Get the number of SIL results passed as address-typed arguments.
   unsigned getNumIndirectSILResults() const {
@@ -236,7 +249,7 @@ public:
   /// SILFunctionType.
   unsigned getNumParameters() const { return funcTy->getNumParameters(); }
 
-  /// Returns an array if parameter info, not including indirect
+  /// Returns an array of parameter info, not including indirect
   /// results. Provides convenient access to the underlying SILFunctionType.
   ArrayRef<SILParameterInfo> getParameters() const {
     return funcTy->getParameters();
@@ -272,6 +285,8 @@ public:
   // callee indices match. Partial apply indices are shifted on the caller
   // side. See ApplySite::getCallArgIndexOfFirstAppliedArg().
   //===--------------------------------------------------------------------===//
+
+  unsigned getSILArgIndexOfFirstIndirectResult() const { return 0; }
 
   unsigned getSILArgIndexOfFirstParam() const {
     return getNumIndirectSILResults();
@@ -357,6 +372,8 @@ inline bool SILModuleConventions::isIndirectSILResult(SILResultInfo result,
   case ResultConvention::Autoreleased:
     return false;
   }
+
+  llvm_unreachable("Unhandled ResultConvention in switch.");
 }
 
 inline SILType SILModuleConventions::getSILParamType(SILParameterInfo param,

@@ -20,6 +20,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -478,7 +479,7 @@ static void lookupVisibleProtocolMemberDecls(
   if (!Visited.insert(PT->getDecl()).second)
     return;
 
-  for (auto Proto : PT->getDecl()->getInheritedProtocols(nullptr))
+  for (auto Proto : PT->getDecl()->getInheritedProtocols())
     lookupVisibleProtocolMemberDecls(BaseTy, Proto->getDeclaredType(), Consumer, CurrDC,
                                  LS, getReasonForSuper(Reason), TypeResolver,
                                  Visited);

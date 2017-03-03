@@ -473,7 +473,7 @@ enum class CodeCompletionKeywordKind {
   None,
 #define KEYWORD(X) kw_##X,
 #define POUND_KEYWORD(X) pound_##X,
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
 };
 
 enum class CompletionKind {

@@ -93,3 +93,12 @@ def async : Flag<["-"], "async">,
 
 def end_pos : Separate<["-"], "end-pos">, HelpText<"line:col">;
 def end_pos_EQ : Joined<["-"], "end-pos=">, Alias<end_pos>;
+
+def swift_name : Separate<["-"], "swift-name">,
+  HelpText<"Swift name to translate from">;
+
+def objc_name : Separate<["-"], "objc-name">,
+  HelpText<"Objective-C name to translate from">;
+
+def objc_selector : Separate<["-"], "objc-selector">,
+  HelpText<"Objective-C selector name to translate from">;

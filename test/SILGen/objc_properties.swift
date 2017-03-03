@@ -4,7 +4,6 @@
 
 import Foundation
 
-
 class A {
   dynamic var prop: Int
   dynamic var computedProp: Int {
@@ -102,9 +101,10 @@ class B : A {
 
 // Test the @NSCopying attribute.
 class TestNSCopying {
-  // CHECK-LABEL: sil hidden @_T015objc_properties13TestNSCopyingC8propertySo8NSStringCfs : $@convention(method) (@owned NSString, @guaranteed TestNSCopying) -> ()
-  // CHECK: bb0(%0 : $NSString, %1 : $TestNSCopying):
-  // CHECK:  class_method [volatile] %0 : $NSString, #NSString.copy!1.foreign
+  // CHECK-LABEL: sil hidden [transparent] @_T015objc_properties13TestNSCopyingC8propertySo8NSStringCfs : $@convention(method) (@owned NSString, @guaranteed TestNSCopying) -> ()
+  // CHECK: bb0([[ARG0:%.*]] : $NSString, [[ARG1:%.*]] : $TestNSCopying):
+  // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
+  // CHECK:   class_method [volatile] [[BORROWED_ARG0]] : $NSString, #NSString.copy!1.foreign
   @NSCopying var property : NSString
 
   @NSCopying var optionalProperty : NSString?
@@ -158,8 +158,10 @@ class HasUnmanaged : NSObject {
   // CHECK-LABEL: sil hidden [thunk] @_T015objc_properties12HasUnmanagedC3refs0D0Vys9AnyObject_pGSgfgTo
   // CHECK: bb0([[CLS:%.*]] : $HasUnmanaged):
   // CHECK:     [[CLS_COPY:%.*]] = copy_value [[CLS]]
+  // CHECK:     [[BORROWED_CLS_COPY:%.*]] = begin_borrow [[CLS_COPY]]
   // CHECK:     [[NATIVE:%.+]] = function_ref @_T015objc_properties12HasUnmanagedC3refs0D0Vys9AnyObject_pGSgfg
-  // CHECK:     [[RESULT:%.+]] = apply [[NATIVE]]([[CLS_COPY]])
+  // CHECK:     [[RESULT:%.+]] = apply [[NATIVE]]([[BORROWED_CLS_COPY]])
+  // CHECK:     end_borrow [[BORROWED_CLS_COPY]] from [[CLS_COPY]]
   // CHECK-NOT: {{(retain|release)}}
   // CHECK:     destroy_value [[CLS_COPY]] : $HasUnmanaged
   // CHECK-NOT: {{(retain|release)}}
@@ -169,13 +171,40 @@ class HasUnmanaged : NSObject {
   // CHECK-LABEL: sil hidden [thunk] @_T015objc_properties12HasUnmanagedC3refs0D0Vys9AnyObject_pGSgfsTo
   // CHECK: bb0([[NEW_VALUE:%.*]] : $Optional<Unmanaged<AnyObject>>, [[SELF:%.*]] : $HasUnmanaged):
   // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $HasUnmanaged
+  // CHECK-NEXT: [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[NATIVE:%.+]] = function_ref @_T015objc_properties12HasUnmanagedC3refs0D0Vys9AnyObject_pGSgfs
-  // CHECK-NEXT: [[RESULT:%.*]] = apply [[NATIVE]]([[NEW_VALUE]], [[SELF_COPY]])
+  // CHECK-NEXT: [[RESULT:%.*]] = apply [[NATIVE]]([[NEW_VALUE]], [[BORROWED_SELF_COPY]])
+  // CHECK-NEXT: end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK-NEXT: destroy_value [[SELF_COPY]] : $HasUnmanaged
   // CHECK-NEXT: return [[RESULT:%.*]]
   // CHECK: } // end sil function '_T015objc_properties12HasUnmanagedC3refs0D0Vys9AnyObject_pGSgfsTo'
   var ref: Unmanaged<AnyObject>?
+}
+
+@_silgen_name("autoreleasing_user")
+func useAutoreleasingUnsafeMutablePointer(_ a: AutoreleasingUnsafeMutablePointer<NSObject>)
+
+class NonObjCClassWithObjCProperty {
+  var property: NSObject
+
+  init(_ newValue: NSObject) {
+    property = newValue
+  }
+
+  // CHECK-LABEL: sil hidden @_T015objc_properties016NonObjCClassWithD9CPropertyC11usePropertyyyF : $@convention(method) (@guaranteed NonObjCClassWithObjCProperty) -> () {
+  // CHECK: bb0([[ARG:%.*]] : $NonObjCClassWithObjCProperty):
+  // CHECK: [[MATERIALIZE_FOR_SET:%.*]] = class_method [[ARG]] : $NonObjCClassWithObjCProperty, #NonObjCClassWithObjCProperty.property!materializeForSet.1
+  // CHECK: [[TUPLE:%.*]] = apply [[MATERIALIZE_FOR_SET]]({{.*}}, {{.*}}, [[ARG]])
+  // CHECK: [[RAW_POINTER:%.*]] = tuple_extract [[TUPLE]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
+  // CHECK: [[OBJECT:%.*]] = pointer_to_address [[RAW_POINTER]] : $Builtin.RawPointer to [strict] $*NSObject
+  // CHECK: [[OBJECT_DEP:%.*]] = mark_dependence [[OBJECT]] : $*NSObject on [[ARG]]
+  // CHECK: [[LOADED_OBJECT:%.*]] = load_borrow [[OBJECT_DEP]]
+  // CHECK: [[UNMANAGED_OBJECT:%.*]] = ref_to_unmanaged [[LOADED_OBJECT]] : $NSObject to $@sil_unmanaged NSObject
+  // CHECK: end_borrow [[LOADED_OBJECT]] from [[OBJECT_DEP]]
+  func useProperty() {
+    useAutoreleasingUnsafeMutablePointer(&property)
+  }
 }
 
 

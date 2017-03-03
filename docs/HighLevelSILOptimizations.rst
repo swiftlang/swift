@@ -349,6 +349,11 @@ sil.never
   @_semantics("optimize.sil.never")
   func miscompile() { ... }
 
+sil.specialize.generic.never
+
+   The sil optimizer should never create generic specializations of this function. 
+
+
 Availability checks
 ~~~~~~~~~~~~~~~~~~~
 

@@ -164,7 +164,10 @@ protocol P {
 // CHECK-LABEL: @existentials : $@convention(thin) (@in P) -> () {
 sil [fragile] @existentials : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
-  %1 = open_existential_addr %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P // CHECK: open_existential_addr %0
+  %1 = open_existential_addr mutable_access %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P // CHECK: open_existential_addr  mutable_access %0
+  %imm = open_existential_addr immutable_access %0 : $*P to $*@opened("01234567-89ab-cdef-0123-100000000000") P // CHECK: open_existential_addr  immutable_access %0
+  %meth = witness_method $@opened("01234567-89ab-cdef-0123-100000000000") P, #P.doIt!1, %imm : $*@opened("01234567-89ab-cdef-0123-100000000000") P : $@convention(witness_method) <T: P> (@in_guaranteed T) -> ()
+  %call = apply %meth<@opened("01234567-89ab-cdef-0123-100000000000") P>(%imm) : $@convention(witness_method) <T: P> (@in_guaranteed T) -> ()
 
   // CHECK: witness_method ${{.*}}, #P.doIt!1
   %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt!1, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method) <T: P> (@inout T) -> ()

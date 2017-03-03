@@ -1,3 +1,4 @@
+
 //===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -13,6 +14,12 @@
 import _SwiftDispatchOverlayShims
 
 public struct DispatchTime : Comparable {
+	private static let timebaseInfo: mach_timebase_info_data_t = {
+		var info = mach_timebase_info_data_t(numer: 1, denom: 1)
+		mach_timebase_info(&info)
+		return info
+	}()
+ 
 	public let rawValue: dispatch_time_t
 
 	public static func now() -> DispatchTime {
@@ -33,14 +40,32 @@ public struct DispatchTime : Comparable {
 	///   - uptimeNanoseconds: The number of nanoseconds since boot, excluding
 	///                        time the system spent asleep
 	/// - Returns: A new `DispatchTime`
-	/// - Discussion: This clock is the same as the value returned by 
+	/// - Discussion: This clock is the same as the value returned by
 	///               `mach_absolute_time` when converted into nanoseconds.
+	///               On some platforms, the nanosecond value is rounded up to a
+	///               multiple of the Mach timebase, using the conversion factors
+	///               returned by `mach_timebase_info()`. The nanosecond equivalent
+	///               of the rounded result can be obtained by reading the
+	///               `uptimeNanoseconds` property.
+	///               Note that `DispatchTime(uptimeNanoseconds: 0)` is
+	///               equivalent to `DispatchTime.now()`, that is, its value
+	///               represents the number of nanoseconds since boot (excluding
+	///               system sleep time), not zero nanoseconds since boot.
 	public init(uptimeNanoseconds: UInt64) {
-		self.rawValue = dispatch_time_t(uptimeNanoseconds)
+		var rawValue = uptimeNanoseconds
+		if (DispatchTime.timebaseInfo.numer != DispatchTime.timebaseInfo.denom) {
+			rawValue = (rawValue * UInt64(DispatchTime.timebaseInfo.denom) 
+				+ UInt64(DispatchTime.timebaseInfo.numer - 1)) / UInt64(DispatchTime.timebaseInfo.numer)
+		}
+		self.rawValue = dispatch_time_t(rawValue)
 	}
 
 	public var uptimeNanoseconds: UInt64 {
-		return UInt64(self.rawValue)
+		var result = self.rawValue
+		if (DispatchTime.timebaseInfo.numer != DispatchTime.timebaseInfo.denom) {
+			result = result * UInt64(DispatchTime.timebaseInfo.numer) / UInt64(DispatchTime.timebaseInfo.denom)
+		}
+		return result
 	}
 }
 

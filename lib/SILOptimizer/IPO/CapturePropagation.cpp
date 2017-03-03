@@ -52,6 +52,8 @@ protected:
 static LiteralInst *getConstant(SILValue V) {
   if (auto I = dyn_cast<ThinToThickFunctionInst>(V))
     return getConstant(I->getOperand());
+  if (auto I = dyn_cast<ConvertFunctionInst>(V))
+    return getConstant(I->getOperand());
   return dyn_cast<LiteralInst>(V);
 }
 
@@ -282,8 +284,8 @@ static bool isProfitable(SILFunction *Callee) {
   SILBasicBlock *EntryBB = &*Callee->begin();
   for (auto *Arg : EntryBB->getArguments()) {
     for (auto *Operand : Arg->getUses()) {
-      if (auto *AI = dyn_cast<ApplyInst>(Operand->getUser())) {
-        if (AI->getCallee() == Operand->get())
+      if (FullApplySite FAS = FullApplySite::isa(Operand->getUser())) {
+        if (FAS.getCallee() == Operand->get())
           return true;
       }
     }

@@ -8,7 +8,7 @@ protocol P {
 }
 
 // CHECK-LABEL: sil {{.*}} @{{.*}}test_open_existential
-// CHECK: [[E:%[0-9]+]] = open_existential_addr %0
+// CHECK: [[E:%[0-9]+]] = open_existential_addr immutable_access %0
 // CHECK: [[W:%[0-9]+]] = witness_method $@opened{{.*}} [[E]] {{.*}} // type-defs: [[E]]
 // CHECK: apply [[W]]<@opened{{.*}} // type-defs: [[E]]
 // CHECK: return
@@ -20,7 +20,7 @@ func test_open_existential(p: P) {
 // Check if after inlining (= cloning) everything is still okay.
 
 // CHECK-LABEL: sil {{.*}} @{{.*}}call_open_existential
-// CHECK: [[E:%[0-9]+]] = open_existential_addr %0
+// CHECK: [[E:%[0-9]+]] = open_existential_addr immutable_access %0
 // CHECK: [[W:%[0-9]+]] = witness_method $@opened{{.*}} [[E]] {{.*}} // type-defs: [[E]]
 // CHECK: apply [[W]]<@opened{{.*}} // type-defs: [[E]]
 // CHECK: return

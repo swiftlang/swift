@@ -53,7 +53,7 @@ discussed below.
 macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are the current
 supported host development operating systems.
 
-For macOS, you need [the latest Xcode](https://developer.apple.com/xcode/downloads/).
+For macOS, you need [Xcode 8.3 Beta 3](https://developer.apple.com/xcode/downloads/).
 
 For Ubuntu, you'll need the following development dependencies:
 

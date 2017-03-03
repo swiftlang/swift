@@ -230,23 +230,25 @@ public:
     return M;
   }
 
-  CanType getSwiftType() const {
-    return isLValue()
-      ? getType().getSwiftType()
-      : getType().getSwiftRValueType();
-  }
-  
   /// Emit a copy of this value with independent ownership.
-  ManagedValue copy(SILGenFunction &gen, SILLocation l);
-  
+  ManagedValue copy(SILGenFunction &gen, SILLocation loc);
+
+  /// Emit a copy of this value with independent ownership into the current
+  /// formal evaluation scope.
+  ManagedValue formalAccessCopy(SILGenFunction &gen, SILLocation loc);
+
   /// Store a copy of this value with independent ownership into the given
   /// uninitialized address.
-  void copyInto(SILGenFunction &gen, SILValue dest, SILLocation L);
-  
+  void copyInto(SILGenFunction &gen, SILValue dest, SILLocation loc);
+
   /// This is the same operation as 'copy', but works on +0 values that don't
   /// have cleanups.  It returns a +1 value with one.
   ManagedValue copyUnmanaged(SILGenFunction &gen, SILLocation loc);
-  
+
+  /// This is the same operation as 'formalAccessCopy', but works on +0 values
+  /// that don't have cleanups.  It returns a +1 value with one.
+  ManagedValue formalAccessCopyUnmanaged(SILGenFunction &gen, SILLocation loc);
+
   bool hasCleanup() const { return cleanup.isValid(); }
   CleanupHandle getCleanup() const { return cleanup; }
 
@@ -256,6 +258,9 @@ public:
   /// +0 r-value, with the assumption that the original ManagedValue
   /// will not be forwarded until the borrowed value is fully used.
   ManagedValue borrow(SILGenFunction &gen, SILLocation loc) const;
+
+  /// Return a formally evaluated "borrowed" version of this value.
+  ManagedValue formalAccessBorrow(SILGenFunction &gen, SILLocation loc) const;
 
   ManagedValue unmanagedBorrow() const {
     return isLValue() ? *this : ManagedValue::forUnmanaged(getValue());
@@ -360,36 +365,6 @@ public:
   ConsumableManagedValue asBorrowedOperand() const {
     return { asUnmanagedValue(), CastConsumptionKind::CopyOnSuccess };
   }
-};
-
-/// An RAII object that allows a user to borrow a value without a specific scope
-/// that ensures that the object is cleaned up before other scoped cleanups
-/// occur. The way cleanup is triggered is by calling:
-///
-///   std::move(value).cleanup();
-class BorrowedManagedValue {
-  SILGenFunction &gen;
-  ManagedValue borrowedValue;
-  Optional<CleanupHandle> handle;
-  SILLocation loc;
-
-public:
-  BorrowedManagedValue(SILGenFunction &gen, ManagedValue originalValue,
-                       SILLocation loc);
-  ~BorrowedManagedValue() {
-    assert(!borrowedValue &&
-           "Did not manually cleanup borrowed managed value?!");
-  }
-  BorrowedManagedValue(const BorrowedManagedValue &) = delete;
-  BorrowedManagedValue(BorrowedManagedValue &&) = delete;
-  BorrowedManagedValue &operator=(const BorrowedManagedValue &) = delete;
-  BorrowedManagedValue &operator=(BorrowedManagedValue &&) = delete;
-
-  void cleanup() && { cleanupImpl(); }
-  operator ManagedValue() const { return borrowedValue; }
-
-private:
-  void cleanupImpl();
 };
 
 } // namespace Lowering

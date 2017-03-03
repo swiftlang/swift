@@ -21,7 +21,6 @@
 #include "ARCEntryPointBuilder.h"
 #include "LLVMARCOpts.h"
 #include "swift/Basic/NullablePtr.h"
-#include "swift/Basic/Fallthrough.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"

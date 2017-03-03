@@ -113,6 +113,10 @@ WARNING(warn_cannot_stat_input,none,
         "unable to determine when '%0' was last modified: %1",
         (StringRef, StringRef))
 
+WARNING(warn_unable_to_load_dependencies, none,
+        "unable to load dependencies file \"%0\", disabling incremental mode",
+        (StringRef))
+
 ERROR(error_input_changed_during_build,none,
       "input file '%0' was modified during the build",
       (StringRef))

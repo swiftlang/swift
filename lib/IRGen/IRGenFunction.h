@@ -96,7 +96,8 @@ public:
 //--- Function prologue and epilogue -------------------------------------------
 public:
   Explosion collectParameters();
-  void emitScalarReturn(SILType resultTy, Explosion &scalars);
+  void emitScalarReturn(SILType resultTy, Explosion &scalars,
+                        bool isSwiftCCReturn);
   void emitScalarReturn(llvm::Type *resultTy, Explosion &scalars);
   
   void emitBBForReturn();
@@ -230,6 +231,9 @@ private:
 
 //--- Reference-counting methods -----------------------------------------------
 public:
+  // Returns the default atomicity of the module.
+  Atomicity getDefaultAtomicity();
+
   llvm::Value *emitUnmanagedAlloc(const HeapLayout &layout,
                                   const llvm::Twine &name,
                                   llvm::Constant *captureDescriptor,
@@ -247,11 +251,15 @@ public:
   llvm::Value *emitLoadRefcountedPtr(Address addr, ReferenceCounting style);
 
   //   - unowned references
-  void emitUnownedRetain(llvm::Value *value, ReferenceCounting style);
-  void emitUnownedRelease(llvm::Value *value, ReferenceCounting style);
-  void emitStrongRetainUnowned(llvm::Value *value, ReferenceCounting style);
+  void emitUnownedRetain(llvm::Value *value, ReferenceCounting style,
+                         Atomicity atomicity);
+  void emitUnownedRelease(llvm::Value *value, ReferenceCounting style,
+                          Atomicity atomicity);
+  void emitStrongRetainUnowned(llvm::Value *value, ReferenceCounting style,
+                               Atomicity atomicity);
   void emitStrongRetainAndUnownedRelease(llvm::Value *value,
-                                         ReferenceCounting style);
+                                         ReferenceCounting style,
+                                         Atomicity atomicity);
   void emitUnownedInit(llvm::Value *val, Address dest, ReferenceCounting style);
   void emitUnownedAssign(llvm::Value *value, Address dest,
                          ReferenceCounting style);
@@ -294,16 +302,15 @@ public:
   //   - strong references
   void emitNativeStrongAssign(llvm::Value *value, Address addr);
   void emitNativeStrongInit(llvm::Value *value, Address addr);
-  void emitNativeStrongRetain(llvm::Value *value,
-                              Atomicity atomicity = Atomicity::Atomic);
-  void emitNativeStrongRelease(llvm::Value *value,
-                               Atomicity atomicity = Atomicity::Atomic);
+  void emitNativeStrongRetain(llvm::Value *value, Atomicity atomicity);
+  void emitNativeStrongRelease(llvm::Value *value, Atomicity atomicity);
   void emitNativeSetDeallocating(llvm::Value *value);
   //   - unowned references
-  void emitNativeUnownedRetain(llvm::Value *value);
-  void emitNativeUnownedRelease(llvm::Value *value);
-  void emitNativeStrongRetainUnowned(llvm::Value *value);
-  void emitNativeStrongRetainAndUnownedRelease(llvm::Value *value);
+  void emitNativeUnownedRetain(llvm::Value *value, Atomicity atomicity);
+  void emitNativeUnownedRelease(llvm::Value *value, Atomicity atomicity);
+  void emitNativeStrongRetainUnowned(llvm::Value *value, Atomicity atomicity);
+  void emitNativeStrongRetainAndUnownedRelease(llvm::Value *value,
+                                               Atomicity atomicity);
   void emitNativeUnownedInit(llvm::Value *val, Address dest);
   void emitNativeUnownedAssign(llvm::Value *value, Address dest);
   void emitNativeUnownedCopyInit(Address destAddr, Address srcAddr);
@@ -340,10 +347,8 @@ public:
   // Routines for an unknown reference-counting style (meaning,
   // dynamically something compatible with either the ObjC or Swift styles).
   //   - strong references
-  void emitUnknownStrongRetain(llvm::Value *value,
-                               Atomicity atomicity = Atomicity::Atomic);
-  void emitUnknownStrongRelease(llvm::Value *valuei,
-                                Atomicity atomicity = Atomicity::Atomic);
+  void emitUnknownStrongRetain(llvm::Value *value, Atomicity atomicity);
+  void emitUnknownStrongRelease(llvm::Value *value, Atomicity atomicity);
   //   - unowned references
   void emitUnknownUnownedInit(llvm::Value *val, Address dest);
   void emitUnknownUnownedAssign(llvm::Value *value, Address dest);

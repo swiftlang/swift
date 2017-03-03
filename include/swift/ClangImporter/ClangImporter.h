@@ -38,10 +38,10 @@ namespace clang {
   class Sema;
   class TargetInfo;
   class VisibleDeclConsumer;
+  class DeclarationName;
 }
 
 namespace swift {
-
 class ASTContext;
 class ClangImporterOptions;
 class ClangModuleUnit;
@@ -171,7 +171,8 @@ public:
   /// -I or -F.
   ///
   /// \returns true if there was an error adding the search path.
-  bool addSearchPath(StringRef newSearchPath, bool isFramework) override;
+  bool addSearchPath(StringRef newSearchPath, bool isFramework,
+                     bool isSystem) override;
 
   /// Imports an Objective-C header file into the shared imported header module.
   ///
@@ -259,21 +260,20 @@ public:
   /// The return value may be an empty identifier, in which case the enum would
   /// not be imported.
   ///
-  /// This is mostly an implementation detail of the importer, but is also
-  /// used by the debugger.
+  /// This is not used by the importer itself, but is used by the debugger.
   Identifier getEnumConstantName(const clang::EnumConstantDecl *enumConstant);
 
   /// Writes the mangled name of \p clangDecl to \p os.
   void getMangledName(raw_ostream &os, const clang::NamedDecl *clangDecl) const;
 
   using ClangModuleLoader::addDependency;
-  
+
   // Print statistics from the Clang AST reader.
   void printStatistics() const override;
 
   /// Dump Swift lookup tables.
   void dumpSwiftLookupTables();
-  
+
   /// Given the path of a Clang module, collect the names of all its submodules.
   /// Calling this function does not load the module.
   void collectSubModuleNames(
@@ -282,6 +282,9 @@ public:
 
   /// Given a Clang module, decide whether this module is imported already.
   static bool isModuleImported(const clang::Module *M);
+
+  DeclName importName(const clang::NamedDecl *D,
+                      clang::DeclarationName givenName);
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,

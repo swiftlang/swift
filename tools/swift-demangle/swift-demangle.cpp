@@ -79,14 +79,14 @@ static llvm::StringRef substrAfter(llvm::StringRef whole,
 }
 
 static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
+                     swift::Demangle::Context &DCtx,
                      const swift::Demangle::DemangleOptions &options) {
   bool hadLeadingUnderscore = false;
   if (name.startswith("__")) {
     hadLeadingUnderscore = true;
     name = name.substr(1);
   }
-  swift::Demangle::NodePointer pointer =
-      swift::demangle_wrappers::demangleSymbolAsNode(name);
+  swift::Demangle::NodePointer pointer = DCtx.demangleSymbolAsNode(name);
   if (ExpandMode || TreeOnly) {
     llvm::outs() << "Demangling for " << name << '\n';
     swift::demangle_wrappers::NodeDumper(pointer).print(llvm::outs());
@@ -99,8 +99,15 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       // mangling and demangling tests.
       remangled = name;
     } else {
+      // Also accept the future mangling prefix.
+      // TODO: remove the "_S" as soon as MANGLING_PREFIX_STR gets "_S".
       remangled = swift::Demangle::mangleNode(pointer,
-                          /*NewMangling*/ name.startswith(MANGLING_PREFIX_STR));
+                          /*NewMangling*/ name.startswith(MANGLING_PREFIX_STR)
+                                          || name.startswith("_S"));
+      if (name.startswith("_S")) {
+        assert(remangled.find(MANGLING_PREFIX_STR) == 0);
+        remangled = "_S" + remangled.substr(3);
+      }
       if (name != remangled) {
         llvm::errs() << "\nError: re-mangled name \n  " << remangled
                      << "\ndoes not match original name\n  " << name << '\n';
@@ -117,7 +124,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         llvm::errs() << "Can't de-mangle " << name << '\n';
         exit(1);
       }
-      std::string remangled = swift::Demangle::mangleNodeNew(pointer);
+      std::string remangled = swift::Demangle::mangleNode(pointer);
       llvm::outs() << remangled;
       return;
     }
@@ -130,26 +137,41 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       std::string cName = name.str();
       if (!swift::Demangle::isSwiftSymbol(cName.c_str()))
         Classifications += 'N';
-      if (swift::Demangle::isThunkSymbol(name.data(), name.size()))
-        Classifications += 'T';
+      if (DCtx.isThunkSymbol(name)) {
+        if (!Classifications.empty())
+          Classifications += ',';
+        Classifications += "T:";
+        Classifications += DCtx.getThunkTarget(name);
+      } else {
+        assert(DCtx.getThunkTarget(name).empty());
+      }
+      if (pointer && !DCtx.hasSwiftCallingConvention(name)) {
+        if (!Classifications.empty())
+          Classifications += ',';
+        Classifications += 'C';
+      }
       if (!Classifications.empty())
         llvm::outs() << '{' << Classifications << "} ";
     }
     llvm::outs() << (string.empty() ? name : llvm::StringRef(string));
   }
+  DCtx.clear();
 }
 
 static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   // This doesn't handle Unicode symbols, but maybe that's okay.
-  llvm::Regex maybeSymbol("(_T|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
+  // Also accept the future mangling prefix.
+  // TODO: remove the "_S" as soon as MANGLING_PREFIX_STR gets "_S".
+  llvm::Regex maybeSymbol("(_T|_S|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
 
+  swift::Demangle::Context DCtx;
   for (std::string mangled; std::getline(std::cin, mangled);) {
     llvm::StringRef inputContents(mangled);
 
     llvm::SmallVector<llvm::StringRef, 1> matches;
     while (maybeSymbol.match(inputContents, &matches)) {
       llvm::outs() << substrBefore(inputContents, matches.front());
-      demangle(llvm::outs(), matches.front(), options);
+      demangle(llvm::outs(), matches.front(), DCtx, options);
       inputContents = substrAfter(inputContents, matches.front());
     }
 
@@ -176,8 +198,9 @@ int main(int argc, char **argv) {
     CompactMode = true;
     return demangleSTDIN(options);
   } else {
+    swift::Demangle::Context DCtx;
     for (llvm::StringRef name : InputNames) {
-      demangle(llvm::outs(), name, options);
+      demangle(llvm::outs(), name, DCtx, options);
       llvm::outs() << '\n';
     }
 

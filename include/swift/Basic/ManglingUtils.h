@@ -157,7 +157,7 @@ void mangleIdentifier(Mangler &M, StringRef ident) {
         // We found a word substitution!
         assert(WordIdx < 26);
         M.SubstWordsInIdent.push_back({wordStartPos, WordIdx});
-      } else if (wordLen >= 2 && M.Words.size() < 26) {
+      } else if (wordLen >= 2 && M.Words.size() < M.MaxNumWords) {
         // It's a new word: remember it.
         // Note: at this time the word's start position is relative to the
         // begin of the identifier. We must update it afterwards so that it is

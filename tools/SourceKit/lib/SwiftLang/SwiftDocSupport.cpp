@@ -378,6 +378,9 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
 
     initDocGenericParams(D, Info);
 
+    llvm::raw_svector_ostream LocalizationKeyOS(Info.LocalizationKey);
+    ide::getLocalizationKey(D, LocalizationKeyOS);
+
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       llvm::raw_svector_ostream OS(Info.FullyAnnotatedDecl);
       if (SynthesizedTarget)

@@ -149,13 +149,91 @@ class Observers {
   }
 }
 
-// CHECK: [[@LINE+2]]:7 s:14swift_ide_test10ObjCClass1C{{$}}
+// CHECK: [[@LINE+2]]:7 c:objc(cs)ObjCClass1{{$}}
 @objc
 class ObjCClass1 {
-  // CHECK: [[@LINE+1]]:8 s:14swift_ide_test10ObjCClass1C13instanceFunc1ySiF{{$}}
-  func instanceFunc1(_ a: Int) {}
-  // CHECK: [[@LINE+1]]:14 s:14swift_ide_test10ObjCClass1C11staticFunc1ySiFZ{{$}}
+  // CHECK: [[@LINE+1]]:7 c:objc(cs)ObjCClass1(py)instanceVar{{$}}
+  var instanceVar: Int = 1
+  // CHECK: [[@LINE+1]]:14 c:objc(cs)ObjCClass1(cpy)typeVar{{$}}
+  static var typeVar: Int = 1
+
+  // CHECK: [[@LINE+1]]:7 c:objc(cs)ObjCClass1(py)computed{{$}}
+  var computed: Int {
+    // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(im)computed{{$}}
+    get { return 1}
+    // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(im)setComputed:{{$}}
+    set {}
+  }
+
+  // CHECK: [[@LINE+1]]:13 c:objc(cs)ObjCClass1(cpy)typeComputed{{$}}
+  class var typeComputed: Int {
+    // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(cm)typeComputed{{$}}
+    get { return 1 }
+    // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(cm)setTypeComputed:{{$}}
+    set {}
+  }
+
+  // CHECK: [[@LINE+1]]:3 c:objc(cs)ObjCClass1(im)initWithX:{{$}}
+  init(x: Int) {}
+  // CHECK: [[@LINE+1]]:3 c:objc(cs)ObjCClass1(im)init{{$}}
+  init() {}
+
+  // CHECK: [[@LINE+1]]:8 c:objc(cs)ObjCClass1(im)instanceFunc1:{{$}}
+  func instanceFunc1(_ a: Int) {
+
+    // CHECK: [[@LINE+1]]:16 s:14swift_ide_test10ObjCClass1C13instanceFunc1ySiF9LocalEnumL_O
+    @objc enum LocalEnum : Int {
+      // CHECK: [[@LINE+1]]:12 s:14swift_ide_test10ObjCClass1C13instanceFunc1ySiF9LocalEnumL_O8someCaseAfFmF
+      case someCase
+    }
+  }
+  // CHECK: [[@LINE+1]]:14 c:objc(cs)ObjCClass1(cm)staticFunc1:{{$}}
   class func staticFunc1(_ a: Int) {}
+
+  // CHECK: [[@LINE+2]]:10 s:14swift_ide_test10ObjCClass1C9subscriptSiSici{{$}}
+  // CHECK: [[@LINE+1]]:20 s:14swift_ide_test10ObjCClass1C1xL_Siv{{$}}
+  public subscript(x: Int) -> Int {
+
+    // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(im)objectAtIndexedSubscript:{{$}}
+    get { return 1 }
+
+    // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(im)setObject:atIndexedSubscript:{{$}}
+    set {}
+  }
+
+  // CHECK: [[@LINE+2]]:10 s:14swift_ide_test10ObjCClass1C9subscriptSiACci{{$}}
+  // CHECK: [[@LINE+1]]:20 s:14swift_ide_test10ObjCClass1C1xL_ACv{{$}}
+  public subscript(x: ObjCClass1) -> Int {
+
+    // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(im)objectForKeyedSubscript:{{$}}
+    get { return 1 }
+
+    // CHECK: [[@LINE+1]]:5 c:objc(cs)ObjCClass1(im)setObject:forKeyedSubscript:{{$}}
+    set {}
+  }
+
+  // Nested types are not officially supported
+  // CHECK: [[@LINE+1]]:15 s:14swift_ide_test10ObjCClass1C6NestedC{{$}}
+  @objc class Nested {}
+}
+
+// CHECK: [[@LINE+1]]:23 c:objc(pl)ObjCProto{{$}}
+@objc public protocol ObjCProto {
+
+  // CHECK: [[@LINE+1]]:8 c:objc(pl)ObjCProto(im)protoMeth{{$}}
+  func protoMeth()
+}
+
+// CHECK: [[@LINE+1]]:12 c:@E@ObjCEnum{{$}}
+@objc enum ObjCEnum : Int {
+
+  // CHECK: [[@LINE+1]]:8 c:@E@ObjCEnum@ObjCEnumAmazingCase{{$}}
+  case amazingCase
+}
+
+extension ObjCClass1 {
+  // CHECK: [[@LINE+1]]:15 c:objc(cs)ObjCClass1(im)objcExtMethodWithX:{{$}}
+  public func objcExtMethod(x: Int) {}
 }
 
 // CHECK: [[@LINE+1]]:6 s:14swift_ide_test5SuitsO{{$}}

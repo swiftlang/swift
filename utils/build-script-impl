@@ -71,6 +71,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
     swift-stdlib-enable-resilience "0"           "build the Swift stdlib and overlays with resilience enabled"
+    swift-stdlib-use-nonatomic-rc "0"            "build the Swift stdlib and overlays with nonatomic reference count operations enabled"
     swift-stdlib-sil-serialize-all "1"           "build the Swift stdlib and overlays with all method bodies serialized"
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
@@ -1210,41 +1211,6 @@ LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 PLAYGROUNDLOGGER_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundLogger"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundSupport"
 
-if [[ ! -d ${CMARK_SOURCE_DIR} ]]; then
-    echo "Couldn't find cmark source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_LLBUILD}" && ! -d ${LLBUILD_SOURCE_DIR} ]]; then
-    echo "Couldn't find llbuild source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_SWIFTPM}" && ! -d ${SWIFTPM_SOURCE_DIR} ]]; then
-    echo "Couldn't find swiftpm source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_XCTEST}" && ! -d ${XCTEST_SOURCE_DIR} ]]; then
-    echo "Couldn't find XCTest source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_FOUNDATION}" && ! -d ${FOUNDATION_SOURCE_DIR} ]]; then
-    echo "Couldn't find Foundation source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_LIBDISPATCH}" && ! -d ${LIBDISPATCH_SOURCE_DIR} ]]; then
-    echo "Couldn't find libdispatch source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_LIBICU}" && ! -d ${LIBICU_SOURCE_DIR} ]]; then
-    echo "Couldn't find libicu source directory."
-    exit 1
-fi
-
 if [[ ! "${SKIP_BUILD_PLAYGROUNDLOGGER}" && ! -d ${PLAYGROUNDLOGGER_SOURCE_DIR} ]]; then
     echo "Couldn't find PlaygroundLogger source directory."
     exit 1
@@ -1688,6 +1654,9 @@ function swift_c_flags() {
     echo -n "${COMMON_C_FLAGS}"
     if [[ $(is_cmake_release_build_type "${SWIFT_BUILD_TYPE}") ]] ; then
         echo -n " -fno-stack-protector"
+    fi
+    if [[ "$(true_false "${SWIFT_STDLIB_USE_NONATOMIC_RC}")" == "TRUE" ]]; then
+        echo -n " -DSWIFT_STDLIB_USE_NONATOMIC_RC"
     fi
 }
 
@@ -2148,6 +2117,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
                     -DSWIFT_STDLIB_ENABLE_RESILIENCE:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_RESILIENCE}")
+                    -DSWIFT_STDLIB_USE_NONATOMIC_RC:BOOL=$(true_false "${SWIFT_STDLIB_USE_NONATOMIC_RC}")
                     -DSWIFT_STDLIB_SIL_SERIALIZE_ALL:BOOL=$(true_false "${SWIFT_STDLIB_SIL_SERIALIZE_ALL}")
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"

@@ -46,9 +46,10 @@ class Derived<T> : Base<T> {
 // Derived has no subclasses and it is a WMO compilation.
 // CHECK: sil hidden [noinline] @_T022devirt_unbound_generic5test2yAA7DerivedCyxGlF
 // CHECK-NOT: class_method
-// CHECK: function_ref @_T022devirt_unbound_generic7DerivedC3fooyyF
-// CHECK-NOT: class_method
+// CHECK-NOT: witness_method
+// CHECK-NOT: apply
 // CHECK: return
+// CHEC: end sil function '_T022devirt_unbound_generic5test2yAA7DerivedCyxGlF'
 @inline(never)
 func test2<T>(_ d: Derived<T>) {
    d.foo()
@@ -62,9 +63,10 @@ public func doTest2<T>(_ t:T) {
 // Derived has no subclasses and it is a WMO compilation.
 // CHECK: sil hidden [noinline] @_T022devirt_unbound_generic5test3yAA7DerivedCyxGlF
 // CHECK-NOT: class_method
-// CHECK: function_ref @_T022devirt_unbound_generic7DerivedC3booyyFZ
-// CHECK-NOT: class_method
+// CHECK-NOT: witness_method
+// CHECK-NOT: apply
 // CHECK: return
+// CHECK: end sil function '_T022devirt_unbound_generic5test3yAA7DerivedCyxGlF'
 @inline(never)
 func test3<T>(_ d: Derived<T>) {
    type(of: d).boo()

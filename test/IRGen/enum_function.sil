@@ -12,8 +12,8 @@ bb0:
   return %0 : $()
 }
 
-// CHECK-64:  define hidden void @test1([[WORD:i64]], [[WORD]])
-// CHECK-32:  define hidden void @test1([[WORD:i32]], [[WORD]])
+// CHECK-64:  define hidden swiftcc void @test1([[WORD:i64]], [[WORD]])
+// CHECK-32:  define hidden swiftcc void @test1([[WORD:i32]], [[WORD]])
 sil hidden @test1 : $@convention(thin) (@owned Optional<() -> ()>) -> () {
 bb0(%0 : $Optional<() -> ()>):
   // CHECK: call void @_T0SqWy
@@ -30,7 +30,7 @@ bb0(%0 : $Optional<() -> ()>):
 bb1(%1 : $() -> ()):
 
   // CHECK: [[FNPTR3:%.*]] = bitcast i8* [[FNPTR2]] to void (%swift.refcounted*)*
-  // CHECK: call void [[FNPTR3]](%swift.refcounted* [[CTX2]])
+  // CHECK: call swiftcc void [[FNPTR3]](%swift.refcounted* swiftself [[CTX2]])
   apply %1() : $() -> ()
 
   // CHECK: br label [[CONT:%[0-9]+]]
@@ -39,7 +39,7 @@ bb1(%1 : $() -> ()):
 bb2:
   %4 = function_ref @test_helper : $@convention(thin) () -> ()
   apply %4() : $@convention(thin) () -> ()
-  // CHECK: call void @test_helper()
+  // CHECK: call swiftcc void @test_helper()
   // CHECK: br label [[CONT]]
   br bb3
 

@@ -4,7 +4,7 @@
 
 // <rdar://problem/13793646>
 struct OptionalStreamAdaptor<T : IteratorProtocol> {
-  // CHECK: define hidden void @_T015generic_ternary21OptionalStreamAdaptorV4next{{[_0-9a-zA-Z]*}}F(%Sq{{.*}}* noalias nocapture sret, %swift.type* %"OptionalStreamAdaptor<T>", %V15generic_ternary21OptionalStreamAdaptor* nocapture dereferenceable({{.*}}))
+  // CHECK: define hidden swiftcc void @_T015generic_ternary21OptionalStreamAdaptorV4next{{[_0-9a-zA-Z]*}}F(%TSq{{.*}}* noalias nocapture sret, %swift.type* %"OptionalStreamAdaptor<T>", %T15generic_ternary21OptionalStreamAdaptorV* nocapture swiftself dereferenceable({{.*}}))
   mutating
   func next() -> Optional<T.Element> {
     return x[0].next()

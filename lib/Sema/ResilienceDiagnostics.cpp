@@ -100,7 +100,8 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
     
   // Protocol requirements are not versioned because there's no
   // global entry point.
-  if (isa<ProtocolDecl>(D->getDeclContext()) && isRequirement(D))
+  if (isa<ProtocolDecl>(D->getDeclContext()) &&
+      D->isProtocolRequirement())
     return false;
 
   // FIXME: Figure out what to do with typealiases
@@ -115,9 +116,14 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
   return true;
 }
 
-void TypeChecker::diagnoseResilientValueConstructor(ConstructorDecl *ctor) {
+void TypeChecker::diagnoseResilientConstructor(ConstructorDecl *ctor) {
   auto nominalDecl = ctor->getDeclContext()
     ->getAsNominalTypeOrNominalTypeExtensionContext();
+
+  // These restrictions only apply to concrete types, and not protocol
+  // extensions.
+  if (isa<ProtocolDecl>(nominalDecl))
+    return;
 
   bool isDelegating =
       (ctor->getDelegatingOrChainedInitKind(&Diags) ==
@@ -131,8 +137,10 @@ void TypeChecker::diagnoseResilientValueConstructor(ConstructorDecl *ctor) {
       // cannot initialize stored properties directly, and must chain to
       // another initializer.
       diagnose(ctor->getLoc(),
-               diag::designated_init_inlineable_resilient,
-               ctor->getDeclContext()->getDeclaredInterfaceType(),
+               isa<ClassDecl>(nominalDecl)
+                 ? diag::class_designated_init_inlineable_resilient
+                 : diag::designated_init_inlineable_resilient,
+               nominalDecl->getDeclaredInterfaceType(),
                getFragileFunctionKind(ctor));
     } else {
       // A designated initializer defined on an extension of a resilient
@@ -140,7 +148,7 @@ void TypeChecker::diagnoseResilientValueConstructor(ConstructorDecl *ctor) {
       // properties directly, and must chain to another initializer.
       diagnose(ctor->getLoc(),
                diag::designated_init_in_extension_resilient,
-               ctor->getDeclContext()->getDeclaredInterfaceType());
+               nominalDecl->getDeclaredInterfaceType());
     }
   }
 }

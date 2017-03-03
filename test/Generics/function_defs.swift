@@ -295,4 +295,4 @@ func badTypeConformance1<T>(_: T) where Int : EqualComparable {} // expected-err
 func badTypeConformance2<T>(_: T) where T.Blarg : EqualComparable { } // expected-error{{'Blarg' is not a member type of 'T'}}
 
 func badSameType<T, U : GeneratesAnElement, V>(_ : T)
-  where T == U.Element, U.Element == V {} // expected-error 2{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
+  where T == U.Element, U.Element == V {} // expected-error{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}

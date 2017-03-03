@@ -19,9 +19,10 @@ import gizmo
     // CHECK:   [[OPT_NSDICT:%[0-9]+]] = enum $Optional<NSDictionary>, #Optional.some!enumelt.1, [[NSDICT_COPY]] : $NSDictionary
     // CHECK:   [[DICT_META:%[0-9]+]] = metatype $@thin Dictionary<Foo, Foo>.Type
     // CHECK:   [[DICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[OPT_NSDICT]], [[DICT_META]])
-
+    // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
     // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_T024objc_dictionary_bridging3FooC23bridge_Dictionary_param{{[_0-9a-zA-Z]*}}F
-    // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[DICT]], [[SELF_COPY]]) : $@convention(method) (@owned Dictionary<Foo, Foo>, @guaranteed Foo) -> ()
+    // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[DICT]], [[BORROWED_SELF_COPY]]) : $@convention(method) (@owned Dictionary<Foo, Foo>, @guaranteed Foo) -> ()
+    // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
     // CHECK:   destroy_value [[SELF_COPY]]
     // CHECK:   return [[RESULT]] : $()
   }
@@ -32,8 +33,10 @@ import gizmo
   func bridge_Dictionary_result() -> Dictionary<Foo, Foo> { 
     // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
+    // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
     // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_T024objc_dictionary_bridging3FooC24bridge_Dictionary_result{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
-    // CHECK:   [[DICT:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF_COPY]]) : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
+    // CHECK:   [[DICT:%[0-9]+]] = apply [[SWIFT_FN]]([[BORROWED_SELF_COPY]]) : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
+    // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
     // CHECK:   destroy_value [[SELF_COPY]]
 
     // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_T0s10DictionaryV10FoundationE19_bridgeToObjectiveCSo12NSDictionaryCyF
@@ -51,8 +54,10 @@ import gizmo
   // CHECK-LABEL: sil hidden [thunk] @_T024objc_dictionary_bridging3FooC8propertys10DictionaryVyAcCGfgTo : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
   // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
+  // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:   [[GETTER:%[0-9]+]] = function_ref @_T024objc_dictionary_bridging3FooC8propertys10DictionaryVyAcCGfg : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
-  // CHECK:   [[DICT:%[0-9]+]] = apply [[GETTER]]([[SELF_COPY]]) : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
+  // CHECK:   [[DICT:%[0-9]+]] = apply [[GETTER]]([[BORROWED_SELF_COPY]]) : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
+  // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK:   destroy_value [[SELF_COPY]]
   // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_T0s10DictionaryV10FoundationE19_bridgeToObjectiveCSo12NSDictionaryCyF
   // CHECK:   [[BORROWED_DICT:%.*]] = begin_borrow [[DICT]]
@@ -72,8 +77,10 @@ import gizmo
   // CHECK:   [[DICT_META:%[0-9]+]] = metatype $@thin Dictionary<Foo, Foo>.Type
   // CHECK:   [[DICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[OPT_NSDICT]], [[DICT_META]])
 
+  // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:   [[SETTER:%[0-9]+]] = function_ref @_T024objc_dictionary_bridging3FooC8propertys10DictionaryVyAcCGfs : $@convention(method) (@owned Dictionary<Foo, Foo>, @guaranteed Foo) -> ()
-  // CHECK:   [[RESULT:%[0-9]+]] = apply [[SETTER]]([[DICT]], [[SELF_COPY]]) : $@convention(method) (@owned Dictionary<Foo, Foo>, @guaranteed Foo) -> ()
+  // CHECK:   [[RESULT:%[0-9]+]] = apply [[SETTER]]([[DICT]], [[BORROWED_SELF_COPY]]) : $@convention(method) (@owned Dictionary<Foo, Foo>, @guaranteed Foo) -> ()
+  // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK:   destroy_value [[SELF_COPY]]
   // CHECK:   return [[RESULT]] : $()
 

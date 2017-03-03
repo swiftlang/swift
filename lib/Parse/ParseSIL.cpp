@@ -15,7 +15,6 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/SIL/AbstractionPattern.h"
@@ -201,6 +200,25 @@ namespace {
       return parseSILIdentifier(Result, L, Diagnostic(ID, Args...));
     }
 
+    template <typename T, typename... DiagArgTypes, typename... ArgTypes>
+    bool parseSILIdentifierSwitch(T &Result, ArrayRef<StringRef> Strings,
+                                  Diag<DiagArgTypes...> ID, ArgTypes... Args) {
+      Identifier TmpResult;
+      SourceLoc L;
+      if (parseSILIdentifier(TmpResult, L, Diagnostic(ID, Args...))) {
+        return true;
+      }
+
+      auto Iter = std::find(Strings.begin(), Strings.end(), TmpResult.str());
+      if (Iter == Strings.end()) {
+        P.diagnose(P.Tok, Diagnostic(ID, Args...));
+        return true;
+      }
+
+      Result = ValueOwnershipKind(*Iter);
+      return false;
+    }
+
     template<typename ...DiagArgTypes, typename ...ArgTypes>
     bool parseSILIdentifier(Identifier &Result, SourceLoc &L,
                             Diag<DiagArgTypes...> ID, ArgTypes... Args) {
@@ -227,31 +245,17 @@ namespace {
       TypeLoc = P.Tok.getLoc();
       return parseASTType(result);
     }
-    bool parseSILOwnership(Optional<ValueOwnershipKind> &OwnershipKind) {
-      // We pare here @ <identifier>.
-      if (P.consumeIf(tok::at_sign) && P.Tok.isNot(tok::identifier)) {
+    bool parseSILOwnership(ValueOwnershipKind &OwnershipKind) {
+      // We parse here @ <identifier>.
+      if (!P.consumeIf(tok::at_sign)) {
         // Add error here.
         return true;
       }
 
-      OwnershipKind =
-          llvm::StringSwitch<Optional<ValueOwnershipKind>>(P.Tok.getText())
-              .Case("trivial",
-                    Optional<ValueOwnershipKind>(ValueOwnershipKind::Trivial))
-              .Case("unowned",
-                    Optional<ValueOwnershipKind>(ValueOwnershipKind::Unowned))
-              .Case("owned",
-                    Optional<ValueOwnershipKind>(ValueOwnershipKind::Owned))
-              .Case("guaranteed", Optional<ValueOwnershipKind>(
-                                      ValueOwnershipKind::Guaranteed))
-              .Default(None);
-
-      if (OwnershipKind.hasValue()) {
-        P.consumeToken();
-        return false;
-      }
-
-      return true;
+      StringRef AllOwnershipKinds[4] = {"trivial", "unowned", "owned",
+                                        "guaranteed"};
+      return parseSILIdentifierSwitch(OwnershipKind, AllOwnershipKinds,
+                                      diag::expected_sil_value_ownership_kind);
     }
     bool parseSILType(SILType &Result,
                       GenericEnvironment *&genericEnv,
@@ -1444,41 +1448,41 @@ bool getApplySubstitutionsFromParsed(
 
   auto loc = parses[0].loc;
 
-  // Collect conformance requirements in a convenient form.
-  llvm::DenseMap<TypeBase *, SmallVector<ProtocolDecl *, 2>> conformsTo;
-  for (auto reqt : env->getGenericSignature()->getRequirements()) {
-    if (reqt.getKind() == RequirementKind::Conformance) {
-      auto canTy = reqt.getFirstType()->getCanonicalType();
-      auto nominal = reqt.getSecondType()->getAnyNominal();
-      conformsTo[canTy.getPointer()].push_back(cast<ProtocolDecl>(nominal));
-    }
-  }
-
   // The replacement is for the corresponding dependent type by ordering.
-  for (auto depTy : env->getGenericSignature()->getAllDependentTypes()) {
+  auto result = env->getGenericSignature()->enumeratePairedRequirements(
+    [&](Type depTy, ArrayRef<Requirement> reqts) -> bool {
+      if (parses.empty()) {
+        SP.P.diagnose(loc, diag::sil_missing_substitutions);
+        return true;
+      }
+      auto parsed = parses.front();
+      parses = parses.slice(1);
 
-    auto canTy = depTy->getCanonicalType().getPointer();
+      SmallVector<ProtocolConformanceRef, 2> conformances;
+      SmallVector<ProtocolDecl *, 2> protocols;
+      for (auto reqt : reqts) {
+        protocols.push_back(reqt.getSecondType()
+                            ->castTo<ProtocolType>()->getDecl());
+      }
 
-    if (parses.empty()) {
-      SP.P.diagnose(loc, diag::sil_missing_substitutions);
-      return true;
-    }
-    auto parsed = parses.front();
-    parses = parses.slice(1);
+      if (getConformancesForSubstitution(SP.P, protocols,
+                                         parsed.replacement,
+                                         parsed.loc, conformances))
+        return true;
 
-    SmallVector<ProtocolConformanceRef, 2> conformances;
-    if (getConformancesForSubstitution(SP.P, conformsTo[canTy],
-                                       parsed.replacement,
-                                       parsed.loc, conformances))
-      return true;
+      subs.push_back({parsed.replacement,
+                      SP.P.Context.AllocateCopy(conformances)});
+      return false;
+    });
 
-    subs.push_back({parsed.replacement,
-                    SP.P.Context.AllocateCopy(conformances)});
-  }
+  if (result)
+    return true;
+
   if (!parses.empty()) {
     SP.P.diagnose(loc, diag::sil_too_many_substitutions);
     return true;
   }
+
   return false;
 }
 
@@ -1744,7 +1748,24 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     P.diagnose(loc, diag::expected_tok_in_sil_instr, "cast consumption kind");
     return true;
   };
-  
+
+  auto parseOpenExistAddrKind = [&](Identifier name, SourceLoc loc,
+                                    OpenedExistentialAccess &out) -> bool {
+    auto kind =
+        llvm::StringSwitch<Optional<OpenedExistentialAccess>>(name.str())
+            .Case("mutable_access", OpenedExistentialAccess::Mutable)
+            .Case("immutable_access", OpenedExistentialAccess::Immutable)
+            .Default(None);
+
+    if (kind) {
+      out = kind.getValue();
+      return false;
+    }
+    P.diagnose(loc, diag::expected_tok_in_sil_instr,
+               "opened existential access kind");
+    return true;
+  };
+
   // Validate the opcode name, and do opcode-specific parsing logic based on the
   // opcode we find.
   SILInstruction *ResultVal;
@@ -2031,7 +2052,18 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     SILType Ty;
     Identifier ToToken;
     SourceLoc ToLoc;
-    
+
+    OpenedExistentialAccess accessKind;
+    Identifier accessKindToken;
+    SourceLoc accessKindLoc;
+    if (Opcode == ValueKind::OpenExistentialAddrInst) {
+      if (parseSILIdentifier(accessKindToken, accessKindLoc,
+                             diag::expected_tok_in_sil_instr,
+                             "opened existential access kind") ||
+          parseOpenExistAddrKind(accessKindToken, accessKindLoc, accessKind))
+        return true;
+    }
+
     if (parseTypedValueRef(Val, B) ||
         parseSILIdentifier(ToToken, ToLoc,
                            diag::expected_tok_in_sil_instr, "to") ||
@@ -2048,7 +2080,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
     switch (Opcode) {
     case ValueKind::OpenExistentialAddrInst:
-      ResultVal = B.createOpenExistentialAddr(InstLoc, Val, Ty);
+      ResultVal = B.createOpenExistentialAddr(InstLoc, Val, Ty, accessKind);
       break;
 
     case ValueKind::OpenExistentialMetatypeInst:
@@ -2097,6 +2129,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
   } break;
 
     UNARY_INSTRUCTION(FixLifetime)
+    UNARY_INSTRUCTION(EndLifetime)
     UNARY_INSTRUCTION(CopyBlock)
     UNARY_INSTRUCTION(IsUnique)
     UNARY_INSTRUCTION(IsUniqueOrPinned)
@@ -2106,9 +2139,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     UNARY_INSTRUCTION(DestroyValue)
     UNARY_INSTRUCTION(CondFail)
     UNARY_INSTRUCTION(EndBorrowArgument)
-    UNARY_INSTRUCTION(UnmanagedReleaseValue)
-    UNARY_INSTRUCTION(UnmanagedRetainValue)
-    UNARY_INSTRUCTION(UnmanagedAutoreleaseValue)
+    REFCOUNTING_INSTRUCTION(UnmanagedReleaseValue)
+    REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
+    REFCOUNTING_INSTRUCTION(UnmanagedAutoreleaseValue)
     REFCOUNTING_INSTRUCTION(StrongPin)
     REFCOUNTING_INSTRUCTION(StrongRetain)
     REFCOUNTING_INSTRUCTION(StrongRelease)
@@ -2134,6 +2167,29 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
      ResultVal = B.createDebugValue(InstLoc, Val, VarInfo);
    else
      ResultVal = B.createDebugValueAddr(InstLoc, Val, VarInfo);
+   break;
+ }
+
+ // unchecked_ownership_conversion <reg> : <type>, <ownership> to <ownership>
+ case ValueKind::UncheckedOwnershipConversionInst: {
+   ValueOwnershipKind LHSKind = ValueOwnershipKind::Any;
+   ValueOwnershipKind RHSKind = ValueOwnershipKind::Any;
+   SourceLoc Loc;
+
+   if (parseTypedValueRef(Val, Loc, B) ||
+       P.parseToken(tok::comma, diag::expected_sil_colon,
+                    "unchecked_ownership_conversion value ownership kind "
+                    "conversion specification") ||
+       parseSILOwnership(LHSKind) || parseVerbatim("to") ||
+       parseSILOwnership(RHSKind) || parseSILDebugLocation(InstLoc, B)) {
+     return true;
+   }
+
+   if (Val.getOwnershipKind() != LHSKind) {
+     return true;
+   }
+
+   ResultVal = B.createUncheckedOwnershipConversion(InstLoc, Val, RHSKind);
    break;
  }
 
@@ -2421,6 +2477,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
   // Checked Conversion instructions.
   case ValueKind::UnconditionalCheckedCastInst:
+  case ValueKind::UnconditionalCheckedCastOpaqueInst:
   case ValueKind::CheckedCastBranchInst: {
     SILType ty;
     SILValue destVal;
@@ -2443,7 +2500,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
         return true;
       ResultVal = B.createUnconditionalCheckedCast(InstLoc, Val, ty);
       break;
-    }    
+    } else if (Opcode == ValueKind::UnconditionalCheckedCastOpaqueInst) {
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+      ResultVal = B.createUnconditionalCheckedCastOpaque(InstLoc, Val, ty);
+      break;
+    }
     // The conditional cast still needs its branch destinations.
     Identifier successBBName, failureBBName;
     SourceLoc successBBLoc, failureBBLoc;
@@ -3691,6 +3753,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     ResultVal = B.createDeinitExistentialAddr(InstLoc, Val);
     break;
   }
+  case ValueKind::DeinitExistentialOpaqueInst: {
+    if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createDeinitExistentialOpaque(InstLoc, Val);
+    break;
+  }
   case ValueKind::InitExistentialAddrInst: {
     CanType Ty;
     SourceLoc TyLoc;
@@ -3717,6 +3785,27 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     
     ResultVal = B.createInitExistentialAddr(InstLoc, Val, Ty, LoweredTy,
                                         conformances);
+    break;
+  }
+  case ValueKind::InitExistentialOpaqueInst: {
+    CanType FormalConcreteTy;
+    SILType ExistentialTy;
+    SourceLoc TyLoc;
+
+    if (parseTypedValueRef(Val, B) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$") ||
+        parseASTType(FormalConcreteTy, TyLoc) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILType(ExistentialTy) || parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    ArrayRef<ProtocolConformanceRef> conformances =
+        collectExistentialConformances(P, FormalConcreteTy, TyLoc,
+                                       ExistentialTy.getSwiftRValueType());
+
+    ResultVal = B.createInitExistentialOpaque(
+        InstLoc, ExistentialTy, FormalConcreteTy, Val, conformances);
     break;
   }
   case ValueKind::AllocExistentialBoxInst: {
@@ -4106,7 +4195,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
     if (P.consumeIf(tok::l_paren)) {
       do {
         SILType Ty;
-        Optional<ValueOwnershipKind> OwnershipKind;
+        ValueOwnershipKind OwnershipKind = ValueOwnershipKind::Any;
         SourceLoc NameLoc;
         StringRef Name = P.Tok.getText();
         if (P.parseToken(tok::sil_local_name, NameLoc,
@@ -4130,9 +4219,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
         if (IsEntry) {
           Arg = BB->createFunctionArgument(Ty);
         } else {
-          Arg = BB->createPHIArgument(
-              Ty, OwnershipKind.getValueOr(
-                      ValueOwnershipKind(ValueOwnershipKind::Any)));
+          Arg = BB->createPHIArgument(Ty, OwnershipKind);
         }
         setLocalValue(Arg, Name, NameLoc);
       } while (P.consumeIf(tok::comma));
@@ -4330,6 +4417,9 @@ bool Parser::parseDeclSILStage() {
   } else if (Tok.isContextualKeyword("canonical")) {
     stage = SILStage::Canonical;
     consumeToken();
+  } else if (Tok.isContextualKeyword("lowered")) {
+    stage = SILStage::Lowered;
+    consumeToken();
   } else {
     diagnose(Tok, diag::expected_sil_stage_name);
     consumeToken();
@@ -4503,7 +4593,7 @@ static ProtocolDecl *parseProtocolDecl(Parser &P, SILParser &SP) {
 }
 
 static AssociatedTypeDecl *parseAssociatedTypeDecl(Parser &P, SILParser &SP,
-           ProtocolDecl *proto) {
+                                                   ProtocolDecl *proto) {
   Identifier DeclName;
   SourceLoc DeclLoc;
   if (SP.parseSILIdentifier(DeclName, DeclLoc, diag::expected_sil_value_name))
@@ -4519,6 +4609,59 @@ static AssociatedTypeDecl *parseAssociatedTypeDecl(Parser &P, SILParser &SP,
     return nullptr;
   }
   return dyn_cast<AssociatedTypeDecl>(VD);
+}
+
+static bool parseAssociatedTypePath(SILParser &SP,
+                                    SmallVectorImpl<Identifier> &path) {
+  do {
+    Identifier name;
+    SourceLoc loc;
+    if (SP.parseSILIdentifier(name, loc, diag::expected_sil_value_name))
+      return false;
+    path.push_back(name);
+  } while (SP.P.consumeIf(tok::period));
+
+  return true;
+}
+
+static bool matchesAssociatedTypePath(CanType assocType,
+                                      ArrayRef<Identifier> path) {
+  if (auto memberType = dyn_cast<DependentMemberType>(assocType)) {
+    return (!path.empty() &&
+            memberType->getName() == path.back() &&
+            matchesAssociatedTypePath(memberType.getBase(), path.drop_back()));
+  } else {
+    assert(isa<GenericTypeParamType>(assocType));
+    return path.empty();
+  }
+}
+
+static CanType parseAssociatedTypePath(Parser &P, SILParser &SP,
+                                       ProtocolDecl *proto) {
+  SourceLoc loc = SP.P.Tok.getLoc();
+  SmallVector<Identifier, 4> path;
+  if (!parseAssociatedTypePath(SP, path))
+    return CanType();
+
+  // This is only used for parsing associated conformances, so we can
+  // go ahead and just search the requirement signature for something that
+  // matches the path.
+  for (auto &reqt : proto->getRequirementSignature()->getRequirements()) {
+    if (reqt.getKind() != RequirementKind::Conformance)
+      continue;
+    CanType assocType = reqt.getFirstType()->getCanonicalType();
+    if (matchesAssociatedTypePath(assocType, path))
+      return assocType;
+  }
+
+  SmallString<128> name;
+  name += path[0].str();
+  for (auto elt : makeArrayRef(path).slice(1)) {
+    name += '.';
+    name += elt.str();
+  }
+  P.diagnose(loc, diag::sil_witness_assoc_conf_not_found, name);
+  return CanType();
 }
 
 static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
@@ -4764,8 +4907,7 @@ bool Parser::parseSILWitnessTable() {
       if (EntryKeyword.str() == "associated_type_protocol") {
         if (parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
           return true;
-        AssociatedTypeDecl *assoc = parseAssociatedTypeDecl(*this,
-                                        WitnessState, proto);
+        CanType assoc = parseAssociatedTypePath(*this, WitnessState, proto);
         if (!assoc)
           return true;
         if (parseToken(tok::colon, diag::expected_sil_witness_colon))
@@ -4788,7 +4930,7 @@ bool Parser::parseSILWitnessTable() {
         }
 
         witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
-          assoc, proto, ProtocolConformanceRef(conformance)
+          assoc, proto, conformance
         });
         continue;
       }

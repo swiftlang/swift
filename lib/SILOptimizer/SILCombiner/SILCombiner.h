@@ -190,6 +190,7 @@ public:
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
   SILInstruction *visitLoadInst(LoadInst *LI);
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
+  SILInstruction *visitAllocRefInst(AllocRefInst *AR);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
   SILInstruction *visitPointerToAddressInst(PointerToAddressInst *PTAI);
@@ -226,7 +227,6 @@ public:
   SILInstruction *visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
   SILInstruction *visitEnumInst(EnumInst *EI);
   SILInstruction *visitConvertFunctionInst(ConvertFunctionInst *CFI);
-  SILInstruction *visitWitnessMethodInst(WitnessMethodInst *WMI);
 
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(BuiltinInst *AI);

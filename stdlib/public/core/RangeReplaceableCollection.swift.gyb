@@ -237,10 +237,10 @@ public protocol _RangeReplaceableIndexable : _Indexable {
 /// add an empty initializer and the `replaceSubrange(_:with:)` method to your
 /// custom type. `RangeReplaceableCollection` provides default implementations
 /// of all its other methods using this initializer and method. For example,
-/// the `removeSubrange` method is implemented by calling `replaceRange` with
-/// an empty collection for the `newElements` parameter. You can override any
-/// of the protocol's required methods to provide your own custom
-/// implementation.
+/// the `removeSubrange(_:)` method is implemented by calling 
+/// `replaceSubrange(_:with:)` with an empty collection for the `newElements` 
+/// parameter. You can override any of the protocol's required methods to 
+/// provide your own custom implementation.
 public protocol RangeReplaceableCollection
   : _RangeReplaceableIndexable, Collection
 {

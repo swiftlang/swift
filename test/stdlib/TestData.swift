@@ -921,6 +921,29 @@ class TestData : TestDataSuper {
         expectEqual(d[4], 0x02)
         expectEqual(d[5], 0x02)
     }
+
+    func test_rangeSlice() {
+        var a: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7]
+        var d = Data(bytes: a)
+        for i in 0..<d.count {
+            for j in i..<d.count {
+                let slice = d[i..<j]
+                if i == 1 && j == 2 {
+                    print("here")
+                    
+                }
+                expectEqual(slice.count, j - i, "where index range is \(i)..<\(j)")
+                expectEqual(slice.map { $0 }, a[i..<j].map { $0 }, "where index range is \(i)..<\(j)")
+                expectEqual(slice.startIndex, i, "where index range is \(i)..<\(j)")
+                expectEqual(slice.endIndex, j, "where index range is \(i)..<\(j)")
+                for n in slice.startIndex..<slice.endIndex {
+                    let p = slice[n]
+                    let q = a[n]
+                    expectEqual(p, q, "where index range is \(i)..<\(j) at index \(n)")
+                }
+            }
+        }
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -1026,7 +1049,9 @@ DataTests.test("bounding failure append absurd length") {
     data.append("hello", count: Int.min)
 }
 
-DataTests.test("bounding failure subscript") {
+DataTests.test("bounding failure subscript")
+        .skip(.always("fails with resilient stdlib (rdar://problem/30560514)"))
+        .code {
     var data = "Hello World".data(using: .utf8)!
     expectCrashLater()
     data[100] = 4

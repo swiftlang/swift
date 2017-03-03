@@ -19,9 +19,9 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -40,8 +40,9 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
 #include <string>
 
@@ -464,7 +465,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case ChunkKind::Equal:
     case ChunkKind::Whitespace:
       AnnotatedTextChunk = C.isAnnotation();
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case ChunkKind::CallParameterName:
     case ChunkKind::CallParameterInternalName:
     case ChunkKind::CallParameterColon:
@@ -692,7 +693,7 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
 #define POUND_KEYWORD(X) case CodeCompletionKeywordKind::pound_##X: \
       Prefix.append("[#" #X "]"); \
       break;
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
     }
     break;
   case ResultKind::Pattern:
@@ -1354,6 +1355,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     case DeclContextKind::TopLevelCodeDecl:
       return typeCheckTopLevelCodeDecl(cast<TopLevelCodeDecl>(DC));
     }
+
+    llvm_unreachable("Unhandled DeclContextKind in switch.");
   }
 
   /// \returns true on success, false on failure.
@@ -4667,7 +4670,7 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink) {
   };
 
 #define DECL_KEYWORD(kw) AddKeyword(#kw, CodeCompletionKeywordKind::kw_##kw);
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
 
   // Context-sensitive keywords.
   auto AddCSKeyword = [&](StringRef Name) {
@@ -4701,7 +4704,7 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody) 
     Builder.addTextChunk(Name);
   };
 #define STMT_KEYWORD(kw) AddKeyword(#kw, CodeCompletionKeywordKind::kw_##kw);
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
 
   // Throw is not marked as a STMT_KEYWORD.
   AddKeyword("throw", CodeCompletionKeywordKind::kw_throw);
@@ -4775,7 +4778,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::StmtOrExpr:
     addDeclKeywords(Sink);
     addStmtKeywords(Sink, MaybeFuncBody);
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case CompletionKind::AssignmentRHS:
   case CompletionKind::ReturnStmtExpr:
   case CompletionKind::PostfixExprBeginning:
@@ -5181,7 +5184,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::KeyPathExprDot:
     Lookup.setHaveDot(SourceLoc());
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case CompletionKind::KeyPathExpr: {
     Lookup.setIsKeyPathExpr();

@@ -48,19 +48,23 @@ func test0(c c: C) {
   unowned var x = c
   // CHECK:   [[X:%.*]] = alloc_box ${ var @sil_unowned C }
   // CHECK:   [[PBX:%.*]] = project_box [[X]]
-  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:   [[T2:%.*]] = ref_to_unowned [[ARG_COPY]] : $C  to $@sil_unowned C
   // CHECK:   unowned_retain [[T2]] : $@sil_unowned C
   // CHECK:   store [[T2]] to [init] [[PBX]] : $*@sil_unowned C
   // CHECK:   destroy_value [[ARG_COPY]]
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 
   a.x = c
-  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:   [[T1:%.*]] = struct_element_addr [[A]] : $*A, #A.x
   // CHECK:   [[T2:%.*]] = ref_to_unowned [[ARG_COPY]] : $C
   // CHECK:   unowned_retain [[T2]] : $@sil_unowned C
   // CHECK:   assign [[T2]] to [[T1]] : $*@sil_unowned C
   // CHECK:   destroy_value [[ARG_COPY]]
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 
   a.x = x
   // CHECK:   [[T2:%.*]] = load [take] [[PBX]] : $*@sil_unowned C     
@@ -84,11 +88,13 @@ func testunowned_local() -> C {
 
   // CHECK: [[UC:%.*]] = alloc_box ${ var @sil_unowned C }, let, name "uc"
   // CHECK: [[PB_UC:%.*]] = project_box [[UC]]
-  // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
+  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
+  // CHECK: [[C_COPY:%.*]] = copy_value [[BORROWED_C]]
   // CHECK: [[tmp1:%.*]] = ref_to_unowned [[C_COPY]] : $C to $@sil_unowned C
   // CHECK: unowned_retain [[tmp1]]
   // CHECK: store [[tmp1]] to [init] [[PB_UC]]
   // CHECK: destroy_value [[C_COPY]]
+  // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   unowned let uc = c
 
   // CHECK: [[tmp2:%.*]] = load [take] [[PB_UC]]
@@ -131,13 +137,15 @@ class TestUnownedMember {
 // CHECK-LABEL: sil hidden @_T07unowned17TestUnownedMemberCAcA1CC5inval_tcfc :
 // CHECK: bb0([[ARG1:%.*]] : $C, [[SELF_PARAM:%.*]] : $TestUnownedMember):
 // CHECK:   [[SELF:%.*]] = mark_uninitialized [rootself] [[SELF_PARAM]] : $TestUnownedMember
-// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
 // CHECK:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+// CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
+// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
 // CHECK:   [[FIELDPTR:%.*]] = ref_element_addr [[BORROWED_SELF]] : $TestUnownedMember, #TestUnownedMember.member
 // CHECK:   [[INVAL:%.*]] = ref_to_unowned [[ARG1_COPY]] : $C to $@sil_unowned C
 // CHECK:   unowned_retain [[INVAL]] : $@sil_unowned C
 // CHECK:   assign [[INVAL]] to [[FIELDPTR]] : $*@sil_unowned C
 // CHECK:   destroy_value [[ARG1_COPY]] : $C
+// CHECK:   end_borrow [[BORROWED_ARG1]] from [[ARG1]]
 // CHECK:   end_borrow [[BORROWED_SELF]] from [[SELF]]
 // CHECK:   [[RET_SELF:%.*]] = copy_value [[SELF]]
 // CHECK:   destroy_value [[SELF]]

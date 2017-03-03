@@ -136,7 +136,7 @@ using TargetFarRelativeIndirectablePointer
   = typename Runtime::template FarRelativeIndirectablePointer<Pointee,Nullable>;
 
 struct HeapObject;
-struct WeakReference;
+class WeakReference;
   
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
@@ -769,6 +769,8 @@ struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
   value_witness_types::storeExtraInhabitant *storeExtraInhabitant;
   value_witness_types::getExtraInhabitantIndex *getExtraInhabitantIndex;
 
+#define SET_WITNESS(NAME) base.NAME,
+
   constexpr ExtraInhabitantsValueWitnessTable()
     : ValueWitnessTable{}, extraInhabitantFlags(),
       storeExtraInhabitant(nullptr),
@@ -778,9 +780,15 @@ struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
                             value_witness_types::extraInhabitantFlags eif,
                             value_witness_types::storeExtraInhabitant *sei,
                             value_witness_types::getExtraInhabitantIndex *geii)
-    : ValueWitnessTable(base), extraInhabitantFlags(eif),
+    : ValueWitnessTable{
+      FOR_ALL_FUNCTION_VALUE_WITNESSES(SET_WITNESS)
+      base.size,
+      base.flags,
+      base.stride
+    }, extraInhabitantFlags(eif),
       storeExtraInhabitant(sei),
       getExtraInhabitantIndex(geii) {}
+#undef SET_WITNESS
 
   static bool classof(const ValueWitnessTable *table) {
     return table->flags.hasExtraInhabitants();
@@ -1331,7 +1339,7 @@ const FullOpaqueMetadata METADATA_SYM(BO);        // Builtin.UnknownObject
 struct HeapMetadataHeaderPrefix {
   /// Destroy the object, returning the allocated size of the object
   /// or 0 if the object shouldn't be deallocated.
-  void (*destroy)(HeapObject *);
+  SWIFT_CC(swift) void (*destroy)(SWIFT_CONTEXT HeapObject *);
 };
 
 /// The header present on all heap metadata.
@@ -1548,7 +1556,7 @@ struct TargetNominalTypeDescriptor {
 };
 using NominalTypeDescriptor = TargetNominalTypeDescriptor<InProcess>;
 
-typedef void (*ClassIVarDestroyer)(HeapObject *);
+typedef SWIFT_CC(swift) void (*ClassIVarDestroyer)(SWIFT_CONTEXT HeapObject *);
 
 /// The structure of all class metadata.  This structure is embedded
 /// directly within the class's heap metadata structure and therefore
@@ -1832,17 +1840,6 @@ struct TargetObjCClassWrapperMetadata : public TargetMetadata<Runtime> {
 using ObjCClassWrapperMetadata
   = TargetObjCClassWrapperMetadata<InProcess>;
 
-// FIXME: Workaround for rdar://problem/18889711. 'Consume' does not require
-// a barrier on ARM64, but LLVM doesn't know that. Although 'relaxed'
-// is formally UB by C++11 language rules, we should be OK because neither
-// the processor model nor the optimizer can realistically reorder our uses
-// of 'consume'.
-#if __arm64__ || __arm__
-#  define SWIFT_MEMORY_ORDER_CONSUME (std::memory_order_relaxed)
-#else
-#  define SWIFT_MEMORY_ORDER_CONSUME (std::memory_order_consume)
-#endif
-
 /// The structure of metadata for foreign types where the source
 /// language doesn't provide any sort of more interesting metadata for
 /// us to use.
@@ -1996,7 +1993,7 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
       return nullptr;
 
     auto asWords = reinterpret_cast<
-      ConstTargetMetadataPointer<Runtime, TargetMetadata> const *>(this);
+      ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *>(this);
     return (asWords + Description->GenericParams.Offset);
   }
 
@@ -2435,7 +2432,7 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
   }
 
   static constexpr StoredPointer
-  OffsetToNumProtocols = sizeof(TargetMetadata<Runtime>) + sizeof(Flags);
+  OffsetToNumProtocols = sizeof(TargetMetadata<Runtime>) + sizeof(ExistentialTypeFlags);
 
 };
 using ExistentialTypeMetadata
@@ -3488,6 +3485,7 @@ std::string nameForMetadata(const Metadata *type,
 
 /// Return the superclass, if any.  The result is nullptr for root
 /// classes and class protocol types.
+SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_INTERFACE
 const Metadata *_swift_class_getSuperclass(const Metadata *theClass);
 

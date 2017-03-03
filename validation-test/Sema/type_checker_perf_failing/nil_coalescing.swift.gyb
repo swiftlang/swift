@@ -1,0 +1,10 @@
+// RUN: not %scale-test -O --begin 1 --end 3 --step 1 --select incrementScopeCounter %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+func t(_ x: Int?) -> Int {
+  return (x ?? 0)
+%for i in range(1, N):
+         + (x ?? 0)
+%end
+}

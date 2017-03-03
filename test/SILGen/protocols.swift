@@ -22,7 +22,7 @@ func use_subscript_rvalue_get(_ i : Int) -> Int {
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_rvalue_get
 // CHECK: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @_T09protocols16subscriptableGetAA013SubscriptableC0_pv : $*SubscriptableGet
-// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[GLOB]] : $*SubscriptableGet to $*[[OPENED:@opened(.*) SubscriptableGet]]
+// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr immutable_access [[GLOB]] : $*SubscriptableGet to $*[[OPENED:@opened(.*) SubscriptableGet]]
 // CHECK: [[ALLOCSTACK:%[0-9]+]] = alloc_stack $[[OPENED]]
 // CHECK: copy_addr [[PROJ]] to [initialization] [[ALLOCSTACK]] : $*[[OPENED]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGet.subscript!getter.1
@@ -38,7 +38,7 @@ func use_subscript_lvalue_get(_ i : Int) -> Int {
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_lvalue_get
 // CHECK: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @_T09protocols19subscriptableGetSetAA013SubscriptablecD0_pv : $*SubscriptableGetSet
-// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[GLOB]] : $*SubscriptableGetSet to $*[[OPENED:@opened(.*) SubscriptableGetSet]]
+// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr immutable_access [[GLOB]] : $*SubscriptableGetSet to $*[[OPENED:@opened(.*) SubscriptableGetSet]]
 // CHECK: [[ALLOCSTACK:%[0-9]+]] = alloc_stack $[[OPENED]]
 // CHECK: copy_addr [[PROJ]] to [initialization] [[ALLOCSTACK]] : $*[[OPENED]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGetSet.subscript!getter.1
@@ -54,7 +54,7 @@ func use_subscript_lvalue_set(_ i : Int) {
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_lvalue_set
 // CHECK: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @_T09protocols19subscriptableGetSetAA013SubscriptablecD0_pv : $*SubscriptableGetSet
-// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[GLOB]] : $*SubscriptableGetSet to $*[[OPENED:@opened(.*) SubscriptableGetSet]]
+// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr mutable_access [[GLOB]] : $*SubscriptableGetSet to $*[[OPENED:@opened(.*) SubscriptableGetSet]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGetSet.subscript!setter.1
 // CHECK-NEXT: apply [[METH]]<[[OPENED]]>(%0, %0, [[PROJ]])
 
@@ -121,7 +121,7 @@ func use_property_rvalue_get() -> Int {
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_property_rvalue_get
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @_T09protocols11propertyGetAA18PropertyWithGetter_pv : $*PropertyWithGetter
-// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[GLOB]] : $*PropertyWithGetter to $*[[OPENED:@opened(.*) PropertyWithGetter]]
+// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr immutable_access [[GLOB]] : $*PropertyWithGetter to $*[[OPENED:@opened(.*) PropertyWithGetter]]
 // CHECK: [[COPY:%.*]] = alloc_stack $[[OPENED]]
 // CHECK-NEXT: copy_addr [[PROJ]] to [initialization] [[COPY]] : $*[[OPENED]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetter.a!getter.1
@@ -132,7 +132,7 @@ func use_property_lvalue_get() -> Int {
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_property_lvalue_get
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @_T09protocols14propertyGetSetAA24PropertyWithGetterSetter_pv : $*PropertyWithGetterSetter
-// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[GLOB]] : $*PropertyWithGetterSetter to $*[[OPENED:@opened(.*) PropertyWithGetterSetter]]
+// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr immutable_access [[GLOB]] : $*PropertyWithGetterSetter to $*[[OPENED:@opened(.*) PropertyWithGetterSetter]]
 // CHECK: [[STACK:%[0-9]+]] = alloc_stack $[[OPENED]]
 // CHECK: copy_addr [[PROJ]] to [initialization] [[STACK]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetterSetter.b!getter.1
@@ -145,7 +145,7 @@ func use_property_lvalue_set(_ x : Int) {
 // CHECK-LABEL: sil hidden @{{.*}}use_property_lvalue_set
 // CHECK: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @_T09protocols14propertyGetSetAA24PropertyWithGetterSetter_pv : $*PropertyWithGetterSetter
-// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[GLOB]] : $*PropertyWithGetterSetter to $*[[OPENED:@opened(.*) PropertyWithGetterSetter]]
+// CHECK: [[PROJ:%[0-9]+]] = open_existential_addr mutable_access [[GLOB]] : $*PropertyWithGetterSetter to $*[[OPENED:@opened(.*) PropertyWithGetterSetter]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetterSetter.b!setter.1
 // CHECK-NEXT: apply [[METH]]<[[OPENED]]>(%0, [[PROJ]])
 
@@ -385,7 +385,7 @@ func testExistentialPropertyRead<T: ExistentialProperty>(_ t: inout T) {
 // CHECK:      [[P_GETTER:%.*]] = witness_method $T, #ExistentialProperty.p!getter.1 :
 // CHECK-NEXT: apply [[P_GETTER]]<T>([[P_TEMP]], [[T_TEMP]])
 // CHECK-NEXT: destroy_addr [[T_TEMP]]
-// CHECK-NEXT: [[OPEN:%.*]] = open_existential_addr [[P_TEMP]] : $*PropertyWithGetterSetter to $*[[P_OPENED:@opened(.*) PropertyWithGetterSetter]]
+// CHECK-NEXT: [[OPEN:%.*]] = open_existential_addr immutable_access [[P_TEMP]] : $*PropertyWithGetterSetter to $*[[P_OPENED:@opened(.*) PropertyWithGetterSetter]]
 // CHECK-NEXT: [[T0:%.*]] = alloc_stack $[[P_OPENED]]
 // CHECK-NEXT: copy_addr [[OPEN]] to [initialization] [[T0]]
 // CHECK-NEXT: [[B_GETTER:%.*]] = witness_method $[[P_OPENED]], #PropertyWithGetterSetter.b!getter.1

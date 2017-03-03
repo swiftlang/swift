@@ -219,11 +219,11 @@ func missingControllingExprInSwitch() {
     case _: return
   }
 
-  switch { 42 } { // expected-error {{expected expression in 'switch' statement}} expected-error{{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error{{consecutive statements on a line must be separated by ';'}} {{16-16=;}} expected-error{{closure expression is unused}} expected-note{{did you mean to use a 'do' statement?}} {{17-17=do }}
+  switch { 42 } { // expected-error {{expected expression in 'switch' statement}} expected-error{{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error{{consecutive statements on a line must be separated by ';'}} {{16-16=;}} expected-error{{closure expression is unused}} expected-note{{did you mean to use a 'do' statement?}} {{17-17=do }} // expected-error{{'switch' statement body must have at least one 'case' or 'default' block}}
     case _: return // expected-error{{'case' label can only appear inside a 'switch' statement}}
   }
 
-  switch { 42 }() { // expected-error {{expected expression in 'switch' statement}} expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error 2 {{consecutive statements on a line must be separated by ';'}} expected-error{{closure expression is unused}} expected-note{{did you mean to use a 'do' statement?}} {{19-19=do }}
+  switch { 42 }() { // expected-error {{expected expression in 'switch' statement}} expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error 2 {{consecutive statements on a line must be separated by ';'}} expected-error{{closure expression is unused}} expected-note{{did you mean to use a 'do' statement?}} {{19-19=do }} // expected-error{{'switch' statement body must have at least one 'case' or 'default' block}}
     case _: return // expected-error{{'case' label can only appear inside a 'switch' statement}}
   }
 }
@@ -638,7 +638,7 @@ func testMultiPatternConditionRecovery(x: Int?) {
 
   // <rdar://problem/20883210> QoI: Following a "let" condition with boolean condition spouts nonsensical errors
   guard let x: Int? = 1, x == 1 else {  }
-  // expected-warning @-1 {{explicitly specified type 'Int?' adds an additional level of optional to the initializer, making the optional check always succeed}} {{16-22=Int}}
+  // expected-warning @-1 {{explicitly specified type 'Int?' adds an additional level of optional to the initializer, making the optional check always succeed}} {{16-20=Int}}
 }
 
 // rdar://20866942

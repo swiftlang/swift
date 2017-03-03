@@ -322,5 +322,6 @@ def main():
     # Remove the .swift file we fed into swift-ide-test
     subprocess.call(['rm', '-f', source_filename])
 
+
 if __name__ == '__main__':
     main()

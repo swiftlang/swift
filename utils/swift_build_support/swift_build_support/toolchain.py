@@ -43,8 +43,15 @@ def _register(name, *tool):
         return self.find_tool(*tool)
     _getter.__name__ = name
     setattr(Toolchain, name, cache_util.reify(_getter))
-_register("cc", "clang")
-_register("cxx", "clang++")
+
+
+if platform.system() == 'Windows':
+    _register("cc", "clang-cl")
+    _register("cxx", "clang-cl")
+else:
+    _register("cc", "clang")
+    _register("cxx", "clang++")
+
 _register("ninja", "ninja", "ninja-build")
 _register("cmake", "cmake")
 _register("distcc", "distcc")
@@ -171,6 +178,15 @@ class Cygwin(Linux):
     pass
 
 
+class Windows(Toolchain):
+    def find_tool(self, *names):
+        for name in names:
+            found = which(name)
+            if found is not None:
+                return found
+        return None
+
+
 def host_toolchain(**kwargs):
     sys = platform.system()
     if sys == 'Darwin':
@@ -181,6 +197,8 @@ def host_toolchain(**kwargs):
         return FreeBSD()
     elif sys.startswith('CYGWIN'):
         return Cygwin()
+    elif sys == 'Windows':
+        return Windows()
     else:
-        raise NotImplementedError(
-            'toolchain() is not supported in this platform')
+        raise NotImplementedError('The platform "%s" does not have a defined '
+                                  'toolchain.' % sys)

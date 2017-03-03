@@ -8,7 +8,7 @@ import Swift
 
 protocol CP: class {}
 
-// CHECK-DAG: define{{( protected)?}} { %swift.refcounted*, i8** } @class_existential_unowned(%swift.refcounted*, i8**) {{.*}} {
+// CHECK-DAG: define{{( protected)?}} swiftcc { %swift.refcounted*, i8** } @class_existential_unowned(%swift.refcounted*, i8**) {{.*}} {
 sil @class_existential_unowned : $@convention(thin) (@owned CP) -> @owned CP {
 entry(%s : $CP):
   %u = ref_to_unowned %s : $CP to $@sil_unowned CP
@@ -33,7 +33,7 @@ entry(%s : $CP):
   return %z : $CP
 }
 
-// CHECK-DAG: define{{( protected)?}} void @class_existential_weak({ %swift.weak, i8** }* noalias nocapture sret, i64, i64)
+// CHECK-DAG: define{{( protected)?}} swiftcc void @class_existential_weak({ %swift.weak, i8** }* noalias nocapture sret, i64, i64)
 sil @class_existential_weak : $@convention(thin) (@owned CP?) -> @out @sil_weak CP? {
 entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[V:%.*]] = alloca { %swift.weak, i8** }

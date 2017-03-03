@@ -183,8 +183,8 @@ protocol P {
 
 sil @existentials : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
-  // CHECK: open_existential_addr %0
-  %1 = open_existential_addr %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P
+  // CHECK: open_existential_addr mutable_access %0
+  %1 = open_existential_addr mutable_access %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P
 
   // CHECK: witness_method ${{.*}}, #P.doIt!1
   %2 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") P, #P.doIt!1, %1 : $*@opened("01234567-89ab-cdef-0123-000000000000") P : $@convention(witness_method) <T: P> (@inout T) -> ()
@@ -194,8 +194,14 @@ bb0(%0 : $*P):
   // CHECK: apply
   %3 = apply %2<@opened("01234567-89ab-cdef-0123-000000000000") P>(%1) : $@convention(witness_method) <T: P> (@inout T) -> ()
   %4 = tuple ()                       // CHECK: tuple ()
-  %5 = destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
-  %6 = return %4 : $()                // CHECK: return
+
+  // CHECK: open_existential_addr immutable_access
+  %5 = open_existential_addr immutable_access %0 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000001") P
+  %6 = witness_method $@opened("01234567-89ab-cdef-0123-000000000001") P, #P.doIt!1, %5 : $*@opened("01234567-89ab-cdef-0123-000000000001") P : $@convention(witness_method) <T: P> (@in_guaranteed T) -> ()
+  %8 = apply %6<@opened("01234567-89ab-cdef-0123-000000000001") P>(%5) : $@convention(witness_method) <T: P> (@in_guaranteed T) -> ()
+
+  %9 = destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
+  %10 = return %4 : $()                // CHECK: return
 }
 
 
@@ -1566,6 +1572,22 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   // CHECK: bind_memory {{%.*}} : $Builtin.RawPointer, {{%.*}} : $Builtin.Word to $*X
   %28 = tuple ()
   return %28 : $()
+}
+
+// CHECK-LABEL: sil @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: end_lifetime {{%.*}} : $Builtin.NativeObject
+sil @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  end_lifetime %0 : $Builtin.NativeObject
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: unchecked_ownership_conversion {{%.*}} : $Builtin.NativeObject, @guaranteed to @owned
+sil @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = unchecked_ownership_conversion %0 : $Builtin.NativeObject, @guaranteed to @owned
+  return undef : $()
 }
 
 // CHECK-LABEL: sil_vtable Foo {

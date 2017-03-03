@@ -19,7 +19,7 @@
 
 #include "swift/Basic/RelativePointer.h"
 
-const uint16_t SWIFT_REFLECTION_METADATA_VERSION = 1;
+const uint16_t SWIFT_REFLECTION_METADATA_VERSION = 2; // use new mangling
 
 namespace swift {
 namespace reflection {

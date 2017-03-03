@@ -15,7 +15,6 @@
 #include "DIMemoryUseCollector.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -25,6 +24,7 @@
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -810,7 +810,7 @@ void LifetimeChecker::doIt() {
       if (isa<StoreInst>(Inst))
         continue;
         
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case DIUseKind::PartialStore:
       handleStoreUse(i);
       break;

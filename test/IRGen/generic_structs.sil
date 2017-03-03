@@ -8,7 +8,7 @@ import Builtin
 //    of the metadata pattern, and no independent vwtable symbol
 // CHECK-NOT: @_T015generic_structs13SingleDynamicVWV
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private constant [34 x i8] c"V15generic_structs13SingleDynamic\00"
+// CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private constant [34 x i8] c"15generic_structs13SingleDynamicV\00"
 // CHECK: [[SINGLEDYNAMIC_FIELDS:@.*]] = private constant [3 x i8] c"x\00\00"
 // CHECK: @_T015generic_structs13SingleDynamicVMn = hidden constant <{ {{.*}} i32 }> <{
 // --       name
@@ -49,7 +49,7 @@ import Builtin
 
 // -- Nominal type descriptor for generic struct with protocol requirements
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[DYNAMICWITHREQUIREMENTS_NAME:@.*]] = private constant [44 x i8] c"V15generic_structs23DynamicWithRequirements\00"
+// CHECK: [[DYNAMICWITHREQUIREMENTS_NAME:@.*]] = private constant [44 x i8] c"15generic_structs23DynamicWithRequirementsV\00"
 // CHECK: [[DYNAMICWITHREQUIREMENTS_FIELDS:@.*]] = private constant [5 x i8] c"x\00y\00\00"
 // CHECK: @_T015generic_structs23DynamicWithRequirementsVMn = hidden constant <{ {{.*}} i32 }> <{
 // --       name
@@ -105,11 +105,13 @@ struct Stringly {
   var size : Builtin.Int64
 }
 
-// CHECK-LABEL: define{{( protected)?}} { i64, i21 } @concrete_instances(i64, i21) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc { i64, i32 } @concrete_instances(i64, i32) {{.*}} {
 // CHECK: entry:
-// CHECK:   %2 = insertvalue { i64, i21 } undef, i64 %0, 0
-// CHECK:   %3 = insertvalue { i64, i21 } %2, i21 %1, 1
-// CHECK:   ret { i64, i21 } %3
+// CHECK:   %2 = trunc i32 %1 to i21
+// CHECK:   %3 = zext i21 %2 to i32
+// CHECK:   %4 = insertvalue { i64, i32 } undef, i64 %0, 0
+// CHECK:   %5 = insertvalue { i64, i32 } %4, i32 %3, 1
+// CHECK:   ret { i64, i32 } %5
 // CHECK: }
 sil @concrete_instances : $(SingleDynamic<Intish>, SingleDynamic<Chareth>) -> (Intish, Chareth) {
 entry(%0 : $SingleDynamic<Intish>, %1 : $SingleDynamic<Chareth>):
@@ -126,7 +128,7 @@ struct ComplexDynamic<U, V> {
   var d : Chareth
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @explode_complex_dynamic
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @explode_complex_dynamic
 sil @explode_complex_dynamic : $<A, B> (@in ComplexDynamic<A, B>, @inout Byteful, @inout A, @inout B, @inout Chareth) -> () {
 entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Chareth):
   %a = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.a2
@@ -135,7 +137,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64, i64* [[METADATA]], i32 3
   // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[FIELD_OFFSET_VECTOR]], i32 2
   // CHECK: [[FIELD_OFFSET:%.*]] = load i64, i64* [[FIELD_OFFSET_ADDR]], align 8
-  // CHECK: [[BYTES:%.*]] = bitcast %V15generic_structs14ComplexDynamic* %0 to i8*
+  // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
   // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i64 [[FIELD_OFFSET]]
   // CHECK: bitcast i8* [[BYTE_OFFSET]] to %swift.opaque*
   %b = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.b
@@ -144,9 +146,9 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64, i64* [[METADATA]], i32 3
   // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[FIELD_OFFSET_VECTOR]], i32 3
   // CHECK: [[FIELD_OFFSET:%.*]] = load i64, i64* [[FIELD_OFFSET_ADDR]], align 8
-  // CHECK: [[BYTES:%.*]] = bitcast %V15generic_structs14ComplexDynamic* %0 to i8*
+  // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
   // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i64 [[FIELD_OFFSET]]
-  // CHECK: bitcast i8* [[BYTE_OFFSET]] to %V15generic_structs13SingleDynamic
+  // CHECK: bitcast i8* [[BYTE_OFFSET]] to %T15generic_structs13SingleDynamicV
   %5 = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.c
   %c = struct_element_addr %5 : $*SingleDynamic<B>, #SingleDynamic.x
 
@@ -154,9 +156,9 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
   // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i64, i64* [[METADATA]], i32 3
   // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[FIELD_OFFSET_VECTOR]], i32 4
   // CHECK: [[FIELD_OFFSET:%.*]] = load i64, i64* [[FIELD_OFFSET_ADDR]], align 8
-  // CHECK: [[BYTES:%.*]] = bitcast %V15generic_structs14ComplexDynamic* %0 to i8*
+  // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
   // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i64 [[FIELD_OFFSET]]
-  // CHECK: bitcast i8* [[BYTE_OFFSET]] to %V15generic_structs7Chareth
+  // CHECK: bitcast i8* [[BYTE_OFFSET]] to %T15generic_structs7CharethV
   %d = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.d
   copy_addr %a to %1 : $*Byteful
   copy_addr %b to %2 : $*A

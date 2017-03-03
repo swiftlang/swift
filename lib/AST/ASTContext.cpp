@@ -17,7 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "ForeignRepresentationInfo.h"
 #include "swift/Strings.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -28,11 +28,11 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/Compiler.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h" // bad dependency
@@ -40,10 +40,11 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
-#include "llvm/Support/Allocator.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/Allocator.h"
+#include "llvm/Support/Compiler.h"
 #include <algorithm>
 #include <memory>
 
@@ -206,17 +207,17 @@ struct ASTContext::Implementation {
     DelayedConformanceDiags;
 
   /// Stores information about lazy deserialization of various declarations.
-  llvm::DenseMap<const Decl *, LazyContextData *> LazyContexts;
+  llvm::DenseMap<const DeclContext *, LazyContextData *> LazyContexts;
 
-  /// Stored archetype builders for canonical generic signatures.
+  /// Stored generic signature builders for canonical generic signatures.
   llvm::DenseMap<std::pair<GenericSignature *, ModuleDecl *>,
-                 std::unique_ptr<ArchetypeBuilder>>
-    ArchetypeBuilders;
+                 std::unique_ptr<GenericSignatureBuilder>>
+    GenericSignatureBuilders;
 
   /// Canonical generic environments for canonical generic signatures.
   ///
-  /// The keys are the archetype builders in \c ArchetypeBuilders.
-  llvm::DenseMap<ArchetypeBuilder *, GenericEnvironment *>
+  /// The keys are the generic signature builders in \c GenericSignatureBuilders.
+  llvm::DenseMap<GenericSignatureBuilder *, GenericEnvironment *>
     CanonicalGenericEnvironments;
 
   /// The set of property names that show up in the defining module of a
@@ -438,8 +439,8 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
   // Record the initial set of search paths.
   for (StringRef path : SearchPathOpts.ImportSearchPaths)
     Impl.SearchPathsSet[path] |= SearchPathKind::Import;
-  for (StringRef path : SearchPathOpts.FrameworkSearchPaths)
-    Impl.SearchPathsSet[path] |= SearchPathKind::Framework;
+  for (const auto &framepath : SearchPathOpts.FrameworkSearchPaths)
+    Impl.SearchPathsSet[framepath.Path] |= SearchPathKind::Framework;
 }
 
 ASTContext::~ASTContext() {
@@ -1145,7 +1146,8 @@ void ASTContext::setSubstitutions(TypeBase* type,
   boundGenericSubstitutions[{type, gpContext}] = Subs;
 }
 
-void ASTContext::addSearchPath(StringRef searchPath, bool isFramework) {
+void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
+                               bool isSystem) {
   OptionSet<SearchPathKind> &loaded = Impl.SearchPathsSet[searchPath];
   auto kind = isFramework ? SearchPathKind::Framework : SearchPathKind::Import;
   if (loaded.contains(kind))
@@ -1153,12 +1155,12 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework) {
   loaded |= kind;
 
   if (isFramework)
-    SearchPathOpts.FrameworkSearchPaths.push_back(searchPath);
+    SearchPathOpts.FrameworkSearchPaths.push_back({searchPath, isSystem});
   else
     SearchPathOpts.ImportSearchPaths.push_back(searchPath);
 
   if (auto *clangLoader = getClangModuleLoader())
-    clangLoader->addSearchPath(searchPath, isFramework);
+    clangLoader->addSearchPath(searchPath, isFramework, isSystem);
 }
 
 void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
@@ -1243,30 +1245,30 @@ void ASTContext::getVisibleTopLevelClangModules(
     collectAllModules(Modules);
 }
 
-ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
+GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
                                                       CanGenericSignature sig,
                                                       ModuleDecl *mod) {
-  // Check whether we already have an archetype builder for this
+  // Check whether we already have a generic signature builder for this
   // signature and module.
-  auto known = Impl.ArchetypeBuilders.find({sig, mod});
-  if (known != Impl.ArchetypeBuilders.end())
+  auto known = Impl.GenericSignatureBuilders.find({sig, mod});
+  if (known != Impl.GenericSignatureBuilders.end())
     return known->second.get();
 
-  // Create a new archetype builder with the given signature.
-  auto builder = new ArchetypeBuilder(*this, LookUpConformanceInModule(mod));
+  // Create a new generic signature builder with the given signature.
+  auto builder = new GenericSignatureBuilder(*this, LookUpConformanceInModule(mod));
   builder->addGenericSignature(sig);
   builder->finalize(SourceLoc(), sig->getGenericParams(),
                     /*allowConcreteGenericParams=*/true);
 
-  // Store this archetype builder (no generic environment yet).
-  Impl.ArchetypeBuilders[{sig, mod}] =
-    std::unique_ptr<ArchetypeBuilder>(builder);
+  // Store this generic signature builder (no generic environment yet).
+  Impl.GenericSignatureBuilders[{sig, mod}] =
+    std::unique_ptr<GenericSignatureBuilder>(builder);
 
   return builder;
 }
 
 GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
-                                                    ArchetypeBuilder *builder,
+                                                    GenericSignatureBuilder *builder,
                                                     ModuleDecl &module) {
   auto known = Impl.CanonicalGenericEnvironments.find(builder);
   if (known != Impl.CanonicalGenericEnvironments.end())
@@ -1476,9 +1478,9 @@ ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
 }
 
 LazyContextData *ASTContext::getOrCreateLazyContextData(
-                                                const Decl *decl,
+                                                const DeclContext *dc,
                                                 LazyMemberLoader *lazyLoader) {
-  auto known = Impl.LazyContexts.find(decl);
+  auto known = Impl.LazyContexts.find(dc);
   if (known != Impl.LazyContexts.end()) {
     // Make sure we didn't provide an incompatible lazy loader.
     assert(!lazyLoader || lazyLoader == known->second->loader);
@@ -1487,30 +1489,18 @@ LazyContextData *ASTContext::getOrCreateLazyContextData(
 
   // Create new lazy iterable context data with the given loader.
   assert(lazyLoader && "Queried lazy data for non-lazy iterable context");
-  if (isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl)) {
+  if (isa<NominalTypeDecl>(dc) || isa<ExtensionDecl>(dc)) {
     auto *contextData = Allocate<LazyIterableDeclContextData>();
     contextData->loader = lazyLoader;
-    Impl.LazyContexts[decl] = contextData;
+    Impl.LazyContexts[dc] = contextData;
     return contextData;
   }
 
-  // Create new lazy generic type data with the given loader.
-  if (isa<GenericTypeDecl>(decl)) {
-    auto *contextData = Allocate<LazyGenericTypeData>();
-    contextData->loader = lazyLoader;
-    Impl.LazyContexts[decl] = contextData;
-    return contextData;
-  }
-
-  // Create new lazy function context data with the given loader.
-  if (isa<AbstractFunctionDecl>(decl)) {
-    auto *contextData = Allocate<LazyAbstractFunctionData>();
-    contextData->loader = lazyLoader;
-    Impl.LazyContexts[decl] = contextData;
-    return contextData;
-  }
-
-  llvm_unreachable("unhandled lazy context");
+  // Create new lazy generic context data with the given loader.
+  auto *contextData = Allocate<LazyGenericContextData>();
+  contextData->loader = lazyLoader;
+  Impl.LazyContexts[dc] = contextData;
+  return contextData;
 }
 
 LazyIterableDeclContextData *ASTContext::getOrCreateLazyIterableContextData(
@@ -1526,18 +1516,13 @@ LazyIterableDeclContextData *ASTContext::getOrCreateLazyIterableContextData(
                                                                    lazyLoader);
 }
 
-LazyAbstractFunctionData *ASTContext::getOrCreateLazyFunctionContextData(
-                                               const AbstractFunctionDecl *func,
+LazyGenericContextData *ASTContext::getOrCreateLazyGenericContextData(
+                                               const GenericContext *dc,
                                                LazyMemberLoader *lazyLoader) {
-  return (LazyAbstractFunctionData *)getOrCreateLazyContextData(func,
-                                                                lazyLoader);
+  return (LazyGenericContextData *)getOrCreateLazyContextData(dc,
+                                                              lazyLoader);
 }
 
-LazyGenericTypeData *ASTContext::getOrCreateLazyGenericTypeData(
-                                               const GenericTypeDecl *type,
-                                               LazyMemberLoader *lazyLoader) {
-  return (LazyGenericTypeData *)getOrCreateLazyContextData(type, lazyLoader);
-}
 void ASTContext::addDelayedConformanceDiag(
        NormalProtocolConformance *conformance,
        DelayedConformanceDiag fn) {
@@ -3542,7 +3527,7 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
 
 GenericEnvironment *GenericEnvironment::getIncomplete(
                                                   GenericSignature *signature,
-                                                  ArchetypeBuilder *builder) {
+                                                  GenericSignatureBuilder *builder) {
   auto &ctx = signature->getASTContext();
 
   // Allocate and construct the new environment.
@@ -3620,6 +3605,36 @@ static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx,
   }
 
   return nullptr;
+}
+
+bool ForeignRepresentationInfo::isRepresentableAsOptional() const {
+  switch (getKind()) {
+  case ForeignRepresentableKind::None:
+    llvm_unreachable("this type is not representable");
+
+  case ForeignRepresentableKind::Trivial:
+    return Storage.getPointer() != 0;
+
+  case ForeignRepresentableKind::Bridged: {
+    auto KPK_ObjectiveCBridgeable = KnownProtocolKind::ObjectiveCBridgeable;
+    ProtocolDecl *proto = getConformance()->getProtocol();
+    assert(proto->isSpecificProtocol(KPK_ObjectiveCBridgeable) &&
+           "unknown protocol; does it support optional?");
+    (void)proto;
+    (void)KPK_ObjectiveCBridgeable;
+
+    return true;
+  }
+
+  case ForeignRepresentableKind::BridgedError:
+    return true;
+
+  case ForeignRepresentableKind::Object:
+  case ForeignRepresentableKind::StaticBridged:
+    llvm_unreachable("unexpected kind in ForeignRepresentableCacheEntry");
+  }
+
+  llvm_unreachable("Unhandled ForeignRepresentableKind in switch.");
 }
 
 ForeignRepresentationInfo
@@ -3751,7 +3766,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
     if (entry.getKind() == ForeignRepresentableKind::BridgedError)
       return ForeignRepresentationInfo::forNone();
 
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case ForeignLanguage::ObjectiveC:
     return entry;

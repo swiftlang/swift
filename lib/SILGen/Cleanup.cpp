@@ -179,7 +179,7 @@ void CleanupManager::setCleanupState(Cleanup &cleanup, CleanupState state) {
   // Do the transition now to avoid doing it in N places below.
   CleanupState oldState = cleanup.getState();
   (void)oldState;
-  cleanup.setState(state);
+  cleanup.setState(Gen, state);
 
   assert(state != oldState && "trivial cleanup state change");
   assert(oldState != CleanupState::Dead && "changing state of dead cleanup");
@@ -201,7 +201,7 @@ void CleanupStateRestorationScope::pushCleanupState(CleanupHandle handle,
          "changing state of dead cleanup");
 
   CleanupState oldState = cleanup.getState();
-  cleanup.setState(newState);
+  cleanup.setState(Cleanups.Gen, newState);
 
   SavedStates.push_back({handle, oldState});
 }
@@ -218,7 +218,7 @@ CleanupStateRestorationScope::pushCurrentCleanupState(CleanupHandle handle) {
   SavedStates.push_back({handle, oldState});
 }
 
-void CleanupStateRestorationScope::pop() {
+void CleanupStateRestorationScope::popImpl() {
   // Restore cleanup states in the opposite order in which we saved them.
   for (auto i = SavedStates.rbegin(), e = SavedStates.rend(); i != e; ++i) {
     CleanupHandle handle = i->first;
@@ -229,9 +229,13 @@ void CleanupStateRestorationScope::pop() {
     Cleanup &cleanup = *iter;
     assert(cleanup.getState() != CleanupState::Dead &&
            "changing state of dead cleanup");
-    cleanup.setState(stateToRestore);
+    cleanup.setState(Cleanups.Gen, stateToRestore);
   }
+
+  SavedStates.clear();
 }
+
+void CleanupStateRestorationScope::pop() && { popImpl(); }
 
 llvm::raw_ostream &Lowering::operator<<(llvm::raw_ostream &os,
                                         CleanupState state) {
@@ -245,6 +249,8 @@ llvm::raw_ostream &Lowering::operator<<(llvm::raw_ostream &os,
   case CleanupState::PersistentlyActive:
     return os << "PersistentlyActive";
   }
+
+  llvm_unreachable("Unhandled CleanupState in switch.");
 }
 
 void CleanupManager::dump() const {
@@ -255,9 +261,16 @@ void CleanupManager::dump() const {
     auto iter = Stack.find(begin);
     const Cleanup &stackCleanup = *iter;
     llvm::errs() << "CLEANUP DEPTH: " << begin.getDepth() << "\n";
-    stackCleanup.dump();
+    stackCleanup.dump(Gen);
     begin = Stack.stabilize(++iter);
     Stack.checkIterator(begin);
   }
 #endif
+}
+
+void CleanupManager::dump(CleanupHandle handle) const {
+  auto iter = Stack.find(handle);
+  const Cleanup &stackCleanup = *iter;
+  llvm::errs() << "CLEANUP DEPTH: " << handle.getDepth() << "\n";
+  stackCleanup.dump(Gen);
 }

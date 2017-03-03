@@ -13,8 +13,8 @@
 // This file implements the protocol conformance data structures.
 //
 //===----------------------------------------------------------------------===//
+
 #include "ConformanceLookupTable.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/LazyResolver.h"
@@ -32,13 +32,14 @@ using namespace swift;
 
 Witness::Witness(ValueDecl *decl, SubstitutionList substitutions,
                  GenericEnvironment *syntheticEnv,
-                 SubstitutionMap reqToSynthesizedEnvMap) {
+                 SubstitutionList reqToSynthesizedEnvSubs) {
   auto &ctx = decl->getASTContext();
 
   auto declRef = ConcreteDeclRef(ctx, decl, substitutions);
   auto storedMem = ctx.Allocate(sizeof(StoredWitness), alignof(StoredWitness));
   auto stored = new (storedMem)
-      StoredWitness{declRef, syntheticEnv, std::move(reqToSynthesizedEnvMap)};
+      StoredWitness{declRef, syntheticEnv,
+                    ctx.AllocateCopy(reqToSynthesizedEnvSubs)};
   ctx.addDestructorCleanup(*stored);
 
   storage = stored;
@@ -251,6 +252,25 @@ AbstractStorageDecl *ProtocolConformance::getBehaviorDecl() const {
   return getRootNormalConformance()->getBehaviorDecl();
 }
 
+void NormalProtocolConformance::setSignatureConformances(
+                               ArrayRef<ProtocolConformanceRef> conformances) {
+  auto &ctx = getProtocol()->getASTContext();
+  SignatureConformances = ctx.AllocateCopy(conformances);
+
+#if !NDEBUG
+  unsigned idx = 0;
+  for (auto req : getProtocol()->getRequirementSignature()->getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance) {
+      assert(idx < conformances.size());
+      assert(conformances[idx].getRequirement() ==
+               req.getSecondType()->castTo<ProtocolType>()->getDecl());
+      ++idx;
+    }
+  }
+  assert(idx == conformances.size() && "Too many conformances");
+#endif
+}
+
 void NormalProtocolConformance::resolveLazyInfo() const {
   assert(Resolver);
   assert(isComplete());
@@ -316,10 +336,109 @@ void NormalProtocolConformance::setTypeWitness(
   TypeWitnesses[assocType] = std::make_pair(substitution, typeDecl);
 }
 
+/// TypeWitnesses is keyed by the protocol's own declarations, but
+/// DependentMemberTypes will sometimes store a base protocol's declaration.
+/// Map to the derived declaration if possible.
+static AssociatedTypeDecl *getOwnAssociatedTypeDecl(ProtocolDecl *protocol,
+                                                    AssociatedTypeDecl *assoc) {
+  // Fast path.
+  if (assoc->getProtocol() == protocol) return assoc;
+
+  // Search the protocol.
+  for (auto member : protocol->getMembers()) {
+    if (auto memberAssoc = dyn_cast<AssociatedTypeDecl>(member)) {
+      if (memberAssoc->getName() == assoc->getName()) {
+        return memberAssoc;
+      }
+    }
+  }
+
+  // Just assume this is fine.
+  return assoc;
+}
+
+Type NormalProtocolConformance::getAssociatedType(Type assocType,
+                                                LazyResolver *resolver) const {
+  assert(assocType->isTypeParameter() &&
+         "associated type must be a type parameter");
+
+  // Fast path.
+  auto type = assocType->getCanonicalType();
+  if (isa<GenericTypeParamType>(type)) {
+    assert(type->isEqual(getProtocol()->getSelfInterfaceType()) &&
+           "type parameter in protocol was not Self");
+    return getType();
+  }
+
+  auto memberType = cast<DependentMemberType>(type);
+
+  // TODO: make this handle multiple levels of dependent member type.
+  assert(memberType.getBase()->isEqual(getProtocol()->getSelfInterfaceType()) &&
+         "dependent member in protocol was not rooted in Self");
+
+  auto assocTypeDecl =
+    getOwnAssociatedTypeDecl(getProtocol(), memberType->getAssocType());
+  auto &subst = getTypeWitnessSubstAndDecl(assocTypeDecl, resolver).first;
+  return subst.getReplacement();
+}
+
+ProtocolConformanceRef
+NormalProtocolConformance::getAssociatedConformance(Type assocType,
+                                                    ProtocolDecl *protocol,
+                                                LazyResolver *resolver) const {
+  assert(assocType->isTypeParameter() &&
+         "associated type must be a type parameter");
+
+#ifndef NDEBUG
+  bool foundInRequirements = false;
+  for (auto &reqt :
+         getProtocol()->getRequirementSignature()->getRequirements()) {
+    if (reqt.getKind() == RequirementKind::Conformance &&
+        reqt.getFirstType()->isEqual(assocType) &&
+        reqt.getSecondType()->castTo<ProtocolType>()->getDecl() == protocol) {
+      foundInRequirements = true;
+      break;
+    }
+  }
+  assert(foundInRequirements &&
+         "requested conformance was not a direct requirement of the protocol");
+#endif
+
+  auto type = assocType->getCanonicalType();
+
+  if (isa<GenericTypeParamType>(type)) {
+    assert(type->isEqual(getProtocol()->getSelfInterfaceType()) &&
+           "type parameter in protocol was not Self");
+    auto conf = getInheritedConformance(protocol);
+    assert(conf && "inherited conformances cannot be abstract");
+    return ProtocolConformanceRef(conf);
+  }
+
+  auto memberType = cast<DependentMemberType>(type);
+
+  // For now, NormalProtocolConformance does not store indirect associations.
+  assert(memberType.getBase()->isEqual(getProtocol()->getSelfInterfaceType()) &&
+         "dependent member in protocol was not rooted in Self");
+
+  auto assocTypeDecl =
+    getOwnAssociatedTypeDecl(getProtocol(), memberType->getAssocType());
+  auto &subst = getTypeWitnessSubstAndDecl(assocTypeDecl, resolver).first;
+
+  // Scan the conformances for the exact conformance.
+  // TODO: should we allow indirect conformances for convenience of use?
+  for (auto &conf : subst.getConformances()) {
+    if (conf.getRequirement() == protocol)
+      return conf;
+  }
+  llvm_unreachable("missing conformance to protocol");
+}
+
   /// Retrieve the value witness corresponding to the given requirement.
 Witness NormalProtocolConformance::getWitness(ValueDecl *requirement,
                                               LazyResolver *resolver) const {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
+  assert(requirement->isProtocolRequirement() && "Not a requirement");
+
   if (Resolver)
     resolveLazyInfo();
 
@@ -344,7 +463,11 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
   assert(getProtocol() == cast<ProtocolDecl>(requirement->getDeclContext()) &&
          "requirement in wrong protocol");
   assert(Mapping.count(requirement) == 0 && "Witness already known");
-  assert((!isComplete() || isInvalid()) && "Conformance already complete?");
+  assert((!isComplete() || isInvalid()
+          || requirement->getAttrs().hasAttribute<OptionalAttr>()
+          || requirement->getAttrs().isUnavailable(
+             requirement->getASTContext())) &&
+				 "Conformance already complete?");
   Mapping[requirement] = witness;
 }
 
@@ -394,7 +517,7 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
 
   // Apply the substitution we computed above
   auto specializedType
-    = genericWitness.getReplacement().subst(substitutionMap, None);
+    = genericWitness.getReplacement().subst(substitutionMap);
   if (!specializedType)
     specializedType = ErrorType::get(genericWitness.getReplacement());
 

@@ -17,9 +17,10 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Identifier.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Syntax/TokenSyntax.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/ADT/SmallString.h"
@@ -168,9 +169,11 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
 Lexer::Lexer(const LangOptions &Options,
              const SourceManager &SM, DiagnosticEngine *Diags,
              unsigned BufferID, bool InSILMode,
-             CommentRetentionMode RetainComments)
+             CommentRetentionMode RetainComments,
+             TriviaRetentionMode TriviaRetention)
     : LangOpts(Options), SourceMgr(SM), Diags(Diags), BufferID(BufferID),
-      InSILMode(InSILMode), RetainComments(RetainComments) {
+      InSILMode(InSILMode), RetainComments(RetainComments),
+      TriviaRetention(TriviaRetention) {
   // Initialize buffer pointers.
   StringRef contents = SM.extractText(SM.getRangeForBuffer(BufferID));
   BufferStart = contents.data();
@@ -235,8 +238,8 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
          "location from the wrong buffer");
 
   Lexer L(LangOpts, SourceMgr, BufferID, Diags, InSILMode,
-          CommentRetentionMode::None);
-  L.restoreState(State(Loc));
+          CommentRetentionMode::None, TriviaRetentionMode::WithoutTrivia);
+  L.restoreState(State(Loc, {}, {}));
   Token Result;
   L.lex(Result);
   return Result;
@@ -256,8 +259,14 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
   if (RetainComments == CommentRetentionMode::AttachToNextToken && SeenComment)
     CommentLength = TokStart - LastCommentBlockStart;
 
-  NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart),
-                     CommentLength);
+  StringRef TokenText { TokStart, static_cast<size_t>(CurPtr - TokStart) };
+
+  lexTrivia(TrailingTrivia, /* StopAtFirstNewline */ true);
+
+  NextToken.setToken(Kind, TokenText, CommentLength);
+  if (!TrailingTrivia.empty() &&
+      TrailingTrivia.front().Kind == syntax::TriviaKind::Backtick)
+    ++CurPtr;
 }
 
 Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
@@ -284,7 +293,7 @@ Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
     }
     break;
   }
-  return State(SourceLoc(llvm::SMLoc::getFromPointer(Ptr)));
+  return State(SourceLoc(llvm::SMLoc::getFromPointer(Ptr)), {}, {});
 }
 
 //===----------------------------------------------------------------------===//
@@ -302,6 +311,37 @@ static void diagnoseEmbeddedNul(DiagnosticEngine *Diags, const char *Ptr) {
   SourceLoc NulEndLoc = Lexer::getSourceLoc(Ptr+1);
   Diags->diagnose(NulLoc, diag::lex_nul_character)
       .fixItRemoveChars(NulLoc, NulEndLoc);
+}
+
+void Lexer::skipUpToEndOfLine() {
+  while (1) {
+    switch (*CurPtr) {
+      case '\n':
+      case '\r':
+        return;
+      default:
+        // If this is a "high" UTF-8 character, validate it.
+        if (*((signed char *)CurPtr) < 0) {
+          const char *CharStart = CurPtr;
+          if (validateUTF8CharacterAndAdvance(CurPtr, BufferEnd) == ~0U)
+            diagnose(CharStart, diag::lex_invalid_utf8);
+          else
+            continue;
+        }
+        break;   // Otherwise, eat other characters.
+      case 0:
+        // If this is a random nul character in the middle of a buffer, skip it as
+        // whitespace.
+        if (CurPtr != BufferEnd) {
+          diagnoseEmbeddedNul(Diags, CurPtr);
+          break;
+        }
+
+        // Otherwise, the last line of the file does not have a newline.
+        return;
+    }
+    ++CurPtr;
+  }
 }
 
 void Lexer::skipToEndOfLine() {
@@ -545,14 +585,14 @@ tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
   tok Kind = llvm::StringSwitch<tok>(Str)
 #define KEYWORD(kw) \
     .Case(#kw, tok::kw_##kw)
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
     .Default(tok::identifier);
 
   // SIL keywords are only active in SIL mode.
   switch (Kind) {
 #define SIL_KEYWORD(kw) \
     case tok::kw_##kw:
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
       if (!InSILMode)
         Kind = tok::identifier;
       break;
@@ -606,7 +646,7 @@ void Lexer::lexHash() {
 #define KEYWORD(kw)
 #define POUND_KEYWORD(id) \
   .Case(#id, tok::pound_##id)
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
   .Default(tok::pound);
 
   // If we didn't find a match, then just return tok::pound.  This is highly
@@ -689,6 +729,23 @@ static bool rangeContainsPlaceholderEnd(const char *CurPtr,
     }
   }
   return false;
+}
+
+syntax::RC<syntax::TokenSyntax> Lexer::fullLex() {
+  if (NextToken.isEscapedIdentifier()) {
+    LeadingTrivia.push_back(syntax::TriviaPiece::backtick());
+    TrailingTrivia.push_front(syntax::TriviaPiece::backtick());
+  }
+  auto Result = syntax::TokenSyntax::make(NextToken.getKind(),
+                                        OwnedString(NextToken.getText()).copy(),
+                                        syntax::SourcePresence::Present,
+                                        {LeadingTrivia}, {TrailingTrivia});
+  LeadingTrivia.clear();
+  TrailingTrivia.clear();
+  if (NextToken.isNot(tok::eof)) {
+    lexImpl();
+  }
+  return Result;
 }
 
 /// lexOperatorIdentifier - Match identifiers formed out of punctuation.
@@ -1106,7 +1163,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     }
     // Move the pointer back to EOF.
     --CurPtr;
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case '\n':  // String literals cannot have \n or \r in them.
   case '\r':
     if (EmitDiagnostics)
@@ -1630,6 +1687,8 @@ void Lexer::lexImpl() {
   SeenComment = false;
 
 Restart:
+  lexTrivia(LeadingTrivia);
+
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
   
@@ -1850,8 +1909,149 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   // we need to lex just the comment token.
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
           CommentRetentionMode::ReturnAsTokens);
-  L.restoreState(State(Loc));
+  L.restoreState(State(Loc, {}, {}));
   return L.peekNextToken();
+}
+
+Optional<syntax::TriviaPiece> Lexer::lexWhitespace(bool StopAtFirstNewline) {
+
+  auto Start = CurPtr;
+  auto Last = *Start;
+
+  if (Start == BufferEnd)
+    return None;
+
+  while (CurPtr != BufferEnd) {
+    auto c = *CurPtr;
+    if (isWhitespace(c)) {
+      if (StopAtFirstNewline && (c == '\n' || c == '\r')) {
+        break;
+      }
+      // If this is a new kind of whitespace, pinch off
+      // a piece of trivia.
+      if (c != *Start)
+        break;
+
+      Last = c;
+      ++CurPtr;
+    } else {
+      break;
+    }
+  }
+
+  unsigned Length = CurPtr - Start;
+
+  if (Length == 0)
+    return None;
+
+  switch (Last) {
+    case '\n':
+    case '\r':
+      return syntax::TriviaPiece {
+        syntax::TriviaKind::Newline,
+        Length,
+        OwnedString(Start, Length),
+      };
+    case ' ':
+      return syntax::TriviaPiece {
+        syntax::TriviaKind::Space,
+        Length,
+        OwnedString(Start, Length),
+      };
+    case '\t':
+      return syntax::TriviaPiece {
+        syntax::TriviaKind::Tab,
+        Length,
+        OwnedString(Start, Length),
+      };
+    default:
+      return None;
+  }
+}
+
+Optional<syntax::TriviaPiece> Lexer::lexSingleLineComment(syntax::TriviaKind Kind) {
+  auto Start = CurPtr;
+  skipUpToEndOfLine();
+
+  unsigned Length = CurPtr - Start;
+
+  if (Length == 0)
+    return None;
+
+  return Optional<syntax::TriviaPiece>({
+    Kind,
+    Length,
+    OwnedString(Start, Length)
+  });
+}
+
+Optional<syntax::TriviaPiece>
+Lexer::lexBlockComment(syntax::TriviaKind Kind) {
+  auto Start = CurPtr++;
+  skipSlashStarComment();
+  unsigned Length = CurPtr - Start;
+  if (Length == 0)
+    return None;
+
+  return Optional<syntax::TriviaPiece>({
+    Kind,
+    Length,
+    OwnedString(Start, Length)
+  });
+}
+
+Optional<syntax::TriviaPiece> Lexer::lexComment() {
+  if (CurPtr >= BufferEnd)
+    return None;
+
+  if (BufferEnd - CurPtr < 2)
+    return None;
+
+  StringRef Prefix { CurPtr, 2 };
+
+  if (Prefix == "//")
+    return lexSingleLineComment(syntax::TriviaKind::LineComment);
+
+  if (Prefix == "/*")
+    return lexBlockComment(syntax::TriviaKind::BlockComment);
+
+  return None;
+}
+
+Optional<syntax::TriviaPiece> Lexer::lexDocComment() {
+  if (CurPtr >= BufferEnd)
+    return None;
+
+  if ((BufferEnd - CurPtr) < 3)
+    return None;
+
+  StringRef Prefix { CurPtr, 3 };
+
+  if (Prefix.startswith("///"))
+    return lexSingleLineComment(syntax::TriviaKind::DocLineComment);
+
+  if (Prefix.startswith("/**"))
+    return lexBlockComment(syntax::TriviaKind::DocBlockComment);
+
+  return None;
+}
+
+void Lexer::lexTrivia(syntax::TriviaList &Pieces,
+                      bool StopAtFirstNewline) {
+  if (TriviaRetention == TriviaRetentionMode::WithoutTrivia)
+    return;
+
+  while (CurPtr != BufferEnd) {
+    if (auto Whitespace = lexWhitespace(StopAtFirstNewline)) {
+      Pieces.push_back(Whitespace.getValue());
+    } else if (auto DocComment = lexDocComment()) {
+      Pieces.push_back(DocComment.getValue());
+    } else if (auto Comment = lexComment()) {
+      Pieces.push_back(Comment.getValue());
+    } else {
+      return;
+    }
+  }
 }
 
 SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
@@ -1870,7 +2070,8 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
   LangOptions FakeLangOptions;
 
   Lexer L(FakeLangOptions, SM, BufferID, nullptr, /*InSILMode=*/false,
-          CommentRetentionMode::None, BufferStart, BufferEnd);
+          CommentRetentionMode::None, TriviaRetentionMode::WithoutTrivia,
+          BufferStart, BufferEnd);
 
   // Lex tokens until we find the token that contains the source location.
   Token Tok;
@@ -2002,7 +2203,7 @@ SourceLoc Lexer::getLocForEndOfLine(SourceManager &SM, SourceLoc Loc) {
   // we need to lex just the comment token.
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
           CommentRetentionMode::ReturnAsTokens);
-  L.restoreState(State(Loc));
+  L.restoreState(State(Loc, {}, {}));
   L.skipToEndOfLine();
   return getSourceLoc(L.CurPtr);
 }

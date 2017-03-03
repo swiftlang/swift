@@ -385,8 +385,10 @@ func test_let() {
   case let x where runced():
   // CHECK: [[CASE1]]:
   // CHECK:   [[A:%.*]] = function_ref @_T010switch_var1aySS1x_tF
-  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[VAL_COPY]]
+  // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
+  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY]]
   // CHECK:   apply [[A]]([[VAL_COPY_COPY]])
+  // CHECK:   end_borrow [[BORROWED_VAL_COPY]] from [[VAL_COPY]]
   // CHECK:   destroy_value [[VAL_COPY]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT:bb[0-9]+]]
@@ -401,8 +403,10 @@ func test_let() {
   case let y where funged():
   // CHECK: [[CASE2]]:
   // CHECK:   [[B:%.*]] = function_ref @_T010switch_var1bySS1x_tF
-  // CHECK:   [[VAL_COPY_2_COPY:%.*]] = copy_value [[VAL_COPY_2]]
+  // CHECK:   [[BORROWED_VAL_COPY_2:%.*]] = begin_borrow [[VAL_COPY_2]]
+  // CHECK:   [[VAL_COPY_2_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY_2]]
   // CHECK:   apply [[B]]([[VAL_COPY_2_COPY]])
+  // CHECK:   end_borrow [[BORROWED_VAL_COPY_2]] from [[VAL_COPY_2]]
   // CHECK:   destroy_value [[VAL_COPY_2]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]
@@ -414,7 +418,8 @@ func test_let() {
   // CHECK: [[NEXT_CASE]]:
   // CHECK:   [[VAL_COPY_3:%.*]] = copy_value [[VAL]]
   // CHECK:   function_ref @_T010switch_var4barsSSyF
-  // CHECK:   [[VAL_COPY_3_COPY:%.*]] = copy_value [[VAL_COPY_3]]
+  // CHECK:   [[BORROWED_VAL_COPY_3:%.*]] = begin_borrow [[VAL_COPY_3]]
+  // CHECK:   [[VAL_COPY_3_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY_3]]
   // CHECK:   store [[VAL_COPY_3_COPY]] to [init] [[IN_ARG:%.*]] :
   // CHECK:   apply {{%.*}}<String>({{.*}}, [[IN_ARG]])
   // CHECK:   cond_br {{%.*}}, [[YES_CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
@@ -476,8 +481,10 @@ func test_mixed_let_var() {
 
   // CHECK: [[CASE2]]:
   // CHECK:   [[B:%.*]] = function_ref @_T010switch_var1bySS1x_tF
-  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[VAL_COPY]]
+  // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
+  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY]]
   // CHECK:   apply [[B]]([[VAL_COPY_COPY]])
+  // CHECK:   end_borrow [[BORROWED_VAL_COPY]] from [[VAL_COPY]]
   // CHECK:   destroy_value [[VAL_COPY]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]  
@@ -489,7 +496,8 @@ func test_mixed_let_var() {
 
   // CHECK: [[NEXT_CASE]]
   // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
-  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[VAL_COPY]]
+  // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
+  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY]]
   // CHECK:   store [[VAL_COPY_COPY]] to [init] [[TMP_VAL_COPY_ADDR:%.*]] : $*String
   // CHECK:   apply {{.*}}<String>({{.*}}, [[TMP_VAL_COPY_ADDR]])
   // CHECK:   cond_br {{.*}}, [[CASE3:bb[0-9]+]], [[NOCASE3:bb[0-9]+]]
@@ -698,5 +706,24 @@ func test_against_reemission(x: Bar) {
   switch x {
   case .Y(let a, _), .Z(_, let a):
     let b = a
+  }
+}
+
+class C    {}
+class D: C {}
+func f(_: D) -> Bool { return true }
+
+// CHECK-LABEL: sil hidden @{{.*}}test_multiple_patterns_value_semantics
+func test_multiple_patterns_value_semantics(_ y: C) {
+  switch y {
+    // CHECK:   checked_cast_br {{%.*}} : $C to $D, [[AS_D:bb[0-9]+]], [[NOT_AS_D:bb[0-9]+]]
+    // CHECK: [[AS_D]]({{.*}}):
+    // CHECK:   cond_br {{%.*}}, [[F_TRUE:bb[0-9]+]], [[F_FALSE:bb[0-9]+]]
+    // CHECK: [[F_TRUE]]:
+    // CHECK:   [[BINDING:%.*]] = copy_value [[ORIG:%.*]] :
+    // CHECK:   destroy_value [[ORIG]]
+    // CHECK:   br {{bb[0-9]+}}([[BINDING]]
+    case let x as D where f(x), let x as D: break
+    default: break
   }
 }

@@ -18,7 +18,7 @@ extension P {
 
 public func process(s: P)
 
-sil @invokeClosure : $@convention(method) <Self where Self : P> (@owned @callee_owned () -> @error Error, @in_guaranteed Self) -> @error Error {
+sil [noinline] @invokeClosure : $@convention(method) <Self where Self : P> (@owned @callee_owned () -> @error Error, @in_guaranteed Self) -> @error Error {
 bb0(%0 : $@callee_owned () -> @error Error, %1 : $*Self):
   strong_release %0 : $@callee_owned () -> @error Error
   %5 = tuple ()
@@ -42,7 +42,7 @@ bb0:
 // CHECK: return
 sil @process : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
-  %2 = open_existential_addr %0 : $*P to $*@opened("4C22C24E-6BAA-11E6-B904-B8E856428C60") P
+  %2 = open_existential_addr immutable_access %0 : $*P to $*@opened("4C22C24E-6BAA-11E6-B904-B8E856428C60") P
   %3 = function_ref @invokeClosure : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @error Error, @in_guaranteed τ_0_0) -> @error Error
   // function_ref (process(s : P) -> ()).(closure #1)
   %4 = function_ref @closure : $@convention(thin) () -> ()

@@ -17,10 +17,12 @@
 #include "ConstraintGraph.h"
 #include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <memory>
 #include <tuple>
+
 using namespace swift;
 using namespace constraints;
 
@@ -866,7 +868,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       if (tc.Context.LangOpts.EffectiveLanguageVersion[0] >= 4)
         continue;
 
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
         
     case ConstraintKind::Layout:
     case ConstraintKind::LiteralConformsTo: {
@@ -887,7 +889,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       hasNonDependentMemberRelationalConstraints = true;
 
       // Handle unspecialized types directly.
-      if (!defaultType->isUnspecializedGeneric()) {
+      if (!defaultType->hasUnboundGenericType()) {
         if (!exactTypes.insert(defaultType->getCanonicalType()).second)
           continue;
 
@@ -1401,6 +1403,24 @@ static bool tryTypeVariableBindings(
               newBindings.push_back({eltType, binding.Kind, None});
           }
         }
+
+        // If we were unsuccessful solving for T?, try solving for T.
+        if (auto objTy = type->getOptionalObjectType()) {
+          if (exploredTypes.insert(objTy->getCanonicalType()).second) {
+            // If T is a type variable, only attempt this if both the
+            // type variable we are trying bindings for, and the type
+            // variable we will attempt to bind, both have the same
+            // polarity with respect to being able to bind lvalues.
+            if (auto otherTypeVar = objTy->getAs<TypeVariableType>()) {
+              if (typeVar->getImpl().canBindToLValue() ==
+                  otherTypeVar->getImpl().canBindToLValue()) {
+                newBindings.push_back({objTy, binding.Kind, None});
+              }
+            } else {
+              newBindings.push_back({objTy, binding.Kind, None});
+            }
+          }
+        }
       }
 
       if (binding.Kind != AllowedBindingKind::Supertypes)
@@ -1895,6 +1915,18 @@ ConstraintSystem::solve(Expr *&expr,
                         ExprTypeCheckListener *listener,
                         SmallVectorImpl<Solution> &solutions,
                         FreeTypeVariableBinding allowFreeTypeVariables) {
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = getASTContext().TypeCheckerDebug->getStream();
+    log << "---Constraint solving for the expression at ";
+    auto R = expr->getSourceRange();
+    if (R.isValid()) {
+      R.print(log, TC.Context.SourceMgr, /*PrintText=*/ false);
+    } else {
+      log << "<invalid range>";
+    }
+    log << "---\n";
+  }
+
   assert(!solverState && "use solveRec for recursive calls");
 
   // Try to shrink the system by reducing disjunction domains. This
@@ -2057,6 +2089,15 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
       constraintComponent[constraint] = components[i];
   }
 
+  // Add the orphaned components to the mapping from constraints to components.
+  unsigned firstOrphanedConstraint =
+    numComponents - CG.getOrphanedConstraints().size();
+  {
+    unsigned component = firstOrphanedConstraint;
+    for (auto constraint : CG.getOrphanedConstraints())
+      constraintComponent[constraint] = component++;
+  }
+
   // Sort the constraints into buckets based on component number.
   std::unique_ptr<ConstraintList[]> constraintBuckets(
                                       new ConstraintList[numComponents]);
@@ -2066,6 +2107,9 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     constraintBuckets[constraintComponent[constraint]].push_back(constraint);
   }
 
+  // Remove all of the orphaned constraints; we'll introduce them as needed.
+  auto allOrphanedConstraints = CG.takeOrphanedConstraints();
+
   // Function object that returns all constraints placed into buckets
   // back to the list of constraints.
   auto returnAllConstraints = [&] {
@@ -2074,6 +2118,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
       InactiveConstraints.splice(InactiveConstraints.end(), 
                                  constraintBuckets[component]);
     }
+    CG.setOrphanedConstraints(std::move(allOrphanedConstraints));
   };
 
   // Compute the partial solutions produced for each connected component.
@@ -2086,24 +2131,30 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
     ++solverState->NumComponentsSplit;
 
     // Collect the constraints for this component.
-    InactiveConstraints.splice(InactiveConstraints.end(), 
+    InactiveConstraints.splice(InactiveConstraints.end(),
                                constraintBuckets[component]);
 
-    // Collect the type variables that are not part of a different
-    // component; this includes type variables that are part of the
-    // component as well as already-resolved type variables.
-    // FIXME: The latter could be avoided if we had already
-    // substituted all of those other type variables through.
-    llvm::SmallVector<TypeVariableType *, 16> allTypeVariables 
+    llvm::SmallVector<TypeVariableType *, 16> allTypeVariables
       = std::move(TypeVariables);
-    for (auto typeVar : allTypeVariables) {
-      auto known = typeVarComponent.find(typeVar);
-      if (known != typeVarComponent.end() && known->second != component)
-        continue;
 
-      TypeVariables.push_back(typeVar);
+    Constraint *orphaned = nullptr;
+    if (component < firstOrphanedConstraint) {
+      // Collect the type variables that are not part of a different
+      // component; this includes type variables that are part of the
+      // component as well as already-resolved type variables.
+      for (auto typeVar : allTypeVariables) {
+        auto known = typeVarComponent.find(typeVar);
+        if (known != typeVarComponent.end() && known->second != component)
+          continue;
+
+        TypeVariables.push_back(typeVar);
+      }
+    } else {
+      // Get the orphaned constraint.
+      orphaned = allOrphanedConstraints[component - firstOrphanedConstraint];
     }
-    
+    CG.setOrphanedConstraint(orphaned);
+
     // Solve for this component. If it fails, we're done.
     bool failed;
     if (TC.getLangOpts().DebugConstraintSolver) {

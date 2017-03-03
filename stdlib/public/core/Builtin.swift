@@ -677,7 +677,7 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 ///     // Smile! 😀
 ///
 /// In this example, accessing the `text` property of the `smileyType` metatype
-/// retrieves the overriden value from the `EmojiSmiley` subclass, instead of
+/// retrieves the overridden value from the `EmojiSmiley` subclass, instead of
 /// the `Smiley` class's original definition.
 ///
 /// Normally, you don't need to be aware of the difference between concrete and
@@ -709,7 +709,7 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 /// This unexpected result occurs because the call to `type(of: value)` inside
 /// `printGenericInfo(_:)` must return a metatype that is an instance of
 /// `T.Type`, but `String.self` (the expected dynamic type) is not an instance
-/// of `P.Type` (the concrete metatype of `value`. To get the dynamic type
+/// of `P.Type` (the concrete metatype of `value`). To get the dynamic type
 /// inside `value` in this generic context, cast the parameter to `Any` when
 /// calling `type(of:)`.
 ///

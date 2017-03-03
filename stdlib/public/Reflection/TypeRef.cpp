@@ -420,19 +420,22 @@ bool isClass(Demangle::NodePointer Node) {
 } // end anonymous namespace
 
 bool NominalTypeTrait::isStruct() const {
-  auto Demangled = Demangle::demangleTypeAsNode(MangledName);
+  Demangle::Demangler Dem;
+  Demangle::NodePointer Demangled = Dem.demangleType(MangledName);
   return ::isStruct(Demangled);
 }
 
 
 bool NominalTypeTrait::isEnum() const {
-  auto Demangled = Demangle::demangleTypeAsNode(MangledName);
+  Demangle::Demangler Dem;
+  Demangle::NodePointer Demangled = Dem.demangleType(MangledName);
   return ::isEnum(Demangled);
 }
 
 
 bool NominalTypeTrait::isClass() const {
-  auto Demangled = Demangle::demangleTypeAsNode(MangledName);
+  Demangle::Demangler Dem;
+  Demangle::NodePointer Demangled = Dem.demangleType(MangledName);
   return ::isClass(Demangled);
 }
 

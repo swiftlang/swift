@@ -16,7 +16,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -27,19 +27,20 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/AST/Mangle.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/Basic/Fallthrough.h"
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/AST/Attr.h"
@@ -495,7 +496,7 @@ GenericParamList::create(const ASTContext &Context,
                          SourceLoc LAngleLoc,
                          ArrayRef<GenericTypeParamDecl *> Params,
                          SourceLoc WhereLoc,
-                         MutableArrayRef<RequirementRepr> Requirements,
+                         ArrayRef<RequirementRepr> Requirements,
                          SourceLoc RAngleLoc) {
   unsigned Size = totalSizeToAlloc<GenericTypeParamDecl *>(Params.size());
   void *Mem = Context.Allocate(Size, alignof(GenericParamList));
@@ -503,6 +504,66 @@ GenericParamList::create(const ASTContext &Context,
                                     WhereLoc,
                                     Context.AllocateCopy(Requirements),
                                     RAngleLoc);
+}
+
+GenericParamList *
+GenericParamList::clone(DeclContext *dc) const {
+  auto &ctx = dc->getASTContext();
+  SmallVector<GenericTypeParamDecl *, 2> params;
+  for (auto param : getParams()) {
+    auto *newParam = new (ctx) GenericTypeParamDecl(
+      dc, param->getName(), param->getNameLoc(),
+      GenericTypeParamDecl::InvalidDepth,
+      param->getIndex());
+    params.push_back(newParam);
+
+    SmallVector<TypeLoc, 2> inherited;
+    for (auto loc : param->getInherited())
+      inherited.push_back(loc.clone(ctx));
+    newParam->setInherited(ctx.AllocateCopy(inherited));
+  }
+
+  SmallVector<RequirementRepr, 2> requirements;
+  for (auto reqt : getRequirements()) {
+    switch (reqt.getKind()) {
+    case RequirementReprKind::TypeConstraint: {
+      auto first = reqt.getSubjectLoc();
+      auto second = reqt.getConstraintLoc();
+      reqt = RequirementRepr::getTypeConstraint(
+          first.clone(ctx),
+          reqt.getColonLoc(),
+          second.clone(ctx));
+      break;
+    }
+    case RequirementReprKind::SameType: {
+      auto first = reqt.getFirstTypeLoc();
+      auto second = reqt.getSecondTypeLoc();
+      reqt = RequirementRepr::getSameType(
+          first.clone(ctx),
+          reqt.getEqualLoc(),
+          second.clone(ctx));
+      break;
+    }
+    case RequirementReprKind::LayoutConstraint: {
+      auto first = reqt.getSubjectLoc();
+      auto layout = reqt.getLayoutConstraintLoc();
+      reqt = RequirementRepr::getLayoutConstraint(
+          first.clone(ctx),
+          reqt.getColonLoc(),
+          layout);
+      break;
+    }
+    }
+
+    requirements.push_back(reqt);
+  }
+
+  return GenericParamList::create(ctx,
+                                  getLAngleLoc(),
+                                  params,
+                                  getWhereLoc(),
+                                  requirements,
+                                  getRAngleLoc());
 }
 
 void GenericParamList::addTrailingWhereClause(
@@ -543,6 +604,89 @@ TrailingWhereClause *TrailingWhereClause::create(
   unsigned size = totalSizeToAlloc<RequirementRepr>(requirements.size());
   void *mem = ctx.Allocate(size, alignof(TrailingWhereClause));
   return new (mem) TrailingWhereClause(whereLoc, requirements);
+}
+
+void GenericContext::setGenericParams(GenericParamList *params) {
+  GenericParams = params;
+
+  if (GenericParams) {
+    for (auto param : *GenericParams)
+      param->setDeclContext(this);
+  }
+}
+
+GenericSignature *GenericContext::getGenericSignature() const {
+  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return genericEnv->getGenericSignature();
+
+  if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
+    return genericSig;
+
+  // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
+  // it.
+  if (auto PD = dyn_cast<ProtocolDecl>(this)) {
+    auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
+    auto req =
+        Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
+    GenericTypeParamType *params[] = {self};
+    Requirement reqs[] = {req};
+
+    auto &ctx = getASTContext();
+    return GenericSignature::get(ctx.AllocateCopy(params),
+                                 ctx.AllocateCopy(reqs));
+  }
+
+  return nullptr;
+}
+
+GenericEnvironment *GenericContext::getGenericEnvironment() const {
+  // Fast case: we already have a generic environment.
+  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return genericEnv;
+
+  // If we only have a generic signature, build the generic environment.
+  if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
+    return getLazyGenericEnvironmentSlow();
+
+  return nullptr;
+}
+
+void GenericContext::setGenericEnvironment(GenericEnvironment *genericEnv) {
+  assert((GenericSigOrEnv.isNull() ||
+          getGenericSignature()->getCanonicalSignature() ==
+            genericEnv->getGenericSignature()->getCanonicalSignature()) &&
+         "set a generic environment with a different generic signature");
+  this->GenericSigOrEnv = genericEnv;
+  if (genericEnv)
+    genericEnv->setOwningDeclContext(this);
+}
+
+GenericEnvironment *
+GenericContext::getLazyGenericEnvironmentSlow() const {
+  assert(GenericSigOrEnv.is<GenericSignature *>() &&
+         "not a lazily deserialized generic environment");
+
+  auto contextData = getASTContext().getOrCreateLazyGenericContextData(
+    this, nullptr);
+  auto *genericEnv = contextData->loader->loadGenericEnvironment(
+    this, contextData->genericEnvData);
+
+  const_cast<GenericContext *>(this)->setGenericEnvironment(genericEnv);
+  ++NumLazyGenericEnvironmentsLoaded;
+  return genericEnv;
+}
+
+void GenericContext::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
+                                               GenericSignature *genericSig,
+                                               uint64_t genericEnvData) {
+  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
+  GenericSigOrEnv = genericSig;
+
+  auto contextData =
+    getASTContext().getOrCreateLazyGenericContextData(this, lazyLoader);
+  contextData->genericEnvData = genericEnvData;
+
+  ++NumLazyGenericEnvironments;
 }
 
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
@@ -672,17 +816,16 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
                              DeclContext *parent,
                              TrailingWhereClause *trailingWhereClause)
   : Decl(DeclKind::Extension, parent),
-    DeclContext(DeclContextKind::ExtensionDecl, parent),
+    GenericContext(DeclContextKind::ExtensionDecl, parent),
     IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
     ExtensionLoc(extensionLoc),
     ExtendedType(extendedType),
-    Inherited(inherited),
-    TrailingWhere(trailingWhereClause)
+    Inherited(inherited)
 {
-  ExtensionDeclBits.Validated = false;
   ExtensionDeclBits.CheckedInheritanceClause = false;
   ExtensionDeclBits.DefaultAndMaxAccessLevel = 0;
   ExtensionDeclBits.HasLazyConformances = false;
+  setTrailingWhereClause(trailingWhereClause);
 }
 
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
@@ -704,72 +847,6 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
     result->setClangNode(clangNode);
 
   return result;
-}
-
-void ExtensionDecl::setGenericParams(GenericParamList *params) {
-  GenericParams = params;
-
-  if (GenericParams) {
-    for (auto param : *GenericParams)
-      param->setDeclContext(this);
-  }
-}
-
-GenericSignature *ExtensionDecl::getGenericSignature() const {
-  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return genericEnv->getGenericSignature();
-
-  if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-    return genericSig;
-
-  return nullptr;
-}
-
-GenericEnvironment *ExtensionDecl::getGenericEnvironment() const {
-  // Fast case: we already have a generic environment.
-  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return genericEnv;
-
-  // If we only have a generic signature, build the generic environment.
-  if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
-    return getLazyGenericEnvironmentSlow();
-
-  return nullptr;
-}
-
-void ExtensionDecl::setGenericEnvironment(GenericEnvironment *genericEnv) {
-  assert((GenericSigOrEnv.isNull() ||
-          getGenericSignature()->getCanonicalSignature() ==
-            genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-         "set a generic environment with a different generic signature");
-  this->GenericSigOrEnv = genericEnv;
-  if (genericEnv)
-    genericEnv->setOwningDeclContext(this);
-}
-
-GenericEnvironment *
-ExtensionDecl::getLazyGenericEnvironmentSlow() const {
-  assert(GenericSigOrEnv.is<GenericSignature *>() &&
-         "not a lazily deserialized generic environment");
-  auto contextData = getASTContext().getOrCreateLazyIterableContextData(this,
-                                                                    nullptr);
-  auto genericEnv = contextData->loader->loadGenericEnvironment(
-                                            this, contextData->genericEnvData);
-  const_cast<ExtensionDecl *>(this)->setGenericEnvironment(genericEnv);
-  ++NumLazyGenericEnvironmentsLoaded;
-  return genericEnv;
-}
-
-void ExtensionDecl::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
-                                              GenericSignature *genericSig,
-                                              uint64_t genericEnvData) {
-  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
-  GenericSigOrEnv = genericSig;
-
-  auto contextData =
-    getASTContext().getOrCreateLazyIterableContextData(this, lazyLoader);
-  contextData->genericEnvData = genericEnvData;
-  ++NumLazyGenericEnvironments;
 }
 
 DeclRange ExtensionDecl::getMembers() const {
@@ -1169,7 +1246,7 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       }
 
       // Fall through to the trivial-implementation case.
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case StoredWithTrivialAccessors:
     case AddressedWithTrivialAccessors: {
@@ -1675,6 +1752,18 @@ ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
   return NTD->getSatisfiedProtocolRequirementsForMember(this, Sorted);
 }
 
+bool ValueDecl::isProtocolRequirement() const {
+  assert(isa<ProtocolDecl>(getDeclContext()));
+
+  if (auto *FD = dyn_cast<FuncDecl>(this))
+    if (FD->isAccessor())
+      return false;
+  if (isa<TypeAliasDecl>(this) ||
+      isa<NominalTypeDecl>(this))
+    return false;
+  return true;
+}
+
 bool ValueDecl::hasInterfaceType() const {
   return !TypeAndAccess.getPointer().isNull();
 }
@@ -1930,7 +2019,7 @@ Type TypeDecl::getDeclaredInterfaceType() const {
         selfTy, const_cast<AssociatedTypeDecl *>(ATD));
   }
 
-  Type interfaceType = getInterfaceType();
+  Type interfaceType = hasInterfaceType() ? getInterfaceType() : nullptr;
   if (interfaceType.isNull() || interfaceType->is<ErrorType>())
     return interfaceType;
 
@@ -2177,86 +2266,15 @@ GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  MutableArrayRef<TypeLoc> inherited,
                                  GenericParamList *GenericParams) :
     TypeDecl(K, DC, name, nameLoc, inherited),
-    DeclContext(DeclContextKind::GenericTypeDecl, DC) {
+    GenericContext(DeclContextKind::GenericTypeDecl, DC) {
   setGenericParams(GenericParams);
 }
 
-
-void GenericTypeDecl::setGenericParams(GenericParamList *params) {
-  // Set the specified generic parameters onto this type declaration, setting
-  // the parameters' context along the way.
-  GenericParams = params;
-  if (params)
-    for (auto Param : *params)
-      Param->setDeclContext(this);
-}
-
-GenericSignature *GenericTypeDecl::getGenericSignature() const {
-  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return genericEnv->getGenericSignature();
-
-  if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-    return genericSig;
-
-  return nullptr;
-}
-
-GenericEnvironment *GenericTypeDecl::getGenericEnvironment() const {
-  // Fast case: we already have a generic environment.
-  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return genericEnv;
-
-  // If we only have a generic signature, build the generic environment.
-  if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
-    return getLazyGenericEnvironmentSlow();
-
-  return nullptr;
-}
-
-/// Set the generic context of this function.
-void GenericTypeDecl::setGenericEnvironment(GenericEnvironment *genericEnv) {
-  assert((GenericSigOrEnv.isNull() ||
-          getGenericSignature()->getCanonicalSignature() ==
-            genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-         "set a generic environment with a different generic signature");
-  this->GenericSigOrEnv = genericEnv;
-
-  if (genericEnv)
-    genericEnv->setOwningDeclContext(this);
-}
-
-GenericEnvironment *
-GenericTypeDecl::getLazyGenericEnvironmentSlow() const {
-  assert(GenericSigOrEnv.is<GenericSignature *>() &&
-         "not a lazily deserialized generic environment");
-  auto contextData = getASTContext().getOrCreateLazyGenericTypeData(this,
-                                                                    nullptr);
-  auto genericEnv = contextData->loader->loadGenericEnvironment(
-                                            this, contextData->genericEnvData);
-  const_cast<GenericTypeDecl *>(this)->setGenericEnvironment(genericEnv);
-  ++NumLazyGenericEnvironmentsLoaded;
-  return genericEnv;
-}
-
-void GenericTypeDecl::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
-                                                GenericSignature *genericSig,
-                                                uint64_t genericEnvData) {
-  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
-  GenericSigOrEnv = genericSig;
-
-  auto contextData =
-    getASTContext().getOrCreateLazyGenericTypeData(this, lazyLoader);
-  contextData->genericEnvData = genericEnvData;
-  ++NumLazyGenericEnvironments;
-}
-
-TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                             SourceLoc NameLoc, GenericParamList *GenericParams,
-                             DeclContext *DC)
+TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, SourceLoc EqualLoc,
+                             Identifier Name, SourceLoc NameLoc,
+                             GenericParamList *GenericParams, DeclContext *DC)
   : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
-    TypeAliasLoc(TypeAliasLoc) {
-  TypeAliasDeclBits.HasCompletedValidation = false;
-}
+    TypeAliasLoc(TypeAliasLoc), EqualLoc(EqualLoc) {}
 
 SourceRange TypeAliasDecl::getSourceRange() const {
   if (UnderlyingTy.hasLocation())
@@ -2265,7 +2283,7 @@ SourceRange TypeAliasDecl::getSourceRange() const {
 }
 
 void TypeAliasDecl::setUnderlyingType(Type underlying) {
-  setHasCompletedValidation();
+  setValidationStarted();
 
   // lldb creates global typealiases containing archetypes
   // sometimes...
@@ -2334,19 +2352,20 @@ SourceRange GenericTypeParamDecl::getSourceRange() const {
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
-                                       TypeLoc defaultDefinition)
-  : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
-    KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition)
-{ }
+                                       TypeLoc defaultDefinition,
+                                       TrailingWhereClause *trailingWhere)
+    : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
+      KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition),
+      TrailingWhere(trailingWhere) {}
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
+                                       TrailingWhereClause *trailingWhere,
                                        LazyMemberLoader *definitionResolver,
                                        uint64_t resolverData)
-  : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
-    KeywordLoc(keywordLoc), Resolver(definitionResolver),
-    ResolverContextData(resolverData)
-{
+    : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
+      KeywordLoc(keywordLoc), TrailingWhere(trailingWhere),
+      Resolver(definitionResolver), ResolverContextData(resolverData) {
   assert(Resolver && "missing resolver");
 }
 
@@ -2409,6 +2428,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
     = static_cast<unsigned>(StoredInheritsSuperclassInits::Unchecked);
   ClassDeclBits.RawForeignKind = 0;
   ClassDeclBits.HasDestructorDecl = 0;
+  ClassDeclBits.ObjCClassKind = 0;
 }
 
 DestructorDecl *ClassDecl::getDestructor() {
@@ -2502,6 +2522,10 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 }
 
 ObjCClassKind ClassDecl::checkObjCAncestry() const {
+  // See if we've already computed this.
+  if (ClassDeclBits.ObjCClassKind)
+    return ObjCClassKind(ClassDeclBits.ObjCClassKind - 1);
+
   llvm::SmallPtrSet<const ClassDecl *, 8> visited;
   bool genericAncestry = false, isObjC = false;
   const ClassDecl *CD = this;
@@ -2528,14 +2552,18 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
       break;
   }
 
+  ObjCClassKind kind = ObjCClassKind::ObjC;
   if (!isObjC)
-    return ObjCClassKind::NonObjC;
-  if (genericAncestry)
-    return ObjCClassKind::ObjCMembers;
-  if (CD == this || !CD->isObjC())
-    return ObjCClassKind::ObjCWithSwiftRoot;
+    kind = ObjCClassKind::NonObjC;
+  else if (genericAncestry)
+    kind = ObjCClassKind::ObjCMembers;
+  else if (CD == this || !CD->isObjC())
+    kind = ObjCClassKind::ObjCWithSwiftRoot;
 
-  return ObjCClassKind::ObjC;
+  // Save the result for later.
+  const_cast<ClassDecl *>(this)->ClassDeclBits.ObjCClassKind
+    = unsigned(kind) + 1;
+  return kind;
 }
 
 /// Mangle the name of a protocol or class for use in the Objective-C
@@ -2543,26 +2571,12 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
 static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
                                        llvm::SmallVectorImpl<char> &buffer) {
   {
-    // TODO: Mangling: Use new mangling scheme as soon as the ObjC runtime
-    // can demangle it.
-
-    // Mangle the type.
-    Mangle::Mangler mangler(false/*dwarf*/, false/*punycode*/);
-
-    // We add the "_Tt" prefix to make this a reserved name that will
-    // not conflict with any valid Objective-C class or protocol name.
-    mangler.append("_Tt");
-
-    NominalTypeDecl *NTD = const_cast<NominalTypeDecl*>(nominal);
-    if (isa<ClassDecl>(nominal)) {
-      mangler.mangleNominalType(NTD);
-    } else {
-      mangler.mangleProtocolDecl(cast<ProtocolDecl>(NTD));
-    }
+    NewMangling::ASTMangler Mangler;
+    std::string MangledName = Mangler.mangleObjCRuntimeName(nominal);
 
     buffer.clear();
     llvm::raw_svector_ostream os(buffer);
-    mangler.finalize(os);
+    os << MangledName;
   }
 
   assert(buffer.size() && "Invalid buffer size");
@@ -2688,12 +2702,73 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   ProtocolDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
   HasMissingRequirements = false;
-  InheritedProtocolsSet = false;
 }
 
-ArrayRef<ProtocolDecl *>
-ProtocolDecl::getInheritedProtocols(LazyResolver *resolver) const {
-  return InheritedProtocols;
+llvm::TinyPtrVector<ProtocolDecl *>
+ProtocolDecl::getInheritedProtocols() const {
+  llvm::TinyPtrVector<ProtocolDecl *> result;
+
+  // FIXME: Gather inherited protocols from the "inherited" list.
+  // We shouldn't need this, but it shows up in recursive invocations.
+  if (!isRequirementSignatureComputed()) {
+    for (auto inherited : getInherited()) {
+      SmallPtrSet<ProtocolDecl *, 4> known;
+      if (auto type = inherited.getType()) {
+        SmallVector<ProtocolDecl *, 4> protocols;
+        if (type->isExistentialType(protocols)) {
+          for (auto proto : protocols) {
+            if (known.insert(proto).second)
+              result.push_back(proto);
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  // Gather inherited protocols from the requirement signature.
+  auto selfType = getProtocolSelfType();
+  for (auto req : getRequirementSignature()->getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance &&
+        req.getFirstType()->isEqual(selfType))
+      result.push_back(req.getSecondType()->castTo<ProtocolType>()->getDecl());
+  }
+  return result;
+}
+
+bool ProtocolDecl::walkInheritedProtocols(
+              llvm::function_ref<TypeWalker::Action(ProtocolDecl *)> fn) const {
+  auto self = const_cast<ProtocolDecl *>(this);
+
+  // Visit all of the inherited protocols.
+  SmallPtrSet<ProtocolDecl *, 8> visited;
+  SmallVector<ProtocolDecl *, 4> stack;
+  stack.push_back(self);
+  visited.insert(self);
+  while (!stack.empty()) {
+    // Pull the next protocol off the stack.
+    auto proto = stack.back();
+    stack.pop_back();
+
+    switch (fn(proto)) {
+    case TypeWalker::Action::Stop:
+      return true;
+
+    case TypeWalker::Action::Continue:
+      // Add inherited protocols to the stack.
+      for (auto inherited : proto->getInheritedProtocols()) {
+        if (visited.insert(inherited).second)
+          stack.push_back(inherited);
+      }
+      break;
+
+    case TypeWalker::Action::SkipChildren:
+      break;
+    }
+  }
+
+  return false;
+
 }
 
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
@@ -2706,25 +2781,27 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
 }
 
 bool ProtocolDecl::requiresClassSlow() {
-  ProtocolDeclBits.RequiresClass = false;
+  ProtocolDeclBits.RequiresClass =
+    walkInheritedProtocols([&](ProtocolDecl *proto) {
+      // If the 'requires class' bit is valid, we don't need to search any
+      // further.
+      if (proto->ProtocolDeclBits.RequiresClassValid) {
+        // If this protocol has a class requirement, we're done.
+        if (proto->ProtocolDeclBits.RequiresClass)
+          return TypeWalker::Action::Stop;
 
-  // Ensure that the result cannot change in future.
-  assert(isInheritedProtocolsValid());
+        return TypeWalker::Action::SkipChildren;
+      }
 
-  if (getAttrs().hasAttribute<ObjCAttr>() || isObjC()) {
-    ProtocolDeclBits.RequiresClass = true;
-    return true;
-  }
+      // Quick check: @objc indicates that it requires a class.
+      if (proto->getAttrs().hasAttribute<ObjCAttr>() || proto->isObjC())
+        return TypeWalker::Action::Stop;
 
-  // Check inherited protocols for class-ness.
-  for (auto *proto : getInheritedProtocols(nullptr)) {
-    if (proto->requiresClass()) {
-      ProtocolDeclBits.RequiresClass = true;
-      return true;
-    }
-  }
+      // Keep looking.
+      return TypeWalker::Action::Continue;
+    });
 
-  return false;
+  return ProtocolDeclBits.RequiresClass;
 }
 
 bool ProtocolDecl::existentialConformsToSelfSlow() {
@@ -2757,8 +2834,7 @@ bool ProtocolDecl::existentialConformsToSelfSlow() {
 
   // Check whether any of the inherited protocols fail to conform to
   // themselves.
-  // FIXME: does this need a resolver?
-  for (auto proto : getInheritedProtocols(nullptr)) {
+  for (auto proto : getInheritedProtocols()) {
     if (!proto->existentialConformsToSelf()) {
       ProtocolDeclBits.ExistentialConformsToSelf = false;
       return false;
@@ -2952,7 +3028,7 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
 
   // Check whether all of the inherited protocols can have existential
   // types themselves.
-  for (auto proto : getInheritedProtocols(resolver)) {
+  for (auto proto : getInheritedProtocols()) {
     if (!proto->existentialTypeSupported(resolver)) {
       ProtocolDeclBits.ExistentialTypeSupported = false;
       return false;
@@ -3018,19 +3094,20 @@ void ProtocolDecl::computeRequirementSignature() {
                   genericSig->getRequirements().size() == 1;
   if (!validSig) {
     // This doesn't look like a protocol we can handle, so some other error must
-    // have occured (usually a protocol nested within another declaration)
+    // have occurred (usually a protocol nested within another declaration)
     return;
   }
 
   auto selfType = genericSig->getGenericParams()[0];
   auto requirement = genericSig->getRequirements()[0];
 
-  RequirementSource source(RequirementSource::ProtocolRequirementSignatureSelf,
-                           getLoc());
-
-  ArchetypeBuilder builder(getASTContext(), LookUpConformanceInModule(module));
+  GenericSignatureBuilder builder(getASTContext(),
+                                  LookUpConformanceInModule(module));
   builder.addGenericParameter(selfType);
-  builder.addRequirement(requirement, source);
+  builder.addRequirement(
+         requirement,
+         GenericSignatureBuilder::RequirementSource
+          ::forRequirementSignature(builder.resolveArchetype(selfType), this));
   builder.finalize(SourceLoc(), { selfType });
   
   RequirementSignature = builder.getGenericSignature();
@@ -3405,14 +3482,31 @@ void AbstractStorageDecl::setInvalidBracesRange(SourceRange BracesRange) {
   GetSetInfo.setPointer(getSetInfo);
 }
 
+static Optional<ObjCSelector>
+getNameFromObjcAttribute(const ObjCAttr *attr, DeclName preferredName) {
+  if (!attr)
+    return None;
+  if (auto name = attr->getName()) {
+    if (attr->isNameImplicit()) {
+      // preferredName > implicit name, because implicit name is just cached
+      // actual name.
+      if (!preferredName)
+        return *name;
+    } else {
+      // explicit name > preferred name.
+      return *name;
+    }
+  }
+  return None;
+}
+
 ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
-               LazyResolver *resolver) const {
+               LazyResolver *resolver, Identifier preferredName) const {
   // If the getter has an @objc attribute with a name, use that.
   if (auto getter = getGetter()) {
-    if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>()) {
-      if (auto name = objcAttr->getName())
+      if (auto name = getNameFromObjcAttribute(getter->getAttrs().
+          getAttribute<ObjCAttr>(), preferredName))
         return *name;
-    }
   }
 
   // Subscripts use a specific selector.
@@ -3430,18 +3524,22 @@ ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
 
   // The getter selector is the property name itself.
   auto var = cast<VarDecl>(this);
-  return VarDecl::getDefaultObjCGetterSelector(ctx, var->getObjCPropertyName());
+  auto name = var->getObjCPropertyName();
+
+  // Use preferred name is specified.
+  if (!preferredName.empty())
+    name = preferredName;
+  return VarDecl::getDefaultObjCGetterSelector(ctx, name);
 }
 
 ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
-               LazyResolver *resolver) const {
+               LazyResolver *resolver, Identifier preferredName) const {
   // If the setter has an @objc attribute with a name, use that.
   auto setter = getSetter();
   auto objcAttr = setter ? setter->getAttrs().getAttribute<ObjCAttr>()
                          : nullptr;
-  if (objcAttr) {
-    if (auto name = objcAttr->getName())
-      return *name;
+  if (auto name = getNameFromObjcAttribute(objcAttr, DeclName(preferredName))) {
+    return *name;
   }
 
   // Subscripts use a specific selector.
@@ -3464,12 +3562,13 @@ ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
   // The setter selector for, e.g., 'fooBar' is 'setFooBar:', with the
   // property name capitalized and preceded by 'set'.
   auto var = cast<VarDecl>(this);
-  auto result = VarDecl::getDefaultObjCSetterSelector(
-                  ctx, 
-                  var->getObjCPropertyName());
+  Identifier Name = var->getObjCPropertyName();
+  if (!preferredName.empty())
+    Name = preferredName;
+  auto result = VarDecl::getDefaultObjCSetterSelector(ctx, Name);
 
   // Cache the result, so we don't perform string manipulation again.
-  if (objcAttr)
+  if (objcAttr && preferredName.empty())
     const_cast<ObjCAttr *>(objcAttr)->setName(result, /*implicit=*/true);
 
   return result;
@@ -3820,7 +3919,7 @@ ParamDecl::ParamDecl(ParamDecl *PD)
     DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()),
     IsTypeLocImplicit(PD->IsTypeLocImplicit),
     defaultArgumentKind(PD->defaultArgumentKind) {
-  typeLoc = PD->getTypeLoc();
+  typeLoc = PD->getTypeLoc().clone(PD->getASTContext());
   if (PD->hasInterfaceType())
     setInterfaceType(PD->getInterfaceType());
 }
@@ -4056,66 +4155,6 @@ SourceRange SubscriptDecl::getSourceRange() const {
   return { getSubscriptLoc(), ElementTy.getSourceRange().End };
 }
 
-GenericSignature *AbstractFunctionDecl::getGenericSignature() const {
-  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return genericEnv->getGenericSignature();
-
-  if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-    return genericSig;
-
-  return nullptr;
-}
-
-GenericEnvironment *AbstractFunctionDecl::getGenericEnvironment() const {
-  // Fast case: we already have a generic environment.
-  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return genericEnv;
-
-  // If we only have a generic signature, build the generic environment.
-  if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
-    return getLazyGenericEnvironmentSlow();
-
-  return nullptr;
-}
-
-void
-AbstractFunctionDecl::setGenericEnvironment(GenericEnvironment *genericEnv) {
-  assert((GenericSigOrEnv.isNull() ||
-          getGenericSignature()->getCanonicalSignature() ==
-            genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-         "set a generic environment with a different generic signature");
-  this->GenericSigOrEnv = genericEnv;
-
-  if (genericEnv)
-    genericEnv->setOwningDeclContext(this);
-}
-
-GenericEnvironment *
-AbstractFunctionDecl::getLazyGenericEnvironmentSlow() const {
-  assert(GenericSigOrEnv.is<GenericSignature *>() &&
-         "not a lazily deserialized generic environment");
-  auto contextData =
-    getASTContext().getOrCreateLazyFunctionContextData(this, nullptr);
-  auto genericEnv = contextData->loader->loadGenericEnvironment(
-                                            this, contextData->genericEnvData);
-  const_cast<AbstractFunctionDecl *>(this)->setGenericEnvironment(genericEnv);
-  ++NumLazyGenericEnvironmentsLoaded;
-  return genericEnv;
-}
-
-void AbstractFunctionDecl::setLazyGenericEnvironment(
-                                                 LazyMemberLoader *lazyLoader,
-                                                 GenericSignature *genericSig,
-                                                 uint64_t genericEnvData) {
-  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
-  GenericSigOrEnv = genericSig;
-
-  auto contextData =
-    getASTContext().getOrCreateLazyFunctionContextData(this, lazyLoader);
-  contextData->genericEnvData = genericEnvData;
-  ++NumLazyGenericEnvironments;
-}
-
 Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor,
                                                     bool wantDynamicSelf) {
   auto *dc = getDeclContext();
@@ -4215,16 +4254,6 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
   return DeclName();
 }
 
-void AbstractFunctionDecl::setGenericParams(GenericParamList *GP) {
-  // Set the specified generic parameters onto this abstract function, setting
-  // the parameters' context to the function along the way.
-  GenericParams = GP;
-  if (GP)
-    for (auto Param : *GP)
-      Param->setDeclContext(this);
-}
-
-
 /// \brief This method returns the implicit 'self' decl.
 ///
 /// Note that some functions don't have an implicit 'self' decl, for example,
@@ -4320,24 +4349,35 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
 }
 
 ObjCSelector AbstractFunctionDecl::getObjCSelector(
-               LazyResolver *resolver) const {
+               LazyResolver *resolver, DeclName preferredName) const {
   // If there is an @objc attribute with a name, use that name.
-  auto objc = getAttrs().getAttribute<ObjCAttr>();
-  if (objc) {
-    if (auto name = objc->getName())
-      return *name;
+  auto *objc = getAttrs().getAttribute<ObjCAttr>();
+  if (auto name = getNameFromObjcAttribute(objc, preferredName)) {
+    return *name;
   }
 
   auto &ctx = getASTContext();
+  auto baseName = getName();
   auto argNames = getFullName().getArgumentNames();
+
+  // Use the preferred name if specified
+  if (preferredName) {
+    // Return invalid selector if argument count doesn't match.
+    if (argNames.size() != preferredName.getArgumentNames().size()) {
+      return ObjCSelector();
+    }
+    baseName = preferredName.getBaseName();
+    argNames = preferredName.getArgumentNames();
+  }
 
   auto func = dyn_cast<FuncDecl>(this);
   if (func) {
     // For a getter or setter, go through the variable or subscript decl.
     if (func->isGetterOrSetter()) {
       auto asd = cast<AbstractStorageDecl>(func->getAccessorStorageDecl());
-      return func->isGetter() ? asd->getObjCGetterSelector(resolver)
-                              : asd->getObjCSetterSelector(resolver);
+      return func->isGetter() ?
+        asd->getObjCGetterSelector(resolver, baseName) :
+        asd->getObjCSetterSelector(resolver, baseName);
     }
   }
 
@@ -4373,12 +4413,12 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
 
   // If we have no arguments, it's a nullary selector.
   if (numSelectorPieces == 0) {
-    return ObjCSelector(ctx, 0, getName());
+    return ObjCSelector(ctx, 0, baseName);
   }
 
  // If it's a unary selector with no name for the first argument, we're done.
   if (numSelectorPieces == 1 && argNames.size() == 1 && argNames[0].empty()) {
-    return ObjCSelector(ctx, 1, getName());
+    return ObjCSelector(ctx, 1, baseName);
   }
 
   /// Collect the selector pieces.
@@ -4403,7 +4443,7 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
 
     // For the first selector piece, attach either the first parameter
     // or "AndReturnError" to the base name, if appropriate.
-    auto firstPiece = getName();
+    auto firstPiece = baseName;
     llvm::SmallString<32> scratch;
     scratch += firstPiece.str();
     if (errorConvention && piece == errorConvention->getErrorParameterIndex()) {
@@ -4439,7 +4479,7 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
 
   // If we did any string manipulation, cache the result. We don't want to
   // do that again.
-  if (didStringManipulation && objc)
+  if (didStringManipulation && objc && !preferredName)
     const_cast<ObjCAttr *>(objc)->setName(result, /*implicit=*/true);
 
   return result;

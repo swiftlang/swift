@@ -53,6 +53,7 @@ def type_bool(string):
         return True
     raise argparse.ArgumentTypeError("%r is not a boolean value" % string)
 
+
 _register(type, 'bool', type_bool)
 
 
@@ -69,6 +70,7 @@ def type_shell_split(string):
     lex.whitespace_split = True
     lex.whitespace += ','
     return list(lex)
+
 
 _register(type, 'shell_split', type_shell_split)
 
@@ -101,6 +103,7 @@ def type_clang_compiler_version(string):
         "must be 'MAJOR.MINOR.PATCH' or "
         "'MAJOR.MINOR.PATCH.PATCH'" % string)
 
+
 _register(type, 'clang_compiler_version', type_clang_compiler_version)
 
 
@@ -121,6 +124,7 @@ def type_swift_compiler_version(string):
         "must be 'MAJOR.MINOR' or "
         "'MAJOR.MINOR.PATCH'" % string)
 
+
 _register(type, 'swift_compiler_version', type_swift_compiler_version)
 
 
@@ -134,6 +138,7 @@ def type_executable(string):
         return os.path.abspath(string)
     raise argparse.ArgumentTypeError(
         "%r is not executable" % string)
+
 
 _register(type, 'executable', type_executable)
 
@@ -162,6 +167,7 @@ class _UnavailableAction(argparse.Action):
             arg = str(values)
         parser.error('unknown argument: %s' % arg)
 
+
 _register(action, 'unavailable', _UnavailableAction)
 
 
@@ -174,6 +180,7 @@ class _ConcatAction(argparse.Action):
         else:
             val = old_val + values
         setattr(namespace, self.dest, val)
+
 
 _register(action, 'concat', _ConcatAction)
 
@@ -197,5 +204,6 @@ class _OptionalBoolAction(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, self.dest, values)
+
 
 _register(action, 'optional_bool', _OptionalBoolAction)

@@ -18,6 +18,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Reflection/MetadataSourceBuilder.h"
 #include "swift/Reflection/Records.h"
 #include "swift/SIL/SILModule.h"
@@ -31,6 +32,7 @@
 #include "IRGenModule.h"
 #include "Linking.h"
 #include "LoadableTypeInfo.h"
+#include "IRGenMangler.h"
 
 using namespace swift;
 using namespace irgen;
@@ -213,22 +215,19 @@ protected:
     // for the purposes of reflection metadata
     assert(!type->hasArchetype() && "Forgot to map typeref out of context");
 
-    Mangle::Mangler mangler(/*DWARFMangling*/false,
-                            /*usePunyCode*/ true,
-                            /*OptimizeProtocolNames*/ false);
-    mangler.setModuleContext(ModuleContext);
-    
     // TODO: As a compatibility hack, mangle single-field boxes with the legacy
     // mangling in reflection metadata.
+    bool isSingleFieldOfBox = false;
     auto boxTy = dyn_cast<SILBoxType>(type);
     if (boxTy && boxTy->getLayout()->getFields().size() == 1) {
       GenericContextScope scope(IGM, Context);
-      mangler.mangleLegacyBoxType(
-        boxTy->getFieldLoweredType(IGM.getSILModule(), 0));
-    } else {
-      mangler.mangleType(type, 0);
+      type = boxTy->getFieldLoweredType(IGM.getSILModule(), 0);
+      isSingleFieldOfBox = true;
     }
-    auto mangledName = IGM.getAddrOfStringForTypeRef(mangler.finalize());
+    IRGenMangler mangler;
+    std::string MangledStr = mangler.mangleTypeForReflection(type,
+                                            ModuleContext, isSingleFieldOfBox);
+    auto mangledName = IGM.getAddrOfStringForTypeRef(MangledStr);
     addRelativeAddress(mangledName);
   }
 

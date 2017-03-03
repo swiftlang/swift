@@ -19,8 +19,8 @@ extension NSReferencePoint: Pointable {}
 // CHECK-LABEL: sil shared [transparent] [fragile] @_T0SC7NSPointV1xSffm
 // CHECK-LABEL: sil shared [transparent] [fragile] @_T0SC7NSPointV1ySffm
 
-// CHECK-LABEL: sil shared @_T0So16NSReferencePointC1xSffm
-// CHECK-LABEL: sil shared @_T0So16NSReferencePointC1ySffm
-
 // CHECK-LABEL: sil shared @_T0So16NSReferencePointC1xSffmytfU_
+// CHECK-LABEL: sil shared @_T0So16NSReferencePointC1xSffm
+
 // CHECK-LABEL: sil shared @_T0So16NSReferencePointC1ySffmytfU_
+// CHECK-LABEL: sil shared @_T0So16NSReferencePointC1ySffm

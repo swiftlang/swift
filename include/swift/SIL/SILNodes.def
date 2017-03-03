@@ -164,6 +164,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(UnmanagedAutoreleaseValueInst, RefCountingInst, unmanaged_autorelease_value, MayHaveSideEffects, DoesNotRelease)
   INST(CopyUnownedValueInst, SILInstruction, copy_unowned_value, MayHaveSideEffects, DoesNotRelease)
   INST(DestroyValueInst, SILInstruction, destroy_value, MayHaveSideEffects, MayRelease)
+  INST(EndLifetimeInst, SILInstruction, end_lifetime, MayHaveSideEffects, MayRelease)
+  INST(UncheckedOwnershipConversionInst, SILInstruction, unchecked_ownership_conversion, MayHaveSideEffects, MayRelease)
 
   // IsUnique does not actually write to memory but should be modeled
   // as such. Its operand is a pointer to an object reference. The
@@ -224,7 +226,10 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 
   // Protocol and Protocol Composition Types
   INST(InitExistentialAddrInst, SILInstruction, init_existential_addr, MayWrite, DoesNotRelease)
+  INST(InitExistentialOpaqueInst, SILInstruction, init_existential_opaque, MayWrite, DoesNotRelease)
   INST(DeinitExistentialAddrInst, SILInstruction, deinit_existential_addr, MayHaveSideEffects,
+       DoesNotRelease)
+  INST(DeinitExistentialOpaqueInst, SILInstruction, deinit_existential_opaque, MayHaveSideEffects,
        DoesNotRelease)
   INST(OpenExistentialAddrInst, SILInstruction, open_existential_addr, MayRead, DoesNotRelease)
   INST(InitExistentialRefInst, SILInstruction, init_existential_ref, None, DoesNotRelease)
@@ -265,6 +270,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(ObjCMetatypeToObjectInst, ConversionInst, objc_metatype_to_object, None, DoesNotRelease)
     INST(ObjCExistentialMetatypeToObjectInst, ConversionInst, objc_existential_metatype_to_object, None,
          DoesNotRelease)
+    INST(UnconditionalCheckedCastOpaqueInst, ConversionInst, unconditional_checked_cast_opaque, None, DoesNotRelease)
     INST(UnconditionalCheckedCastInst, ConversionInst, unconditional_checked_cast, None, DoesNotRelease)
     VALUE_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
   INST(IsNonnullInst, SILInstruction, is_nonnull, None, DoesNotRelease)

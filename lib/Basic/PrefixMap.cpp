@@ -13,6 +13,7 @@
 #include "swift/Basic/PrefixMap.h"
 #include "swift/Basic/QuotedString.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 

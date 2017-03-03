@@ -9,24 +9,28 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// A storage structure for holding a destructured rvalue with an optional
-// cleanup(s).
-// Ownership of the rvalue can be "forwarded" to disable the associated
-// cleanup(s).
-//
+///
+/// \file
+///
+/// A storage structure for holding a destructured rvalue with an optional
+/// cleanup(s).
+///
+/// Ownership of the rvalue can be "forwarded" to disable the associated
+/// cleanup(s).
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_LOWERING_RVALUE_H
 #define SWIFT_LOWERING_RVALUE_H
 
 #include "ManagedValue.h"
-#include "SILGenFunction.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 namespace Lowering {
-  class Initialization;
+
+class Initialization;
+class SILGenFunction;
 
 /// An "exploded" SIL rvalue, in which tuple values are recursively
 /// destructured. (In SILGen we don't try to explode structs, because doing so

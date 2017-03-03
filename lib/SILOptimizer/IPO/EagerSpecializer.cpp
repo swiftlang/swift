@@ -287,7 +287,7 @@ public:
         substConv(ReInfo.getSubstitutedType(), GenericFunc->getModule()),
         Builder(*GenericFunc), Loc(GenericFunc->getLocation()) {
     Builder.setCurrentDebugScope(GenericFunc->getDebugScope());
-    IsClassF = Builder.getModule().hasFunction(
+    IsClassF = Builder.getModule().findFunction(
       "_swift_isClassOrObjCExistentialType", SILLinkage::PublicExternal);
     assert(IsClassF);
   }
@@ -337,41 +337,30 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   // SubstitutableTypes, skipping DependentTypes.
   auto GenericSig =
     GenericFunc->getLoweredFunctionType()->getGenericSignature();
-  auto SubIt = ReInfo.getClonerParamSubstitutions().begin();
-  auto SubEnd = ReInfo.getClonerParamSubstitutions().end();
-  auto DepTypes = GenericSig->getAllDependentTypes();
-  for (auto DepTy : DepTypes) {
-    assert(SubIt != SubEnd && "Not enough substitutions.");
-    if (auto ParamTy = DepTy->getAs<SubstitutableType>()) {
-      auto Replacement = SubIt->getReplacement();
-      auto GenericEnv = ReInfo.getSpecializedGenericEnvironment();
-      if (!Replacement->hasArchetype()) {
-        if (GenericEnv)
-          Replacement = GenericEnv->mapTypeIntoContext(Replacement);
-        assert(!Replacement->hasTypeParameter());
-        // Dispatch on concrete type.
-        emitTypeCheck(FailedTypeCheckBB, ParamTy, Replacement);
-      } else {
-        // If Replacement has a layout constraint, then dispatch based
-        // on its size and the fact that it is trivial.
-        auto LayoutInfo = Replacement->getLayoutConstraint();
-        if (LayoutInfo && LayoutInfo->isTrivial()) {
-          // Emit a check that it is a trivial type of a certain size.
-          emitTrivialAndSizeCheck(FailedTypeCheckBB, ParamTy,
-                                  GenericEnv->mapTypeIntoContext(Replacement),
-                                  LayoutInfo);
-        } else if (LayoutInfo && LayoutInfo->isRefCountedObject()) {
-          // Emit a check that it is an object of a reference counted type.
-          emitRefCountedObjectCheck(FailedTypeCheckBB, ParamTy,
-                                    GenericEnv->mapTypeIntoContext(Replacement),
-                                    LayoutInfo);
-        }
+  auto SubMap = GenericSig->getSubstitutionMap(
+    ReInfo.getClonerParamSubstitutions());
+  for (auto ParamTy : GenericSig->getSubstitutableParams()) {
+    auto Replacement = Type(ParamTy).subst(SubMap);
+    assert(!Replacement->hasTypeParameter());
+
+    if (!Replacement->hasArchetype()) {
+      // Dispatch on concrete type.
+      emitTypeCheck(FailedTypeCheckBB, ParamTy, Replacement);
+    } else {
+      // If Replacement has a layout constraint, then dispatch based
+      // on its size and the fact that it is trivial.
+      auto LayoutInfo = Replacement->getLayoutConstraint();
+      if (LayoutInfo && LayoutInfo->isTrivial()) {
+        // Emit a check that it is a trivial type of a certain size.
+        emitTrivialAndSizeCheck(FailedTypeCheckBB, ParamTy,
+                                Replacement, LayoutInfo);
+      } else if (LayoutInfo && LayoutInfo->isRefCountedObject()) {
+        // Emit a check that it is an object of a reference counted type.
+        emitRefCountedObjectCheck(FailedTypeCheckBB, ParamTy,
+                                  Replacement, LayoutInfo);
       }
     }
-    ++SubIt;
   }
-  assert(SubIt == SubEnd && "Too many substitutions.");
-  (void) SubEnd;
   static_cast<void>(FailedTypeCheckBB);
 
   if (OldReturnBB == &EntryBB) {
@@ -709,13 +698,9 @@ static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
   DEBUG(auto FT = GenericFunc->getLoweredFunctionType();
         dbgs() << "  Generic Sig:";
         dbgs().indent(2); FT->getGenericSignature()->print(dbgs());
-        dbgs() << "\n  Substituting: <";
-        auto depTypes = FT->getGenericSignature()->getAllDependentTypes();
-        interleave(depTypes.begin(), depTypes.end(),
-                   [&](Type t){
-                     GenericFunc->mapTypeIntoContext(t).print(dbgs()); },
-                   []{ dbgs() << ", "; });
-        dbgs() << "> with ";
+        dbgs() << "  Generic Env:";
+        dbgs().indent(2); GenericFunc->getGenericEnvironment()->dump(dbgs());
+        dbgs() << "  Specialize Attr:";
         SA.print(dbgs()); dbgs() << "\n");
 
   GenericFuncSpecializer

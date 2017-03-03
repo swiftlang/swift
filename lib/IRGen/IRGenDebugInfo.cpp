@@ -86,11 +86,15 @@ static unsigned getSizeInBits(llvm::DIType *Ty) {
   return Ty->getSizeInBits();
 }
 
+#ifndef NDEBUG
+
 /// Return the size reported by the variable's type.
 static unsigned getSizeInBits(const llvm::DILocalVariable *Var) {
   llvm::DIType *Ty = Var->getType().resolve();
   return getSizeInBits(Ty);
 }
+
+#endif
 
 IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
                                ClangImporter &CI,
@@ -565,8 +569,10 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
 void IRGenDebugInfo::createParameterType(
     llvm::SmallVectorImpl<llvm::Metadata *> &Parameters, SILType type,
     DeclContext *DeclCtx) {
-  // FIXME: This use of getSwiftType() is extremely suspect.
-  auto DbgTy = DebugTypeInfo::getFromTypeInfo(DeclCtx, type.getSwiftType(),
+  auto RealType = type.getSwiftRValueType();
+  if (type.isAddress())
+    RealType = CanInOutType::get(RealType);
+  auto DbgTy = DebugTypeInfo::getFromTypeInfo(DeclCtx, RealType,
                                               IGM.getTypeInfo(type));
   Parameters.push_back(getOrCreateType(DbgTy));
 }
@@ -815,7 +821,8 @@ void IRGenDebugInfo::emitArtificialFunction(IRBuilder &Builder,
 TypeAliasDecl *IRGenDebugInfo::getMetadataType() {
   if (!MetadataTypeDecl) {
     MetadataTypeDecl = new (IGM.Context) TypeAliasDecl(
-        SourceLoc(), IGM.Context.getIdentifier("$swift.type"), SourceLoc(),
+        SourceLoc(), SourceLoc(),
+        IGM.Context.getIdentifier("$swift.type"), SourceLoc(),
         /*genericparams*/nullptr, IGM.Context.TheBuiltinModule);
     MetadataTypeDecl->setUnderlyingType(IGM.Context.TheRawPointerType);
   }
@@ -1585,7 +1592,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       auto DT = getOrCreateDesugaredType(ObjectTy, DbgTy);
       return createPointerSizedStruct(
           Scope, MangledName, DT, File, 0, Flags,
-          BaseTy->isUnspecializedGeneric() ? StringRef() : MangledName);
+          MangledName);
     } else
       return createOpaqueStruct(Scope, MangledName, File, 0, SizeInBits,
                                 AlignInBits, Flags, MangledName);

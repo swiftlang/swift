@@ -1410,8 +1410,8 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
 
   // If we were given a mangled name, do a very simple form of LLDB's logic to
   // look up a type based on that name.
-  Demangle::NodePointer node =
-    demangle_wrappers::demangleSymbolAsNode(MangledNameToFind);
+  Demangle::Context DCtx;
+  Demangle::NodePointer node = DCtx.demangleSymbolAsNode(MangledNameToFind);
   using NodeKind = Demangle::Node::Kind;
 
   if (!node) {
@@ -1560,7 +1560,8 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
     for (auto MangledName : MangledNames) {
 
       // Global
-      auto node = demangle_wrappers::demangleSymbolAsNode(MangledName);
+      Demangle::Context DCtx;
+      auto node = DCtx.demangleSymbolAsNode(MangledName);
 
       // TypeMangling
       node = node->getFirstChild();
@@ -2962,12 +2963,14 @@ int main(int argc, char *argv[]) {
   InitInvok.getClangImporterOptions().ModuleCachePath =
     options::ModuleCachePath;
   InitInvok.setImportSearchPaths(options::ImportPaths);
-  InitInvok.setFrameworkSearchPaths(options::FrameworkPaths);
-  for (const auto &systemFrameworkPath : options::SystemFrameworkPaths) {
-    auto &extraArgs = InitInvok.getClangImporterOptions().ExtraArgs;
-    extraArgs.push_back("-iframework");
-    extraArgs.push_back(systemFrameworkPath);
+  std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
+  for (const auto &path : options::FrameworkPaths) {
+    FramePaths.push_back({path, /*isSystem=*/false});
   }
+  for (const auto &path : options::SystemFrameworkPaths) {
+    FramePaths.push_back({path, /*isSystem=*/true});
+  }
+  InitInvok.setFrameworkSearchPaths(FramePaths);
   InitInvok.getFrontendOptions().EnableSourceImport |=
     options::EnableSourceImport;
   InitInvok.getFrontendOptions().ImplicitObjCHeaderPath =

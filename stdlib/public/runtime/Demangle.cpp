@@ -10,9 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define NO_NEW_DEMANGLING
-
 #include "../../../lib/Basic/Demangle.cpp"
+#include "../../../lib/Basic/Demangler.cpp"
 #include "../../../lib/Basic/ManglingUtils.cpp"
 #include "../../../lib/Basic/Punycode.cpp"
 #include "swift/Runtime/Metadata.h"
@@ -27,11 +26,12 @@
 // to change stdlib reflection over to using remote mirrors.
 
 Demangle::NodePointer
-swift::_swift_buildDemanglingForMetadata(const Metadata *type);
+swift::_swift_buildDemanglingForMetadata(const Metadata *type,
+                                         Demangle::Demangler &Dem);
 
 // Build a demangled type tree for a nominal type.
 static Demangle::NodePointer
-_buildDemanglingForNominalType(const Metadata *type) {
+_buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   using namespace Demangle;
 
   const Metadata *parent;
@@ -72,50 +72,51 @@ _buildDemanglingForNominalType(const Metadata *type) {
   }
 
   // Demangle the base name.
-  auto node = demangleTypeAsNode(description->Name,
-                                 strlen(description->Name));
+  auto node = Dem.demangleType(StringRef(description->Name));
   assert(node->getKind() == Node::Kind::Type);
 
   // Demangle the parent.
   if (parent) {
-    auto parentNode = _swift_buildDemanglingForMetadata(parent);
+    auto parentNode = _swift_buildDemanglingForMetadata(parent, Dem);
     if (parentNode->getKind() == Node::Kind::Type)
       parentNode = parentNode->getChild(0);
 
     auto typeNode = node->getChild(0);
-    auto newTypeNode = NodeFactory::create(typeNode->getKind());
-    newTypeNode->addChild(parentNode);
-    newTypeNode->addChild(typeNode->getChild(1));
+    auto newTypeNode = Dem.createNode(typeNode->getKind());
+    newTypeNode->addChild(parentNode, Dem);
+    newTypeNode->addChild(typeNode->getChild(1), Dem);
 
-    auto newNode = NodeFactory::create(Node::Kind::Type);
-    newNode->addChild(newTypeNode);
+    auto newNode = Dem.createNode(Node::Kind::Type);
+    newNode->addChild(newTypeNode, Dem);
     node = newNode;
   }
 
   // If generic, demangle the type parameters.
   if (description->GenericParams.NumPrimaryParams > 0) {
-    auto typeParams = NodeFactory::create(Node::Kind::TypeList);
+    auto typeParams = Dem.createNode(Node::Kind::TypeList);
     auto typeBytes = reinterpret_cast<const char *>(type);
     auto genericParam = reinterpret_cast<const Metadata * const *>(
                  typeBytes + sizeof(void*) * description->GenericParams.Offset);
     for (unsigned i = 0, e = description->GenericParams.NumPrimaryParams;
          i < e; ++i, ++genericParam) {
-      auto demangling = _swift_buildDemanglingForMetadata(*genericParam);
+      auto demangling = _swift_buildDemanglingForMetadata(*genericParam, Dem);
       if (demangling == nullptr)
         return nullptr;
-      typeParams->addChild(demangling);
+      typeParams->addChild(demangling, Dem);
     }
 
-    auto genericNode = NodeFactory::create(boundGenericKind);
-    genericNode->addChild(node);
-    genericNode->addChild(typeParams);
+    auto genericNode = Dem.createNode(boundGenericKind);
+    genericNode->addChild(node, Dem);
+    genericNode->addChild(typeParams, Dem);
     return genericNode;
   }
   return node;
 }
 
 // Build a demangled type tree for a type.
-Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *type) {
+Demangle::NodePointer
+swift::_swift_buildDemanglingForMetadata(const Metadata *type,
+                                         Demangle::Demangler &Dem) {
   using namespace Demangle;
 
   switch (type->getKind()) {
@@ -123,19 +124,19 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
   case MetadataKind::Enum:
   case MetadataKind::Optional:
   case MetadataKind::Struct:
-    return _buildDemanglingForNominalType(type);
+    return _buildDemanglingForNominalType(type, Dem);
   case MetadataKind::ObjCClassWrapper: {
 #if SWIFT_OBJC_INTEROP
     auto objcWrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
     const char *className = class_getName((Class)objcWrapper->Class);
     
     // ObjC classes mangle as being in the magic "__ObjC" module.
-    auto module = NodeFactory::create(Node::Kind::Module, "__ObjC");
+    auto module = Dem.createNode(Node::Kind::Module, "__ObjC");
     
-    auto node = NodeFactory::create(Node::Kind::Class);
-    node->addChild(module);
-    node->addChild(NodeFactory::create(Node::Kind::Identifier,
-                                       llvm::StringRef(className)));
+    auto node = Dem.createNode(Node::Kind::Class);
+    node->addChild(module, Dem);
+    node->addChild(Dem.createNode(Node::Kind::Identifier,
+                                       llvm::StringRef(className)), Dem);
     
     return node;
 #else
@@ -145,15 +146,14 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
   }
   case MetadataKind::ForeignClass: {
     auto foreign = static_cast<const ForeignClassMetadata *>(type);
-    return Demangle::demangleTypeAsNode(foreign->getName(),
-                                        strlen(foreign->getName()));
+    return Dem.demangleType(foreign->getName());
   }
   case MetadataKind::Existential: {
     auto exis = static_cast<const ExistentialTypeMetadata *>(type);
-    NodePointer proto_list = NodeFactory::create(Node::Kind::ProtocolList);
-    NodePointer type_list = NodeFactory::create(Node::Kind::TypeList);
+    NodePointer proto_list = Dem.createNode(Node::Kind::ProtocolList);
+    NodePointer type_list = Dem.createNode(Node::Kind::TypeList);
 
-    proto_list->addChild(type_list);
+    proto_list->addChild(type_list, Dem);
     
     std::vector<const ProtocolDescriptor *> protocols;
     protocols.reserve(exis->Protocols.NumProtocols);
@@ -170,20 +170,25 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
     
     for (auto *protocol : protocols) {
       // The protocol name is mangled as a type symbol, with the _Tt prefix.
-      auto protocolNode = demangleSymbolAsNode(protocol->Name,
-                                               strlen(protocol->Name));
+      NodePointer protocolNode = nullptr;
+      StringRef ProtoName(protocol->Name);
+      if (ProtoName.startswith("_Tt")) {
+        protocolNode = demangleOldSymbolAsNode(ProtoName, Dem);
+      } else {
+        protocolNode = Dem.demangleSymbol(ProtoName);
+      }
       
       // ObjC protocol names aren't mangled.
       if (!protocolNode) {
-        auto module = NodeFactory::create(Node::Kind::Module,
+        auto module = Dem.createNode(Node::Kind::Module,
                                           MANGLING_MODULE_OBJC);
-        auto node = NodeFactory::create(Node::Kind::Protocol);
-        node->addChild(module);
-        node->addChild(NodeFactory::create(Node::Kind::Identifier,
-                                           llvm::StringRef(protocol->Name)));
-        auto typeNode = NodeFactory::create(Node::Kind::Type);
-        typeNode->addChild(node);
-        type_list->addChild(typeNode);
+        auto node = Dem.createNode(Node::Kind::Protocol);
+        node->addChild(module, Dem);
+        node->addChild(Dem.createNode(Node::Kind::Identifier,
+                                        llvm::StringRef(protocol->Name)), Dem);
+        auto typeNode = Dem.createNode(Node::Kind::Type);
+        typeNode->addChild(node, Dem);
+        type_list->addChild(typeNode, Dem);
         continue;
       }
 
@@ -197,16 +202,17 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
       
       assert(protocolNode->getKind() == Node::Kind::Type);
       assert(protocolNode->getChild(0)->getKind() == Node::Kind::Protocol);
-      type_list->addChild(protocolNode);
+      type_list->addChild(protocolNode, Dem);
     }
     
     return proto_list;
   }
   case MetadataKind::ExistentialMetatype: {
     auto metatype = static_cast<const ExistentialMetatypeMetadata *>(type);
-    auto instance = _swift_buildDemanglingForMetadata(metatype->InstanceType);
-    auto node = NodeFactory::create(Node::Kind::ExistentialMetatype);
-    node->addChild(instance);
+    auto instance = _swift_buildDemanglingForMetadata(metatype->InstanceType,
+                                                      Dem);
+    auto node = Dem.createNode(Node::Kind::ExistentialMetatype);
+    node->addChild(instance, Dem);
     return node;
   }
   case MetadataKind::Function: {
@@ -231,54 +237,56 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
     std::vector<NodePointer> inputs;
     for (unsigned i = 0, e = func->getNumArguments(); i < e; ++i) {
       auto arg = func->getArguments()[i];
-      auto input = _swift_buildDemanglingForMetadata(arg.getPointer());
+      auto input = _swift_buildDemanglingForMetadata(arg.getPointer(), Dem);
       if (arg.getFlag()) {
-        NodePointer inout = NodeFactory::create(Node::Kind::InOut);
-        inout->addChild(input);
+        NodePointer inout = Dem.createNode(Node::Kind::InOut);
+        inout->addChild(input, Dem);
         input = inout;
       }
       inputs.push_back(input);
     }
 
-    NodePointer totalInput;
+    NodePointer totalInput = nullptr;
     if (inputs.size() > 1) {
-      auto tuple = NodeFactory::create(Node::Kind::NonVariadicTuple);
+      auto tuple = Dem.createNode(Node::Kind::NonVariadicTuple);
       for (auto &input : inputs)
-        tuple->addChild(input);
+        tuple->addChild(input, Dem);
       totalInput = tuple;
     } else {
       totalInput = inputs.front();
     }
     
-    NodePointer args = NodeFactory::create(Node::Kind::ArgumentTuple);
-    args->addChild(totalInput);
+    NodePointer args = Dem.createNode(Node::Kind::ArgumentTuple);
+    args->addChild(totalInput, Dem);
     
-    NodePointer resultTy = _swift_buildDemanglingForMetadata(func->ResultType);
-    NodePointer result = NodeFactory::create(Node::Kind::ReturnType);
-    result->addChild(resultTy);
+    NodePointer resultTy = _swift_buildDemanglingForMetadata(func->ResultType,
+                                                             Dem);
+    NodePointer result = Dem.createNode(Node::Kind::ReturnType);
+    result->addChild(resultTy, Dem);
     
-    auto funcNode = NodeFactory::create(kind);
+    auto funcNode = Dem.createNode(kind);
     if (func->throws())
-      funcNode->addChild(NodeFactory::create(Node::Kind::ThrowsAnnotation));
-    funcNode->addChild(args);
-    funcNode->addChild(result);
+      funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+    funcNode->addChild(args, Dem);
+    funcNode->addChild(result, Dem);
     return funcNode;
   }
   case MetadataKind::Metatype: {
     auto metatype = static_cast<const MetatypeMetadata *>(type);
-    auto instance = _swift_buildDemanglingForMetadata(metatype->InstanceType);
-    auto typeNode = NodeFactory::create(Node::Kind::Type);
-    typeNode->addChild(instance);
-    auto node = NodeFactory::create(Node::Kind::Metatype);
-    node->addChild(typeNode);
+    auto instance = _swift_buildDemanglingForMetadata(metatype->InstanceType,
+                                                      Dem);
+    auto typeNode = Dem.createNode(Node::Kind::Type);
+    typeNode->addChild(instance, Dem);
+    auto node = Dem.createNode(Node::Kind::Metatype);
+    node->addChild(typeNode, Dem);
     return node;
   }
   case MetadataKind::Tuple: {
     auto tuple = static_cast<const TupleTypeMetadata *>(type);
     const char *labels = tuple->Labels;
-    auto tupleNode = NodeFactory::create(Node::Kind::NonVariadicTuple);
+    auto tupleNode = Dem.createNode(Node::Kind::NonVariadicTuple);
     for (unsigned i = 0, e = tuple->NumElements; i < e; ++i) {
-      auto elt = NodeFactory::create(Node::Kind::TupleElement);
+      auto elt = Dem.createNode(Node::Kind::TupleElement);
 
       // Add a label child if applicable:
       if (labels) {
@@ -287,9 +295,9 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
           // If there is one, and the label isn't empty, add a label child.
           if (labels != space) {
             auto eltName =
-              NodeFactory::create(Node::Kind::TupleElementName,
-                                  std::string(labels, space));
-            elt->addChild(std::move(eltName));
+              Dem.createNode(Node::Kind::TupleElementName,
+                                  llvm::StringRef(labels, space - labels));
+            elt->addChild(eltName, Dem);
           }
 
           // Skip past the space.
@@ -299,11 +307,11 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
 
       // Add the element type child.
       auto eltType =
-        _swift_buildDemanglingForMetadata(tuple->getElement(i).Type);
-      elt->addChild(std::move(eltType));
+        _swift_buildDemanglingForMetadata(tuple->getElement(i).Type, Dem);
+      elt->addChild(eltType, Dem);
 
       // Add the completed element to the tuple.
-      tupleNode->addChild(std::move(elt));
+      tupleNode->addChild(elt, Dem);
     }
     return tupleNode;
   }

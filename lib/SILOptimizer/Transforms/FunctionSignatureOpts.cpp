@@ -93,7 +93,7 @@ static SILInstruction *findOnlyApply(SILFunction *F) {
 ///
 /// TODO: we should teach the demangler to understand this suffix.
 static std::string getUniqueName(std::string Name, SILModule &M) {
-  if (!M.lookUpFunction(Name))
+  if (!M.hasFunction(Name))
     return Name;
   return getUniqueName(Name + "_unique_suffix", M);
 }
@@ -372,7 +372,7 @@ std::string FunctionSignatureTransform::createOptimizedSILFunctionName() {
   do {
     New = NewFM.mangle(UniqueID);
     ++UniqueID;
-  } while (M.lookUpFunction(New));
+  } while (M.hasFunction(New));
 
   return NewMangling::selectMangling(Old, New);
 }
@@ -760,19 +760,19 @@ OwnedToGuaranteedAddArgumentRelease(ArgumentDescriptor &AD, SILBuilder &Builder,
     Builder.setInsertionPoint(&*std::next(SILBasicBlock::iterator(Call)));
     Builder.createReleaseValue(RegularLocation(SourceLoc()),
                                F->getArguments()[AD.Index],
-                               Atomicity::Atomic);
+                               Builder.getDefaultAtomicity());
   } else {
     SILBasicBlock *NormalBB = dyn_cast<TryApplyInst>(Call)->getNormalBB();
     Builder.setInsertionPoint(&*NormalBB->begin());
     Builder.createReleaseValue(RegularLocation(SourceLoc()),
                                F->getArguments()[AD.Index],
-                               Atomicity::Atomic);
+                               Builder.getDefaultAtomicity());
 
     SILBasicBlock *ErrorBB = dyn_cast<TryApplyInst>(Call)->getErrorBB();
     Builder.setInsertionPoint(&*ErrorBB->begin());
     Builder.createReleaseValue(RegularLocation(SourceLoc()),
                                F->getArguments()[AD.Index],
-                               Atomicity::Atomic);
+                               Builder.getDefaultAtomicity());
   }
 }
 
@@ -790,12 +790,12 @@ OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD, SILBuilder &Builder,
   if (isa<ApplyInst>(Call)) {
     Builder.setInsertionPoint(&*std::next(SILBasicBlock::iterator(Call)));
     Builder.createRetainValue(RegularLocation(SourceLoc()), Call,
-                              Atomicity::Atomic);
+                              Builder.getDefaultAtomicity());
   } else {
     SILBasicBlock *NormalBB = dyn_cast<TryApplyInst>(Call)->getNormalBB();
     Builder.setInsertionPoint(&*NormalBB->begin());
     Builder.createRetainValue(RegularLocation(SourceLoc()),
-                              NormalBB->getArgument(0), Atomicity::Atomic);
+                              NormalBB->getArgument(0), Builder.getDefaultAtomicity());
   }
 }
 

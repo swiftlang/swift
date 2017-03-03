@@ -9,11 +9,11 @@
 public class C {
 }
 
-// CHECK-LABEL: define {{(protected )?}}void @_T027runtime_calling_conventions3fooyAA1CCF(%C27runtime_calling_conventions1C*)
+// CHECK-LABEL: define {{(protected )?}}swiftcc void @_T027runtime_calling_conventions3fooyAA1CCF(%T27runtime_calling_conventions1CC*)
 // Check that runtime functions use a proper calling convention.
 // CHECK: call void {{.*}} @swift_rt_swift_release
 
-// OPT-CHECK-LABEL: define {{(protected )?}}void @_T027runtime_calling_conventions3fooyAA1CCF(%C27runtime_calling_conventions1C*)
+// OPT-CHECK-LABEL: define {{(protected )?}}swiftcc void @_T027runtime_calling_conventions3fooyAA1CCF(%T27runtime_calling_conventions1CC*)
 // Check that runtime functions use a proper calling convention.
 // OPT-CHECK: tail call void @swift_rt_swift_release
 

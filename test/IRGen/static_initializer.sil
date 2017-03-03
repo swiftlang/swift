@@ -19,15 +19,15 @@ public struct S2 {
   var s : S
 }
 
-// CHECK: %Vs5Int32 = type <{ i32 }>
-// CHECK: %V18static_initializer2S2 = type <{ %Vs5Int32, %Vs5Int32, %V18static_initializer1S }>
-// CHECK: %V18static_initializer1S = type <{ %Vs5Int32 }>
+// CHECK: %Ts5Int32V = type <{ i32 }>
+// CHECK: %T18static_initializer2S2V = type <{ %Ts5Int32V, %Ts5Int32V, %T18static_initializer1SV }>
+// CHECK: %T18static_initializer1SV = type <{ %Ts5Int32V }>
 
 sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@convention(thin) () -> ()
-// CHECK: @_Tv2ch1xSi = {{(protected )?}}global %Vs5Int32 <{ i32 2 }>, align 4
+// CHECK: @_Tv2ch1xSi = {{(protected )?}}global %Ts5Int32V <{ i32 2 }>, align 4
 
 sil_global @_Tv6nested1xVS_2S2 : $S2, @globalinit_func1 : $@convention(thin) () -> ()
-// CHECK: @_Tv6nested1xVS_2S2 = {{(protected )?}}global %V18static_initializer2S2 <{ %Vs5Int32 <{ i32 2 }>, %Vs5Int32 <{ i32 3 }>, %V18static_initializer1S <{ %Vs5Int32 <{ i32 4 }> }> }>, align 4
+// CHECK: @_Tv6nested1xVS_2S2 = {{(protected )?}}global %T18static_initializer2S2V <{ %Ts5Int32V <{ i32 2 }>, %Ts5Int32V <{ i32 3 }>, %T18static_initializer1SV <{ %Ts5Int32V <{ i32 4 }> }> }>, align 4
 
 sil private @globalinit_func0 : $@convention(thin) () -> () {
 bb0:
@@ -39,9 +39,9 @@ bb0:
   return %4 : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} i8* @_TF2cha1xSi() {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @_TF2cha1xSi() {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: ret i8* bitcast (%Vs5Int32* @_Tv2ch1xSi to i8*)
+// CHECK-NEXT: ret i8* bitcast (%Ts5Int32V* @_Tv2ch1xSi to i8*)
 sil [global_init] @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   %0 = global_addr @_Tv2ch1xSi : $*Int32
@@ -49,9 +49,9 @@ bb0:
   return %1 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define{{( protected)?}} i32 @_TF2ch1fFT_Si() {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @_TF2ch1fFT_Si() {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: load i32, i32* getelementptr inbounds (%Vs5Int32, %Vs5Int32* @_Tv2ch1xSi, i32 0, i32 0)
+// CHECK-NEXT: load i32, i32* getelementptr inbounds (%Ts5Int32V, %Ts5Int32V* @_Tv2ch1xSi, i32 0, i32 0)
 // CHECK-NEXT: ret
 sil @_TF2ch1fFT_Si : $@convention(thin) () -> Int32 {
 bb0:
@@ -76,9 +76,9 @@ bb0:
   return %10 : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} i8* @_TF6nesteda1xVS_2S2() {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @_TF6nesteda1xVS_2S2() {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: ret i8* bitcast (%V18static_initializer2S2* @_Tv6nested1xVS_2S2 to i8*)
+// CHECK-NEXT: ret i8* bitcast (%T18static_initializer2S2V* @_Tv6nested1xVS_2S2 to i8*)
 sil [global_init] @_TF6nesteda1xVS_2S2 : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   %0 = global_addr @_Tv6nested1xVS_2S2 : $*S2
@@ -86,11 +86,11 @@ bb0:
   return %1 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define{{( protected)?}} { i32, i32, i32 } @_TF6nested1fFT_VS_2S2() {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc { i64, i32 } @_TF6nested1fFT_VS_2S2() {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: load i32, i32* getelementptr inbounds (%V18static_initializer2S2, %V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 0, i32 0)
-// CHECK-NEXT: load i32, i32* getelementptr inbounds (%V18static_initializer2S2, %V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 1, i32 0)
-// CHECK-NEXT: load i32, i32* getelementptr inbounds (%V18static_initializer2S2, %V18static_initializer2S2* @_Tv6nested1xVS_2S2, i32 0, i32 2, i32 0, i32 0)
+// CHECK: load i32, i32* getelementptr inbounds (%T18static_initializer2S2V, %T18static_initializer2S2V* @_Tv6nested1xVS_2S2, i32 0, i32 0, i32 0)
+// CHECK-NEXT: load i32, i32* getelementptr inbounds (%T18static_initializer2S2V, %T18static_initializer2S2V* @_Tv6nested1xVS_2S2, i32 0, i32 1, i32 0)
+// CHECK-NEXT: load i32, i32* getelementptr inbounds (%T18static_initializer2S2V, %T18static_initializer2S2V* @_Tv6nested1xVS_2S2, i32 0, i32 2, i32 0, i32 0)
 sil @_TF6nested1fFT_VS_2S2 : $@convention(thin) () -> S2 {
 bb0:
   %0 = global_addr @_Tv6nested1xVS_2S2 : $*S2

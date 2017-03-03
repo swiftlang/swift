@@ -95,15 +95,14 @@ class F: D {
 // CHECK-LABEL: sil private @_T013vtable_thunks1DC3iuo{{[_0-9a-zA-Z]*}}FTV
 // CHECK: bb0([[X:%.*]] : $B, [[Y:%.*]] : $Optional<B>, [[Z:%.*]] : $B, [[W:%.*]] : $D):
 // CHECK:   [[WRAP_X:%.*]] = enum $Optional<B>, #Optional.some!enumelt.1, [[X]] : $B
-// CHECK:   switch_enum [[Y]] : $Optional<B>, case #Optional.none!enumelt: [[NONE_BB:bb[0-9][0-9]*]], default [[SOME_BB:bb[0-9][0-9]*]]
+// CHECK:   switch_enum [[Y]] : $Optional<B>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 
 // CHECK: [[NONE_BB]]:
 // CHECK:   [[DIAGNOSE_UNREACHABLE_FUNC:%.*]] = function_ref @_TFs30_diagnoseUnexpectedNilOptional{{.*}}
 // CHECK:   apply [[DIAGNOSE_UNREACHABLE_FUNC]]
 // CHECK:   unreachable
 
-// CHECK: [[SOME_BB]]:
-// CHECK:   [[UNWRAP_Y:%.*]] = unchecked_enum_data [[Y]]
+// CHECK: [[SOME_BB]]([[UNWRAP_Y:%.*]] : $B):
 // CHECK:   [[THUNK_FUNC:%.*]] = function_ref @_T013vtable_thunks1DC3iuo{{.*}}
 // CHECK:   [[RES:%.*]] = apply [[THUNK_FUNC]]([[WRAP_X]], [[UNWRAP_Y]], [[Z]], [[W]])
 // CHECK:   [[WRAP_RES:%.*]] = enum $Optional<B>, {{.*}} [[RES]]

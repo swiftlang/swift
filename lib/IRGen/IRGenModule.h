@@ -73,7 +73,7 @@ namespace clang {
 }
 
 namespace swift {
-  class ArchetypeBuilder;
+  class GenericSignatureBuilder;
   class ASTContext;
   class BraceStmt;
   class CanType;
@@ -393,6 +393,9 @@ public:
   /// Should we add value names to local IR values?
   bool EnableValueNames = false;
 
+  // Is swifterror returned in a register by the target ABI.
+  bool IsSwiftErrorInRegister;
+
   llvm::Type *VoidTy;                  /// void (usually {})
   llvm::IntegerType *Int1Ty;           /// i1
   llvm::IntegerType *Int8Ty;           /// i8
@@ -427,7 +430,6 @@ public:
   llvm::PointerType *UnownedReferencePtrTy;/// %swift.unowned_reference*
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
-  llvm::StructType *WitnessFunctionPairTy;    /// { i8*, %witness.table* }
   llvm::FunctionType *DeallocatingDtorTy; /// void (%swift.refcounted*)
   llvm::StructType *TypeMetadataStructTy; /// %swift.type = type { ... }
   llvm::PointerType *TypeMetadataPtrTy;/// %swift.type*
@@ -473,6 +475,8 @@ public:
   llvm::CallingConv::ID C_CC;          /// standard C calling convention
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID RegisterPreservingCC; /// lightweight calling convention
+  llvm::CallingConv::ID SwiftCC;     /// swift calling convention
+  bool UseSwiftCC;
 
   llvm::FunctionType *getAssociatedTypeMetadataAccessFunctionTy();
   llvm::FunctionType *getAssociatedTypeWitnessTableAccessFunctionTy();
@@ -591,7 +595,6 @@ public:
   ExplosionSchema getSchema(SILType T);
   unsigned getExplosionSize(SILType T);
   llvm::PointerType *isSingleIndirectValue(SILType T);
-  llvm::PointerType *requiresIndirectResult(SILType T);
   bool isPOD(SILType type, ResilienceExpansion expansion);
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
@@ -965,13 +968,11 @@ public:
                                            AssociatedTypeDecl *associatedType);
   llvm::Function *getAddrOfAssociatedTypeWitnessTableAccessFunction(
                                            const NormalProtocolConformance *C,
-                                           AssociatedTypeDecl *associatedType,
+                                           CanType depAssociatedType,
                                            ProtocolDecl *requiredProtocol);
 
   Address getAddrOfObjCISAMask();
 
-  StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);
- 
   /// Retrieve the generic environment for the current generic context.
   ///
   /// Fails if there is no generic context.
@@ -994,6 +995,12 @@ public:
   /// Mark a global variable as true-const by putting it in the text section of
   /// the binary.
   void setTrueConstGlobal(llvm::GlobalVariable *var);
+
+  /// Add the swiftself attribute.
+  void addSwiftSelfAttributes(llvm::AttributeSet &attrs, unsigned argIndex);
+
+  /// Add the swifterror attribute.
+  void addSwiftErrorAttributes(llvm::AttributeSet &attrs, unsigned argIndex);
 
 private:
   llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,

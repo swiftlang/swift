@@ -19,7 +19,11 @@
 #define SWIFT_STDLIB_SHIMS_VISIBILITY_H
 
 #if !defined(__has_feature)
-#define __has_feature(x) false
+#define __has_feature(x) 0
+#endif
+
+#if !defined(__has_attribute)
+#define __has_attribute(x) 0
 #endif
 
 #if __has_feature(nullability)
@@ -38,6 +42,30 @@
 # define _Nonnull
 # define SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 # define SWIFT_END_NULLABILITY_ANNOTATIONS
+#endif
+
+#if __has_attribute(pure)
+#define SWIFT_READONLY __attribute__((__pure__))
+#else
+#define SWIFT_READONLY
+#endif
+
+#if __has_attribute(const)
+#define SWIFT_READNONE __attribute__((__const__))
+#else
+#define SWIFT_READNONE
+#endif
+
+#if __has_attribute(always_inline)
+#define SWIFT_ALWAYS_INLINE __attribute__((always_inline))
+#else
+#define SWIFT_ALWAYS_INLINE
+#endif
+
+#if __has_attribute(unavailable)
+#define SWIFT_ATTRIBUTE_UNAVAILABLE __attribute__((__unavailable__))
+#else
+#define SWIFT_ATTRIBUTE_UNAVAILABLE
 #endif
 
 // TODO: support using shims headers in overlays by parameterizing

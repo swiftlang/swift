@@ -156,7 +156,7 @@ namespace {
 
           witness = concrete->getTypeWitnessSubstAndDecl(assocType, &TC)
             .second;
-        } else if (TC.isRequirement(found)) {
+        } else if (found->isProtocolRequirement()) {
           witness = concrete->getWitness(found, &TC).getDecl();
         }
 

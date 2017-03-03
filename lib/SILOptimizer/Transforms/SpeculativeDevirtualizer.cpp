@@ -16,8 +16,8 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-speculative-devirtualizer"
+
 #include "swift/Basic/DemangleWrappers.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -38,6 +38,7 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
+
 using namespace swift;
 
 // This is the limit for the number of subclasses (jump targets) that the
@@ -142,9 +143,9 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
       (next == Continue->end()) ? nullptr : dyn_cast<StrongReleaseInst>(next);
   if (Release && Release->getOperand() == CMI->getOperand()) {
     VirtBuilder.createStrongRelease(Release->getLoc(), CMI->getOperand(),
-                                    Atomicity::Atomic);
+                                    Release->getAtomicity());
     IdenBuilder.createStrongRelease(Release->getLoc(), DownCastedClassInstance,
-                                    Atomicity::Atomic);
+                                    Release->getAtomicity());
     Release->eraseFromParent();
   }
 

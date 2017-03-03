@@ -12,6 +12,9 @@
 #
 # ===---------------------------------------------------------------------===//
 
+from __future__ import print_function
+
+import functools
 import multiprocessing
 import os
 import re
@@ -53,6 +56,7 @@ class Result(object):
 
 def _unwrap_self(args):
     return type(args[0]).process_input(*args)
+
 
 BenchmarkDriver_OptLevels = ['Onone', 'O', 'Ounchecked']
 
@@ -106,7 +110,7 @@ class BenchmarkDriver(object):
             acc['extra_data'] = r.merge_in_extra_data(acc['extra_data'])
             return acc
 
-        return reduce(reduce_results, results, {
+        return functools.reduce(reduce_results, results, {
             'result': [],
             'has_failure': False,
             'max_test_len': 0,
@@ -124,7 +128,9 @@ class BenchmarkDriver(object):
         self.data = [
             self.run_for_opt_level(binary, opt_level, test_filter)
             for binary, opt_level in self.targets]
-        max_test_len = reduce(max, [d['max_test_len']for d in self.data])
-        has_failure = reduce(max, [d['has_failure']for d in self.data])
+        max_test_len = functools.reduce(max,
+                                        [d['max_test_len'] for d in self.data])
+        has_failure = functools.reduce(max,
+                                       [d['has_failure'] for d in self.data])
         self.print_data(self.data, max_test_len)
         return not has_failure

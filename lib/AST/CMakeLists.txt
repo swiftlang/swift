@@ -4,7 +4,6 @@ if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
 endif()
 
 add_swift_library(swiftAST STATIC
-  ArchetypeBuilder.cpp
   ASTContext.cpp
   ASTDumper.cpp
   ASTMangler.cpp
@@ -30,6 +29,7 @@ add_swift_library(swiftAST STATIC
   Expr.cpp
   GenericEnvironment.cpp
   GenericSignature.cpp
+  GenericSignatureBuilder.cpp
   Identifier.cpp
   LayoutConstraint.cpp
   LookupVisibleDecls.cpp
@@ -49,6 +49,7 @@ add_swift_library(swiftAST STATIC
   Substitution.cpp
   SubstitutionList.cpp
   SubstitutionMap.cpp
+  SwiftNameTranslation.cpp
   Type.cpp
   TypeJoinMeet.cpp
   TypeRefinementContext.cpp

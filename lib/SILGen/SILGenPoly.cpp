@@ -80,8 +80,7 @@
 
 #include "SILGen.h"
 #include "Scope.h"
-#include "swift/Basic/Fallthrough.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -93,6 +92,7 @@
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -200,8 +200,8 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
     // Unwrap zero or more metatype levels
     openedArchetype = getOpenedArchetype(openedType);
 
-    state = SGF.emitOpenExistential(loc, input,
-                                    openedArchetype, loweredOpenedType);
+    state = SGF.emitOpenExistential(loc, input, openedArchetype,
+                                    loweredOpenedType, AccessKind::Read);
     inputType = openedType;
   }
 
@@ -473,11 +473,19 @@ ManagedValue Transform::transform(ManagedValue v,
                            v.getCleanup());
     }
 
-    // Upcast to a superclass.
-    return ManagedValue(SGF.B.createUpcast(Loc,
-                                           v.getValue(),
-                                           loweredResultTy),
-                        v.getCleanup());
+    if (outputSubstType->isExactSuperclassOf(inputSubstType, nullptr)) {
+      // Upcast to a superclass.
+      return ManagedValue(SGF.B.createUpcast(Loc,
+                                             v.getValue(),
+                                             loweredResultTy),
+                          v.getCleanup());
+    } else {
+      // Unchecked-downcast to a covariant return type.
+      assert(inputSubstType->isExactSuperclassOf(outputSubstType, nullptr)
+             && "should be inheritance relationship between input and output");
+      return SGF.emitManagedRValueWithCleanup(
+        SGF.B.createUncheckedRefCast(Loc, v.forward(SGF), loweredResultTy));      
+    }
   }
 
   //  - upcasts from an archetype
@@ -742,17 +750,17 @@ static ManagedValue manageParam(SILGenFunction &gen,
         return gen.emitManagedBufferWithCleanup(copy);
       }
     }
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case ParameterConvention::Direct_Guaranteed:
     if (allowPlusZero)
       return gen.emitManagedBeginBorrow(loc, paramValue);
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   // Unowned parameters are only guaranteed at the instant of the call, so we
   // must retain them even if we're in a context that can accept a +0 value.
   case ParameterConvention::Direct_Unowned:
     paramValue = gen.getTypeLowering(paramValue->getType())
         .emitCopyValue(gen.B, loc, paramValue);
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case ParameterConvention::Direct_Owned:
     return gen.emitManagedRValueWithCleanup(paramValue);
 
@@ -1089,7 +1097,7 @@ namespace {
         SGF.B.createInitExistentialAddr(Loc, existentialBuf,
                                         inputTupleType,
                                         concreteTL.getLoweredType(),
-                                        /*Conformances=*/{});
+                                        /*conformances=*/{});
 
       auto tupleTemp = SGF.useBufferAsTemporary(tupleBuf, concreteTL);
       translateAndImplodeInto(inputOrigType, inputTupleType,
@@ -1903,7 +1911,7 @@ ResultPlanner::planTupleIntoIndirectResult(AbstractionPattern innerOrigType,
     SILValue outerConcreteResultAddr
       = Gen.B.createInitExistentialAddr(Loc, outerResultAddr, innerSubstType,
                                         Gen.getLoweredType(opaque, innerSubstType),
-                                        /*Conformances=*/{});
+                                        /*conformances=*/{});
 
     // Emit into that address.
     planTupleIntoIndirectResult(innerOrigType, innerSubstType,
@@ -2203,7 +2211,7 @@ SILValue ResultPlanner::execute(SILValue innerResult) {
     {
       Scope S(Gen.Cleanups, CleanupLocation::get(Loc));
 
-      // First create a rvalue cleanup for our direct result.
+      // First create an rvalue cleanup for our direct result.
       assert(innerResult.getOwnershipKind() == ValueOwnershipKind::Owned ||
              innerResult.getOwnershipKind() == ValueOwnershipKind::Trivial);
       ManagedValue ownedInnerResult = Gen.emitManagedRValueWithCleanup(innerResult);
@@ -2245,7 +2253,7 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
     case ResultConvention::Indirect:
       assert(!Gen.silConv.isSILIndirect(result)
              && "claiming indirect result as direct!");
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
       return Gen.emitManagedRValueWithCleanup(resultValue, resultTL);
@@ -2255,7 +2263,7 @@ void ResultPlanner::execute(ArrayRef<SILValue> innerDirectResults,
       // originally 'self'.
       Gen.SGM.diagnose(Loc.getSourceLoc(), diag::not_implemented,
                        "reabstraction of returns_inner_pointer function");
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case ResultConvention::Unowned:
       return Gen.emitManagedRetain(Loc, resultValue, resultTL);
     }
@@ -2492,7 +2500,7 @@ buildThunkSignature(SILGenFunction &gen,
     return genericSig;
   }
 
-  ArchetypeBuilder builder(ctx, LookUpConformanceInModule(mod));
+  GenericSignatureBuilder builder(ctx, LookUpConformanceInModule(mod));
 
   // Add the existing generic signature.
   int depth = 0;
@@ -2509,7 +2517,8 @@ buildThunkSignature(SILGenFunction &gen,
   builder.addGenericParameter(newGenericParam);
   Requirement newRequirement(RequirementKind::Conformance, newGenericParam,
                              openedExistential->getOpenedExistentialType());
-  RequirementSource source(RequirementSource::Explicit, SourceLoc());
+  auto source =
+    GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   builder.addRequirement(newRequirement, source);
 
   builder.finalize(SourceLoc(), {newGenericParam},
@@ -3113,7 +3122,8 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
 
   SILLocation loc(witness.getDecl());
   FullExpr scope(Cleanups, CleanupLocation::get(loc));
- 
+  FormalEvaluationScope formalEvalScope(*this);
+
   auto witnessKind = getWitnessDispatchKind(selfType, witness, isFree);
   auto thunkTy = F.getLoweredFunctionType();
 

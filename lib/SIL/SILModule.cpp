@@ -499,7 +499,7 @@ bool SILModule::linkFunction(StringRef Name, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Name);
 }
 
-SILFunction *SILModule::hasFunction(StringRef Name, SILLinkage Linkage) {
+SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
   assert((Linkage == SILLinkage::Public ||
           Linkage == SILLinkage::PublicExternal) &&
          "Only a lookup of public functions is supported currently");
@@ -560,6 +560,14 @@ SILFunction *SILModule::hasFunction(StringRef Name, SILLinkage Linkage) {
     F->setFragile(IsFragile_t::IsNotFragile);
   F->setLinkage(Linkage);
   return F;
+}
+
+bool SILModule::hasFunction(StringRef Name) {
+  if (lookUpFunction(Name))
+    return true;
+  SILLinkerVisitor Visitor(*this, getSILLoader(),
+                           SILModule::LinkingMode::LinkNormal);
+  return Visitor.hasFunction(Name);
 }
 
 void SILModule::linkAllWitnessTables() {

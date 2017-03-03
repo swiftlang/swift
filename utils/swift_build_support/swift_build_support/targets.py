@@ -126,6 +126,8 @@ class StdlibDeploymentTarget(object):
 
     Android = Platform("android", archs=["armv7"])
 
+    Windows = Platform("windows", archs=["x86_64"])
+
     # The list of known platforms.
     known_platforms = [
         OSX,
@@ -135,7 +137,8 @@ class StdlibDeploymentTarget(object):
         Linux,
         FreeBSD,
         Cygwin,
-        Android]
+        Android,
+        Windows]
 
     # Cache of targets by name.
     _targets_by_name = dict((target.name, target)
@@ -146,7 +149,7 @@ class StdlibDeploymentTarget(object):
     def host_target():
         """
         Return the host target for the build machine, if it is one of
-        the recognized targets. Otherwise, return None.
+        the recognized targets. Otherwise, throw a NotImplementedError.
         """
         system = platform.system()
         machine = platform.machine()
@@ -181,7 +184,12 @@ class StdlibDeploymentTarget(object):
             if machine == 'x86_64':
                 return StdlibDeploymentTarget.Cygwin.x86_64
 
-        return None
+        elif system == 'Windows':
+            if machine == "AMD64":
+                return StdlibDeploymentTarget.Windows.x86_64
+
+        raise NotImplementedError('System "%s" with architecture "%s" is not '
+                                  'supported' % (system, machine))
 
     @staticmethod
     def default_stdlib_deployment_targets():

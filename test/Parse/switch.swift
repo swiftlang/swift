@@ -123,12 +123,12 @@ default: // expected-error{{additional 'case' blocks cannot appear after the 'de
 
 switch x {
   x = 1 // expected-error{{all statements inside a switch must be covered by a 'case' or 'default'}}
-}
+} // expected-error{{'switch' statement body must have at least one 'case' or 'default' block}}
 
 switch x {
   x = 1 // expected-error{{all statements inside a switch must be covered by a 'case' or 'default'}}
   x = 2
-}
+} // expected-error{{'switch' statement body must have at least one 'case' or 'default' block}}
 
 switch x {
 default: // expected-error{{'default' label in a 'switch' should have at least one executable statement}} {{9-9= break}}
@@ -264,7 +264,7 @@ Gronk:
 
 func enumElementSyntaxOnTuple() {
   switch (1, 1) {
-  case .Bar: // expected-error {{enum case 'Bar' not found in type '(Int, Int)'}}
+  case .Bar: // expected-error {{pattern cannot match values of type '(Int, Int)'}}
     break
   default:
     break

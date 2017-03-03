@@ -26,7 +26,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -39,6 +38,7 @@
 #include "llvm/IR/Value.h"
 #include "llvm/IR/GlobalAlias.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ConvertUTF.h"
 
@@ -1073,7 +1073,6 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
   switch (getKind()) {
   // Most type metadata depend on the formal linkage of their type.
   case Kind::ValueWitnessTable:
-  case Kind::TypeMangling:
     return getSILLinkage(getTypeLinkage(getType()), forDefinition);
 
   case Kind::TypeMetadata:
@@ -1210,7 +1209,6 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
     return ::isAvailableExternally(IGM, getProtocolConformance()->getDeclContext());
 
   case Kind::ObjCClassRef:
-  case Kind::TypeMangling:
   case Kind::ValueWitness:
   case Kind::WitnessTableOffset:
   case Kind::TypeMetadataAccessFunction:
@@ -1697,8 +1695,21 @@ static bool isReadOnlyFunction(SILFunction *f) {
     return false;
 
   auto Eff = f->getEffectsKind();
-  return Eff == EffectsKind::ReadNone ||
-         Eff == EffectsKind::ReadOnly;
+
+  // Swift's readonly does not automatically match LLVM's readonly.
+  // Swift SIL optimizer relies on @effects(readonly) to remove e.g.
+  // dead code remaining from initializers of strings or dictionaries
+  // of variables that are not used. But those initializers are often
+  // not really readonly in terms of LLVM IR. For example, the
+  // Dictionary.init() is marked as @effects(readonly) in Swift, but
+  // it does invoke reference-counting operations.
+  if (Eff == EffectsKind::ReadOnly || Eff == EffectsKind::ReadNone) {
+    // TODO: Analyze the body of function f and return true if it is
+    // really readonly.
+    return false;
+  }
+
+  return false;
 }
 
 static clang::GlobalDecl getClangGlobalDeclForFunction(const clang::Decl *decl) {
@@ -1838,7 +1849,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
     assert(definitionType == nullptr);
     // FIXME: don't just fall through; force the creation of a weak
     // definition so that we can emit a relative reference.
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case SymbolReferenceKind::Absolute:
     return { getAddrOfLLVMVariable(entity, alignment, definitionType,
@@ -3092,12 +3103,6 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
   return address;
 }
 
-/// Mangle the name of a type.
-StringRef IRGenModule::mangleType(CanType type, SmallVectorImpl<char> &buffer) {
-  LinkEntity::forTypeMangling(type).mangle(buffer);
-  return StringRef(buffer.data(), buffer.size());
-}
-
 /// Do we have to use resilient access patterns when working with this
 /// declaration?
 ///
@@ -3298,16 +3303,15 @@ IRGenModule::getAddrOfAssociatedTypeMetadataAccessFunction(
 llvm::Function *
 IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
                                   const NormalProtocolConformance *conformance,
-                                  AssociatedTypeDecl *associate,
-                                  ProtocolDecl *associateProtocol) {
+                                  CanType associatedType,
+                                  ProtocolDecl *associatedProtocol) {
   checkEligibleConf(conformance);
   auto forDefinition = ForDefinition;
 
-  assert(conformance->getProtocol() == associate->getProtocol());
   LinkEntity entity =
     LinkEntity::forAssociatedTypeWitnessTableAccessFunction(conformance,
-                                                            associate,
-                                                            associateProtocol);
+                                                            associatedType,
+                                                            associatedProtocol);
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) {
     if (forDefinition) updateLinkageForDefinition(*this, entry, entity);

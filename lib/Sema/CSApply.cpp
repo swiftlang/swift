@@ -19,10 +19,13 @@
 #include "ConstraintSystem.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -1363,7 +1366,8 @@ namespace {
 
     /// \brief Build a new reference to another constructor.
     Expr *buildOtherConstructorRef(Type openedFullType,
-                                   ConstructorDecl *ctor, DeclNameLoc loc,
+                                   ConstructorDecl *ctor, Expr *base,
+                                   DeclNameLoc loc,
                                    ConstraintLocatorBuilder locator,
                                    bool implicit) {
       auto &tc = cs.getTypeChecker();
@@ -1400,8 +1404,21 @@ namespace {
                                    resultFnTy->getExtInfo());
 
       // Build the constructor reference.
-      return cs.cacheType(
+      Expr *ctorRef = cs.cacheType(
           new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit, resultTy));
+
+      // Wrap in covariant `Self` return if needed.
+      if (selfTy->hasReferenceSemantics()) {
+        auto covariantTy = resultTy
+          ->replaceCovariantResultType(base->getType()
+                                           ->getLValueOrInOutObjectType(),
+                                       ctor->getNumParameterLists());
+        if (!covariantTy->isEqual(resultTy))
+          ctorRef = cs.cacheType(
+               new (ctx) CovariantFunctionConversionExpr(ctorRef, covariantTy));
+      }
+
+      return ctorRef;
     }
 
     /// Bridge the given value (which is an error type) to NSError.
@@ -2456,7 +2473,7 @@ namespace {
       }
 
       // Build a partial application of the delegated initializer.
-      Expr *ctorRef = buildOtherConstructorRef(openedType, ctor, nameLoc,
+      Expr *ctorRef = buildOtherConstructorRef(openedType, ctor, base, nameLoc,
                                                ctorLocator, implicit);
       auto *call = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef, dotLoc,
                                                               base);
@@ -2522,7 +2539,7 @@ namespace {
         }
 
         // Fall through to build the member reference.
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
       }
 
       case OverloadChoiceKind::Decl:
@@ -3479,11 +3496,13 @@ namespace {
     Expr *visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
       // If we end up here, we should have diagnosed somewhere else
       // already.
-      if (!SuppressDiagnostics) {
-        cs.TC.diagnose(expr->getLoc(), diag::pattern_in_expr,
+      Expr *simplified = simplifyExprType(expr);
+      if (!SuppressDiagnostics
+          && !simplified->getType()->is<UnresolvedType>()) {
+        cs.TC.diagnose(simplified->getLoc(), diag::pattern_in_expr,
                        expr->getSubPattern()->getKind());
       }
-      return expr;
+      return simplified;
     }
     
     Expr *visitBindOptionalExpr(BindOptionalExpr *expr) {
@@ -6305,6 +6324,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         auto arg = apply->getArg();
         if (auto tuple = dyn_cast<TupleExpr>(arg))
           arg = tuple->getElements()[0];
+        arg = cs.coerceToRValue(arg);
         auto replacement = new (tc.Context)
           DynamicTypeExpr(apply->getFn()->getLoc(),
                           apply->getArg()->getStartLoc(),

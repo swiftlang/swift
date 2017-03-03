@@ -34,7 +34,7 @@ class NodeDumper {
   NodePointer Root;
 
 public:
-  NodeDumper(NodePointer Root): Root(std::move(Root)) {}
+  NodeDumper(NodePointer Root): Root(Root) {}
   void dump() const;
   void print(llvm::raw_ostream &Out) const;
 };
@@ -42,20 +42,8 @@ public:
 /// Utility function, useful to be called from the debugger.
 void dumpNode(const NodePointer &Root);
 
-NodePointer
-demangleSymbolAsNode(StringRef MangledName,
-                     const DemangleOptions &Options = DemangleOptions());
-
 std::string nodeToString(NodePointer Root,
                          const DemangleOptions &Options = DemangleOptions());
-
-std::string
-demangleSymbolAsString(StringRef MangledName,
-                       const DemangleOptions &Options = DemangleOptions());
-
-std::string
-demangleTypeAsString(StringRef MangledTypeName,
-                     const DemangleOptions &Options = DemangleOptions());
 
 } // end namespace demangle_wrappers
 } // end namespace swift

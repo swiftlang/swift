@@ -27,6 +27,7 @@
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/ManglingMacros.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Basic/Demangler.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
@@ -51,7 +52,8 @@ public:
   LazySKDUID(const char *Name) : Name(Name) { }
 
   sourcekitd_uid_t get() const {
-    if (!UID)
+    sourcekitd_uid_t UIDValue = UID;
+    if (!UIDValue)
       UID = SKDUIDFromUIdent(UIdent(Name));
     return UID;
   }
@@ -108,6 +110,7 @@ static LazySKDUID RequestBuildSettingsRegister(
     "source.request.buildsettings.register");
 static LazySKDUID RequestModuleGroups(
     "source.request.module.groups");
+static LazySKDUID RequestNameTranslation("source.request.name.translation");
 
 static LazySKDUID KindExpr("source.lang.swift.expr");
 static LazySKDUID KindStmt("source.lang.swift.stmt");
@@ -124,6 +127,13 @@ static UIdent DiagKindNote("source.diagnostic.severity.note");
 static UIdent DiagKindWarning("source.diagnostic.severity.warning");
 static UIdent DiagKindError("source.diagnostic.severity.error");
 
+
+static UIdent KindNameObjc("source.lang.name.kind.objc");
+static UIdent KindNameSwift("source.lang.name.kind.swift");
+
+static LazySKDUID SwiftNameKind("source.lang.name.kind.swift");
+static LazySKDUID ObjcNameKind("source.lang.name.kind.objc");
+
 static void onDocumentUpdateNotification(StringRef DocumentName) {
   static UIdent DocumentUpdateNotificationUID(
       "source.notification.editor.documentupdate");
@@ -132,7 +142,7 @@ static void onDocumentUpdateNotification(StringRef DocumentName) {
   auto Dict = RespBuilder.getDictionary();
   Dict.set(KeyNotification, DocumentUpdateNotificationUID);
   Dict.set(KeyName, DocumentName);
-  
+
   sourcekitd::postNotification(RespBuilder.createResponse());
 }
 
@@ -171,6 +181,8 @@ static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,
 static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec);
 
 static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec);
+
+static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec);
 
 static void findRelatedIdents(StringRef Filename,
                               int64_t Offset,
@@ -323,7 +335,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     ResponseBuilder RB;
     auto dict = RB.getDictionary();
     dict.set(KeyVersionMajor, ProtocolMajorVersion);
-    dict.set(KeyVersionMinor, ProtocolMinorVersion);
+    dict.set(KeyVersionMinor, static_cast<int64_t>(ProtocolMinorVersion));
     return Rec(RB.createResponse());
   }
 
@@ -761,6 +773,46 @@ handleSemanticRequest(RequestDict Req,
       "'key.offset' or 'key.length' is required"));
   }
 
+  if (ReqUID == RequestNameTranslation) {
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    int64_t Offset;
+    if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false)) {
+      return Rec(createErrorRequestInvalid("'key.offset' is required"));
+    }
+    NameTranslatingInfo Input;
+    auto NK = Req.getUID(KeyNameKind);
+    if (!NK) {
+      return Rec(createErrorRequestInvalid("'key.namekind' is required"));
+    }
+    if (NK == SwiftNameKind)
+      Input.NameKind = KindNameSwift;
+    else if (NK == ObjcNameKind)
+      Input.NameKind = KindNameObjc;
+    else
+      return Rec(createErrorRequestInvalid("'key.namekind' is unrecognizable"));
+    if (auto Base = Req.getString(KeyBaseName)) {
+      Input.BaseName = Base.getValue();
+    }
+    llvm::SmallVector<const char*, 4> ArgParts;
+    llvm::SmallVector<const char*, 4> Selectors;
+    Req.getStringArray(KeyArgNames, ArgParts, true);
+    Req.getStringArray(KeySelectorPieces, Selectors, true);
+    if (!ArgParts.empty() && !Selectors.empty()) {
+      return Rec(createErrorRequestInvalid("cannot specify 'key.selectorpieces' "
+                                           "and 'key.argnames' at the same time"));
+    }
+    Input.ArgNames.resize(ArgParts.size() + Selectors.size());
+    std::transform(ArgParts.begin(), ArgParts.end(), Input.ArgNames.begin(),
+      [](const char *C) {
+        StringRef Original(C);
+        return Original == "_" ? StringRef() : Original;
+      });
+    std::transform(Selectors.begin(), Selectors.end(), Input.ArgNames.begin(),
+                   [](const char *C) { return StringRef(C); });
+    return Lang.getNameInfo(*SourceFile, Offset, Input, Args,
+      [Rec](const NameTranslatingInfo &Info) { reportNameInfo(Info, Rec); });
+  }
+
   if (ReqUID == RequestRelatedIdents) {
     int64_t Offset;
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
@@ -1067,7 +1119,7 @@ static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
     if (!isSwiftPrefixed(MangledName))
       return std::string(); // Not a mangled name
 
-    std::string Result = swift::demangle_wrappers::demangleSymbolAsString(
+    std::string Result = swift::Demangle::demangleSymbolAsString(
         MangledName, DemangleOptions);
 
     if (Result == MangledName)
@@ -1090,18 +1142,19 @@ static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
 static std::string mangleSimpleClass(StringRef moduleName,
                                      StringRef className) {
   using namespace swift::Demangle;
+  Demangler Dem;
+  auto moduleNode = Dem.createNode(Node::Kind::Module, moduleName);
+  auto IdNode = Dem.createNode(Node::Kind::Identifier, className);
+  auto classNode = Dem.createNode(Node::Kind::Class);
+  auto typeNode = Dem.createNode(Node::Kind::Type);
+  auto typeManglingNode = Dem.createNode(Node::Kind::TypeMangling);
+  auto globalNode = Dem.createNode(Node::Kind::Global);
 
-  auto moduleNode = NodeFactory::create(Node::Kind::Module, moduleName);
-  auto IdNode = NodeFactory::create(Node::Kind::Identifier, className);
-  auto classNode = NodeFactory::create(Node::Kind::Class);
-  auto typeNode = NodeFactory::create(Node::Kind::Type);
-  auto typeManglingNode = NodeFactory::create(Node::Kind::TypeMangling);
-  auto globalNode = NodeFactory::create(Node::Kind::Global);
-
-  classNode->addChildren(moduleNode, IdNode);
-  typeNode->addChild(classNode);
-  typeManglingNode->addChild(typeNode);
-  globalNode->addChild(typeManglingNode);
+  classNode->addChild(moduleNode, Dem);
+  classNode->addChild(IdNode, Dem);
+  typeNode->addChild(classNode, Dem);
+  typeManglingNode->addChild(typeNode, Dem);
+  globalNode->addChild(typeManglingNode, Dem);
   return mangleNode(globalNode, swift::useNewMangling(globalNode));
 }
 
@@ -1159,6 +1212,8 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
     Elem.set(KeyDocFullAsXML, Info.DocComment);
   if (!Info.FullyAnnotatedDecl.empty())
     Elem.set(KeyFullyAnnotatedDecl, Info.FullyAnnotatedDecl);
+  if (!Info.LocalizationKey.empty())
+    Elem.set(KeyLocalizationKey, Info.LocalizationKey);
 
   if (!Info.GenericParams.empty()) {
     auto GPArray = Elem.setArray(KeyGenericParams);
@@ -1261,7 +1316,7 @@ bool SKDocConsumer::handleAvailableAttribute(const AvailableAttrInfo &Info) {
     Elem.set(KeyDeprecated, Info.Deprecated.getValue().getAsString());
   if (Info.Obsoleted.hasValue())
     Elem.set(KeyObsoleted, Info.Obsoleted.getValue().getAsString());
-  
+
   return true;
 }
 
@@ -1334,6 +1389,8 @@ static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec) {
     Elem.set(KeyModuleName, Info.ModuleName);
   if (!Info.GroupName.empty())
     Elem.set(KeyGroupName, Info.GroupName);
+  if (!Info.LocalizationKey.empty())
+    Elem.set(KeyLocalizationKey, Info.LocalizationKey);
   if (!Info.ModuleInterfaceName.empty())
     Elem.set(KeyModuleInterfaceName, Info.ModuleInterfaceName);
   if (Info.DeclarationLoc.hasValue()) {
@@ -1394,6 +1451,37 @@ static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec) {
   Elem.set(KeyKind, Info.RangeKind);
   Elem.set(KeyTypeName, Info.ExprType);
   Elem.set(KeyRangeContent, Info.RangeContent);
+  Rec(RespBuilder.createResponse());
+}
+
+//===----------------------------------------------------------------------===//
+// ReportNameInfo
+//===----------------------------------------------------------------------===//
+
+static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec) {
+  if (Info.IsCancelled)
+    return Rec(createErrorRequestCancelled());
+
+  ResponseBuilder RespBuilder;
+  if (Info.NameKind.isInvalid())
+    return Rec(RespBuilder.createResponse());
+  if (Info.BaseName.empty() && Info.ArgNames.empty())
+    return Rec(RespBuilder.createResponse());
+
+  auto Elem = RespBuilder.getDictionary();
+  Elem.set(KeyNameKind, Info.NameKind);
+
+  if (!Info.BaseName.empty()) {
+    Elem.set(KeyBaseName, Info.BaseName);
+  }
+  if (!Info.ArgNames.empty()) {
+    auto Arr = Elem.setArray(Info.NameKind == KindNameSwift ? KeyArgNames :
+                             KeySelectorPieces);
+    for (auto N : Info.ArgNames) {
+      auto NameEle = Arr.appendDictionary();
+      NameEle.set(KeyName, N);
+    }
+  }
   Rec(RespBuilder.createResponse());
 }
 
@@ -1814,7 +1902,7 @@ public:
                                          unsigned Length) override;
 
   bool recordAffectedRange(unsigned Offset, unsigned Length) override;
-  
+
   bool recordAffectedLineRange(unsigned Line, unsigned Length) override;
 
   bool recordFormattedText(StringRef Text) override;
@@ -2045,14 +2133,14 @@ bool SKEditorConsumer::handleDocumentSubStructureElement(UIdent Kind,
 bool SKEditorConsumer::recordAffectedRange(unsigned Offset, unsigned Length) {
   Dict.set(KeyOffset, Offset);
   Dict.set(KeyLength, Length);
-  
+
   return true;
 }
 
 bool SKEditorConsumer::recordAffectedLineRange(unsigned Line, unsigned Length) {
   Dict.set(KeyLine, Line);
   Dict.set(KeyLength, Length);
-  
+
   return true;
 }
 
