@@ -753,7 +753,7 @@ static void callectUsedArchetypes(
     llvm::SmallSetVector<ArchetypeType *, 2> &UsedCallerArchetypes) {
 
   for (auto Sub : ParamSubs) {
-    auto Replacement = Sub.getReplacement()->getCanonicalType();
+    auto Replacement = Sub.getReplacement();
     if (!Replacement->hasArchetype())
       continue;
 
@@ -926,10 +926,6 @@ void ReabstractionInfo::specializeConcreteAndGenericSubstitutions(
   llvm::DenseMap<CanType, Type>
       SpecializedInterfaceToCallerArchetypeMapping;
 
-  // Construct an archetype builder by collecting the constraints from the
-  // requirements of the original generic function and substitutions,
-  // because both define the capabilities of the requirement.
-
   // This is a builder for a new specialized generic signature.
   GenericSignatureBuilder Builder(Ctx, LookUpConformanceInModule(SM));
   auto Source =
@@ -942,6 +938,10 @@ void ReabstractionInfo::specializeConcreteAndGenericSubstitutions(
   // These are the contextual archetypes of the caller function, which
   // invokes a generic function that is being specialized.
   llvm::SmallSetVector<ArchetypeType *, 2> UsedCallerArchetypes;
+
+  /////////////////////////////////////////////////////////////////////////////
+  // Add generic type parameters to the new generic signature
+  /////////////////////////////////////////////////////////////////////////////
 
   // Collect all used caller's archetypes from all the substitutions.
   callectUsedArchetypes(ParamSubs, UsedCallerArchetypes);
@@ -1044,13 +1044,7 @@ void ReabstractionInfo::specializeConcreteAndGenericSubstitutions(
             },
             LookUpConformanceInSignature(*CallerGenericSig));
 
-  // Next, add each of the requirements (mapped from the requirement's
-  // interface types into the specialized interface type parameters).
-  // TODO: Do we need to add requirements of the caller's archetypes, which
-  // stem from the caller's generic signature? If so, which ones? All of them?
-  // Just some of them? Most likely we need to add only those which are not
-  // present in the callee's signature.
-
+  // A helper method to be used for re-mapping the requirements.
   auto MapCalleeInterfaceTypeToSpecializedInterfaceType = [&](Type ty) -> Type {
     // Concrete types do not change after re-mapping.
     ty = CalleeGenericSig->getCanonicalTypeInContext(ty, *SM);
@@ -1066,6 +1060,12 @@ void ReabstractionInfo::specializeConcreteAndGenericSubstitutions(
     return SpecializedInterfaceTy;
   };
 
+  // Next, add each of the requirements (mapped from the requirement's
+  // interface types into the specialized interface type parameters).
+  // TODO: Do we need to add requirements of the caller's archetypes, which
+  // stem from the caller's generic signature? If so, which ones? All of them?
+  // Just some of them? Most likely we need to add only those which are not
+  // present in the callee's signature.
   remapRequirements(
       CalleeGenericSig,
       // Mapping from calle's interface types to caller archetypes.
@@ -1074,6 +1074,7 @@ void ReabstractionInfo::specializeConcreteAndGenericSubstitutions(
   // Finalize the archetype builder.
   Builder.finalize(SourceLoc(), AllGenericParams);
 
+  // Get the specialized generic signature and generic environment.
   if (!AllGenericParams.empty()) {
     // Produce the generic signature and environment.
     auto GenPair = getGenericEnvironmentAndSignature(Builder, M);
@@ -1081,6 +1082,10 @@ void ReabstractionInfo::specializeConcreteAndGenericSubstitutions(
     SpecializedGenericEnv = GenPair.first;
   }
 
+  /////////////////////////////////////////////////////////////////////////////
+  // Create substitution lists for the caller and cloner.
+  // Create a substitution map for the caller interface substitutions.
+  /////////////////////////////////////////////////////////////////////////////
   {
     SmallVector<Substitution, 4> List;
 
@@ -1110,16 +1115,8 @@ void ReabstractionInfo::specializeConcreteAndGenericSubstitutions(
             LookUpConformanceInSignature(*SpecializedGenericSig));
 
     SpecializedGenericSig->getSubstitutions(
-        [&](SubstitutableType *type) -> Type {
-          auto Replacement =
-              Type(type).subst(SpecializedInterfaceToCallerArchetypeMap);
-          if (Replacement)
-            return Replacement;
-          Replacement = SpecializedGenericEnv->mapTypeIntoContext(type);
-          assert(!Replacement->hasArchetype() && "Expected a concrete type");
-          return Replacement;
-        },
-        LookUpConformanceInSignature(*SpecializedGenericSig), List);
+        SpecializedInterfaceToCallerArchetypeMap, List);
+
     CallerParamSubs = Ctx.AllocateCopy(List);
     verifySubstitutionList(CallerParamSubs);
   }
@@ -1136,7 +1133,12 @@ void ReabstractionInfo::specializeConcreteAndGenericSubstitutions(
         LookUpConformanceInSignature(*CalleeGenericSig));
   }
 
-  // TODO: Should we minimize the number of generic parameters?
+  /////////////////////////////////////////////////////////////////////////////
+  // Create a function type for the new specialized function signature using
+  // the new generic signature.
+  /////////////////////////////////////////////////////////////////////////////
+
+  // TODO: Should we try to minimize the number of generic parameters?
   // We can remove the generic parameter if it is not used
   // anywhere in the function signature.
   // This is a specialized interface type of the callee.
