@@ -1,4 +1,4 @@
-//===----------------------------------------------------------------------===//
+//===--- NSErrorShims.h - Foundation declarations for NSError overlay ------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,13 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-import CoreFoundation
+#import "FoundationShimSupport.h"
 
-@_silgen_name("__CFHashInt")
-internal func __CFHashInt(_ i: Int) -> CFHashCode
+NS_BEGIN_DECLS
 
-@_silgen_name("__CFHashDouble")
-internal func __CFHashDouble(_ d: Double) -> CFHashCode
+NS_INLINE void __NSErrorPerformRecoverySelector(_Nullable id delegate, SEL selector, BOOL success, void *_Nullable contextInfo) {
+    objc_msgSend(delegate, selector, success, contextInfo);
+}
 
-@_silgen_name("__CFHashBytes")
-internal func CFHashBytes(_ bytes: UnsafeMutablePointer<UInt8>?, _ length: Int) -> CFHashCode
+NS_END_DECLS

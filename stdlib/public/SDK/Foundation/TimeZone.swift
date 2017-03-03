@@ -11,15 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Foundation // Clang module
-
-@_silgen_name("__NSTimeZoneIsAutoupdating")
-internal func __NSTimeZoneIsAutoupdating(_ timezone: NSTimeZone) -> Bool
-
-@_silgen_name("__NSTimeZoneAutoupdating")
-internal func __NSTimeZoneAutoupdating() -> NSTimeZone
-
-@_silgen_name("__NSTimeZoneCurrent")
-internal func __NSTimeZoneCurrent() -> NSTimeZone
+import _SwiftFoundationOverlayShims
 
 /**
  `TimeZone` defines the behavior of a time zone. Time zone values represent geopolitical regions. Consequently, these values have names for these regions. Time zone values also represent a temporal offset, either plus or minus, from Greenwich Mean Time (GMT) and an abbreviation (such as PST for Pacific Standard Time).
@@ -38,7 +30,7 @@ public struct TimeZone : Hashable, Equatable, ReferenceConvertible {
     
     /// The time zone currently used by the system.
     public static var current : TimeZone {
-        return TimeZone(adoptingReference: __NSTimeZoneCurrent(), autoupdating: false)
+        return TimeZone(adoptingReference: __NSTimeZoneCurrent() as! NSTimeZone, autoupdating: false)
     }
     
     /// The time zone currently used by the system, automatically updating to the user's current preference.
@@ -47,7 +39,7 @@ public struct TimeZone : Hashable, Equatable, ReferenceConvertible {
     ///
     /// The autoupdating time zone only compares equal to itself.
     public static var autoupdatingCurrent : TimeZone {
-        return TimeZone(adoptingReference: __NSTimeZoneAutoupdating(), autoupdating: true)
+        return TimeZone(adoptingReference: __NSTimeZoneAutoupdating() as! NSTimeZone, autoupdating: true)
     }
     
     // MARK: -
