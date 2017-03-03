@@ -1997,7 +1997,8 @@ struct ASTNodeBase {};
 
         if (auto req = dyn_cast<ValueDecl>(member)) {
           if (!normal->hasWitness(req)) {
-            if (req->getAttrs().isUnavailable(Ctx) &&
+            if ((req->getAttrs().isUnavailable(Ctx) ||
+								 req->getAttrs().hasAttribute<OptionalAttr>()) &&
                 proto->isObjC()) {
               continue;
             }
