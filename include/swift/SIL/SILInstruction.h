@@ -4359,6 +4359,26 @@ class EndLifetimeInst
       : UnaryInstructionBase(DebugLoc, Operand) {}
 };
 
+/// An unsafe conversion in between ownership kinds.
+///
+/// This is used today in destructors where due to objective-c legacy
+/// constraints, we need to be able to convert a guaranteed paramter to an owned
+/// parameter.
+class UncheckedOwnershipConversionInst
+    : public UnaryInstructionBase<ValueKind::UncheckedOwnershipConversionInst> {
+  friend SILBuilder;
+
+  ValueOwnershipKind Kind;
+
+  UncheckedOwnershipConversionInst(SILDebugLocation DebugLoc, SILValue operand,
+                                   ValueOwnershipKind Kind)
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()),
+        Kind(Kind) {}
+
+public:
+  ValueOwnershipKind getConversionOwnershipKind() const { return Kind; }
+};
+
 /// MarkDependenceInst - Marks that one value depends on another for
 /// validity in a non-obvious way.
 class MarkDependenceInst : public SILInstruction {

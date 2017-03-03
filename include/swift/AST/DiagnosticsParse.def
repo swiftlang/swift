@@ -448,6 +448,10 @@ ERROR(expected_sil_constant,none,
       "expected constant in SIL code", ())
 ERROR(referenced_value_no_accessor,none,
       "referenced declaration has no %select{getter|setter}0", (unsigned))
+ERROR(expected_sil_value_ownership_kind,none,
+      "expected value ownership kind in SIL code", ())
+ERROR(expected_sil_colon,none,
+      "expected ':' before %0", (StringRef))
 
 // SIL Values
 ERROR(sil_value_redefinition,none,

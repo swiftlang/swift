@@ -535,6 +535,9 @@ class Foo<T> {
   // CHECK-NEXT:   dealloc_ref [[SELF]] : $Foo<T>
   // CHECK-NEXT:   [[RESULT:%[0-9]+]] = tuple ()
   // CHECK-NEXT:   return [[RESULT]] : $()
+  // CHECK-NEXT: } // end sil function '_T08lifetime3FooCfD'
+
+  
   // CHECK-LABEL: sil hidden @_T08lifetime3FooCfd : $@convention(method) <T> (@guaranteed Foo<T>) -> @owned Builtin.NativeObject
 
   deinit {
@@ -542,8 +545,6 @@ class Foo<T> {
     bar()
     // CHECK: function_ref @_T08lifetime3barSiyF
     // CHECK: apply
-
-    // CHECK: [[PTR:%.*]] = unchecked_ref_cast [[THIS]] : ${{.*}} to $Builtin.NativeObject
 
     // -- don't need to destroy_value x because it's trivial
     // CHECK-NOT: ref_element_addr [[THIS]] : {{.*}}, #Foo.x
@@ -557,9 +558,30 @@ class Foo<T> {
     // CHECK: [[WADDR:%[0-9]+]] = ref_element_addr [[THIS]] : {{.*}}, #Foo.w
     // CHECK: destroy_addr [[WADDR]]
     // -- return back this
-    // CHECK: return [[PTR]]
+    // CHECK: [[PTR:%.*]] = unchecked_ref_cast [[THIS]] : $Foo<T> to $Builtin.NativeObject
+    // CHECK: [[PTR_OWNED:%.*]] = unchecked_ownership_conversion [[PTR]] : $Builtin.NativeObject, @guaranteed to @owned
+    // CHECK: return [[PTR_OWNED]]
+    // CHECK: } // end sil function '_T08lifetime3FooCfd'
   }
 
+}
+
+class FooSubclass<T> : Foo<T> {
+
+  // CHECK-LABEL: sil hidden @_T08lifetime11FooSubclassCfd : $@convention(method) <T> (@guaranteed FooSubclass<T>) -> @owned Builtin.NativeObject
+  // CHECK: bb0([[THIS:%[0-9]+]] : $FooSubclass<T>):
+  // -- base dtor
+  // CHECK: [[BASE:%[0-9]+]] = upcast [[THIS]] : ${{.*}} to $Foo<T>
+  // CHECK: [[BASE_DTOR:%[0-9]+]] = function_ref @_T08lifetime3FooCfd : $@convention(method) <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
+  // CHECK: [[PTR:%.*]] = apply [[BASE_DTOR]]<T>([[BASE]])
+  // CHECK: [[BORROWED_PTR:%.*]] = begin_borrow [[PTR]]
+  // CHECK: end_borrow [[BORROWED_PTR]] from [[PTR]]
+  // CHECK: return [[PTR]]
+  
+
+  deinit {
+    bar()
+  }
 }
 
 class ImplicitDtor {
@@ -589,14 +611,22 @@ class ImplicitDtorDerived<T> : ImplicitDtor {
     self.z = z
   }
 
+  // CHECK: sil hidden @_T08lifetime19ImplicitDtorDerivedCfd : $@convention(method) <T> (@guaranteed ImplicitDtorDerived<T>) -> @owned Builtin.NativeObject {
   // CHECK: bb0([[THIS:%[0-9]+]] : $ImplicitDtorDerived<T>):
   // -- base dtor
   // CHECK: [[BASE:%[0-9]+]] = upcast [[THIS]] : ${{.*}} to $ImplicitDtor
   // CHECK: [[BASE_DTOR:%[0-9]+]] = function_ref @_T08lifetime12ImplicitDtorCfd
-  // CHECK: apply [[BASE_DTOR]]([[BASE]])
+  // CHECK: [[PTR:%.*]] = apply [[BASE_DTOR]]([[BASE]])
   // -- destroy_value z
-  // CHECK: [[ZADDR:%[0-9]+]] = ref_element_addr [[THIS]] : {{.*}}, #ImplicitDtorDerived.z
+  // CHECK: [[BORROWED_PTR:%.*]] = begin_borrow [[PTR]]
+  // CHECK: [[CAST_BORROWED_PTR:%.*]] = unchecked_ref_cast [[BORROWED_PTR]] : $Builtin.NativeObject to $ImplicitDtorDerived<T>
+  // CHECK: [[ZADDR:%[0-9]+]] = ref_element_addr [[CAST_BORROWED_PTR]] : {{.*}}, #ImplicitDtorDerived.z
   // CHECK: destroy_addr [[ZADDR]]
+  // CHECK: end_borrow [[BORROWED_PTR]] from [[PTR]]
+  // -- epilog
+  // CHECK-NOT: unchecked_ref_cast
+  // CHECK-NOT: unchecked_ownership_conversion
+  // CHECK: return [[PTR]]
 }
 
 class ImplicitDtorDerivedFromGeneric<T> : ImplicitDtorDerived<Int> {

@@ -137,10 +137,19 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       std::string cName = name.str();
       if (!swift::Demangle::isSwiftSymbol(cName.c_str()))
         Classifications += 'N';
-      if (DCtx.isThunkSymbol(name))
-        Classifications += 'T';
-      if (pointer && !DCtx.hasSwiftCallingConvention(name))
+      if (DCtx.isThunkSymbol(name)) {
+        if (!Classifications.empty())
+          Classifications += ',';
+        Classifications += "T:";
+        Classifications += DCtx.getThunkTarget(name);
+      } else {
+        assert(DCtx.getThunkTarget(name).empty());
+      }
+      if (pointer && !DCtx.hasSwiftCallingConvention(name)) {
+        if (!Classifications.empty())
+          Classifications += ',';
         Classifications += 'C';
+      }
       if (!Classifications.empty())
         llvm::outs() << '{' << Classifications << "} ";
     }
