@@ -3351,9 +3351,10 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
                                              Type type2,
                                              TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator) {
-  // There's no bridging without ObjC interop.
-  if (!TC.Context.LangOpts.EnableObjCInterop)
-    return SolutionKind::Error;
+  // There's no bridging without ObjC interop, so we shouldn't have set up
+  // bridging constraints without it.
+  assert(TC.Context.LangOpts.EnableObjCInterop
+         && "bridging constraint w/o ObjC interop?!");
   
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
