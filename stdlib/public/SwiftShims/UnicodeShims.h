@@ -283,6 +283,7 @@ enum {
     __swift_stdlib_UTEXT_PROVIDER_HAS_META_DATA = 4,
     __swift_stdlib_UTEXT_PROVIDER_OWNS_TEXT = 5
 };
+typedef __swift_uint32_t __swift_stdlib_UChar32;
 typedef __swift_uint16_t __swift_stdlib_UChar;
 typedef __swift_int8_t __swift_stdlib_UBool;
 typedef struct __swift_stdlib_UText __swift_stdlib_UText;
@@ -401,6 +402,158 @@ void
 __swift_stdlib_ubrk_setUText(__swift_stdlib_UBreakIterator* bi,
              __swift_stdlib_UText*          text,
              __swift_stdlib_UErrorCode*     status);
+
+
+typedef enum {
+    
+    __swift_stdlib_UNORM2_COMPOSE,
+    
+    __swift_stdlib_UNORM2_DECOMPOSE,
+    
+    __swift_stdlib_UNORM2_FCD,
+    
+    __swift_stdlib_UNORM2_COMPOSE_CONTIGUOUS
+} __swift_stdlib_UNormalization2Mode;
+
+
+typedef enum __swift_stdlib_UNormalizationCheckResult {
+  
+  __swift_stdlib_UNORM_NO,
+  
+  __swift_stdlib_UNORM_YES,
+  
+  __swift_stdlib_UNORM_MAYBE
+} __swift_stdlib_UNormalizationCheckResult;
+
+
+struct __swift_stdlib_UNormalizer2;
+typedef struct __swift_stdlib_UNormalizer2 __swift_stdlib_UNormalizer2;  
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const __swift_stdlib_UNormalizer2 *
+__swift_stdlib_unorm2_getNFCInstance(__swift_stdlib_UErrorCode *pErrorCode);
+
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const __swift_stdlib_UNormalizer2 *
+__swift_stdlib_unorm2_getNFDInstance(__swift_stdlib_UErrorCode *pErrorCode);
+
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const __swift_stdlib_UNormalizer2 *
+__swift_stdlib_unorm2_getNFKCInstance(__swift_stdlib_UErrorCode *pErrorCode);
+
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const __swift_stdlib_UNormalizer2 *
+__swift_stdlib_unorm2_getNFKDInstance(__swift_stdlib_UErrorCode *pErrorCode);
+
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const __swift_stdlib_UNormalizer2 *
+__swift_stdlib_unorm2_getNFKCCasefoldInstance(__swift_stdlib_UErrorCode *pErrorCode);
+
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const __swift_stdlib_UNormalizer2 *
+__swift_stdlib_unorm2_getInstance(const char *packageName,
+                   const char *name,
+                   __swift_stdlib_UNormalization2Mode mode,
+                   __swift_stdlib_UErrorCode *pErrorCode);
+
+
+// We don't want to expose USet, at least not yet
+#if 0
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_stdlib_UNormalizer2 *
+__swift_stdlib_unorm2_openFiltered(const __swift_stdlib_UNormalizer2 *norm2, const
+                                   __swift_stdlib_USet *filterSet, __swift_stdlib_UErrorCode *pErrorCode);
+#endif 
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void
+__swift_stdlib_unorm2_close(__swift_stdlib_UNormalizer2 *norm2);
+
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int32_t
+__swift_stdlib_unorm2_normalize(const __swift_stdlib_UNormalizer2 *norm2,
+                 const __swift_stdlib_UChar *src, int32_t length,
+                 __swift_stdlib_UChar *dest, int32_t capacity,
+                 __swift_stdlib_UErrorCode *pErrorCode);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int32_t
+__swift_stdlib_unorm2_normalizeSecondAndAppend(const __swift_stdlib_UNormalizer2 *norm2,
+                                __swift_stdlib_UChar *first, int32_t firstLength, int32_t firstCapacity,
+                                const __swift_stdlib_UChar *second, int32_t secondLength,
+                                __swift_stdlib_UErrorCode *pErrorCode);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int32_t
+__swift_stdlib_unorm2_append(const __swift_stdlib_UNormalizer2 *norm2,
+              __swift_stdlib_UChar *first, int32_t firstLength, int32_t firstCapacity,
+              const __swift_stdlib_UChar *second, int32_t secondLength,
+              __swift_stdlib_UErrorCode *pErrorCode);
+
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int32_t
+__swift_stdlib_unorm2_getDecomposition(const __swift_stdlib_UNormalizer2 *norm2,
+                        __swift_stdlib_UChar32 c, __swift_stdlib_UChar *decomposition, int32_t capacity,
+                        __swift_stdlib_UErrorCode *pErrorCode);
+
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int32_t
+__swift_stdlib_unorm2_getRawDecomposition(const __swift_stdlib_UNormalizer2 *norm2,
+                           __swift_stdlib_UChar32 c, __swift_stdlib_UChar *decomposition, int32_t capacity,
+                           __swift_stdlib_UErrorCode *pErrorCode);
+
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_stdlib_UChar32
+__swift_stdlib_unorm2_composePair(const __swift_stdlib_UNormalizer2 *norm2, __swift_stdlib_UChar32 a, __swift_stdlib_UChar32 b);
+
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_uint8_t
+__swift_stdlib_unorm2_getCombiningClass(const __swift_stdlib_UNormalizer2 *norm2, __swift_stdlib_UChar32 c);
+
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_stdlib_UBool
+__swift_stdlib_unorm2_isNormalized(const __swift_stdlib_UNormalizer2 *norm2,
+                    const __swift_stdlib_UChar *s, int32_t length,
+                    __swift_stdlib_UErrorCode *pErrorCode);
+
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_stdlib_UNormalizationCheckResult
+__swift_stdlib_unorm2_quickCheck(const __swift_stdlib_UNormalizer2 *norm2,
+                  const __swift_stdlib_UChar *s, int32_t length,
+                  __swift_stdlib_UErrorCode *pErrorCode);
+
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int32_t
+__swift_stdlib_unorm2_spanQuickCheckYes(const __swift_stdlib_UNormalizer2 *norm2,
+                         const __swift_stdlib_UChar *s, int32_t length,
+                         __swift_stdlib_UErrorCode *pErrorCode);
+
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_stdlib_UBool
+__swift_stdlib_unorm2_hasBoundaryBefore(const __swift_stdlib_UNormalizer2 *norm2, __swift_stdlib_UChar32 c);
+
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_stdlib_UBool
+__swift_stdlib_unorm2_hasBoundaryAfter(const __swift_stdlib_UNormalizer2 *norm2, __swift_stdlib_UChar32 c);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_stdlib_UBool
+unorm2_isInert(const UNormalizer2 *norm2, UChar32 c);
     
 #ifdef __cplusplus
 }} // extern "C", namespace swift

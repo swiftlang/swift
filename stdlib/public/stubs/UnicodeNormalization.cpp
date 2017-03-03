@@ -36,6 +36,7 @@
 
 #include <unicode/ubrk.h>
 #include <unicode/utext.h>
+#include <unicode/unorm2.h>
 
 #pragma clang diagnostic pop
 
@@ -302,6 +303,9 @@ namespace {
   template <typename T, typename U> T* ptr_cast(U* p) {
     return static_cast<T*>(static_cast<void*>(p));
   }
+  template <typename T, typename U> const T* ptr_cast(const U* p) {
+    return static_cast<const T*>(static_cast<const void*>(p));
+  }
 }
 
 void swift::__swift_stdlib_ubrk_close(
@@ -345,3 +349,23 @@ swift::__swift_stdlib_ubrk_setUText(__swift_stdlib_UBreakIterator* bi,
       ptr_cast<UErrorCode>(status));
 }
 
+const swift::__swift_stdlib_UNormalizer2 *
+swift::__swift_stdlib_unorm2_getNFCInstance(
+  __swift_stdlib_UErrorCode *pErrorCode
+) {
+  static const swift::__swift_stdlib_UNormalizer2 * result
+  = ptr_cast<__swift_stdlib_UNormalizer2>(
+    unorm2_getNFCInstance(ptr_cast<UErrorCode>(pErrorCode)));
+  return result;
+}
+
+int32_t
+swift::__swift_stdlib_unorm2_normalize(const __swift_stdlib_UNormalizer2 *norm2,
+                 const __swift_stdlib_UChar *src, __swift_int32_t length,
+                 __swift_stdlib_UChar *dest, __swift_int32_t capacity,
+                 __swift_stdlib_UErrorCode *pErrorCode) {
+  return unorm2_normalize(ptr_cast<UNormalizer2>(norm2),
+                          ptr_cast<UChar>(src), length,
+                          ptr_cast<UChar>(dest), capacity,
+                          ptr_cast<UErrorCode>(pErrorCode));
+}
