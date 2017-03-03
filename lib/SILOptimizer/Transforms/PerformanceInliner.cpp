@@ -316,8 +316,7 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 // specialization for a given call.
 static bool canSpecializeGeneric(ApplySite AI, SILFunction *F,
                                  SubstitutionList Subs) {
-  ReabstractionInfo ReInfo(AI, F, Subs);
-  return ReInfo.canBeSpecialized();
+  return ReabstractionInfo::canBeSpecialized(AI, F, Subs);
 }
 
 bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
