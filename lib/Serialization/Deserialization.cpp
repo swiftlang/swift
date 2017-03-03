@@ -4057,7 +4057,7 @@ Type ModuleFile::getType(TypeID TID) {
     
     SmallVector<Substitution, 4> genericArgs;
     if (auto sig = layout->getGenericSignature()) {
-      for (unsigned i : range(sig->getAllDependentTypes().size())) {
+      for (unsigned i : range(sig->getSubstitutionListSize())) {
         (void)i;
         auto sub = maybeReadSubstitution(DeclTypeCursor);
         if (!sub) {

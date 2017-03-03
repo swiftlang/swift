@@ -12,6 +12,7 @@
 
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Demangler.h"
 #include "swift/Basic/ManglingMacros.h"
 
@@ -60,19 +61,12 @@ std::string GenericSpecializationMangler::mangle() {
   SILFunctionType *FTy = Function->getLoweredFunctionType();
   CanGenericSignature Sig = FTy->getGenericSignature();
 
-  unsigned idx = 0;
+  auto SubMap = Sig->getSubstitutionMap(Subs);
   bool First = true;
-  for (Type DepType : Sig->getAllDependentTypes()) {
-    // It is sufficient to only mangle the substitutions of the "primary"
-    // dependent types. As all other dependent types are just derived from the
-    // primary types, this will give us unique symbol names.
-    if (DepType->is<GenericTypeParamType>()) {
-      appendType(Subs[idx].getReplacement()->getCanonicalType());
-      appendListSeparator(First);
-    }
-    ++idx;
+  for (auto ParamType : Sig->getSubstitutableParams()) {
+    appendType(Type(ParamType).subst(SubMap)->getCanonicalType());
+    appendListSeparator(First);
   }
-  assert(idx == Subs.size() && "subs not parallel to dependent types");
   assert(!First && "no generic substitutions");
   
   appendSpecializationOperator(isReAbstracted ? "Tg" : "TG");

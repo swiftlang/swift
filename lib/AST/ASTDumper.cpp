@@ -3117,13 +3117,17 @@ void TypeBase::dump(raw_ostream &os, unsigned indent) const {
   Type(const_cast<TypeBase *>(this)).dump(os, indent);
 }
 
-void GenericEnvironment::dump() const {
-  llvm::errs() << "Generic environment:\n";
+void GenericEnvironment::dump(raw_ostream &os) const {
+  os << "Generic environment:\n";
   for (auto gp : getGenericParams()) {
-    gp->dump();
-    mapTypeIntoContext(gp)->dump();
+    gp->dump(os);
+    mapTypeIntoContext(gp)->dump(os);
   }
-  llvm::errs() << "Generic parameters:\n";
+  os << "Generic parameters:\n";
   for (auto paramTy : getGenericParams())
-    paramTy->dump();
+    paramTy->dump(os);
+}
+
+void GenericEnvironment::dump() const {
+  dump(llvm::errs());
 }
