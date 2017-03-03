@@ -194,7 +194,7 @@ struct ${Self} {
     hashedByteCount += 8
   }
 
-% for data_type in ['UInt', 'Int', 'UInt64', 'Int64', 'UInt32', 'Int32']:
+  % for data_type in ['UInt', 'Int', 'UInt64', 'Int64', 'UInt32', 'Int32', 'UInt16', 'Int16']:
   public // @testable
   mutating func append(_ data: ${data_type}) {
     var data = data

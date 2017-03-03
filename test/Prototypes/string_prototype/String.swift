@@ -157,6 +157,19 @@ extension SwiftCanonicalString : Comparable {
   }
 }
 
+extension SwiftCanonicalString : Hashable {
+  var hashValue : Int {
+    var hasher = _SipHash13Context(key: _Hashing.secretKey)
+    for x in storage.nfcNormalizedUTF16 { hasher.append(x) }
+    let resultBits = hasher.finalizeAndReturnHash()
+#if arch(i386) || arch(arm)
+    return Int(truncatingBitPattern: resultBits)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+    return Int(Int64(bitPattern: resultBits))
+#endif
+  }
+}
+
 extension SwiftCanonicalString /* : RangeReplaceableCollection */ {
   mutating func replaceSubrange<C: Collection>(
     _ subrange: Range<Int>, with newValues: C
@@ -347,6 +360,18 @@ extension String : Comparable {
     }
   }
 }
+
+extension String : Hashable {
+  var hashValue : Int {
+    switch contents {
+    case .canonical(let representation):
+      return representation.hashValue
+    default:
+      fatalError("TODO")
+    }
+  }
+}
+
 
 extension String : BidirectionalCollection {
   typealias Index = Characters.Index
