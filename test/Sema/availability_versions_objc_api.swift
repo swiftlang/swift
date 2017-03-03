@@ -8,9 +8,9 @@ import Foundation
 
 // Tests for uses of version-based potential unavailability imported from ObjC APIs.
 func callUnavailableObjC() {
+      // expected-note@-1 5{{add @available attribute to enclosing global function}}
   _ = NSAvailableOn10_51() // expected-error {{'NSAvailableOn10_51' is only available on OS X 10.51 or newer}}
-      // expected-note@-1 {{add @available attribute to enclosing global function}}
-      // expected-note@-2 {{add 'if #available' version check}}
+      // expected-note@-1 {{add 'if #available' version check}}
   
   
   if #available(OSX 10.51, *) {
@@ -18,23 +18,19 @@ func callUnavailableObjC() {
     
     // Properties
     _ = o.propertyOn10_52 // expected-error {{'propertyOn10_52' is only available on OS X 10.52 or newer}}
-        // expected-note@-1 {{add @available attribute to enclosing global function}}
-        // expected-note@-2 {{add 'if #available' version check}}
+        // expected-note@-1 {{add 'if #available' version check}}
 
     o.propertyOn10_52 = 22 // expected-error {{'propertyOn10_52' is only available on OS X 10.52 or newer}}
-        // expected-note@-1 {{add @available attribute to enclosing global function}}
-        // expected-note@-2 {{add 'if #available' version check}}
+        // expected-note@-1 {{add 'if #available' version check}}
     
     // Methods
     o.methodAvailableOn10_52() // expected-error {{'methodAvailableOn10_52()' is only available on OS X 10.52 or newer}}
-        // expected-note@-1 {{add @available attribute to enclosing global function}}
-        // expected-note@-2 {{add 'if #available' version check}}
+        // expected-note@-1 {{add 'if #available' version check}}
     
     // Initializers
     
     _ = NSAvailableOn10_51(stringOn10_52:"Hi") // expected-error {{'init(stringOn10_52:)' is only available on OS X 10.52 or newer}}
-        // expected-note@-1 {{add @available attribute to enclosing global function}}
-        // expected-note@-2 {{add 'if #available' version check}}
+        // expected-note@-1 {{add 'if #available' version check}}
   }
 }
 
@@ -74,50 +70,43 @@ let _: NSEnumWithUnavailableElement = .third // expected-error {{'third' is only
 // Differing availability on getters and setters imported from ObjC.
 
 func gettersAndSettersFromObjC(o: NSAvailableOn10_9) {
+      // expected-note@-1 6{{add @available attribute to enclosing global function}}
   let _: Int = o.propertyOn10_51WithSetterOn10_52After  // expected-error {{'propertyOn10_51WithSetterOn10_52After' is only available on OS X 10.51 or newer}}
-      // expected-note@-1 {{add @available attribute to enclosing global function}}
-      // expected-note@-2 {{add 'if #available' version check}}
+      // expected-note@-1 {{add 'if #available' version check}}
 
   if #available(OSX 10.51, *) {
     // Properties with unavailable accessors declared before property in Objective-C header
     o.propertyOn10_51WithSetterOn10_52Before = 5 // expected-error {{setter for 'propertyOn10_51WithSetterOn10_52Before' is only available on OS X 10.52 or newer}}
-        // expected-note@-1 {{add @available attribute to enclosing global function}}
-        // expected-note@-2 {{add 'if #available' version check}}
+        // expected-note@-1 {{add 'if #available' version check}}
 
     let _: Int = o.propertyOn10_51WithGetterOn10_52Before // expected-error {{getter for 'propertyOn10_51WithGetterOn10_52Before' is only available on OS X 10.52 or newer}}
-        // expected-note@-1 {{add @available attribute to enclosing global function}}
-        // expected-note@-2 {{add 'if #available' version check}}
+        // expected-note@-1 {{add 'if #available' version check}}
 
     // Properties with unavailable accessors declared after property in Objective-C header
     o.propertyOn10_51WithSetterOn10_52After = 5 // expected-error {{setter for 'propertyOn10_51WithSetterOn10_52After' is only available on OS X 10.52 or newer}}
-        // expected-note@-1 {{add @available attribute to enclosing global function}}
-        // expected-note@-2 {{add 'if #available' version check}}
+        // expected-note@-1 {{add 'if #available' version check}}
 
     let _: Int = o.propertyOn10_51WithGetterOn10_52After // expected-error {{getter for 'propertyOn10_51WithGetterOn10_52After' is only available on OS X 10.52 or newer}}
-        // expected-note@-1 {{add @available attribute to enclosing global function}}
-        // expected-note@-2 {{add 'if #available' version check}}
+        // expected-note@-1 {{add 'if #available' version check}}
 
     // Property with unavailable setter redeclared in Objective-C category
     o.readOnlyRedeclaredWithSetterInCategory = 5 // expected-error {{setter for 'readOnlyRedeclaredWithSetterInCategory' is only available on OS X 10.52 or newer}}
-        // expected-note@-1 {{add @available attribute to enclosing global function}}
-        // expected-note@-2 {{add 'if #available' version check}}
+        // expected-note@-1 {{add 'if #available' version check}}
   }
 }
 
 // Globals from Objective-C
 
 func useGlobalsFromObjectiveC() {
+      // expected-note@-1 3{{add @available attribute to enclosing global function}}
   _ = globalStringAvailableOn10_51 // expected-error {{'globalStringAvailableOn10_51' is only available on OS X 10.51 or newer}}
-      // expected-note@-1 {{add @available attribute to enclosing global function}}
-      // expected-note@-2 {{add 'if #available' version check}}
+      // expected-note@-1 {{add 'if #available' version check}}
 
   _ = globalStringAvailableOn10_52 // expected-error {{'globalStringAvailableOn10_52' is only available on OS X 10.52 or newer}}
-      // expected-note@-1 {{add @available attribute to enclosing global function}}
-      // expected-note@-2 {{add 'if #available' version check}}
+      // expected-note@-1 {{add 'if #available' version check}}
 
   _ = globalClassInstanceAvailableOn10_51 // expected-error {{'globalClassInstanceAvailableOn10_51' is only available on OS X 10.51 or newer}}
-      // expected-note@-1 {{add @available attribute to enclosing global function}}
-      // expected-note@-2 {{add 'if #available' version check}}
+      // expected-note@-1 {{add 'if #available' version check}}
 
   if #available(OSX 10.51, *) {
     _ = globalStringAvailableOn10_51
@@ -177,9 +166,9 @@ class UserClass : UnannotatedFrameworkProtocol {
 }
 
 func callViaUnannotatedFrameworkProtocol(p: UnannotatedFrameworkProtocol) {
-  let _ = p.returnSomething() // expected-error {{'returnSomething()' is only available on OS X 10.51 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing global function}}
-      // expected-note@-2 {{add 'if #available' version check}}
+  let _ = p.returnSomething() // expected-error {{'returnSomething()' is only available on OS X 10.51 or newer}}
+      // expected-note@-1 {{add 'if #available' version check}}
 }
 
 func callViaAnnotatedFrameworkProtocol(p: AnnotatedFrameworkProtocol) {
