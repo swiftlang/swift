@@ -20,13 +20,9 @@ class SyntaxCollectionData : public SyntaxData {
 
   SyntaxCollectionData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
                        CursorIndex IndexInParent = 0)
-    : SyntaxData(Raw, Parent, IndexInParent) {
+      : SyntaxData(Raw, Parent, IndexInParent),
+        CachedElements(Raw->Layout.size(), nullptr) {
     assert(Raw->Kind == CollectionKind);
-#ifndef NDEBUG
-    for (auto Child : Raw->Layout) {
-      CachedElements.push_back(nullptr);
-    }
-#endif
   }
 
   static RC<SyntaxCollectionData<CollectionKind, ElementType>>
