@@ -289,11 +289,11 @@ testSuite.test("string-compare") {
   expectEqual(.same, s4u16.ordered(with: s4u16))
 
   expectEqual(.before, s1u16.ordered(with: s2u16))
-  // FIXME: bug, or Character following UCA instead?: expectEqual(.before, s2u16.ordered(with: s3u16))
+  expectEqual(.before, s2u16.ordered(with: s3u16))
   expectEqual(.same, s3u16.ordered(with: s4u16))
 
   expectEqual(.after, s2u16.ordered(with: s1u16))
-  // FIXME: bug, or Character following UCA instead?: expectEqual(.after, s3u16.ordered(with: s2u16))
+  expectEqual(.after, s3u16.ordered(with: s2u16))
   expectEqual(.same, s4u16.ordered(with: s3u16))
 }
 

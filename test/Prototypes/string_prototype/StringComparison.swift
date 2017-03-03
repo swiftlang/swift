@@ -626,11 +626,8 @@ where
         let rhsRest = _UnicodeStorage(
           rhs.codeUnits.suffix(from: rhsIdx).map { $0 }, OtherEncoding.self
         )
-        // TODO: instead, use normalized scalar view
-        return lhsRest.characters.lexicographicCompare(rhsRest.characters) {
-          lhsChar, rhsChar in
-          return lhsChar.ordered(with: rhsChar)
-        }
+        return lhsRest.nfcNormalizedUTF16.lexicographicCompare(
+          rhsRest.nfcNormalizedUTF16)
       }
     }
   }
