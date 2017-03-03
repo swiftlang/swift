@@ -289,6 +289,13 @@ public:
   /// or ObjC-as-swift thunks.
   bool isThunkSymbol(llvm::StringRef MangledName);
 
+  /// Returns the mangled name of the target of a thunk.
+  ///
+  /// \returns Returns the remaining name after removing the thunk mangling
+  /// characters from \p MangledName. If \p MangledName is not a thunk symbol,
+  /// an empty string is returned.
+  std::string getThunkTarget(llvm::StringRef MangledName);
+
   /// Returns true if the \p mangledName refers to a function which conforms to
   /// the Swift calling convention.
   ///
