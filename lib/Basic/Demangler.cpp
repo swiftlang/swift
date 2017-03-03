@@ -208,11 +208,34 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
     StringRef Remaining = MangledName.substr(2);
     if (Remaining.startswith("To") ||   // swift-as-ObjC thunk
         Remaining.startswith("TO") ||   // ObjC-as-swift thunk
-        Remaining.startswith("PA")) {  // (ObjC) partial application forwarder
+        Remaining.startswith("PA_") ||  // partial application forwarder
+        Remaining.startswith("PAo_")) { // ObjC partial application forwarder
       return true;
     }
   }
   return false;
+}
+
+std::string Context::getThunkTarget(llvm::StringRef MangledName) {
+  if (!isThunkSymbol(MangledName))
+    return std::string();
+
+  if (MangledName.startswith(MANGLING_PREFIX_STR)
+      // Also accept the future mangling prefix.
+      // TODO: remove this line as soon as MANGLING_PREFIX_STR gets "_S".
+      || MangledName.startswith("_S")) {
+
+    return MangledName.substr(0, MangledName.size() - 2).str();
+  }
+  // Old mangling.
+  assert(MangledName.startswith("_T"));
+  StringRef Remaining = MangledName.substr(2);
+  if (Remaining.startswith("PA_"))
+    return Remaining.substr(3).str();
+  if (Remaining.startswith("PAo_"))
+    return Remaining.substr(4).str();
+  assert(Remaining.startswith("To") || Remaining.startswith("TO"));
+  return std::string("_T") + Remaining.substr(2).str();
 }
 
 bool Context::hasSwiftCallingConvention(llvm::StringRef MangledName) {
