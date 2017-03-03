@@ -26,18 +26,18 @@ extension Foo {
 
 extension Foo where T: Runcible {
   // A constrained extension always uses the extension mangling.
-  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVAaA8RuncibleRzlE1aSifg
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVA2A8RuncibleRzlE1aSifg
   var a: Int { return 0 }
 
-  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVAaA8RuncibleRzlE1bxfg
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVA2A8RuncibleRzlE1bxfg
   var b: T { get { } }
 }
 
 extension Foo where T: Runcible, T.Spoon: Runcible {
-  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVAaA8RuncibleRzAaD5SpoonRpzlE1aSifg
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVA2A8RuncibleRzAaD5SpoonRpzlE1aSifg
   var a: Int { return 0 }
 
-  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVAaA8RuncibleRzAaD5SpoonRpzlE1bxfg
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions3FooVA2A8RuncibleRzAaD5SpoonRpzlE1bxfg
   var b: T { get { } }
 }
 
@@ -53,6 +53,6 @@ extension Runcible {
 }
 
 extension Runcible where Self.Spoon == Self.Hat {
-  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions8RunciblePAaaBRz5SpoonQz3HatRtzlE5runceyyF
+  // CHECK-LABEL: sil hidden @_T027mangling_generic_extensions8RunciblePA2aBRz5SpoonQz3HatRtzlE5runceyyF
   func runce() {}
 }

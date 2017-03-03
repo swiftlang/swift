@@ -964,24 +964,25 @@ Types
   nominal-type ::= context decl-name 'V'     // nominal struct type
   nominal-type ::= protocol 'P'              // nominal protocol type
 
-  nominal-type ::= known-nominal-type
+  nominal-type ::= 'S' KNOWN-TYPE-KIND       // known nominal type substitution
+  nominal-type ::= 'S' NATURAL KNOWN-TYPE-KIND    // repeated known type substitutions of the same kind
 
-  known-nominal-type ::= 'Sa'                // Swift.Array
-  known-nominal-type ::= 'Sb'                // Swift.Bool
-  known-nominal-type ::= 'Sc'                // Swift.UnicodeScalar
-  known-nominal-type ::= 'Sd'                // Swift.Float64
-  known-nominal-type ::= 'Sf'                // Swift.Float32
-  known-nominal-type ::= 'Si'                // Swift.Int
-  known-nominal-type ::= 'SV'                // Swift.UnsafeRawPointer
-  known-nominal-type ::= 'Sv'                // Swift.UnsafeMutableRawPointer
-  known-nominal-type ::= 'SP'                // Swift.UnsafePointer
-  known-nominal-type ::= 'Sp'                // Swift.UnsafeMutablePointer
-  known-nominal-type ::= 'SQ'                // Swift.ImplicitlyUnwrappedOptional
-  known-nominal-type ::= 'Sq'                // Swift.Optional
-  known-nominal-type ::= 'SR'                // Swift.UnsafeBufferPointer
-  known-nominal-type ::= 'Sr'                // Swift.UnsafeMutableBufferPointer
-  known-nominal-type ::= 'SS'                // Swift.String
-  known-nominal-type ::= 'Su'                // Swift.UInt
+  KNOWN-TYPE-KIND ::= 'a'                    // Swift.Array
+  KNOWN-TYPE-KIND ::= 'b'                    // Swift.Bool
+  KNOWN-TYPE-KIND ::= 'c'                    // Swift.UnicodeScalar
+  KNOWN-TYPE-KIND ::= 'd'                    // Swift.Float64
+  KNOWN-TYPE-KIND ::= 'f'                    // Swift.Float32
+  KNOWN-TYPE-KIND ::= 'i'                    // Swift.Int
+  KNOWN-TYPE-KIND ::= 'V'                    // Swift.UnsafeRawPointer
+  KNOWN-TYPE-KIND ::= 'v'                    // Swift.UnsafeMutableRawPointer
+  KNOWN-TYPE-KIND ::= 'P'                    // Swift.UnsafePointer
+  KNOWN-TYPE-KIND ::= 'p'                    // Swift.UnsafeMutablePointer
+  KNOWN-TYPE-KIND ::= 'Q'                    // Swift.ImplicitlyUnwrappedOptional
+  KNOWN-TYPE-KIND ::= 'q'                    // Swift.Optional
+  KNOWN-TYPE-KIND ::= 'R'                    // Swift.UnsafeBufferPointer
+  KNOWN-TYPE-KIND ::= 'r'                    // Swift.UnsafeMutableBufferPointer
+  KNOWN-TYPE-KIND ::= 'S'                    // Swift.String
+  KNOWN-TYPE-KIND ::= 'u'                    // Swift.UInt
 
   protocol ::= context decl-name
 
@@ -1298,7 +1299,11 @@ Substitutions
 ::
 
   substitution ::= 'A' INDEX                  // substitution of N+26
-  substitution ::= 'A' [a-z]* [A-Z]           // One or more consecutive substitutions of N < 26
+  substitution ::= 'A' SUBST_IDX* LAST-SUBST-IDX    // One or more consecutive substitutions of N < 26
+  SUBST-IDX ::= [a-z]
+  SUBST-IDX ::= NATURAL [a-z]
+  LAST-SUBST-IDX ::= [A-Z]
+  LAST-SUBST-IDX ::= NATURAL [A-Z]
 
 
 ``<substitution>`` is a back-reference to a previously mangled entity. The mangling
@@ -1325,7 +1330,7 @@ third argument type will mangle using the substitution for ``zim``,
 if it mangled again.) The result type will mangle using the substitution for
 ``zim.zang``, ``AB3zoo`` (and acquire substitution ``AE``).
 
-There are some pre-defined substitutions, see ``<known-nominal-type>``.
+There are some pre-defined substitutions, see ``KNOWN-TYPE-KIND``.
 
 If the mangling contains two or more consecutive substitutions, it can be
 abbreviated with the ``A`` substitution. Similar to word-substitutions the
@@ -1333,6 +1338,9 @@ index is encoded as letters, whereas the last letter is uppercase::
 
   AaeB      // equivalent to A_A4_A0_
 
+Repeated substitutions are encoded with a natural prefix number::
+
+  A3a2B     // equivalent to AaaabB
 
 Numbers and Indexes
 ~~~~~~~~~~~~~~~~~~~

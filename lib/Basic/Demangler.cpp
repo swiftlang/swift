@@ -627,27 +627,53 @@ NodePointer Demangler::demangleIndexAsNode() {
 }
 
 NodePointer Demangler::demangleMultiSubstitutions() {
+  int RepeatCount = -1;
   while (true) {
     char c = nextChar();
     if (isLowerLetter(c)) {
-      unsigned Idx = c - 'a';
-      if (Idx >= Substitutions.size())
+      // It's a substitution with an index < 26.
+      NodePointer Nd = pushMultiSubstitutions(RepeatCount, c - 'a');
+      if (!Nd)
         return nullptr;
-      pushNode(Substitutions[Idx]);
+      pushNode(Nd);
+      RepeatCount = -1;
+      // A lowercase letter indicates that there are more substitutions to
+      // follow.
       continue;
     }
     if (isUpperLetter(c)) {
-      unsigned Idx = c - 'A';
+      // The last substitution.
+      return pushMultiSubstitutions(RepeatCount, c - 'A');
+    }
+    if (c == '_') {
+      // The previously demangled number is actually not a repeat count but
+      // the large (> 26) index of a substitution. Because it's an index we
+      // have to add 27 and not 26.
+      unsigned Idx = RepeatCount + 27;
       if (Idx >= Substitutions.size())
         return nullptr;
       return Substitutions[Idx];
     }
     pushBack();
-    unsigned Idx = demangleIndex() + 26;
-    if (Idx >= Substitutions.size())
+    // Not a letter? Then it can only be a natural number which might be the
+    // repeat count or a large (> 26) substitution index.
+    RepeatCount = demangleNatural();
+    if (RepeatCount < 0)
       return nullptr;
-    return Substitutions[Idx];
   }
+}
+
+NodePointer Demangler::pushMultiSubstitutions(int RepeatCount,
+                                              size_t SubstIdx) {
+  if (SubstIdx >= Substitutions.size())
+    return nullptr;
+  if (RepeatCount > SubstitutionMerging::MaxRepeatCount)
+    return nullptr;
+  NodePointer Nd = Substitutions[SubstIdx];
+  while (RepeatCount-- > 1) {
+    pushNode(Nd);
+  }
+  return Nd;
 }
 
 NodePointer Demangler::createSwiftType(Node::Kind typeKind, const char *name) {
@@ -670,16 +696,30 @@ NodePointer Demangler::demangleStandardSubstitution() {
       addSubstitution(OptionalTy);
       return OptionalTy;
     }
-    default:
-#define STANDARD_TYPE(KIND, MANGLING, TYPENAME)                   \
-      if (c == #MANGLING[0]) {                                    \
-        return createSwiftType(Node::Kind::KIND, #TYPENAME);      \
+    default: {
+      pushBack();
+      int RepeatCount = demangleNatural();
+      if (RepeatCount > SubstitutionMerging::MaxRepeatCount)
+        return nullptr;
+      if (NodePointer Nd = createStandardSubstitution(nextChar())) {
+        while (RepeatCount-- > 1) {
+          pushNode(Nd);
+        }
+        return Nd;
       }
+      return nullptr;
+    }
+  }
+}
+
+NodePointer Demangler::createStandardSubstitution(char Subst) {
+#define STANDARD_TYPE(KIND, MANGLING, TYPENAME)                   \
+  if (Subst == #MANGLING[0]) {                                    \
+    return createSwiftType(Node::Kind::KIND, #TYPENAME);      \
+  }
 
 #include "swift/Basic/StandardTypesMangling.def"
-
-      return nullptr;
-  }
+  return nullptr;
 }
 
 NodePointer Demangler::demangleIdentifier() {

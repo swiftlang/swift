@@ -20,7 +20,7 @@
         {
           key.kind: source.lang.swift.decl.enumelement,
           key.name: "one",
-          key.usr: "s:15index_enum_case1EO3oneAcCmF",
+          key.usr: "s:15index_enum_case1EO3oneA2CmF",
           key.line: 6,
           key.column: 10
         },
@@ -43,7 +43,7 @@
         {
           key.kind: source.lang.swift.decl.enumelement,
           key.name: "three",
-          key.usr: "s:15index_enum_case1EO5threeAcCmF",
+          key.usr: "s:15index_enum_case1EO5threeA2CmF",
           key.line: 6,
           key.column: 31
         },
@@ -64,7 +64,7 @@
                 {
                   key.kind: source.lang.swift.ref.enumelement,
                   key.name: "one",
-                  key.usr: "s:15index_enum_case1EO3oneAcCmF",
+                  key.usr: "s:15index_enum_case1EO3oneA2CmF",
                   key.line: 10,
                   key.column: 15
                 },
@@ -78,7 +78,7 @@
                 {
                   key.kind: source.lang.swift.ref.enumelement,
                   key.name: "three",
-                  key.usr: "s:15index_enum_case1EO5threeAcCmF",
+                  key.usr: "s:15index_enum_case1EO5threeA2CmF",
                   key.line: 14,
                   key.column: 15
                 }
@@ -147,7 +147,7 @@
         {
           key.kind: source.lang.swift.ref.enumelement,
           key.name: "one",
-          key.usr: "s:15index_enum_case1EO3oneAcCmF",
+          key.usr: "s:15index_enum_case1EO3oneA2CmF",
           key.line: 28,
           key.column: 12
         }

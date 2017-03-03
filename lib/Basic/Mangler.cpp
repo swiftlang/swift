@@ -317,8 +317,8 @@ void Mangler::beginMangling() {
   Storage.clear();
   Substitutions.clear();
   StringSubstitutions.clear();
-  lastSubstIdx = -2;
   Words.clear();
+  SubstMerging.clear();
   Buffer << MANGLING_PREFIX_STR;
 }
 
@@ -367,17 +367,13 @@ void Mangler::mangleSubstitution(unsigned Idx) {
     return appendOperator("A", Index(Idx - 26));
   }
 
-  char c = Idx + 'A';
-  if (lastSubstIdx == (int)Storage.size() - 1) {
-    assert(isUpperLetter(Storage[lastSubstIdx]));
-    Storage[lastSubstIdx] = Storage[lastSubstIdx] - 'A' + 'a';
-    Buffer << c;
+  char Subst = Idx + 'A';
+  if (SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ false)) {
 #ifndef NDEBUG
     mergedSubsts++;
 #endif
   } else {
-    appendOperator("A", StringRef(&c, 1));
+    appendOperator("A", StringRef(&Subst, 1));
   }
-  lastSubstIdx = (int)Storage.size() - 1;
 }
 

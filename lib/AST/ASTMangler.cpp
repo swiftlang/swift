@@ -1583,16 +1583,12 @@ bool ASTMangler::tryAppendStandardSubstitution(const NominalTypeDecl *decl) {
   if (!isStdlibType(decl))
     return false;
 
-  StringRef name = decl->getName().str();
-
-#define STANDARD_TYPE(KIND, MANGLING, TYPENAME)      \
-  if (name == #TYPENAME) {                           \
-    appendOperator("S" #MANGLING);                   \
-    return true;                                     \
+  if (char Subst = getStandardTypeSubst(decl->getName().str())) {
+    if (!SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ true)) {
+      appendOperator("S", StringRef(&Subst, 1));
+    }
+    return true;
   }
-
-#include "swift/Basic/StandardTypesMangling.def"
-
   return false;
 }
 

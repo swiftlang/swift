@@ -44,6 +44,7 @@ class Mangler {
 protected:
   template <typename Mangler>
   friend void mangleIdentifier(Mangler &M, StringRef ident);
+  friend class SubstitutionMerging;
 
   /// The storage for the mangled symbol.
   llvm::SmallVector<char, 128> Storage;
@@ -60,11 +61,11 @@ protected:
   /// Identifier substitutions.
   llvm::StringMap<unsigned> StringSubstitutions;
 
-  /// The position in the Buffer where the last substitution was written.
-  int lastSubstIdx = -2;
-
   /// Word substitutions in mangled identifiers.
   llvm::SmallVector<SubstitutionWord, 26> Words;
+
+  /// Used for repeated substitutions and known substitutions, e.g. A3B, S2i.
+  SubstitutionMerging SubstMerging;
 
   size_t MaxNumWords = 26;
 
@@ -86,6 +87,13 @@ protected:
   /// Returns the buffer as a StringRef, needed by mangleIdentifier().
   StringRef getBufferStr() const {
     return StringRef(Storage.data(), Storage.size());
+  }
+
+  /// Removes the last characters of the buffer by setting it's size to a
+  /// smaller value.
+  void resetBuffer(size_t toPos) {
+    assert(toPos <= Storage.size());
+    Storage.resize(toPos);
   }
 
 protected:

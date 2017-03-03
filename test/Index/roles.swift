@@ -17,13 +17,13 @@ let x = 2
 var y = x + 1
 // CHECK: [[@LINE-1]]:5 | variable/Swift | y | s:14swift_ide_test1ySiv | Def | rel: 0
 // CHECK: [[@LINE-2]]:9 | variable/Swift | x | s:14swift_ide_test1xSiv | Ref,Read | rel: 0
-// CHECK: [[@LINE-3]]:11 | function/infix-operator/Swift | +(_:_:) | s:s1poiSiSi_SitF | Ref,Call | rel: 0
+// CHECK: [[@LINE-3]]:11 | function/infix-operator/Swift | +(_:_:) | s:s1poiS2i_SitF | Ref,Call | rel: 0
 
 // Read of x + Write of y
 y = x + 1
 // CHECK: [[@LINE-1]]:1 | variable/Swift | y | s:14swift_ide_test1ySiv | Ref,Writ | rel: 0
 // CHECK: [[@LINE-2]]:5 | variable/Swift | x | s:14swift_ide_test1xSiv | Ref,Read | rel: 0
-// CHECK: [[@LINE-3]]:7 | function/infix-operator/Swift | +(_:_:) | s:s1poiSiSi_SitF | Ref,Call | rel: 0
+// CHECK: [[@LINE-3]]:7 | function/infix-operator/Swift | +(_:_:) | s:s1poiS2i_SitF | Ref,Call | rel: 0
 
 // Read of y + Write of y
 y += x
@@ -116,18 +116,18 @@ struct AStruct {
 
   // RelationChildOf, RelationAccessorOf
   subscript(index: Int) -> Int {
-    // CHECK: [[@LINE-1]]:3 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructV9subscriptSiSici | Def,RelChild | rel: 1
+    // CHECK: [[@LINE-1]]:3 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2ici | Def,RelChild | rel: 1
     // CHECK-NEXT: RelChild | AStruct | s:14swift_ide_test7AStructV
 
     get {
-      // CHECK: [[@LINE-1]]:5 | instance-method/acc-get/Swift | getter:subscript(_:) | s:14swift_ide_test7AStructV9subscriptSiSicfg | Def,RelChild,RelAcc | rel: 1
-      // CHECK-NEXT: RelChild,RelAcc | subscript(_:) | s:14swift_ide_test7AStructV9subscriptSiSici
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-get/Swift | getter:subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2icfg | Def,RelChild,RelAcc | rel: 1
+      // CHECK-NEXT: RelChild,RelAcc | subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2ici
 
       return x
     }
     set {
-      // CHECK: [[@LINE-1]]:5 | instance-method/acc-set/Swift | setter:subscript(_:) | s:14swift_ide_test7AStructV9subscriptSiSicfs | Def,RelChild,RelAcc | rel: 1
-      // CHECK-NEXT: RelChild,RelAcc | subscript(_:) | s:14swift_ide_test7AStructV9subscriptSiSici
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-set/Swift | setter:subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2icfs | Def,RelChild,RelAcc | rel: 1
+      // CHECK-NEXT: RelChild,RelAcc | subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2ici
 
       x = newValue
     }
@@ -153,11 +153,11 @@ let _ = AClass.foo
 let _ = AClass(x: 1).foo
 // CHECK: [[@LINE-1]]:22 | instance-method/Swift | foo() | s:14swift_ide_test6AClassC3fooSiyF | Ref | rel: 0
 let _ = AClass(x: 1)[1]
-// CHECK: [[@LINE-1]]:21 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test6AClassC9subscriptSiSici | Ref,Read | rel: 0
-// CHECK: [[@LINE-2]]:21 | function/acc-get/Swift | getter:subscript(_:) | s:14swift_ide_test6AClassC9subscriptSiSicfg | Ref,Call,Dyn,Impl,RelRec | rel: 1
+// CHECK: [[@LINE-1]]:21 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test6AClassC9subscriptS2ici | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:21 | function/acc-get/Swift | getter:subscript(_:) | s:14swift_ide_test6AClassC9subscriptS2icfg | Ref,Call,Dyn,Impl,RelRec | rel: 1
 let _ = AClass(x: 1)[1] = 2
-// CHECK: [[@LINE-1]]:21 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test6AClassC9subscriptSiSici | Ref,Writ | rel: 0
-// CHECK: [[@LINE-2]]:21 | function/acc-set/Swift | setter:subscript(_:) | s:14swift_ide_test6AClassC9subscriptSiSicfs | Ref,Call,Dyn,Impl,RelRec | rel: 1
+// CHECK: [[@LINE-1]]:21 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test6AClassC9subscriptS2ici | Ref,Writ | rel: 0
+// CHECK: [[@LINE-2]]:21 | function/acc-set/Swift | setter:subscript(_:) | s:14swift_ide_test6AClassC9subscriptS2icfs | Ref,Call,Dyn,Impl,RelRec | rel: 1
 
 // RelationBaseOf, RelationOverrideOf
 
@@ -258,11 +258,11 @@ let otherInstance = AStruct(x: 1)
 
 let _ = otherInstance[0]
 // CHECK: [[@LINE-1]]:9 | variable/Swift | otherInstance | s:14swift_ide_test13otherInstanceAA7AStructVv | Ref,Read | rel: 0
-// CHECK: [[@LINE-2]]:22 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructV9subscriptSiSici | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:22 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2ici | Ref,Read | rel: 0
 
 let _ = anInstance[0]
 // CHECK: [[@LINE-1]]:9 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCv | Ref,Read | rel: 0
-// CHECK: [[@LINE-2]]:19 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test6AClassC9subscriptSiSici | Ref,Read | rel: 0
+// CHECK: [[@LINE-2]]:19 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test6AClassC9subscriptS2ici | Ref,Read | rel: 0
 
 let aSubInstance: AClass = ASubClass(x: 1)
 // CHECK: [[@LINE-1]]:5 | variable/Swift | aSubInstance | s:14swift_ide_test12aSubInstanceAA6AClassCv | Def | rel: 0

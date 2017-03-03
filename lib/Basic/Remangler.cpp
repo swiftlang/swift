@@ -136,6 +136,7 @@ bool SubstitutionEntry::deepEquals(Node *lhs, Node *rhs) const {
 class Remangler {
   template <typename Mangler>
   friend void NewMangling::mangleIdentifier(Mangler &M, StringRef ident);
+  friend class NewMangling::SubstitutionMerging;
 
   const bool UsePunycode = true;
 
@@ -149,13 +150,15 @@ class Remangler {
   std::unordered_map<SubstitutionEntry, unsigned,
                      SubstitutionEntry::Hasher> Substitutions;
 
-  int lastSubstIdx = -2;
+  SubstitutionMerging SubstMerging;
 
   // We have to cons up temporary nodes sometimes when remangling
   // nested generics. This factory owns them.
   NodeFactory Factory;
 
   StringRef getBufferStr() const { return Buffer.getStringRef(); }
+
+  void resetBuffer(size_t toPos) { Buffer.resetSize(toPos); }
 
   template <typename Mangler>
   friend void mangleIdentifier(Mangler &M, StringRef ident);
@@ -313,16 +316,10 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry,
     mangleIndex(Idx - 26);
     return true;
   }
-  char c = Idx + 'A';
-  if (lastSubstIdx == (int)Buffer.getStringRef().size() - 1) {
-    char &lastChar = Buffer.lastChar();
-    assert(isUpperLetter(lastChar));
-    lastChar = lastChar - 'A' + 'a';
-    Buffer << c;
-  } else {
-    Buffer << 'A' << c;
+  char Subst = Idx + 'A';
+  if (!SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ false)) {
+    Buffer << 'A' << Subst;
   }
-  lastSubstIdx = Buffer.getStringRef().size() - 1;
   return true;
 }
 
@@ -364,15 +361,12 @@ bool Remangler::mangleStandardSubstitution(Node *node) {
       || context->getText() != STDLIB_NAME)
     return false;
 
-  Node *Nominal = node->getChild(1);
-#define STANDARD_TYPE(KIND, MANGLING, TYPENAME)      \
-  if (Nominal->getText() == #TYPENAME) {             \
-    Buffer << "S" #MANGLING;                         \
-    return true;                                     \
+  if (char Subst = getStandardTypeSubst(node->getChild(1)->getText())) {
+    if (!SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ true)) {
+      Buffer << 'S' << Subst;
+    }
+    return true;
   }
-
-#include "swift/Basic/StandardTypesMangling.def"
-
   return false;
 }
 
