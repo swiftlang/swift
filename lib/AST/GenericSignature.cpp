@@ -78,6 +78,20 @@ GenericSignature::getInnermostGenericParams() const {
   return params;
 }
 
+
+SmallVector<GenericTypeParamType *, 2>
+GenericSignature::getSubstitutableParams() const {
+  SmallVector<GenericTypeParamType *, 2> result;
+
+  enumeratePairedRequirements([&](Type depTy, ArrayRef<Requirement>) -> bool {
+    if (auto *paramTy = depTy->getAs<GenericTypeParamType>())
+      result.push_back(paramTy);
+    return false;
+  });
+
+  return result;
+}
+
 std::string GenericSignature::gatherGenericParamBindingsText(
     ArrayRef<Type> types, TypeSubstitutionFn substitutions) const {
   llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
@@ -375,21 +389,21 @@ SubstitutionMap
 GenericSignature::getSubstitutionMap(SubstitutionList subs) const {
   SubstitutionMap result;
 
-  // An empty parameter list gives an empty map.
-  if (subs.empty())
-    assert(getGenericParams().empty() || areAllParamsConcrete());
+  enumeratePairedRequirements(
+    [&](Type depTy, ArrayRef<Requirement> reqts) -> bool {
+      auto sub = subs.front();
+      subs = subs.slice(1);
 
-  for (auto depTy : getAllDependentTypes()) {
-    auto sub = subs.front();
-    subs = subs.slice(1);
+      auto canTy = depTy->getCanonicalType();
+      if (isa<SubstitutableType>(canTy))
+        result.addSubstitution(cast<SubstitutableType>(canTy),
+                               sub.getReplacement());
+      assert(reqts.size() == sub.getConformances().size());
+      for (auto conformance : sub.getConformances())
+        result.addConformance(canTy, conformance);
 
-    auto canTy = depTy->getCanonicalType();
-    if (isa<SubstitutableType>(canTy))
-      result.addSubstitution(cast<SubstitutableType>(canTy),
-                             sub.getReplacement());
-    for (auto conformance : sub.getConformances())
-      result.addConformance(canTy, conformance);
-  }
+      return false;
+    });
 
   assert(subs.empty() && "did not use all substitutions?!");
   populateParentMap(result);
@@ -428,16 +442,6 @@ getSubstitutionMap(TypeSubstitutionFn subs,
 
   populateParentMap(subMap);
   return subMap;
-}
-
-SmallVector<Type, 4> GenericSignature::getAllDependentTypes() const {
-  SmallVector<Type, 4> result;
-  enumeratePairedRequirements([&](Type type, ArrayRef<Requirement>) {
-    result.push_back(type);
-    return false;
-  });
-
-  return result;
 }
 
 void GenericSignature::

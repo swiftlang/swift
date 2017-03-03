@@ -242,6 +242,8 @@ public:
 
   SubstitutionList getForwardingSubstitutions() const;
 
+  void dump(raw_ostream &os) const;
+
   void dump() const;
 };
   

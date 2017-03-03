@@ -1448,41 +1448,41 @@ bool getApplySubstitutionsFromParsed(
 
   auto loc = parses[0].loc;
 
-  // Collect conformance requirements in a convenient form.
-  llvm::DenseMap<TypeBase *, SmallVector<ProtocolDecl *, 2>> conformsTo;
-  for (auto reqt : env->getGenericSignature()->getRequirements()) {
-    if (reqt.getKind() == RequirementKind::Conformance) {
-      auto canTy = reqt.getFirstType()->getCanonicalType();
-      auto nominal = reqt.getSecondType()->getAnyNominal();
-      conformsTo[canTy.getPointer()].push_back(cast<ProtocolDecl>(nominal));
-    }
-  }
-
   // The replacement is for the corresponding dependent type by ordering.
-  for (auto depTy : env->getGenericSignature()->getAllDependentTypes()) {
+  auto result = env->getGenericSignature()->enumeratePairedRequirements(
+    [&](Type depTy, ArrayRef<Requirement> reqts) -> bool {
+      if (parses.empty()) {
+        SP.P.diagnose(loc, diag::sil_missing_substitutions);
+        return true;
+      }
+      auto parsed = parses.front();
+      parses = parses.slice(1);
 
-    auto canTy = depTy->getCanonicalType().getPointer();
+      SmallVector<ProtocolConformanceRef, 2> conformances;
+      SmallVector<ProtocolDecl *, 2> protocols;
+      for (auto reqt : reqts) {
+        protocols.push_back(reqt.getSecondType()
+                            ->castTo<ProtocolType>()->getDecl());
+      }
 
-    if (parses.empty()) {
-      SP.P.diagnose(loc, diag::sil_missing_substitutions);
-      return true;
-    }
-    auto parsed = parses.front();
-    parses = parses.slice(1);
+      if (getConformancesForSubstitution(SP.P, protocols,
+                                         parsed.replacement,
+                                         parsed.loc, conformances))
+        return true;
 
-    SmallVector<ProtocolConformanceRef, 2> conformances;
-    if (getConformancesForSubstitution(SP.P, conformsTo[canTy],
-                                       parsed.replacement,
-                                       parsed.loc, conformances))
-      return true;
+      subs.push_back({parsed.replacement,
+                      SP.P.Context.AllocateCopy(conformances)});
+      return false;
+    });
 
-    subs.push_back({parsed.replacement,
-                    SP.P.Context.AllocateCopy(conformances)});
-  }
+  if (result)
+    return true;
+
   if (!parses.empty()) {
     SP.P.diagnose(loc, diag::sil_too_many_substitutions);
     return true;
   }
+
   return false;
 }
 

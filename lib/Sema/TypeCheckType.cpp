@@ -2269,7 +2269,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
 
     params = genericSig->getGenericParams();
     if (repr->getGenericArguments().size()
-          != genericSig->getAllDependentTypes().size()) {
+          != genericSig->getSubstitutionListSize()) {
       TC.diagnose(repr->getLoc(), diag::sil_box_arg_mismatch);
       return ErrorType::get(Context);
     }
