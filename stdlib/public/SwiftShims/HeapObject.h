@@ -31,7 +31,7 @@ typedef struct HeapMetadata HeapMetadata;
 // The members of the HeapObject header that are not shared by a
 // standard Objective-C instance
 #define SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS       \
-  InlineRefCounts refCounts;
+  InlineRefCounts refCounts
 
 /// The Swift heap-object header.
 struct HeapObject {
