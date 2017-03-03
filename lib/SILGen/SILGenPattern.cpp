@@ -1792,8 +1792,11 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
         SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue->getType());
-        if (eltTL->isLoadable())
-          boxedValue = SGF.B.createLoadBorrow(loc, boxedValue);
+        if (eltTL->isLoadable()) {
+          ManagedValue newLoadedBoxValue = SGF.B.createLoadBorrow(
+              loc, ManagedValue::forUnmanaged(boxedValue));
+          boxedValue = newLoadedBoxValue.getUnmanagedValue();
+        }
 
         // The boxed value may be shared, so we always have to copy it.
         eltCMV = getManagedSubobject(SGF, boxedValue, *eltTL,
