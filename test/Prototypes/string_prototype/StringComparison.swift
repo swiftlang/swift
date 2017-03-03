@@ -593,21 +593,21 @@ where
         lhs, rhs, preNormalized: true
       )
       switch partialResult {
-        case .result(let res):
-          return res
-        case .moreProcessingRequired(let lhsIdx, let rhsIdx):
-          // FIXME: avoid the copy into array once I get constraints right...
-          let lhsRest = UnicodeStorage<[CodeUnits.Iterator.Element], Encoding>(
-            lhs.codeUnits.suffix(from: lhsIdx).map { $0 }, Encoding.self
-          )
-          let rhsRest = UnicodeStorage<[OtherCodeUnits.Iterator.Element], OtherEncoding>(
-            rhs.codeUnits.suffix(from: rhsIdx).map { $0 }, OtherEncoding.self
-          )
-          // Fall back to decoding and comparing decoded scalars
-          return lhsRest.scalars.lexicographicCompare(rhsRest.scalars) {
-            lhsScalar, rhsScalar in
-            return lhsScalar.ordered(with: rhsScalar)
-          }
+      case .result(let res):
+        return res
+      case .moreProcessingRequired(let lhsIdx, let rhsIdx):
+        // FIXME: avoid the copy into array once I get constraints right...
+        let lhsRest = UnicodeStorage<[CodeUnits.Iterator.Element], Encoding>(
+          lhs.codeUnits.suffix(from: lhsIdx).map { $0 }, Encoding.self
+        )
+        let rhsRest = UnicodeStorage<[OtherCodeUnits.Iterator.Element], OtherEncoding>(
+          rhs.codeUnits.suffix(from: rhsIdx).map { $0 }, OtherEncoding.self
+        )
+        // Fall back to decoding and comparing decoded scalars
+        return lhsRest.scalars.lexicographicCompare(rhsRest.scalars) {
+          lhsScalar, rhsScalar in
+          return lhsScalar.ordered(with: rhsScalar)
+        }
       }
 
     case .normalizeThenCompareUnicodeScalarValues:
@@ -616,21 +616,21 @@ where
         lhs, rhs, preNormalized: false
       )
       switch partialResult {
-        case .result(let res):
-          return res
-        case .moreProcessingRequired(let lhsIdx, let rhsIdx):
-          // FIXME: avoid the copy into array once I get constraints right...
-          let lhsRest = UnicodeStorage<[CodeUnits.Iterator.Element], Encoding>(
-            lhs.codeUnits.suffix(from: lhsIdx).map { $0 }, Encoding.self
-          )
-          let rhsRest = UnicodeStorage<[OtherCodeUnits.Iterator.Element], OtherEncoding>(
-            rhs.codeUnits.suffix(from: rhsIdx).map { $0 }, OtherEncoding.self
-          )
-          // TODO: instead, use normalized scalar view
-          return lhsRest.characters.lexicographicCompare(rhsRest.characters) {
-            lhsChar, rhsChar in
-            return lhsChar.ordered(with: rhsChar)
-          }
+      case .result(let res):
+        return res
+      case .moreProcessingRequired(let lhsIdx, let rhsIdx):
+        // FIXME: avoid the copy into array once I get constraints right...
+        let lhsRest = UnicodeStorage<[CodeUnits.Iterator.Element], Encoding>(
+          lhs.codeUnits.suffix(from: lhsIdx).map { $0 }, Encoding.self
+        )
+        let rhsRest = UnicodeStorage<[OtherCodeUnits.Iterator.Element], OtherEncoding>(
+          rhs.codeUnits.suffix(from: rhsIdx).map { $0 }, OtherEncoding.self
+        )
+        // TODO: instead, use normalized scalar view
+        return lhsRest.characters.lexicographicCompare(rhsRest.characters) {
+          lhsChar, rhsChar in
+          return lhsChar.ordered(with: rhsChar)
+        }
       }
     }
   }
