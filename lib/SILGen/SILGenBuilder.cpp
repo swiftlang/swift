@@ -511,3 +511,26 @@ void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
   SILBuilder::createCheckedCastBranch(loc, isExact, operand.forward(gen), type,
                                       trueBlock, falseBlock);
 }
+
+ManagedValue SILGenBuilder::createUpcast(SILLocation Loc, ManagedValue Original,
+                                         SILType Type) {
+  bool hadCleanup = Original.hasCleanup();
+  bool isLValue = Original.isLValue();
+
+  SILValue convertedValue =
+      SILBuilder::createUpcast(Loc, Original.forward(gen), Type);
+
+  if (isLValue) {
+    return ManagedValue::forLValue(convertedValue);
+  }
+
+  if (!hadCleanup) {
+    return ManagedValue::forUnmanaged(convertedValue);
+  }
+
+  if (Type.isAddress()) {
+    return gen.emitManagedBufferWithCleanup(convertedValue);
+  }
+
+  return gen.emitManagedRValueWithCleanup(convertedValue);
+}
