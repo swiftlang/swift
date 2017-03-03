@@ -395,25 +395,27 @@ SubstitutionMap GenericEnvironment::
 getSubstitutionMap(SubstitutionList subs) const {
   SubstitutionMap result;
 
-  for (auto depTy : getGenericSignature()->getAllDependentTypes()) {
+  getGenericSignature()->enumeratePairedRequirements(
+    [&](Type depTy, ArrayRef<Requirement> reqts) -> bool {
+      // Map the interface type to a context type.
+      auto contextTy = depTy.subst(QueryInterfaceTypeSubstitutions(this),
+                                   MakeAbstractConformanceForGenericType());
 
-    // Map the interface type to a context type.
-    auto contextTy = depTy.subst(QueryInterfaceTypeSubstitutions(this),
-                                 MakeAbstractConformanceForGenericType());
+      auto sub = subs.front();
+      subs = subs.slice(1);
 
-    auto sub = subs.front();
-    subs = subs.slice(1);
+      // Record the replacement type and its conformances.
+      if (auto *archetype = contextTy->getAs<ArchetypeType>()) {
+        result.addSubstitution(CanArchetypeType(archetype), sub.getReplacement());
+        assert(reqts.size() == sub.getConformances().size());
+        for (auto conformance : sub.getConformances())
+          result.addConformance(CanType(archetype), conformance);
+        return false;
+      }
 
-    // Record the replacement type and its conformances.
-    if (auto *archetype = contextTy->getAs<ArchetypeType>()) {
-      result.addSubstitution(CanArchetypeType(archetype), sub.getReplacement());
-      for (auto conformance : sub.getConformances())
-        result.addConformance(CanType(archetype), conformance);
-      continue;
-    }
-
-    assert(contextTy->hasError());
-  }
+      assert(contextTy->hasError());
+      return false;
+    });
 
   assert(subs.empty() && "did not use all substitutions?!");
 
