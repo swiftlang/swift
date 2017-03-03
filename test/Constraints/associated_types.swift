@@ -37,3 +37,50 @@ func owl3() {
 func spoon<S: Spoon>(_ s: S) {
   let _: S.Runcee?
 }
+
+// SR-4143
+
+protocol SameTypedDefault {
+    associatedtype X
+    associatedtype Y
+    static var x: X { get }
+    static var y: Y { get }
+}
+extension SameTypedDefault where Y == X {
+    static var x: X {
+        return y
+    }
+}
+
+struct UsesSameTypedDefault: SameTypedDefault {
+    static var y: Int {
+        return 0
+    }
+}
+
+protocol XReqt {}
+protocol YReqt {}
+
+protocol SameTypedDefaultWithReqts {
+    associatedtype X: XReqt // expected-note{{}}
+    associatedtype Y: YReqt // expected-note{{}}
+    static var x: X { get }
+    static var y: Y { get }
+}
+extension SameTypedDefaultWithReqts where Y == X {
+    static var x: X {
+        return y
+    }
+}
+
+struct XYType: XReqt, YReqt {}
+struct YType: YReqt {}
+
+struct UsesSameTypedDefaultWithReqts: SameTypedDefaultWithReqts {
+    static var y: XYType { return XYType() }
+}
+
+// expected-error@+1{{does not conform}}
+struct UsesSameTypedDefaultWithoutSatisfyingReqts: SameTypedDefaultWithReqts {
+    static var y: YType { return YType() }
+}
