@@ -209,9 +209,10 @@ FunctionCallArgumentListSyntax getFullArgumentList() {
                                                      Comma);
 
   return SyntaxFactory::makeBlankFunctionCallArgumentList()
-    .withAdditionalArgument(Arg)
-    .withAdditionalArgument(Arg.withLabel(Y))
-    .withAdditionalArgument(Arg.withLabel(Z).withTrailingComma(NoComma));
+    .appending(Arg)
+    .appending(Arg.withLabel(Y))
+    .appending(Arg.withLabel(Z).withTrailingComma(NoComma))
+    .castTo<FunctionCallArgumentListSyntax>();
 }
 
 FunctionCallArgumentListSyntax getLabellessArgumentList() {
@@ -235,9 +236,10 @@ FunctionCallArgumentListSyntax getLabellessArgumentList() {
                                                           Three, NoComma);
 
   return SyntaxFactory::makeBlankFunctionCallArgumentList()
-    .withAdditionalArgument(OneArg)
-    .withAdditionalArgument(TwoArg)
-    .withAdditionalArgument(ThreeArg);
+    .appending(OneArg)
+    .appending(TwoArg)
+    .appending(ThreeArg)
+    .castTo<FunctionCallArgumentListSyntax>();
 }
 }
 
@@ -255,17 +257,18 @@ TEST(ExprSyntaxTests, FunctionCallArgumentListGetAPIs) {
                                                      Comma);
 
   auto ArgList = SyntaxFactory::makeBlankFunctionCallArgumentList()
-    .withAdditionalArgument(Arg)
-    .withAdditionalArgument(Arg.withLabel(Y))
-    .withAdditionalArgument(Arg.withLabel(Z).withTrailingComma(NoComma));
+    .appending(Arg)
+    .appending(Arg.withLabel(Y))
+    .appending(Arg.withLabel(Z).withTrailingComma(NoComma))
+    .castTo<FunctionCallArgumentListSyntax>();
 
-  ASSERT_EQ(ArgList.getNumArguments(), size_t(3));
+  ASSERT_EQ(ArgList.size(), size_t(3));
 
   {
     llvm::SmallString<16> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    auto GottenArg1 = ArgList.getArgument(0);
-    auto GottenArg1_2 = ArgList.getArgument(0);
+    auto GottenArg1 = ArgList[0];
+    auto GottenArg1_2 = ArgList[0];
     ASSERT_TRUE(GottenArg1.hasSameIdentityAs(GottenArg1_2));
     GottenArg1.print(OS);
     ASSERT_EQ(OS.str().str(), "x: foo, ");
@@ -274,8 +277,8 @@ TEST(ExprSyntaxTests, FunctionCallArgumentListGetAPIs) {
   {
     llvm::SmallString<16> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    auto GottenArg2 = ArgList.getArgument(1);
-    auto GottenArg2_2 = ArgList.getArgument(1);
+    auto GottenArg2 = ArgList[1];
+    auto GottenArg2_2 = ArgList[1];
     ASSERT_TRUE(GottenArg2.hasSameIdentityAs(GottenArg2_2));
     GottenArg2.print(OS);
     ASSERT_EQ(OS.str().str(), "y: foo, ");
@@ -284,8 +287,8 @@ TEST(ExprSyntaxTests, FunctionCallArgumentListGetAPIs) {
   {
     llvm::SmallString<16> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    auto GottenArg3 = ArgList.getArgument(2);
-    auto GottenArg3_2 = ArgList.getArgument(2);
+    auto GottenArg3 = ArgList[2];
+    auto GottenArg3_2 = ArgList[2];
     ASSERT_TRUE(GottenArg3.hasSameIdentityAs(GottenArg3_2));
     GottenArg3.print(OS);
     ASSERT_EQ(OS.str().str(), "z: foo");
@@ -321,7 +324,7 @@ TEST(ExprSyntaxTests, FunctionCallArgumentListMakeAPIs) {
     llvm::raw_svector_ostream OS(Scratch);
     auto ArgList = SyntaxFactory::makeFunctionCallArgumentList(Args);
     ArgList.print(OS);
-    ASSERT_EQ(ArgList.getNumArguments(), size_t(3));
+    ASSERT_EQ(ArgList.size(), size_t(3));
     ASSERT_EQ(OS.str().str(), "x: foo, y: foo, z: foo");
   }
 }
@@ -330,9 +333,9 @@ TEST(ExprSyntaxTests, FunctionCallArgumentListWithAPIs) {
   auto ArgList = getFullArgumentList();
   llvm::SmallString<64> Scratch;
   llvm::raw_svector_ostream OS(Scratch);
-  ASSERT_EQ(ArgList.getNumArguments(), size_t(3));
+  ASSERT_EQ(ArgList.size(), size_t(3));
   ArgList.print(OS);
-  ASSERT_EQ(ArgList.getNumArguments(), size_t(3));
+  ASSERT_EQ(ArgList.size(), size_t(3));
   ASSERT_EQ(OS.str().str(), "x: foo, y: foo, z: foo");
 }
 
