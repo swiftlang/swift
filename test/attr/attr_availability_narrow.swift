@@ -32,10 +32,10 @@ func useFooUnaffectedSimilarText() {
 }
 
 func useFooWayOff() {
+    // expected-note@-1{{add @available attribute to enclosing global function}}
   if #available(OSX 10.10, *) {
     foo() // expected-error {{'foo()' is only available on OS X 10.12.2 or newer}}
-    // expected-note@-1{{add @available attribute to enclosing global function}}
-    // expected-note@-2{{add 'if #available' version check}}
+    // expected-note@-1{{add 'if #available' version check}}
   }
 }
 
