@@ -27,7 +27,7 @@ ConformanceRequirementSyntaxData::
 ConformanceRequirementSyntaxData(RC<RawSyntax> Raw,
                                  const SyntaxData *Parent,
                                  CursorIndex IndexInParent)
-  : SyntaxData(Raw, Parent, IndexInParent) {
+  : GenericRequirementSyntaxData(Raw, Parent, IndexInParent) {
   assert(Raw->Kind == SyntaxKind::ConformanceRequirement);
   syntax_assert_child_kind(Raw,
     ConformanceRequirementSyntax::Cursor::LeftTypeIdentifier,
@@ -226,52 +226,24 @@ GenericParameterClauseSyntax GenericParameterClauseBuilder::build() const {
   return { Data, Data.get() };
 }
 
-#pragma mark - generic-requirement-list Data
-
-GenericRequirementListSyntaxData::
-GenericRequirementListSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent,
-                                 CursorIndex IndexInParent)
-  : SyntaxData(Raw, Parent, IndexInParent) {
-  assert(Raw->Kind == SyntaxKind::GenericRequirementList);
-}
-
-RC<GenericRequirementListSyntaxData>
-GenericRequirementListSyntaxData::make(RC<RawSyntax> Raw,
-                                       const SyntaxData *Parent,
-                                       CursorIndex IndexInParent) {
-  return RC<GenericRequirementListSyntaxData> {
-    new GenericRequirementListSyntaxData {
-      Raw, Parent, IndexInParent
-    }
-  };
-}
-
-RC<GenericRequirementListSyntaxData>
-GenericRequirementListSyntaxData::makeBlank() {
-  auto Raw = RawSyntax::make(SyntaxKind::GenericRequirementList,
-                             {},
-                             SourcePresence::Present);
-  return make(Raw);
-}
-
 #pragma mark - generic-where-clause Data
 
 GenericWhereClauseSyntaxData::
-GenericWhereClauseSyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent,
-                             CursorIndex IndexInParent)
+GenericWhereClauseSyntaxData(const RC<RawSyntax> Raw, const SyntaxData *Parent,
+                             const CursorIndex IndexInParent)
   : SyntaxData(Raw, Parent, IndexInParent) {
   assert(Raw->Kind == SyntaxKind::GenericWhereClause);
   syntax_assert_child_token_text(Raw,
-    GenericWhereClauseSyntax::Cursor::WhereToken, tok::kw_where, "where");
+    GenericWhereClauseSyntax::Cursor::WhereKeyword, tok::kw_where, "where");
   syntax_assert_child_kind(Raw,
     GenericWhereClauseSyntax::Cursor::RequirementList,
     SyntaxKind::GenericRequirementList);
 }
 
 RC<GenericWhereClauseSyntaxData>
-GenericWhereClauseSyntaxData::make(RC<RawSyntax> Raw,
+GenericWhereClauseSyntaxData::make(const RC<RawSyntax> Raw,
                                    const SyntaxData *Parent,
-                                   CursorIndex IndexInParent) {
+                                   const CursorIndex IndexInParent) {
   return RC<GenericWhereClauseSyntaxData> {
     new GenericWhereClauseSyntaxData { Raw, Parent, IndexInParent }
   };
@@ -293,20 +265,34 @@ GenericWhereClauseSyntax(RC<SyntaxData> Root,
                          const GenericWhereClauseSyntaxData *Data)
   : Syntax(Root, Data) {}
 
+GenericWhereClauseSyntax GenericWhereClauseSyntax::
+withWhereKeyword(RC<TokenSyntax> NewWhereKeyword) const {
+  syntax_assert_token_is(NewWhereKeyword, tok::kw_where, "where");
+  return Data->replaceChild<GenericWhereClauseSyntax>(NewWhereKeyword,
+                                                      Cursor::WhereKeyword);
+}
+
+GenericWhereClauseSyntax GenericWhereClauseSyntax::
+withRequirementList(GenericRequirementListSyntax NewRequirements) const {
+  return Data->replaceChild<GenericWhereClauseSyntax>(NewRequirements.getRaw(),
+                                                      Cursor::RequirementList);
+}
+
 #pragma mark - same-type-requirement Data
 
 SameTypeRequirementSyntaxData::
 SameTypeRequirementSyntaxData(RC<RawSyntax> Raw,
                               const SyntaxData *Parent,
                               CursorIndex IndexInParent)
-  : SyntaxData(Raw, Parent, IndexInParent) {
+  : GenericRequirementSyntaxData(Raw, Parent, IndexInParent) {
   assert(Raw->Kind == SyntaxKind::SameTypeRequirement);
   assert(Raw->Layout.size() == 3);
   syntax_assert_child_kind(Raw,
     SameTypeRequirementSyntax::Cursor::LeftTypeIdentifier,
     SyntaxKind::TypeIdentifier);
   syntax_assert_child_token_text(Raw,
-    SameTypeRequirementSyntax::Cursor::EqualityToken, tok::identifier, "==");
+    SameTypeRequirementSyntax::Cursor::EqualityToken,
+    tok::oper_binary_spaced, "==");
   assert(Raw->getChild(SameTypeRequirementSyntax::Cursor::RightType)->isType());
 }
 

@@ -221,6 +221,44 @@ FunctionSignatureSyntax SyntaxFactory::makeBlankFunctionSignature() {
   return { Data, Data.get() };
 }
 
+#pragma mark - function-declaration
+
+FunctionDeclSyntax SyntaxFactory::
+makeFunctionDecl(TypeAttributesSyntax Attributes,
+                 DeclModifierListSyntax Modifiers,
+                 RC<TokenSyntax> FuncKeyword,
+                 RC<TokenSyntax> Identifier,
+                 llvm::Optional<GenericParameterClauseSyntax> GenericParams,
+                 FunctionSignatureSyntax Signature,
+                 llvm::Optional<GenericWhereClauseSyntax> GenericWhereClause,
+                 llvm::Optional<CodeBlockStmtSyntax> Body) {
+  auto Raw = RawSyntax::make(SyntaxKind::FunctionDecl,
+    {
+      Attributes.getRaw(),
+      Modifiers.getRaw(),
+      FuncKeyword,
+      Identifier,
+      GenericParams.hasValue()
+       ? GenericParams.getValue().getRaw()
+       : SyntaxFactory::makeBlankGenericParameterClause().getRaw(),
+      Signature.getRaw(),
+      GenericWhereClause.hasValue()
+        ? GenericWhereClause.getValue().getRaw()
+        : SyntaxFactory::makeBlankGenericWhereClause().getRaw(),
+      Body.hasValue()
+       ? Body.getValue().getRaw()
+       : SyntaxFactory::makeBlankCodeBlock().getRaw()
+    },
+    SourcePresence::Present);
+  auto Data = FunctionDeclSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+FunctionDeclSyntax SyntaxFactory::makeBlankFunctionDecl() {
+  auto Data = FunctionDeclSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
 #pragma mark - Statements
 
 CodeBlockStmtSyntax
@@ -849,6 +887,23 @@ makeSameTypeRequirement( TypeIdentifierSyntax LeftTypeIdentifier,
 SameTypeRequirementSyntax SyntaxFactory::makeBlankSameTypeRequirement() {
   auto Data = SameTypeRequirementSyntaxData::makeBlank();
   return SameTypeRequirementSyntax { Data, Data.get() };
+}
+
+GenericRequirementListSyntax SyntaxFactory::
+makeGenericRequirementList(std::vector<GenericRequirementSyntax> &Requirements){
+  RawSyntax::LayoutList Layout;
+  for (auto Req : Requirements) {
+    Layout.push_back(Req.getRaw());
+  }
+  auto Raw = RawSyntax::make(SyntaxKind::GenericRequirementList, Layout,
+                             SourcePresence::Present);
+  auto Data = GenericRequirementListSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+GenericRequirementListSyntax SyntaxFactory::makeBlankGenericRequirementList() {
+  auto Data = GenericRequirementListSyntaxData::makeBlank();
+  return { Data, Data.get() };
 }
 
 #pragma mark - Operators

@@ -53,8 +53,9 @@ SYNTAX(GenericWhereClause, Syntax)
 SYNTAX(GenericRequirementList, Syntax)
 SYNTAX(GenericArgumentClause, Syntax)
 SYNTAX(GenericArgumentList, Syntax)
-SYNTAX(ConformanceRequirement, Syntax)
-SYNTAX(SameTypeRequirement, Syntax)
+ABSTRACT_SYNTAX(GenericRequirementSyntax, Syntax)
+  SYNTAX(ConformanceRequirement, GenericRequirementSyntax)
+  SYNTAX(SameTypeRequirement, GenericRequirementSyntax)
 SYNTAX(TypeArgumentList, Syntax)
 
 // Types

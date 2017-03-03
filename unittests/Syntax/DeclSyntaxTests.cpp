@@ -84,8 +84,7 @@ TEST(DeclSyntaxTests, TypealiasMakeAPIs) {
     auto ElementParam =
       SyntaxFactory::makeGenericParameter("Element", {}, {});
     auto LeftAngle = SyntaxFactory::makeLeftAngleToken({}, {});
-    auto RightAngle =
-      SyntaxFactory::makeRightAngleToken({}, { Trivia::spaces(1) });
+    auto RightAngle = SyntaxFactory::makeRightAngleToken({}, Trivia::spaces(1));
     auto GenericParams = GenericParameterClauseBuilder()
       .useLeftAngleBracket(LeftAngle)
       .useRightAngleBracket(RightAngle)
@@ -352,7 +351,7 @@ FunctionSignatureSyntax getCannedFunctionSignature() {
   auto Throws = SyntaxFactory::makeThrowsKeyword({}, Trivia::spaces(1));
   auto Arrow = SyntaxFactory::makeArrow({}, Trivia::spaces(1));
   auto NoAttributes = SyntaxFactory::makeBlankTypeAttributes();
-  auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
+  auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, Trivia::spaces(1));
 
   return SyntaxFactory::makeFunctionSignature(LParen, List, RParen, Throws,
                                               Arrow, NoAttributes, Int);
@@ -372,7 +371,7 @@ TEST(DeclSyntaxTests, FunctionSignatureMakeAPIs) {
     ASSERT_EQ(OS.str().str(),
       "(with radius: Int = -1, "
       "with radius: Int = -1, "
-      "with radius: Int = -1, ) throws -> Int");
+      "with radius: Int = -1, ) throws -> Int ");
   }
 }
 
@@ -488,7 +487,7 @@ GenericParameterClauseSyntax getCannedGenericParams() {
   GenericParameterClauseBuilder GB;
 
   auto LAngle = SyntaxFactory::makeLeftAngleToken({}, {});
-  auto RAngle = SyntaxFactory::makeLeftAngleToken({}, Trivia::spaces(1));
+  auto RAngle = SyntaxFactory::makeRightAngleToken({}, {});
 
   auto T = SyntaxFactory::makeGenericParameter("T", {}, {});
   auto U = SyntaxFactory::makeGenericParameter("U", {}, {});
@@ -498,7 +497,7 @@ GenericParameterClauseSyntax getCannedGenericParams() {
   GB.addParameter(llvm::None, T);
   GB.addParameter(Comma, U);
   GB.useLeftAngleBracket(LAngle);
-  GB.useLeftAngleBracket(RAngle);
+  GB.useRightAngleBracket(RAngle);
 
   return GB.build();
 }
@@ -508,7 +507,7 @@ CodeBlockStmtSyntax getCannedBody() {
   auto OneDigits = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
   auto One = SyntaxFactory::makeIntegerLiteralExpr(NoSign, OneDigits);
   auto ReturnKW =
-    SyntaxFactory::makeReturnKeyword(Trivia::newlines(1) + Trivia::spaces(1),
+    SyntaxFactory::makeReturnKeyword(Trivia::newlines(1) + Trivia::spaces(2),
                                      {});
   auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, One);
 
@@ -522,17 +521,35 @@ CodeBlockStmtSyntax getCannedBody() {
   return SyntaxFactory::makeCodeBlock(LBrace, Stmts, RBrace);
 }
 
+GenericWhereClauseSyntax getCannedWhereClause() {
+  auto WhereKW = SyntaxFactory::makeWhereKeyword({}, Trivia::spaces(1));
+  auto T = SyntaxFactory::makeTypeIdentifier("T", {}, Trivia::spaces(1));
+  auto EqualEqual = SyntaxFactory::makeEqualityOperator({}, Trivia::spaces(1));
+  auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, Trivia::spaces(1));
+  auto SameType = SyntaxFactory::makeSameTypeRequirement(T, EqualEqual, Int);
+
+  auto Requirements = SyntaxFactory::makeBlankGenericRequirementList()
+    .appending(SameType.castTo<GenericRequirementSyntax>())
+    .castTo<GenericRequirementListSyntax>();
+
+  return SyntaxFactory::makeBlankGenericWhereClause()
+    .withWhereKeyword(WhereKW)
+    .withRequirementList(Requirements);
+}
+
 FunctionDeclSyntax getCannedFunctionDecl() {
   auto NoAttributes = SyntaxFactory::makeBlankTypeAttributes();
   auto Foo = SyntaxFactory::makeIdentifier("foo", {}, {});
   auto FuncKW = SyntaxFactory::makeFuncKeyword({}, Trivia::spaces(1));
   auto Modifiers = getCannedModifiers();
   auto GenericParams = getCannedGenericParams();
+  auto GenericWhere = getCannedWhereClause();
   auto Signature = getCannedFunctionSignature();
   auto Body = getCannedBody();
 
   return SyntaxFactory::makeFunctionDecl(NoAttributes, Modifiers, FuncKW, Foo,
-                                         GenericParams, Signature, Body);
+                                         GenericParams, Signature, GenericWhere,
+                                         Body);
 }
 
 TEST(DeclSyntaxTests, FunctionDeclMakeAPIs) {
@@ -547,8 +564,13 @@ TEST(DeclSyntaxTests, FunctionDeclMakeAPIs) {
     llvm::raw_svector_ostream OS(Scratch);
     getCannedFunctionDecl().print(OS);
     ASSERT_EQ(OS.str().str(),
-              "public static func foo(x: Int, y: Int) throws -> Int {\n"
-              "  return 1\n"
+              "public static func foo<T, U>"
+              "(with radius: Int = -1, "
+              "with radius: Int = -1, "
+              "with radius: Int = -1, ) "
+              "throws -> Int "
+              "where T == Int {\n"
+              "  return1\n"
               "}");
   }
 }

@@ -101,6 +101,7 @@ struct SyntaxFactory {
                    RC<TokenSyntax> Identifier,
                    llvm::Optional<GenericParameterClauseSyntax> GenericParams,
                    FunctionSignatureSyntax Signature,
+                   llvm::Optional<GenericWhereClauseSyntax> GenericWhereClause,
                    llvm::Optional<CodeBlockStmtSyntax> Body);
 
   /// Make a function declaration with all missing elements.
@@ -593,6 +594,14 @@ struct SyntaxFactory {
   static SameTypeRequirementSyntax
   makeSameTypeRequirement(TypeIdentifierSyntax LeftTypeIdentifier,
                           RC<TokenSyntax> EqualityToken, TypeSyntax RightType);
+
+  /// Make a list of generic requirements with the given loosely collected
+  /// requirements/
+  static GenericRequirementListSyntax makeGenericRequirementList(
+    std::vector<GenericRequirementSyntax> &Requirements);
+
+  /// Make an empty list of generic requirements.
+  static GenericRequirementListSyntax makeBlankGenericRequirementList();
 
   /// Make a same-type requirement with all elements marked as missing.
   static SameTypeRequirementSyntax makeBlankSameTypeRequirement();

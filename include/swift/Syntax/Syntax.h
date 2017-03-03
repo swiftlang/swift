@@ -52,7 +52,6 @@ class Syntax {
   friend class SyntaxData;
   friend class LegacyASTTransformer;
   friend class sema::Semantics;
-  using DataType = SyntaxData;
 
 #define SYNTAX(Id, Parent) friend class Id##Syntax;
 #include "swift/Syntax/SyntaxKinds.def"
@@ -75,6 +74,8 @@ protected:
   }
 
 public:
+  using DataType = SyntaxData;
+
   Syntax(const RC<SyntaxData> Root, const SyntaxData *Data);
 
   /// Get the kind of syntax.

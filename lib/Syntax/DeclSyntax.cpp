@@ -44,8 +44,18 @@ DeclModifierSyntaxData(const RC<RawSyntax> Raw,
   : SyntaxData(Raw, Parent, IndexInParent) {
   assert(Raw->Kind == SyntaxKind::DeclModifier);
   assert(Raw->Layout.size() == 4);
-  syntax_assert_child_token(Raw, DeclModifierSyntax::Cursor::Name,
-                           tok::identifier);
+#ifndef NDEBUG
+  auto Name =
+    cast<TokenSyntax>(Raw->getChild(DeclModifierSyntax::Cursor::Name));
+  auto Kind = Name->getTokenKind();
+  assert(Kind == tok::kw_class ||
+         Kind == tok::kw_static ||
+         Kind == tok::identifier ||
+         Kind == tok::kw_public ||
+         Kind == tok::kw_private ||
+         Kind == tok::kw_fileprivate ||
+         Kind == tok::kw_internal);
+#endif
   syntax_assert_child_token_text(Raw, DeclModifierSyntax::Cursor::LeftParen,
                                  tok::l_paren, "(");
   syntax_assert_child_token(Raw, DeclModifierSyntax::Cursor::Argument,
