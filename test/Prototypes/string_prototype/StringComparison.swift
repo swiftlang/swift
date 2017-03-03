@@ -597,10 +597,10 @@ where
         return res
       case .moreProcessingRequired(let lhsIdx, let rhsIdx):
         // FIXME: avoid the copy into array once I get constraints right...
-        let lhsRest = UnicodeStorage<[CodeUnits.Iterator.Element], Encoding>(
+        let lhsRest = _UnicodeStorage(
           lhs.codeUnits.suffix(from: lhsIdx).map { $0 }, Encoding.self
         )
-        let rhsRest = UnicodeStorage<[OtherCodeUnits.Iterator.Element], OtherEncoding>(
+        let rhsRest = _UnicodeStorage(
           rhs.codeUnits.suffix(from: rhsIdx).map { $0 }, OtherEncoding.self
         )
         // Fall back to decoding and comparing decoded scalars
@@ -620,10 +620,10 @@ where
         return res
       case .moreProcessingRequired(let lhsIdx, let rhsIdx):
         // FIXME: avoid the copy into array once I get constraints right...
-        let lhsRest = UnicodeStorage<[CodeUnits.Iterator.Element], Encoding>(
+        let lhsRest = _UnicodeStorage(
           lhs.codeUnits.suffix(from: lhsIdx).map { $0 }, Encoding.self
         )
-        let rhsRest = UnicodeStorage<[OtherCodeUnits.Iterator.Element], OtherEncoding>(
+        let rhsRest = _UnicodeStorage(
           rhs.codeUnits.suffix(from: rhsIdx).map { $0 }, OtherEncoding.self
         )
         // TODO: instead, use normalized scalar view

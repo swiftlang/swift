@@ -50,10 +50,24 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
   public init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
     self.codeUnits = codeUnits
   }
-  
+
   public var codeUnits: CodeUnits
 }
 
+/// A straightforward typealias for _UnicodeStorage
+///
+/// Use this to escape the automatic deduction of the generic arguments given
+/// the name `UnicodeStorage` from within nested contexts
+/// (https://bugs.swift.org/browse/SR-4155).
+internal typealias _UnicodeStorage<
+  CodeUnits : RandomAccessCollection,
+  Encoding : UnicodeEncoding
+>  = UnicodeStorage<CodeUnits, Encoding>
+where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
 
 /// A lazy collection of `Encoding.EncodedScalar` that results
 /// from parsing an instance of codeUnits using that `Encoding`.
@@ -185,7 +199,8 @@ extension UnicodeStorage {
       from src: FromEncoding.Type = FromEncoding.self,
       to dst: ToEncoding.Type = ToEncoding.self
     ) {
-      base = Base(UnicodeStorage<CodeUnits, FromEncoding>.EncodedScalars(codeUnits, src).lazy.map {
+      base = Base(
+        UnicodeStorage.EncodedScalars(codeUnits, src).lazy.map {
           dst.encode($0)!
         })
     }
@@ -227,7 +242,7 @@ extension UnicodeStorage : _UTextable {
     _ offset: Int64,
     _ slice: (CodeUnits.Index) -> CodeUnits.SubSequence
   ) -> UnicodeStorage<CodeUnits.SubSequence,Encoding>.EncodedScalars.SubSequence {
-    return UnicodeStorage<CodeUnits.SubSequence, Encoding>(
+    return _UnicodeStorage(
       slice(codeUnits.index(atOffset: offset)), Encoding.self
     ).scalars.dropFirst(0)
   }
@@ -352,8 +367,8 @@ extension UnicodeStorage : _UTextable {
       // FIXME: we should be using an associated UTF16View type here rather than
       // the generic TranscodedView, which is likely to be less efficient in
       // some common cases.
-      let source = UnicodeStorage<CodeUnits.SubSequence,Encoding>.TranscodedView(
-        base, from: Encoding.self, to: UTF16.self)
+      let source
+        = _UnicodeStorage(base, Encoding.self).transcoded(to: UTF16.self)
       var d = destination // copy due to https://bugs.swift.org/browse/SR-3782
       let (limit, remainder) = d.copy(from: source)
       
@@ -398,9 +413,8 @@ extension UnicodeStorage : _UTextable {
       ..<
       codeUnits.index(atOffset: nativeIndex)]
     
-    return UnicodeStorage<CodeUnits.SubSequence,Encoding>.TranscodedView(
-      nativeChunk, from: Encoding.self, to: UTF16.self
-    ).count^
+    return _UnicodeStorage(
+      nativeChunk, Encoding.self).transcoded(to: UTF16.self).count^
   }
 }
 
@@ -415,15 +429,14 @@ extension UnicodeStorage {
   public struct CharacterView : BidirectionalCollection {
 
     public init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
-      self.storage = UnicodeStorage<CodeUnits,Encoding>(codeUnits)
+      self.storage = UnicodeStorage(codeUnits)
     }
 
-    internal let storage: UnicodeStorage<CodeUnits, Encoding>
+    internal let storage: UnicodeStorage
 
     public typealias SubSequence = BidirectionalSlice<CharacterView>
 
     public typealias Index = CodeUnits.Index
-
     public var startIndex: Index { return storage.codeUnits.startIndex }
     public var endIndex: Index { return storage.codeUnits.endIndex }
 
@@ -433,15 +446,15 @@ extension UnicodeStorage {
       // _debugLog("subscript: j=\(j)")
       
       let charSlice = storage.codeUnits[i..<j]
-      let utf8 = UnicodeStorage<CodeUnits.SubSequence,Encoding>.TranscodedView(
-        charSlice, from: Encoding.self, to: UTF8.self)
+      let utf8 = _UnicodeStorage(
+        charSlice, Encoding.self).transcoded(to: UTF8.self)
         
       if let small = Character(_smallUtf8: utf8) {
         return small
       }
       else {
         // FIXME: there is undoubtley a less ridiculous way to do this
-        let scalars = UnicodeStorage<CodeUnits.SubSequence, Encoding>(
+        let scalars = _UnicodeStorage(
           charSlice, Encoding.self
         ).scalars.lazy.map(UnicodeScalar.init)
         let string = Swift.String(Swift.String.UnicodeScalarView(scalars))
