@@ -52,7 +52,6 @@ class Syntax {
   friend class SyntaxData;
   friend class LegacyASTTransformer;
   friend class sema::Semantics;
-  using DataType = SyntaxData;
 
 #define SYNTAX(Id, Parent) friend class Id##Syntax;
 #include "swift/Syntax/SyntaxKinds.def"
@@ -75,6 +74,8 @@ protected:
   }
 
 public:
+  using DataType = SyntaxData;
+
   Syntax(const RC<SyntaxData> Root, const SyntaxData *Data);
 
   /// Get the kind of syntax.
@@ -150,7 +151,7 @@ public:
   /// Print a debug representation of the syntax node to standard error.
   void dump() const;
 
-  bool hasSameIdentityAs(const Syntax &Other) {
+  bool hasSameIdentityAs(const Syntax &Other) const {
     return Root == Other.Root && Data == Other.Data;
   }
 

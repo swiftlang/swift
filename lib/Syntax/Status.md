@@ -16,6 +16,12 @@ Include the following in each entry:
 
 ### Declarations
 
+- declaration-modifiers
+  - `DeclModifierListSyntax`
+
+- declaration-modifier
+  - `DeclModifierSyntax`
+
 - struct-declaration
   - `StructDeclSyntax`
 
@@ -39,6 +45,27 @@ Include the following in each entry:
   struct-members
   - `DeclMembersSyntax`
   - `StructDeclSyntax` used for the `{` `}` braces.
+
+- function-declaration
+  - `FunctionDeclSyntax`
+
+- function-body
+  - `CodeBlockSyntax`
+
+- function-result
+  - `TypeSyntax`
+
+- function-signature
+  - `FunctionSignatureSyntax`
+
+- parameter-clause
+  - `FunctionParameterClauseSyntax`
+
+- parameter-list
+  - `FunctionParameterListSyntax`
+
+- parameter
+  - `FunctionParameterSyntax`
 
 ### Statements
 
@@ -209,8 +236,6 @@ These are categorized somewhat by difficulty and priority.
 - as-pattern
 - case-condition
 - case-label
-- declaration-modifiers
-  - declaration-modifier
 - dynamic-type-expression
 - floating-point-literal
 - forced-value-expression
@@ -317,13 +342,6 @@ These are categorized somewhat by difficulty and priority.
     - setter-clause
       - setter-name
 - subscript-declaration
-- function-declaration
-  - function-body
-  - function-result
-  - function-signature
-    - parameter-clause
-      - parameter-list
-        - parameter
 - enum-case-pattern
 - initializer-declaration
   - initializer-head

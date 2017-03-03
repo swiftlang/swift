@@ -51,6 +51,26 @@ struct SyntaxFactory {
   makeUnknownSyntax(llvm::ArrayRef<RC<TokenSyntax>> Tokens);
 
 #pragma mark - Declarations
+
+#pragma mark - declaration-modifier
+
+  /// Make a declaration modifier with the specified elements.
+  static DeclModifierSyntax
+  makeDeclModifier(RC<TokenSyntax> Name, RC<TokenSyntax> LeftParen,
+                   RC<TokenSyntax> Argument, RC<TokenSyntax> RightParen);
+
+  /// Make a declaration modifier with all missing elements.
+  static DeclModifierSyntax makeBlankDeclModifier();
+
+  /// Make a declaration modifier list with the specified modifiers.
+  static DeclModifierListSyntax
+  makeDeclModifierList(const std::vector<DeclModifierSyntax> &Modifiers);
+
+  /// Make an empty declaration modifier list.
+  static DeclModifierListSyntax makeBlankDeclModifierList();
+
+#pragma mark - struct-declaration
+
   /// Make a struct declaration with the specified elements.
   static StructDeclSyntax
   makeStructDecl(RC<TokenSyntax> StructToken, RC<TokenSyntax> Identifier,
@@ -72,6 +92,65 @@ struct SyntaxFactory {
 
   /// Make an empty list of declaration members.
   static DeclMembersSyntax makeBlankDeclMembers();
+
+  /// Make a function declaration with the specified elements.
+  static FunctionDeclSyntax
+  makeFunctionDecl(TypeAttributesSyntax Attributes,
+                   DeclModifierListSyntax Modifiers,
+                   RC<TokenSyntax> FuncKeyword,
+                   RC<TokenSyntax> Identifier,
+                   llvm::Optional<GenericParameterClauseSyntax> GenericParams,
+                   FunctionSignatureSyntax Signature,
+                   llvm::Optional<GenericWhereClauseSyntax> GenericWhereClause,
+                   llvm::Optional<CodeBlockStmtSyntax> Body);
+
+  /// Make a function declaration with all missing elements.
+  static FunctionDeclSyntax makeBlankFunctionDecl();
+
+#pragma mark - function-parameter
+
+  /// Make a function parameter with the given elements.
+  static FunctionParameterSyntax
+  makeFunctionParameter(RC<TokenSyntax> ExternalName, RC<TokenSyntax> LocalName,
+                        RC<TokenSyntax> Colon,
+                        llvm::Optional<TypeSyntax> ParameterTypeSyntax,
+                        RC<TokenSyntax> Ellipsis,
+                        RC<TokenSyntax> Equal,
+                        llvm::Optional<ExprSyntax> DefaultValue,
+                        RC<TokenSyntax> TrailingComma);
+
+  /// Make a function parameter with all elements marked as missing.
+  static FunctionParameterSyntax makeBlankFunctionParameter();
+
+#pragma mark - function-parameter-list
+
+  /// Make a function parameter list with the given parameters.
+  static FunctionParameterListSyntax makeFunctionParameterList(
+    const std::vector<FunctionParameterSyntax> &Parameters);
+
+  /// Make an empty function parameter list.
+  static FunctionParameterListSyntax makeBlankFunctionParameterList();
+
+#pragma mark - function-signature
+
+  /// Make a function signature with the given elements.
+  static FunctionSignatureSyntax
+  makeFunctionSignature(RC<TokenSyntax> LeftParen,
+                        FunctionParameterListSyntax ParameterList,
+                        RC<TokenSyntax> RightParen,
+                        RC<TokenSyntax> ThrowsOrRethrows,
+                        RC<TokenSyntax> Arrow,
+                        TypeAttributesSyntax ReturnTypeAttributes,
+                        TypeSyntax ReturnTypeSyntax);
+
+  /// Make a blank function signature.
+  static FunctionSignatureSyntax makeBlankFunctionSignature();
+
+  //-/ Make a function declaration with the given elements.
+  // TODO
+
+  //-/ Make a blank function declaration.
+  // TODO
 
 #pragma mark - Statements
 
@@ -118,6 +197,12 @@ struct SyntaxFactory {
   /// Make a return statement with the `return` keyword and return expression
   /// marked as missing.
   static ReturnStmtSyntax makeBlankReturnStmt();
+
+  /// Make a statement list from a loosely connected list of statements.
+  static StmtListSyntax makeStmtList(const std::vector<StmtSyntax> &Statements);
+
+  /// Make an empty statement list.
+  static StmtListSyntax makeBlankStmtList();
 
 #pragma mark - Expressions
 
@@ -168,6 +253,19 @@ struct SyntaxFactory {
 
 #pragma mark - Tokens
 
+  /// Make a 'static' keyword with the specified leading and trailing trivia.
+  static RC<TokenSyntax> makeStaticKeyword(const Trivia &LeadingTrivia,
+                                           const Trivia &TrailingTrivia);
+
+
+  /// Make a 'public' keyword with the specified leading and trailing trivia.
+  static RC<TokenSyntax> makePublicKeyword(const Trivia &LeadingTrivia,
+                                           const Trivia &TrailingTrivia);
+
+  /// Make a 'func' keyword with the specified leading and trailing trivia.
+  static RC<TokenSyntax> makeFuncKeyword(const Trivia &LeadingTrivia,
+                                         const Trivia &TrailingTrivia);
+
   /// Make a 'fallthrough' keyword with the specified leading and
   /// trailing trivia.
   static RC<TokenSyntax> makeFallthroughKeyword(const Trivia &LeadingTrivia,
@@ -212,6 +310,17 @@ struct SyntaxFactory {
   /// trailing trivia.
   static RC<TokenSyntax> makeRightParenToken(const Trivia &LeadingTrivia,
                                             const Trivia &TrailingTrivia);
+
+  /// Make a left brace '{' token with the specified leading and
+  /// trailing trivia.
+  static RC<TokenSyntax> makeLeftBraceToken(const Trivia &LeadingTrivia,
+                                            const Trivia &TrailingTrivia);
+
+  /// Make a right brace '}' token with the specified leading and
+  /// trailing trivia.
+  static RC<TokenSyntax> makeRightBraceToken(const Trivia &LeadingTrivia,
+                                             const Trivia &TrailingTrivia);
+
 
   /// Make a left square bracket '[' token with the specified leading and
   /// trailing trivia.
@@ -333,12 +442,16 @@ struct SyntaxFactory {
   /// Make a set of type attributes with all elements marked as missing.
   static TypeAttributesSyntax makeBlankTypeAttributes();
 
+#pragma mark - balanced-tokens
+
   /// Make a list of balanced tokens.
   static BalancedTokensSyntax
   makeBalancedTokens(RawSyntax::LayoutList Tokens);
 
   /// Make an empty list of balanced tokens.
   static BalancedTokensSyntax makeBlankBalancedTokens();
+
+#pragma mark - type-identifier
 
   /// Make a non-generic type identifier with some name.
   static TypeIdentifierSyntax
@@ -356,6 +469,8 @@ struct SyntaxFactory {
   /// Make a bare "Self" type.
   static TypeIdentifierSyntax makeSelfTypeIdentifier();
 
+#pragma mark - tuple-type
+
   /// Make a bare "()" void tuple type
   static TupleTypeSyntax makeVoidTupleType();
 
@@ -366,12 +481,16 @@ struct SyntaxFactory {
   /// Make a tuple type element without a label.
   static TupleTypeElementSyntax makeTupleTypeElement(TypeSyntax ElementType);
 
+#pragma mark - optional-type
+
   /// Make an optional type, such as `Int?`
   static OptionalTypeSyntax
   makeOptionalType(TypeSyntax BaseType, const Trivia &TrailingTrivia);
 
   /// Make an optional type with all elements marked as missing.
   static OptionalTypeSyntax makeBlankOptionalType();
+
+#pragma mark - implicitly-unwrapped-optional-type
 
   /// Make an implicitly unwrapped optional type, such as `Int!`
   static ImplicitlyUnwrappedOptionalTypeSyntax
@@ -380,6 +499,8 @@ struct SyntaxFactory {
 
   static ImplicitlyUnwrappedOptionalTypeSyntax
   makeBlankImplicitlyUnwrappedOptionalType();
+
+#pragma mark - metatype-type
 
   /// Make a metatype type, as in `T.Type`
   /// `Type` is a terminal token here, not a placeholder for something else.
@@ -390,6 +511,8 @@ struct SyntaxFactory {
   /// Make a metatype type with all elements marked as missing.
   static MetatypeTypeSyntax makeBlankMetatypeType();
 
+#pragma mark - array-type
+
   /// Make a sugared Array type, as in `[MyType]`.
   static ArrayTypeSyntax makeArrayType(RC<TokenSyntax> LeftSquareBracket,
                                        TypeSyntax ElementType,
@@ -397,6 +520,8 @@ struct SyntaxFactory {
 
   /// Make an array type with all elements marked as missing.
   static ArrayTypeSyntax makeBlankArrayType();
+
+#pragma mark - dictionary-type
 
   /// Make a Dictionary type, as in `[Key : Value]`.
   static DictionaryTypeSyntax
@@ -406,6 +531,8 @@ struct SyntaxFactory {
 
   /// Make an a dictionary type with all elements marked as missing.
   static DictionaryTypeSyntax makeBlankDictionaryType();
+
+#pragma mark - function-type-argument
 
   /// Make a function argument type syntax with the specified elements.
   static FunctionTypeArgumentSyntax
@@ -431,6 +558,8 @@ struct SyntaxFactory {
   /// Make a function argument type syntax with all elements marked as missing.
   static FunctionTypeArgumentSyntax makeBlankFunctionArgumentType();
 
+#pragma mark - function-type
+
   /// Make a function type, for example, `(Int, Int) throws -> Int`
   static FunctionTypeSyntax
   makeFunctionType(TypeAttributesSyntax TypeAttributes,
@@ -441,6 +570,8 @@ struct SyntaxFactory {
 
   /// Make a function type with all elements marked as missing.
   static FunctionTypeSyntax makeBlankFunctionType();
+
+#pragma mark - type-argument-list
 
   /// Make a list of type arguments with all elements marked as missing.
   static TypeArgumentListSyntax makeBlankTypeArgumentList();
@@ -463,6 +594,14 @@ struct SyntaxFactory {
   static SameTypeRequirementSyntax
   makeSameTypeRequirement(TypeIdentifierSyntax LeftTypeIdentifier,
                           RC<TokenSyntax> EqualityToken, TypeSyntax RightType);
+
+  /// Make a list of generic requirements with the given loosely collected
+  /// requirements/
+  static GenericRequirementListSyntax makeGenericRequirementList(
+    std::vector<GenericRequirementSyntax> &Requirements);
+
+  /// Make an empty list of generic requirements.
+  static GenericRequirementListSyntax makeBlankGenericRequirementList();
 
   /// Make a same-type requirement with all elements marked as missing.
   static SameTypeRequirementSyntax makeBlankSameTypeRequirement();

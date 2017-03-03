@@ -443,11 +443,11 @@ LegacyASTTransformer::visitBraceStmt(BraceStmt *S,
                     BufferID, Tokens)
     : TokenSyntax::missingToken(tok::l_brace, "{");
 
-  StmtListSyntaxBuilder StmtsBuilder;
+  std::vector<StmtSyntax> Stmts;
   for (auto Node : S->getElements()) {
     auto Transformed = transformAST(Node, Sema, SourceMgr, BufferID, Tokens);
     if (Transformed.hasValue()) {
-      StmtsBuilder.addStatement(Transformed.getValue());
+      Stmts.push_back(Transformed.getValue().castTo<StmtSyntax>());
     }
   }
 
@@ -456,8 +456,9 @@ LegacyASTTransformer::visitBraceStmt(BraceStmt *S,
                     BufferID, Tokens)
     : TokenSyntax::missingToken(tok::r_brace, "}");
 
-  return SyntaxFactory::makeCodeBlock(LeftBrace, StmtsBuilder.build(),
-                                      RightBrace).Root;
+  auto StmtList = SyntaxFactory::makeStmtList(Stmts);
+
+  return SyntaxFactory::makeCodeBlock(LeftBrace, StmtList, RightBrace).Root;
 }
 
 RC<SyntaxData>
