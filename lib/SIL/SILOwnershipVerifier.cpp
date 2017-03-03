@@ -477,6 +477,7 @@ ACCEPTS_ANY_OWNERSHIP_INST(DynamicMethodBranch)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedTrivialBitCast)
 ACCEPTS_ANY_OWNERSHIP_INST(ExistentialMetatype)
 ACCEPTS_ANY_OWNERSHIP_INST(ValueMetatype)
+ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?

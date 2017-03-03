@@ -165,6 +165,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(CopyUnownedValueInst, SILInstruction, copy_unowned_value, MayHaveSideEffects, DoesNotRelease)
   INST(DestroyValueInst, SILInstruction, destroy_value, MayHaveSideEffects, MayRelease)
   INST(EndLifetimeInst, SILInstruction, end_lifetime, MayHaveSideEffects, MayRelease)
+  INST(UncheckedOwnershipConversionInst, SILInstruction, unchecked_ownership_conversion, MayHaveSideEffects, MayRelease)
 
   // IsUnique does not actually write to memory but should be modeled
   // as such. Its operand is a pointer to an object reference. The

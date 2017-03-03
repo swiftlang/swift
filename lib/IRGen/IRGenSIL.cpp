@@ -901,6 +901,10 @@ public:
   void visitEndLifetimeInst(EndLifetimeInst *i) {
     llvm_unreachable("unimplemented");
   }
+  void
+  visitUncheckedOwnershipConversionInst(UncheckedOwnershipConversionInst *i) {
+    llvm_unreachable("unimplemented");
+  }
   void visitBeginBorrowInst(BeginBorrowInst *i) {
     llvm_unreachable("unimplemented");
   }

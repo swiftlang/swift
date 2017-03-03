@@ -1234,6 +1234,13 @@ public:
     *this << getIDAndType(operand) << " to " << CI->getType();
   }
 
+  void visitUncheckedOwnershipConversionInst(
+      UncheckedOwnershipConversionInst *UOCI) {
+    *this << getIDAndType(UOCI->getOperand()) << ", "
+          << "@" << UOCI->getOperand().getOwnershipKind() << " to "
+          << "@" << UOCI->getConversionOwnershipKind();
+  }
+
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
   }

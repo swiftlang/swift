@@ -234,6 +234,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::AllocGlobalInst:
     case ValueKind::GlobalAddrInst:
     case ValueKind::EndLifetimeInst:
+    case ValueKind::UncheckedOwnershipConversionInst:
       return InlineCost::Free;
 
     // Typed GEPs are free.

@@ -200,6 +200,25 @@ namespace {
       return parseSILIdentifier(Result, L, Diagnostic(ID, Args...));
     }
 
+    template <typename T, typename... DiagArgTypes, typename... ArgTypes>
+    bool parseSILIdentifierSwitch(T &Result, ArrayRef<StringRef> Strings,
+                                  Diag<DiagArgTypes...> ID, ArgTypes... Args) {
+      Identifier TmpResult;
+      SourceLoc L;
+      if (parseSILIdentifier(TmpResult, L, Diagnostic(ID, Args...))) {
+        return true;
+      }
+
+      auto Iter = std::find(Strings.begin(), Strings.end(), TmpResult.str());
+      if (Iter == Strings.end()) {
+        P.diagnose(P.Tok, Diagnostic(ID, Args...));
+        return true;
+      }
+
+      Result = ValueOwnershipKind(*Iter);
+      return false;
+    }
+
     template<typename ...DiagArgTypes, typename ...ArgTypes>
     bool parseSILIdentifier(Identifier &Result, SourceLoc &L,
                             Diag<DiagArgTypes...> ID, ArgTypes... Args) {
@@ -226,31 +245,17 @@ namespace {
       TypeLoc = P.Tok.getLoc();
       return parseASTType(result);
     }
-    bool parseSILOwnership(Optional<ValueOwnershipKind> &OwnershipKind) {
-      // We pare here @ <identifier>.
-      if (P.consumeIf(tok::at_sign) && P.Tok.isNot(tok::identifier)) {
+    bool parseSILOwnership(ValueOwnershipKind &OwnershipKind) {
+      // We parse here @ <identifier>.
+      if (!P.consumeIf(tok::at_sign)) {
         // Add error here.
         return true;
       }
 
-      OwnershipKind =
-          llvm::StringSwitch<Optional<ValueOwnershipKind>>(P.Tok.getText())
-              .Case("trivial",
-                    Optional<ValueOwnershipKind>(ValueOwnershipKind::Trivial))
-              .Case("unowned",
-                    Optional<ValueOwnershipKind>(ValueOwnershipKind::Unowned))
-              .Case("owned",
-                    Optional<ValueOwnershipKind>(ValueOwnershipKind::Owned))
-              .Case("guaranteed", Optional<ValueOwnershipKind>(
-                                      ValueOwnershipKind::Guaranteed))
-              .Default(None);
-
-      if (OwnershipKind.hasValue()) {
-        P.consumeToken();
-        return false;
-      }
-
-      return true;
+      StringRef AllOwnershipKinds[4] = {"trivial", "unowned", "owned",
+                                        "guaranteed"};
+      return parseSILIdentifierSwitch(OwnershipKind, AllOwnershipKinds,
+                                      diag::expected_sil_value_ownership_kind);
     }
     bool parseSILType(SILType &Result,
                       GenericEnvironment *&genericEnv,
@@ -2162,6 +2167,29 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
      ResultVal = B.createDebugValue(InstLoc, Val, VarInfo);
    else
      ResultVal = B.createDebugValueAddr(InstLoc, Val, VarInfo);
+   break;
+ }
+
+ // unchecked_ownership_conversion <reg> : <type>, <ownership> to <ownership>
+ case ValueKind::UncheckedOwnershipConversionInst: {
+   ValueOwnershipKind LHSKind = ValueOwnershipKind::Any;
+   ValueOwnershipKind RHSKind = ValueOwnershipKind::Any;
+   SourceLoc Loc;
+
+   if (parseTypedValueRef(Val, Loc, B) ||
+       P.parseToken(tok::comma, diag::expected_sil_colon,
+                    "unchecked_ownership_conversion value ownership kind "
+                    "conversion specification") ||
+       parseSILOwnership(LHSKind) || parseVerbatim("to") ||
+       parseSILOwnership(RHSKind) || parseSILDebugLocation(InstLoc, B)) {
+     return true;
+   }
+
+   if (Val.getOwnershipKind() != LHSKind) {
+     return true;
+   }
+
+   ResultVal = B.createUncheckedOwnershipConversion(InstLoc, Val, RHSKind);
    break;
  }
 
@@ -4167,7 +4195,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
     if (P.consumeIf(tok::l_paren)) {
       do {
         SILType Ty;
-        Optional<ValueOwnershipKind> OwnershipKind;
+        ValueOwnershipKind OwnershipKind = ValueOwnershipKind::Any;
         SourceLoc NameLoc;
         StringRef Name = P.Tok.getText();
         if (P.parseToken(tok::sil_local_name, NameLoc,
@@ -4191,9 +4219,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
         if (IsEntry) {
           Arg = BB->createFunctionArgument(Ty);
         } else {
-          Arg = BB->createPHIArgument(
-              Ty, OwnershipKind.getValueOr(
-                      ValueOwnershipKind(ValueOwnershipKind::Any)));
+          Arg = BB->createPHIArgument(Ty, OwnershipKind);
         }
         setLocalValue(Arg, Name, NameLoc);
       } while (P.consumeIf(tok::comma));
