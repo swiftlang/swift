@@ -481,6 +481,8 @@ class GenericSignatureBuilder::RequirementSource final
   : public llvm::FoldingSetNode,
     private llvm::TrailingObjects<RequirementSource, PotentialArchetype *> {
 
+  friend class FloatingRequirementSource;
+
 public:
   enum Kind : uint8_t {
     /// A requirement stated explicitly, e.g., in a where clause or type
@@ -737,12 +739,14 @@ public:
   static const RequirementSource *forNestedTypeNameMatch(
                                      PotentialArchetype *root);
 
+private:
   /// A requirement source that describes that a requirement comes from a
   /// requirement of the given protocol described by the parent.
   const RequirementSource *viaAbstractProtocolRequirement(
                              GenericSignatureBuilder &builder,
                              ProtocolDecl *protocol) const;
 
+public:
   /// A requirement source that describes that a requirement that is resolved
   /// via a superclass requirement.
   const RequirementSource *viaSuperclass(
@@ -863,7 +867,9 @@ class GenericSignatureBuilder::FloatingRequirementSource {
     /// An explicit requirement source lacking a root.
     Explicit,
     /// An inferred requirement source lacking a root.
-    Inferred
+    Inferred,
+    /// A requirement source augmented by an abstract protocol requirement
+    AbstractProtocol,
   } kind;
 
   using Storage =
@@ -871,6 +877,12 @@ class GenericSignatureBuilder::FloatingRequirementSource {
                         const RequirementRepr *>;
 
   Storage storage;
+
+  // Additional storage for an abstract protocol requirement.
+  struct {
+    ProtocolDecl *protocol = nullptr;
+    llvm::PointerUnion<const TypeRepr *, const RequirementRepr *> written;
+  } abstractProtocolReq;
 
   FloatingRequirementSource(Kind kind, Storage storage)
     : kind(kind), storage(storage) { }
@@ -895,6 +907,26 @@ public:
 
   static FloatingRequirementSource forInferred(const TypeRepr *typeRepr) {
     return { Inferred, typeRepr };
+  }
+
+  static FloatingRequirementSource viaAbstractProtocolRequirement(
+                                     const RequirementSource *base,
+                                     ProtocolDecl *inProtocol) {
+    FloatingRequirementSource result{ AbstractProtocol, base };
+    result.abstractProtocolReq.protocol = inProtocol;
+    return result;
+  }
+
+  static FloatingRequirementSource viaAbstractProtocolRequirement(
+                                     const RequirementSource *base,
+                                     ProtocolDecl *inProtocol,
+                                     llvm::PointerUnion<
+                                       const TypeRepr *,
+                                       const RequirementRepr *> written) {
+    FloatingRequirementSource result{ AbstractProtocol, base };
+    result.abstractProtocolReq.protocol = inProtocol;
+    result.abstractProtocolReq.written = written;
+    return result;
   }
 
   /// Retrieve the complete requirement source rooted at the given potential

@@ -576,6 +576,12 @@ const RequirementSource *FloatingRequirementSource::getSource(
 
   case Inferred:
     return RequirementSource::forInferred(pa, storage.get<const TypeRepr *>());
+
+  case AbstractProtocol:
+    // FIXME: Dropping "as written" information.
+    return storage.get<const RequirementSource *>()
+      ->viaAbstractProtocolRequirement(*pa->getBuilder(),
+                                       abstractProtocolReq.protocol);
   }
 
   llvm_unreachable("Unhandled FloatingPointRequirementSourceKind in switch.");
@@ -1800,7 +1806,8 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   if (Proto->isRequirementSignatureComputed()) {
     auto reqSig = Proto->getRequirementSignature();
 
-    auto innerSource = Source->viaAbstractProtocolRequirement(*this, Proto);
+    auto innerSource =
+      FloatingRequirementSource::viaAbstractProtocolRequirement(Source, Proto);
     for (auto rawReq : reqSig->getRequirements()) {
       auto req = rawReq.subst(protocolSubMap);
       assert(req && "substituting Self in requirement shouldn't fail");
@@ -1829,8 +1836,10 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
           return true;
       }
       if (auto WhereClause = AssocType->getTrailingWhereClause()) {
-        auto innerSource = Source->viaAbstractProtocolRequirement(*this, Proto);
         for (auto &req : WhereClause->getRequirements()) {
+          auto innerSource =
+            FloatingRequirementSource::viaAbstractProtocolRequirement(
+                                                          Source, Proto, &req);
           addRequirement(&req, innerSource, &protocolSubMap);
         }
       }
@@ -2305,43 +2314,45 @@ bool GenericSignatureBuilder::addInheritedRequirements(
                     decl->getInherited(),
                     [&](Type inheritedType, const TypeRepr *typeRepr) -> bool {
     // Local function to get the source.
-    auto getSource = [&] {
+    auto getFloatingSource = [&] {
       if (parentSource) {
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-          // FIXME: Pass along the typeRepr!
           auto proto = assocType->getProtocol();
-          return parentSource->viaAbstractProtocolRequirement(*this, proto);
+          return FloatingRequirementSource::viaAbstractProtocolRequirement(
+                                                parentSource, proto, typeRepr);
         }
 
-        // FIXME: Pass along the typeRepr.
         auto proto = cast<ProtocolDecl>(decl);
-        return parentSource->viaAbstractProtocolRequirement(*this, proto);
+        return FloatingRequirementSource::viaAbstractProtocolRequirement(
+                                              parentSource, proto, typeRepr);
       }
 
       // Explicit requirement.
       if (typeRepr)
-        return RequirementSource::forExplicit(pa, typeRepr);
+        return FloatingRequirementSource::forExplicit(typeRepr);
 
       // An abstract explicit requirement.
-      return RequirementSource::forAbstract(pa);
+      return FloatingRequirementSource::forAbstract();
     };
 
     // Protocol requirement.
     if (auto protocolType = inheritedType->getAs<ProtocolType>()) {
       if (visited.count(protocolType->getDecl())) {
         markPotentialArchetypeRecursive(pa, protocolType->getDecl(),
-                                        getSource());
+                                        getFloatingSource().getSource(pa));
 
         return true;
       }
 
-      return addConformanceRequirement(pa, protocolType->getDecl(), getSource(),
+      return addConformanceRequirement(pa, protocolType->getDecl(),
+                                       getFloatingSource().getSource(pa),
                                        visited);
     }
 
     // Superclass requirement.
     if (inheritedType->getClassOrBoundGenericClass()) {
-      return addSuperclassRequirement(pa, inheritedType, getSource());
+      return addSuperclassRequirement(pa, inheritedType,
+                                      getFloatingSource().getSource(pa));
     }
 
     // Note: anything else is an error, to be diagnosed later.
