@@ -335,6 +335,9 @@ bool SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {
 }
 
 std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
+  if (P->isImplicit())
+    return { true, P };
+
   if (auto *EP = dyn_cast<EnumElementPattern>(P)) {
     auto *Element = EP->getElementDecl();
     if (!Element)
