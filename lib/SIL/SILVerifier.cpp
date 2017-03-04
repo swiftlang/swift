@@ -1664,7 +1664,7 @@ public:
     }
 
     // Metatypes preserve their instance type through lowering.
-    if (auto loweredMT = loweredType.getAs<MetatypeType>()) {
+    if (loweredType.is<MetatypeType>()) {
       if (auto formalMT = dyn_cast<MetatypeType>(formalType)) {
         return isLoweringOf(loweredType.getMetatypeInstanceType(F.getModule()),
                             formalMT.getInstanceType());
@@ -3010,7 +3010,7 @@ public:
   void checkSwitchValueInst(SwitchValueInst *SVI) {
     // TODO: Type should be either integer or function
     auto Ty = SVI->getOperand()->getType();
-    require(Ty.getAs<BuiltinIntegerType>() || Ty.getAs<SILFunctionType>(),
+    require(Ty.is<BuiltinIntegerType>() || Ty.is<SILFunctionType>(),
             "switch_value operand should be either of an integer "
             "or function type");
 
