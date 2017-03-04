@@ -488,10 +488,11 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   DEBUG(llvm::dbgs() << "  -> create specialized function " << Name << "\n");
 
   NewF = M.createFunction(linkage, Name, createOptimizedSILFunctionType(),
-                          nullptr, F->getLocation(), F->isBare(),
-                          F->isTransparent(), F->isFragile(), F->isThunk(),
-                          F->getClassVisibility(), F->getInlineStrategy(),
-                          F->getEffectsKind(), nullptr, F->getDebugScope());
+                          F->getGenericEnvironment(), F->getLocation(),
+                          F->isBare(), F->isTransparent(), F->isFragile(),
+                          F->isThunk(), F->getClassVisibility(),
+                          F->getInlineStrategy(), F->getEffectsKind(), nullptr,
+                          F->getDebugScope());
   if (F->hasUnqualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();
   }
