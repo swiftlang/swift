@@ -180,7 +180,6 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addSimplifyCFG();
   P.addPerformanceConstantPropagation();
   P.addSimplifyCFG();
-  P.addArrayElementPropagation();
   // End of unrolling passes.
   P.addRemovePins();
   P.addABCOpt();
@@ -295,6 +294,7 @@ static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("HighLevel+EarlyLoopOpt");
   // FIXME: update this to be a function pass.
   P.addEagerSpecializer();
+  P.addArrayElementPropagation();
   addSSAPasses(P, OptimizationLevelKind::HighLevel);
   addHighLevelLoopOptPasses(P);
 }

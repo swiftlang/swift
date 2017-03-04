@@ -228,7 +228,8 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
   // Don't inline functions that are marked with the @_semantics or @effects
   // attribute if the inliner is asked not to inline them.
   if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
-    if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
+    if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit &&
+      !Callee->hasSemanticsAttr("early_inline")) {
       return nullptr;
     }
     // The "availability" semantics attribute is treated like global-init.
