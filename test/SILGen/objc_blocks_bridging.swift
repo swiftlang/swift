@@ -67,8 +67,10 @@ import Foundation
 
   // Blocks and C function pointers must not be reabstracted when placed in optionals.
   // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC7optFunc{{[_0-9a-zA-Z]*}}FTo
-  // CHECK:         [[COPY:%.*]] = copy_block %0
-  // CHECK:         [[BLOCK:%.*]] = unchecked_enum_data [[COPY]]
+  // CHECK: bb0([[ARG0:%.*]] : $Optional<@convention(block) (NSString) -> @autoreleased NSString>,
+  // CHECK:         [[COPY:%.*]] = copy_block [[ARG0]]
+  // CHECK:         switch_enum [[COPY]] : $Optional<@convention(block) (NSString) -> @autoreleased NSString>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+  // CHECK: [[SOME_BB]]([[BLOCK:%.*]] : $@convention(block) (NSString) -> @autoreleased NSString):
   // TODO: redundant reabstractions here
   // CHECK:         [[BLOCK_THUNK:%.*]] = function_ref @_T0So8NSStringCABIyBya_S2SIxxo_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[BLOCK_THUNK]]([[BLOCK]])

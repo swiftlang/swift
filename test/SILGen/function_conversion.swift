@@ -216,10 +216,8 @@ func convExistentialTrivial(_ t2: @escaping (Q) -> Trivial, t3: @escaping (Q?) -
 // CHECK:         return
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T019function_conversion1Q_pSgAA7TrivialVIxid_AESgAA1P_pIxyr_TR
-// CHECK:         select_enum
-// CHECK:         cond_br
-// CHECK: bb1:
-// CHECK:         unchecked_enum_data
+// CHECK:         switch_enum
+// CHECK: bb1([[TRIVIAL:%.*]] : $Trivial):
 // CHECK:         init_existential_addr
 // CHECK:         init_enum_data_addr
 // CHECK:         copy_addr
@@ -270,10 +268,8 @@ func convExistentialMetatype(_ em: @escaping (Q.Type?) -> Trivial.Type) {
 // CHECK-NEXT:    return
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T019function_conversion1Q_pXmTSgAA7TrivialVXMtIxyd_AEXMtSgAA1P_pXmTIxyd_TR : $@convention(thin) (Optional<@thin Trivial.Type>, @owned @callee_owned (Optional<@thick Q.Type>) -> @thin Trivial.Type) -> @thick P.Type
-// CHECK:         select_enum %0 : $Optional<@thin Trivial.Type>
-// CHECK-NEXT:    cond_br
-// CHECK: bb1:
-// CHECK-NEXT:    unchecked_enum_data %0 : $Optional<@thin Trivial.Type>
+// CHECK:         switch_enum %0 : $Optional<@thin Trivial.Type>
+// CHECK: bb1([[META:%.*]] : $@thin Trivial.Type):
 // CHECK-NEXT:    metatype $@thick Trivial.Type
 // CHECK-NEXT:    init_existential_metatype {{.*}} : $@thick Trivial.Type, $@thick Q.Type
 // CHECK-NEXT:    enum $Optional<@thick Q.Type>

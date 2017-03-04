@@ -19,10 +19,10 @@ class A {
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[BORROWED_SELF_COPY]])
 // CHECK-NEXT: end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
 // CHECK-NEXT: destroy_value [[SELF_COPY]]
-// CHECK:      [[T2:%.*]] = select_enum [[T1]]
-// CHECK-NEXT: cond_br [[T2]]
+// CHECK-NEXT: switch_enum [[T1]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+//
 //   Something branch: project value, translate, inject into result.
-// CHECK:      [[STR:%.*]] = unchecked_enum_data [[T1]]
+// CHECK:    [[SOME_BB]]([[STR:%.*]] : $String):
 // CHECK:      [[T0:%.*]] = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK-NEXT: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[BORROWED_STR]])
@@ -31,10 +31,12 @@ class A {
 // CHECK-NEXT: destroy_value [[STR]]
 // CHECK-NEXT: br
 //   Nothing branch: inject nothing into result.
-// CHECK:      enum $Optional<NSString>, #Optional.none!enumelt
+//
+// CHECK: [[NONE_BB]]:
+// CHECK-NEXT: enum $Optional<NSString>, #Optional.none!enumelt
 // CHECK-NEXT: br
 //   Continuation.
-// CHECK:      bb3([[T0:%.*]] : $Optional<NSString>):
+// CHECK: bb3([[T0:%.*]] : $Optional<NSString>):
 // CHECK-NEXT: return [[T0]]
 
   @objc func bar(x x : String?) {}
@@ -42,10 +44,10 @@ class A {
 // CHECK:    bb0([[ARG:%.*]] : $Optional<NSString>, [[SELF:%.*]] : $A):
 // CHECK:      [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:      [[SELF_COPY:%.*]] = copy_value [[SELF]]
-// CHECK:      [[T1:%.*]] = select_enum [[ARG_COPY]]
-// CHECK-NEXT: cond_br [[T1]]
+// CHECK:      switch_enum [[ARG_COPY]] : $Optional<NSString>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+//
 //   Something branch: project value, translate, inject into result.
-// CHECK:      [[NSSTR:%.*]] = unchecked_enum_data [[ARG_COPY]]
+// CHECK:    [[SOME_BB]]([[NSSTR:%.*]] : $NSString):
 // CHECK:      [[T0:%.*]] = function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ
 //   Make a temporary initialized string that we're going to clobber as part of the conversion process (?).
 // CHECK-NEXT: [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NSSTR]] : $NSString
@@ -53,7 +55,9 @@ class A {
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[NSSTR_BOX]], [[STRING_META]])
 // CHECK-NEXT: enum $Optional<String>, #Optional.some!enumelt.1, [[T1]]
 // CHECK-NEXT: br
+//
 //   Nothing branch: inject nothing into result.
+// CHECK:   [[NONE_BB]]:
 // CHECK:      enum $Optional<String>, #Optional.none!enumelt
 // CHECK-NEXT: br
 //   Continuation.

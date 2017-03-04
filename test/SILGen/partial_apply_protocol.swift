@@ -56,9 +56,8 @@ func testClonable(c: Clonable) {
 // CHECK-NEXT:    [[INNER_RESULT:%.*]] = alloc_stack $Optional<τ_0_0>
 // CHECK-NEXT:    apply %1([[INNER_RESULT]])
 // CHECK-NEXT:    [[OUTER_RESULT:%.*]] = alloc_stack $Optional<Clonable>
-// CHECK:         [[IS_SOME:%.*]] = select_enum_addr [[INNER_RESULT]]
-// CHECK-NEXT:    cond_br [[IS_SOME]], bb1, bb2
-// CHECK:       bb1:
+// CHECK-NEXT:    switch_enum_addr [[INNER_RESULT]] : $*Optional<{{.*}}>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]],
+// CHECK:       [[SOME_BB]]:
 // CHECK-NEXT:    [[INNER_RESULT_ADDR:%.*]] = unchecked_take_enum_data_addr [[INNER_RESULT]]
 // CHECK-NEXT:    [[SOME_PAYLOAD:%.*]] = alloc_stack $Clonable
 // CHECK-NEXT:    [[SOME_PAYLOAD_ADDR:%.*]] = init_existential_addr [[SOME_PAYLOAD]]

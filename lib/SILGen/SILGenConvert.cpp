@@ -11,7 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
+#include "ArgumentSource.h"
+#include "Initialization.h"
+#include "LValue.h"
+#include "RValue.h"
 #include "Scope.h"
+#include "SwitchCaseFullExpr.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -19,13 +24,9 @@
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
-#include "Initialization.h"
-#include "LValue.h"
-#include "RValue.h"
-#include "ArgumentSource.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -301,75 +302,68 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   auto isNotPresentBB = createBasicBlock();
   auto isPresentBB = createBasicBlock();
 
+  SwitchEnumBuilder SEBuilder(B, loc, input);
+  SILType noOptResultTy = resultTy.getAnyOptionalObjectType();
+  assert(noOptResultTy);
+
   // Create a temporary for the output optional.
-  auto &resultTL = getTypeLowering(resultTy);
+  auto &resultTL = F.getTypeLowering(resultTy);
 
   // If the result is address-only, we need to return something in memory,
   // otherwise the result is the BBArgument in the merge point.
-  SILValue result;
-  if (resultTL.isAddressOnly())
-    result = emitTemporaryAllocation(loc, resultTy);
-  else
-    result = contBB->createPHIArgument(resultTL.getLoweredType(),
-                                       ValueOwnershipKind::Owned);
-
-  // Branch on whether the input is optional, this doesn't consume the value.
-  auto isPresent = emitDoesOptionalHaveValue(loc, input.getValue());
-  B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);
-
-  // If it's present, apply the recursive transformation to the value.
-  B.emitBlock(isPresentBB);
-  SILValue branchArg;
-  {
-    // Don't allow cleanups to escape the conditional block.
-    FullExpr presentScope(Cleanups, CleanupLocation::get(loc));
-
-    CanType resultValueTy =
-      resultTy.getSwiftRValueType().getAnyOptionalObjectType();
-    assert(resultValueTy);
-    SILType loweredResultValueTy = getLoweredType(resultValueTy);
-
-    // Pull the value out.  This will load if the value is not address-only.
-    auto &inputTL = getTypeLowering(input.getType());
-    auto inputValue = emitUncheckedGetOptionalValueFrom(loc, input,
-                                                        inputTL, SGFContext());
-
-    // Transform it.
-    auto resultValue = transformValue(*this, loc, inputValue,
-                                      loweredResultValueTy);
-
-    // Inject that into the result type if the result is address-only.
-    if (resultTL.isAddressOnly()) {
-      ArgumentSource resultValueRV(loc, RValue(*this, loc,
-                                               resultValueTy, resultValue));
-      emitInjectOptionalValueInto(loc, std::move(resultValueRV),
-                                  result, resultTL);
-    } else {
-      resultValue = getOptionalSomeValue(loc, resultValue, resultTL);
-      branchArg = resultValue.forward(*this);
-    }
-  }
-  if (branchArg)
-    B.createBranch(loc, contBB, branchArg);
-  else
-    B.createBranch(loc, contBB);
-
-  // If it's not present, inject 'nothing' into the result.
-  B.emitBlock(isNotPresentBB);
+  ManagedValue finalResult;
   if (resultTL.isAddressOnly()) {
-    emitInjectOptionalNothingInto(loc, result, resultTL);
-    B.createBranch(loc, contBB);
+    finalResult = emitManagedBufferWithCleanup(
+        emitTemporaryAllocation(loc, resultTy), resultTL);
   } else {
-    branchArg = getOptionalNoneValue(loc, resultTL);
-    B.createBranch(loc, contBB, branchArg);
+    SavedInsertionPoint IP(*this, contBB);
+    finalResult = B.createOwnedPHIArgument(resultTL.getLoweredType());
   }
 
-  // Continue.
-  B.emitBlock(contBB);
-  if (resultTL.isAddressOnly())
-    return emitManagedBufferWithCleanup(result, resultTL);
+  SEBuilder.addCase(
+      getASTContext().getOptionalSomeDecl(), isPresentBB, contBB,
+      [&](ManagedValue input, SwitchCaseFullExpr &scope) {
+        // If we have an address only type, we want to match the old behavior of
+        // transforming the underlying type instead of the optional type. This
+        // ensures that we use the more efficient non-generic code paths when
+        // possible.
+        if (F.getTypeLowering(input.getType()).isAddressOnly()) {
+          auto *someDecl = B.getASTContext().getOptionalSomeDecl();
+          input = B.createUncheckedTakeEnumDataAddr(
+              loc, input, someDecl, input.getType().getAnyOptionalObjectType());
+        }
 
-  return emitManagedRValueWithCleanup(result, resultTL);
+        ManagedValue result = transformValue(*this, loc, input, noOptResultTy);
+
+        if (!resultTL.isAddressOnly()) {
+          SILValue some = B.createOptionalSome(loc, result).forward(*this);
+          return scope.exit(loc, some);
+        }
+
+        RValue R(*this, loc, noOptResultTy.getSwiftRValueType(), result);
+        ArgumentSource resultValueRV(loc, std::move(R));
+        emitInjectOptionalValueInto(loc, std::move(resultValueRV),
+                                    finalResult.getValue(), resultTL);
+        return scope.exit(loc);
+      });
+
+  SEBuilder.addCase(
+      getASTContext().getOptionalNoneDecl(), isNotPresentBB, contBB,
+      [&](ManagedValue input, SwitchCaseFullExpr &scope) {
+        if (!resultTL.isAddressOnly()) {
+          SILValue none =
+              B.createManagedOptionalNone(loc, resultTy).forward(*this);
+          return scope.exit(loc, none);
+        }
+
+        emitInjectOptionalNothingInto(loc, finalResult.getValue(), resultTL);
+        return scope.exit(loc);
+      });
+
+  std::move(SEBuilder).emit();
+
+  B.emitBlock(contBB);
+  return finalResult;
 }
 
 SILGenFunction::OpaqueValueRAII::~OpaqueValueRAII() {

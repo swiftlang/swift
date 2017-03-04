@@ -38,14 +38,13 @@ extension Sub {
 
     // Then check the setter @objc thunk.
     //
-    // TODO: This codegens using a select_enum + cond_br. It would be better to
-    // just use a switch_enum so we can consume the value. This change will be
-    // necessary in a semantic ARC world.
-    //
     // CHECK-LABEL: sil hidden [thunk] @_T015objc_extensions3SubC4propSQySSGfsTo : $@convention(objc_method) (Optional<NSString>, Sub) -> () {
     // CHECK: bb0([[NEW_VALUE:%.*]] : $Optional<NSString>, [[SELF:%.*]] : $Sub):
-    // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Sub
-    // CHECK: bb1:
+    // CHECK:   [[NEW_VALUE_COPY:%.*]] = copy_value [[NEW_VALUE]]
+    // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Sub
+    // CHECK:   switch_enum [[NEW_VALUE_COPY]] : $Optional<NSString>, case #Optional.some!enumelt.1: [[SUCC_BB:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL_BB:bb[0-9]+]]
+    // CHECK: [[SUCC_BB]]([[STR:%.*]] : $NSString):
+    // CHECK: [[FAIL_BB]]:
     // CHECK: bb3([[BRIDGED_NEW_VALUE:%.*]] : $Optional<String>):
     // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
     // CHECK:   [[NORMAL_FUNC:%.*]] = function_ref @_T015objc_extensions3SubC4propSQySSGfs : $@convention(method) (@owned Optional<String>, @guaranteed Sub) -> ()
@@ -70,8 +69,12 @@ extension Sub {
     // CHECK:   destroy_value [[SELF_COPY]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
+    // CHECK:   [[BORROWED_NEW_VALUE:%.*]] = begin_borrow [[NEW_VALUE]]
+    // CHECK:   [[NEW_VALUE_COPY:%.*]] = copy_value [[BORROWED_NEW_VALUE]]
     // CHECK:   [[SET_SUPER_METHOD:%.*]] = super_method [volatile] [[SELF_COPY]] : $Sub, #Base.prop!setter.1.foreign : (Base) -> (String!) -> (), $@convention(objc_method) (Optional<NSString>, Base) -> ()
-    // CHECK: bb4:
+    // CHECK:   switch_enum [[NEW_VALUE_COPY]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+    //
+    // CHECK: bb4([[OLD_STRING:%.*]] : $String):
     // CHECK: bb6([[BRIDGED_NEW_STRING:%.*]] : $Optional<NSString>):
     // CHECK:    apply [[SET_SUPER_METHOD]]([[BRIDGED_NEW_STRING]], [[UPCAST_SELF_COPY]])
     // CHECK:    destroy_value [[BRIDGED_NEW_STRING]]
