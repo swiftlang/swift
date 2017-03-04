@@ -20,6 +20,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 
@@ -399,6 +400,8 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
     return false;
   }
   }
+
+  llvm_unreachable("Unhandled RequirementKind in switch.");
 }
 
 void

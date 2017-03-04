@@ -32,6 +32,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <functional>
 #include <memory>
@@ -590,6 +591,8 @@ private:
     case Concrete:
       return 0;
     }
+
+    llvm_unreachable("Unhandled RequirementSourceKind in switch.");
   }
 
   /// Determines whether we have been provided with an acceptable storage kind
@@ -618,6 +621,8 @@ private:
     case Concrete:
       return false;
     }
+
+    llvm_unreachable("Unhandled RequirementSourceKind in switch.");
   }
 
 public:
