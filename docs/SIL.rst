@@ -84,7 +84,7 @@ predictable.
   If an arithmetic overflow occurs during the constant expression computation, a diagnostic
   is issued.
 - **Return analysis** verifies that each function returns a value on every
-  code path and doesn't "fall of the end" of its definition, which is an error.
+  code path and doesn't "fall off the end" of its definition, which is an error.
   It also issues an error when a ``noreturn`` function returns.
 - **Critical edge splitting** splits all critical edges from terminators that
   don't support arbitrary basic block arguments (all non cond_branch
