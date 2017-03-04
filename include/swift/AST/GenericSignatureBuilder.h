@@ -74,6 +74,10 @@ public:
   using RequirementRHS =
       llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
 
+  /// The location of a requirement as written somewhere in the source.
+  typedef llvm::PointerUnion<const TypeRepr *, const RequirementRepr *>
+    WrittenRequirementLoc;
+
   class RequirementSource;
 
   class FloatingRequirementSource;
@@ -479,7 +483,8 @@ public:
 /// Requirement sources are uniqued within a generic signature builder.
 class GenericSignatureBuilder::RequirementSource final
   : public llvm::FoldingSetNode,
-    private llvm::TrailingObjects<RequirementSource, PotentialArchetype *> {
+    private llvm::TrailingObjects<RequirementSource, ProtocolDecl *,
+                                  WrittenRequirementLoc> {
 
   friend class FloatingRequirementSource;
 
@@ -549,8 +554,6 @@ private:
   /// The kind of storage we have.
   enum class StorageKind : uint8_t {
     RootArchetype,
-    TypeRepr,
-    RequirementRepr,
     ProtocolDecl,
     ProtocolConformance,
     AssociatedTypeDecl,
@@ -559,16 +562,13 @@ private:
   /// The kind of storage we have.
   const StorageKind storageKind;
 
+  /// Whether there is a trailing written requirement location.
+  const bool hasTrailingWrittenRequirementLoc;
+
   /// The actual storage, described by \c storageKind.
   union {
     /// The root archetype.
     PotentialArchetype *rootArchetype;
-
-    /// The type representation describing where the requirement came from.
-    const TypeRepr *typeRepr;
-
-    /// Where a requirement came from.
-    const RequirementRepr *requirementRepr;
 
     /// The protocol being described.
     ProtocolDecl *protocol;
@@ -582,16 +582,14 @@ private:
 
   friend TrailingObjects;
 
-  /// The trailing potential archetype, for
-  size_t numTrailingObjects(OverloadToken<PotentialArchetype *>) const {
+  /// The trailing protocol declaration, if there is one.
+  size_t numTrailingObjects(OverloadToken<ProtocolDecl *>) const {
     switch (kind) {
     case RequirementSignatureSelf:
       return 1;
 
     case Explicit:
     case Inferred:
-      return storageKind == StorageKind::RootArchetype ? 0 : 1;
-
     case NestedTypeNameMatch:
     case ProtocolRequirement:
     case Superclass:
@@ -603,16 +601,25 @@ private:
     llvm_unreachable("Unhandled RequirementSourceKind in switch.");
   }
 
+  /// The trailing written requirement location, if there is one.
+  size_t numTrailingObjects(OverloadToken<WrittenRequirementLoc>) const {
+    return hasTrailingWrittenRequirementLoc ? 1 : 0;
+  }
+
   /// Determines whether we have been provided with an acceptable storage kind
   /// for the given requirement source kind.
   static bool isAcceptableStorageKind(Kind kind, StorageKind storageKind);
 
   /// Retrieve the opaque storage as a single pointer, for use in uniquing.
-  const void *getOpaqueStorage() const;
+  const void *getOpaqueStorage1() const;
 
-  /// Retrieve the extra opaque storage as a single pointer, for use in
+  /// Retrieve the second opaque storage as a single pointer, for use in
   /// uniquing.
-  const void *getExtraOpaqueStorage() const;
+  const void *getOpaqueStorage2() const;
+
+  /// Retrieve the third opaque storage as a single pointer, for use in
+  /// uniquing.
+  const void *getOpaqueStorage3() const;
 
   /// Whether this kind of requirement source is a root.
   static bool isRootKind(Kind kind) {
@@ -640,53 +647,43 @@ public:
   /// requirement source with one of the "root" kinds.
   const RequirementSource * const parent;
 
-  RequirementSource(Kind kind, const RequirementSource *parent,
-                    PotentialArchetype *rootArchetype)
-    : kind(kind), storageKind(StorageKind::RootArchetype), parent(parent) {
-    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
-           "Root RequirementSource should not have parent (or vice versa)");
+  RequirementSource(Kind kind, PotentialArchetype *rootArchetype,
+                    ProtocolDecl *protocol,
+                    WrittenRequirementLoc writtenReqLoc)
+    : kind(kind), storageKind(StorageKind::RootArchetype),
+      hasTrailingWrittenRequirementLoc(!writtenReqLoc.isNull()),
+      parent(nullptr) {
     assert(isAcceptableStorageKind(kind, storageKind) &&
            "RequirementSource kind/storageKind mismatch");
 
     storage.rootArchetype = rootArchetype;
+    if (kind == RequirementSignatureSelf)
+      getTrailingObjects<ProtocolDecl *>()[0] = protocol;
+    if (hasTrailingWrittenRequirementLoc)
+      getTrailingObjects<WrittenRequirementLoc>()[0] = writtenReqLoc;
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
-                    const TypeRepr *typeRepr)
-    : kind(kind), storageKind(StorageKind::TypeRepr), parent(parent) {
-    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
-           "Root RequirementSource should not have parent (or vice versa)");
-    assert(isAcceptableStorageKind(kind, storageKind) &&
-           "RequirementSource kind/storageKind mismatch");
+                    ProtocolDecl *protocol,
+                    WrittenRequirementLoc writtenReqLoc)
+    : kind(kind), storageKind(StorageKind::ProtocolDecl),
+      hasTrailingWrittenRequirementLoc(!writtenReqLoc.isNull()),
 
-    storage.typeRepr = typeRepr;
-  }
-
-  RequirementSource(Kind kind, const RequirementSource *parent,
-                    const RequirementRepr *requirementRepr)
-    : kind(kind), storageKind(StorageKind::RequirementRepr), parent(parent) {
-    assert((static_cast<bool>(parent) != isRootKind(kind)) &&
-           "Root RequirementSource should not have parent (or vice versa)");
-    assert(isAcceptableStorageKind(kind, storageKind) &&
-           "RequirementSource kind/storageKind mismatch");
-
-    storage.requirementRepr = requirementRepr;
-  }
-
-  RequirementSource(Kind kind, const RequirementSource *parent,
-                    ProtocolDecl *protocol)
-    : kind(kind), storageKind(StorageKind::ProtocolDecl), parent(parent) {
+      parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
     assert(isAcceptableStorageKind(kind, storageKind) &&
            "RequirementSource kind/storageKind mismatch");
 
     storage.protocol = protocol;
+    if (hasTrailingWrittenRequirementLoc)
+      getTrailingObjects<WrittenRequirementLoc>()[0] = writtenReqLoc;
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
                     ProtocolConformance *conformance)
     : kind(kind), storageKind(StorageKind::ProtocolConformance),
+      hasTrailingWrittenRequirementLoc(false),
       parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
@@ -699,6 +696,7 @@ public:
   RequirementSource(Kind kind, const RequirementSource *parent,
                     AssociatedTypeDecl *assocType)
     : kind(kind), storageKind(StorageKind::AssociatedTypeDecl),
+      hasTrailingWrittenRequirementLoc(false),
       parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
@@ -713,15 +711,9 @@ public:
   static const RequirementSource *forAbstract(PotentialArchetype *root);
 
   /// Retrieve a requirement source representing an explicit requirement
-  /// stated in an 'inheritance' clause.
+  /// stated in an 'inheritance' or 'where' clause.
   static const RequirementSource *forExplicit(PotentialArchetype *root,
-                                              const TypeRepr *typeRepr);
-
-  /// Retrieve a requirement source representing an explicit requirement
-  /// stated in an 'where' clause.
-  static const RequirementSource *forExplicit(
-                                        PotentialArchetype *root,
-                                        const RequirementRepr *requirementRepr);
+                                              WrittenRequirementLoc writtenLoc);
 
   /// Retrieve a requirement source representing a requirement that is
   /// inferred from some part of a generic declaration's signature, e.g., the
@@ -744,7 +736,9 @@ private:
   /// requirement of the given protocol described by the parent.
   const RequirementSource *viaAbstractProtocolRequirement(
                              GenericSignatureBuilder &builder,
-                             ProtocolDecl *protocol) const;
+                             ProtocolDecl *protocol,
+                             WrittenRequirementLoc writtenLoc =
+                               WrittenRequirementLoc()) const;
 
 public:
   /// A requirement source that describes that a requirement that is resolved
@@ -799,15 +793,17 @@ public:
 
   /// Retrieve the type representation for this requirement, if there is one.
   const TypeRepr *getTypeRepr() const {
-    if (storageKind != StorageKind::TypeRepr) return nullptr;
-    return storage.typeRepr;
+    if (!hasTrailingWrittenRequirementLoc) return nullptr;
+    return getTrailingObjects<WrittenRequirementLoc>()[0]
+             .dyn_cast<const TypeRepr *>();
   }
 
   /// Retrieve the requirement representation for this requirement, if there is
   /// one.
   const RequirementRepr *getRequirementRepr() const {
-    if (storageKind != StorageKind::RequirementRepr) return nullptr;
-    return storage.requirementRepr;
+    if (!hasTrailingWrittenRequirementLoc) return nullptr;
+    return getTrailingObjects<WrittenRequirementLoc>()[0]
+             .dyn_cast<const RequirementRepr *>();
   }
 
   /// Retrieve the protocol for this requirement, if there is one.
@@ -828,17 +824,19 @@ public:
 
   /// Profiling support for \c FoldingSet.
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, kind, parent, getOpaqueStorage(), getExtraOpaqueStorage());
+    Profile(ID, kind, parent, getOpaqueStorage1(), getOpaqueStorage2(),
+            getOpaqueStorage3());
   }
 
   /// Profiling support for \c FoldingSet.
   static void Profile(llvm::FoldingSetNodeID &ID, Kind kind,
-                      const RequirementSource *parent, const void *storage,
-                      const void *extraStorage) {
+                      const RequirementSource *parent, const void *storage1,
+                      const void *storage2, const void *storage3) {
     ID.AddInteger(kind);
     ID.AddPointer(parent);
-    ID.AddPointer(storage);
-    ID.AddPointer(extraStorage);
+    ID.AddPointer(storage1);
+    ID.AddPointer(storage2);
+    ID.AddPointer(storage3);
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -881,7 +879,7 @@ class GenericSignatureBuilder::FloatingRequirementSource {
   // Additional storage for an abstract protocol requirement.
   struct {
     ProtocolDecl *protocol = nullptr;
-    llvm::PointerUnion<const TypeRepr *, const RequirementRepr *> written;
+    WrittenRequirementLoc written;
   } abstractProtocolReq;
 
   FloatingRequirementSource(Kind kind, Storage storage)
@@ -920,9 +918,7 @@ public:
   static FloatingRequirementSource viaAbstractProtocolRequirement(
                                      const RequirementSource *base,
                                      ProtocolDecl *inProtocol,
-                                     llvm::PointerUnion<
-                                       const TypeRepr *,
-                                       const RequirementRepr *> written) {
+                                     WrittenRequirementLoc written) {
     FloatingRequirementSource result{ AbstractProtocol, base };
     result.abstractProtocolReq.protocol = inProtocol;
     result.abstractProtocolReq.written = written;

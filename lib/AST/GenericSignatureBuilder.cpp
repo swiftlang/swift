@@ -81,40 +81,15 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
                                                 StorageKind storageKind) {
   switch (kind) {
   case Explicit:
-    switch (storageKind) {
-    case StorageKind::RootArchetype:
-    case StorageKind::TypeRepr:
-    case StorageKind::RequirementRepr:
-      return true;
-
-    case StorageKind::ProtocolDecl:
-    case StorageKind::ProtocolConformance:
-    case StorageKind::AssociatedTypeDecl:
-      return false;
-    }
-
   case Inferred:
-    switch (storageKind) {
-    case StorageKind::RootArchetype:
-    case StorageKind::TypeRepr:
-      return true;
-
-    case StorageKind::ProtocolDecl:
-    case StorageKind::ProtocolConformance:
-    case StorageKind::RequirementRepr:
-    case StorageKind::AssociatedTypeDecl:
-      return false;
-    }
-
+  case RequirementSignatureSelf:
   case NestedTypeNameMatch:
     switch (storageKind) {
     case StorageKind::RootArchetype:
-        return true;
+      return true;
 
-    case StorageKind::TypeRepr:
     case StorageKind::ProtocolDecl:
     case StorageKind::ProtocolConformance:
-    case StorageKind::RequirementRepr:
     case StorageKind::AssociatedTypeDecl:
       return false;
     }
@@ -122,26 +97,21 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
   case Parent:
     switch (storageKind) {
     case StorageKind::AssociatedTypeDecl:
-        return true;
+      return true;
 
     case StorageKind::RootArchetype:
-    case StorageKind::TypeRepr:
     case StorageKind::ProtocolDecl:
     case StorageKind::ProtocolConformance:
-    case StorageKind::RequirementRepr:
       return false;
     }
 
-  case RequirementSignatureSelf:
   case ProtocolRequirement:
     switch (storageKind) {
     case StorageKind::ProtocolDecl:
       return true;
 
     case StorageKind::RootArchetype:
-    case StorageKind::TypeRepr:
     case StorageKind::ProtocolConformance:
-    case StorageKind::RequirementRepr:
     case StorageKind::AssociatedTypeDecl:
       return false;
     }
@@ -154,8 +124,6 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
 
     case StorageKind::RootArchetype:
     case StorageKind::ProtocolDecl:
-    case StorageKind::TypeRepr:
-    case StorageKind::RequirementRepr:
     case StorageKind::AssociatedTypeDecl:
       return false;
     }
@@ -164,16 +132,10 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
   llvm_unreachable("Unhandled RequirementSourceKind in switch.");
 }
 
-const void *RequirementSource::getOpaqueStorage() const {
+const void *RequirementSource::getOpaqueStorage1() const {
   switch (storageKind) {
   case StorageKind::RootArchetype:
     return storage.rootArchetype;
-
-  case StorageKind::TypeRepr:
-    return storage.typeRepr;
-
-  case StorageKind::RequirementRepr:
-    return storage.requirementRepr;
 
   case StorageKind::ProtocolConformance:
     return storage.conformance;
@@ -188,9 +150,19 @@ const void *RequirementSource::getOpaqueStorage() const {
   llvm_unreachable("Unhandled StorageKind in switch.");
 }
 
-const void *RequirementSource::getExtraOpaqueStorage() const {
-  if (numTrailingObjects(OverloadToken<PotentialArchetype *>()) == 1)
-    return getTrailingObjects<PotentialArchetype *>()[0];
+const void *RequirementSource::getOpaqueStorage2() const {
+  if (numTrailingObjects(OverloadToken<ProtocolDecl *>()) == 1)
+    return getTrailingObjects<ProtocolDecl *>()[0];
+  if (numTrailingObjects(OverloadToken<WrittenRequirementLoc>()) == 1)
+    return getTrailingObjects<WrittenRequirementLoc>()[0].getOpaqueValue();
+
+  return nullptr;
+}
+
+const void *RequirementSource::getOpaqueStorage3() const {
+  if (numTrailingObjects(OverloadToken<ProtocolDecl *>()) == 1 &&
+      numTrailingObjects(OverloadToken<WrittenRequirementLoc>()) == 1)
+    return getTrailingObjects<WrittenRequirementLoc>()[0].getOpaqueValue();
 
   return nullptr;
 }
@@ -289,103 +261,119 @@ bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa) const {
   return false;
 }
 
-#define REQUIREMENT_SOURCE_FACTORY_BODY(                                   \
-          SourceKind, Parent, Storage, ExtraStorage,                       \
-          NumPotentialArchetypes)                                          \
+#define REQUIREMENT_SOURCE_FACTORY_BODY(ProfileArgs, ConstructorArgs,      \
+                                        NumProtocolDecls, WrittenReq)      \
   llvm::FoldingSetNodeID nodeID;                                           \
-  Profile(nodeID, Kind::SourceKind, Parent, Storage, ExtraStorage);        \
+  Profile ProfileArgs;                                                     \
                                                                            \
   void *insertPos = nullptr;                                               \
   if (auto known =                                                         \
         builder.Impl->RequirementSources.FindNodeOrInsertPos(nodeID,       \
-                                                            insertPos))    \
+                                                             insertPos))   \
     return known;                                                          \
                                                                            \
   unsigned size =                                                          \
-    totalSizeToAlloc<PotentialArchetype *>(NumPotentialArchetypes);        \
+    totalSizeToAlloc<ProtocolDecl *, WrittenRequirementLoc>(               \
+                                           NumProtocolDecls,               \
+                                           WrittenReq.isNull()? 0 : 1);    \
   void *mem = malloc(size);                                                \
-  auto result = new (mem) RequirementSource(Kind::SourceKind, Parent,      \
-                                            Storage);                      \
-  if (NumPotentialArchetypes > 0)                                          \
-    result->getTrailingObjects<PotentialArchetype *>()[0] = ExtraStorage;  \
+  auto result = new (mem) RequirementSource ConstructorArgs;               \
   builder.Impl->RequirementSources.InsertNode(result, insertPos);          \
   return result
 
 const RequirementSource *RequirementSource::forAbstract(
                                                     PotentialArchetype *root) {
   auto &builder = *root->getBuilder();
-  REQUIREMENT_SOURCE_FACTORY_BODY(Explicit, nullptr, root, nullptr, 0);
+  REQUIREMENT_SOURCE_FACTORY_BODY(
+                        (nodeID, Explicit, nullptr, root, nullptr, nullptr),
+                        (Explicit, root, nullptr, WrittenRequirementLoc()),
+                        0, WrittenRequirementLoc());
 }
 
 const RequirementSource *RequirementSource::forExplicit(
                                              PotentialArchetype *root,
-                                             const TypeRepr *typeRepr) {
-  // If the type representation is NULL, we have an abstract requirement
-  // source.
-  if (!typeRepr)
-    return forAbstract(root);
-
+                                             WrittenRequirementLoc writtenLoc) {
   auto &builder = *root->getBuilder();
-  REQUIREMENT_SOURCE_FACTORY_BODY(Explicit, nullptr, typeRepr, root, 1);
-}
-
-const RequirementSource *RequirementSource::forExplicit(
-                                      PotentialArchetype *root,
-                                      const RequirementRepr *requirementRepr) {
-  // If the requirement representation is NULL, we have an abstract requirement
-  // source.
-  if (!requirementRepr)
-    return forAbstract(root);
-
-  auto &builder = *root->getBuilder();
-  REQUIREMENT_SOURCE_FACTORY_BODY(Explicit, nullptr, requirementRepr, root, 1);
+  REQUIREMENT_SOURCE_FACTORY_BODY(
+                        (nodeID, Explicit, nullptr, root,
+                         writtenLoc.getOpaqueValue(), nullptr),
+                        (Explicit, root, nullptr, writtenLoc),
+                        0, writtenLoc);
 }
 
 const RequirementSource *RequirementSource::forInferred(
                                               PotentialArchetype *root,
                                               const TypeRepr *typeRepr) {
+  WrittenRequirementLoc writtenLoc = typeRepr;
   auto &builder = *root->getBuilder();
-  REQUIREMENT_SOURCE_FACTORY_BODY(Inferred, nullptr, typeRepr, root, 1);
+  REQUIREMENT_SOURCE_FACTORY_BODY(
+                        (nodeID, Inferred, nullptr, root,
+                         writtenLoc.getOpaqueValue(), nullptr),
+                        (Inferred, root, nullptr, writtenLoc),
+                        0, writtenLoc);
 }
 
 const RequirementSource *RequirementSource::forRequirementSignature(
                                               PotentialArchetype *root,
                                               ProtocolDecl *protocol) {
   auto &builder = *root->getBuilder();
-  REQUIREMENT_SOURCE_FACTORY_BODY(RequirementSignatureSelf, nullptr, protocol,
-                                  root, 1);
+  REQUIREMENT_SOURCE_FACTORY_BODY(
+                        (nodeID, RequirementSignatureSelf, nullptr, root,
+                         protocol, nullptr),
+                        (RequirementSignatureSelf, root, protocol,
+                         WrittenRequirementLoc()),
+                        1, WrittenRequirementLoc());
+
 }
 
 const RequirementSource *RequirementSource::forNestedTypeNameMatch(
                                              PotentialArchetype *root) {
   auto &builder = *root->getBuilder();
-  REQUIREMENT_SOURCE_FACTORY_BODY(NestedTypeNameMatch, nullptr, root, nullptr,
-                                  0);
+  REQUIREMENT_SOURCE_FACTORY_BODY(
+                        (nodeID, NestedTypeNameMatch, nullptr, root,
+                         nullptr, nullptr),
+                        (NestedTypeNameMatch, root, nullptr,
+                         WrittenRequirementLoc()),
+                        0, WrittenRequirementLoc());
 }
 
 const RequirementSource *RequirementSource::viaAbstractProtocolRequirement(
-                                               GenericSignatureBuilder &builder,
-                                               ProtocolDecl *protocol) const {
-  REQUIREMENT_SOURCE_FACTORY_BODY(ProtocolRequirement, this, protocol,
-                                  nullptr, 0);
+                                    GenericSignatureBuilder &builder,
+                                     ProtocolDecl *protocol,
+                                     WrittenRequirementLoc writtenLoc) const {
+  REQUIREMENT_SOURCE_FACTORY_BODY(
+                        (nodeID, ProtocolRequirement, this, protocol,
+                         writtenLoc.getOpaqueValue(), nullptr),
+                        (ProtocolRequirement, this, protocol, writtenLoc),
+                        0, writtenLoc);
 }
 
 const RequirementSource *RequirementSource::viaSuperclass(
                                       GenericSignatureBuilder &builder,
                                       ProtocolConformance *conformance) const {
-  REQUIREMENT_SOURCE_FACTORY_BODY(Superclass, this, conformance, nullptr, 0);
+  REQUIREMENT_SOURCE_FACTORY_BODY(
+                        (nodeID, Superclass, this, conformance,
+                         nullptr, nullptr),
+                        (Superclass, this, conformance),
+                        0, WrittenRequirementLoc());
 }
 
 const RequirementSource *RequirementSource::viaConcrete(
                                       GenericSignatureBuilder &builder,
                                       ProtocolConformance *conformance) const {
-  REQUIREMENT_SOURCE_FACTORY_BODY(Concrete, this, conformance, nullptr, 0);
+  REQUIREMENT_SOURCE_FACTORY_BODY(
+                        (nodeID, Concrete, this, conformance, nullptr, nullptr),
+                        (Concrete, this, conformance),
+                        0, WrittenRequirementLoc());
 }
 
 const RequirementSource *RequirementSource::viaParent(
                                       GenericSignatureBuilder &builder,
                                       AssociatedTypeDecl *assocType) const {
-  REQUIREMENT_SOURCE_FACTORY_BODY(Parent, this, assocType, nullptr, 0);
+  REQUIREMENT_SOURCE_FACTORY_BODY(
+                        (nodeID, Parent, this, assocType, nullptr, nullptr),
+                        (Parent, this, assocType),
+                        0, WrittenRequirementLoc());
 }
 
 #undef REQUIREMENT_SOURCE_FACTORY_BODY
@@ -396,11 +384,7 @@ PotentialArchetype *RequirementSource::getRootPotentialArchetype() const {
   while (auto parent = root->parent)
     root = parent;
 
-  // If the root archetype is in extra storage, grab it from there.
-  if (root->numTrailingObjects(OverloadToken<PotentialArchetype *>()) == 1)
-    return root->getTrailingObjects<PotentialArchetype *>()[0];
-
-  // Otherwise, it's in inline storage.
+  // We're at the root, so it's in the inline storage.
   assert(storageKind == StorageKind::RootArchetype);
   return storage.rootArchetype;
 }
@@ -408,8 +392,8 @@ PotentialArchetype *RequirementSource::getRootPotentialArchetype() const {
 ProtocolDecl *RequirementSource::getProtocolDecl() const {
   switch (storageKind) {
   case StorageKind::RootArchetype:
-  case StorageKind::TypeRepr:
-  case StorageKind::RequirementRepr:
+    if (kind == RequirementSignatureSelf)
+      return getTrailingObjects<ProtocolDecl *>()[0];
     return nullptr;
 
   case StorageKind::ProtocolDecl:
@@ -429,8 +413,19 @@ ProtocolDecl *RequirementSource::getProtocolDecl() const {
 }
 
 SourceLoc RequirementSource::getLoc() const {
+  // Don't produce locations for protocol requirements unless the parent is
+  // the protocol self.
+  // FIXME: We should have a better notion of when to emit diagnostics
+  // for a particular requirement, rather than turning on/off location info.
+  // Locations that fall into this category should be advisory, emitted via
+  // notes rather than as the normal location.
+  if (kind == ProtocolRequirement && parent &&
+      parent->kind != RequirementSignatureSelf)
+    return parent->getLoc();
+
   if (auto typeRepr = getTypeRepr())
     return typeRepr->getStartLoc();
+
   if (auto requirementRepr = getRequirementRepr()) {
     switch (requirementRepr->getKind()) {
     case RequirementReprKind::LayoutConstraint:
@@ -443,6 +438,7 @@ SourceLoc RequirementSource::getLoc() const {
   }
   if (parent)
     return parent->getLoc();
+
   if (kind == RequirementSignatureSelf)
     return getProtocolDecl()->getLoc();
 
@@ -537,11 +533,6 @@ void RequirementSource::print(llvm::raw_ostream &out,
   case StorageKind::RootArchetype:
     break;
 
-  case StorageKind::TypeRepr:
-  case StorageKind::RequirementRepr:
-    dumpSourceLoc(getLoc());
-    break;
-
   case StorageKind::ProtocolDecl:
     if (storage.protocol)
       out << " (" << storage.protocol->getName() << ")";
@@ -558,6 +549,10 @@ void RequirementSource::print(llvm::raw_ostream &out,
     out << " (" << storage.assocType->getProtocol()->getName()
         << "::" << storage.assocType->getName() << ")";
     break;
+  }
+
+  if (getTypeRepr() || getRequirementRepr()) {
+    dumpSourceLoc(getLoc());
   }
 }
 
@@ -578,10 +573,10 @@ const RequirementSource *FloatingRequirementSource::getSource(
     return RequirementSource::forInferred(pa, storage.get<const TypeRepr *>());
 
   case AbstractProtocol:
-    // FIXME: Dropping "as written" information.
     return storage.get<const RequirementSource *>()
       ->viaAbstractProtocolRequirement(*pa->getBuilder(),
-                                       abstractProtocolReq.protocol);
+                                       abstractProtocolReq.protocol,
+                                       abstractProtocolReq.written);
   }
 
   llvm_unreachable("Unhandled FloatingPointRequirementSourceKind in switch.");

@@ -102,7 +102,7 @@ func superclassConformance3<T>(t: T) where T : C, T : P4, T : C2 {}
 
 protocol P5: A { } // expected-error{{non-class type 'P5' cannot inherit from class 'A'}}
 
-protocol P6: A, Other { } // expected-error{{protocol 'P6' cannot be a subclass of both 'Other' and 'A'}}
+protocol P6: A, Other { } // expected-error {{protocol 'P6' cannot be a subclass of both 'Other' and 'A'}}
 // expected-error@-1{{non-class type 'P6' cannot inherit from class 'A'}}
 // expected-error@-2{{non-class type 'P6' cannot inherit from class 'Other'}}
 // expected-note@-3{{superclass constraint 'Self' : 'A' written here}}
@@ -112,8 +112,9 @@ func takeP5<T: P5>(_ t: T) {
 	takeA(t) // okay
 }
 
-protocol P7 { // expected-error{{'Self.Assoc' cannot be a subclass of both 'Other' and 'A'}}
+protocol P7 {
 	associatedtype Assoc: A, Other 
 	// FIXME: expected-error@-1{{multiple inheritance from classes 'A' and 'Other'}}
-	// FIXME weird location: expected-note@-3{{superclass constraint 'Self.Assoc' : 'A' written here}}
+	// expected-note@-2{{superclass constraint 'Self.Assoc' : 'A' written here}}
+	// expected-error@-3{{'Self.Assoc' cannot be a subclass of both 'Other' and 'A'}}
 }
