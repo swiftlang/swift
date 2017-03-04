@@ -168,7 +168,12 @@ func _mixInt(_ value: Int) -> Int {
 public // @testable
 func _squeezeHashValue(_ hashValue: Int, _ upperBound: Int) -> Int {
   _sanityCheck(_isPowerOf2(upperBound))
-  let mixedHashValue = _mixInt(hashValue)
+
+  // Before mixing the hash value, XOR the upper bound to ensure that a
+  // different final value is chosen for each capacity level. This avoids
+  // accidentally quadratic performance when rebuilding a collection using
+  // its iterated order. (SR-3268)
+  let mixedHashValue = _mixInt(hashValue ^ upperBound)
 
   // As `upperBound` is a power of two we can do a bitwise-and to calculate
   // mixedHashValue % upperBound.
