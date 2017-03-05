@@ -130,10 +130,15 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   bool HasConcreteGenericParams = false;
   bool HasNonArchetypeGenericParams = false;
   HasUnboundGenericParams = false;
-  for (auto DT : CalleeGenericSig->getGenericParams()) {
+  auto *SM = Apply.getModule().getSwiftModule();
+  for (auto GP : CalleeGenericSig->getGenericParams()) {
+    // Don't take into account any generic parameters known
+    // to be concrete.
+    if (CalleeGenericSig->isConcreteType(Type(GP), *SM))
+      continue;
     // Check only the substitutions for the generic parameters.
     // Ignore any dependent types, etc.
-    auto Replacement = Type(DT).subst(InterfaceSubs);
+    auto Replacement = Type(GP).subst(InterfaceSubs);
     if (!Replacement->is<ArchetypeType>())
       HasNonArchetypeGenericParams = true;
 
@@ -146,7 +151,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
       if (CalleeGenericEnv) {
         if (auto Archetype = Replacement->getAs<ArchetypeType>()) {
           auto OrigArchetype =
-              CalleeGenericEnv->mapTypeIntoContext(DT)->castTo<ArchetypeType>();
+              CalleeGenericEnv->mapTypeIntoContext(GP)->castTo<ArchetypeType>();
           if (Archetype->requiresClass() && !OrigArchetype->requiresClass())
             HasNonArchetypeGenericParams = true;
           if (Archetype->getLayoutConstraint() &&
@@ -261,6 +266,7 @@ ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
     SpecializedType = CanSILFunctionType();
     SubstitutedType = CanSILFunctionType();
     SpecializedGenericSig = nullptr;
+    SpecializedGenericEnv = nullptr;
     return;
   }
 
@@ -454,7 +460,8 @@ getGenericEnvironmentAndSignature(GenericSignatureBuilder &Builder,
   GenericSignatureBuilder TmpBuilder(
       M.getASTContext(), LookUpConformanceInModule(M.getSwiftModule()));
   TmpBuilder.addGenericSignature(GenericSig);
-  TmpBuilder.finalize(SourceLoc(), GenericSig->getGenericParams());
+  TmpBuilder.finalize(SourceLoc(), GenericSig->getGenericParams(),
+                      /*allowConcreteGenericParams=*/true);
   GenericSig =
       TmpBuilder.getGenericSignature()->getCanonicalSignature().getPointer();
   GenericEnv = GenericSig->createGenericEnvironment(*M.getSwiftModule());
@@ -482,7 +489,8 @@ getSignatureWithRequirements(GenericSignature *OrigGenSig,
     Builder.addRequirement(Req, Source);
   }
 
-  Builder.finalize(SourceLoc(), OrigGenSig->getGenericParams());
+  Builder.finalize(SourceLoc(), OrigGenSig->getGenericParams(),
+                   /*allowConcreteGenericParams=*/true);
   return getGenericEnvironmentAndSignature(Builder, M);
 }
 
