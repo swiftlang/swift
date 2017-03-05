@@ -352,11 +352,12 @@ NodePointer NodeFactory::createNode(Node::Kind K) {
 NodePointer NodeFactory::createNode(Node::Kind K, Node::IndexType Index) {
   return new (Allocate<Node>()) Node(K, Index);
 }
-NodePointer NodeFactory::createNode(Node::Kind K, llvm::StringRef Text) {
-  return new (Allocate<Node>()) Node(K, Text.copy(*this));
+NodePointer NodeFactory::createNodeWithAllocatedText(Node::Kind K,
+                                                     llvm::StringRef Text) {
+  return new (Allocate<Node>()) Node(K, Text);
 }
 NodePointer NodeFactory::createNode(Node::Kind K, const CharVector &Text) {
-  return new (Allocate<Node>()) Node(K, Text.str());
+  return createNodeWithAllocatedText(K, Text.str());
 }
 NodePointer NodeFactory::createNode(Node::Kind K, const char *Text) {
   return new (Allocate<Node>()) Node(K, llvm::StringRef(Text));
@@ -527,7 +528,7 @@ NodePointer Demangler::changeKind(NodePointer Node, Node::Kind NewKind) {
     return nullptr;
   NodePointer NewNode = nullptr;
   if (Node->hasText()) {
-    NewNode = createNode(NewKind, Node->getText());
+    NewNode = createNodeWithAllocatedText(NewKind, Node->getText());
   } else if (Node->hasIndex()) {
     NewNode = createNode(NewKind, Node->getIndex());
   } else {
@@ -649,7 +650,7 @@ NodePointer Demangler::demangleMultiSubstitutions() {
   }
 }
 
-NodePointer Demangler::createSwiftType(Node::Kind typeKind, StringRef name) {
+NodePointer Demangler::createSwiftType(Node::Kind typeKind, const char *name) {
   return createType(createWithChildren(typeKind,
     createNode(Node::Kind::Module, STDLIB_NAME),
     createNode(Node::Kind::Identifier, name)));
@@ -985,8 +986,9 @@ NodePointer Demangler::popTuple() {
       firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
       NodePointer TupleElmt = createNode(Node::Kind::TupleElement);
       if (NodePointer Ident = popNode(Node::Kind::Identifier)) {
-        TupleElmt->addChild(createNode(Node::Kind::TupleElementName,
-                                                Ident->getText()), *this);
+        TupleElmt->addChild(createNodeWithAllocatedText(
+                              Node::Kind::TupleElementName, Ident->getText()),
+                            *this);
       }
       NodePointer Ty = popNode(Node::Kind::Type);
       if (!Ty)
@@ -1135,7 +1137,7 @@ NodePointer Demangler::demangleImplFunctionType() {
   if (GenSig && nextIf('P'))
     GenSig = changeKind(GenSig, Node::Kind::DependentPseudogenericSignature);
 
-  StringRef CAttr;
+  const char *CAttr = nullptr;
   switch (nextChar()) {
     case 'y': CAttr = "@callee_unowned"; break;
     case 'g': CAttr = "@callee_guaranteed"; break;
@@ -1145,7 +1147,7 @@ NodePointer Demangler::demangleImplFunctionType() {
   }
   type->addChild(createNode(Node::Kind::ImplConvention, CAttr), *this);
 
-  StringRef FAttr;
+  const char *FAttr = nullptr;
   switch (nextChar()) {
     case 'B': FAttr = "@convention(block)"; break;
     case 'C': FAttr = "@convention(c)"; break;
@@ -1157,7 +1159,7 @@ NodePointer Demangler::demangleImplFunctionType() {
       pushBack();
       break;
   }
-  if (!FAttr.empty())
+  if (FAttr)
     type->addChild(createNode(Node::Kind::ImplFunctionAttribute, FAttr), *this);
 
   addChild(type, GenSig);
@@ -1473,7 +1475,7 @@ NodePointer Demangler::demangleFunctionSpecialization() {
           // A '_' escapes a leading digit or '_' of a string constant.
           Text = Text.drop_front(1);
         }
-        addChild(Param, createNode(
+        addChild(Param, createNodeWithAllocatedText(
           Node::Kind::FunctionSignatureSpecializationParamPayload, Text));
         Param->reverseChildren(FixedChildren);
         break;
@@ -1523,7 +1525,7 @@ NodePointer Demangler::demangleFuncSpecParam(Node::IndexType ParamIdx) {
         case 's': {
           // Consumes an identifier parameter (the string constant),
           // which will be added later.
-          StringRef Encoding;
+          const char *Encoding = nullptr;
           switch (nextChar()) {
             case 'b': Encoding = "u8"; break;
             case 'w': Encoding = "u16"; break;
