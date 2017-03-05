@@ -3539,18 +3539,18 @@ GenericEnvironment *GenericEnvironment::getIncomplete(
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
-                                         Identifier baseName,
+                                         DeclBaseName baseName,
                                          ArrayRef<Identifier> argumentNames) {
-  id.AddPointer(baseName.get());
+  id.AddPointer(baseName.getAsOpaquePointer());
   id.AddInteger(argumentNames.size());
   for (auto arg : argumentNames)
     id.AddPointer(arg.get());
 }
 
-void DeclName::initialize(ASTContext &C, Identifier baseName,
+void DeclName::initialize(ASTContext &C, DeclBaseName baseName,
                           ArrayRef<Identifier> argumentNames) {
   if (argumentNames.size() == 0) {
-    SimpleOrCompound = IdentifierAndCompound(baseName, true);
+    SimpleOrCompound = BaseNameAndCompound(baseName, true);
     return;
   }
 
@@ -3576,7 +3576,7 @@ void DeclName::initialize(ASTContext &C, Identifier baseName,
 
 /// Build a compound value name given a base name and a set of argument names
 /// extracted from a parameter list.
-DeclName::DeclName(ASTContext &C, Identifier baseName,
+DeclName::DeclName(ASTContext &C, DeclBaseName baseName,
                    ParameterList *paramList) {
   SmallVector<Identifier, 4> names;
   
