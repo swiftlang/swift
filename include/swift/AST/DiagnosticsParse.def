@@ -755,8 +755,6 @@ ERROR(no_default_arg_subscript,none,
       "default arguments are not allowed in subscripts", ())
 ERROR(no_default_arg_curried,none,
       "default arguments are not allowed in curried parameter lists", ())
-WARNING(let_on_param_is_redundant, none,
-      "'let' keyword is unnecessary; function parameters are immutable by default", (unsigned))
 ERROR(var_pattern_in_var,none,
       "'%select{var|let}0' cannot appear nested inside another 'var' or "
       "'let' pattern", (unsigned))
