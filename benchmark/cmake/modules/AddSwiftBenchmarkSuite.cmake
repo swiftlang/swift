@@ -14,6 +14,21 @@ endif()
 add_definitions(-DSWIFT_EXEC -DSWIFT_LIBRARY_PATH -DONLY_PLATFORMS
                 -DSWIFT_OPTIMIZATION_LEVELS -DSWIFT_BENCHMARK_EMIT_SIB)
 
+set(macosx_arch "x86_64")
+set(iphoneos_arch "arm64" "armv7")
+set(appletvos_arch "arm64")
+set(watchos_arch "armv7k")
+
+set(macosx_ver "10.9")
+set(iphoneos_ver "8.0")
+set(appletvos_ver "9.1")
+set(watchos_ver "2.0")
+
+set(macosx_triple_platform "macosx")
+set(iphoneos_triple_platform "ios")
+set(appletvos_triple_platform "tvos")
+set(watchos_triple_platform "watchos")
+
 # Benchmark setup functions.
 
 function (_swift_benchmark_compile_archopts)
@@ -407,7 +422,30 @@ function(_swift_benchmark_compile)
   endforeach()
 endfunction()
 
-function(swift_benchmark_compile_all_platforms platforms sdks)
+function(_swift_benchmark_get_platforms_sdks platforms_outvar sdks_outvar)
+  set(sdks)
+  set(platforms)
+  foreach(platform ${ONLY_PLATFORMS})
+    execute_process(
+      COMMAND "xcrun" "--sdk" "${platform}" "--show-sdk-path"
+      OUTPUT_VARIABLE ${platform}_sdk
+      RESULT_VARIABLE result
+      ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if("${result}" MATCHES "0")
+      list(APPEND sdks "${${platform}_sdk}")
+      list(APPEND platforms ${platform})
+    endif()
+  endforeach()
+
+  set(${platforms_outvar} "${platforms}" PARENT_SCOPE)
+  set(${sdks_outvar} "${sdks}" PARENT_SCOPE)
+endfunction()
+
+function(swift_benchmark_compile_all_platforms)
+  # Look up the platform/SDKs
+  _swift_benchmark_get_platforms_sdks(platforms sdks)
+
+  # Then print out our configuration
   message("--")
   message("-- Swift Benchmark Suite:")
   message("--   SWIFT_EXEC = ${SWIFT_EXEC}")

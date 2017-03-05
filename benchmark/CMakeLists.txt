@@ -172,35 +172,6 @@ set(BENCHOPTS_MULTITHREADED
     "-whole-module-optimization" "-num-threads" "4")
 set(BENCHOPTS_SINGLEFILE "")
 
-set(macosx_arch "x86_64")
-set(iphoneos_arch "arm64" "armv7")
-set(appletvos_arch "arm64")
-set(watchos_arch "armv7k")
-
-set(macosx_ver "10.9")
-set(iphoneos_ver "8.0")
-set(appletvos_ver "9.1")
-set(watchos_ver "2.0")
-
-set(macosx_triple_platform "macosx")
-set(iphoneos_triple_platform "ios")
-set(appletvos_triple_platform "tvos")
-set(watchos_triple_platform "watchos")
-
-set(sdks)
-set(platforms)
-foreach(platform ${ONLY_PLATFORMS})
-  execute_process(
-      COMMAND "xcrun" "--sdk" "${platform}" "--show-sdk-path"
-      OUTPUT_VARIABLE ${platform}_sdk
-      RESULT_VARIABLE result
-      ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if("${result}" MATCHES "0")
-    list(APPEND sdks "${${platform}_sdk}")
-    list(APPEND platforms ${platform})
-  endif()
-endforeach()
-
 set(executable_targets)
 
 if(SWIFT_SDKS)
@@ -216,6 +187,6 @@ else()
 endif()
 
 # Compile the perf test suite for all platform
-swift_benchmark_compile_all_platforms("${platforms}" "${sdks}")
+swift_benchmark_compile_all_platforms()
 
 add_subdirectory(scripts)
