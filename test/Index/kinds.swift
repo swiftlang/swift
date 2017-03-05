@@ -214,3 +214,13 @@ class AttrAnnots {
   @GKInspectable var gkString = "gk"
   // CHECK: [[@LINE-1]]:22 | instance-property(GKI)/Swift | gkString |
 }
+
+// CHECK: [[@LINE+1]]:7 | class/Swift | C1 | [[C1_USR:.*]] | Def | rel: 0
+class C1 {}
+// CHECK: [[@LINE+1]]:11 | type-alias/Swift | C1Alias | [[C1Alias_USR:.*]] | Def | rel: 0
+typealias C1Alias = C1
+// CHECK: [[@LINE+4]]:7 | class/Swift | SubC1 | [[SubC1_USR:.*]] | Def | rel: 0
+// CHECK: [[@LINE+3]]:15 | type-alias/Swift | C1Alias | [[C1Alias_USR]] | Ref | rel: 0
+// CHECK: [[@LINE+2]]:15 | class/Swift | C1 | [[C1_USR]] | Ref,Impl,RelBase | rel: 1
+// CHECK-NEXT: RelBase | SubC1 | [[SubC1_USR]]
+class SubC1 : C1Alias {}
