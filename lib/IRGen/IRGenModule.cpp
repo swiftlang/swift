@@ -713,6 +713,10 @@ Lowering::TypeConverter &IRGenModule::getSILTypes() const {
   return IRGen.SIL.Types;
 }
 
+clang::CodeGen::CodeGenModule &IRGenModule::getClangCGM() const {
+  return ClangCodeGen->CGM();
+}
+
 llvm::Module *IRGenModule::getModule() const {
   return ClangCodeGen->GetModule();
 }

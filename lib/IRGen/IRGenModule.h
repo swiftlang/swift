@@ -69,6 +69,7 @@ namespace clang {
   class Type;
   namespace CodeGen {
     class CGFunctionInfo;
+    class CodeGenModule;
   }
 }
 
@@ -605,6 +606,8 @@ public:
            "requesting clang AST context without clang importer!");
     return *ClangASTContext;
   }
+
+  clang::CodeGen::CodeGenModule &getClangCGM() const;
 
   bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion);
   ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);

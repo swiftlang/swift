@@ -19,6 +19,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instructions.h"
+#include "clang/CodeGen/ConstantInitBuilder.h"
 
 #include "Address.h"
 #include "IRGenModule.h"
@@ -26,6 +27,83 @@
 
 namespace swift {
 namespace irgen {
+
+class ConstantAggregateBuilderBase;
+class ConstantStructBuilder;
+class ConstantArrayBuilder;
+class ConstantInitBuilder;
+
+struct ConstantInitBuilderTraits {
+  using InitBuilder = ConstantInitBuilder;
+  using AggregateBuilderBase = ConstantAggregateBuilderBase;
+  using ArrayBuilder = ConstantArrayBuilder;
+  using StructBuilder = ConstantStructBuilder;
+};
+
+/// A Swift customization of Clang's ConstantInitBuilder.
+class ConstantInitBuilder
+    : public clang::CodeGen::ConstantInitBuilderTemplateBase<
+                                                    ConstantInitBuilderTraits> {
+public:
+  IRGenModule &IGM;
+  ConstantInitBuilder(IRGenModule &IGM)
+    : ConstantInitBuilderTemplateBase(IGM.getClangCGM()),
+      IGM(IGM) {}
+};
+
+class ConstantAggregateBuilderBase
+    : public clang::CodeGen::ConstantAggregateBuilderBase {
+protected:
+  ConstantAggregateBuilderBase(ConstantInitBuilder &builder,
+                               ConstantAggregateBuilderBase *parent)
+    : clang::CodeGen::ConstantAggregateBuilderBase(builder, parent) {}
+
+  ConstantInitBuilder &getBuilder() const {
+    return static_cast<ConstantInitBuilder&>(Builder);
+  }
+  IRGenModule &IGM() const { return getBuilder().IGM; }
+
+public:
+  void addInt32(uint32_t value) {
+    addInt(IGM().Int32Ty, value);
+  }
+
+  void addRelativeReference(llvm::Constant *target) {
+    return addRelativeOffset(IGM().RelativeAddressTy, target);
+  }
+
+  /// Add a tagged relative reference to the given address.  The direct
+  /// target must be defined within the current image, but it might be
+  /// a "GOT-equivalent", i.e. a pointer to an external object; if so,
+  /// set the low bit of the offset to indicate that this is true.
+  void addRelativeReference(ConstantReference reference) {
+    return addTaggedRelativeOffset(IGM().RelativeAddressTy,
+                                   reference.getValue(),
+                                   unsigned(reference.isIndirect()));
+  }
+};
+
+class ConstantArrayBuilder
+    : public clang::CodeGen::ConstantArrayBuilderTemplateBase<
+                                                    ConstantInitBuilderTraits> {
+public:
+  template <class... As>
+  ConstantArrayBuilder(As &&... args)
+    : ConstantArrayBuilderTemplateBase(std::forward<As>(args)...) {}
+};
+
+class ConstantStructBuilder
+    : public clang::CodeGen::ConstantStructBuilderTemplateBase<
+                                                    ConstantInitBuilderTraits> {
+public:
+  template <class... As>
+  ConstantStructBuilder(As &&... args)
+    : ConstantStructBuilderTemplateBase(std::forward<As>(args)...) {}
+};
+
+
+// The legacy stuff.
+
 
 class ConstantBuilderBase {
 protected:

@@ -242,6 +242,13 @@ public:
     return llvm::Log2_64(Value);
   }
 
+  operator clang::CharUnits() const {
+    return asCharUnits();
+  }
+  clang::CharUnits asCharUnits() const {
+    return clang::CharUnits::fromQuantity(getValue());
+  }
+
   explicit operator bool() const { return Value != 0; }
 
   friend bool operator< (Alignment L, Alignment R){ return L.Value <  R.Value; }
@@ -330,6 +337,9 @@ public:
     return llvm::Log2_64(Value);
   }
 
+  operator clang::CharUnits() const {
+    return asCharUnits();
+  }
   clang::CharUnits asCharUnits() const {
     return clang::CharUnits::fromQuantity(getValue());
   }
