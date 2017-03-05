@@ -1326,6 +1326,8 @@ function calculate_targets_for_host() {
                 swift_sdk="LINUX"
                 build_for_this_target=$(not ${SKIP_BUILD_LINUX})
                 test_this_target=$(not ${SKIP_TEST_LINUX})
+                build_benchmark_this_target=$(not ${SKIP_BUILD_LINUX})
+                test_benchmark_this_target=$(not ${SKIP_BUILD_LINUX})
                 ;;
             freebsd-*)
                 swift_sdk="FREEBSD"
