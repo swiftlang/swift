@@ -16,7 +16,7 @@ add_definitions(-DSWIFT_EXEC -DSWIFT_LIBRARY_PATH -DONLY_PLATFORMS
 
 # Benchmark setup functions.
 
-function (swift_benchmark_compile_archopts)
+function (_swift_benchmark_compile_archopts)
   cmake_parse_arguments(BENCH_COMPILE_ARCHOPTS "" "PLATFORM;ARCH;OPT" "" ${ARGN})
   set(sdk ${${BENCH_COMPILE_ARCHOPTS_PLATFORM}_sdk})
   set(ver ${${BENCH_COMPILE_ARCHOPTS_PLATFORM}_ver})
@@ -360,7 +360,7 @@ function(_swift_benchmark_get_stdlib_dependencies outvar)
   set(${outvar} ${dependencies} PARENT_SCOPE)
 endfunction()
 
-function(swift_benchmark_compile)
+function(_swift_benchmark_compile)
   cmake_parse_arguments(SWIFT_BENCHMARK_COMPILE "" "PLATFORM" "" ${ARGN})
 
   if(IS_SWIFT_BUILD)
@@ -370,7 +370,7 @@ function(swift_benchmark_compile)
   foreach(arch ${${SWIFT_BENCHMARK_COMPILE_PLATFORM}_arch})
     set(platform_executables)
     foreach(optset ${SWIFT_OPTIMIZATION_LEVELS})
-      swift_benchmark_compile_archopts(
+      _swift_benchmark_compile_archopts(
         PLATFORM "${platform}"
         ARCH "${arch}"
         OPT "${optset}")
@@ -409,6 +409,6 @@ endfunction()
 
 function(swift_benchmark_compile_all_platforms platforms)
   foreach(platform ${platforms})
-    swift_benchmark_compile(PLATFORM ${platform})
+    _swift_benchmark_compile(PLATFORM ${platform})
   endforeach()
 endfunction()
