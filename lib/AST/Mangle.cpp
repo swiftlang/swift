@@ -368,7 +368,7 @@ void Mangler::bindGenericParameters(const DeclContext *DC) {
 }
 
 static OperatorFixity getDeclFixity(const ValueDecl *decl) {
-  if (!decl->getName().isOperator())
+  if (!decl->isOperator())
     return OperatorFixity::NotOperator;
 
   switch (decl->getAttrs().getUnaryOperatorKind()) {

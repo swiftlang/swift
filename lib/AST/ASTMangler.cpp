@@ -376,7 +376,7 @@ static bool isInPrivateOrLocalContext(const ValueDecl *D) {
 }
 
 void ASTMangler::appendDeclName(const ValueDecl *decl) {
-  if (decl->getName().isOperator()) {
+  if (decl->isOperator()) {
     appendIdentifier(translateOperator(decl->getName().str()));
     switch (decl->getAttrs().getUnaryOperatorKind()) {
       case UnaryOperatorKind::Prefix:
