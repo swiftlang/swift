@@ -410,6 +410,12 @@ ValueOwnershipKindVisitor::visitForwardingInst(SILInstruction *I,
 
     auto MergedValue = Base.merge(OpKind.Value);
     if (!MergedValue.hasValue()) {
+      // If we have mismatched SILOwnership and sil ownership is not enabled,
+      // just return Any for staging purposes. If SILOwnership is enabled, then
+      // we must assert!
+      if (!I->getModule().getOptions().EnableSILOwnership) {
+        return ValueOwnershipKind::Any;
+      }
       llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
     }
   }
