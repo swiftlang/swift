@@ -215,6 +215,7 @@ CONSTANT_OWNERSHIP_INST(Owned, PartialApply)
 CONSTANT_OWNERSHIP_INST(Owned, StrongPin)
 CONSTANT_OWNERSHIP_INST(Owned, ThinToThickFunction)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialOpaque)
+CONSTANT_OWNERSHIP_INST(Owned, UnconditionalCheckedCastOpaque)
 
 // One would think that these /should/ be unowned. In truth they are owned since
 // objc metatypes do not go through the retain/release fast path. In their
@@ -409,6 +410,12 @@ ValueOwnershipKindVisitor::visitForwardingInst(SILInstruction *I,
 
     auto MergedValue = Base.merge(OpKind.Value);
     if (!MergedValue.hasValue()) {
+      // If we have mismatched SILOwnership and sil ownership is not enabled,
+      // just return Any for staging purposes. If SILOwnership is enabled, then
+      // we must assert!
+      if (!I->getModule().getOptions().EnableSILOwnership) {
+        return ValueOwnershipKind::Any;
+      }
       llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
     }
   }
@@ -433,7 +440,6 @@ FORWARDING_OWNERSHIP_INST(Struct)
 FORWARDING_OWNERSHIP_INST(Tuple)
 FORWARDING_OWNERSHIP_INST(UncheckedRefCast)
 FORWARDING_OWNERSHIP_INST(UnconditionalCheckedCast)
-FORWARDING_OWNERSHIP_INST(UnconditionalCheckedCastOpaque)
 FORWARDING_OWNERSHIP_INST(Upcast)
 FORWARDING_OWNERSHIP_INST(MarkUninitialized)
 FORWARDING_OWNERSHIP_INST(UncheckedEnumData)
