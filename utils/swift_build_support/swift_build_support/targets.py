@@ -119,6 +119,11 @@ class StdlibDeploymentTarget(object):
         "powerpc64",
         "powerpc64le",
         "s390x"])
+    # We support build/test benchmarks only on Linux x86_64.
+    #
+    # TODO: If we support any more platforms, we should consider refactoring the
+    # supports_benchmark property onto the target from the platform.
+    Linux.x86_64.supports_benchmark = True
 
     FreeBSD = Platform("freebsd", archs=["x86_64"])
 
