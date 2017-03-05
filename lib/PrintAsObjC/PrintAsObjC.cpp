@@ -330,6 +330,9 @@ private:
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
+    auto members = ED->getMembers();
+    if (members.empty()) return;
+
     auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
 
     os << "@interface " << getNameForObjC(baseClass);
@@ -337,7 +340,7 @@ private:
     os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
     printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
-    printMembers(ED->getMembers());
+    printMembers(members);
     os << "@end\n";
   }
 
