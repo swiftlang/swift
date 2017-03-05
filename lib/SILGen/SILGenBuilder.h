@@ -163,11 +163,15 @@ public:
                         ArrayRef<ManagedValue> elementCountOperands);
 
   using SILBuilder::createTupleExtract;
-
   ManagedValue createTupleExtract(SILLocation loc, ManagedValue value,
                                   unsigned index, SILType type);
   ManagedValue createTupleExtract(SILLocation loc, ManagedValue value,
                                   unsigned index);
+  using SILBuilder::createTupleElementAddr;
+  ManagedValue createTupleElementAddr(SILLocation loc, ManagedValue addr,
+                                      unsigned index, SILType type);
+  ManagedValue createTupleElementAddr(SILLocation loc, ManagedValue addr,
+                                      unsigned index);
 
   using SILBuilder::createLoadBorrow;
   ManagedValue createLoadBorrow(SILLocation loc, ManagedValue base);
@@ -196,9 +200,9 @@ public:
   ManagedValue createLoadTake(SILLocation loc, ManagedValue addr);
   ManagedValue createLoadTake(SILLocation loc, ManagedValue addr,
                               const TypeLowering &lowering);
-  ManagedValue createLoadCopy(SILLocation Loc, ManagedValue Addr);
-  ManagedValue createLoadCopy(SILLocation Loc, ManagedValue Addr,
-                              const TypeLowering &Lowering);
+  ManagedValue createLoadCopy(SILLocation loc, ManagedValue addr);
+  ManagedValue createLoadCopy(SILLocation loc, ManagedValue addr,
+                              const TypeLowering &lowering);
 
   ManagedValue createFunctionArgument(SILType type, ValueDecl *decl);
 

@@ -1260,13 +1260,17 @@ public:
               "store [init] or store [assign] can only be applied to "
               "non-trivial types");
       break;
-    case StoreOwnershipQualifier::Trivial:
+    case StoreOwnershipQualifier::Trivial: {
       require(
           F.hasQualifiedOwnership(),
           "Inst with qualified ownership in a function that is not qualified");
-      require(SI->getSrc()->getType().isTrivial(SI->getModule()),
-              "A store with trivial ownership must store a trivial type");
+      SILValue Src = SI->getSrc();
+      require(Src->getType().isTrivial(SI->getModule()) ||
+              Src.getOwnershipKind() == ValueOwnershipKind::Trivial,
+              "A store with trivial ownership must store a type with trivial "
+              "ownership");
       break;
+    }
     }
   }
 

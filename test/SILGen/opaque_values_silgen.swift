@@ -50,9 +50,13 @@ func s030______assigninout<T>(_ a: inout T, _ b: T) {
 // CHECK:   [[TPL:%.*]] = tuple ([[ARG0]] : $Int, [[ARG1]] : $T)
 // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[TPL]] : $(Int, T)
 // CHECK:   [[CPY:%.*]] = copy_value [[BORROWED_ARG1]] : $(Int, T)
-// CHECK:   [[INT:%.*]] = tuple_extract [[CPY]] : $(Int, T), 0
-// CHECK:   [[GEN:%.*]] = tuple_extract [[CPY]] : $(Int, T), 1
-// CHECK:   destroy_value [[GEN]] : $T
+// CHECK:   [[BORROWED_CPY:%.*]] = begin_borrow [[CPY]]
+// CHECK:   [[INT:%.*]] = tuple_extract [[BORROWED_CPY]] : $(Int, T), 0
+// CHECK:   [[GEN:%.*]] = tuple_extract [[BORROWED_CPY]] : $(Int, T), 1
+// CHECK:   [[COPY_GEN:%.*]] = copy_value [[GEN]]
+// CHECK:   destroy_value [[COPY_GEN]]
+// CHECK:   end_borrow [[BORROWED_CPY]] from [[CPY]]
+// CHECK:   destroy_value [[CPY]]
 // CHECK:   end_borrow [[BORROWED_ARG1]] from [[TPL]] : $(Int, T), $(Int, T)
 // CHECK:   destroy_value [[TPL]] : $(Int, T)
 // CHECK:   return [[INT]]
