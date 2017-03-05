@@ -240,6 +240,61 @@ func partialApplySelfReturn(c: Factory, t: Factory.Type) {
   _ = Factory.staticNewInstance
 }
 
+// Super call to a method returning Self
+class Base {
+  required init() {}
+
+  func returnsSelf() -> Self {
+    return self
+  }
+
+  static func returnsSelfStatic() -> Self {
+    return self.init()
+  }
+}
+
+class Derived : Base {
+  // CHECK-LABEL: sil hidden @_TFC12dynamic_self7Derived9superCallfT_T_ : $@convention(method) (@guaranteed Derived) -> ()
+  // CHECK: [[SELF:%.*]] = copy_value %0
+  // CHECK: [[SUPER:%.*]] = upcast [[SELF]] : $Derived to $Base
+  // CHECK: [[METHOD:%.*]] = function_ref @_TFC12dynamic_self4Base11returnsSelffT_DS0_
+  // CHECK: apply [[METHOD]]([[SUPER]])
+  // CHECK: return
+  func superCall() {
+    super.returnsSelf()
+  }
+
+  // CHECK-LABEL: sil hidden @_TZFC12dynamic_self7Derived15superCallStaticfT_T_ : $@convention(method) (@thick Derived.Type) -> ()
+  // CHECK: [[SUPER:%.*]] = upcast %0 : $@thick Derived.Type to $@thick Base.Type
+  // CHECK: [[METHOD:%.*]] = function_ref @_TZFC12dynamic_self4Base17returnsSelfStaticfT_DS0_
+  // CHECK: apply [[METHOD]]([[SUPER]])
+  // CHECK: return
+  static func superCallStatic() {
+    super.returnsSelfStatic()
+  }
+
+  // CHECK-LABEL: sil hidden @_TFC12dynamic_self7Derived32superCallFromMethodReturningSelffT_DS0_ : $@convention(method) (@guaranteed Derived) -> @owned Derived
+  // CHECK: [[SELF:%.*]] = copy_value %0
+  // CHECK: [[SUPER:%.*]] = upcast [[SELF]] : $Derived to $Base
+  // CHECK: [[METHOD:%.*]] = function_ref @_TFC12dynamic_self4Base11returnsSelffT_DS0_
+  // CHECK: apply [[METHOD]]([[SUPER]])
+  // CHECK: return
+  func superCallFromMethodReturningSelf() -> Self {
+    super.returnsSelf()
+    return self
+  }
+
+  // CHECK-LABEL: sil hidden @_TZFC12dynamic_self7Derived38superCallFromMethodReturningSelfStaticfT_DS0_ : $@convention(method) (@thick Derived.Type) -> @owned Derived
+  // CHECK: [[SUPER:%.*]] = upcast %0 : $@thick Derived.Type to $@thick Base.Type
+  // CHECK: [[METHOD:%.*]] = function_ref @_TZFC12dynamic_self4Base17returnsSelfStaticfT_DS0_
+  // CHECK: apply [[METHOD]]([[SUPER]])
+  // CHECK: return
+  static func superCallFromMethodReturningSelfStatic() -> Self {
+    super.returnsSelfStatic()
+    return self.init()
+  }
+}
+
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {
 // CHECK: method #P.f!1: @_TTWC12dynamic_self1XS_1PS_FS1_1f
 
