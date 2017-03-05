@@ -21,16 +21,18 @@ import objc_generics
 // CHECK-NEXT: @end
 @objc class A1 {}
 
-// CHECK-LABEL: @interface A1 (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: @end
+// NEGATIVE-NOT: @interface A1 (SWIFT_EXTENSION(extensions))
 extension A1 {}
 
 // CHECK-LABEL: @interface A2{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 // CHECK-LABEL: @interface A2 (SWIFT_EXTENSION(extensions))
+// CHECK-DAG: @property (nonatomic, readonly) NSInteger some;
 // CHECK-NEXT: @end
-extension A2 {}
+extension A2 {
+  var some: Int { return 1 }
+}
 @objc class A2 {}
 
 // CHECK-LABEL: @interface A3{{$}}
@@ -95,8 +97,7 @@ extension GenericClass {
 class NotObjC {}
 extension NotObjC {}
 
-// CHECK-LABEL: @interface NSObject (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: @end
+// NEGATIVE-NOT: @interface NSObject (SWIFT_EXTENSION(extensions))
 // NEGATIVE-NOT: @interface NSObject{{$}}
 // NEGATIVE-NOT: @class NSObject
 extension NSObject {}
