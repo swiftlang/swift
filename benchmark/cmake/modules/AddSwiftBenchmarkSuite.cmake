@@ -366,7 +366,6 @@ function(swift_benchmark_compile)
     endforeach()
   endif()
 
-  set(platform_executables)
   foreach(arch ${${SWIFT_BENCHMARK_COMPILE_PLATFORM}_arch})
     set(platform_executables)
     foreach(optset ${SWIFT_OPTIMIZATION_LEVELS})
