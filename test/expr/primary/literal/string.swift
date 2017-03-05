@@ -31,5 +31,3 @@ verify(extendedGraphemeClusterLiteral: "김", with: StaticString.self)
 
 verify(stringLiteral: "abc", with: String.self)
 verify(stringLiteral: "∂éƒg", with: StaticString.self)
-
-test this is compiled
