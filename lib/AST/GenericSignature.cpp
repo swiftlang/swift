@@ -78,8 +78,22 @@ GenericSignature::getInnermostGenericParams() const {
   return params;
 }
 
+
+SmallVector<GenericTypeParamType *, 2>
+GenericSignature::getSubstitutableParams() const {
+  SmallVector<GenericTypeParamType *, 2> result;
+
+  enumeratePairedRequirements([&](Type depTy, ArrayRef<Requirement>) -> bool {
+    if (auto *paramTy = depTy->getAs<GenericTypeParamType>())
+      result.push_back(paramTy);
+    return false;
+  });
+
+  return result;
+}
+
 std::string GenericSignature::gatherGenericParamBindingsText(
-    ArrayRef<Type> types, const TypeSubstitutionMap &substitutions) const {
+    ArrayRef<Type> types, TypeSubstitutionFn substitutions) const {
   llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
   for (auto type : types) {
     type.visit([&](Type type) {
@@ -106,11 +120,11 @@ std::string GenericSignature::gatherGenericParamBindingsText(
     result += gp->getName().str();
     result += " = ";
 
-    auto found = substitutions.find(canonGP);
-    if (found == substitutions.end())
+    auto type = substitutions(canonGP);
+    if (!type)
       return "";
 
-    result += found->second.getString();
+    result += type.getString();
   }
 
   result += "]";
@@ -239,6 +253,19 @@ bool GenericSignature::enumeratePairedRequirements(
   ArrayRef<GenericTypeParamType *> genericParams = getGenericParams();
   unsigned curGenericParamIdx = 0, numGenericParams = genericParams.size();
 
+  // Figure out which generic parameters are complete.
+  SmallVector<bool, 4> genericParamsAreConcrete(genericParams.size(), false);
+  for (auto req : reqs) {
+    if (req.getKind() != RequirementKind::SameType) continue;
+    if (req.getSecondType()->isTypeParameter()) continue;
+
+    auto gp = req.getFirstType()->getAs<GenericTypeParamType>();
+    if (!gp) continue;
+
+    unsigned index = GenericParamKey(gp).findIndexIn(genericParams);
+    genericParamsAreConcrete[index] = true;
+  }
+
   /// Local function to 'catch up' to the next dependent type we're going to
   /// visit, calling the function for each of the generic parameters in the
   /// generic parameter list prior to this parameter.
@@ -263,7 +290,10 @@ bool GenericSignature::enumeratePairedRequirements(
       if (curGenericParam->getDepth() < stopDepth ||
           (curGenericParam->getDepth() == stopDepth &&
            curGenericParam->getIndex() < stopIndex)) {
-        if (fn(curGenericParam, { })) return true;
+        if (!genericParamsAreConcrete[curGenericParamIdx] &&
+            fn(curGenericParam, { }))
+          return true;
+
         ++curGenericParamIdx;
         continue;
       }
@@ -291,16 +321,10 @@ bool GenericSignature::enumeratePairedRequirements(
 
     // Utility to skip over non-conformance constraints that apply to this
     // type.
-    bool sawSameTypeToConcreteConstraint = false;
     auto skipNonConformanceConstraints = [&] {
       while (curReqIdx != numReqs &&
              reqs[curReqIdx].getKind() != RequirementKind::Conformance &&
              reqs[curReqIdx].getFirstType()->getCanonicalType() == depTy) {
-        // Record whether we saw a same-type constraint mentioning this type.
-        if (reqs[curReqIdx].getKind() == RequirementKind::SameType &&
-            !reqs[curReqIdx].getSecondType()->isTypeParameter())
-          sawSameTypeToConcreteConstraint = true;
-
         ++curReqIdx;
       }
     };
@@ -324,7 +348,10 @@ bool GenericSignature::enumeratePairedRequirements(
     // If there were any conformance constraints, or we have a generic
     // parameter we can't skip, invoke the callback.
     if ((startIdx != endIdx ||
-         (isa<GenericTypeParamType>(depTy) && !sawSameTypeToConcreteConstraint)) &&
+         (isa<GenericTypeParamType>(depTy) &&
+          !genericParamsAreConcrete[
+            GenericParamKey(cast<GenericTypeParamType>(depTy))
+              .findIndexIn(genericParams)])) &&
         fn(depTy, reqs.slice(startIdx, endIdx-startIdx)))
       return true;
   }
@@ -362,21 +389,21 @@ SubstitutionMap
 GenericSignature::getSubstitutionMap(SubstitutionList subs) const {
   SubstitutionMap result;
 
-  // An empty parameter list gives an empty map.
-  if (subs.empty())
-    assert(getGenericParams().empty() || areAllParamsConcrete());
+  enumeratePairedRequirements(
+    [&](Type depTy, ArrayRef<Requirement> reqts) -> bool {
+      auto sub = subs.front();
+      subs = subs.slice(1);
 
-  for (auto depTy : getAllDependentTypes()) {
-    auto sub = subs.front();
-    subs = subs.slice(1);
+      auto canTy = depTy->getCanonicalType();
+      if (isa<SubstitutableType>(canTy))
+        result.addSubstitution(cast<SubstitutableType>(canTy),
+                               sub.getReplacement());
+      assert(reqts.size() == sub.getConformances().size());
+      for (auto conformance : sub.getConformances())
+        result.addConformance(canTy, conformance);
 
-    auto canTy = depTy->getCanonicalType();
-    if (isa<SubstitutableType>(canTy))
-      result.addSubstitution(cast<SubstitutableType>(canTy),
-                             sub.getReplacement());
-    for (auto conformance : sub.getConformances())
-      result.addConformance(canTy, conformance);
-  }
+      return false;
+    });
 
   assert(subs.empty() && "did not use all substitutions?!");
   populateParentMap(result);
@@ -415,16 +442,6 @@ getSubstitutionMap(TypeSubstitutionFn subs,
 
   populateParentMap(subMap);
   return subMap;
-}
-
-SmallVector<Type, 4> GenericSignature::getAllDependentTypes() const {
-  SmallVector<Type, 4> result;
-  enumeratePairedRequirements([&](Type type, ArrayRef<Requirement>) {
-    result.push_back(type);
-    return false;
-  });
-
-  return result;
 }
 
 void GenericSignature::

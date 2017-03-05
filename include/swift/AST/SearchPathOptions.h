@@ -30,11 +30,26 @@ public:
   /// \c ASTContext::addSearchPath.
   std::vector<std::string> ImportSearchPaths;
 
+  struct FrameworkSearchPath {
+    std::string Path;
+    bool IsSystem = false;
+    FrameworkSearchPath(StringRef path, bool isSystem)
+    : Path(path), IsSystem(isSystem) {}
+
+    friend bool operator ==(const FrameworkSearchPath &LHS,
+                            const FrameworkSearchPath &RHS) {
+      return LHS.Path == RHS.Path && LHS.IsSystem == RHS.IsSystem;
+    }
+    friend bool operator !=(const FrameworkSearchPath &LHS,
+                            const FrameworkSearchPath &RHS) {
+      return !(LHS == RHS);
+    }
+  };
   /// Path(s) which should be searched for frameworks.
   ///
   /// Do not add values to this directly. Instead, use
   /// \c ASTContext::addSearchPath.
-  std::vector<std::string> FrameworkSearchPaths;
+  std::vector<FrameworkSearchPath> FrameworkSearchPaths;
 
   /// Path(s) which should be searched for libraries.
   ///

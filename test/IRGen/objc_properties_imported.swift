@@ -19,7 +19,7 @@ class OverridesBoolProperty : HasProperties {
   }
 }
 
-// CHECK-LABEL: define hidden void @_T024objc_properties_imported16testBoolProperty{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: define hidden swiftcc void @_T024objc_properties_imported16testBoolProperty{{[_0-9a-zA-Z]*}}F
 func testBoolProperty(hp: HasProperties) {
   // CHECK-NOT: ret void
   // CHECK: load i8*, i8** @"\01L_selector(isEnabled)"

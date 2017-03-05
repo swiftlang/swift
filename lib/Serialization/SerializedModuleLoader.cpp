@@ -96,7 +96,7 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
   // FIXME: Which name should we be using here? Do we care about CPU subtypes?
   // FIXME: At the very least, don't hardcode "arch".
   llvm::SmallString<16> archFile{
-      ctx.LangOpts.getPlatformConditionValue("arch")};
+      ctx.LangOpts.getPlatformConditionValue(PlatformConditionKind::Arch)};
   llvm::SmallString<16> archDocFile{archFile};
   if (!archFile.empty()) {
     archFile += '.';
@@ -131,8 +131,8 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
     moduleFramework += ".framework";
     isFramework = true;
 
-    for (auto path : ctx.SearchPathOpts.FrameworkSearchPaths) {
-      currPath = path;
+    for (const auto &framepath : ctx.SearchPathOpts.FrameworkSearchPaths) {
+      currPath = framepath.Path;
       llvm::sys::path::append(currPath, moduleFramework.str(),
                               "Modules", moduleFilename.str());
       auto err = openModuleFiles(currPath,

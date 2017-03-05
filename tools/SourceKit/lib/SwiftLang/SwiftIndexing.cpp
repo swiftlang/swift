@@ -65,6 +65,8 @@ private:
   }
 
   Action startSourceEntity(const IndexSymbol &symbol) override {
+    if (symbol.symInfo.Kind == SymbolKind::Parameter)
+      return Skip;
 
     // report any parent relations to this reference
     if (symbol.roles & (SymbolRoleSet)SymbolRole::RelationBaseOf) {

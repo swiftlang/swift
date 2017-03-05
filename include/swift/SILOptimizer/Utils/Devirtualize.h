@@ -43,8 +43,7 @@ namespace swift {
 /// casted to produce a properly typed value (first element).
 typedef std::pair<ValueBase *, ApplySite> DevirtualizationResult;
 
-DevirtualizationResult tryDevirtualizeApply(FullApplySite AI);
-DevirtualizationResult tryDevirtualizeApply(FullApplySite AI,
+DevirtualizationResult tryDevirtualizeApply(ApplySite AI,
                                             ClassHierarchyAnalysis *CHA);
 bool canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA);
 bool isNominalTypeWithUnboundGenericParameters(SILType Ty, SILModule &M);
@@ -55,9 +54,7 @@ DevirtualizationResult devirtualizeClassMethod(FullApplySite AI,
                                                SILValue ClassInstance);
 DevirtualizationResult tryDevirtualizeClassMethod(FullApplySite AI,
                                                   SILValue ClassInstance);
-DevirtualizationResult tryDevirtualizeWitnessMethod(ApplySite AI); 
-/// Check if an upcast is legal.
-bool isLegalUpcast(SILType FromTy, SILType ToTy);
+DevirtualizationResult tryDevirtualizeWitnessMethod(ApplySite AI);
 }
 
 #endif

@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/Utils.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Frontend/Frontend.h"
@@ -25,6 +24,7 @@
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Serialization/ASTReader.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 
@@ -284,7 +284,7 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
         break;
       case clang::frontend::IndexHeaderMap:
         CCArgs.push_back("-index-header-map");
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
       case clang::frontend::Angled: {
         std::string Flag;
         if (Entry.IsFramework)

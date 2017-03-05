@@ -53,6 +53,14 @@ size_t swift_demangle_getSimplifiedDemangledName(const char *MangledName,
                                                  char *OutputBuffer,
                                                  size_t Length);
 
+/// \brief Demangles a Swift function name and returns true if the function
+/// conforms to the Swift calling convention.
+///
+/// \returns true if the function conforms to the Swift calling convention.
+/// The return value is unspecified if the \p MangledName does not refer to a
+/// function symbol.
+int swift_demangle_hasSwiftCallingConvention(const char *MangledName);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

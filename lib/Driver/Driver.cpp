@@ -21,7 +21,6 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/Version.h"
@@ -471,6 +470,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     ArgList->hasArg(options::OPT_driver_skip_execution);
   bool ShowIncrementalBuildDecisions =
     ArgList->hasArg(options::OPT_driver_show_incremental);
+  bool ShowJobLifecycle =
+    ArgList->hasArg(options::OPT_driver_show_job_lifecycle);
 
   bool Incremental = ArgList->hasArg(options::OPT_incremental);
   if (ArgList->hasArg(options::OPT_whole_module_optimization)) {
@@ -643,8 +644,11 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
       ContinueBuildingAfterErrors)
     C->setContinueBuildingAfterErrors();
 
-  if (ShowIncrementalBuildDecisions)
+  if (ShowIncrementalBuildDecisions || ShowJobLifecycle)
     C->setShowsIncrementalBuildDecisions();
+
+  if (ShowJobLifecycle)
+    C->setShowJobLifecycle();
 
   // This has to happen after building jobs, because otherwise we won't even
   // emit .swiftdeps files for the next build.
@@ -1357,7 +1361,7 @@ void Driver::buildActions(const ToolChain &TC,
           AllLinkerInputs.push_back(Current.release());
           break;
         }
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
       case types::TY_Image:
       case types::TY_dSYM:
       case types::TY_Dependencies:

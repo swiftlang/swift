@@ -16,10 +16,10 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILLinkage.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
@@ -157,7 +157,7 @@ static bool hasLoweredLocalCaptures(AnyFunctionRef AFR,
           return true;
 
         // Otherwise, transitively capture the accessors.
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
 
       case VarDecl::Computed:
         addFunctionCapture(var->getGetter());
@@ -205,7 +205,7 @@ static bool hasLoweredLocalCaptures(AnyFunctionRef AFR,
         case VarDecl::ComputedWithMutableAddress:
           assert(!capture.isDirect() && "should have short circuited out");
           // Otherwise, transitively capture the accessors.
-          SWIFT_FALLTHROUGH;
+          LLVM_FALLTHROUGH;
           
         case VarDecl::Computed:
           if (captureHasLocalCaptures(var->getGetter()))
@@ -661,7 +661,7 @@ static std::string mangleConstantOld(SILDeclRef c,
       }
 
     // Otherwise, fall through into the 'other decl' case.
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case SILDeclRef::Kind::EnumElement:
     mangler.append(introducer);
@@ -805,7 +805,7 @@ static std::string mangleConstant(SILDeclRef c, SILDeclRef::ManglingKind Kind) {
       }
 
     // Otherwise, fall through into the 'other decl' case.
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case SILDeclRef::Kind::EnumElement:
     return mangler.mangleEntity(c.getDecl(), c.isCurried, SKind);

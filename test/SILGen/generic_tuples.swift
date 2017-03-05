@@ -35,5 +35,5 @@ extension HasAssoc where A == (Int, Int) {
     return (0, 0)
   }
 }
-// CHECK-LABEL: sil hidden @_T014generic_tuples8HasAssocPAaaBRzSi_Sit1ARtzlE16returnTupleAliasAEyF : $@convention(method) <Self where Self : HasAssoc, Self.A == (Int, Int)> (@in_guaranteed Self) -> (Int, Int) {
+// CHECK-LABEL: sil hidden @_T014generic_tuples8HasAssocPAaaBRzSi_Sit1ARtzlE16returnTupleAliasSi_SityF : $@convention(method) <Self where Self : HasAssoc, Self.A == (Int, Int)> (@in_guaranteed Self) -> (Int, Int) {
 // CHECK:       return {{.*}} : $(Int, Int)

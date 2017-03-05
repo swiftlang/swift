@@ -171,7 +171,8 @@ public:
   /// -I or -F.
   ///
   /// \returns true if there was an error adding the search path.
-  bool addSearchPath(StringRef newSearchPath, bool isFramework) override;
+  bool addSearchPath(StringRef newSearchPath, bool isFramework,
+                     bool isSystem) override;
 
   /// Imports an Objective-C header file into the shared imported header module.
   ///
@@ -259,8 +260,7 @@ public:
   /// The return value may be an empty identifier, in which case the enum would
   /// not be imported.
   ///
-  /// This is mostly an implementation detail of the importer, but is also
-  /// used by the debugger.
+  /// This is not used by the importer itself, but is used by the debugger.
   Identifier getEnumConstantName(const clang::EnumConstantDecl *enumConstant);
 
   /// Writes the mangled name of \p clangDecl to \p os.

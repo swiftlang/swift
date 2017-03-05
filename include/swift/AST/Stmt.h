@@ -20,6 +20,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ASTNode.h"
+#include "swift/AST/IfConfigClause.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -653,41 +654,17 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Guard; }
 };
 
-  
-/// This represents one part of a #if block.  If the condition field is
-/// non-null, then this represents a #if or a #elseif, otherwise it represents
-/// an #else block.
-struct IfConfigStmtClause {
-  /// The location of the #if, #elseif, or #else keyword.
-  SourceLoc Loc;
-  
-  /// The condition guarding this #if or #elseif block.  If this is null, this
-  /// is a #else clause.
-  Expr *Cond;
-  
-  /// Elements inside the clause
-  ArrayRef<ASTNode> Elements;
-
-  /// True if this is the active clause of the #if block.
-  bool isActive;
-
-  IfConfigStmtClause(SourceLoc Loc, Expr *Cond,
-                     ArrayRef<ASTNode> Elements, bool isActive)
-    : Loc(Loc), Cond(Cond), Elements(Elements), isActive(isActive) {
-  }
-};
-
 /// IfConfigStmt - This class models the statement-side representation of
 /// #if/#else/#endif blocks.
 class IfConfigStmt : public Stmt {
   /// An array of clauses controlling each of the #if/#elseif/#else conditions.
   /// The array is ASTContext allocated.
-  ArrayRef<IfConfigStmtClause> Clauses;
+  ArrayRef<IfConfigClause<ASTNode>> Clauses;
   SourceLoc EndLoc;
   bool HadMissingEnd;
 
 public:
-  IfConfigStmt(ArrayRef<IfConfigStmtClause> Clauses, SourceLoc EndLoc,
+  IfConfigStmt(ArrayRef<IfConfigClause<ASTNode>> Clauses, SourceLoc EndLoc,
                bool HadMissingEnd)
   : Stmt(StmtKind::IfConfig, /*implicit=*/false),
     Clauses(Clauses), EndLoc(EndLoc), HadMissingEnd(HadMissingEnd) {}
@@ -699,7 +676,9 @@ public:
 
   bool hadMissingEnd() const { return HadMissingEnd; }
   
-  const ArrayRef<IfConfigStmtClause> &getClauses() const { return Clauses; }
+  const ArrayRef<IfConfigClause<ASTNode>> &getClauses() const {
+    return Clauses;
+  }
 
   ArrayRef<ASTNode> getActiveClauseElements() const {
     for (auto &Clause : Clauses)

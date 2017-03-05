@@ -19,7 +19,6 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -36,7 +35,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
                              ManagedValue swiftValue,
                              ProtocolConformance *conformance) {
   // Dig out the nominal type we're bridging from.
-  Type swiftValueType = swiftValue.getSwiftType()->getRValueType();
+  Type swiftValueType = swiftValue.getType().getSwiftRValueType();
 
   // Find the _bridgeToObjectiveC requirement.
   auto requirement = gen.SGM.getBridgeToObjectiveCRequirement(loc);
@@ -499,9 +498,10 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
   // some work by opening it.
   if (loweredNativeTy->isExistentialType()) {
     auto openedTy = ArchetypeType::getOpened(loweredNativeTy);
-    
-    auto openedExistential = gen.emitOpenExistential(loc, v, openedTy,
-                                                 gen.getLoweredType(openedTy));
+
+    auto openedExistential = gen.emitOpenExistential(
+        loc, v, openedTy, gen.getLoweredType(openedTy), AccessKind::Read);
+
     v = gen.manageOpaqueValue(openedExistential, loc, SGFContext());
     loweredNativeTy = openedTy;
   }
@@ -988,14 +988,17 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
       gen.emitBridgedToNativeValue(loc,
                                    bridgedArgs[i],
                                    SILFunctionTypeRepresentation::ObjCMethod,
-                                   argTy.getSwiftType());
+                                   argTy.getSwiftRValueType());
     SILValue argValue;
 
-    if (nativeInputs[i].isConsumed())
+    if (nativeInputs[i].isConsumed()) {
       argValue = native.forward(gen);
-    else
+    } else if (nativeInputs[i].isGuaranteed()) {
+      argValue = native.borrow(gen, loc).getUnmanagedValue();
+    } else {
       argValue = native.getValue();
-    
+    }
+
     args.push_back(argValue);
   }
 

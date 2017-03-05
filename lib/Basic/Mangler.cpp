@@ -13,6 +13,7 @@
 #define CHECK_MANGLING_AGAINST_OLD
 
 #include "swift/Basic/Mangler.h"
+#include "swift/Basic/Demangler.h"
 #include "swift/Basic/Punycode.h"
 #include "swift/Basic/ManglingMacros.h"
 #include "llvm/ADT/StringMap.h"
@@ -188,12 +189,13 @@ std::string NewMangling::selectMangling(const std::string &Old,
                                         const std::string &New,
                                         bool compareTrees) {
   using namespace Demangle;
+  Demangler Dem;
 
-  NodePointer NewNode = demangleSymbolAsNode(New);
+  NodePointer NewNode = Dem.demangleSymbol(New);
 
   if (!NewNode && StringRef(New).startswith("s:")) {
     std::string demangleStr = MANGLING_PREFIX_STR + New.substr(2);
-    NewNode = demangleSymbolAsNode(demangleStr);
+    NewNode = Dem.demangleSymbol(demangleStr);
   }
 
 #ifndef NDEBUG
@@ -201,9 +203,9 @@ std::string NewMangling::selectMangling(const std::string &Old,
 
   static int numCmp = 0;
 
-  NodePointer OldNode;
+  NodePointer OldNode = nullptr;
   if (compareTrees)
-    OldNode = demangleSymbolAsNode(Old);
+    OldNode = Dem.demangleSymbol(Old);
 
   if (StringRef(New).startswith(MANGLING_PREFIX_STR) &&
       (!NewNode || treeContains(NewNode, Demangle::Node::Kind::Suffix))) {
@@ -224,7 +226,7 @@ std::string NewMangling::selectMangling(const std::string &Old,
       assert(false);
     }
     if (StringRef(New).startswith(MANGLING_PREFIX_STR)) {
-      std::string Remangled = mangleNodeNew(NewNode);
+      std::string Remangled = mangleNode(NewNode);
       if (New != Remangled) {
         bool isEqual = false;
         if (treeContains(NewNode,
@@ -232,7 +234,7 @@ std::string NewMangling::selectMangling(const std::string &Old,
             // Does the mangling contain an identifier which is the name of
             // an old-mangled function?
             New.find("_T", 2) != std::string::npos) {
-          NodePointer RemangledNode = demangleSymbolAsNode(Remangled);
+          NodePointer RemangledNode = Dem.demangleSymbol(Remangled);
           isEqual = areTreesEqual(NewNode, RemangledNode);
         }
         if (!isEqual) {

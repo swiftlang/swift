@@ -12,7 +12,6 @@
 
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
 
-#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 

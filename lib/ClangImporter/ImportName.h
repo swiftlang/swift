@@ -25,9 +25,6 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "clang/Sema/Sema.h"
 
-// TODO: remove when we drop import name options
-#include "clang/AST/Decl.h"
-
 namespace swift {
 namespace importer {
 struct PlatformAvailability;
@@ -55,11 +52,35 @@ enum class ImportNameVersion : unsigned {
 
   /// Names as they appeared in Swift 4 family
   Swift4,
-};
-enum { NumImportNameVersions = 4 };
 
-/// Map a language version into an import name version
+  /// A placeholder for the latest version, to be used in loops and such.
+  LAST_VERSION = Swift4
+};
+
+static inline void
+forEachImportNameVersion(llvm::function_ref<void(ImportNameVersion)> action) {
+  auto limit = static_cast<unsigned>(ImportNameVersion::LAST_VERSION);
+  for (unsigned raw = 0; raw <= limit; ++raw)
+    action(static_cast<ImportNameVersion>(raw));
+}
+
+static inline ImportNameVersion &operator++(ImportNameVersion &value) {
+  assert(value != ImportNameVersion::LAST_VERSION);
+  value = static_cast<ImportNameVersion>(static_cast<unsigned>(value) + 1);
+  return value;
+}
+
+static inline ImportNameVersion &operator--(ImportNameVersion &value) {
+  assert(value != ImportNameVersion::Raw);
+  value = static_cast<ImportNameVersion>(static_cast<unsigned>(value) - 1);
+  return value;
+}
+
+/// Map a language version into an import name version.
 ImportNameVersion nameVersionFromOptions(const LangOptions &langOpts);
+
+/// Map an import name version into a language version.
+unsigned majorVersionNumberForNameVersion(ImportNameVersion version);
 
 /// Describes a name that was imported from Clang.
 class ImportedName {
@@ -220,6 +241,11 @@ public:
 /// Strips a trailing "Notification", if present. Returns {} if name doesn't end
 /// in "Notification", or it there would be nothing left.
 StringRef stripNotification(StringRef name);
+
+/// Find the swift_name attribute associated with this declaration, if any,
+/// appropriate for \p version.
+const clang::SwiftNameAttr *findSwiftNameAttr(const clang::Decl *decl,
+                                              ImportNameVersion version);
 
 /// Class to determine the Swift name of foreign entities. Currently fairly
 /// stateless and borrows from the ClangImporter::Implementation, but in the

@@ -9,6 +9,7 @@
     - [Smoke Testing](#smoke-testing)
     - [Validation Testing](#validation-testing)
     - [Lint Testing](#lint-testing)
+    - [Specific Preset Testing](#specific-preset-testing)
 - [Cross Repository Testing](#cross-repository-testing)
 - [ci.swift.org bots](#ciswiftorg-bots)
 
@@ -28,6 +29,7 @@ swift-ci pull request testing is triggered by writing a comment on this PR addre
 2. Validation Testing
 3. Benchmarking.
 4. Lint Testing
+5. Specific Preset Testing
 
 We describe each in detail below:
 
@@ -79,6 +81,7 @@ A smoke test on Linux does the following:
         OS X platform               | @swift-ci Please benchmark                    | Swift Benchmark on OS X Platform
         Linux platform              | @swift-ci Please test Linux platform          | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
         Linux platform              | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
+        OS X platform               | @swift-ci Please ASAN test                    | Swift ASAN Test OS X Platform
 
 The core principles of validation testing is that:
 
@@ -120,6 +123,20 @@ A validation test on Linux does the following:
         Language     | Comment | Check Status
         ------------ | ------- | ------------
         Python       | @swift-ci Please Python lint | Python lint
+
+### Specific Preset Testing
+
+        Platform     | Comment | Check Status
+        ------------ | ------- | ------------
+        OS X platform | preset=<preset> <br> @swift-ci Please test macOS with preset | Swift Test macOS Platform with preset
+
+For example:
+
+```
+preset=buildbot_incremental,tools=RA,stdlib=RD,smoketest=macosx,single-thread
+@swift-ci Please test macOS with preset
+
+```
 
 ## Cross Repository Testing
 

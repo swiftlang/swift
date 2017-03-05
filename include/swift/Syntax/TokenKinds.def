@@ -1,0 +1,228 @@
+//===--- TokenKinds.def - Swift Tokenizer Metaprogramming -----------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming lexer tokens.
+//
+//===----------------------------------------------------------------------===//
+
+/// KEYWORD(kw)
+///   Expands for every Swift keyword, such as 'if', 'else', etc.
+#ifndef KEYWORD
+#define KEYWORD(kw)
+#endif
+
+/// DECL_KEYWORD(kw)
+///   Expands for every Swift keyword that can be used in a declaration.
+#ifndef DECL_KEYWORD
+#define DECL_KEYWORD(kw) KEYWORD(kw)
+#endif
+
+/// STMT_KEYWORD(kw)
+///   Expands for every Swift keyword used in statement grammar.
+#ifndef STMT_KEYWORD
+#define STMT_KEYWORD(kw) KEYWORD(kw)
+#endif
+
+/// POUND_KEYWORD(kw)
+///   Every keyword in the #foo namespace.
+#ifndef POUND_KEYWORD
+#define POUND_KEYWORD(kw)
+#endif
+
+/// POUND_OBJECT_LITERAL(kw, desc, proto)
+///   Every keyword in the #foo namespace representing an object literal.
+#ifndef POUND_OBJECT_LITERAL
+#define POUND_OBJECT_LITERAL(kw, desc, proto) POUND_KEYWORD(kw)
+#endif
+
+/// POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)
+///   Every keyword in the #foo namespace representing an object literal.
+#ifndef POUND_OLD_OBJECT_LITERAL
+#define POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg) POUND_KEYWORD(kw)
+#endif
+
+/// POUND_CONFIG(kw)
+///   Every keyword in the #foo namespace representing a configuration.
+#ifndef POUND_CONFIG
+#define POUND_CONFIG(kw) POUND_KEYWORD(kw)
+#endif
+
+/// SIL_KEYWORD(kw)
+///   Expands for every SIL keyword. These are only keywords when parsing SIL.
+#ifndef SIL_KEYWORD
+#define SIL_KEYWORD(kw) KEYWORD(kw)
+#endif
+
+/// PUNCTUATOR(name, str)
+///   Expands for every Swift punctuator.
+///   \param name  The symbolic name of the punctuator, such as
+///                'l_paren' or 'arrow'.
+///   \param str   A string literal containing the spelling of the punctuator,
+///                such as '"("' or '"->"'.
+#ifndef PUNCTUATOR
+#define PUNCTUATOR(name, str)
+#endif
+
+// Keywords that start decls.
+DECL_KEYWORD(associatedtype)
+DECL_KEYWORD(class)
+DECL_KEYWORD(deinit)
+DECL_KEYWORD(enum)
+DECL_KEYWORD(extension)
+DECL_KEYWORD(func)
+DECL_KEYWORD(import)
+DECL_KEYWORD(init)
+DECL_KEYWORD(inout)
+DECL_KEYWORD(let)
+DECL_KEYWORD(operator)
+DECL_KEYWORD(precedencegroup)
+DECL_KEYWORD(protocol)
+DECL_KEYWORD(struct)
+DECL_KEYWORD(subscript)
+DECL_KEYWORD(typealias)
+DECL_KEYWORD(var)
+
+DECL_KEYWORD(fileprivate)
+DECL_KEYWORD(internal)
+DECL_KEYWORD(private)
+DECL_KEYWORD(public)
+DECL_KEYWORD(static)
+
+SIL_KEYWORD(undef)
+SIL_KEYWORD(sil)
+SIL_KEYWORD(sil_stage)
+SIL_KEYWORD(sil_vtable)
+SIL_KEYWORD(sil_global)
+SIL_KEYWORD(sil_witness_table)
+SIL_KEYWORD(sil_default_witness_table)
+SIL_KEYWORD(sil_coverage_map)
+SIL_KEYWORD(sil_scope)
+
+// Statement keywords.
+STMT_KEYWORD(defer)
+STMT_KEYWORD(if)
+STMT_KEYWORD(guard)
+STMT_KEYWORD(do)
+STMT_KEYWORD(repeat)
+STMT_KEYWORD(else)
+STMT_KEYWORD(for)
+STMT_KEYWORD(in)
+STMT_KEYWORD(while)
+STMT_KEYWORD(return)
+STMT_KEYWORD(break)
+STMT_KEYWORD(continue)
+STMT_KEYWORD(fallthrough)
+STMT_KEYWORD(switch)
+STMT_KEYWORD(case)
+STMT_KEYWORD(default)
+STMT_KEYWORD(where)
+STMT_KEYWORD(catch)
+
+// Expression keywords.
+KEYWORD(as)
+KEYWORD(Any)
+KEYWORD(false)
+KEYWORD(is)
+KEYWORD(nil)
+KEYWORD(rethrows)
+KEYWORD(super)
+KEYWORD(self)
+KEYWORD(Self)
+KEYWORD(throw)
+KEYWORD(true)
+KEYWORD(try)
+KEYWORD(throws)
+KEYWORD(__FILE__)
+KEYWORD(__LINE__)
+KEYWORD(__COLUMN__)
+KEYWORD(__FUNCTION__)
+KEYWORD(__DSO_HANDLE__)
+
+// Pattern keywords.
+KEYWORD(_)
+
+// Punctuators.
+PUNCTUATOR(l_paren,       "(")
+PUNCTUATOR(r_paren,       ")")
+PUNCTUATOR(l_brace,       "{")
+PUNCTUATOR(r_brace,       "}")
+PUNCTUATOR(l_square,      "[")
+PUNCTUATOR(r_square,      "]")
+PUNCTUATOR(l_angle,       "<")
+PUNCTUATOR(r_angle,       ">")
+
+PUNCTUATOR(period,        ".")
+PUNCTUATOR(period_prefix, ".")
+PUNCTUATOR(comma,         ",")
+PUNCTUATOR(colon,         ":")
+PUNCTUATOR(semi,          ";")
+PUNCTUATOR(equal,         "=")
+PUNCTUATOR(at_sign,       "@")
+PUNCTUATOR(pound,         "#")
+
+PUNCTUATOR(amp_prefix,    "&")
+PUNCTUATOR(arrow,         "->")
+
+PUNCTUATOR(backtick,      "`")
+
+PUNCTUATOR(exclaim_postfix, "!") // if left-bound
+
+PUNCTUATOR(question_postfix, "?") // if left-bound
+PUNCTUATOR(question_infix,"?")    // if not left-bound
+
+PUNCTUATOR(sil_dollar,    "$")    // Only in SIL mode.
+PUNCTUATOR(sil_exclamation, "!")    // Only in SIL mode.
+
+// Legacy punctuators used for migrating old object literal syntax.
+// NOTE: Remove in the future.
+PUNCTUATOR(l_square_lit,  "[#")
+PUNCTUATOR(r_square_lit,  "#]")
+
+// Keywords in the # namespace.  "if" becomes "tok::pound_if".
+POUND_KEYWORD(if)
+POUND_KEYWORD(else)
+POUND_KEYWORD(elseif)
+POUND_KEYWORD(endif)
+POUND_KEYWORD(keyPath)
+POUND_KEYWORD(line)
+POUND_KEYWORD(sourceLocation)
+POUND_KEYWORD(selector)
+
+// Keywords in the # namespace that are build configurations.
+POUND_CONFIG(available)
+
+
+// Declaratively define object literals, including their
+// corresponding protocols.
+POUND_OBJECT_LITERAL(fileLiteral, "file reference", ExpressibleByFileReferenceLiteral)
+POUND_OBJECT_LITERAL(imageLiteral, "image", ExpressibleByImageLiteral)
+POUND_OBJECT_LITERAL(colorLiteral, "color", ExpressibleByColorLiteral)
+
+POUND_OLD_OBJECT_LITERAL(FileReference, fileLiteral, fileReferenceLiteral, resourceName)
+POUND_OLD_OBJECT_LITERAL(Image, imageLiteral, imageLiteral, resourceName)
+POUND_OLD_OBJECT_LITERAL(Color, colorLiteral, colorLiteralRed, red)
+
+POUND_KEYWORD(file)
+POUND_KEYWORD(column)
+POUND_KEYWORD(function)
+POUND_KEYWORD(dsohandle)
+
+
+#undef KEYWORD
+#undef DECL_KEYWORD
+#undef STMT_KEYWORD
+#undef SIL_KEYWORD
+#undef PUNCTUATOR
+#undef POUND_KEYWORD
+#undef POUND_OBJECT_LITERAL
+#undef POUND_OLD_OBJECT_LITERAL
+#undef POUND_CONFIG

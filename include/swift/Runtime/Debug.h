@@ -20,7 +20,6 @@
 #include <llvm/Support/Compiler.h>
 #include <stdint.h>
 #include "swift/Runtime/Config.h"
-#include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Unreachable.h"
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
@@ -63,6 +62,12 @@ static void CRSetCrashLogMessage(const char *) {}
 
 namespace swift {
 
+// Duplicated from Metadata.h. We want to use this header
+// in places that cannot themselves include Metadata.h.
+struct InProcess;
+template <typename Runtime> struct TargetMetadata;
+using Metadata = TargetMetadata<InProcess>;
+
 // swift::crash() halts with a crash log message, 
 // but otherwise tries not to disturb register state.
 
@@ -87,11 +92,6 @@ static inline void _failCorruptType(const Metadata *type) {
 LLVM_ATTRIBUTE_NORETURN
 extern void
 fatalError(uint32_t flags, const char *format, ...);
-  
-struct InProcess;
-
-template <typename Runtime> struct TargetMetadata;
-using Metadata = TargetMetadata<InProcess>;
 
 // swift_dynamicCastFailure halts using fatalError()
 // with a description of a failed cast's types.
@@ -111,6 +111,14 @@ swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
 
 SWIFT_RUNTIME_EXPORT
 void swift_reportError(uint32_t flags, const char *message);
+
+// Halt due to an overflow in swift_retain().
+LLVM_ATTRIBUTE_NORETURN LLVM_ATTRIBUTE_NOINLINE
+void swift_abortRetainOverflow();
+
+// Halt due to reading an unowned reference to a dead object.
+LLVM_ATTRIBUTE_NORETURN LLVM_ATTRIBUTE_NOINLINE
+void swift_abortRetainUnowned(const void *object);
 
 // namespace swift
 }

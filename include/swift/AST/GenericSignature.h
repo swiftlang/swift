@@ -114,19 +114,13 @@ public:
   /// \param substitutions The generic parameter -> generic argument
   /// substitutions that will have been applied to these types.
   /// These are used to produce the "parameter = argument" bindings in the test.
-  std::string gatherGenericParamBindingsText(
-      ArrayRef<Type> types, const TypeSubstitutionMap &substitutions) const;
+  std::string
+  gatherGenericParamBindingsText(ArrayRef<Type> types,
+                                 TypeSubstitutionFn substitutions) const;
 
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const {
     return const_cast<GenericSignature *>(this)->getRequirementsBuffer();
-  }
-
-  /// Check if the generic signature makes all generic parameters
-  /// concrete.
-  bool areAllParamsConcrete() const {
-    auto iter = getAllDependentTypes();
-    return iter.begin() == iter.end();
   }
 
   /// Only allow allocation by doing a placement new.
@@ -173,11 +167,6 @@ public:
   void getSubstitutions(const SubstitutionMap &subMap,
                         SmallVectorImpl<Substitution> &result) const;
 
-  /// Return a range that iterates through all of the types that require
-  /// substitution, which includes the generic parameter types as well as
-  /// other dependent types that require additional conformances.
-  SmallVector<Type, 4> getAllDependentTypes() const;
-
   /// Enumerate all of the dependent types in the type signature that will
   /// occur in substitution lists (in order), along with the set of
   /// conformance requirements placed on that dependent type.
@@ -189,6 +178,33 @@ public:
   /// \returns true if any call to \c fn returned \c true, otherwise \c false.
   bool enumeratePairedRequirements(
          llvm::function_ref<bool(Type, ArrayRef<Requirement>)> fn) const;
+
+  /// Return a vector of all generic parameters that are not subject to
+  /// a concrete same-type constraint.
+  SmallVector<GenericTypeParamType *, 2> getSubstitutableParams() const;
+
+  /// Check if the generic signature makes all generic parameters
+  /// concrete.
+  bool areAllParamsConcrete() const {
+    return !enumeratePairedRequirements(
+      [](Type, ArrayRef<Requirement>) -> bool {
+        return true;
+      });
+  }
+
+  /// Return the size of a SubstitutionList built from this signature.
+  ///
+  /// Don't add new calls of this -- the representation of SubstitutionList
+  /// will be changing soon.
+  unsigned getSubstitutionListSize() const {
+    unsigned result = 0;
+    enumeratePairedRequirements(
+      [&](Type, ArrayRef<Requirement>) -> bool {
+        result++;
+        return false;
+      });
+    return result;
+  }
 
   /// Determines whether this GenericSignature is canonical.
   bool isCanonical() const;

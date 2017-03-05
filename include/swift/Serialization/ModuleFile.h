@@ -153,11 +153,16 @@ private:
   /// All modules this module depends on.
   SmallVector<Dependency, 8> Dependencies;
 
+  struct SearchPath {
+    StringRef Path;
+    bool IsFramework;
+    bool IsSystem;
+  };
   /// Search paths this module may provide.
   ///
   /// This is not intended for use by frameworks, but may show up in debug
   /// modules.
-  std::vector<std::pair<StringRef, bool>> SearchPaths;
+  std::vector<SearchPath> SearchPaths;
 
   /// Info for the (lone) imported header for this module.
   struct {
@@ -312,6 +317,10 @@ private:
   using SerializedDeclTable =
       llvm::OnDiskIterableChainedHashTable<DeclTableInfo>;
 
+  class ExtensionTableInfo;
+  using SerializedExtensionTable =
+      llvm::OnDiskIterableChainedHashTable<ExtensionTableInfo>;
+
   class LocalDeclTableInfo;
   using SerializedLocalDeclTable =
       llvm::OnDiskIterableChainedHashTable<LocalDeclTableInfo>;
@@ -323,9 +332,9 @@ private:
   std::unique_ptr<SerializedDeclTable> TopLevelDecls;
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
   std::unique_ptr<SerializedDeclTable> PrecedenceGroupDecls;
-  std::unique_ptr<SerializedDeclTable> ExtensionDecls;
   std::unique_ptr<SerializedDeclTable> ClassMembersByName;
   std::unique_ptr<SerializedDeclTable> OperatorMethodDecls;
+  std::unique_ptr<SerializedExtensionTable> ExtensionDecls;
   std::unique_ptr<SerializedLocalDeclTable> LocalTypeDecls;
   std::unique_ptr<SerializedNestedTypeDeclsTable> NestedTypeDecls;
 
@@ -447,6 +456,11 @@ private:
   readObjCMethodTable(ArrayRef<uint64_t> fields, StringRef blobData);
 
   /// Read an on-disk local decl hash table stored in
+  /// index_block::ExtensionTableLayout format.
+  std::unique_ptr<SerializedExtensionTable>
+  readExtensionTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+  /// Read an on-disk local decl hash table stored in
   /// index_block::NestedTypeDeclsLayout format.
   std::unique_ptr<SerializedNestedTypeDeclsTable>
   readNestedTypeDeclsTable(ArrayRef<uint64_t> fields, StringRef blobData);
@@ -493,8 +507,7 @@ private:
   /// Set up a (potentially lazy) generic environment for the given type,
   /// function or extension.
   void configureGenericEnvironment(
-                   llvm::PointerUnion3<GenericTypeDecl *, ExtensionDecl *,
-                                       AbstractFunctionDecl *> genericDecl,
+                   GenericContext *genericDecl,
                    serialization::GenericEnvironmentID envID);
 
   /// Populates the vector with members of a DeclContext from \c DeclTypeCursor.
@@ -697,7 +710,7 @@ public:
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
 
-  GenericEnvironment *loadGenericEnvironment(const Decl *decl,
+  GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
                                              uint64_t contextData) override;
 
   Optional<StringRef> getGroupNameById(unsigned Id) const;

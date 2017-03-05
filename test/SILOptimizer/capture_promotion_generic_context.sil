@@ -35,16 +35,11 @@ entry(%0 : $*T, %1 : $Int):
   return %k : $@callee_owned () -> Int
 }
 
-// Applying the caller's substitutions to a generic closure callee would also
-// be disastrous, but it appears that capture promotion currently bails out
-// on generic closures. This test is included to ensure there aren't regressions
-// if capture promotion is ever generalized to generic closures.
-
 protocol P {}
 
-// TODO: Ought to be promotable, but currently is not.
-// rdar://problem/28948735
-// CHECK-LABEL: sil @generic_promotable_box
+// CHECK-LABEL: sil @_TTSf2n_i__generic_promotable_box : $@convention(thin) <T> (@in T, Builtin.Int32) -> Builtin.Int32
+// CHECK:       bb0(%0 : $*T, %1 : $Builtin.Int32):
+// CHECK-NEXT:    return %1 : $Builtin.Int32
 
 sil @generic_promotable_box : $@convention(thin) <T> (@in T, <τ_0_0> { var τ_0_0 } <Int>) -> Int {
 entry(%0 : $*T, %b : $<τ_0_0> { var τ_0_0 } <Int>):
@@ -54,8 +49,12 @@ entry(%0 : $*T, %b : $<τ_0_0> { var τ_0_0 } <Int>):
 }
 
 // CHECK-LABEL: sil @call_generic_promotable_box_from_different_generic
-// CHECK:         [[F:%.*]] = function_ref @generic_promotable_box
-// CHECK:         partial_apply [[F]]<U>(
+// CHECK:       bb0(%0 : $*T, %1 : $*U, %2 : $Builtin.Int32):
+// CHECK-NEXT:    destroy_addr %0 : $*T
+// CHECK-NEXT:    destroy_addr %1 : $*U
+// CHECK:         [[F:%.*]] = function_ref @_TTSf2n_i__generic_promotable_box : $@convention(thin) <τ_0_0> (@in τ_0_0, Builtin.Int32) -> Builtin.Int32
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [[F]]<U>(%2)
+// CHECK-NEXT:    return [[CLOSURE]]
 
 sil @call_generic_promotable_box_from_different_generic : $@convention(thin) <T, U: P> (@in T, @in U, Int) -> @owned @callee_owned (@in U) -> Int {
 entry(%0 : $*T, %1 : $*U, %2 : $Int):

@@ -16,7 +16,6 @@
 
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Enum.h"
 #include "swift/Runtime/Debug.h"

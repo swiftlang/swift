@@ -92,6 +92,7 @@ static sourcekitd_uid_t KeyOffset;
 static sourcekitd_uid_t KeySourceFile;
 static sourcekitd_uid_t KeyModuleName;
 static sourcekitd_uid_t KeyGroupName;
+static sourcekitd_uid_t KeyLocalizationKey;
 static sourcekitd_uid_t KeyActionName;
 static sourcekitd_uid_t KeySynthesizedExtension;
 static sourcekitd_uid_t KeyName;
@@ -215,6 +216,7 @@ static int skt_main(int argc, const char **argv) {
   KeySourceFile = sourcekitd_uid_get_from_cstr("key.sourcefile");
   KeyModuleName = sourcekitd_uid_get_from_cstr("key.modulename");
   KeyGroupName = sourcekitd_uid_get_from_cstr("key.groupname");
+  KeyLocalizationKey = sourcekitd_uid_get_from_cstr("key.localization_key");
   KeyActionName = sourcekitd_uid_get_from_cstr("key.actionname");
   KeySynthesizedExtension = sourcekitd_uid_get_from_cstr("key.synthesizedextensions");
   KeyName = sourcekitd_uid_get_from_cstr("key.name");
@@ -593,7 +595,7 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
       } else {
         BaseName = Text.substr(0, ArgStart);
         auto ArgEnd = Text.find_last_of(')');
-        if (ArgEnd != StringRef::npos) {
+        if (ArgEnd == StringRef::npos) {
           llvm::errs() << "Swift name is malformed.\n";
           return 1;
         }
@@ -1160,9 +1162,6 @@ static void printNameTranslationInfo(sourcekitd_variant_t Info,
   }
   for (auto S : Selectors) {
     OS << S;
-    if (S != Selectors.back()) {
-      OS << ":";
-    }
   }
   OS << '\n';
 }
@@ -1194,6 +1193,9 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
                                                               KeyModuleName);
   const char *GroupName = sourcekitd_variant_dictionary_get_string(Info,
                                                                    KeyGroupName);
+
+  const char *LocalizationKey =
+    sourcekitd_variant_dictionary_get_string(Info, KeyLocalizationKey);
   const char *ModuleInterfaceName =
       sourcekitd_variant_dictionary_get_string(Info, KeyModuleInterfaceName);
   const char *TypeInterface =
@@ -1290,6 +1292,9 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     OS << FullAnnotDecl << '\n';
   if (DocFullAsXML)
     OS << DocFullAsXML << '\n';
+  if (LocalizationKey)
+    OS << "<LocalizationKey>" << LocalizationKey;
+  OS << "</LocalizationKey>" << '\n';
   OS << "OVERRIDES BEGIN\n";
   for (auto OverUSR : OverrideUSRs)
     OS << OverUSR << '\n';

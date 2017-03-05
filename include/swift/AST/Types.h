@@ -606,13 +606,6 @@ public:
                            LazyResolver *resolver,
                            DeclContext *gpContext = nullptr);
 
-  /// \brief Determine whether the given type is "generic", meaning that
-  /// it involves generic types for which generic arguments have not been
-  /// provided.
-  /// For example, the type Vector and Vector<Int>.InnerGeneric are both
-  /// unspecialized generic, but the type Vector<Int> is not.
-  bool isUnspecializedGeneric();
-
   /// \brief Determine whether this type is a legal, lowered SIL type.
   ///
   /// A type is SIL-illegal if it is:
@@ -882,13 +875,15 @@ public:
   /// Get the substitutions to apply to the type of the given member as seen
   /// from this base type.
   ///
-  /// If the member has its own generic parameters, they will remain unchanged
-  /// by the substitution.
+  /// \param genericEnv If non-null, generic parameters of the member are
+  /// mapped to context archetypes of this generic environment.
   SubstitutionMap getMemberSubstitutionMap(ModuleDecl *module,
-                                           const ValueDecl *member);
+                                           const ValueDecl *member,
+                                           GenericEnvironment *genericEnv=nullptr);
 
   /// Deprecated version of the above.
-  TypeSubstitutionMap getMemberSubstitutions(const ValueDecl *member);
+  TypeSubstitutionMap getMemberSubstitutions(const ValueDecl *member,
+                                             GenericEnvironment *genericEnv=nullptr);
 
   /// Retrieve the type of the given member as seen through the given base
   /// type, substituting generic arguments where necessary.
@@ -2828,7 +2823,7 @@ public:
   /// storage. Therefore they will be passed using an indirect formal
   /// convention, and this method will return an address type. However, in
   /// canonical SIL the opaque arguments might not have an address type.
-  SILType getSILStorageType() const; // in SILFunctioConventions.h
+  SILType getSILStorageType() const; // in SILFunctionConventions.h
 
   /// Return a version of this parameter info with the type replaced.
   SILParameterInfo getWithType(CanType type) const {
@@ -2925,7 +2920,7 @@ public:
   /// storage. Therefore they will be returned using an indirect formal
   /// convention, and this method will return an address type. However, in
   /// canonical SIL the opaque results might not have an address type.
-  SILType getSILStorageType() const; // in SILFunctioConventions.h
+  SILType getSILStorageType() const; // in SILFunctionConventions.h
 
   /// Return a version of this result info with the type replaced.
   SILResultInfo getWithType(CanType type) const {
@@ -3239,7 +3234,7 @@ public:
   // substituted SIL types match, a formal direct argument may not be passed
   // to a formal indirect parameter and vice-versa. Hence, the formally
   // indirect property, not the SIL indirect property, should be consulted to
-  // determine whether function reabstraction is necesary.
+  // determine whether function reabstraction is necessary.
   unsigned getNumIndirectFormalResults() const {
     return NumIndirectFormalResults;
   }
@@ -4471,6 +4466,8 @@ inline NominalTypeDecl *TypeBase::getAnyNominal() {
 inline Type TypeBase::getNominalParent() {
   if (auto classType = getAs<NominalType>()) {
     return classType->getParent();
+  } else if (auto unboundType = getAs<UnboundGenericType>()) {
+    return unboundType->getParent();
   } else {
     return castTo<BoundGenericType>()->getParent();
   }

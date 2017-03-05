@@ -21,9 +21,11 @@ func createErrorDomain(str: String) -> ErrorDomain {
 // CHECK-RAW: [[SELF:%[0-9]+]] = project_box [[SELF_BOX]]
 // CHECK-RAW: [[UNINIT_SELF:%[0-9]+]] = mark_uninitialized [rootself] [[SELF]]
 // CHECK-RAW: [[BRIDGE_FN:%[0-9]+]] = function_ref @{{.*}}_bridgeToObjectiveC
-// CHECK-RAW: [[BRIDGED:%[0-9]+]] = apply [[BRIDGE_FN]]([[STR]])
+// CHECK-RAW: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
+// CHECK-RAW: [[BRIDGED:%[0-9]+]] = apply [[BRIDGE_FN]]([[BORROWED_STR]])
 // CHECK-RAW: [[RAWVALUE_ADDR:%[0-9]+]] = struct_element_addr [[UNINIT_SELF]]
 // CHECK-RAW: assign [[BRIDGED]] to [[RAWVALUE_ADDR]]
+// CHECK-RAW: end_borrow [[BORROWED_STR]] from [[STR]]
 
 func getRawValue(ed: ErrorDomain) -> String {
   return ed.rawValue

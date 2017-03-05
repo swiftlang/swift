@@ -20,7 +20,6 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/DiagnosticsParse.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
@@ -751,6 +750,9 @@ public:
                                            DeclAttributes &Attributes);
   ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
                                 SourceLoc *classRequirementLoc);
+  ParserStatus parseDeclItem(bool &PreviousHadSemi,
+                             Parser::ParseDeclOptions Options,
+                             llvm::function_ref<void(Decl*)> handler);
   bool parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                      Diag<> ErrorDiag, ParseDeclOptions Options,
                      llvm::function_ref<void(Decl*)> handler);
@@ -792,13 +794,17 @@ public:
   };
 
   bool parseGetSetImpl(ParseDeclOptions Flags,
-                       ParameterList *Indices, TypeLoc ElementTy,
+                       GenericParamList *GenericParams,
+                       ParameterList *Indices,
+                       TypeLoc ElementTy,
                        ParsedAccessors &accessors,
                        SourceLoc &LastValidLoc,
                        SourceLoc StaticLoc, SourceLoc VarLBLoc,
                        SmallVectorImpl<Decl *> &Decls);
   bool parseGetSet(ParseDeclOptions Flags,
-                   ParameterList *Indices, TypeLoc ElementTy,
+                   GenericParamList *GenericParams,
+                   ParameterList *Indices,
+                   TypeLoc ElementTy,
                    ParsedAccessors &accessors,
                    SourceLoc StaticLoc, SmallVectorImpl<Decl *> &Decls);
   void recordAccessors(AbstractStorageDecl *storage, ParseDeclOptions flags,

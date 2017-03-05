@@ -4,7 +4,7 @@
 class UIWindow {}
 class AppDelegate {
   var window: UIWindow?
-  // CHECK: define hidden i1 {{.*}}11AppDelegateC1f
+  // CHECK: define hidden {{.*}}i1 {{.*}}11AppDelegateC1f
   func f() -> Bool {
     // Test for -O0 shadow copies.
     // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[B:.*]], metadata !{{[0-9]+}})

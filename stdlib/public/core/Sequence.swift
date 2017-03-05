@@ -363,7 +363,7 @@ public protocol Sequence {
   /// to lowercase strings and then to count their characters.
   ///
   ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
-  ///     let lowercaseNames = cast.map { $0.lowercaseString }
+  ///     let lowercaseNames = cast.map { $0.lowercased() }
   ///     // 'lowercaseNames' == ["vivien", "marlon", "kim", "karl"]
   ///     let letterCounts = cast.map { $0.characters.count }
   ///     // 'letterCounts' == [6, 6, 3, 4]
@@ -798,7 +798,7 @@ extension Sequence {
   /// to lowercase strings and then to count their characters.
   ///
   ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
-  ///     let lowercaseNames = cast.map { $0.lowercaseString }
+  ///     let lowercaseNames = cast.map { $0.lowercased() }
   ///     // 'lowercaseNames' == ["vivien", "marlon", "kim", "karl"]
   ///     let letterCounts = cast.map { $0.characters.count }
   ///     // 'letterCounts' == [6, 6, 3, 4]

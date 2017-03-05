@@ -120,14 +120,23 @@ public:
 
   std::string mangleAssociatedTypeWitnessTableAccessFunction(
                                       const ProtocolConformance *Conformance,
-                                      StringRef AssocTyName,
+                                      CanType AssociatedType,
                                       const ProtocolDecl *Proto) {
     beginMangling();
     appendProtocolConformance(Conformance);
-    appendIdentifier(AssocTyName);
+    appendAssociatedTypePath(AssociatedType);
     appendNominalType(Proto);
     appendOperator("WT");
     return finalize();
+  }
+
+  void appendAssociatedTypePath(CanType associatedType) {
+    if (auto memberType = dyn_cast<DependentMemberType>(associatedType)) {
+      appendAssociatedTypePath(memberType.getBase());
+      appendIdentifier(memberType->getName().str());
+    } else {
+      assert(isa<GenericTypeParamType>(associatedType));
+    }
   }
 
   std::string mangleReflectionBuiltinDescriptor(Type type) {
@@ -166,8 +175,19 @@ public:
     return mangleTypeWithoutPrefix(type);
   }
 
+  std::string mangleForProtocolDescriptor(ProtocolType *Proto) {
+    beginMangling();
+    appendType(Proto->getCanonicalType());
+    appendOperator("D");
+    return finalize();
+  }
+
   std::string mangleTypeForReflection(Type Ty, ModuleDecl *Module,
                                       bool isSingleFieldOfBox);
+
+  std::string mangleTypeForLLVMTypeName(CanType Ty);
+
+  std::string mangleProtocolForLLVMTypeName(ProtocolCompositionType *type);
 
 protected:
 

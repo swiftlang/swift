@@ -410,5 +410,6 @@ class CMakeOptionsTestCase(unittest.TestCase):
             "-DOPT1_1=VAL1",
             "-DOPT1_2=VAL2"])
 
+
 if __name__ == '__main__':
     unittest.main()

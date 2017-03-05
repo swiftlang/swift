@@ -99,8 +99,15 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       // mangling and demangling tests.
       remangled = name;
     } else {
+      // Also accept the future mangling prefix.
+      // TODO: remove the "_S" as soon as MANGLING_PREFIX_STR gets "_S".
       remangled = swift::Demangle::mangleNode(pointer,
-                          /*NewMangling*/ name.startswith(MANGLING_PREFIX_STR));
+                          /*NewMangling*/ name.startswith(MANGLING_PREFIX_STR)
+                                          || name.startswith("_S"));
+      if (name.startswith("_S")) {
+        assert(remangled.find(MANGLING_PREFIX_STR) == 0);
+        remangled = "_S" + remangled.substr(3);
+      }
       if (name != remangled) {
         llvm::errs() << "\nError: re-mangled name \n  " << remangled
                      << "\ndoes not match original name\n  " << name << '\n';
@@ -117,7 +124,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         llvm::errs() << "Can't de-mangle " << name << '\n';
         exit(1);
       }
-      std::string remangled = swift::Demangle::mangleNodeNew(pointer);
+      std::string remangled = swift::Demangle::mangleNode(pointer);
       llvm::outs() << remangled;
       return;
     }
@@ -130,8 +137,19 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       std::string cName = name.str();
       if (!swift::Demangle::isSwiftSymbol(cName.c_str()))
         Classifications += 'N';
-      if (swift::Demangle::isThunkSymbol(name.data(), name.size()))
-        Classifications += 'T';
+      if (DCtx.isThunkSymbol(name)) {
+        if (!Classifications.empty())
+          Classifications += ',';
+        Classifications += "T:";
+        Classifications += DCtx.getThunkTarget(name);
+      } else {
+        assert(DCtx.getThunkTarget(name).empty());
+      }
+      if (pointer && !DCtx.hasSwiftCallingConvention(name)) {
+        if (!Classifications.empty())
+          Classifications += ',';
+        Classifications += 'C';
+      }
       if (!Classifications.empty())
         llvm::outs() << '{' << Classifications << "} ";
     }
@@ -142,7 +160,9 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
 
 static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   // This doesn't handle Unicode symbols, but maybe that's okay.
-  llvm::Regex maybeSymbol("(_T|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
+  // Also accept the future mangling prefix.
+  // TODO: remove the "_S" as soon as MANGLING_PREFIX_STR gets "_S".
+  llvm::Regex maybeSymbol("(_T|_S|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
 
   swift::Demangle::Context DCtx;
   for (std::string mangled; std::getline(std::cin, mangled);) {

@@ -519,9 +519,13 @@ func dynamicTypePlusZero(_ a : Super1) -> Super1.Type {
   return type(of: a)
 }
 // CHECK-LABEL: dynamicTypePlusZero
-// CHECK: bb0(%0 : $Super1):
+// CHECK: bb0([[ARG:%.*]] : $Super1):
 // CHECK-NOT: copy_value
-// CHECK: value_metatype  $@thick Super1.Type, %0 : $Super1
+// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK-NOT: copy_value
+// CHECK: value_metatype  $@thick Super1.Type, [[BORROWED_ARG]] : $Super1
+// CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK: destroy_value [[ARG]]
 
 struct NonTrivialStruct { var c : Super1 }
 
@@ -531,9 +535,11 @@ func dontEmitIgnoredLoadExpr(_ a : NonTrivialStruct) -> NonTrivialStruct.Type {
 // CHECK-LABEL: dontEmitIgnoredLoadExpr
 // CHECK: bb0(%0 : $NonTrivialStruct):
 // CHECK-NEXT: debug_value
-// CHECK-NEXT: %2 = metatype $@thin NonTrivialStruct.Type
+// CHECK-NEXT: begin_borrow
+// CHECK-NEXT: end_borrow
+// CHECK-NEXT: %4 = metatype $@thin NonTrivialStruct.Type
 // CHECK-NEXT: destroy_value %0
-// CHECK-NEXT: return %2 : $@thin NonTrivialStruct.Type
+// CHECK-NEXT: return %4 : $@thin NonTrivialStruct.Type
 
 
 // <rdar://problem/18851497> Swiftc fails to compile nested destructuring tuple binding
@@ -541,7 +547,7 @@ func dontEmitIgnoredLoadExpr(_ a : NonTrivialStruct) -> NonTrivialStruct.Type {
 // CHECK: bb0(%0 : $Optional<((Int, Int), Int)>):
 func implodeRecursiveTuple(_ expr: ((Int, Int), Int)?) {
 
-  // CHECK:      [[WHOLE:%[0-9]+]] = unchecked_enum_data {{.*}} : $Optional<((Int, Int), Int)>
+  // CHECK: bb2([[WHOLE:%.*]] : $((Int, Int), Int)):
   // CHECK-NEXT: [[X:%[0-9]+]] = tuple_extract [[WHOLE]] : $((Int, Int), Int), 0
   // CHECK-NEXT: [[X0:%[0-9]+]] = tuple_extract [[X]] : $(Int, Int), 0
   // CHECK-NEXT: [[X1:%[0-9]+]] = tuple_extract [[X]] : $(Int, Int), 1

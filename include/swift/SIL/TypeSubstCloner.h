@@ -97,12 +97,12 @@ protected:
   }
 
   Substitution remapSubstitution(Substitution sub) {
-    sub = sub.subst(SwiftMod, SubsMap);
-
     // Remap opened archetypes into the cloned context.
-    return Substitution(getASTTypeInClonedContext(sub.getReplacement()
-                                                    ->getCanonicalType()),
-                        sub.getConformances());
+    sub = Substitution(
+        getASTTypeInClonedContext(sub.getReplacement()->getCanonicalType()),
+        sub.getConformances());
+    // Now remap the substitution. 
+    return sub.subst(SwiftMod, SubsMap);
   }
 
   ProtocolConformanceRef remapConformance(CanType type,

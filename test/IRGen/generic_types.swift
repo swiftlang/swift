@@ -4,11 +4,11 @@
 
 import Swift
 
-// CHECK: [[A:%C13generic_types1A]] = type <{ [[REF:%swift.refcounted]], [[INT:%Si]] }>
+// CHECK: [[A:%T13generic_types1AC]] = type <{ [[REF:%swift.refcounted]], [[INT:%TSi]] }>
 // CHECK: [[INT]] = type <{ i64 }>
-// CHECK: [[B:%C13generic_types1B]] = type <{ [[REF:%swift.refcounted]], [[UNSAFE:%Sp]] }>
-// CHECK: [[C:%C13generic_types1C]] = type
-// CHECK: [[D:%C13generic_types1D]] = type
+// CHECK: [[B:%T13generic_types1BC]] = type <{ [[REF:%swift.refcounted]], [[UNSAFE:%TSp]] }>
+// CHECK: [[C:%T13generic_types1CC]] = type
+// CHECK: [[D:%T13generic_types1DC]] = type
 
 // CHECK-LABEL: @_TMPC13generic_types1A = hidden global
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_A,
@@ -34,7 +34,7 @@ import Swift
 // CHECK-SAME:   i32 16,
 // CHECK-SAME:   %swift.type* null,
 // CHECK-SAME:   void (%swift.opaque*, [[A]]*)* @_TFC13generic_types1A3run
-// CHECK-SAME:   %C13generic_types1A* (i64, %C13generic_types1A*)* @_TFC13generic_types1AcfT1ySi_GS0_x_
+// CHECK-SAME:   %T13generic_types1AC* (i64, %T13generic_types1AC*)* @_TFC13generic_types1AcfT1ySi_GS0_x_
 // CHECK-SAME: }
 // CHECK-LABEL: @_TMPC13generic_types1B = hidden global
 // CHECK-SAME:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_B,
@@ -80,7 +80,7 @@ import Swift
 // CHECK-objc-SAME:   %swift.opaque* @_objc_empty_cache,
 // CHECK-SAME:   %swift.opaque* null,
 // CHECK-SAME:   i64 1,
-// CHECK-SAME:   void (%Si*, [[D]]*)* @_TTVFC13generic_types1D3runfSiT_
+// CHECK-SAME:   void (%TSi*, [[D]]*)* @_TTVFC13generic_types1D3runfSiT_
 // CHECK-SAME: }
 
 // CHECK-LABEL: define{{( protected)?}} private %swift.type* @create_generic_metadata_A(%swift.type_pattern*, i8**) {{.*}} {

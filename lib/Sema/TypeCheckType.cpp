@@ -333,7 +333,7 @@ findDeclContextForType(TypeChecker &TC,
 
       // If not, walk into the superclass and inherited protocols, if any.
       if (auto *protoDecl = dyn_cast<ProtocolDecl>(parentNominal)) {
-        for (auto *refined : protoDecl->getInheritedProtocols(&TC))
+        for (auto *refined : protoDecl->getInheritedProtocols())
           pushDecl(refined);
       } else {
         if (auto *classDecl = dyn_cast<ClassDecl>(parentNominal))
@@ -575,8 +575,9 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   for (auto tyR : genericArgs)
     args.push_back(tyR);
 
+  auto argumentOptions = options - TR_NonEnumInheritanceClauseOuterLayer;
   auto result = applyUnboundGenericArguments(type, genericDecl, loc, dc, args,
-                                             options, resolver,
+                                             argumentOptions, resolver,
                                              unsatisfiedDependency);
   if (!result)
     return result;
@@ -675,9 +676,11 @@ Type TypeChecker::applyUnboundGenericArguments(
     assert(genericSig != nullptr);
     auto substitutions = BGT->getContextSubstitutions(BGT->getDecl());
 
-    auto result = checkGenericArguments(
-        dc, loc, noteLoc, UGT, genericSig,
-        substitutions, unsatisfiedDependency);
+    auto result =
+        checkGenericArguments(dc, loc, noteLoc, UGT, genericSig,
+                              QueryTypeSubstitutionMap{substitutions},
+                              LookUpConformanceInModule{dc->getParentModule()},
+                              unsatisfiedDependency);
 
     // Unsatisfied dependency case.
     if (result.first)
@@ -726,7 +729,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
       return nullptr;
   } else {
     // Validate the declaration.
-    TC.validateDecl(typeDecl);
+    TC.validateDeclForNameLookup(typeDecl);
   }
 
   // If we didn't bail out with an unsatisfiedDependency,
@@ -993,14 +996,10 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // For lookups within the generic signature, look at the generic
   // parameters (only), then move up to the enclosing context.
   if (options.contains(TR_GenericSignature)) {
-    GenericParamList *genericParams;
-    if (auto *generic = dyn_cast<GenericTypeDecl>(DC)) {
-      genericParams = generic->getGenericParams();
-    } else if (auto *ext = dyn_cast<ExtensionDecl>(DC)) {
-      genericParams = ext->getGenericParams();
-    } else {
-      genericParams = cast<AbstractFunctionDecl>(DC)->getGenericParams();
-    }
+    GenericParamList *genericParams = nullptr;
+
+    if (DC->isInnermostContextGeneric())
+      genericParams = DC->getGenericParamsOfContext();
 
     if (genericParams) {
       auto matchingParam =
@@ -1090,7 +1089,26 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                 dyn_cast<GenericIdentTypeRepr>(comp), options,
                                 resolver, unsatisfiedDependency);
 
-    if (!type || type->hasError())
+    if (!type)
+      return type;
+
+    auto hasError = type->hasError();
+    if (options & TR_NonEnumInheritanceClauseOuterLayer) {
+      auto protocolOrClass =
+          hasError ? (isa<ProtocolDecl>(typeDecl) || isa<ClassDecl>(typeDecl))
+                   : (type->is<ProtocolType>() || type->is<ClassType>());
+      if (!protocolOrClass) {
+        auto diagnosedType = hasError ? typeDecl->getDeclaredInterfaceType() : type;
+        if (diagnosedType && /*FIXME:*/!hasError) {
+          TC.diagnose(comp->getIdLoc(),
+                      diag::inheritance_from_non_protocol_or_class,
+                      diagnosedType);
+          return ErrorType::get(diagnosedType);
+        }
+      }
+    }
+
+    if (hasError)
       return type;
 
     // If this is the first result we found, record it.
@@ -1322,6 +1340,16 @@ static Type resolveNestedIdentTypeComponent(
     return ErrorType::get(TC.Context);
   }
 
+  if (options & TR_NonEnumInheritanceClauseOuterLayer) {
+    auto protocolOrClass =
+        memberType->is<ProtocolType>() || memberType->is<ClassType>();
+    if (!protocolOrClass) {
+      TC.diagnose(comp->getIdLoc(),
+                  diag::inheritance_from_non_protocol_or_class, memberType);
+      return ErrorType::get(memberType);
+    }
+  }
+
   // If there are generic arguments, apply them now.
   if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
     memberType = TC.applyGenericArguments(
@@ -1361,8 +1389,9 @@ static Type resolveIdentTypeComponent(
 
   // All remaining components use qualified lookup.
 
+  auto parentOptions = options - TR_NonEnumInheritanceClauseOuterLayer;
   // Resolve the parent type.
-  Type parentTy = resolveIdentTypeComponent(TC, DC, parentComps, options,
+  Type parentTy = resolveIdentTypeComponent(TC, DC, parentComps, parentOptions,
                                             diagnoseErrors, resolver,
                                             unsatisfiedDependency);
   if (!parentTy || parentTy->hasError()) return parentTy;
@@ -2240,7 +2269,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
 
     params = genericSig->getGenericParams();
     if (repr->getGenericArguments().size()
-          != genericSig->getAllDependentTypes().size()) {
+          != genericSig->getSubstitutionListSize()) {
       TC.diagnose(repr->getLoc(), diag::sil_box_arg_mismatch);
       return ErrorType::get(Context);
     }

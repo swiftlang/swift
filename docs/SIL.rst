@@ -84,7 +84,7 @@ predictable.
   If an arithmetic overflow occurs during the constant expression computation, a diagnostic
   is issued.
 - **Return analysis** verifies that each function returns a value on every
-  code path and doesn't "fall of the end" of its definition, which is an error.
+  code path and doesn't "fall off the end" of its definition, which is an error.
   It also issues an error when a ``noreturn`` function returns.
 - **Critical edge splitting** splits all critical edges from terminators that
   don't support arbitrary basic block arguments (all non cond_branch
@@ -3741,7 +3741,9 @@ container may use one of several representations:
   before IR generation.
   The following instructions manipulate "loadable" opaque existential containers:
   
+  * `init_existential_opaque`_
   * `open_existential_opaque`_
+  * `deinit_existential_opaque`_
 
 - **Class existential containers**: If a protocol type is constrained by one or
   more class protocols, then the existential container for that type is
@@ -3815,6 +3817,21 @@ initialized existential container can be destroyed with ``destroy_addr`` as
 usual. It is undefined behavior to ``destroy_addr`` a partially-initialized
 existential container.
 
+init_existential_opaque
+```````````````````````
+::
+
+  sil-instruction ::= 'init_existential_opaque' sil-operand ':' sil-type ','
+                                             sil-type
+
+  %1 = init_existential_opaque %0 : $L' : $C, $P
+  // %0 must be of loadable type $L', lowered from AST type $L, conforming to
+  //    protocol(s) $P
+  // %1 will be of type $P
+
+Loadable version of the above: Inits-up the existential
+container prepared to contain a value of type ``$P``.
+
 deinit_existential_addr
 ```````````````````````
 ::
@@ -3831,13 +3848,31 @@ existential containers that have been partially initialized by
 ``init_existential_addr`` but haven't had their contained value initialized.
 A fully initialized existential must be destroyed with ``destroy_addr``.
 
+deinit_existential_opaque
+`````````````````````````
+::
+
+  sil-instruction ::= 'deinit_existential_opaque' sil-operand
+
+  deinit_existential_opaque %0 : $P
+  // %0 must be of a $P opaque type for non-class protocol or protocol
+  // composition type P
+
+Undoes the partial initialization performed by
+``init_existential_opaque``.  ``deinit_existential_opaque`` is only valid for
+existential containers that have been partially initialized by
+``init_existential_opaque`` but haven't had their contained value initialized.
+A fully initialized existential must be destroyed with ``destroy_value``.
+
 open_existential_addr
 `````````````````````
 ::
 
-  sil-instruction ::= 'open_existential_addr' sil-operand 'to' sil-type
+  sil-instruction ::= 'open_existential_addr' sil-allowed-access sil-operand 'to' sil-type
+  sil-allowed-access ::= 'immutable_access'
+  sil-allowed-access ::= 'mutable_access'
 
-  %1 = open_existential_addr %0 : $*P to $*@opened P
+  %1 = open_existential_addr immutable_access %0 : $*P to $*@opened P
   // %0 must be of a $*P type for non-class protocol or protocol composition
   //   type P
   // $*@opened P must be a unique archetype that refers to an opened
@@ -3848,7 +3883,11 @@ Obtains the address of the concrete value inside the existential
 container referenced by ``%0``. The protocol conformances associated
 with this existential container are associated directly with the
 archetype ``$*@opened P``. This pointer can be used with any operation
-on archetypes, such as ``witness_method``.
+on archetypes, such as ``witness_method`` assuming this operation obeys the
+access constraint: The returned address can either allow ``mutable_access`` or
+``immutable_access``. Users of the returned address may only consume
+(e.g ``destroy_addr`` or ``copy_addr [take]``) or mutate the value at the
+address if they have ``mutable_access``.
 
 open_existential_opaque
 ```````````````````````
@@ -4407,7 +4446,7 @@ Checked Conversions
 
 Some user-level cast operations can fail and thus require runtime checking.
 
-The `unconditional_checked_cast_addr`_ and `unconditional_checked_cast`_
+The `unconditional_checked_cast_addr`_, `unconditional_checked_cast_opaque`_ and `unconditional_checked_cast`_
 instructions performs an unconditional checked cast; it is a runtime failure
 if the cast fails. The `checked_cast_addr_br`_ and `checked_cast_br`_
 terminator instruction performs a conditional checked cast; it branches to one
@@ -4444,6 +4483,20 @@ unconditional_checked_cast_addr
   // %1 will be of type $*B
 
 Performs a checked indirect conversion, causing a runtime failure if the
+conversion fails.
+
+unconditional_checked_cast_opaque
+`````````````````````````````````
+::
+
+  sil-instruction ::= 'unconditional_checked_cast_opaque' sil-operand 'to' sil-type
+
+  %1 = unconditional_checked_cast_opaque %0 : $A to $B
+  // $A must be not be an address
+  // $B must be an opaque value
+  // %1 will be of type $B
+
+Performs a checked conversion, causing a runtime failure if the
 conversion fails.
 
 Runtime Failures

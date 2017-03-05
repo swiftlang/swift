@@ -16,7 +16,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -99,15 +98,8 @@ static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
 }
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
-  Mangle::Mangler mangler(/*debug style=*/false, /*usePunycode=*/true);
-  mangler.mangleContext(type);
-  std::string Old = mangler.finalize();
-
-  NewMangling::ASTMangler NewMangler(/*debug style=*/false,
-                                     /*usePunycode=*/true);
-  std::string New = NewMangler.mangleTypeAsContextUSR(type);
-
-  return NewMangling::selectMangling(Old, New);
+  NewMangling::ASTMangler Mangler;
+  return Mangler.mangleTypeAsContextUSR(type);
 }
 
 bool swift::emitReferenceDependencies(DiagnosticEngine &diags,

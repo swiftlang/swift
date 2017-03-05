@@ -272,6 +272,44 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   return finalize();
 }
 
+static bool isPrivate(const NominalTypeDecl *Nominal) {
+  return Nominal->hasAccessibility() &&
+         Nominal->getFormalAccess() <= Accessibility::FilePrivate;
+}
+
+std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
+  DeclContext *Ctx = Nominal->getDeclContext();
+
+  if (Ctx->isModuleScopeContext() && !isPrivate(Nominal)) {
+    // Use the old mangling for non-private top-level classes and protocols.
+    // This is what the ObjC runtime needs to demangle.
+    // TODO: Use new mangling scheme as soon as the ObjC runtime
+    // can demangle it.
+    //
+    // Don't use word-substitutions and punycode encoding.
+    MaxNumWords = 0;
+    UsePunycode = false;
+    Buffer << "_Tt";
+    bool isProto = false;
+    if (isa<ClassDecl>(Nominal)) {
+      Buffer << 'C';
+    } else {
+      isProto = true;
+      assert(isa<ProtocolDecl>(Nominal));
+      Buffer << 'P';
+    }
+    appendModule(Ctx->getParentModule());
+    appendIdentifier(Nominal->getName().str());
+    if (isProto)
+      Buffer << '_';
+    return finalize();
+  }
+  // For all other cases, we can use the new mangling.
+  beginMangling();
+  appendNominalType(Nominal);
+  return finalize();
+}
+
 std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {
   appendContext(type);
   return finalize();
@@ -1420,8 +1458,7 @@ void ASTMangler::appendInitializerEntity(const VarDecl *var) {
 /// Self type out of its mangling.
 static bool isMethodDecl(const Decl *decl) {
   return isa<AbstractFunctionDecl>(decl)
-    && (isa<NominalTypeDecl>(decl->getDeclContext())
-        || isa<ExtensionDecl>(decl->getDeclContext()));
+    && decl->getDeclContext()->isTypeContext();
 }
 
 static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
@@ -1436,54 +1473,59 @@ static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
   return false;
 }
 
-Type ASTMangler::getDeclTypeForMangling(const ValueDecl *decl,
-                                ArrayRef<GenericTypeParamType *> &genericParams,
-                                unsigned &initialParamDepth,
-                                ArrayRef<Requirement> &requirements,
-                                SmallVectorImpl<Requirement> &requirementsBuf) {
+CanType ASTMangler::getDeclTypeForMangling(
+    const ValueDecl *decl,
+    ArrayRef<GenericTypeParamType *> &genericParams,
+    unsigned &initialParamDepth,
+    ArrayRef<Requirement> &requirements,
+    SmallVectorImpl<Requirement> &requirementsBuf) {
   auto &C = decl->getASTContext();
   if (!decl->hasInterfaceType())
     return ErrorType::get(C)->getCanonicalType();
 
-  Type type = decl->getInterfaceType();
+  auto type = decl->getInterfaceType()->getCanonicalType();
 
   initialParamDepth = 0;
   CanGenericSignature sig;
-  if (auto gft = type->getAs<GenericFunctionType>()) {
-    sig = gft->getGenericSignature()->getCanonicalSignature();
+  if (auto gft = dyn_cast<GenericFunctionType>(type)) {
+    sig = gft.getGenericSignature();
     CurGenericSignature = sig;
     genericParams = sig->getGenericParams();
     requirements = sig->getRequirements();
 
-    type = FunctionType::get(gft->getInput(), gft->getResult(),
-                             gft->getExtInfo());
+    type = CanFunctionType::get(gft.getInput(), gft.getResult(),
+                                gft->getExtInfo());
   } else {
     genericParams = {};
     requirements = {};
   }
 
-  // Shed the 'self' type and generic requirements from method manglings.
-  if (isMethodDecl(decl) && type && !type->hasError()) {
-    // Drop the Self argument clause from the type.
-    type = type->castTo<AnyFunctionType>()->getResult();
+  if (!type->hasError()) {
+    // Shed the 'self' type and generic requirements from method manglings.
+    if (isMethodDecl(decl)) {
+      // Drop the Self argument clause from the type.
+      type = cast<AnyFunctionType>(type).getResult();
+    }
 
-    // Drop generic parameters and requirements from the method's context.
-    if (auto parentGenericSig =
-          decl->getDeclContext()->getGenericSignatureOfContext()) {
-      // The method's depth starts below the depth of the context.
-      if (!parentGenericSig->getGenericParams().empty())
-        initialParamDepth =
-          parentGenericSig->getGenericParams().back()->getDepth()+1;
+    if (isMethodDecl(decl) || isa<SubscriptDecl>(decl)) {
+      // Drop generic parameters and requirements from the method's context.
+      auto parentGenericSig =
+        decl->getDeclContext()->getGenericSignatureOfContext();
+      if (parentGenericSig && sig) {
+        // The method's depth starts below the depth of the context.
+        if (!parentGenericSig->getGenericParams().empty())
+          initialParamDepth =
+            parentGenericSig->getGenericParams().back()->getDepth()+1;
 
-      while (!genericParams.empty()) {
-        if (genericParams.front()->getDepth() >= initialParamDepth)
-          break;
-        genericParams = genericParams.slice(1);
-      }
+        while (!genericParams.empty()) {
+          if (genericParams.front()->getDepth() >= initialParamDepth)
+            break;
+          genericParams = genericParams.slice(1);
+        }
 
-      requirementsBuf.clear();
-      for (auto &reqt : sig->getRequirements()) {
-        switch (reqt.getKind()) {
+        requirementsBuf.clear();
+        for (auto &reqt : sig->getRequirements()) {
+          switch (reqt.getKind()) {
         case RequirementKind::Conformance:
         case RequirementKind::Layout:
         case RequirementKind::Superclass:
@@ -1499,12 +1541,13 @@ Type ASTMangler::getDeclTypeForMangling(const ValueDecl *decl,
               !genericParamIsBelowDepth(reqt.getSecondType(),initialParamDepth))
             continue;
           break;
-        }
+          }
 
-        // If we fell through the switch, mangle the requirement.
-        requirementsBuf.push_back(reqt);
+          // If we fell through the switch, mangle the requirement.
+          requirementsBuf.push_back(reqt);
+        }
+        requirements = requirementsBuf;
       }
-      requirements = requirementsBuf;
     }
   }
   return type->getCanonicalType();
@@ -1516,7 +1559,7 @@ void ASTMangler::appendDeclType(const ValueDecl *decl) {
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> requirementsBuf;
   Mod = decl->getModuleContext();
-  Type type = getDeclTypeForMangling(decl,
+  auto type = getDeclTypeForMangling(decl,
                                      genericParams, initialParamDepth,
                                      requirements, requirementsBuf);
   appendType(type);
@@ -1689,7 +1732,7 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> requirementsBuf;
   Mod = decl->getModuleContext();
-  Type type = getDeclTypeForMangling(decl,
+  auto type = getDeclTypeForMangling(decl,
                                      genericParams, initialParamDepth,
                                      requirements, requirementsBuf);
 

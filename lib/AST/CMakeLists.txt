@@ -49,6 +49,7 @@ add_swift_library(swiftAST STATIC
   Substitution.cpp
   SubstitutionList.cpp
   SubstitutionMap.cpp
+  SwiftNameTranslation.cpp
   Type.cpp
   TypeJoinMeet.cpp
   TypeRefinementContext.cpp

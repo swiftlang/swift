@@ -139,6 +139,9 @@ def debug_constraints : Flag<["-"], "debug-constraints">,
 def debug_constraints_attempt : Separate<["-"], "debug-constraints-attempt">,
   HelpText<"Debug the constraint solver at a given attempt">;
 
+def propagate_constraints : Flag<["-"], "propagate-constraints">,
+  HelpText<"Enable constraint propagation in the type checker">;
+
 def iterative_type_checker : Flag<["-"], "iterative-type-checker">,
   HelpText<"Enable the iterative type checker">;
 

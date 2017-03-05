@@ -16,7 +16,7 @@ sil_vtable C {}
 
 sil @_TFC11enum_32_bit1CD : $@convention(thin) (@owned C) -> ()
 
-// CHECK-LABEL: %O11enum_32_bit3Foo = type <{ [4 x i8] }>
+// CHECK-LABEL: %T11enum_32_bit3FooO = type <{ [4 x i8] }>
 enum Foo {
   case A(C)
   case B
@@ -24,32 +24,32 @@ enum Foo {
 
 @objc protocol ClassExistential {}
 
-// CHECK-LABEL: %O11enum_32_bit3Bar = type <{ [4 x i8] }>
+// CHECK-LABEL: %T11enum_32_bit3BarO = type <{ [4 x i8] }>
 enum Bar {
   case A(ClassExistential)
   case B
 }
 
-// CHECK-LABEL: %O11enum_32_bit3Bas = type <{ [4 x i8] }>
+// CHECK-LABEL: %T11enum_32_bit3BasO = type <{ [4 x i8] }>
 enum Bas {
   case A(ClassExistential)
   case B(C)
   case Z
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @foo(i32)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @foo(i32)
 sil @foo : $@convention(thin) (@owned Foo) -> () {
 entry(%0 : $Foo):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @bar(i32)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @bar(i32)
 sil @bar : $@convention(thin) (@owned Bar) -> () {
 entry(%0 : $Bar):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @bas(i32)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @bas(i32)
 sil @bas : $@convention(thin) (@owned Bas) -> () {
 entry(%0 : $Bas):
   return undef : $()

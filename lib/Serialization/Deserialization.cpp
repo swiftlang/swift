@@ -23,11 +23,14 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Basic/Defer.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 
 #define DEBUG_TYPE "Serialization"
 
+STATISTIC(NumDeclsLoaded, "# of decls deserialized");
 STATISTIC(NumMemberListsLoaded,
           "# of nominals/extensions whose members were loaded");
 STATISTIC(NumNestedTypeShortcuts,
@@ -712,6 +715,15 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   dc->getAsNominalTypeOrNominalTypeExtensionContext()
     ->registerProtocolConformance(conformance);
 
+  // Read requirement signature conformances.
+  SmallVector<ProtocolConformanceRef, 4> reqConformances;
+  for (auto req : proto->getRequirementSignature()->getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance) {
+      auto reqConformance = readConformance(DeclTypeCursor);
+      reqConformances.push_back(reqConformance);
+    }
+  }
+  conformance->setSignatureConformances(reqConformances);
 
   // Read inherited conformances.
   InheritedConformanceMap inheritedConformances;
@@ -989,8 +1001,7 @@ void ModuleFile::readGenericRequirements(
 }
 
 void ModuleFile::configureGenericEnvironment(
-             llvm::PointerUnion3<GenericTypeDecl *, ExtensionDecl *,
-                                 AbstractFunctionDecl *> genericDecl,
+             GenericContext *genericDecl,
              serialization::GenericEnvironmentID envID) {
   if (envID == 0) return;
 
@@ -999,33 +1010,15 @@ void ModuleFile::configureGenericEnvironment(
   // If we just have a generic signature, set up lazy generic environment
   // creation.
   if (auto genericSig = sigOrEnv.dyn_cast<GenericSignature *>()) {
-    if (auto type = genericDecl.dyn_cast<GenericTypeDecl *>()) {
-      type->setLazyGenericEnvironment(this, genericSig, envID);
-      DelayedGenericEnvironments.push_back(type);
-    } else if (auto func = genericDecl.dyn_cast<AbstractFunctionDecl *>()) {
-      func->setLazyGenericEnvironment(this, genericSig, envID);
-      DelayedGenericEnvironments.push_back(func);
-    } else {
-      auto ext = genericDecl.get<ExtensionDecl *>();
-      ext->setLazyGenericEnvironment(this, genericSig, envID);
-      DelayedGenericEnvironments.push_back(ext);
-    }
-
+    genericDecl->setLazyGenericEnvironment(this, genericSig, envID);
+    DelayedGenericEnvironments.push_back(genericDecl);
     return;
   }
 
   // If we have a full generic environment, it's because it happened to be
   // deserialized already. Record it directly.
   if (auto genericEnv = sigOrEnv.dyn_cast<GenericEnvironment *>()) {
-    if (auto type = genericDecl.dyn_cast<GenericTypeDecl *>()) {
-      type->setGenericEnvironment(genericEnv);
-    } else if (auto func = genericDecl.dyn_cast<AbstractFunctionDecl *>()) {
-      func->setGenericEnvironment(genericEnv);
-    } else {
-      auto ext = genericDecl.get<ExtensionDecl *>();
-      ext->setGenericEnvironment(genericEnv);
-    }
-
+    genericDecl->setGenericEnvironment(genericEnv);
     return;
   }
 }
@@ -1337,11 +1330,10 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
     IdentifierID IID;
     TypeID TID = 0;
     bool isType = (recordID == XREF_TYPE_PATH_PIECE);
-    bool onlyInNominal = false;
     bool inProtocolExt = false;
     bool isStatic = false;
     if (isType)
-      XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
+      XRefTypePathPieceLayout::readRecord(scratch, IID, inProtocolExt);
     else
       XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
                                            isStatic);
@@ -1504,7 +1496,7 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
           pathTrace.removeLast();
         }
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     }
     case XREF_VALUE_PATH_PIECE:
     case XREF_INITIALIZER_PATH_PIECE: {
@@ -1512,13 +1504,12 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
       Identifier memberName;
       Optional<swift::CtorInitializerKind> ctorInit;
       bool isType = false;
-      bool onlyInNominal = false;
       bool inProtocolExt = false;
       bool isStatic = false;
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID;
-        XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
+        XRefTypePathPieceLayout::readRecord(scratch, IID, inProtocolExt);
         memberName = getIdentifier(IID);
         isType = true;
         break;
@@ -1564,7 +1555,7 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
         return nullptr;
       }
 
-      auto members = nominal->lookupDirect(memberName, onlyInNominal);
+      auto members = nominal->lookupDirect(memberName);
       values.append(members.begin(), members.end());
       filterValues(filterTy, M, genericSig, isType, inProtocolExt, isStatic,
                    ctorInit, values);
@@ -2162,6 +2153,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (declOrOffset.isComplete())
     return declOrOffset;
 
+  ++NumDeclsLoaded;
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(declOrOffset);
   auto entry = DeclTypeCursor.advance();
@@ -2492,7 +2484,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto alias = createDecl<TypeAliasDecl>(SourceLoc(), getIdentifier(nameID),
+    auto alias = createDecl<TypeAliasDecl>(SourceLoc(), SourceLoc(),
+                                           getIdentifier(nameID),
                                            SourceLoc(), genericParams, DC);
     declOrOffset = alias;
 
@@ -2565,13 +2558,21 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto assocType = createDecl<AssociatedTypeDecl>(DC, SourceLoc(),
-                                                    getIdentifier(nameID),
-                                                    SourceLoc(), this,
-                                                    defaultDefinitionID);
+    // The where-clause information is pushed up into the protocol
+    // (specifically, into its requirement signature) and
+    // serialized/deserialized there, so the actual Decl doesn't need to store
+    // it.
+    TrailingWhereClause *trailingWhere = nullptr;
+    auto assocType = createDecl<AssociatedTypeDecl>(
+        DC, SourceLoc(), getIdentifier(nameID), SourceLoc(), trailingWhere,
+        this, defaultDefinitionID);
     declOrOffset = assocType;
 
     assocType->computeType();
+
+    assert(!assocType->getDeclaredInterfaceType()->hasError() &&
+           "erroneous associated type");
+
     Accessibility parentAccess = cast<ProtocolDecl>(DC)->getFormalAccess();
     assocType->setAccessibility(std::max(parentAccess,Accessibility::Internal));
     if (isImplicit)
@@ -3010,14 +3011,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isImplicit, isClassBounded, isObjC;
     GenericEnvironmentID genericEnvID;
     uint8_t rawAccessLevel;
-    unsigned numProtocols;
-    ArrayRef<uint64_t> rawProtocolAndInheritedIDs;
+    ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
                                             genericEnvID, rawAccessLevel,
-                                            numProtocols,
-                                            rawProtocolAndInheritedIDs);
+                                            rawInheritedIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3026,8 +3025,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto proto = createDecl<ProtocolDecl>(DC, SourceLoc(), SourceLoc(),
                                           getIdentifier(nameID), None);
     declOrOffset = proto;
-
-    configureGenericEnvironment(proto, genericEnvID);
 
     proto->setRequiresClass(isClassBounded);
     
@@ -3038,18 +3035,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return nullptr;
     }
 
-    auto protocols = ctx.Allocate<ProtocolDecl *>(numProtocols);
-    for_each(protocols, rawProtocolAndInheritedIDs.slice(0, numProtocols),
-             [this](ProtocolDecl *&p, uint64_t rawID) {
-               p = cast<ProtocolDecl>(getDecl(rawID));
-             });
-    proto->setInheritedProtocols(protocols);
-
-    handleInherited(proto, rawProtocolAndInheritedIDs.slice(numProtocols));
-
     auto genericParams = maybeReadGenericParams(DC);
     assert(genericParams && "protocol with no generic parameters?");
     proto->setGenericParams(genericParams);
+
+    handleInherited(proto, rawInheritedIDs);
+
+    configureGenericEnvironment(proto, genericEnvID);
 
     SmallVector<Requirement, 4> requirements;
     readGenericRequirements(requirements, DeclTypeCursor);
@@ -3361,6 +3353,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::SUBSCRIPT_DECL: {
     DeclContextID contextID;
     bool isImplicit, isObjC;
+    GenericEnvironmentID genericEnvID;
     TypeID interfaceTypeID;
     DeclID getterID, setterID, materializeForSetID;
     DeclID addressorID, mutableAddressorID, willSetID, didSetID;
@@ -3371,6 +3364,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID,
                                              isImplicit, isObjC, rawStorageKind,
+                                             genericEnvID,
                                              interfaceTypeID,
                                              getterID, setterID,
                                              materializeForSetID,
@@ -3379,7 +3373,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                              overriddenID, rawAccessLevel,
                                              rawSetterAccessLevel,
                                              argNameIDs);
-    auto DC = getDeclContext(contextID);
+    auto parent = getDeclContext(contextID);
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
+    auto *genericParams = maybeReadGenericParams(parent);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -3390,8 +3388,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     DeclName name(ctx, ctx.Id_subscript, argNames);
     auto subscript = createDecl<SubscriptDecl>(name, SourceLoc(), nullptr,
-                                               SourceLoc(), TypeLoc(), DC);
+                                               SourceLoc(), TypeLoc(),
+                                               parent, genericParams);
     declOrOffset = subscript;
+
+    configureGenericEnvironment(subscript, genericEnvID);
 
     subscript->setIndices(readParameterList());
 
@@ -3477,7 +3478,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                        DeclTypeCursor.GetCurrentBitNo()));
 
     nominal->addExtension(extension);
-    extension->setValidated(true);
 
     break;
   }
@@ -3539,7 +3539,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (DAttrs)
     declOrOffset.get()->getAttrs().setRawAttributeChain(DAttrs);
 
-  return declOrOffset;
+  auto decl = declOrOffset.get();
+  decl->setValidationStarted();
+  return decl;
 }
 
 /// Translate from the Serialization function type repr enum values to the AST
@@ -4055,7 +4057,7 @@ Type ModuleFile::getType(TypeID TID) {
     
     SmallVector<Substitution, 4> genericArgs;
     if (auto sig = layout->getGenericSignature()) {
-      for (unsigned i : range(sig->getAllDependentTypes().size())) {
+      for (unsigned i : range(sig->getSubstitutionListSize())) {
         (void)i;
         auto sub = maybeReadSubstitution(DeclTypeCursor);
         if (!sub) {
@@ -4249,8 +4251,12 @@ Type ModuleFile::getType(TypeID TID) {
   }
 
 #ifndef NDEBUG
-  PrettyStackTraceType(ctx, "deserializing", typeOrOffset.get());
-  assert(!typeOrOffset.get()->hasError());
+  PrettyStackTraceType trace(ctx, "deserializing", typeOrOffset.get());
+  if (typeOrOffset.get()->hasError()) {
+    typeOrOffset.get()->dump();
+    llvm_unreachable("deserialization produced an invalid type "
+                     "(rdar://problem/30382791)");
+  }
 #endif
 
   // Invoke the callback on the deserialized type.
@@ -4339,11 +4345,18 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
                                               typeCount, inheritedCount,
                                               rawIDs);
 
+  // Skip requirement signature conformances.
+  auto proto = conformance->getProtocol();
+  for (auto req : proto->getRequirementSignature()->getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance) {
+      (void)readConformance(DeclTypeCursor);
+    }
+  }
+
   // Skip trailing inherited conformances.
   while (inheritedCount--)
     (void)readConformance(DeclTypeCursor);
 
-  ASTContext &ctx = getContext();
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
 
   while (valueCount--) {
@@ -4351,7 +4364,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto witness = cast_or_null<ValueDecl>(getDecl(*rawIDIter++));
     assert(witness ||
            req->getAttrs().hasAttribute<OptionalAttr>() ||
-           req->getAttrs().isUnavailable(ctx));
+           req->getAttrs().isUnavailable(getContext()));
     if (!witness) {
       conformance->setWitness(req, Witness());
       continue;
@@ -4433,7 +4446,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   }
 }
 
-GenericEnvironment *ModuleFile::loadGenericEnvironment(const Decl *decl,
+GenericEnvironment *ModuleFile::loadGenericEnvironment(const DeclContext *decl,
                                                        uint64_t contextData) {
   return getGenericEnvironment(contextData);
 }

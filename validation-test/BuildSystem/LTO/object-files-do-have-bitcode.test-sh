@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+# This test makes sure that if lto is enabled and that all host libraries
+# contain only bitcode.
+#
+# *NOTE* This will not trigger for embedded bitcode sections since to file those
+# are still mach-o files and come up as such.
+
+set -e
+set -u
+
+# REQUIRES: lto
+# REQUIRES: OS=macosx
+# RUN: %s %swift_obj_root
+
+if find $1/lib -iname '*.cpp.o' -type f -exec file {} \; | grep -q -v -e bitcode -e bit-code; then
+    echo "Found a ./lib non-bitcode object file!"
+    exit 1
+else
+    echo "All ./lib object files are bit-code files!"
+fi
+
+if find $1/unittests -iname '*.cpp.o' -type f -exec file {} \; | grep -q -v -e bitcode -e bit-code; then
+    echo "Found a ./unittests non-bitcode object file!"
+    exit 1
+else
+    echo "All ./unittests object files are bit-code files!"
+fi
+
+set +u
+set +e

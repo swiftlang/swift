@@ -51,6 +51,7 @@
 #include "StructMetadataLayout.h"
 #include "StructLayout.h"
 #include "EnumMetadataLayout.h"
+#include "IRGenMangler.h"
 
 #include "GenMeta.h"
 
@@ -122,10 +123,9 @@ static Address createPointerSizedGEP(IRGenFunction &IGF,
 // It should be removed when fixed. rdar://problem/22674524
 static llvm::Constant *getMangledTypeName(IRGenModule &IGM, CanType type,
                                       bool willBeRelativelyAddressed = false) {
-  auto name = LinkEntity::forTypeMangling(type);
-  llvm::SmallString<32> mangling;
-  name.mangle(mangling);
-  return IGM.getAddrOfGlobalString(mangling, willBeRelativelyAddressed);
+  IRGenMangler Mangler;
+  std::string Name = Mangler.mangleTypeForMetadata(type);
+  return IGM.getAddrOfGlobalString(Name, willBeRelativelyAddressed);
 }
 
 llvm::Value *irgen::emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
@@ -5641,19 +5641,18 @@ namespace {
       // Include the _Tt prefix. Since Swift protocol descriptors are laid
       // out to look like ObjC Protocol* objects, the name has to clearly be
       // a Swift mangled name.
-      SmallString<32> mangling;
-      mangling += "_Tt";
-      
-      auto name = LinkEntity::forTypeMangling(
-        Protocol->getDeclaredType()->getCanonicalType());
-      name.mangle(mangling);
-      auto global = IGM.getAddrOfGlobalString(mangling);
+
+      IRGenMangler mangler;
+      std::string Name =
+        mangler.mangleForProtocolDescriptor(Protocol->getDeclaredType());
+
+      auto global = IGM.getAddrOfGlobalString(Name);
       addWord(global);
     }
     
     void addInherited() {
       // If there are no inherited protocols, produce null.
-      auto inherited = Protocol->getInheritedProtocols(nullptr);
+      auto inherited = Protocol->getInheritedProtocols();
       if (inherited.empty()) {
         addWord(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
         return;

@@ -802,7 +802,7 @@ static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
 
   // Check for an unneeded minor version, otherwise just list valid versions
   if (vers.hasValue() && !vers.getValue().empty() &&
-      vers.getValue().asMajorVersion().isValidEffectiveLanguageVersion()) {
+      vers.getValue().asMajorVersion().getEffectiveLanguageVersion()) {
     diags.diagnose(SourceLoc(), diag::note_swift_version_major,
                    vers.getValue()[0]);
   } else {
@@ -822,12 +822,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (auto A = Args.getLastArg(OPT_swift_version)) {
     auto vers = version::Version::parseVersionString(
       A->getValue(), SourceLoc(), &Diags);
-    if (vers.hasValue() &&
-        vers.getValue().isValidEffectiveLanguageVersion()) {
-      Opts.EffectiveLanguageVersion = vers.getValue();
-    } else {
-      diagnoseSwiftVersion(vers, A, Args, Diags);
+    bool isValid = false;
+    if (vers.hasValue()) {
+      if (auto effectiveVers = vers.getValue().getEffectiveLanguageVersion()) {
+        Opts.EffectiveLanguageVersion = effectiveVers.getValue();
+        isValid = true;
+      }
     }
+    if (!isValid)
+      diagnoseSwiftVersion(vers, A, Args, Diags);
   }
 
   Opts.AttachCommentsToDecls |= Args.hasArg(OPT_dump_api_path);
@@ -864,6 +867,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   Opts.EnableASTScopeLookup |= Args.hasArg(OPT_enable_astscope_lookup);
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
+  Opts.EnableConstraintPropagation |= Args.hasArg(OPT_propagate_constraints);
   Opts.IterativeTypeChecker |= Args.hasArg(OPT_iterative_type_checker);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
@@ -1034,9 +1038,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
     Opts.ImportSearchPaths.push_back(resolveSearchPath(A->getValue()));
   }
 
-  for (const Arg *A : make_range(Args.filtered_begin(OPT_F),
+  for (const Arg *A : make_range(Args.filtered_begin(OPT_F, OPT_Fsystem),
                                  Args.filtered_end())) {
-    Opts.FrameworkSearchPaths.push_back(resolveSearchPath(A->getValue()));
+    Opts.FrameworkSearchPaths.push_back({resolveSearchPath(A->getValue()),
+                           /*isSystem=*/A->getOption().getID() == OPT_Fsystem});
   }
 
   for (const Arg *A : make_range(Args.filtered_begin(OPT_L),

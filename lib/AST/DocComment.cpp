@@ -22,6 +22,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/RawComment.h"
 #include "swift/Markup/Markup.h"
+#include "llvm/ADT/SetVector.h"
 
 using namespace swift;
 
@@ -214,6 +215,7 @@ bool extractSimpleField(
     SmallVectorImpl<const swift::markup::MarkupASTNode *> &BodyNodes) {
   auto Children = L->getChildren();
   SmallVector<swift::markup::MarkupASTNode *, 8> NormalItems;
+  llvm::SmallSetVector<StringRef, 8> Tags;
   for (auto Child : Children) {
     auto I = dyn_cast<swift::markup::Item>(Child);
     if (!I) {
@@ -261,16 +263,26 @@ bool extractSimpleField(
     ParagraphText->setLiteralContent(Remainder);
     auto Field = swift::markup::createSimpleField(MC, Tag, ItemChildren);
 
-    if (auto RF = dyn_cast<swift::markup::ReturnsField>(Field))
+    if (auto RF = dyn_cast<swift::markup::ReturnsField>(Field)) {
       Parts.ReturnsField = RF;
-    else if (auto TF = dyn_cast<swift::markup::ThrowsField>(Field))
+    } else if (auto TF = dyn_cast<swift::markup::ThrowsField>(Field)) {
       Parts.ThrowsField = TF;
-    else
+    } else if (auto TF = dyn_cast<swift::markup::TagField>(Field)) {
+      llvm::SmallString<64> Scratch;
+      llvm::raw_svector_ostream OS(Scratch);
+      printInlinesUnder(TF, OS);
+      Tags.insert(MC.allocateCopy(OS.str()));
+    } else if (auto LKF = dyn_cast<markup::LocalizationKeyField>(Field)) {
+      Parts.LocalizationKeyField = LKF;
+    } else {
       BodyNodes.push_back(Field);
+    }
   }
 
   if (NormalItems.size() != Children.size())
     L->setChildren(NormalItems);
+
+  Parts.Tags = MC.allocateCopy(Tags.getArrayRef());
 
   return NormalItems.size() == 0;
 }

@@ -1216,7 +1216,12 @@ public:
           << " to " << CI->getTargetType() << " in "
           << getIDAndType(CI->getDest());
   }
-  
+
+  void visitUnconditionalCheckedCastOpaqueInst(
+      UnconditionalCheckedCastOpaqueInst *CI) {
+    *this << getIDAndType(CI->getOperand()) << " to " << CI->getType();
+  }
+
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
     *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
           << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
@@ -1227,6 +1232,13 @@ public:
 
   void printUncheckedConversionInst(ConversionInst *CI, SILValue operand) {
     *this << getIDAndType(operand) << " to " << CI->getType();
+  }
+
+  void visitUncheckedOwnershipConversionInst(
+      UncheckedOwnershipConversionInst *UOCI) {
+    *this << getIDAndType(UOCI->getOperand()) << ", "
+          << "@" << UOCI->getOperand().getOwnershipKind() << " to "
+          << "@" << UOCI->getConversionOwnershipKind();
   }
 
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
@@ -1477,6 +1489,10 @@ public:
     *this << DMI->getType();
   }
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *OI) {
+    if (OI->getAccessKind() == OpenedExistentialAccess::Immutable)
+      *this << "immutable_access ";
+    else
+      *this << "mutable_access ";
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
   void visitOpenExistentialRefInst(OpenExistentialRefInst *OI) {
@@ -1495,6 +1511,10 @@ public:
     *this << getIDAndType(AEI->getOperand()) << ", $"
           << AEI->getFormalConcreteType();
   }
+  void visitInitExistentialOpaqueInst(InitExistentialOpaqueInst *AEI) {
+    *this << getIDAndType(AEI->getOperand()) << ", $"
+          << AEI->getFormalConcreteType() << ", " << AEI->getType();
+  }
   void visitInitExistentialRefInst(InitExistentialRefInst *AEI) {
     *this << getIDAndType(AEI->getOperand()) << " : $"
           << AEI->getFormalConcreteType() << ", " << AEI->getType();
@@ -1507,6 +1527,9 @@ public:
           << AEBI->getFormalConcreteType();
   }
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *DEI) {
+    *this << getIDAndType(DEI->getOperand());
+  }
+  void visitDeinitExistentialOpaqueInst(DeinitExistentialOpaqueInst *DEI) {
     *this << getIDAndType(DEI->getOperand());
   }
   void visitDeallocExistentialBoxInst(DeallocExistentialBoxInst *DEI) {
@@ -1533,6 +1556,11 @@ public:
   void visitFixLifetimeInst(FixLifetimeInst *RI) {
     *this << getIDAndType(RI->getOperand());
   }
+
+  void visitEndLifetimeInst(EndLifetimeInst *ELI) {
+    *this << getIDAndType(ELI->getOperand());
+  }
+
   void visitMarkDependenceInst(MarkDependenceInst *MDI) {
     *this << getIDAndType(MDI->getValue()) << " on "
           << getIDAndType(MDI->getBase());
@@ -2136,6 +2164,9 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   case SILStage::Canonical:
     OS << "canonical";
     break;
+  case SILStage::Lowered:
+    OS << "lowered";
+    break;
   }
   
   OS << "\n\nimport Builtin\nimport " << STDLIB_NAME
@@ -2227,6 +2258,19 @@ void SILVTable::dump() const {
   print(llvm::errs());
 }
 
+/// Returns true if anything was printed.
+static bool printAssociatedTypePath(llvm::raw_ostream &OS, CanType path) {
+  if (auto memberType = dyn_cast<DependentMemberType>(path)) {
+    if (printAssociatedTypePath(OS, memberType.getBase()))
+      OS << '.';
+    OS << memberType->getName().str();
+    return true;
+  } else {
+    assert(isa<GenericTypeParamType>(path));
+    return false;
+  }
+}
+
 void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   PrintOptions Options = PrintOptions::printSIL();
   PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
@@ -2282,9 +2326,9 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     case AssociatedTypeProtocol: {
       // associated_type_protocol (AssociatedTypeName: Protocol): <conformance>
       auto &assocProtoWitness = witness.getAssociatedTypeProtocolWitness();
-      OS << "associated_type_protocol ("
-         << assocProtoWitness.Requirement->getName() << ": "
-         << assocProtoWitness.Protocol->getName() << "): ";
+      OS << "associated_type_protocol (";
+      (void) printAssociatedTypePath(OS, assocProtoWitness.Requirement);
+      OS << ": " << assocProtoWitness.Protocol->getName() << "): ";
       if (assocProtoWitness.Witness.isConcrete())
         assocProtoWitness.Witness.getConcrete()->printName(OS, Options);
       else

@@ -50,6 +50,7 @@ class G<T> {
   @_specialize(where T == Int)
   @_specialize(where T == T) // expected-error{{Only concrete type same-type requirements are supported by '_specialize' attribute}}
   @_specialize(where T == S<T>) // expected-error{{Only concrete type same-type requirements are supported by '_specialize' attribute}}
+	// expected-error@-1{{same-type constraint 'T' == 'S<T>' is recursive}}
   @_specialize(where T == Int, U == Int) // expected-error{{use of undeclared type 'U'}}
   func noGenericParams() {}
 
@@ -85,7 +86,7 @@ struct FloatElement : HasElt {
   typealias Element = Float
 }
 @_specialize(where T == FloatElement)
-@_specialize(where T == IntElement) // expected-error{{generic parameter 'T.Element' cannot be equal to both 'Float' and 'Int'}}
+@_specialize(where T == IntElement) // expected-error{{associated type 'T.Element' cannot be equal to both 'Float' and 'Int'}}
 func sameTypeRequirement<T : HasElt>(_ t: T) where T.Element == Float {}
 
 @_specialize(where T == Sub)
@@ -115,6 +116,8 @@ public func funcWithEmptySpecializeAttr<X: P, Y>(x: X, y: Y) {
 @_specialize(where X:_Trivial(8), Y == Int)
 @_specialize(where X == Int, Y == Int)
 @_specialize(where X == Int, X == Int) // expected-error{{too few type parameters are specified in '_specialize' attribute (got 1, but expected 2)}} expected-error{{Missing constraint for 'Y' in '_specialize' attribute}}
+// expected-warning@-1{{redundant same-type constraint 'X' == 'Int'}}
+// expected-note@-2{{same-type constraint 'X' == 'Int' written here}}
 @_specialize(where Y:_Trivial(32), X == Float)
 @_specialize(where X1 == Int, Y1 == Int) // expected-error{{use of undeclared type 'X1'}} expected-error{{use of undeclared type 'Y1'}} expected-error{{too few type parameters are specified in '_specialize' attribute (got 0, but expected 2)}} expected-error{{Missing constraint for 'X' in '_specialize' attribute}} expected-error{{Missing constraint for 'Y' in '_specialize' attribute}}
 public func funcWithTwoGenericParameters<X, Y>(x: X, y: Y) {

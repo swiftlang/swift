@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine -inline -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine -devirtualizer -inline -sil-combine | %FileCheck %s
 
 // Check that type propagation is performed correctly for existentials.
 // The concrete type set in init_existential instructions should be propagated
@@ -57,7 +57,7 @@ bb0:
   %4 = metatype $@thick ArrayClassReaderWriter.Type
   %5 = apply %3(%4) : $@convention(thin) (@thick ArrayClassReaderWriter.Type) -> @owned ArrayClassReaderWriter
   store %5 to %2 : $*ArrayClassReaderWriter
-  %7 = open_existential_addr %1 : $*ReaderWriterType to $*@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType
+  %7 = open_existential_addr immutable_access %1 : $*ReaderWriterType to $*@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType
   // Check that the type information reaches the witness_method instruction and allows for devirtualization.
   %8 = witness_method $@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType, #ReaderWriterType.read!1, %7 : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType : $@convention(witness_method) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int32, @in_guaranteed τ_0_0) -> Int32
   %9 = integer_literal $Builtin.Int32, 0
@@ -92,7 +92,7 @@ bb0:
   store %6 to %3 : $*ArrayClassReaderWriter
   // Check that the type information set for %1 is propagated here to %2.
   copy_addr %1 to [initialization] %2 : $*ReaderWriterType
-  %9 = open_existential_addr %2 : $*ReaderWriterType to $*@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType
+  %9 = open_existential_addr immutable_access %2 : $*ReaderWriterType to $*@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType
   // Check that the type information reaches the witness_method instruction and allows for devirtualization.
   %10 = witness_method $@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType, #ReaderWriterType.read!1, %9 : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType : $@convention(witness_method) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int32, @in_guaranteed τ_0_0) -> Int32
   %11 = integer_literal $Builtin.Int32, 0
@@ -139,7 +139,7 @@ bb1:
   br bb2
 
 bb2:
-  %10 = open_existential_addr %2 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P
+  %10 = open_existential_addr immutable_access %2 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P
   %11 = witness_method $@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P, #P.foo!1, %10 : $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   %12 = apply %11<@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P>(%10) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   destroy_addr %2 : $*P
@@ -161,7 +161,7 @@ bb0(%0 : $*P):
   store %8 to %3 : $*X
   destroy_addr %2 : $*P
   copy_addr [take] %0 to %2 : $*P                 // id: %5
-  %10 = open_existential_addr %2 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P
+  %10 = open_existential_addr immutable_access %2 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P
   %11 = witness_method $@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P, #P.foo!1, %10 : $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   %12 = apply %11<@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P>(%10) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   dealloc_stack %2 : $*P
@@ -184,7 +184,7 @@ bb0:
   destroy_addr %2 : $*P
   %f = function_ref @write_p : $@convention(thin) () -> @out P
   %a = apply %f(%2) : $@convention(thin) () -> @out P
-  %10 = open_existential_addr %2 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P
+  %10 = open_existential_addr immutable_access %2 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P
   %11 = witness_method $@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P, #P.foo!1, %10 : $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   %12 = apply %11<@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P>(%10) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   dealloc_stack %2 : $*P
@@ -207,7 +207,7 @@ bb0:
   store %8 to %3 : $*X
   %f = function_ref @read_p : $@convention(thin) (@in P) -> ()
   %a = apply %f(%2) : $@convention(thin) (@in P) -> ()
-  %10 = open_existential_addr %2 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P
+  %10 = open_existential_addr immutable_access %2 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P
   %11 = witness_method $@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P, #P.foo!1, %10 : $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   %12 = apply %11<@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83") P>(%10) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   destroy_addr %2 : $*P
@@ -234,4 +234,67 @@ sil_witness_table public_external ArrayClassReaderWriter: ReaderWriterType modul
   method #ReaderWriterType.init!allocator.1: @_TTWC28existential_type_propagation22ArrayClassReaderWriterS_16ReaderWriterTypeS_FS1_CuRq_S1__fMq_FT_q_
   method #ReaderWriterType.read!1: @_TTWC28existential_type_propagation22ArrayClassReaderWriterS_16ReaderWriterTypeS_FS1_4readuRq_S1__fq_FSiSi
   method #ReaderWriterType.write!1: @_TTWC28existential_type_propagation22ArrayClassReaderWriterS_16ReaderWriterTypeS_FS1_5writeuRq_S1__fRq_FTSi5valueSi_T_
+}
+
+protocol PPP : class {
+  func foo()
+}
+
+class BBB: PPP {
+  @inline(never)
+  func foo()
+}
+
+final class XXX : BBB {
+  @inline(never)
+  override func foo()
+}
+
+// Check that sil-combine does not crash on this example and does not generate a wrong
+// upcast.
+// CHECK-LABEL: sil @silcombine_dont_generate_wrong_upcasts_during_devirt
+// CHECK: [[SELF:%.*]] = unchecked_ref_cast %0 : $BBB to $XXX
+// CHECK: [[WITNESS_THUNK:%.*]] = function_ref @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_ : $@convention(witness_method) (@guaranteed XXX) -> ()
+// CHECK: apply [[WITNESS_THUNK]]([[SELF]])
+// CHECK: return
+sil @silcombine_dont_generate_wrong_upcasts_during_devirt: $@convention(thin) (@owned BBB) -> () {
+bb0(%0 : $BBB):
+  strong_retain %0 : $BBB
+  %3 = init_existential_ref %0 : $BBB : $BBB, $PPP
+  %5 = open_existential_ref %3 : $PPP to $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP
+  %6 = witness_method $BBB, #PPP.foo!1, %5 : $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
+  strong_release %3 : $PPP
+  %9 = tuple ()
+  strong_release %0 : $BBB
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// Check that both applies can be devirtualized by means of propagating the concrete
+// type of the existential into witness_method and apply instructions.
+// CHECK-LABEL: sil @silcombine_devirt_both_applies_of_witness_method
+// CHECK-NOT: open_existential_ref
+// CHECK-NOT: witness_method
+// CHECK: [[FR1:%.*]] = function_ref @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_
+// CHECK: apply [[FR1]](%0)
+// CHECK: return
+sil @silcombine_devirt_both_applies_of_witness_method : $@convention(thin) (@owned XXX) -> () {
+bb0(%0 : $XXX):
+  strong_retain %0 : $XXX
+  %3 = init_existential_ref %0 : $XXX : $XXX, $PPP
+  %5 = open_existential_ref %3 : $PPP to $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP
+  %6 = witness_method $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP, #PPP.foo!1, %5 : $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
+  strong_release %3 : $PPP
+  %9 = tuple ()
+  strong_release %0 : $XXX
+  %11 = tuple ()
+  return %11 : $()
+}
+
+sil @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_ : $@convention(witness_method) (@guaranteed XXX) -> ()
+
+sil_witness_table XXX: PPP module nix2 {
+  method #PPP.foo!1: @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_	// protocol witness for PPP.foo() -> () in conformance XXX
 }

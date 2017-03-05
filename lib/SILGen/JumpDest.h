@@ -49,6 +49,15 @@ public:
   CleanupsDepth getDepth() const { return Depth; }
   CleanupLocation getCleanupLocation() const { return CleanupLoc; }
 
+  JumpDest translate(CleanupsDepth NewDepth) && {
+    JumpDest NewValue(Block, NewDepth, CleanupLoc);
+    Block = nullptr;
+    Depth = CleanupsDepth::invalid();
+    // Null location.
+    CleanupLoc = CleanupLocation::get(ArtificialUnreachableLocation());
+    return NewValue;
+  }
+
   bool isValid() const { return Block != nullptr; }
   static JumpDest invalid() {
     return JumpDest(CleanupLocation((Expr*) nullptr));

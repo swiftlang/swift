@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -Xllvm -sil-inline-generics=false -Xllvm -new-mangling-for-tests -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O -emit-sil %s | %FileCheck %s
 
 public protocol Foo { 
   func foo(_ x:Int) -> Int
@@ -178,11 +178,13 @@ protocol MathP {
 }
 
 extension MathP {
+  @inline(never)
   func plus() -> Self {
     sum += 1
     return self
   }
 
+  @inline(never)
   func minus() {
     sum -= 1
     if sum == 0 {

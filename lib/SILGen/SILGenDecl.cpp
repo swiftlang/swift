@@ -29,9 +29,9 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/SmallString.h"
 #include <iterator>
+
 using namespace swift;
 using namespace Mangle;
 using namespace Lowering;
@@ -83,7 +83,7 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
   // A scalar value is being copied into the tuple, break it into elements
   // and assign/init each element in turn.
   SILValue value = valueMV.forward(SGF);
-  auto sourceType = cast<TupleType>(valueMV.getSwiftType());
+  auto sourceType = valueMV.getType().castTo<TupleType>();
   auto sourceSILType = value->getType();
   for (unsigned i = 0, e = sourceType->getNumElements(); i != e; ++i) {
     SILType fieldTy = sourceSILType.getTupleElementType(i);
@@ -120,7 +120,7 @@ namespace {
     void emit(SILGenFunction &gen, CleanupLocation l) override {
       gen.B.emitDestroyValueOperation(l, closure);
     }
-    void dump() const override {
+    void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
       llvm::errs() << "CleanupClosureConstant\n"
                    << "State:" << getState() << "\n"
@@ -222,7 +222,7 @@ public:
     gen.B.createEndBorrow(l, borrowed, original);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "EndBorrowCleanup "
                  << "State:" << getState() << "\n"
@@ -246,7 +246,7 @@ public:
       gen.B.emitDestroyValueOperation(l, v);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "ReleaseValueCleanup\n"
                  << "State:" << getState() << "\n"
@@ -267,7 +267,7 @@ public:
     gen.B.createDeallocStack(l, Addr);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "DeallocStackCleanup\n"
                  << "State:" << getState() << "\n"
@@ -288,7 +288,7 @@ public:
     gen.destroyLocalVariable(l, Var);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "DestroyLocalVariable\n"
                  << "State:" << getState() << "\n";
@@ -310,7 +310,7 @@ public:
     gen.deallocateUninitializedLocalVariable(l, Var);
   }
 
-  void dump() const override {
+  void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
     llvm::errs() << "DeallocateUninitializedLocalVariable\n"
                  << "State:" << getState() << "\n";
@@ -447,7 +447,8 @@ public:
     } else {
       // If this is a let with an initializer or bound value, we only need a
       // buffer if the type is address only.
-      needsTemporaryBuffer = lowering.isAddressOnly();
+      needsTemporaryBuffer =
+          lowering.isAddressOnly() && gen.silConv.useLoweredAddresses();
     }
    
     if (needsTemporaryBuffer) {
@@ -812,9 +813,10 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   
   // Reabstract to the substituted type, if needed.
   CanType substEltTy =
-    value.getSwiftType()->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
-                                      ElementDecl,
-                                      ElementDecl->getArgumentInterfaceType())
+    value.getType().getSwiftRValueType()
+      ->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
+                        ElementDecl,
+                        ElementDecl->getArgumentInterfaceType())
       ->getCanonicalType();
 
   AbstractionPattern origEltTy =
@@ -1210,12 +1212,6 @@ CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
   return Cleanups.getTopCleanup();
 }
 
-CleanupHandle SILGenFunction::enterEndBorrowCleanup(SILValue original,
-                                                    SILValue borrowed) {
-  Cleanups.pushCleanup<EndBorrowCleanup>(original, borrowed);
-  return Cleanups.getTopCleanup();
-}
-
 namespace {
   /// A cleanup that deinitializes an opaque existential container
   /// before a value has been stored into it, or after its value was taken.
@@ -1238,7 +1234,11 @@ namespace {
       case ExistentialRepresentation::Metatype:
         llvm_unreachable("cannot cleanup existential");
       case ExistentialRepresentation::Opaque:
-        gen.B.createDeinitExistentialAddr(l, existentialAddr);
+        if (gen.silConv.useLoweredAddresses()) {
+          gen.B.createDeinitExistentialAddr(l, existentialAddr);
+        } else {
+          gen.B.createDeinitExistentialOpaque(l, existentialAddr);
+        }
         break;
       case ExistentialRepresentation::Boxed:
         gen.B.createDeallocExistentialBox(l, concreteFormalType,
@@ -1247,7 +1247,7 @@ namespace {
       }
     }
 
-    void dump() const override {
+    void dump(SILGenFunction &) const override {
 #ifndef NDEBUG
       llvm::errs() << "DeinitExistentialCleanup\n"
                    << "State:" << getState() << "\n"
@@ -1358,6 +1358,16 @@ SILGenFunction::emitTemporary(SILLocation loc, const TypeLowering &tempTL) {
   return useBufferAsTemporary(addr, tempTL);
 }
 
+std::unique_ptr<TemporaryInitialization>
+SILGenFunction::emitFormalAccessTemporary(SILLocation loc,
+                                          const TypeLowering &tempTL) {
+  SILValue addr = emitTemporaryAllocation(loc, tempTL.getLoweredType());
+  CleanupHandle cleanup =
+      enterDormantFormalAccessTemporaryCleanup(addr, loc, tempTL);
+  return std::unique_ptr<TemporaryInitialization>(
+      new TemporaryInitialization(addr, cleanup));
+}
+
 /// Create an Initialization for an uninitialized buffer.
 std::unique_ptr<TemporaryInitialization>
 SILGenFunction::useBufferAsTemporary(SILValue addr,
@@ -1375,6 +1385,90 @@ SILGenFunction::enterDormantTemporaryCleanup(SILValue addr,
 
   Cleanups.pushCleanupInState<ReleaseValueCleanup>(CleanupState::Dormant, addr);
   return Cleanups.getCleanupsDepth();
+}
+
+namespace {
+
+struct FormalAccessReleaseValueCleanup : Cleanup {
+  FormalEvaluationContext::stable_iterator Depth;
+
+  FormalAccessReleaseValueCleanup() : Depth() {}
+
+  void setState(SILGenFunction &gen, CleanupState newState) override {
+    if (newState == CleanupState::Dead) {
+      getEvaluation(gen).setFinished();
+    }
+
+    state = newState;
+  }
+
+  void emit(SILGenFunction &gen, CleanupLocation l) override {
+    getEvaluation(gen).finish(gen);
+  }
+
+  void dump(SILGenFunction &gen) const override {
+#ifndef NDEBUG
+    llvm::errs() << "FormalAccessReleaseValueCleanup "
+                 << "State:" << getState() << "\n"
+                 << "Value:" << getValue(gen) << "\n";
+#endif
+  }
+
+  OwnedFormalAccess &getEvaluation(SILGenFunction &gen) const {
+    auto &evaluation = *gen.FormalEvalContext.find(Depth);
+    assert(evaluation.getKind() == FormalAccess::Owned);
+    return static_cast<OwnedFormalAccess &>(evaluation);
+  }
+
+  SILValue getValue(SILGenFunction &gen) const {
+    return getEvaluation(gen).getValue();
+  }
+};
+
+} // end anonymous namespace
+
+ManagedValue
+SILGenFunction::emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
+                                                         SILValue addr) {
+  assert(InWritebackScope && "Must be in formal evaluation scope");
+  auto &lowering = F.getTypeLowering(addr->getType());
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(addr);
+
+  auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
+  CleanupHandle handle = Cleanups.getTopCleanup();
+  FormalEvalContext.push<OwnedFormalAccess>(loc, handle, addr);
+  cleanup.Depth = FormalEvalContext.stable_begin();
+  return ManagedValue(addr, handle);
+}
+
+ManagedValue
+SILGenFunction::emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
+                                                         SILValue value) {
+  assert(InWritebackScope && "Must be in formal evaluation scope");
+  auto &lowering = F.getTypeLowering(value->getType());
+  if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(value);
+
+  auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
+  CleanupHandle handle = Cleanups.getTopCleanup();
+  FormalEvalContext.push<OwnedFormalAccess>(loc, handle, value);
+  cleanup.Depth = FormalEvalContext.stable_begin();
+  return ManagedValue(value, handle);
+}
+
+CleanupHandle SILGenFunction::enterDormantFormalAccessTemporaryCleanup(
+    SILValue addr, SILLocation loc, const TypeLowering &tempTL) {
+  assert(InWritebackScope && "Must be in formal evaluation scope");
+  if (tempTL.isTrivial())
+    return CleanupHandle::invalid();
+
+  auto &cleanup = Cleanups.pushCleanup<FormalAccessReleaseValueCleanup>();
+  CleanupHandle handle = Cleanups.getTopCleanup();
+  Cleanups.setCleanupState(handle, CleanupState::Dormant);
+  FormalEvalContext.push<OwnedFormalAccess>(loc, handle, addr);
+  cleanup.Depth = FormalEvalContext.stable_begin();
+  return handle;
 }
 
 void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
@@ -1631,56 +1725,23 @@ public:
                     SILWitnessTable::MethodWitness{requirementRef, witnessFn});
   }
 
-  void addAssociatedType(AssociatedTypeDecl *td,
-                         ArrayRef<ProtocolDecl *> protos) {
+  void addAssociatedType(AssociatedTypeDecl *td) {
     // Find the substitution info for the witness type.
     const auto &witness = Conformance->getTypeWitness(td, /*resolver=*/nullptr);
 
     // Emit the record for the type itself.
     Entries.push_back(SILWitnessTable::AssociatedTypeWitness{td,
-                                witness.getReplacement()->getCanonicalType()});
+                                witness.getReplacement()->getCanonicalType()});    
+  }
 
-    // Emit records for the protocol requirements on the type.
-    assert(protos.size() == witness.getConformances().size()
-           && "number of conformances in assoc type substitution do not match "
-              "number of requirements on assoc type");
-    // The conformances should be all abstract or all concrete.
-    assert(witness.getConformances().empty()
-           || (witness.getConformances()[0].isConcrete()
-                 ? std::all_of(witness.getConformances().begin(),
-                               witness.getConformances().end(),
-                               [&](const ProtocolConformanceRef C) -> bool {
-                                 return C.isConcrete();
-                               })
-                 : std::all_of(witness.getConformances().begin(),
-                               witness.getConformances().end(),
-                               [&](const ProtocolConformanceRef C) -> bool {
-                                 return C.isAbstract();
-                               })));
+  void addAssociatedConformance(CanType dependentType, ProtocolDecl *protocol) {
+    auto assocConformance =
+      Conformance->getAssociatedConformance(dependentType, protocol);
 
-    for (auto *protocol : protos) {
-      // Only reference the witness if the protocol requires it.
-      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
-        continue;
+    SGM.useConformance(assocConformance);
 
-      ProtocolConformanceRef conformance(protocol);
-      // If the associated type requirement is satisfied by an associated type,
-      // these will all be abstract conformances.
-      if (witness.getConformances()[0].isConcrete()) {
-        auto foundConformance = std::find_if(witness.getConformances().begin(),
-                                        witness.getConformances().end(),
-                                        [&](ProtocolConformanceRef c) {
-                                          return c.getRequirement() == protocol;
-                                        });
-        assert(foundConformance != witness.getConformances().end());
-        conformance = *foundConformance;
-      }
-      SGM.useConformance(conformance);
-
-      Entries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
-        td, protocol, conformance
-      });
-    }
+    Entries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
+        dependentType, protocol, assocConformance});
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *d) {
@@ -2004,18 +2065,13 @@ public:
     DefaultWitnesses.push_back(entry);
   }
 
-  void addAssociatedType(AssociatedTypeDecl *ty,
-                         ArrayRef<ProtocolDecl *> protos) {
-    // Add a dummy entry for the metatype itself, and then for each conformance.
+  void addAssociatedType(AssociatedTypeDecl *ty) {
+    // Add a dummy entry for the metatype itself.
     addMissingDefault();
+  }
 
-    for (auto *protocol : protos) {
-      // Only reference the witness if the protocol requires it.
-      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
-        continue;
-
-      addMissingDefault();
-    }
+  void addAssociatedConformance(CanType type, ProtocolDecl *requirement) {
+    addMissingDefault();
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *d) {

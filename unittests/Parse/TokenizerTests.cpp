@@ -38,7 +38,7 @@ public:
     case swift::tok::X: return #X; break;
 #define POUND(X, Y) \
     case swift::tok::pound_##X: return "pound_" #X; break;
-  #include "swift/Parse/Tokens.def"
+  #include "swift/Syntax/TokenKinds.def"
 
   #define OTHER(X) \
   case swift::tok::X: return #X; break;

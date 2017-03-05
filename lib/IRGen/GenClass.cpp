@@ -795,7 +795,7 @@ static bool getInstanceSizeByMethod(IRGenFunction &IGF,
 
   // Retain 'self' if necessary.
   if (fnType->getParameters()[0].isConsumed()) {
-    IGF.emitNativeStrongRetain(selfValue);
+    IGF.emitNativeStrongRetain(selfValue, IGF.getDefaultAtomicity());
   }
 
   // Adjust down to the defining subclass type if necessary.
@@ -1030,7 +1030,7 @@ namespace {
       // Objective-C protocol conformances.
       // FIXME: We can't use visitConformances() because there are no
       // conformances for protocols to protocols right now.
-      for (ProtocolDecl *p : theProtocol->getInheritedProtocols(nullptr)) {
+      for (ProtocolDecl *p : theProtocol->getInheritedProtocols()) {
         if (!p->isObjC())
           continue;
         // Don't emit the magic AnyObject conformance.
@@ -1046,19 +1046,35 @@ namespace {
     /// Gather protocol records for all of the explicitly-specified Objective-C
     /// protocol conformances.
     void visitConformances(DeclContext *dc) {
+      llvm::SmallSetVector<ProtocolDecl *, 2> protocols;
       for (auto conformance : dc->getLocalConformances(
                                 ConformanceLookupKind::OnlyExplicit,
                                 nullptr, /*sorted=*/true)) {
         ProtocolDecl *proto = conformance->getProtocol();
-        if (!proto->isObjC())
-          continue;
+        getObjCProtocols(proto, protocols);
+      }
 
+      for (ProtocolDecl *proto : protocols) {
         // Don't emit the magic AnyObject conformance.
         if (auto known = proto->getKnownProtocolKind())
           if (*known == KnownProtocolKind::AnyObject)
             continue;
 
         Protocols.push_back(buildProtocolRef(proto));
+      }
+    }
+
+    /// Add the protocol to the vector, if it's Objective-C protocol,
+    /// or search its superprotocols.
+    void getObjCProtocols(ProtocolDecl *proto,
+                          llvm::SmallSetVector<ProtocolDecl *, 2> &result) {
+      if (proto->isObjC()) {
+        result.insert(proto);
+      } else {
+        for (ProtocolDecl *inherited : proto->getInheritedProtocols()) {
+          // Recursively check inherited protocol for objc conformance.
+          getObjCProtocols(inherited, result);
+        }
       }
     }
 

@@ -639,40 +639,31 @@ namespace {
 
   /// A class which lays out a witness table in the abstract.
   class WitnessTableLayout : public SILWitnessVisitor<WitnessTableLayout> {
-    unsigned NumWitnesses = 0;
     SmallVector<WitnessTableEntry, 16> Entries;
-
-    WitnessIndex getNextIndex() {
-      return WitnessIndex(NumWitnesses++, /*isPrefix=*/false);
-    }
 
   public:
     /// The next witness is an out-of-line base protocol.
     void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
-      Entries.push_back(
-             WitnessTableEntry::forOutOfLineBase(baseProto, getNextIndex()));
+      Entries.push_back(WitnessTableEntry::forOutOfLineBase(baseProto));
     }
 
     void addMethod(FuncDecl *func) {
-      Entries.push_back(WitnessTableEntry::forFunction(func, getNextIndex()));
+      Entries.push_back(WitnessTableEntry::forFunction(func));
     }
 
     void addConstructor(ConstructorDecl *ctor) {
-      Entries.push_back(WitnessTableEntry::forFunction(ctor, getNextIndex()));
+      Entries.push_back(WitnessTableEntry::forFunction(ctor));
     }
 
-    void addAssociatedType(AssociatedTypeDecl *ty,
-                           ArrayRef<ProtocolDecl *> protos) {
-      // An associated type takes up a spot for the type metadata and for the
-      // witnesses to all its conformances.
+    void addAssociatedType(AssociatedTypeDecl *ty) {
+      Entries.push_back(WitnessTableEntry::forAssociatedType(ty));
+    }
+
+    void addAssociatedConformance(CanType path, ProtocolDecl *protocol) {
       Entries.push_back(
-                      WitnessTableEntry::forAssociatedType(ty, getNextIndex()));
-      for (auto *proto : protos)
-        if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
-          ++NumWitnesses;
+                   WitnessTableEntry::forAssociatedConformance(path, protocol));
     }
 
-    unsigned getNumWitnesses() const { return NumWitnesses; }
     ArrayRef<WitnessTableEntry> getEntries() const { return Entries; }
   };
 
@@ -764,17 +755,16 @@ namespace {
       // Keep track of whether we found a better path than the
       // previous best.
       bool foundBetter = false;
-      for (auto base : proto->getInheritedProtocols(nullptr)) {
+      for (auto base : proto->getInheritedProtocols()) {
         // ObjC protocols do not have witnesses.
         if (!Lowering::TypeConverter::protocolRequiresWitnessTable(base))
           continue;
 
-        auto &baseEntry = protoInfo.getWitnessEntry(base);
-        assert(baseEntry.isBase());
+        auto baseIndex = protoInfo.getBaseIndex(base);
 
         // Compute the length down to this base.
         unsigned lengthToBase = lengthSoFar;
-        if (baseEntry.isOutOfLineBase()) {
+        if (!baseIndex.isPrefix()) {
           lengthToBase++;
 
           // Don't consider this path if we reach a length that can't
@@ -803,8 +793,8 @@ namespace {
         foundBetter = true;
 
         // Add the link from proto to base if necessary.
-        if (baseEntry.isOutOfLineBase()) {
-          ReversePath.push_back(baseEntry.getOutOfLineBaseIndex());
+        if (!baseIndex.isPrefix()) {
+          ReversePath.push_back(baseIndex);
 
         // If it isn't necessary, then we might be able to
         // short-circuit considering the bases of this protocol.
@@ -1048,8 +1038,8 @@ public:
              && "sil witness table does not match protocol");
       assert(entry.getBaseProtocolWitness().Requirement == baseProto
              && "sil witness table does not match protocol");
-      auto piEntry = PI.getWitnessEntry(baseProto);
-      assert(piEntry.getOutOfLineBaseIndex().getValue() == Table.size()
+      auto piIndex = PI.getBaseIndex(baseProto);
+      assert(piIndex.getValue() == Table.size()
              && "offset doesn't match ProtocolInfo layout");
 #endif
       
@@ -1092,8 +1082,8 @@ public:
              && "sil witness table does not match protocol");
       assert(entry.getMethodWitness().Requirement.getDecl() == requirement
              && "sil witness table does not match protocol");
-      auto piEntry = PI.getWitnessEntry(requirement);
-      assert(piEntry.getFunctionIndex().getValue() == Table.size()
+      auto piIndex = PI.getFunctionIndex(requirement);
+      assert(piIndex.getValue() == Table.size()
              && "offset doesn't match ProtocolInfo layout");
 #endif
 
@@ -1118,16 +1108,15 @@ public:
       return addMethodFromSILWitnessTable(requirement);
     }
 
-    void addAssociatedType(AssociatedTypeDecl *requirement,
-                           ArrayRef<ProtocolDecl *> protos) {
+    void addAssociatedType(AssociatedTypeDecl *requirement) {
 #ifndef NDEBUG
       auto &entry = SILEntries.front();
       assert(entry.getKind() == SILWitnessTable::AssociatedType
              && "sil witness table does not match protocol");
       assert(entry.getAssociatedTypeWitness().Requirement == requirement
              && "sil witness table does not match protocol");
-      auto piEntry = PI.getWitnessEntry(requirement);
-      assert(piEntry.getAssociatedTypeIndex().getValue() == Table.size()
+      auto piIndex = PI.getAssociatedTypeIndex(requirement);
+      assert(piIndex.getValue() == Table.size()
              && "offset doesn't match ProtocolInfo layout");
 #endif
 
@@ -1135,7 +1124,6 @@ public:
 
       const Substitution &sub =
         Conformance.getTypeWitness(requirement, nullptr);
-      assert(protos.size() == sub.getConformances().size());
 
       // This type will be expressed in terms of the archetypes
       // of the conforming context.
@@ -1145,34 +1133,41 @@ public:
       llvm::Constant *metadataAccessFunction =
         getAssociatedTypeMetadataAccessFunction(requirement, associate);
       Table.push_back(metadataAccessFunction);
+    }
 
+    void addAssociatedConformance(Type associatedType, ProtocolDecl *protocol) {
       // FIXME: Add static witness tables for type conformances.
-      for (auto index : indices(protos)) {
-        ProtocolDecl *protocol = protos[index];
-        auto associatedConformance = sub.getConformances()[index];
 
-        if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
-          continue;
+      CanType associate = Conformance.getAssociatedType(associatedType)
+                                    ->getCanonicalType();
+      assert(!associate->hasTypeParameter());
+
+      ProtocolConformanceRef associatedConformance =
+        Conformance.getAssociatedConformance(associatedType, protocol);
 
 #ifndef NDEBUG
-        auto &entry = SILEntries.front();
-        (void)entry;
-        assert(entry.getKind() == SILWitnessTable::AssociatedTypeProtocol
-               && "sil witness table does not match protocol");
-        auto associatedWitness = entry.getAssociatedTypeProtocolWitness();
-        assert(associatedWitness.Requirement == requirement
-               && "sil witness table does not match protocol");
-        assert(associatedWitness.Protocol == protocol
-               && "sil witness table does not match protocol");
+      auto &entry = SILEntries.front();
+      (void)entry;
+      assert(entry.getKind() == SILWitnessTable::AssociatedTypeProtocol
+             && "sil witness table does not match protocol");
+      auto associatedWitness = entry.getAssociatedTypeProtocolWitness();
+      assert(associatedWitness.Requirement->isEqual(associatedType)
+             && "sil witness table does not match protocol");
+      assert(associatedWitness.Protocol == protocol
+             && "sil witness table does not match protocol");
+      auto piIndex =
+        PI.getAssociatedConformanceIndex(associatedType->getCanonicalType(),
+                                         protocol);
+      assert(piIndex.getValue() == Table.size()
+             && "offset doesn't match ProtocolInfo layout");
 #endif
 
-        SILEntries = SILEntries.slice(1);
+      SILEntries = SILEntries.slice(1);
 
-        llvm::Constant *wtableAccessFunction = 
-          getAssociatedTypeWitnessTableAccessFunction(requirement, associate,
-                                            protocol, associatedConformance);
-        Table.push_back(wtableAccessFunction);
-      }
+      llvm::Constant *wtableAccessFunction = 
+        getAssociatedTypeWitnessTableAccessFunction(CanType(associatedType),
+                                 associate, protocol, associatedConformance);
+      Table.push_back(wtableAccessFunction);
     }
 
   private:
@@ -1183,7 +1178,7 @@ public:
                                             CanType associatedType);
 
     llvm::Constant *
-    getAssociatedTypeWitnessTableAccessFunction(AssociatedTypeDecl *requirement,
+    getAssociatedTypeWitnessTableAccessFunction(CanType depAssociatedType,
                                                 CanType associatedType,
                                                 ProtocolDecl *protocol,
                                         ProtocolConformanceRef conformance);
@@ -1344,8 +1339,19 @@ getOrCreateWitnessTableAccessFunction(IRGenModule &IGM, CanType type,
   }
 }
 
+static void buildAssociatedTypeValueName(CanType depAssociatedType,
+                                         SmallString<128> &name) {
+  if (auto memberType = dyn_cast<DependentMemberType>(depAssociatedType)) {
+    buildAssociatedTypeValueName(memberType.getBase(), name);
+    name += '.';
+    name += memberType->getName().str();
+  } else {
+    assert(isa<GenericTypeParamType>(depAssociatedType)); // Self
+  }
+}
+
 llvm::Constant *WitnessTableBuilder::
-getAssociatedTypeWitnessTableAccessFunction(AssociatedTypeDecl *requirement,
+getAssociatedTypeWitnessTableAccessFunction(CanType depAssociatedType,
                                             CanType associatedType,
                                             ProtocolDecl *associatedProtocol,
                                 ProtocolConformanceRef associatedConformance) {
@@ -1359,7 +1365,7 @@ getAssociatedTypeWitnessTableAccessFunction(AssociatedTypeDecl *requirement,
   // Otherwise, emit an access function.
   llvm::Function *accessor =
     IGM.getAddrOfAssociatedTypeWitnessTableAccessFunction(&Conformance,
-                                                          requirement,
+                                                          depAssociatedType,
                                                           associatedProtocol);
 
   IRGenFunction IGF(IGM, accessor);
@@ -1372,16 +1378,19 @@ getAssociatedTypeWitnessTableAccessFunction(AssociatedTypeDecl *requirement,
 
   // We use a non-standard name for the type that states the association
   // requirement rather than the concrete type.
-  if (IGM.EnableValueNames)
-    associatedTypeMetadata->setName(Twine(ConcreteType->getString())
-                                      + "." + requirement->getNameStr());
+  if (IGM.EnableValueNames) {
+    SmallString<128> name;
+    name += ConcreteType->getString();
+    buildAssociatedTypeValueName(depAssociatedType, name);
+    associatedTypeMetadata->setName(name);
+  }
 
   llvm::Value *self = parameters.claimNext();
   setTypeMetadataName(IGM, self, ConcreteType);
 
   Address destTable(parameters.claimNext(), IGM.getPointerAlignment());
   setProtocolWitnessTableName(IGM, destTable.getAddress(), ConcreteType,
-                              requirement->getProtocol());
+                              Conformance.getProtocol());
 
   const ConformanceInfo *conformanceI = nullptr;
   if (associatedConformance.isConcrete()) {
@@ -1642,8 +1651,7 @@ const ProtocolInfo &TypeConverter::getProtocolInfo(ProtocolDecl *protocol) {
     layout.visitProtocolDecl(protocol);
 
   // Create a ProtocolInfo object from the layout.
-  ProtocolInfo *info = ProtocolInfo::create(layout.getNumWitnesses(),
-                                            layout.getEntries());
+  ProtocolInfo *info = ProtocolInfo::create(layout.getEntries());
   info->NextConverted = FirstProtocol;
   FirstProtocol = info;
 
@@ -1655,11 +1663,10 @@ const ProtocolInfo &TypeConverter::getProtocolInfo(ProtocolDecl *protocol) {
 }
 
 /// Allocate a new ProtocolInfo.
-ProtocolInfo *ProtocolInfo::create(unsigned numWitnesses,
-                                   ArrayRef<WitnessTableEntry> table) {
+ProtocolInfo *ProtocolInfo::create(ArrayRef<WitnessTableEntry> table) {
   size_t bufferSize = totalSizeToAlloc<WitnessTableEntry>(table.size());
   void *buffer = ::operator new(bufferSize);
-  return new(buffer) ProtocolInfo(numWitnesses, table);
+  return new(buffer) ProtocolInfo(table);
 }
 
 ProtocolInfo::~ProtocolInfo() {
@@ -2054,7 +2061,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     auto conformance = sourceKey.Kind.getProtocolConformance();
     auto protocol = conformance.getRequirement();
     auto inheritedProtocol =
-      protocol->getInheritedProtocols(nullptr)[component.getPrimaryIndex()];
+      protocol->getInheritedProtocols()[component.getPrimaryIndex()];
 
     sourceKey.Kind =
       LocalTypeDataKind::forAbstractProtocolWitnessTable(inheritedProtocol);
@@ -2069,13 +2076,13 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
 
     if (source) {
       auto &pi = IGF.IGM.getProtocolInfo(protocol);
-      auto &entry = pi.getWitnessEntry(inheritedProtocol);
-      assert(entry.isOutOfLineBase());
-      source = emitInvariantLoadOfOpaqueWitness(IGF, source,
-                                                entry.getOutOfLineBaseIndex());
-      source = IGF.Builder.CreateBitCast(source, IGF.IGM.WitnessTablePtrTy);
-      setProtocolWitnessTableName(IGF.IGM, source, sourceKey.Type,
-                                  inheritedProtocol);
+      auto index = pi.getBaseIndex(inheritedProtocol);
+      if (!index.isPrefix()) {
+        source = emitInvariantLoadOfOpaqueWitness(IGF, source, index);
+        source = IGF.Builder.CreateBitCast(source, IGF.IGM.WitnessTablePtrTy);
+        setProtocolWitnessTableName(IGF.IGM, source, sourceKey.Type,
+                                    inheritedProtocol);
+      }
     }
     return source;
   }
@@ -2259,10 +2266,23 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   if (concreteConformance->getProtocol() != proto) {
     concreteConformance = concreteConformance->getInheritedConformance(proto);
   }
+
+  // Check immediately for an existing cache entry.
+  auto wtable = IGF.tryGetLocalTypeData(
+    srcType,
+    LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance));
+  if (wtable) return wtable;
+
   auto &protoI = IGF.IGM.getProtocolInfo(proto);
   auto &conformanceI =
     protoI.getConformance(IGF.IGM, proto, concreteConformance);
-  return conformanceI.getTable(IGF, srcType, srcMetadataCache);
+  wtable = conformanceI.getTable(IGF, srcType, srcMetadataCache);
+
+  IGF.setScopedLocalTypeData(
+    srcType,
+    LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance),
+    wtable);
+  return wtable;
 }
 
 /// Emit the witness table references required for the given type
@@ -2739,7 +2759,7 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
 
   // Find the witness we're interested in.
   auto &fnProtoInfo = IGF.IGM.getProtocolInfo(conformance.getRequirement());
-  auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
+  auto index = fnProtoInfo.getFunctionIndex(fn);
   llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
   
   // Cast the witness pointer to i8*.
@@ -2747,7 +2767,6 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   
   // Build the value.
   out.add(witness);
-  out.add(wtable);
 }
 
 llvm::FunctionType *IRGenModule::getAssociatedTypeMetadataAccessFunctionTy() {
@@ -2767,7 +2786,7 @@ llvm::Value *irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                                   llvm::Value *wtable,
                                           AssociatedTypeDecl *associatedType) {
   auto &pi = IGF.IGM.getProtocolInfo(associatedType->getProtocol());
-  auto index = pi.getWitnessEntry(associatedType).getAssociatedTypeIndex();
+  auto index = pi.getAssociatedTypeIndex(associatedType);
   llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
 
   // Cast the witness to the appropriate function type.
@@ -2806,12 +2825,13 @@ llvm::Value *
 irgen::emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
                                          llvm::Value *parentMetadata,
                                          llvm::Value *wtable,
-                                         AssociatedTypeDecl *associatedType,
+                                         ProtocolDecl *parentProtocol,
+                                         CanType associatedType,
                                          llvm::Value *associatedTypeMetadata,
                                          ProtocolDecl *associatedProtocol) {
-  auto &pi = IGF.IGM.getProtocolInfo(associatedType->getProtocol());
-  auto index = pi.getWitnessEntry(associatedType)
-                 .getAssociatedTypeWitnessTableIndex(associatedProtocol);
+  auto &pi = IGF.IGM.getProtocolInfo(parentProtocol);
+  auto index =
+    pi.getAssociatedConformanceIndex(associatedType, associatedProtocol);
   llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
 
   // Cast the witness to the appropriate function type.

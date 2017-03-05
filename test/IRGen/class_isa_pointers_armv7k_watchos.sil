@@ -17,7 +17,7 @@ class Purebred {
 }
 sil_vtable Purebred {}
 
-// CHECK-LABEL: define{{( protected)?}} void @purebred_method(%C33class_isa_pointers_armv7k_watchos8Purebred*) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @purebred_method(%C33class_isa_pointers_armv7k_watchos8Purebred*) {{.*}} {
 // CHECK:         [[ISA_PTR:%.*]] = bitcast %C33class_isa_pointers_armv7k_watchos8Purebred* %0 to %swift.type**
 // CHECK:         [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_PTR]]
 // CHECK:         [[VTABLE:%.*]] = bitcast %swift.type* [[ISA]]
@@ -38,7 +38,7 @@ class Mongrel: Gizmo {
 }
 sil_vtable Mongrel {}
 
-// CHECK-LABEL: define{{( protected)?}} void @mongrel_method(%C33class_isa_pointers_armv7k_watchos7Mongrel*) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @mongrel_method(%C33class_isa_pointers_armv7k_watchos7Mongrel*) {{.*}} {
 // CHECK:         [[T0:%.*]] = bitcast {{.*}} %0 to %objc_object*
 // CHECK:         [[T1:%.*]] = call %objc_class* @object_getClass(%objc_object* [[T0]])
 // CHECK:         [[ISA:%.*]] = bitcast %objc_class* [[T1]] to %swift.type*

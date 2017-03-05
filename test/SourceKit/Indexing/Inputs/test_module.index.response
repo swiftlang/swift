@@ -13,27 +13,27 @@
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "C2",
-      key.usr: "s:C11test_module2C2"
+      key.usr: "s:11test_module2C2C"
     },
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "ComputedProperty",
-      key.usr: "s:C11test_module16ComputedProperty",
+      key.usr: "s:11test_module16ComputedPropertyC",
       key.entities: [
         {
           key.kind: source.lang.swift.decl.var.instance,
           key.name: "value",
-          key.usr: "s:vC11test_module16ComputedProperty5valueSi",
+          key.usr: "s:11test_module16ComputedPropertyC5valueSiv",
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
               key.name: "getter:value",
-              key.usr: "s:FC11test_module16ComputedPropertyg5valueSi"
+              key.usr: "s:11test_module16ComputedPropertyC5valueSifg"
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
               key.name: "setter:value",
-              key.usr: "s:FC11test_module16ComputedPropertys5valueSi"
+              key.usr: "s:11test_module16ComputedPropertyC5valueSifs"
             }
           ]
         }
@@ -42,76 +42,76 @@
     {
       key.kind: source.lang.swift.decl.protocol,
       key.name: "Prot1",
-      key.usr: "s:P11test_module5Prot1"
+      key.usr: "s:11test_module5Prot1P"
     },
     {
       key.kind: source.lang.swift.decl.protocol,
       key.name: "Prot2",
-      key.usr: "s:P11test_module5Prot2",
+      key.usr: "s:11test_module5Prot2P",
       key.related: [
         {
           key.kind: source.lang.swift.ref.protocol,
           key.name: "Prot1",
-          key.usr: "s:P11test_module5Prot1"
+          key.usr: "s:11test_module5Prot1P"
         }
       ]
     },
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "TwoInts",
-      key.usr: "s:C11test_module7TwoInts",
+      key.usr: "s:11test_module7TwoIntsC",
       key.entities: [
         {
           key.kind: source.lang.swift.decl.var.instance,
           key.name: "x",
-          key.usr: "s:vC11test_module7TwoInts1xSi"
+          key.usr: "s:11test_module7TwoIntsC1xSiv"
         },
         {
           key.kind: source.lang.swift.decl.var.instance,
           key.name: "y",
-          key.usr: "s:vC11test_module7TwoInts1ySi"
+          key.usr: "s:11test_module7TwoIntsC1ySiv"
         },
         {
           key.kind: source.lang.swift.decl.function.constructor,
           key.name: "init(a:b:)",
-          key.usr: "s:FC11test_module7TwoIntscFT1aSi1bSi_S0_"
+          key.usr: "s:11test_module7TwoIntsCACSi1a_Si1btcfc"
         }
       ]
     },
     {
       key.kind: source.lang.swift.decl.protocol,
       key.name: "Prot3",
-      key.usr: "s:P11test_module5Prot3"
+      key.usr: "s:11test_module5Prot3P"
     },
     {
       key.kind: source.lang.swift.decl.function.free,
       key.name: "globalFunc()",
-      key.usr: "s:F11test_module10globalFuncFT_T_"
+      key.usr: "s:11test_module10globalFuncyyF"
     },
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "Empty",
-      key.usr: "s:C11test_module5Empty"
+      key.usr: "s:11test_module5EmptyC"
     },
     {
       key.kind: source.lang.swift.decl.extension.class,
       key.name: "C2",
-      key.usr: "s:C11test_module2C2",
+      key.usr: "s:e:s:11test_module2C2Cs:11test_module5Prot3P",
       key.related: [
         {
           key.kind: source.lang.swift.ref.protocol,
           key.name: "Prot3",
-          key.usr: "s:P11test_module5Prot3"
+          key.usr: "s:11test_module5Prot3P"
         },
         {
           key.kind: source.lang.swift.ref.protocol,
           key.name: "Prot1",
-          key.usr: "s:P11test_module5Prot1"
+          key.usr: "s:11test_module5Prot1P"
         },
         {
           key.kind: source.lang.swift.ref.protocol,
           key.name: "Prot2",
-          key.usr: "s:P11test_module5Prot2"
+          key.usr: "s:11test_module5Prot2P"
         }
       ]
     }

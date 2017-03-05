@@ -17,6 +17,9 @@
 #ifndef SWIFT_RUNTIME_CONFIG_H
 #define SWIFT_RUNTIME_CONFIG_H
 
+// Bring in visibility attribute macros for library visibility.
+#include "llvm/Support/Compiler.h"
+
 /// Does the current Swift platform support "unbridged" interoperation
 /// with Objective-C?  If so, the implementations of various types must
 /// implicitly handle Objective-C pointers.
@@ -33,7 +36,7 @@
 /// Does the current Swift platform use LLVM's intrinsic "swiftcall"
 /// calling convention for Swift functions?
 #ifndef SWIFT_USE_SWIFTCALL
-#ifdef __s390x__
+#if __has_attribute(swiftcall) || defined(__linux__)
 #define SWIFT_USE_SWIFTCALL 1
 #else
 #define SWIFT_USE_SWIFTCALL 0
@@ -128,6 +131,11 @@
 
 #define SWIFT_LLVM_CC_RegisterPreservingCC llvm::CallingConv::PreserveMost
 
+#if SWIFT_USE_SWIFTCALL
+#define SWIFT_LLVM_CC_SwiftCC  llvm::CallingConv::Swift
+#else
+#define SWIFT_LLVM_CC_SwiftCC  llvm::CallingConv::C
+#endif
 
 // If defined, it indicates that runtime function wrappers
 // should be used on all platforms, even they do not support
@@ -179,9 +187,6 @@
 #define SWIFT_CC_RegisterPreservingCC_IMPL SWIFT_CC_c
 
 #endif
-
-// Bring in visibility attribute macros for library visibility.
-#include "llvm/Support/Compiler.h"
 
 // Generates a name of the runtime entry's implementation by
 // adding an underscore as a prefix and a suffix.

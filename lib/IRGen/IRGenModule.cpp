@@ -28,6 +28,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
+#include "clang/CodeGen/SwiftCallingConv.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Lex/HeaderSearch.h"
@@ -272,10 +273,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     FunctionPtrTy,
     RefCountedPtrTy,
   });
-  WitnessFunctionPairTy = createStructType(*this, "swift.function", {
-    FunctionPtrTy,
-    WitnessTablePtrTy,
-  });
   
   OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
                   ->getPointerTo(DefaultAS);
@@ -387,10 +384,17 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   else
     RegisterPreservingCC = DefaultCC;
 
+  SwiftCC = SWIFT_LLVM_CC(SwiftCC);
+  UseSwiftCC = (SwiftCC == llvm::CallingConv::Swift);
+
   if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
     DebugInfo = new IRGenDebugInfo(IRGen.Opts, *CI, *this, Module, SF);
 
   initClangTypeConverter();
+
+  IsSwiftErrorInRegister =
+    clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
+      ClangCodeGen->CGM());
 }
 
 IRGenModule::~IRGenModule() {

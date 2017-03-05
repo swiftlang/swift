@@ -127,12 +127,6 @@ public:
     return SILType(T, SILValueCategory::Address);
   }
 
-  ///  Apply a substitution to the function type.
-  static CanSILFunctionType substFuncType(SILModule &silModule,
-                                          const SubstitutionMap &subs,
-                                          CanSILFunctionType SrcTy,
-                                          bool dropGenerics);
-
   bool isNull() const { return value.getPointer() == nullptr; }
   explicit operator bool() const { return bool(value.getPointer()); }
 
@@ -165,15 +159,6 @@ public:
   /// Returns the Swift type referenced by this SIL type.
   CanType getSwiftRValueType() const {
     return CanType(value.getPointer());
-  }
-
-  /// Returns the Swift type equivalent to this SIL type. If the SIL type is
-  /// an address type, returns an InOutType.
-  CanType getSwiftType() const {
-    CanType rvalueTy = getSwiftRValueType();
-    if (isAddress())
-      return CanInOutType::get(rvalueTy);
-    return rvalueTy;
   }
   
   /// Returns the AbstractCC of a function type.
@@ -436,9 +421,14 @@ public:
   SILType substGenericArgs(SILModule &M,
                            SubstitutionList Subs) const;
 
+  /// If the original type is generic, pass the signature as genericSig.
+  ///
+  /// If the replacement types are generic, you must push a generic context
+  /// first.
   SILType subst(SILModule &silModule,
                 TypeSubstitutionFn subs,
-                LookupConformanceFn conformances) const;
+                LookupConformanceFn conformances,
+                CanGenericSignature genericSig=CanGenericSignature()) const;
 
   SILType subst(SILModule &silModule, const SubstitutionMap &subs) const;
 

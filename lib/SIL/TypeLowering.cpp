@@ -23,13 +23,13 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "clang/AST/Type.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -758,7 +758,7 @@ namespace {
                            SILValue value) const override {
       if (B.getFunction().hasQualifiedOwnership())
         return B.createCopyValue(loc, value);
-      B.createRetainValue(loc, value, Atomicity::Atomic);
+      B.createRetainValue(loc, value, B.getDefaultAtomicity());
       return value;
     }
 
@@ -891,7 +891,7 @@ namespace {
                            SILValue value) const override {
       if (B.getFunction().hasQualifiedOwnership())
         return B.createCopyValue(loc, value);
-      B.createRetainValue(loc, value, Atomicity::Atomic);
+      B.createRetainValue(loc, value, B.getDefaultAtomicity());
       return value;
     }
 
@@ -900,7 +900,7 @@ namespace {
                                   LoweringStyle style) const override {
       if (B.getFunction().hasQualifiedOwnership())
         return B.createCopyValue(loc, value);
-      B.createRetainValue(loc, value, Atomicity::Atomic);
+      B.createRetainValue(loc, value, B.getDefaultAtomicity());
       return value;
     }
 
@@ -960,7 +960,7 @@ namespace {
       if (B.getFunction().hasQualifiedOwnership())
         return B.createCopyValue(loc, value);
 
-      B.createStrongRetain(loc, value, Atomicity::Atomic);
+      B.createStrongRetain(loc, value, B.getDefaultAtomicity());
       return value;
     }
 
@@ -985,7 +985,7 @@ namespace {
       if (B.getFunction().hasQualifiedOwnership())
         return B.createCopyValue(loc, value);
 
-      B.createUnownedRetain(loc, value, Atomicity::Atomic);
+      B.createUnownedRetain(loc, value, B.getDefaultAtomicity());
       return value;
     }
 
@@ -995,7 +995,7 @@ namespace {
         B.createDestroyValue(loc, value);
         return;
       }
-      B.createUnownedRelease(loc, value, Atomicity::Atomic);
+      B.createUnownedRelease(loc, value, B.getDefaultAtomicity());
     }
   };
 
@@ -1105,38 +1105,10 @@ namespace {
       llvm_unreachable("destroy address");
     }
 
-    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
-                           SILValue value) const override {
-      llvm_unreachable("destroy value");
-    }
-
     void emitCopyInto(SILBuilder &B, SILLocation loc,
                       SILValue src, SILValue dest, IsTake_t isTake,
                       IsInitialization_t isInit) const override {
       llvm_unreachable("copy into");
-    }
-
-    // --- Same as NonTrivialLoadableTypeLowering
-
-    SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
-                            SILValue addr, IsTake_t isTake) const override {
-      llvm_unreachable("load copy");
-    }
-
-    void emitStoreOfCopy(SILBuilder &B, SILLocation loc,
-                         SILValue newValue, SILValue addr,
-                         IsInitialization_t isInit) const override {
-      llvm_unreachable("store copy");
-    }
-
-    void emitStore(SILBuilder &B, SILLocation loc, SILValue value,
-                   SILValue addr, StoreOwnershipQualifier qual) const override {
-      llvm_unreachable("store");
-    }
-
-    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
-                      LoadOwnershipQualifier qual) const override {
-      llvm_unreachable("store");
     }
 
     // --- Same as LeafLoadableTypeLowering.
@@ -1778,7 +1750,7 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
                                                      ASTContext &context) {
   auto *DC = VD->getDeclContext();
   CanType resultTy =
-      DC->mapTypeOutOfContext(VD->getParentInitializer()->getType())
+      DC->mapTypeOutOfContext(VD->getParentPattern()->getType())
           ->getCanonicalType();
   GenericSignature *sig = DC->getGenericSignatureOfContext();
 
@@ -2145,7 +2117,8 @@ TypeConverter::getProtocolDispatchStrategy(ProtocolDecl *P) {
 CanSILFunctionType TypeConverter::
 getMaterializeForSetCallbackType(AbstractStorageDecl *storage,
                                  CanGenericSignature genericSig,
-                                 Type selfType) {
+                                 Type selfType,
+                                 SILFunctionTypeRepresentation rep) {
   auto &ctx = M.getASTContext();
 
   // Get lowered formal types for callback parameters.
@@ -2183,9 +2156,8 @@ getMaterializeForSetCallbackType(AbstractStorageDecl *storage,
     { canSelfMetatypeType, ParameterConvention::Direct_Unowned },
   };
   ArrayRef<SILResultInfo> results = {};
-  auto extInfo = 
-    SILFunctionType::ExtInfo()
-      .withRepresentation(SILFunctionTypeRepresentation::Thin);
+
+  auto extInfo = SILFunctionType::ExtInfo().withRepresentation(rep);
 
   if (genericSig && genericSig->areAllParamsConcrete())
     genericSig = nullptr;
@@ -2276,7 +2248,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
             goto capture_value;
 
           // Otherwise, transitively capture the accessors.
-          SWIFT_FALLTHROUGH;
+          LLVM_FALLTHROUGH;
 
         case VarDecl::Computed: {
           collectFunctionCaptures(capturedVar->getGetter());

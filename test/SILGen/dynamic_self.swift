@@ -32,29 +32,34 @@ class GX<T> {
 class GY<T> : GX<[T]> { }
 
 // CHECK-LABEL: sil hidden @_T012dynamic_self23testDynamicSelfDispatch{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Y) -> ()
-func testDynamicSelfDispatch(y: Y) {
 // CHECK: bb0([[Y:%[0-9]+]] : $Y):
-// CHECK:   [[Y_COPY:%.*]] = copy_value [[Y]]
+// CHECK:   [[BORROWED_Y:%.*]] = begin_borrow [[Y]]
+// CHECK:   [[Y_COPY:%.*]] = copy_value [[BORROWED_Y]]
 // CHECK:   [[Y_AS_X_COPY:%[0-9]+]] = upcast [[Y_COPY]] : $Y to $X  
 // CHECK:   [[X_F:%[0-9]+]] = class_method [[Y_AS_X_COPY]] : $X, #X.f!1 : (X) -> () -> @dynamic_self X, $@convention(method) (@guaranteed X) -> @owned X
+// => SEMANTIC SIL TODO: This argument here needs to be borrowed.
 // CHECK:   [[X_RESULT:%[0-9]+]] = apply [[X_F]]([[Y_AS_X_COPY]]) : $@convention(method) (@guaranteed X) -> @owned X
 // CHECK:   destroy_value [[Y_AS_X_COPY]]
 // CHECK:   [[Y_RESULT:%[0-9]+]] = unchecked_ref_cast [[X_RESULT]] : $X to $Y
 // CHECK:   destroy_value [[Y_RESULT]] : $Y
+// CHECK:   end_borrow [[BORROWED_Y]] from [[Y]]
 // CHECK:   destroy_value [[Y]] : $Y
+func testDynamicSelfDispatch(y: Y) {
   y.f()
 }
 
 // CHECK-LABEL: sil hidden @_T012dynamic_self30testDynamicSelfDispatchGeneric{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned GY<Int>) -> ()
 func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
   // CHECK: bb0([[GY:%[0-9]+]] : $GY<Int>):
-  // CHECK:   [[GY_COPY:%.*]] = copy_value [[GY]]
+  // CHECK:   [[BORROWED_GY:%.*]] = begin_borrow [[GY]]
+  // CHECK:   [[GY_COPY:%.*]] = copy_value [[BORROWED_GY]]
   // CHECK:   [[GY_AS_GX_COPY:%[0-9]+]] = upcast [[GY_COPY]] : $GY<Int> to $GX<Array<Int>>
   // CHECK:   [[GX_F:%[0-9]+]] = class_method [[GY_AS_GX_COPY]] : $GX<Array<Int>>, #GX.f!1 : <T> (GX<T>) -> () -> @dynamic_self GX<T>, $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
   // CHECK:   [[GX_RESULT:%[0-9]+]] = apply [[GX_F]]<[Int]>([[GY_AS_GX_COPY]]) : $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
   // CHECK:   destroy_value [[GY_AS_GX_COPY]]
   // CHECK:   [[GY_RESULT:%[0-9]+]] = unchecked_ref_cast [[GX_RESULT]] : $GX<Array<Int>> to $GY<Int>
   // CHECK:   destroy_value [[GY_RESULT]] : $GY<Int>
+  // CHECK:   end_borrow [[BORROWED_GY]] from [[GY]]
   // CHECK:   destroy_value [[GY]]
   gy.f()
 }
@@ -71,7 +76,7 @@ func testArchetypeDispatch<T: P>(t: T) {
 // CHECK-LABEL: sil hidden @_T012dynamic_self23testExistentialDispatch{{[_0-9a-zA-Z]*}}F
 func testExistentialDispatch(p: P) {
 // CHECK: bb0([[P:%[0-9]+]] : $*P):
-// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr [[P]] : $*P to $*@opened([[N:".*"]]) P
+// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P to $*@opened([[N:".*"]]) P
 // CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $P
 // CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*P, $@opened([[N]]) P
 // CHECK:   [[P_F_METHOD:%[0-9]+]] = witness_method $@opened([[N]]) P, #P.f!1 : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
@@ -83,13 +88,16 @@ func testExistentialDispatch(p: P) {
 }
 
 // CHECK-LABEL: sil hidden @_T012dynamic_self28testExistentialDispatchClass{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned CP) -> ()
-func testExistentialDispatchClass(cp: CP) {
 // CHECK: bb0([[CP:%[0-9]+]] : $CP):
-// CHECK:   [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $CP to $@opened([[N:".*"]]) CP
+// CHECK:   [[BORROWED_CP:%.*]] = begin_borrow [[CP]]
+// CHECK:   [[CP_ADDR:%[0-9]+]] = open_existential_ref [[BORROWED_CP]] : $CP to $@opened([[N:".*"]]) CP
 // CHECK:   [[CP_F:%[0-9]+]] = witness_method $@opened([[N]]) CP, #CP.f!1 : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
 // CHECK:   [[CP_F_RESULT:%[0-9]+]] = apply [[CP_F]]<@opened([[N]]) CP>([[CP_ADDR]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
 // CHECK:   [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[CP_F_RESULT]] : $@opened([[N]]) CP : $@opened([[N]]) CP, $CP
 // CHECK:   destroy_value [[CP_F_RESULT]] : $@opened([[N]]) CP
+// CHECK:   end_borrow [[BORROWED_CP]] from [[CP]]
+// CHECK:   destroy_value [[CP]]
+func testExistentialDispatchClass(cp: CP) {
   cp.f()
 }
 
@@ -152,7 +160,8 @@ func testOptionalResult(v : OptionalResultInheritor) {
 
 // CHECK-LABEL: sil hidden @_T012dynamic_self18testOptionalResultyAA0dE9InheritorC1v_tF : $@convention(thin) (@owned OptionalResultInheritor) -> () {
 // CHECK: bb0([[ARG:%.*]] : $OptionalResultInheritor):
-// CHECK:      [[COPY_ARG:%.*]] = copy_value [[ARG]]
+// CHECK:      [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:      [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:      [[CAST_COPY_ARG:%.*]] = upcast [[COPY_ARG]]
 // CHECK:      [[T0:%.*]] = class_method [[CAST_COPY_ARG]] : $OptionalResult, #OptionalResult.foo!1 : (OptionalResult) -> () -> @dynamic_self OptionalResult?, $@convention(method) (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
 // CHECK-NEXT: [[RES:%.*]] = apply [[T0]]([[CAST_COPY_ARG]])
@@ -238,6 +247,20 @@ func partialApplySelfReturn(c: Factory, t: Factory.Type) {
   _ = type(of: c).staticNewInstance
   // CHECK: function_ref @_T012dynamic_self7FactoryC17staticNewInstanceACXDyFZTc : $@convention(thin) (@thick Factory.Type) -> @owned @callee_owned () -> @owned Factory
   _ = Factory.staticNewInstance
+}
+
+class FactoryFactory {
+
+  // CHECK-LABEL: sil hidden @_T012dynamic_self07FactoryC0C11newInstanceACXDyFZ : $@convention(method) (@thick FactoryFactory.Type) -> @owned FactoryFactory
+  static func newInstance() -> Self {
+    // CHECK: bb0(%0 : $@thick FactoryFactory.Type):
+
+    // CHECK: [[METATYPE:%.*]] = value_metatype $@thick @dynamic_self FactoryFactory.Type.Type, %0 : $@thick FactoryFactory.Type
+    // CHECK: [[ANY:%.*]] = init_existential_metatype [[METATYPE]] : $@thick @dynamic_self FactoryFactory.Type.Type, $@thick Any.Type
+    let _: Any.Type = type(of: self)
+
+    // CHECK: unreachable
+  }
 }
 
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {

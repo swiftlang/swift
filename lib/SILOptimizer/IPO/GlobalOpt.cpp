@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "globalopt"
-#include "swift/Basic/DemangleWrappers.h"
+#include "swift/Basic/Demangle.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILInstruction.h"
@@ -398,7 +398,7 @@ static bool isAvailabilityCheckOnDomPath(SILBasicBlock *From, SILBasicBlock *To,
 void SILGlobalOpt::placeInitializers(SILFunction *InitF,
                                      ArrayRef<ApplyInst*> Calls) {
   DEBUG(llvm::dbgs() << "GlobalOpt: calls to "
-        << demangle_wrappers::demangleSymbolAsString(InitF->getName())
+        << Demangle::demangleSymbolAsString(InitF->getName())
         << " : " << Calls.size() << "\n");
   // Map each initializer-containing function to its final initializer call.
   llvm::DenseMap<SILFunction*, ApplyInst*> ParentFuncs;

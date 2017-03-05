@@ -25,6 +25,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -207,7 +208,7 @@ void constraints::simplifyLocator(Expr *&anchor,
         path = path.slice(1);
         continue;
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case ConstraintLocator::Member:
     case ConstraintLocator::MemberRefBase:
@@ -3509,6 +3510,8 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
                                              convertTypePurpose, TCEOptions,
                                              listener, CS);
 
+  CS->cacheExprTypes(subExpr);
+
   // This is a terrible hack to get around the fact that typeCheckExpression()
   // might change subExpr to point to a new OpenExistentialExpr. In that case,
   // since the caller passed subExpr by value here, they would be left
@@ -5749,13 +5752,13 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     }
   };
 
+  auto dc = env->getOwningDeclContext();
   RequirementsListener genericReqListener;
-  auto result =
-    TC.checkGenericArguments(env->getOwningDeclContext(), argExpr->getLoc(),
-                             AFD->getLoc(), AFD->getInterfaceType(),
-                             env->getGenericSignature(), substitutions, nullptr,
-                             ConformanceCheckFlags::SuppressDependencyTracking,
-                             &genericReqListener);
+  auto result = TC.checkGenericArguments(
+      dc, argExpr->getLoc(), AFD->getLoc(), AFD->getInterfaceType(),
+      env->getGenericSignature(), QueryTypeSubstitutionMap{substitutions},
+      LookUpConformanceInModule{dc->getParentModule()}, nullptr,
+      ConformanceCheckFlags::SuppressDependencyTracking, &genericReqListener);
 
   return !result.second;
 }
@@ -5912,14 +5915,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (auto fn = fnType->getAs<AnyFunctionType>()) {
     using Closeness = CalleeCandidateInfo::ClosenessResultTy;
 
-    auto isGenericType = [](Type type) -> bool {
-      if (type->hasError() || type->hasTypeVariable() ||
-          type->hasUnresolvedType())
-        return false;
-
-      return type->isCanonical() && type->isUnspecializedGeneric();
-    };
-
     calleeInfo.filterList([&](UncurriedCandidate candidate) -> Closeness {
       auto resultType = candidate.getResultType();
       if (!resultType)
@@ -5930,8 +5925,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       // because there is no easy way to do that, and candidate set is going
       // to be pruned by matching of the argument types later on anyway, so
       // it's better to over report than to be too conservative.
-      if ((isGenericType(resultType) && isGenericType(fn->getResult())) ||
-          resultType->isEqual(fn->getResult()))
+      if (resultType->isEqual(fn->getResult()))
         return {CC_ExactMatch, {}};
 
       return {CC_GeneralMismatch, {}};
@@ -6083,9 +6077,13 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
     if (callExpr->isImplicit() && overloadName == "~=") {
       // This binop was synthesized when typechecking an expression pattern.
-      auto diag = diagnose(lhsExpr->getLoc(),
-                    diag::cannot_match_expr_pattern_with_value,
-                           lhsType, rhsType);
+      auto diag = lhsType->is<UnresolvedType>()
+        ? diagnose(lhsExpr->getLoc(),
+                   diag::cannot_match_unresolved_expr_pattern_with_value,
+                   rhsType)
+        : diagnose(lhsExpr->getLoc(),
+                   diag::cannot_match_expr_pattern_with_value,
+                   lhsType, rhsType);
       diag.highlight(lhsExpr->getSourceRange());
       diag.highlight(rhsExpr->getSourceRange());
       if (auto optUnwrappedType = rhsType->getOptionalObjectType()) {

@@ -13,7 +13,7 @@
 // REQUIRES: objc_interop
 // REQUIRES: CPU=x86_64
 
-V12TypeLowering9HasCTypes
+12TypeLowering9HasCTypesV
 // CHECK:     (struct TypeLowering.HasCTypes)
 // CHECK-NEXT: (struct size=40 alignment=8 stride=40 num_extra_inhabitants=0
 // CHECK-NEXT:   (field name=mcs offset=0
@@ -24,7 +24,7 @@ V12TypeLowering9HasCTypes
 // CHECK-NEXT:     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0)))
 
 
-V12TypeLowering13AlsoHasCTypes
+12TypeLowering13AlsoHasCTypesV
 // CHECK:      (struct size=12 alignment=8 stride=16 num_extra_inhabitants=0
 // CHECK-NEXT:   (field name=mcu offset=0
 // CHECK-NEXT:     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0))

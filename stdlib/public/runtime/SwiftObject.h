@@ -23,6 +23,7 @@
 #include <utility>
 #include "swift/Runtime/HeapObject.h"
 #if SWIFT_OBJC_INTEROP
+#include "llvm/Support/Compiler.h"
 #include <objc/NSObject.h>
 #endif
 

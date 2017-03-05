@@ -16,6 +16,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
+#include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
 
@@ -143,6 +144,19 @@ ValueOwnershipKind::merge(ValueOwnershipKind RHS) const {
   return (LHSVal == RHSVal) ? Optional<ValueOwnershipKind>(*this) : None;
 }
 
+ValueOwnershipKind::ValueOwnershipKind(StringRef S) {
+  auto Result = llvm::StringSwitch<Optional<ValueOwnershipKind::innerty>>(S)
+                    .Case("trivial", ValueOwnershipKind::Trivial)
+                    .Case("unowned", ValueOwnershipKind::Unowned)
+                    .Case("owned", ValueOwnershipKind::Owned)
+                    .Case("guaranteed", ValueOwnershipKind::Guaranteed)
+                    .Case("any", ValueOwnershipKind::Any)
+                    .Default(None);
+  if (!Result.hasValue())
+    llvm_unreachable("Invalid string representation of ValueOwnershipKind");
+  Value = Result.getValue();
+}
+
 //===----------------------------------------------------------------------===//
 //                 Instruction ValueOwnershipKind Computation
 //===----------------------------------------------------------------------===//
@@ -200,6 +214,7 @@ CONSTANT_OWNERSHIP_INST(Owned, LoadWeak)
 CONSTANT_OWNERSHIP_INST(Owned, PartialApply)
 CONSTANT_OWNERSHIP_INST(Owned, StrongPin)
 CONSTANT_OWNERSHIP_INST(Owned, ThinToThickFunction)
+CONSTANT_OWNERSHIP_INST(Owned, InitExistentialOpaque)
 
 // One would think that these /should/ be unowned. In truth they are owned since
 // objc metatypes do not go through the retain/release fast path. In their
@@ -240,7 +255,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, ObjCToThickMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, OpenExistentialAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, OpenExistentialBox)
 CONSTANT_OWNERSHIP_INST(Trivial, OpenExistentialMetatype)
-CONSTANT_OWNERSHIP_INST(Trivial, OpenExistentialOpaque)
 CONSTANT_OWNERSHIP_INST(Trivial, PointerToAddress)
 CONSTANT_OWNERSHIP_INST(Trivial, PointerToThinFunction)
 CONSTANT_OWNERSHIP_INST(Trivial, ProjectBlockStorage)
@@ -331,7 +345,9 @@ NO_RESULT_OWNERSHIP_INST(DestroyValue)
 NO_RESULT_OWNERSHIP_INST(AllocGlobal)
 NO_RESULT_OWNERSHIP_INST(InjectEnumAddr)
 NO_RESULT_OWNERSHIP_INST(DeinitExistentialAddr)
+NO_RESULT_OWNERSHIP_INST(DeinitExistentialOpaque)
 NO_RESULT_OWNERSHIP_INST(CondFail)
+NO_RESULT_OWNERSHIP_INST(EndLifetime)
 
 // Terminators. These do not produce SILValue, so they do not have a
 // ValueOwnershipKind. They do have ownership implications in terms of the
@@ -410,12 +426,14 @@ FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
 FORWARDING_OWNERSHIP_INST(InitExistentialRef)
 FORWARDING_OWNERSHIP_INST(OpenExistentialRef)
+FORWARDING_OWNERSHIP_INST(OpenExistentialOpaque)
 FORWARDING_OWNERSHIP_INST(RefToBridgeObject)
 FORWARDING_OWNERSHIP_INST(SelectValue)
 FORWARDING_OWNERSHIP_INST(Struct)
 FORWARDING_OWNERSHIP_INST(Tuple)
 FORWARDING_OWNERSHIP_INST(UncheckedRefCast)
 FORWARDING_OWNERSHIP_INST(UnconditionalCheckedCast)
+FORWARDING_OWNERSHIP_INST(UnconditionalCheckedCastOpaque)
 FORWARDING_OWNERSHIP_INST(Upcast)
 FORWARDING_OWNERSHIP_INST(MarkUninitialized)
 FORWARDING_OWNERSHIP_INST(UncheckedEnumData)
@@ -454,6 +472,12 @@ ValueOwnershipKind ValueOwnershipKindVisitor::visitUncheckedBitwiseCastInst(
 
   // Otherwise, we forward our ownership.
   return visitForwardingInst(UBCI);
+}
+
+ValueOwnershipKind
+ValueOwnershipKindVisitor::visitUncheckedOwnershipConversionInst(
+    UncheckedOwnershipConversionInst *I) {
+  return I->getConversionOwnershipKind();
 }
 
 // An enum without payload is trivial. One with non-trivial payload is

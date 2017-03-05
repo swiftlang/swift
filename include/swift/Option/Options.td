@@ -91,6 +91,9 @@ def driver_use_frontend_path : Separate<["-"], "driver-use-frontend-path">,
 def driver_show_incremental : Flag<["-"], "driver-show-incremental">,
   InternalDebugOpt,
   HelpText<"With -v, dump information about why files are being rebuilt">;
+def driver_show_job_lifecycle : Flag<["-"], "driver-show-job-lifecycle">,
+  InternalDebugOpt,
+  HelpText<"Show every step in the lifecycle of driver jobs">;
 def driver_use_filelists : Flag<["-"], "driver-use-filelists">,
   InternalDebugOpt, HelpText<"Pass input files as filelists whenever possible">;
 
@@ -147,6 +150,9 @@ def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
 def F : JoinedOrSeparate<["-"], "F">, Flags<[FrontendOption]>,
   HelpText<"Add directory to framework search path">;
 def F_EQ : Joined<["-"], "F=">, Flags<[FrontendOption]>, Alias<F>;
+
+def Fsystem : Separate<["-"], "Fsystem">, Flags<[FrontendOption]>,
+  HelpText<"Add directory to system framework search path">;
 
 def I : JoinedOrSeparate<["-"], "I">, Flags<[FrontendOption]>,
   HelpText<"Add directory to the import search path">;

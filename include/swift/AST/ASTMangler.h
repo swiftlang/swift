@@ -54,10 +54,8 @@ public:
     DirectMethodReferenceThunk,
   };
 
-  ASTMangler(bool DWARFMangling = false,
-          bool usePunycode = true)
-    : Mangler(usePunycode),
-      DWARFMangling(DWARFMangling) {}
+  ASTMangler(bool DWARFMangling = false)
+    : DWARFMangling(DWARFMangling) {}
 
   std::string mangleClosureEntity(const AbstractClosureExpr *closure,
                                   SymbolKind SKind);
@@ -112,6 +110,8 @@ public:
                                              ModuleDecl *Module);
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
+
+  std::string mangleObjCRuntimeName(const NominalTypeDecl *Nominal);
 
   std::string mangleTypeAsUSR(Type type) {
     return mangleTypeWithoutPrefix(type);
@@ -198,11 +198,11 @@ protected:
 
   void appendInitializerEntity(const VarDecl *var);
 
-  Type getDeclTypeForMangling(const ValueDecl *decl,
-                              ArrayRef<GenericTypeParamType *> &genericParams,
-                              unsigned &initialParamIndex,
-                              ArrayRef<Requirement> &requirements,
-                              SmallVectorImpl<Requirement> &requirementsBuf);
+  CanType getDeclTypeForMangling(const ValueDecl *decl,
+                                 ArrayRef<GenericTypeParamType *> &genericParams,
+                                 unsigned &initialParamIndex,
+                                 ArrayRef<Requirement> &requirements,
+                                 SmallVectorImpl<Requirement> &requirementsBuf);
 
   void appendDeclType(const ValueDecl *decl);
 

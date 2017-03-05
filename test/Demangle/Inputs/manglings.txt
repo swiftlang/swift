@@ -77,10 +77,12 @@ _TF3foolp3barSi ---> foo.bar.nativePinningAddressor : Swift.Int
 _TF3foog3barSi ---> foo.bar.getter : Swift.Int
 _TF3foos3barSi ---> foo.bar.setter : Swift.Int
 _TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas (zim : foo.zim) -> ()
-_TToFC3foo3bar3basfT3zimCS_3zim_T_ ---> {T} @objc foo.bar.bas (zim : foo.zim) -> ()
-_TTOFSC3fooFTSdSd_Sd ---> {T} @nonobjc __C.foo (Swift.Double, Swift.Double) -> Swift.Double
-_T03foo3barC3basyAA3zimCAE_tFTo ---> {T} @objc foo.bar.bas (zim : foo.zim) -> ()
-_T0SC3fooSdSd_SdtFTO ---> {T} @nonobjc __C.foo (Swift.Double, Swift.Double) -> Swift.Double
+_TToFC3foo3bar3basfT3zimCS_3zim_T_ ---> {T:_TFC3foo3bar3basfT3zimCS_3zim_T_,C} @objc foo.bar.bas (zim : foo.zim) -> ()
+_TTOFSC3fooFTSdSd_Sd ---> {T:_TFSC3fooFTSdSd_Sd} @nonobjc __C.foo (Swift.Double, Swift.Double) -> Swift.Double
+_T03foo3barC3basyAA3zimCAE_tFTo ---> {T:_T03foo3barC3basyAA3zimCAE_tF,C} @objc foo.bar.bas (zim : foo.zim) -> ()
+_T0SC3fooSdSd_SdtFTO ---> {T:_T0SC3fooSdSd_SdtF} @nonobjc __C.foo (Swift.Double, Swift.Double) -> Swift.Double
+_S3foo3barC3basyAA3zimCAE_tFTo ---> {T:_S3foo3barC3basyAA3zimCAE_tF,C} @objc foo.bar.bas (zim : foo.zim) -> ()
+_SSC3fooSdSd_SdtFTO ---> {T:_SSC3fooSdSd_SdtF} @nonobjc __C.foo (Swift.Double, Swift.Double) -> Swift.Double
 _TTDFC3foo3bar3basfT3zimCS_3zim_T_ ---> dynamic foo.bar.bas (zim : foo.zim) -> ()
 _TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas (zim : foo.zim) -> ()
 _TF3foooi1pFTCS_3barVS_3bas_OS_3zim ---> foo.+ infix (foo.bar, foo.bas) -> foo.zim
@@ -94,31 +96,31 @@ _TMnC3foo3bar ---> nominal type descriptor for foo.bar
 _TMmC3foo3bar ---> metaclass for foo.bar
 _TMC3foo3bar ---> type metadata for foo.bar
 _TMfC3foo3bar ---> full type metadata for foo.bar
-_TwalC3foo3bar ---> allocateBuffer value witness for foo.bar
-_TwcaC3foo3bar ---> assignWithCopy value witness for foo.bar
-_TwtaC3foo3bar ---> assignWithTake value witness for foo.bar
-_TwdeC3foo3bar ---> deallocateBuffer value witness for foo.bar
-_TwxxC3foo3bar ---> destroy value witness for foo.bar
-_TwXXC3foo3bar ---> destroyBuffer value witness for foo.bar
-_TwCPC3foo3bar ---> initializeBufferWithCopyOfBuffer value witness for foo.bar
-_TwCpC3foo3bar ---> initializeBufferWithCopy value witness for foo.bar
-_TwcpC3foo3bar ---> initializeWithCopy value witness for foo.bar
-_TwTKC3foo3bar ---> initializeBufferWithTakeOfBuffer value witness for foo.bar
-_TwTkC3foo3bar ---> initializeBufferWithTake value witness for foo.bar
-_TwtkC3foo3bar ---> initializeWithTake value witness for foo.bar
-_TwprC3foo3bar ---> projectBuffer value witness for foo.bar
+_TwalC3foo3bar ---> {C} allocateBuffer value witness for foo.bar
+_TwcaC3foo3bar ---> {C} assignWithCopy value witness for foo.bar
+_TwtaC3foo3bar ---> {C} assignWithTake value witness for foo.bar
+_TwdeC3foo3bar ---> {C} deallocateBuffer value witness for foo.bar
+_TwxxC3foo3bar ---> {C} destroy value witness for foo.bar
+_TwXXC3foo3bar ---> {C} destroyBuffer value witness for foo.bar
+_TwCPC3foo3bar ---> {C} initializeBufferWithCopyOfBuffer value witness for foo.bar
+_TwCpC3foo3bar ---> {C} initializeBufferWithCopy value witness for foo.bar
+_TwcpC3foo3bar ---> {C} initializeWithCopy value witness for foo.bar
+_TwTKC3foo3bar ---> {C} initializeBufferWithTakeOfBuffer value witness for foo.bar
+_TwTkC3foo3bar ---> {C} initializeBufferWithTake value witness for foo.bar
+_TwtkC3foo3bar ---> {C} initializeWithTake value witness for foo.bar
+_TwprC3foo3bar ---> {C} projectBuffer value witness for foo.bar
 _TWVC3foo3bar ---> value witness table for foo.bar
 _TWoFC3foo3bar3basFSiSi ---> witness table offset for foo.bar.bas (Swift.Int) -> Swift.Int
 _TWvdvC3foo3bar3basSi ---> direct field offset for foo.bar.bas : Swift.Int
 _TWvivC3foo3bar3basSi ---> indirect field offset for foo.bar.bas : Swift.Int
 _TWPC3foo3barS_8barrables ---> protocol witness table for foo.bar : foo.barrable in Swift
-_TWaC3foo3barS_8barrableS_ ---> protocol witness table accessor for foo.bar : foo.barrable in foo
-_TWlC3foo3barS0_S_8barrableS_ ---> lazy protocol witness table accessor for type foo.bar and conformance foo.bar : foo.barrable in foo
+_TWaC3foo3barS_8barrableS_ ---> {C} protocol witness table accessor for foo.bar : foo.barrable in foo
+_TWlC3foo3barS0_S_8barrableS_ ---> {C} lazy protocol witness table accessor for type foo.bar and conformance foo.bar : foo.barrable in foo
 _TWLC3foo3barS0_S_8barrableS_ ---> lazy protocol witness table cache variable for type foo.bar and conformance foo.bar : foo.barrable in foo
 _TWGC3foo3barS_8barrableS_ ---> generic protocol witness table for foo.bar : foo.barrable in foo
-_TWIC3foo3barS_8barrableS_ ---> instantiation function for generic protocol witness table for foo.bar : foo.barrable in foo
-_TWtC3foo3barS_8barrableS_4fred ---> associated type metadata accessor for fred in foo.bar : foo.barrable in foo
-_TWTC3foo3barS_8barrableS_4fredS_6thomas ---> associated type witness table accessor for fred : foo.thomas in foo.bar : foo.barrable in foo
+_TWIC3foo3barS_8barrableS_ ---> {C} instantiation function for generic protocol witness table for foo.bar : foo.barrable in foo
+_TWtC3foo3barS_8barrableS_4fred ---> {C} associated type metadata accessor for fred in foo.bar : foo.barrable in foo
+_TWTC3foo3barS_8barrableS_4fredS_6thomas ---> {C} associated type witness table accessor for fred : foo.thomas in foo.bar : foo.barrable in foo
 _TFSCg5greenVSC5Color ---> __C.green.getter : __C.Color
 _TIF1t1fFT1iSi1sSS_T_A_ ---> t.(f (i : Swift.Int, s : Swift.String) -> ()).(default argument 0)
 _TIF1t1fFT1iSi1sSS_T_A0_ ---> t.(f (i : Swift.Int, s : Swift.String) -> ()).(default argument 1)
@@ -141,7 +143,7 @@ _Tw ---> _Tw
 _TWa ---> _TWa
 _Twal ---> _Twal
 _T ---> _T
-_TTo ---> {T} _TTo
+_TTo ---> {T:_T} _TTo
 _TC ---> _TC
 _TM ---> _TM
 _TM ---> _TM
@@ -187,10 +189,10 @@ _TTSgSiS_ ---> _TTSgSiS_
 _TTSgSi__xyz ---> _TTSgSi__xyz
 _TTSr5Si___TF4test7genericurFxx ---> generic not re-abstracted specialization <Swift.Int> of test.generic <A> (A) -> A
 _TTSrq5Si___TF4test7genericurFxx ---> generic not re-abstracted specialization <preserving fragile attribute, Swift.Int> of test.generic <A> (A) -> A
-_TPA__TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_ ---> {T} partial apply forwarder for reabstraction thunk helper from @callee_owned (@owned Swift.String, @owned Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.String, @in Swift.String) -> (@unowned Swift.Bool)
-_TPAo__TTRGrXFo_dGSPx__dGSPx_zoPs5Error__XFo_iGSPx__iGSPx_zoPS___ ---> {T} partial apply ObjC forwarder for reabstraction thunk helper <A> from @callee_owned (@unowned Swift.UnsafePointer<A>) -> (@unowned Swift.UnsafePointer<A>, @error @owned Swift.Error) to @callee_owned (@in Swift.UnsafePointer<A>) -> (@out Swift.UnsafePointer<A>, @error @owned Swift.Error)
-_T0SSSSSbIxxxd_SSSSSbIxiid_TRTA ---> {T} partial apply forwarder for reabstraction thunk helper from @callee_owned (@owned Swift.String, @owned Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.String, @in Swift.String) -> (@unowned Swift.Bool)
-_T0SPyxGSPyxGs5Error_pIxydzo_SPyxGSPyxGsAA_pIxirzo_lTRTa ---> {T} partial apply ObjC forwarder for reabstraction thunk helper <A> from @callee_owned (@unowned Swift.UnsafePointer<A>) -> (@unowned Swift.UnsafePointer<A>, @error @owned Swift.Error) to @callee_owned (@in Swift.UnsafePointer<A>) -> (@out Swift.UnsafePointer<A>, @error @owned Swift.Error)
+_TPA__TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_ ---> {T:_TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_} partial apply forwarder for reabstraction thunk helper from @callee_owned (@owned Swift.String, @owned Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.String, @in Swift.String) -> (@unowned Swift.Bool)
+_TPAo__TTRGrXFo_dGSPx__dGSPx_zoPs5Error__XFo_iGSPx__iGSPx_zoPS___ ---> {T:_TTRGrXFo_dGSPx__dGSPx_zoPs5Error__XFo_iGSPx__iGSPx_zoPS___} partial apply ObjC forwarder for reabstraction thunk helper <A> from @callee_owned (@unowned Swift.UnsafePointer<A>) -> (@unowned Swift.UnsafePointer<A>, @error @owned Swift.Error) to @callee_owned (@in Swift.UnsafePointer<A>) -> (@out Swift.UnsafePointer<A>, @error @owned Swift.Error)
+_T0SSSSSbIxxxd_SSSSSbIxiid_TRTA ---> {T:_T0SSSSSbIxxxd_SSSSSbIxiid_TR} partial apply forwarder for reabstraction thunk helper from @callee_owned (@owned Swift.String, @owned Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.String, @in Swift.String) -> (@unowned Swift.Bool)
+_T0SPyxGSPyxGs5Error_pIxydzo_SPyxGSPyxGsAA_pIxirzo_lTRTa ---> {T:_T0SPyxGSPyxGs5Error_pIxydzo_SPyxGSPyxGsAA_pIxirzo_lTR} partial apply ObjC forwarder for reabstraction thunk helper <A> from @callee_owned (@unowned Swift.UnsafePointer<A>) -> (@unowned Swift.UnsafePointer<A>, @error @owned Swift.Error) to @callee_owned (@in Swift.UnsafePointer<A>) -> (@out Swift.UnsafePointer<A>, @error @owned Swift.Error)
 _TiC4Meow5MyCls9subscriptFT1iSi_Sf ---> Meow.MyCls.subscript (i : Swift.Int) -> Swift.Float
 _TF8manglingX22egbpdajGbuEbxfgehfvwxnFT_T_ ---> mangling.ليهمابتكلموشعربي؟ () -> ()
 _TF8manglingX24ihqwcrbEcvIaIdqgAFGpqjyeFT_T_ ---> mangling.他们为什么不说中文 () -> ()
@@ -239,5 +241,7 @@ _TFVFE15nested_genericsSS3fooFT_T_L_6CheeseCfT8materialx_GS0_x_ ---> (extension 
 _TTWOE5imojiCSo5Imoji14ImojiMatchRankS_9RankValueS_FS2_g9rankValueqq_Ss16RawRepresentable8RawValue ---> _TTWOE5imojiCSo5Imoji14ImojiMatchRankS_9RankValueS_FS2_g9rankValueqq_Ss16RawRepresentable8RawValue
 _TtFzas4VoidGC16FusionXBaseUtils6FutureQq_ZFVS_7Futures6futureurFFzT_GS0_x_GS0_x__ ---> _TtFzas4VoidGC16FusionXBaseUtils6FutureQq_ZFVS_7Futures6futureurFFzT_GS0_x_GS0_x__
 _T0s17MutableCollectionP1asAARzs012RandomAccessB0RzsAA11SubSequences013BidirectionalB0PRpzsAdHRQlE06rotatecD05Indexs01_A9IndexablePQzAM15shiftingToStart_tFAJs01_J4BasePQzAQcfU_ ---> (extension in a):Swift.MutableCollection<A where A: Swift.MutableCollection, A: Swift.RandomAccessCollection, A.SubSequence: Swift.MutableCollection, A.SubSequence: Swift.RandomAccessCollection>.(rotateRandomAccess (shiftingToStart : A.Index) -> A.Index).(closure #1)
+_T03foo4_123ABTf3psbpsb_n ---> function signature specialization <Arg[0] = [Constant Propagated String : u8'123'], Arg[1] = [Constant Propagated String : u8'123']> of foo
 _T04main5innerys5Int32Vz_yADctF25closure_with_box_argumentxz_Bi32__lXXTf1nc_n ---> function signature specialization <Arg[1] = [Closure Propagated : closure_with_box_argument, Argument Types : [<A> { var A } <Builtin.Int32>]> of main.inner (inout Swift.Int32, (Swift.Int32) -> ()) -> ()
+_T03foo6testityyyc_yyctF1a1bTf3pfpf_n ---> function signature specialization <Arg[0] = [Constant Propagated Function : a], Arg[1] = [Constant Propagated Function : b]> of foo.testit (() -> (), () -> ()) -> ()
 

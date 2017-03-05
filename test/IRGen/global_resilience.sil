@@ -41,7 +41,7 @@ sil_global [let] @largeGlobal : $LargeResilientStruct
 // so allocate it directly.
 //
 
-// CHECK: @fixedGlobal = hidden global %V17global_resilience20LargeResilientStruct zeroinitializer
+// CHECK: @fixedGlobal = hidden global %T17global_resilience20LargeResilientStructV zeroinitializer
 sil_global hidden @fixedGlobal : $LargeResilientStruct
 
 //
@@ -52,7 +52,7 @@ sil_global hidden @fixedGlobal : $LargeResilientStruct
 // CHECK: @otherGlobal = {{(protected )?}}global [[BUFFER]] zeroinitializer
 sil_global [let] @otherGlobal : $Size
 
-// CHECK-LABEL: define{{( protected)?}} void @testSmallGlobal()
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testSmallGlobal()
 sil @testSmallGlobal : $@convention(thin) () -> () {
 bb0:
   // This is just a no-op
@@ -60,7 +60,7 @@ bb0:
 
   %addr = global_addr @smallGlobal : $*SmallResilientStruct
 
-  // CHECK: [[VALUE:%.*]] = load i32, i32* getelementptr inbounds (%V17global_resilience20SmallResilientStruct, %V17global_resilience20SmallResilientStruct* bitcast ([[BUFFER]]* @smallGlobal to %V17global_resilience20SmallResilientStruct*), i32 0, i32 0, i32 0)
+  // CHECK: [[VALUE:%.*]] = load i32, i32* getelementptr inbounds (%T17global_resilience20SmallResilientStructV, %T17global_resilience20SmallResilientStructV* bitcast ([[BUFFER]]* @smallGlobal to %T17global_resilience20SmallResilientStructV*), i32 0, i32 0, i32 0)
   %x_addr = struct_element_addr %addr : $*SmallResilientStruct, #SmallResilientStruct.x
   %x = load %x_addr : $*Int32
 
@@ -70,14 +70,14 @@ bb0:
   return %tuple : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @testLargeGlobal()
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testLargeGlobal()
 sil @testLargeGlobal : $@convention(thin) () -> () {
 bb0:
   // CHECK: [[ALLOC:%.*]] = call noalias i8* @swift_rt_swift_slowAlloc([[INT]] 32, [[INT]] 7)
   // CHECK: store i8* [[ALLOC]], i8** bitcast ([[BUFFER]]* @largeGlobal to i8**), align 1
   alloc_global @largeGlobal
 
-  // CHECK: [[VALUE:%.*]] = load %V17global_resilience20LargeResilientStruct*, %V17global_resilience20LargeResilientStruct** bitcast ([[BUFFER]]* @largeGlobal to %V17global_resilience20LargeResilientStruct**)
+  // CHECK: [[VALUE:%.*]] = load %T17global_resilience20LargeResilientStructV*, %T17global_resilience20LargeResilientStructV** bitcast ([[BUFFER]]* @largeGlobal to %T17global_resilience20LargeResilientStructV**)
   %addr = global_addr @largeGlobal : $*LargeResilientStruct
 
   %tuple = tuple ()
@@ -86,14 +86,14 @@ bb0:
   return %tuple : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @testFixedGlobal()
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @testFixedGlobal()
 sil @testFixedGlobal : $@convention(thin) () -> () {
 bb0:
   alloc_global @fixedGlobal
 
   %addr = global_addr @fixedGlobal : $*LargeResilientStruct
 
-  // CHECK:      load i64, i64* getelementptr inbounds (%V17global_resilience20LargeResilientStruct, %V17global_resilience20LargeResilientStruct* @fixedGlobal, i32 0, i32 1, i32 0)
+  // CHECK:      load i64, i64* getelementptr inbounds (%T17global_resilience20LargeResilientStructV, %T17global_resilience20LargeResilientStructV* @fixedGlobal, i32 0, i32 1, i32 0)
   %x_addr = struct_element_addr %addr : $*LargeResilientStruct, #LargeResilientStruct.x
   %x = load %x_addr : $*Int64
 

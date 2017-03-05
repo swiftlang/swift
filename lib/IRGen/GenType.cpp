@@ -43,6 +43,8 @@
 #include "ReferenceTypeInfo.h"
 #include "ScalarTypeInfo.h"
 #include "WeakTypeInfo.h"
+#include "NativeConventionSchema.h"
+#include "IRGenMangler.h"
 
 using namespace swift;
 using namespace irgen;
@@ -81,6 +83,13 @@ ExplosionSchema TypeInfo::getSchema() const {
   return schema;
 }
 
+TypeInfo::~TypeInfo() {
+  if (nativeReturnSchema)
+    delete nativeReturnSchema;
+  if (nativeParameterSchema)
+    delete nativeParameterSchema;
+}
+
 Address TypeInfo::getAddressForPointer(llvm::Value *ptr) const {
   assert(ptr->getType()->getPointerElementType() == StorageType);
   return Address(ptr, StorageAlignment);
@@ -96,6 +105,20 @@ bool TypeInfo::isKnownEmpty(ResilienceExpansion expansion) const {
   if (auto fixed = dyn_cast<FixedTypeInfo>(this))
     return fixed->isKnownEmpty(expansion);
   return false;
+}
+
+const NativeConventionSchema &
+TypeInfo::nativeReturnValueSchema(IRGenModule &IGM) const {
+  if (nativeReturnSchema == nullptr)
+    nativeReturnSchema = new NativeConventionSchema(IGM, this, true);
+  return *nativeReturnSchema;
+}
+
+const NativeConventionSchema &
+TypeInfo::nativeParameterValueSchema(IRGenModule &IGM) const {
+  if (nativeParameterSchema == nullptr)
+    nativeParameterSchema = new NativeConventionSchema(IGM, this, false);
+  return *nativeParameterSchema;
 }
 
 /// Copy a value from one object to a new object, directly taking
@@ -152,7 +175,8 @@ void LoadableTypeInfo::addScalarToAggLowering(IRGenModule &IGM,
                                               SwiftAggLowering &lowering,
                                               llvm::Type *type, Size offset,
                                               Size storageSize) {
-  lowering.addTypedData(type, offset.asCharUnits(), storageSize.asCharUnits());
+  lowering.addTypedData(type, offset.asCharUnits(),
+                        offset.asCharUnits() + storageSize.asCharUnits());
 }
 
 static llvm::Constant *asSizeConstant(IRGenModule &IGM, Size size) {
@@ -549,7 +573,7 @@ namespace {
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
       lowering.addOpaqueData(offset.asCharUnits(),
-                             getFixedSize().asCharUnits());
+                             (offset + getFixedSize()).asCharUnits());
     }
     
     void packIntoEnumPayload(IRGenFunction &IGF,
@@ -1513,9 +1537,9 @@ llvm::StructType *IRGenModule::createNominalType(CanType type) {
     type = type.getNominalOrBoundGenericNominal()->getDeclaredType()
                                                  ->getCanonicalType();
 
-  llvm::SmallString<32> typeName;
-  LinkEntity::forTypeMangling(type).mangle(typeName);
-  return llvm::StructType::create(getLLVMContext(), typeName.str());
+  IRGenMangler Mangler;
+  std::string typeName = Mangler.mangleTypeForLLVMTypeName(type);
+  return llvm::StructType::create(getLLVMContext(), StringRef(typeName));
 }
 
 /// createNominalType - Create a new nominal LLVM type for the given
@@ -1525,20 +1549,9 @@ llvm::StructType *IRGenModule::createNominalType(CanType type) {
 /// distinguish different cases.
 llvm::StructType *
 IRGenModule::createNominalType(ProtocolCompositionType *type) {
-  llvm::SmallString<32> typeName;
-
-  SmallVector<ProtocolDecl *, 4> protocols;
-  type->getAnyExistentialTypeProtocols(protocols);
-  
-  if (protocols.empty()) {
-    typeName.append("Any");
-  } else {
-    for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
-      if (i) typeName.push_back('&');
-      LinkEntity::forNonFunction(protocols[i]).mangle(typeName);
-    }
-  }
-  return llvm::StructType::create(getLLVMContext(), typeName.str());
+  IRGenMangler Mangler;
+  std::string typeName = Mangler.mangleProtocolForLLVMTypeName(type);
+  return llvm::StructType::create(getLLVMContext(), StringRef(typeName));
 }
 
 /// Compute the explosion schema for the given type.
@@ -1595,15 +1608,6 @@ llvm::PointerType *IRGenModule::isSingleIndirectValue(SILType type) {
   getSchema(type, schema);
   if (schema.size() == 1 && schema.begin()->isAggregate())
     return schema.begin()->getAggregateType()->getPointerTo(0);
-  return nullptr;
-}
-
-/// Determine whether this type requires an indirect result.
-llvm::PointerType *IRGenModule::requiresIndirectResult(SILType type) {
-  auto &ti = getTypeInfo(type);
-  ExplosionSchema schema = ti.getSchema();
-  if (schema.requiresIndirectResult(*this))
-    return ti.getStorageType()->getPointerTo();
   return nullptr;
 }
 

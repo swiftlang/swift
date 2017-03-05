@@ -67,6 +67,9 @@ void takeGenericClass(__nullable GenericClass<NSString *> *thing);
 
 @end
 
+@interface PettableOverextendedMetaphor: NSObject <Pettable>
+@end
+
 @protocol Fungible
 @end
 

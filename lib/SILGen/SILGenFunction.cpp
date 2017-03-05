@@ -18,7 +18,6 @@
 #include "SILGenFunction.h"
 #include "RValue.h"
 #include "Scope.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -52,8 +51,6 @@ SILGenFunction::~SILGenFunction() {
   // If we didn't clean up the rethrow destination, we screwed up somewhere.
   assert(!ThrowDest.isValid() &&
          "SILGenFunction did not emit throw destination");
-
-  freeWritebackStack();
 }
 
 //===----------------------------------------------------------------------===//

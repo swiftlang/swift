@@ -74,49 +74,70 @@ llvm::Value *irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
   return metadata;
 }
 
-static bool declaresDirectConformance(AssociatedTypeDecl *associatedType,
-                                      ProtocolDecl *target) {
-  for (auto protocol : associatedType->getConformingProtocols()) {
-    if (protocol == target)
-      return true;
-  }
-  return false;
+namespace {
+  struct ConformancePath {
+    CanArchetypeType ParentArchetype;
+    ProtocolDecl *ParentProtocol;
+    CanType Path;
+  };
 }
 
-static AssociatedTypeDecl *
-findConformanceDeclaration(ArrayRef<ProtocolDecl*> conformsTo,
-                           AssociatedTypeDecl *associatedType,
-                           ProtocolDecl *target) {
-  // Fast path: this associated type declaration declares the
-  // desired conformance.
-  if (declaresDirectConformance(associatedType, target))
-    return associatedType;
-
-  // Otherwise, look at the conformance list.
-  for (auto source : conformsTo) {
-    // Do a lookup in this protocol.
-    auto results = source->lookupDirect(associatedType->getFullName());
-    for (auto lookupResult: results) {
-      if (auto sourceAssociatedType =
-            dyn_cast<AssociatedTypeDecl>(lookupResult)) {
-        if (declaresDirectConformance(sourceAssociatedType, target))
-          return sourceAssociatedType;
+static Optional<ConformancePath>
+declaresDirectConformance(ProtocolDecl *source,
+                          AssociatedTypeDecl *associatedType,
+                          ProtocolDecl *target) {
+  for (auto &reqt : source->getRequirementSignature()->getRequirements()) {
+    if (reqt.getKind() != RequirementKind::Conformance)
+      continue;
+    if (reqt.getSecondType()->castTo<ProtocolType>()->getDecl() != target)
+      continue;
+    auto path = reqt.getFirstType()->getCanonicalType();
+    if (auto memberType = dyn_cast<DependentMemberType>(path)) {
+      if (isa<GenericTypeParamType>(memberType.getBase())) {
+        assert(memberType.getBase()->isEqual(source->getSelfInterfaceType()));
+        if (memberType->getName() == associatedType->getName())
+          return ConformancePath{ CanArchetypeType(), source, path };
       }
     }
+  }
+  return None;
+}
+
+static Optional<ConformancePath>
+findConformanceRecursive(ArrayRef<ProtocolDecl*> conformsTo,
+                         AssociatedTypeDecl *associatedType,
+                         ProtocolDecl *target) {
+  for (auto source : conformsTo) {
+    // Check the protocol directly.
+    if (source != associatedType->getProtocol())
+      if (auto result = declaresDirectConformance(source, associatedType,
+                                                  target))
+        return result;
 
     // Recurse into implied protocols.
-    if (auto result =
-          findConformanceDeclaration(source->getInheritedProtocols(nullptr),
-                                     associatedType, target)) {
+    if (auto result = findConformanceRecursive(source->getInheritedProtocols(),
+                                               associatedType, target))
       return result;
-    }
   }
 
   // Give up.
-  return nullptr;
+  return None;
 }
 
-static IRGenFunction::ArchetypeAccessPath
+static Optional<ConformancePath>
+findConformanceDeclaration(ArrayRef<ProtocolDecl*> conformsTo,
+                           AssociatedTypeDecl *associatedType,
+                           ProtocolDecl *target) {
+  // Fast path: if the protocol that made this associated type
+  // declaration declared the desired conformance, we can use it directly.
+  if (auto result = declaresDirectConformance(associatedType->getProtocol(),
+                                              associatedType, target))
+    return result;
+
+  return findConformanceRecursive(conformsTo, associatedType, target);
+}
+
+static ConformancePath
 findAccessPathDeclaringConformance(IRGenFunction &IGF,
                                    CanArchetypeType archetype,
                                    ProtocolDecl *protocol) {
@@ -128,14 +149,20 @@ findAccessPathDeclaringConformance(IRGenFunction &IGF,
     auto association =
       findConformanceDeclaration(parent->getConformsTo(),
                                  archetype->getAssocType(), protocol);
-    if (association) return { parent, association };
+    if (association) {
+      association->ParentArchetype = parent;
+      return *association;
+    }
   }
 
   for (auto accessPath : IGF.getArchetypeAccessPaths(archetype)) {
     auto association =
       findConformanceDeclaration(accessPath.BaseType->getConformsTo(),
                                  accessPath.Association, protocol);
-    if (association) return { accessPath.BaseType, association };
+    if (association) {
+      association->ParentArchetype = accessPath.BaseType;
+      return *association;
+    }
   }
 
   llvm_unreachable("no relation found that declares conformance to target");
@@ -197,16 +224,30 @@ public:
 
     // If that's not present, this conformance must be implied by some
     // associated-type relationship.
+
+    // First, find the right access path.
     auto accessPath =
       findAccessPathDeclaringConformance(IGF, archetype, protocol);
 
-    // To do this, we need the metadata for the associated type.
-    auto associatedMetadata = emitArchetypeTypeMetadataRef(IGF, archetype);
+    // Get the metadata for the parent.
+    llvm::Value *parentMetadata =
+      emitArchetypeTypeMetadataRef(IGF, accessPath.ParentArchetype);
 
-    CanArchetypeType parent = accessPath.BaseType;
-    AssociatedTypeDecl *association = accessPath.Association;
-    wtable = emitAssociatedTypeWitnessTableRef(IGF, parent, association,
-                                               associatedMetadata,
+    // Get the conformance of the parent to the protocol which declares
+    // the associated conformance.
+    llvm::Value *parentWTable =
+      emitArchetypeWitnessTableRef(IGF, accessPath.ParentArchetype,
+                                   accessPath.ParentProtocol);
+
+    // Get the metadata for the associated type, i.e. this type.
+    auto archetypeMetadata = emitArchetypeTypeMetadataRef(IGF, archetype);
+
+    // Call the accessor.
+    wtable = emitAssociatedTypeWitnessTableRef(IGF, parentMetadata,
+                                               parentWTable,
+                                               accessPath.ParentProtocol,
+                                               accessPath.Path,
+                                               archetypeMetadata,
                                                protocol);
 
     setProtocolWitnessTableName(IGF.IGM, wtable, archetype, protocol);
@@ -359,34 +400,6 @@ llvm::Value *irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
   llvm::Value *originMetadata = emitArchetypeTypeMetadataRef(IGF, origin);
 
   return emitAssociatedTypeMetadataRef(IGF, originMetadata, wtable, associate);
-}
-
-llvm::Value *
-irgen::emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
-                                         CanArchetypeType origin,
-                                         AssociatedTypeDecl *associate,
-                                         llvm::Value *associateMetadata,
-                                         ProtocolDecl *associateProtocol) {
-  // We might really be asking for information associated with a more refined
-  // associated type declaration.
-  associate = findConformanceDeclaration(origin->getConformsTo(),
-                                         associate,
-                                         associateProtocol);
-  assert(associate &&
-         "didn't find any associatedtype declaration declaring "
-         "direct conformance to target protocol");
-
-  // Find the conformance of the origin to the associated type's protocol.
-  llvm::Value *wtable = emitArchetypeWitnessTableRef(IGF, origin,
-                                                     associate->getProtocol());
-
-  // Find the origin's type metadata.
-  llvm::Value *originMetadata = emitArchetypeTypeMetadataRef(IGF, origin);
-
-  // FIXME: will this ever be an indirect requirement?
-  return emitAssociatedTypeWitnessTableRef(IGF, originMetadata, wtable,
-                                           associate, associateMetadata,
-                                           associateProtocol);
 }
 
 const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {

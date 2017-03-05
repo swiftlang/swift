@@ -360,6 +360,17 @@ public:
     assert(sizeof(U) == top().allocated_size());
     Begin += sizeof(U);
   }
+
+  /// Pop objects off of the stack until \p the object pointed to by stable_iter
+  /// is the top element of the stack.
+  void pop(stable_iterator stable_iter) {
+    iterator iter = find(stable_iter);
+    checkIterator(iter);
+    while (Begin != iter.Ptr) {
+      pop();
+      checkIterator(iter);
+    }
+  }
 };
 
 } // end namespace swift

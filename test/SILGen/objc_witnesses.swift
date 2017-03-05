@@ -52,7 +52,7 @@ extension Gizmo : Bells {
 // CHECK:   [[INIT:%[0-9]+]] = function_ref @_T0So5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo>
 // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[I]], [[META]]) : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo>
 // CHECK:   switch_enum [[IUO_RESULT]]
-// CHECK:   [[UNWRAPPED_RESULT:%[0-9]+]] = unchecked_enum_data [[IUO_RESULT]]
+// CHECK: bb2([[UNWRAPPED_RESULT:%.*]] : $Gizmo):
 // CHECK:   store [[UNWRAPPED_RESULT]] to [init] [[SELF]] : $*Gizmo
 
 // Test extension of a native @objc class to conform to a protocol with a
@@ -94,5 +94,5 @@ public class Positron : Lepton {
   public dynamic var spin: Float = 0.5
 }
 
-// CHECK-LABEL: sil [transparent] [thunk] @_T014objc_witnesses8PositronCAA6LeptonAaaDP4spinSffgTW
-// CHECK-LABEL: sil shared [transparent] [thunk] @_T014objc_witnesses8PositronC4spinSffgTD
+// CHECK-LABEL: sil [transparent] [fragile] [thunk] @_T014objc_witnesses8PositronCAA6LeptonAaaDP4spinSffgTW
+// CHECK-LABEL: sil shared [transparent] [fragile] [thunk] @_T014objc_witnesses8PositronC4spinSffgTD

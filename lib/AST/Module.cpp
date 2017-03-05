@@ -81,7 +81,8 @@ void BuiltinUnit::LookupCache::lookupValue(
   ASTContext &Ctx = M.getParentModule()->getASTContext();
   if (!Entry) {
     if (Type Ty = getBuiltinType(Ctx, Name.str())) {
-      auto *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
+      auto *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), SourceLoc(),
+                                          Name, SourceLoc(),
                                           /*genericparams*/nullptr,
                                           const_cast<BuiltinUnit*>(&M));
       TAD->setUnderlyingType(Ty);
@@ -631,6 +632,7 @@ TypeBase::gatherAllSubstitutions(ModuleDecl *module,
                       {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
                        genericEnv->mapTypeIntoContext(gp)});
       assert(result.second);
+      (void) result;
     }
   }
 

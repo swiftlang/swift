@@ -14,6 +14,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/SILFunction.h"
@@ -21,6 +22,7 @@
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
+
 using namespace swift;
 
 template<typename...T, typename...U>
@@ -56,7 +58,6 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
            FLoc.isASTNode<ClosureExpr>() ? 1 : 0);
 }
 
-
 static void diagnoseUnreachable(const SILInstruction *I,
                                 ASTContext &Context) {
   if (auto *UI = dyn_cast<UnreachableInst>(I)) {
@@ -83,7 +84,8 @@ static void diagnoseUnreachable(const SILInstruction *I,
 
     // A non-exhaustive switch would also produce an unreachable instruction.
     if (L.isASTNode<SwitchStmt>()) {
-      diagnose(Context, L.getEndSourceLoc(), diag::non_exhaustive_switch);
+      diagnoseMissingCases(Context, L.getAsASTNode<SwitchStmt>(),
+                           diag::non_exhaustive_switch);
       return;
     }
 

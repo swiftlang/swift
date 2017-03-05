@@ -145,7 +145,7 @@ bool PartialApplyCombiner::allocateTemporaries() {
   // by apply instructions.
   bool needsReleases = false;
   CanSILFunctionType PAITy =
-      dyn_cast<SILFunctionType>(PAI->getCallee()->getType().getSwiftType());
+    PAI->getCallee()->getType().getAs<SILFunctionType>();
 
   // Emit a destroy value for each captured closure argument.
   ArrayRef<SILParameterInfo> Params = PAITy->getParameters();
@@ -228,7 +228,7 @@ void PartialApplyCombiner::releaseTemporaries() {
       if (!TmpType.isAddressOnly(PAI->getModule())) {
         auto *Load = Builder.createLoad(PAI->getLoc(), Op,
                                         LoadOwnershipQualifier::Unqualified);
-        Builder.createReleaseValue(PAI->getLoc(), Load, Atomicity::Atomic);
+        Builder.createReleaseValue(PAI->getLoc(), Load, Builder.getDefaultAtomicity());
       } else {
         Builder.createDestroyAddr(PAI->getLoc(), Op);
       }
@@ -320,20 +320,20 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
     for (auto Arg : ToBeReleasedArgs) {
       Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
-    Builder.createStrongRelease(AI.getLoc(), PAI, Atomicity::Atomic);
+    Builder.createStrongRelease(AI.getLoc(), PAI, Builder.getDefaultAtomicity());
     Builder.setInsertionPoint(TAI->getErrorBB()->begin());
     // Release the non-consumed parameters.
     for (auto Arg : ToBeReleasedArgs) {
       Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
-    Builder.createStrongRelease(AI.getLoc(), PAI, Atomicity::Atomic);
+    Builder.createStrongRelease(AI.getLoc(), PAI, Builder.getDefaultAtomicity());
     Builder.setInsertionPoint(AI.getInstruction());
   } else {
     // Release the non-consumed parameters.
     for (auto Arg : ToBeReleasedArgs) {
       Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
-    Builder.createStrongRelease(AI.getLoc(), PAI, Atomicity::Atomic);
+    Builder.createStrongRelease(AI.getLoc(), PAI, Builder.getDefaultAtomicity());
   }
 
   SilCombiner->replaceInstUsesWith(*AI.getInstruction(), NAI.getInstruction());
@@ -519,7 +519,7 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
           Builder.createDestroyAddr(FAS.getLoc(), Arg);
           break;
         case ParameterConvention::Direct_Owned:
-          Builder.createReleaseValue(FAS.getLoc(), Arg, Atomicity::Atomic);
+          Builder.createReleaseValue(FAS.getLoc(), Arg, Builder.getDefaultAtomicity());
           break;
         case ParameterConvention::Indirect_In_Guaranteed:
         case ParameterConvention::Indirect_Inout:
@@ -961,7 +961,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI) {
   // In we find arguments that are not the 'self' argument and if
   // they are of the Self type then we abort the optimization.
   for (auto Arg : AI.getArgumentsWithoutSelf()) {
-    if (Arg->getType().getSwiftType().getLValueOrInOutObjectType() ==
+    if (Arg->getType().getSwiftRValueType() ==
         AI.getArguments().back()->getType().getSwiftRValueType())
       return nullptr;
   }
@@ -1044,7 +1044,7 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
 
   // Emit a retain for the @owned return.
   SILBuilderWithScope Builder(Call);
-  Builder.createRetainValue(Call->getLoc(), OnX, Atomicity::Atomic);
+  Builder.createRetainValue(Call->getLoc(), OnX, Builder.getDefaultAtomicity());
 
   // Emit a release for the @owned parameter, or none for a @guaranteed
   // parameter.
@@ -1056,7 +1056,7 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
          ParamInfo == ParameterConvention::Direct_Guaranteed);
 
   if (ParamInfo == ParameterConvention::Direct_Owned)
-    Builder.createReleaseValue(Call->getLoc(), OnX, Atomicity::Atomic);
+    Builder.createReleaseValue(Call->getLoc(), OnX, Builder.getDefaultAtomicity());
 }
 
 /// Replace an application of a cast composition f_inverse(f(x)) by x.
@@ -1097,14 +1097,16 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
     // X might not be strong_retain/release'able. Replace it by a
     // retain/release_value on X instead.
     if (isa<StrongRetainInst>(User)) {
-      SILBuilderWithScope(User).createRetainValue(User->getLoc(), X,
-                                                  Atomicity::Atomic);
+      SILBuilderWithScope Builder(User);
+      Builder.createRetainValue(User->getLoc(), X,
+                                cast<StrongRetainInst>(User)->getAtomicity());
       eraseInstFromFunction(*User);
       continue;
     }
     if (isa<StrongReleaseInst>(User)) {
-      SILBuilderWithScope(User).createReleaseValue(User->getLoc(), X,
-                                                   Atomicity::Atomic);
+      SILBuilderWithScope Builder(User);
+      Builder.createReleaseValue(User->getLoc(), X,
+                                 cast<StrongReleaseInst>(User)->getAtomicity());
       eraseInstFromFunction(*User);
       continue;
     }

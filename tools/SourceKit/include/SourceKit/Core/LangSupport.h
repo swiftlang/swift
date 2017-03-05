@@ -258,6 +258,9 @@ struct CursorInfo {
   StringRef DocComment;
   StringRef TypeInterface;
   StringRef GroupName;
+  /// A key for documentation comment localization, if it exists in the doc
+  /// comment for the declaration.
+  StringRef LocalizationKey;
   /// Annotated XML pretty printed declaration.
   StringRef AnnotatedDeclaration;
   /// Fully annotated XML pretty printed declaration.
@@ -330,6 +333,7 @@ struct DocEntityInfo {
   llvm::SmallString<64> ProvideImplementationOfUSR;
   llvm::SmallString<64> DocComment;
   llvm::SmallString<64> FullyAnnotatedDecl;
+  llvm::SmallString<64> LocalizationKey;
   std::vector<DocGenericParam> GenericParams;
   std::vector<std::string> GenericRequirements;
   unsigned Offset = 0;

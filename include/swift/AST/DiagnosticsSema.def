@@ -164,6 +164,9 @@ ERROR(value_type_comparison_with_nil_illegal,none,
 ERROR(cannot_match_expr_pattern_with_value,none,
       "expression pattern of type %0 cannot match values of type %1",
       (Type, Type))
+ERROR(cannot_match_unresolved_expr_pattern_with_value,none,
+      "pattern cannot match values of type %0",
+      (Type))
 
 ERROR(cannot_reference_compare_types,none,
       "cannot check reference equality of functions; operands here have types "
@@ -1562,9 +1565,6 @@ ERROR(requires_generic_params_made_equal,none,
 ERROR(requires_generic_param_made_equal_to_concrete,none,
       "same-type requirement makes generic parameter %0 non-generic",
       (Type))
-ERROR(requires_superclass_conflict,none,
-      "generic parameter %0 cannot be a subclass of both %1 and %2",
-      (Type, Type, Type))
 ERROR(recursive_type_reference,none,
       "%0 %1 references itself", (DescriptiveDeclKind, Identifier))
 ERROR(recursive_requirement_reference,none,
@@ -1574,13 +1574,29 @@ ERROR(recursive_same_type_constraint,none,
 ERROR(recursive_superclass_constraint,none,
       "superclass constraint %0 : %1 is recursive", (Type, Type))
 ERROR(requires_same_type_conflict,none,
-      "generic parameter %0 cannot be equal to both %1 and %2",
-      (Type, Type, Type))
+      "%select{associated type|generic parameter}0 %1 cannot be equal to "
+      "both %2 and %3", (bool, Type, Type, Type))
 ERROR(requires_generic_param_same_type_does_not_conform,none,
       "same-type constraint type %0 does not conform to required protocol %1",
       (Type, Identifier))
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
+ERROR(protocol_typealias_conflict, none,
+      "typealias %0 requires types %1 and %2 to be the same",
+      (Identifier, Type, Type))
+WARNING(redundant_same_type_to_concrete,none,
+        "redundant same-type constraint %0 == %1", (Type, Type))
+NOTE(same_type_redundancy_here,none,
+     "same-type constraint %1 == %2 %select{written here|implied here}0",
+     (bool, Type, Type))
+ERROR(requires_superclass_conflict,none,
+      "%select{generic parameter |protocol |}0%1 cannot be a subclass of both "
+      "%2 and %3", (unsigned, Type, Type, Type))
+WARNING(redundant_superclass_constraint,none,
+        "redundant superclass constraint %0 : %1", (Type, Type))
+NOTE(superclass_redundancy_here,none,
+     "superclass constraint %1 : %2 %select{written here|implied here}0",
+     (bool, Type, Type))
 
 ERROR(mutiple_layout_constraints,none,
       "multiple layout constraints cannot be used at the same time: %0 and %1",
@@ -2681,6 +2697,8 @@ ERROR(trailing_closure_requires_parens,none,
       "trailing closure requires parentheses for disambiguation in this"
       " context", ())
 
+ERROR(empty_switch_stmt,none,
+"'switch' statement body must have at least one 'case' or 'default' block",())
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------
@@ -3370,9 +3388,22 @@ ERROR(designated_init_in_extension_resilient,none,
       "non-'@_fixed_layout' type %0 must delegate to another initializer", (Type))
 
 ERROR(designated_init_inlineable_resilient,none,
-      "initializer of non-'@_fixed_layout' type %0 is "
+      "initializer for non-'@_fixed_layout' type %0 is "
       "'%select{@_transparent|@inline(__always)|@_inlineable|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
+
+ERROR(class_designated_init_inlineable_resilient,none,
+      "initializer for class %0 is "
+      "'%select{@_transparent|@inline(__always)|@_inlineable|%error}1' and must "
+      "delegate to another initializer", (Type, unsigned))
+
+ERROR(inlineable_stored_property,
+      none, "'@_inlineable' attribute cannot be applied to stored properties", ())
+
+ERROR(inlineable_decl_not_public,
+      none, "'@_inlineable' attribute can only be applied to public declarations, "
+      "but %0 is %select{private|fileprivate|internal|%error|%error}1",
+      (Identifier, Accessibility))
 
 //------------------------------------------------------------------------------
 // @_specialize diagnostics

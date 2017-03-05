@@ -94,8 +94,9 @@ extension NSObject {
 // CHECK-LABEL: sil hidden [thunk] @_TToFE14foreign_errorsCSo8NSObject14badDescription{{.*}} : $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, NSObject) -> @autoreleased Optional<NSString> {
 // CHECK: bb0([[UNOWNED_ARG0:%.*]] : $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, [[UNOWNED_ARG1:%.*]] : $NSObject):
 // CHECK: [[ARG1:%.*]] = copy_value [[UNOWNED_ARG1]]
+// CHECK: [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
 // CHECK: [[T0:%.*]] = function_ref @_TFE14foreign_errorsCSo8NSObject14badDescription{{.*}} : $@convention(method) (@guaranteed NSObject) -> (@owned String, @error Error)
-// CHECK: try_apply [[T0]]([[ARG1]]) : $@convention(method) (@guaranteed NSObject) -> (@owned String, @error Error), normal [[NORMAL_BB:bb[0-9][0-9]*]], error [[ERROR_BB:bb[0-9][0-9]*]]
+// CHECK: try_apply [[T0]]([[BORROWED_ARG1]]) : $@convention(method) (@guaranteed NSObject) -> (@owned String, @error Error), normal [[NORMAL_BB:bb[0-9][0-9]*]], error [[ERROR_BB:bb[0-9][0-9]*]]
 //
 // CHECK: [[NORMAL_BB]]([[RESULT:%.*]] : $String):
 // CHECK:   [[T0:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString : $@convention(method) (@guaranteed String) -> @owned NSString
@@ -127,7 +128,10 @@ extension NSObject {
 // CHECK: bb5:
 // CHECK:   [[T0:%.*]] = enum $Optional<NSString>, #Optional.none!enumelt
 // CHECK:   br bb6([[T0]] : $Optional<NSString>)
+//
 // CHECK: bb6([[T0:%.*]] : $Optional<NSString>):
+// CHECK:   end_borrow [[BORROWED_ARG1]] from [[ARG1]]
+// CHECK:   destroy_value [[ARG1]]
 // CHECK:   return [[T0]] : $Optional<NSString>
 
 // CHECK-LABEL: sil hidden [thunk] @_TToFE14foreign_errorsCSo8NSObject7takeInt{{.*}} : $@convention(objc_method) (Int, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, NSObject) -> ObjCBool
@@ -180,29 +184,37 @@ class VeryErrorProne : ErrorProne {
   }
 }
 
+// SEMANTIC SIL TODO: _TFC14foreign_errors14VeryErrorPronec has a lot more going
+// on than is being tested here, we should consider adding FileCheck tests for
+// it.
+
 // CHECK-LABEL:    sil hidden @_TFC14foreign_errors14VeryErrorPronec{{.*}}
 // CHECK:    bb0([[ARG1:%.*]] : $Optional<AnyObject>, [[ARG2:%.*]] : $VeryErrorProne):
 // CHECK:      [[BOX:%.*]] = alloc_box ${ var VeryErrorProne }
 // CHECK:      [[PB:%.*]] = project_box [[BOX]]
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[PB]]
 // CHECK:      store [[ARG2]] to [init] [[MARKED_BOX]]
-// CHECK:      [[T0:%.*]] = load_borrow [[MARKED_BOX]]
+// CHECK:      [[T0:%.*]] = load [take] [[MARKED_BOX]]
 // CHECK-NEXT: [[T1:%.*]] = upcast [[T0]] : $VeryErrorProne to $ErrorProne
 // CHECK-NEXT: [[T2:%.*]] = super_method [volatile] [[T0]] : $VeryErrorProne, #ErrorProne.init!initializer.1.foreign : (ErrorProne.Type) -> (Any?) throws -> ErrorProne, $@convention(objc_method) (Optional<AnyObject>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned ErrorProne) -> @owned Optional<ErrorProne>
-// CHECK:      [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+// CHECK:      [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
+// CHECK:      [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
 // CHECK-NOT:  [[BOX]]{{^[0-9]}}
 // CHECK-NOT:  [[MARKED_BOX]]{{^[0-9]}}
 // CHECK:      apply [[T2]]([[ARG1_COPY]], {{%.*}}, [[T1]])
 
 // rdar://21051021
-// CHECK: sil hidden @_TF14foreign_errors12testProtocolFzPSo18ErrorProneProtocol_T_
+// CHECK: sil hidden @_TF14foreign_errors12testProtocolFzPSo18ErrorProneProtocol_T_ : $@convention(thin) (@owned ErrorProneProtocol) -> @error Error
+// CHECK: bb0([[ARG0:%.*]] : $ErrorProneProtocol):
 func testProtocol(_ p: ErrorProneProtocol) throws {
-  // CHECK:   [[T0:%.*]] = open_existential_ref %0 : $ErrorProneProtocol to $[[OPENED:@opened(.*) ErrorProneProtocol]]
+  // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
+  // CHECK:   [[T0:%.*]] = open_existential_ref [[BORROWED_ARG0]] : $ErrorProneProtocol to $[[OPENED:@opened(.*) ErrorProneProtocol]]
   // CHECK:   [[T1:%.*]] = witness_method [volatile] $[[OPENED]], #ErrorProneProtocol.obliterate!1.foreign : {{.*}}, [[T0]] : $[[OPENED]] :
   // CHECK:   apply [[T1]]<[[OPENED]]>({{%.*}}, [[T0]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : ErrorProneProtocol> (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, τ_0_0) -> ObjCBool
   try p.obliterate()
 
-  // CHECK:   [[T0:%.*]] = open_existential_ref %0 : $ErrorProneProtocol to $[[OPENED:@opened(.*) ErrorProneProtocol]]
+  // CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
+  // CHECK:   [[T0:%.*]] = open_existential_ref [[BORROWED_ARG0]] : $ErrorProneProtocol to $[[OPENED:@opened(.*) ErrorProneProtocol]]
   // CHECK:   [[T1:%.*]] = witness_method [volatile] $[[OPENED]], #ErrorProneProtocol.invigorate!1.foreign : {{.*}}, [[T0]] : $[[OPENED]] :
   // CHECK:   apply [[T1]]<[[OPENED]]>({{%.*}}, {{%.*}}, [[T0]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : ErrorProneProtocol> (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, Optional<@convention(block) () -> ()>, τ_0_0) -> ObjCBool
   try p.invigorate(callback: {})

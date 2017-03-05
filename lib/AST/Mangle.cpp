@@ -466,8 +466,7 @@ void Mangler::mangleDeclTypeForDebugger(const ValueDecl *decl) {
 /// Self type out of its mangling.
 static bool isMethodDecl(const Decl *decl) {
   return isa<AbstractFunctionDecl>(decl)
-    && (isa<NominalTypeDecl>(decl->getDeclContext())
-        || isa<ExtensionDecl>(decl->getDeclContext()));
+    && decl->getDeclContext()->isTypeContext();
 }
 
 static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
@@ -482,54 +481,59 @@ static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
   return false;
 }
 
-Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
-                                ArrayRef<GenericTypeParamType *> &genericParams,
-                                unsigned &initialParamDepth,
-                                ArrayRef<Requirement> &requirements,
-                                SmallVectorImpl<Requirement> &requirementsBuf) {
+CanType Mangler::getDeclTypeForMangling(
+    const ValueDecl *decl,
+    ArrayRef<GenericTypeParamType *> &genericParams,
+    unsigned &initialParamDepth,
+    ArrayRef<Requirement> &requirements,
+    SmallVectorImpl<Requirement> &requirementsBuf) {
   auto &C = decl->getASTContext();
   if (!decl->hasInterfaceType())
-    return ErrorType::get(C);
+    return ErrorType::get(C)->getCanonicalType();
 
-  Type type = decl->getInterfaceType();
+  auto type = decl->getInterfaceType()->getCanonicalType();
 
   initialParamDepth = 0;
   CanGenericSignature sig;
-  if (auto gft = type->getAs<GenericFunctionType>()) {
-    sig = gft->getGenericSignature()->getCanonicalSignature();
+  if (auto gft = dyn_cast<GenericFunctionType>(type)) {
+    sig = gft.getGenericSignature();
     CurGenericSignature = sig;
     genericParams = sig->getGenericParams();
     requirements = sig->getRequirements();
 
-    type = FunctionType::get(gft->getInput(), gft->getResult(),
-                             gft->getExtInfo());
+    type = CanFunctionType::get(gft.getInput(), gft.getResult(),
+                                gft->getExtInfo());
   } else {
     genericParams = {};
     requirements = {};
   }
 
   // Shed the 'self' type and generic requirements from method manglings.
-  if (isMethodDecl(decl) && type && !type->hasError()) {
-    // Drop the Self argument clause from the type.
-    type = type->castTo<AnyFunctionType>()->getResult();
+  if (!type->hasError()) {
+    if (isMethodDecl(decl)) {
+      // Drop the Self argument clause from the type.
+      type = cast<AnyFunctionType>(type).getResult();
+    }
 
-    // Drop generic parameters and requirements from the method's context.
-    if (auto parentGenericSig =
-          decl->getDeclContext()->getGenericSignatureOfContext()) {
-      // The method's depth starts below the depth of the context.
-      if (!parentGenericSig->getGenericParams().empty())
-        initialParamDepth =
-          parentGenericSig->getGenericParams().back()->getDepth()+1;
+    if (isMethodDecl(decl) || isa<SubscriptDecl>(decl)) {
+      // Drop generic parameters and requirements from the method's context.
+      auto parentGenericSig =
+        decl->getDeclContext()->getGenericSignatureOfContext();
+      if (parentGenericSig && sig) {
+        // The method's depth starts below the depth of the context.
+        if (!parentGenericSig->getGenericParams().empty())
+          initialParamDepth =
+            parentGenericSig->getGenericParams().back()->getDepth()+1;
 
-      while (!genericParams.empty()) {
-        if (genericParams.front()->getDepth() >= initialParamDepth)
-          break;
-        genericParams = genericParams.slice(1);
-      }
+        while (!genericParams.empty()) {
+          if (genericParams.front()->getDepth() >= initialParamDepth)
+            break;
+          genericParams = genericParams.slice(1);
+        }
 
-      requirementsBuf.clear();
-      for (auto &reqt : sig->getRequirements()) {
-        switch (reqt.getKind()) {
+        requirementsBuf.clear();
+        for (auto &reqt : sig->getRequirements()) {
+          switch (reqt.getKind()) {
         case RequirementKind::Conformance:
         case RequirementKind::Layout:
         case RequirementKind::Superclass:
@@ -545,12 +549,13 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
               !genericParamIsBelowDepth(reqt.getSecondType(),initialParamDepth))
             continue;
           break;
-        }
+          }
 
-        // If we fell through the switch, mangle the requirement.
-        requirementsBuf.push_back(reqt);
+          // If we fell through the switch, mangle the requirement.
+          requirementsBuf.push_back(reqt);
+        }
+        requirements = requirementsBuf;
       }
-      requirements = requirementsBuf;
     }
   }
 
@@ -564,7 +569,7 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> requirementsBuf;
   Mod = decl->getModuleContext();
-  Type type = getDeclTypeForMangling(decl,
+  auto type = getDeclTypeForMangling(decl,
                                      genericParams, initialParamDepth,
                                      requirements, requirementsBuf);
 

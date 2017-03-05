@@ -19,8 +19,10 @@ import gizmo
     // CHECK:   [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.some!enumelt.1, [[NSSET_COPY]] : $NSSet
     // CHECK:   [[SET_META:%[0-9]+]] = metatype $@thin Set<Foo>.Type
     // CHECK:   [[SET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[OPT_NSSET]], [[SET_META]])
+    // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
     // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_T017objc_set_bridging3FooC16bridge_Set_param{{[_0-9a-zA-Z]*}}F : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
-    // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[SET]], [[SELF_COPY]]) : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
+    // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[SET]], [[BORROWED_SELF_COPY]]) : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
+    // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
     // CHECK:   destroy_value [[SELF_COPY]]
     // CHECK:   return [[RESULT]] : $()
   }
@@ -31,8 +33,10 @@ import gizmo
   func bridge_Set_result() -> Set<Foo> { 
     // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Foo
+    // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
     // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_T017objc_set_bridging3FooC17bridge_Set_result{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
-    // CHECK:   [[SET:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF_COPY]]) : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
+    // CHECK:   [[SET:%[0-9]+]] = apply [[SWIFT_FN]]([[BORROWED_SELF_COPY]]) : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
+    // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
     // CHECK:   destroy_value [[SELF_COPY]]
     // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_T0s3SetV10FoundationE19_bridgeToObjectiveCSo5NSSetCyF
     // CHECK:   [[BORROWED_SET:%.*]] = begin_borrow [[SET]]
@@ -49,8 +53,10 @@ import gizmo
   // CHECK-LABEL: sil hidden [thunk] @_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}fgTo : $@convention(objc_method) (Foo) -> @autoreleased NSSet
   // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
   // CHECK:   [[SELF_COPY]] = copy_value [[SELF]] : $Foo
+  // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:   [[GETTER:%[0-9]+]] = function_ref @_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}fg : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
-  // CHECK:   [[SET:%[0-9]+]] = apply [[GETTER]]([[SELF_COPY]]) : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
+  // CHECK:   [[SET:%[0-9]+]] = apply [[GETTER]]([[BORROWED_SELF_COPY]]) : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
+  // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK:   destroy_value [[SELF_COPY]]
   // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_T0s3SetV10FoundationE19_bridgeToObjectiveCSo5NSSetCyF
   // CHECK:   [[BORROWED_SET:%.*]] = begin_borrow [[SET]]
@@ -69,8 +75,10 @@ import gizmo
   // CHECK:   [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.some!enumelt.1, [[NSSET_COPY]] : $NSSet
   // CHECK:   [[SET_META:%[0-9]+]] = metatype $@thin Set<Foo>.Type
   // CHECK:   [[SET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[OPT_NSSET]], [[SET_META]])
+  // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:   [[SETTER:%[0-9]+]] = function_ref @_T017objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}fs : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
-  // CHECK:   [[RESULT:%[0-9]+]] = apply [[SETTER]]([[SET]], [[SELF_COPY]]) : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
+  // CHECK:   [[RESULT:%[0-9]+]] = apply [[SETTER]]([[SET]], [[BORROWED_SELF_COPY]]) : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
+  // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK:   destroy_value [[SELF_COPY]] : $Foo
   // CHECK:   return [[RESULT]] : $()
   

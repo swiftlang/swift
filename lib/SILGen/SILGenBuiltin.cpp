@@ -22,7 +22,6 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 
@@ -70,9 +69,11 @@ static ManagedValue emitBuiltinRetain(SILGenFunction &gen,
                                        ArrayRef<ManagedValue> args,
                                        CanFunctionType formalApplyType,
                                        SGFContext C) {
-  // The value was produced at +1; we can produce an unbalanced
-  // retain simply by disabling the cleanup.
-  args[0].forward(gen);
+  // The value was produced at +1; we can produce an unbalanced retain simply by
+  // disabling the cleanup. But this would violate ownership semantics. Instead,
+  // we must allow for the cleanup and emit a new unmanaged retain value.
+  gen.B.createUnmanagedRetainValue(loc, args[0].getValue(),
+                                   gen.B.getDefaultAtomicity());
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
 }
 
@@ -85,7 +86,8 @@ static ManagedValue emitBuiltinRelease(SILGenFunction &gen,
   // The value was produced at +1, so to produce an unbalanced
   // release we need to leave the cleanup intact and then do a *second*
   // release.
-  gen.B.createDestroyValue(loc, args[0].getValue());
+  gen.B.createUnmanagedReleaseValue(loc, args[0].getValue(),
+                                    gen.B.getDefaultAtomicity());
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
 }
 
@@ -95,9 +97,8 @@ static ManagedValue emitBuiltinAutorelease(SILGenFunction &gen,
                                            ArrayRef<ManagedValue> args,
                                            CanFunctionType formalApplyType,
                                            SGFContext C) {
-  // The value was produced at +1, so to produce an unbalanced
-  // autorelease we need to leave the cleanup intact.
-  gen.B.createAutoreleaseValue(loc, args[0].getValue(), Atomicity::Atomic);
+  gen.B.createUnmanagedAutoreleaseValue(loc, args[0].getValue(),
+                                        gen.B.getDefaultAtomicity());
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
 }
 
@@ -129,7 +130,7 @@ static ManagedValue emitBuiltinTryPin(SILGenFunction &gen,
   // retain, so we have to leave the cleanup in place.  TODO: try to
   // emit the argument at +0.
   SILValue result =
-      gen.B.createStrongPin(loc, args[0].getValue(), Atomicity::Atomic);
+      gen.B.createStrongPin(loc, args[0].getValue(), gen.B.getDefaultAtomicity());
 
   // The handle, if non-null, is effectively +1.
   return gen.emitManagedRValueWithCleanup(result);
@@ -145,7 +146,7 @@ static ManagedValue emitBuiltinUnpin(SILGenFunction &gen,
 
   if (requireIsOptionalNativeObject(gen, loc, subs[0].getReplacement())) {
     // Unpinning takes responsibility for the +1 handle.
-    gen.B.createStrongUnpin(loc, args[0].forward(gen), Atomicity::Atomic);
+    gen.B.createStrongUnpin(loc, args[0].forward(gen), gen.B.getDefaultAtomicity());
   }
 
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
@@ -651,9 +652,12 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
 
     // Initialize the +1 result buffer without taking the incoming value. The
     // source and destination cleanups will be independent.
-    auto buffer = gen.getBufferForExprResult(loc, toTL.getLoweredType(), C);
-    gen.B.createCopyAddr(loc, toAddr, buffer, IsNotTake, IsInitialization);
-    return gen.manageBufferForExprResult(buffer, toTL, C);
+    return gen.B.bufferForExpr(
+        loc, toTL.getLoweredType(), toTL, C,
+        [&](SILValue bufferAddr) {
+          gen.B.createCopyAddr(loc, toAddr, bufferAddr, IsNotTake,
+                               IsInitialization);
+        });
   }
   // Create the appropriate bitcast based on the source and dest types.
   auto &in = args[0];

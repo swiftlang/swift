@@ -1997,7 +1997,8 @@ struct ASTNodeBase {};
 
         if (auto req = dyn_cast<ValueDecl>(member)) {
           if (!normal->hasWitness(req)) {
-            if (req->getAttrs().isUnavailable(Ctx) &&
+            if ((req->getAttrs().isUnavailable(Ctx) ||
+                 req->getAttrs().hasAttribute<OptionalAttr>()) &&
                 proto->isObjC()) {
               continue;
             }
@@ -2023,6 +2024,40 @@ struct ASTNodeBase {};
           }
 
           continue;
+        }
+      }
+
+      // Make sure we have the right signature conformances.
+      if (!normal->isInvalid()){
+        auto conformances = normal->getSignatureConformances();
+        unsigned idx = 0;
+        for (auto req : proto->getRequirementSignature()->getRequirements()) {
+          if (req.getKind() != RequirementKind::Conformance)
+            continue;
+
+          if (idx >= conformances.size()) {
+            Out << "error: not enough conformances for requirement signature\n";
+            normal->dump(Out);
+            abort();
+          }
+
+          auto reqProto =
+            req.getSecondType()->castTo<ProtocolType>()->getDecl();
+          if (reqProto != conformances[idx].getRequirement()) {
+            Out << "error: wrong protocol in signature conformances: have "
+              << conformances[idx].getRequirement()->getName().str()
+              << ", expected " << reqProto->getName().str()<< "\n";
+            normal->dump(Out);
+            abort();
+          }
+
+          ++idx;
+        }
+
+        if (idx != conformances.size()) {
+          Out << "error: too many conformances for requirement signature\n";
+          normal->dump(Out);
+          abort();
         }
       }
     }

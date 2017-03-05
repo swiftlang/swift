@@ -27,6 +27,7 @@
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/ManglingMacros.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Basic/Demangler.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
@@ -51,7 +52,8 @@ public:
   LazySKDUID(const char *Name) : Name(Name) { }
 
   sourcekitd_uid_t get() const {
-    if (!UID)
+    sourcekitd_uid_t UIDValue = UID;
+    if (!UIDValue)
       UID = SKDUIDFromUIdent(UIdent(Name));
     return UID;
   }
@@ -333,7 +335,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     ResponseBuilder RB;
     auto dict = RB.getDictionary();
     dict.set(KeyVersionMajor, ProtocolMajorVersion);
-    dict.set(KeyVersionMinor, ProtocolMinorVersion);
+    dict.set(KeyVersionMinor, static_cast<int64_t>(ProtocolMinorVersion));
     return Rec(RB.createResponse());
   }
 
@@ -801,7 +803,10 @@ handleSemanticRequest(RequestDict Req,
     }
     Input.ArgNames.resize(ArgParts.size() + Selectors.size());
     std::transform(ArgParts.begin(), ArgParts.end(), Input.ArgNames.begin(),
-                   [](const char *C) { return StringRef(C); });
+      [](const char *C) {
+        StringRef Original(C);
+        return Original == "_" ? StringRef() : Original;
+      });
     std::transform(Selectors.begin(), Selectors.end(), Input.ArgNames.begin(),
                    [](const char *C) { return StringRef(C); });
     return Lang.getNameInfo(*SourceFile, Offset, Input, Args,
@@ -1114,7 +1119,7 @@ static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
     if (!isSwiftPrefixed(MangledName))
       return std::string(); // Not a mangled name
 
-    std::string Result = swift::demangle_wrappers::demangleSymbolAsString(
+    std::string Result = swift::Demangle::demangleSymbolAsString(
         MangledName, DemangleOptions);
 
     if (Result == MangledName)
@@ -1137,18 +1142,19 @@ static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
 static std::string mangleSimpleClass(StringRef moduleName,
                                      StringRef className) {
   using namespace swift::Demangle;
+  Demangler Dem;
+  auto moduleNode = Dem.createNode(Node::Kind::Module, moduleName);
+  auto IdNode = Dem.createNode(Node::Kind::Identifier, className);
+  auto classNode = Dem.createNode(Node::Kind::Class);
+  auto typeNode = Dem.createNode(Node::Kind::Type);
+  auto typeManglingNode = Dem.createNode(Node::Kind::TypeMangling);
+  auto globalNode = Dem.createNode(Node::Kind::Global);
 
-  auto moduleNode = NodeFactory::create(Node::Kind::Module, moduleName);
-  auto IdNode = NodeFactory::create(Node::Kind::Identifier, className);
-  auto classNode = NodeFactory::create(Node::Kind::Class);
-  auto typeNode = NodeFactory::create(Node::Kind::Type);
-  auto typeManglingNode = NodeFactory::create(Node::Kind::TypeMangling);
-  auto globalNode = NodeFactory::create(Node::Kind::Global);
-
-  classNode->addChildren(moduleNode, IdNode);
-  typeNode->addChild(classNode);
-  typeManglingNode->addChild(typeNode);
-  globalNode->addChild(typeManglingNode);
+  classNode->addChild(moduleNode, Dem);
+  classNode->addChild(IdNode, Dem);
+  typeNode->addChild(classNode, Dem);
+  typeManglingNode->addChild(typeNode, Dem);
+  globalNode->addChild(typeManglingNode, Dem);
   return mangleNode(globalNode, swift::useNewMangling(globalNode));
 }
 
@@ -1206,6 +1212,8 @@ void SKDocConsumer::addDocEntityInfoToDict(const DocEntityInfo &Info,
     Elem.set(KeyDocFullAsXML, Info.DocComment);
   if (!Info.FullyAnnotatedDecl.empty())
     Elem.set(KeyFullyAnnotatedDecl, Info.FullyAnnotatedDecl);
+  if (!Info.LocalizationKey.empty())
+    Elem.set(KeyLocalizationKey, Info.LocalizationKey);
 
   if (!Info.GenericParams.empty()) {
     auto GPArray = Elem.setArray(KeyGenericParams);
@@ -1381,6 +1389,8 @@ static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec) {
     Elem.set(KeyModuleName, Info.ModuleName);
   if (!Info.GroupName.empty())
     Elem.set(KeyGroupName, Info.GroupName);
+  if (!Info.LocalizationKey.empty())
+    Elem.set(KeyLocalizationKey, Info.LocalizationKey);
   if (!Info.ModuleInterfaceName.empty())
     Elem.set(KeyModuleInterfaceName, Info.ModuleInterfaceName);
   if (Info.DeclarationLoc.hasValue()) {

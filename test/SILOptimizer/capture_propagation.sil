@@ -163,6 +163,42 @@ bb0:
   return %2 : $@callee_owned (Int32, Int32) -> (Bool, @error Error)
 }
 
+// Check if we can handle a non-throwing closure which is passed to a thunk accepting a throwing closure.
+
+sil @simple_nonthrowing_closure : $@convention(thin) (Int32) -> Bool
+
+// CHECK-LABEL: sil shared @{{.*}}throwing_thunk{{.*}} : $@convention(thin) (Int32) -> (Bool, @error Error) {
+// CHECK: = function_ref @simple_nonthrowing_closure
+// CHECK-NEXT: thin_to_thick_function
+// CHECK-NEXT: convert_function
+// CHECK-NEXT: try_apply
+// CHECK: return
+// CHECK: throw
+sil @throwing_thunk : $@convention(thin) (Int32, @owned @callee_owned (Int32) -> (Bool, @error Error)) -> (Bool, @error Error) {
+bb0(%0 : $Int32, %1 : $@callee_owned (Int32) -> (Bool, @error Error)):
+  try_apply %1(%0) : $@callee_owned (Int32) -> (Bool, @error Error), normal bb1, error bb2
+
+bb1(%5 : $Bool):
+  return %5 : $Bool
+
+bb2(%7 : $Error):
+  throw %7 : $Error
+}
+
+// CHECK-LABEL: sil @return_throwing_thunk_closure
+// CHECK: [[F:%[0-9]+]] = function_ref @{{.*}}throwing_thunk{{.*}} : $@convention(thin) (Int32) -> (Bool, @error Error)
+// CHECK: [[T:%[0-9]+]] = thin_to_thick_function [[F]]
+// CHECK: return [[T]]
+sil @return_throwing_thunk_closure : $@convention(thin) () -> @owned @callee_owned (Int32) -> (Bool, @error Error) {
+bb0:
+  %c1 = function_ref @simple_nonthrowing_closure : $@convention(thin) (Int32) -> Bool
+  %c2 = thin_to_thick_function %c1 : $@convention(thin) (Int32) -> Bool to $@callee_owned (Int32) -> Bool
+  %c3 = convert_function %c2 : $@callee_owned (Int32) -> Bool to $@callee_owned (Int32) -> (Bool, @error Error)
+  %t1 = function_ref @throwing_thunk : $@convention(thin) (Int32, @owned @callee_owned (Int32) -> (Bool, @error Error)) -> (Bool, @error Error)
+  %2 = partial_apply %t1(%c3) : $@convention(thin) (Int32, @owned @callee_owned (Int32) -> (Bool, @error Error)) -> (Bool, @error Error)
+  return %2 : $@callee_owned (Int32) -> (Bool, @error Error)
+}
+
 // Negative tests
 
 sil @swapped_arguments : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool {

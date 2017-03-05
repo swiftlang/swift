@@ -4,12 +4,12 @@
 
 // REQUIRES: objc_interop
 
-// CHECK: [[SGIZMO:C13objc_subclass10SwiftGizmo]] = type
+// CHECK: [[SGIZMO:T13objc_subclass10SwiftGizmoC]] = type
 // CHECK: [[TYPE:%swift.type]] = type
-// CHECK: [[INT:%Si]] = type <{ [[LLVM_PTRSIZE_INT:i(32|64)]] }>
+// CHECK: [[INT:%TSi]] = type <{ [[LLVM_PTRSIZE_INT:i(32|64)]] }>
 // CHECK: [[OBJC_CLASS:%objc_class]] = type
 // CHECK: [[OPAQUE:%swift.opaque]] = type
-// CHECK: [[GIZMO:%CSo5Gizmo]] = type opaque
+// CHECK: [[GIZMO:%TSo5GizmoC]] = type opaque
 // CHECK: [[OBJC:%objc_object]] = type opaque
 
 // CHECK-32: @_T013objc_subclass10SwiftGizmoC1xSivWvd = hidden global i32 12, align [[WORD_SIZE_IN_BYTES:4]]
@@ -316,7 +316,7 @@ class GenericGizmo<T> : Gizmo {
 
   var array : [T] = []
 }
-// CHECK: define hidden [[LLVM_PTRSIZE_INT]] @_T013objc_subclass12GenericGizmoC1xSifg(
+// CHECK: define hidden swiftcc [[LLVM_PTRSIZE_INT]] @_T013objc_subclass12GenericGizmoC1xSifg(
 
 var sg = SwiftGizmo()
 sg.duplicate()

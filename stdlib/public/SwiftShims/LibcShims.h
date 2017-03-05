@@ -60,13 +60,13 @@ __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
                                            __swift_size_t nitems);
 
 // String handling <string.h>
-__attribute__((__pure__)) SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
+SWIFT_READONLY SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
 _swift_stdlib_strlen(const char *s);
 
-__attribute__((__pure__)) SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
+SWIFT_READONLY SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
 _swift_stdlib_strlen_unsigned(const unsigned char *s);
 
-__attribute__((__pure__))
+SWIFT_READONLY
 SWIFT_RUNTIME_STDLIB_INTERFACE
 int _swift_stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
 
@@ -80,7 +80,7 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 int _swift_stdlib_close(int fd);
 
 // Non-standard extensions
-__attribute__((__const__)) SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
+SWIFT_READNONE SWIFT_RUNTIME_STDLIB_INTERFACE __swift_size_t
 _swift_stdlib_malloc_size(const void *ptr);
 
 // Random number <random>
@@ -91,35 +91,35 @@ __swift_uint32_t
 _swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
 
 // Math library functions
-static inline __attribute__((always_inline))
+static inline SWIFT_ALWAYS_INLINE
 float _swift_stdlib_remainderf(float _self, float _other) {
   return __builtin_remainderf(_self, _other);
 }
   
-static inline __attribute__((always_inline))
+static inline SWIFT_ALWAYS_INLINE
 float _swift_stdlib_squareRootf(float _self) {
   return __builtin_sqrt(_self);
 }
 
-static inline __attribute__((always_inline))
+static inline SWIFT_ALWAYS_INLINE
 double _swift_stdlib_remainder(double _self, double _other) {
   return __builtin_remainder(_self, _other);
 }
 
-static inline __attribute__((always_inline))
+static inline SWIFT_ALWAYS_INLINE
 double _swift_stdlib_squareRoot(double _self) {
   return __builtin_sqrt(_self);
 }
 
 // TODO: Remove horrible workaround when importer does Float80 <-> long double.
 #if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
-static inline __attribute__((always_inline))
+static inline SWIFT_ALWAYS_INLINE
 void _swift_stdlib_remainderl(void *_self, const void *_other) {
   long double *_f80self = (long double *)_self;
   *_f80self = __builtin_remainderl(*_f80self, *(const long double *)_other);
 }
 
-static inline __attribute__((always_inline))
+static inline SWIFT_ALWAYS_INLINE
 void _swift_stdlib_squareRootl(void *_self) {
   long double *_f80self = (long double *)_self;
   *_f80self = __builtin_sqrtl(*_f80self);
@@ -135,4 +135,3 @@ void _swift_stdlib_squareRootl(void *_self) {
 #endif
 
 #endif // SWIFT_STDLIB_SHIMS_LIBCSHIMS_H
-

@@ -27,14 +27,14 @@ lazy
 var val3: Int = 0;
 #line
 
-class C { // expected-note 2 {{in declaration of 'C'}} expected-note {{to match this opening '{'}}
+class C { // expected-note {{to match this opening '{'}}
 
 #if os(iOS)
 	func foo() {}
-} // expected-error{{expected declaration}}
+} // expected-error{{unexpected '}' in conditional compilation block}}
 #else
 	func bar() {}
 	func baz() {}
-} // expected-error{{expected declaration}}
+} // expected-error{{unexpected '}' in conditional compilation block}}
 #endif
 // expected-error@+1{{expected '}' in class}}

@@ -1004,7 +1004,7 @@ static bool isOrContainsReference(SILType Ty, SILModule *Mod) {
   if (Ty.hasReferenceSemantics())
     return true;
 
-  if (Ty.getSwiftType() == Mod->getASTContext().TheRawPointerType)
+  if (Ty.getSwiftRValueType() == Mod->getASTContext().TheRawPointerType)
     return true;
 
   if (auto *Str = Ty.getStructOrBoundGenericStruct()) {

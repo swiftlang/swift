@@ -24,14 +24,15 @@
 #include "../SwiftShims/Visibility.h"
 
 #include "llvm/Support/Compiler.h"
+#include "swift/Runtime/Config.h"
 
 namespace swift {
 struct HeapObject;
 }
 
-SWIFT_RUNTIME_EXPORT LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED
 void swift_leaks_startTrackingObjects(const char *);
-SWIFT_RUNTIME_EXPORT LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED
 int swift_leaks_stopTrackingObjects(const char *);
 SWIFT_RUNTIME_EXPORT LLVM_ATTRIBUTE_NOINLINE LLVM_ATTRIBUTE_USED
 void swift_leaks_startTrackingObject(swift::HeapObject *);

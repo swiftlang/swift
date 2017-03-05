@@ -136,7 +136,7 @@ public:
 
   T* get() const { return Obj; }
 
-  explicit operator bool() const { return Obj; }
+  explicit operator bool() const { return get(); }
 
   void swap(llvm::IntrusiveRefCntPtr<T> &other) {
     llvm::sys::ScopedLock L(*getMutex(this));

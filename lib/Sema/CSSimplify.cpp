@@ -18,6 +18,7 @@
 #include "ConstraintSystem.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "llvm/Support/Compiler.h"
 
 using namespace swift;
 using namespace constraints;
@@ -1486,7 +1487,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           return SolutionKind::Solved;
         }
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case ConstraintKind::Subtype:
       // Subtype constraints are subject for edge contraction,
@@ -1521,7 +1522,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         assignFixedType(typeVar2, type1);
         return SolutionKind::Solved;
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:
@@ -2089,8 +2090,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
   // literals.
   if (auto elt = locator.last()) {
-    if (elt->getKind() == ConstraintLocator::ClosureResult &&
-        !(subflags & TMF_UnwrappingOptional)) {
+    if (elt->getKind() == ConstraintLocator::ClosureResult) {
       if (concrete && kind >= ConstraintKind::Subtype &&
           (type1->isUninhabited() || type2->isVoid())) {
         increaseScore(SK_FunctionConversion);
@@ -2230,10 +2230,6 @@ commit_to_conversions:
 
   // Handle restrictions.
   if (auto restriction = conversionsOrFixes[0].getRestriction()) {
-    if (flags.contains(TMF_UnwrappingOptional)) {
-      subflags |= TMF_UnwrappingOptional;
-    }
-    
     return simplifyRestrictedConstraint(*restriction, type1, type2,
                                         kind, subflags, locator);
   }
@@ -3355,6 +3351,11 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
                                              Type type2,
                                              TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator) {
+  // There's no bridging without ObjC interop, so we shouldn't have set up
+  // bridging constraints without it.
+  assert(TC.Context.LangOpts.EnableObjCInterop
+         && "bridging constraint w/o ObjC interop?!");
+  
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   /// Form an unresolved result.
@@ -3872,8 +3873,9 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (auto generic2 = type2->getAs<BoundGenericType>()) {
       if (generic2->getDecl()->classifyAsOptionalType()) {
         return matchTypes(type1, generic2->getGenericArgs()[0],
-                          matchKind, (subflags | TMF_UnwrappingOptional),
-                          locator);
+                          matchKind, subflags,
+                          locator.withPathElement(
+                            ConstraintLocator::OptionalPayload));
       }
     }
 

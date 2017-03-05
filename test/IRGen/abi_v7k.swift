@@ -4,7 +4,7 @@
 // REQUIRES: CPU=armv7k
 // REQUIRES: OS=watchos
 
-// CHECK-LABEL: define hidden float @_TF8test_v7k9addFloats{{.*}}(float, float)
+// CHECK-LABEL: define hidden swiftcc float @_TF8test_v7k9addFloats{{.*}}(float, float)
 // CHECK: fadd float %0, %1
 // CHECK ret float
 // V7K-LABEL: __TF8test_v7k9addFloats{{.*}}
@@ -13,7 +13,7 @@ func addFloats(x: Float, y : Float) -> Float {
   return x+y
 }
 
-// CHECK-LABEL: define hidden double @_TF8test_v7k10addDoubles{{.*}}(double, double, double)
+// CHECK-LABEL: define hidden swiftcc double @_TF8test_v7k10addDoubles{{.*}}(double, double, double)
 // CHECK: fadd double %0, %1
 // CHECK: fadd double
 // CHECK: ret double
@@ -24,7 +24,7 @@ func addDoubles(x: Double, y: Double, z: Double) -> Double {
   return x+y+z
 }
 
-// CHECK-LABEL: define hidden float @_TF8test_v7k6addFDF{{.*}}(float, double, float)
+// CHECK-LABEL: define hidden swiftcc float @_TF8test_v7k6addFDF{{.*}}(float, double, float)
 // CHECK: fmul float
 // CHECK: ret float
 // V7K-LABEL: __TF8test_v7k6addFDF
@@ -34,7 +34,7 @@ func addFDF(x: Float, y: Double, z: Float) -> Float {
   return x*z
 }
 
-// CHECK-LABEL: define hidden double @_TF8test_v7k8addStackFT{{.*}}(double, double, double, double, double, double, double, float, double)
+// CHECK-LABEL: define hidden swiftcc double @_TF8test_v7k8addStackFT{{.*}}(double, double, double, double, double, double, double, float, double)
 // CHECK: fadd double
 // CHECK: ret double
 // V7K-LABEL: __TF8test_v7k8addStackFT
@@ -46,7 +46,7 @@ func addStack(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
   return a+c
 }
 
-// CHECK-LABEL: define hidden float @_TF8test_v7k9addStack2{{.*}}(double, double, double, double, double, double, double, float, double, float)
+// CHECK-LABEL: define hidden swiftcc float @_TF8test_v7k9addStack2{{.*}}(double, double, double, double, double, double, double, float, double, float)
 // CHECK: fadd float
 // V7K-LABEL: __TF8test_v7k9addStack2
 // V7K: vldr s0, [sp, #8]
@@ -58,14 +58,14 @@ func addStack2(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
 }
 
 // Passing various enums:
-// CHECK-LABEL: define hidden void @_TF8test_v7k9testEmpty{{.*}}()
+// CHECK-LABEL: define hidden swiftcc void @_TF8test_v7k9testEmpty{{.*}}()
 // V7K-LABEL: __TF8test_v7k9testEmpty
 enum Empty {}
 func testEmpty(x: Empty) -> Empty {
   return x
 }
 
-// CHECK-LABEL: define hidden i32 @_TF8test_v7k10testSingle{{.*}}()
+// CHECK-LABEL: define hidden swiftcc i32 @_TF8test_v7k10testSingle{{.*}}()
 // CHECK: ret i32 1
 // V7K-LABEL: __TF8test_v7k10testSingle
 // V7K: movw    r0, #1
@@ -77,7 +77,7 @@ func testSingle(x: SingleCase) -> Int32{
   }
 }
 
-// CHECK-LABEL: define hidden double @_TF8test_v7k8testData{{.*}}(i32, double)
+// CHECK-LABEL: define hidden swiftcc double @_TF8test_v7k8testData{{.*}}(i32, double)
 // CHECK: ret double
 // V7K-LABEL: __TF8test_v7k8testData
 // V7K: vstr d0
@@ -90,7 +90,7 @@ func testData(x: DataCase) -> Double {
   }
 }
 
-// CHECK-LABEL: define hidden i32 @_TF8test_v7k10testClike2{{.*}}(i1)
+// CHECK-LABEL: define hidden swiftcc i32 @_TF8test_v7k10testClike2{{.*}}(i8)
 // CHECK: [[ID:%[0-9]+]] = phi i32 [ 2, {{.*}} ], [ 1, {{.*}} ]
 // CHECK: ret i32 [[ID]]
 // V7K-LABEL: __TF8test_v7k10testClike2
@@ -110,11 +110,12 @@ func testClike2(x: CLike2) -> Int {
   }
 }
 
-// CHECK-LABEL: define hidden i32 @_TF8test_v7k10testClike8{{.*}}(i32, i8)
+// CHECK-LABEL: define hidden swiftcc i32 @_TF8test_v7k10testClike8{{.*}}(i32, i8)
 // CHECK: [[ID:%[0-9]+]] = phi i32 [ -1, {{.*}} ], [ 1, {{.*}} ]
 // CHECK: ret i32 [[ID]]
 // V7K-LABEL: __TF8test_v7k10testClike8
-// V7K: tst r1, #7
+// V7K: sxtb r1, r1
+// V7K: cmp r1, #0
 // V7K: movw r0, #1
 // V7K: mvn r0, #0
 enum CLike8 {
@@ -138,7 +139,7 @@ func testClike8(t: Int, x: CLike8) -> Int {
 
 // layout of the enum: the tag bit is set for the no-data cases, which are then
 // assigned values in the data area of the enum in declaration order
-// CHECK-LABEL: define hidden double @_TF8test_v7k11testSingleP{{.*}}(i32, i32, i1)
+// CHECK-LABEL: define hidden swiftcc double @_TF8test_v7k11testSingleP{{.*}}(i32, i32, i8)
 // CHECK: br i1
 // CHECK: switch i32 [[ID:%[0-9]+]]
 // CHECK: [[FIRST:%[0-9]+]] = zext i32 %0 to i64
@@ -164,7 +165,7 @@ func testSingleP(x: SinglePayload) -> Double {
   }
 }
 
-// CHECK-LABEL: define hidden double @_TF8test_v7k10testMultiP{{.*}}(i32, i32, i8)
+// CHECK-LABEL: define hidden swiftcc double @_TF8test_v7k10testMultiP{{.*}}(i32, i32, i8)
 // CHECK: [[FIRST:%[0-9]+]] = zext i32 %0 to i64
 // CHECK: [[SECOND:%[0-9]+]] = zext i32 %1 to i64
 // CHECK: [[TEMP:%[0-9]+]] = shl i64 [[SECOND]], 32
@@ -193,9 +194,10 @@ func testMultiP(x: MultiPayload) -> Double {
   }
 }
 
-// CHECK-LABEL: define hidden float @_TF8test_v7k7testOpt{{.*}}(i32, i1)
+// CHECK-LABEL: define hidden swiftcc float @_TF8test_v7k7testOpt{{.*}}(i32, i8)
 // CHECK: entry:
-// CHECK: br i1 %1, {{.*}}, label %[[PAYLOADLABEL:.*]]
+// CHECK: [[TR:%.*]] = trunc i8 %1
+// CHECK: br i1 [[TR]], {{.*}}, label %[[PAYLOADLABEL:.*]]
 // CHECK: <label>:[[PAYLOADLABEL]]
 // CHECK: [[ID:%[0-9]+]] = bitcast i32 %0 to float
 // CHECK: ret float [[ID]]
@@ -213,7 +215,7 @@ func testOpt(x: Float?) -> Float {
 }
 
 // Returning tuple: (Int, Int)
-// CHECK-LABEL: define hidden { i32, i32 } @_TF8test_v7k6minMaxF{{.*}}(i32, i32)
+// CHECK-LABEL: define hidden swiftcc { i32, i32 } @_TF8test_v7k6minMaxF{{.*}}(i32, i32)
 // V7K-LABEL: __TF8test_v7k6minMaxF
 // V7K: ldr r0
 // V7K: ldr r1
@@ -261,23 +263,22 @@ struct MyRect4 {
    s = MySize(w: 1.0, h: 2.0)
   }
 }
-// CHECK-LABEL: define hidden void @_TF8test_v7k8testRet2{{.*}}(%V8test_v7k6MyRect* noalias nocapture sret, double, i32)
+// CHECK-LABEL: define hidden swiftcc { double, double, double, double } @_TF8test_v7k8testRet2{{.*}}(double, i32)
 // V7K-LABEL: __TF8test_v7k8testRet2
-// sret in r0, double in d0, i32 in r1
-// V7K: vmov [[ID:s[0-9]+]], r1
+// double in d0, i32 in r0, return in d0,...,d3
+// V7K: vmov [[ID:s[0-9]+]], r0
 // V7K: vcvt.f64.s32 [[ID2:d[0-9]+]], [[ID]]
+// V7K: vstr d0, [sp]
 // V7K: vmov.f64 d0, [[ID2]]
 // V7K: bl
-// V7K: vstr d{{.*}}, [r0]
-// V7K: vstr d{{.*}}, [r0, #8]
-// V7K: vstr d{{.*}}, [r0, #16]
-// V7K: vstr d{{.*}}, [r0, #24]
+// V7K: vldr [[ID3:d[0-9]+]], [sp]
+// V7K: vmov.f64 d2, [[ID3]]
 func testRet2(w : Double, i : Int) -> MyRect {
   var r = MyRect(x : Double(i), y : 2.0, w : 3.0, h : 4.0)
   r.w = w
   return r
 }
-// CHECK-LABEL: define hidden { i8, double, double } @_TF8test_v7k8testRet3{{.*}}()
+// CHECK-LABEL: define hidden swiftcc { i8, double, double } @_TF8test_v7k8testRet3{{.*}}()
 // V7K-LABEL: __TF8test_v7k8testRet3
 func testRet3() -> MyRect2 {
   var r = MyRect2()
@@ -285,7 +286,7 @@ func testRet3() -> MyRect2 {
 }
 
 // Returning tuple?: (Int x 6)?
-// CHECK-LABEL: define hidden void @_TF8test_v7k7minMax2{{.*}}({{%GSq.*}} noalias nocapture sret, i32, i32)
+// CHECK-LABEL: define hidden swiftcc void @_TF8test_v7k7minMax2{{.*}}({{%GSq.*}} noalias nocapture sret, i32, i32)
 // V7K-LABEL: __TF8test_v7k7minMax2
 // We will indirectly return an optional with the address in r0, input parameters will be in r1 and r2
 // V7K: cmp r1, r2
@@ -313,7 +314,7 @@ func minMax2(x : Int, y : Int) -> (min: Int, max: Int, min2: Int, max2: Int, min
 }
 
 // Returning struct?: {Int x 6}?
-// CHECK-LABEL: define hidden void @_TF8test_v7k7minMax3{{.*}}({{%GSq.*}} noalias nocapture sret, i32, i32)
+// CHECK-LABEL: define hidden swiftcc void @_TF8test_v7k7minMax3{{.*}}({{%GSq.*}} noalias nocapture sret, i32, i32)
 // V7K-LABEL: __TF8test_v7k7minMax3
 struct Ret {
   var min:Int
@@ -336,7 +337,7 @@ func minMax3(x : Int, y : Int) -> Ret? {
 }
 
 // Passing struct: Int8, MyPoint x 10, MySize * 10
-// CHECK-LABEL: define hidden double @_TF8test_v7k8testRet5{{.*}}(%V8test_v7k7MyRect3* noalias nocapture dereferenceable(328))
+// CHECK-LABEL: define hidden swiftcc double @_TF8test_v7k8testRet5{{.*}}(%V8test_v7k7MyRect3* noalias nocapture dereferenceable(328))
 // V7K-LABEL: __TF8test_v7k8testRet5
 // V7K: ldrb [[TMP1:r[0-9]+]], [r0]
 // V7K: vldr [[REG1:d[0-9]+]], [r0, #8]

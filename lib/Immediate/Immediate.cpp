@@ -119,7 +119,7 @@ static bool tryLoadLibrary(LinkLibrary linkLib,
     // Try user-provided framework search paths first; frameworks contain
     // binaries as well as modules.
     for (auto &frameworkDir : searchPathOpts.FrameworkSearchPaths) {
-      path = frameworkDir;
+      path = frameworkDir.Path;
       llvm::sys::path::append(path, frameworkPart.str());
       success = loadRuntimeLib(path);
       if (success)
@@ -259,6 +259,7 @@ bool swift::immediate::IRGenImportedModules(
       hadError = true;
       break;
     }
+    runSILLoweringPasses(*SILMod);
 
     // FIXME: We shouldn't need to use the global context here, but
     // something is persisting across calls to performIRGeneration.

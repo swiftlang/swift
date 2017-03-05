@@ -8,7 +8,7 @@
 import objc_enum_multi_file_helper
 #endif
 
-// CHECK-LABEL: define hidden i32 @_T04main6useFoo{{.*}}F(i32) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc i32 @_T04main6useFoo{{.*}}F(i32) {{.*}} {
 func useFoo(_ x: Foo) -> Int32 {
   // CHECK: switch i32 %0, label %[[DEFAULT:.+]] [
   // CHECK-DAG: i32 1, label %[[CASE_B:.+]]
@@ -41,7 +41,7 @@ func useFoo(_ x: Foo) -> Int32 {
   // CHECK: ret i32 %[[RETVAL]]
 }
 
-// CHECK-LABEL: define hidden i32 @_T04main6useBar{{.*}}F(i32) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc i32 @_T04main6useBar{{.*}}F(i32) {{.*}} {
 func useBar(_ x: Bar) -> Int32 {
   // CHECK: switch i32 %0, label %[[DEFAULT:.+]] [
   // CHECK-DAG: i32 6, label %[[CASE_B:.+]]

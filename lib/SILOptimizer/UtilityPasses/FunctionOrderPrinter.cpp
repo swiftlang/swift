@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
-#include "swift/Basic/DemangleWrappers.h"
+#include "swift/Basic/Demangle.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -50,7 +50,7 @@ class FunctionOrderPrinterPass : public SILModuleTransform {
 
       for (auto *F : SCC) {
         llvm::outs() << Indent
-                     << demangle_wrappers::demangleSymbolAsString(F->getName())
+                     << Demangle::demangleSymbolAsString(F->getName())
                      << "\n";
       }
     }

@@ -32,3 +32,9 @@ extension BaseClass {
   @objc public func getSwiftEnum() -> SwiftEnum { return .Quux }
   public init() {}
 }
+
+@objc(RenamedClass) public class SwiftClass {}
+
+public func getSwiftClass() -> SwiftClass {
+  return SwiftClass()
+}

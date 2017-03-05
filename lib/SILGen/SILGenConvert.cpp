@@ -16,7 +16,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
@@ -56,19 +55,21 @@ SILGenFunction::emitInjectOptional(SILLocation loc,
   // evaluating into the context.
 
   // Prepare a buffer for the object value.
-  auto optBuf = getBufferForExprResult(loc, optTy.getObjectType(), ctxt);
-  auto objectBuf = B.createInitEnumDataAddr(loc, optBuf, someDecl, objectTy);
+  return B.bufferForExpr(
+      loc, optTy.getObjectType(), optTL, ctxt,
+      [&](SILValue optBuf) {
+        auto objectBuf = B.createInitEnumDataAddr(loc, optBuf, someDecl, objectTy);
 
-  // Evaluate the value in-place into that buffer.
-  TemporaryInitialization init(objectBuf, CleanupHandle::invalid());
-  ManagedValue objectResult = generator(SGFContext(&init));
-  if (!objectResult.isInContext()) {
-    objectResult.forwardInto(*this, loc, objectBuf);
-  }
+        // Evaluate the value in-place into that buffer.
+        TemporaryInitialization init(objectBuf, CleanupHandle::invalid());
+        ManagedValue objectResult = generator(SGFContext(&init));
+        if (!objectResult.isInContext()) {
+          objectResult.forwardInto(*this, loc, objectBuf);
+        }
 
-  // Finalize the outer optional buffer.
-  B.createInjectEnumAddr(loc, optBuf, someDecl);
-  return manageBufferForExprResult(optBuf, optTL, ctxt);
+        // Finalize the outer optional buffer.
+        B.createInjectEnumAddr(loc, optBuf, someDecl);
+      });
 }
 
 void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
@@ -122,8 +123,7 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
   SILType optType = optTL.getLoweredType();
   CanType formalOptType = optType.getSwiftRValueType();
 
-  auto formalObjectType = formalOptType.getAnyOptionalObjectType();
-  assert(formalObjectType);
+  assert(formalOptType.getAnyOptionalObjectType());
   auto someDecl = getASTContext().getOptionalSomeDecl();
   
   SILValue result =
@@ -171,21 +171,29 @@ static void emitSourceLocationArgs(SILGenFunction &gen,
   args[3] = ManagedValue::forUnmanaged(literal);
 }
 
-void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
-                                                      SILValue optional) {
+ManagedValue
+SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
+                                                 ManagedValue optional) {
   // Generate code to the optional is present, and if not, abort with a message
   // (provided by the stdlib).
   SILBasicBlock *contBB = createBasicBlock();
   SILBasicBlock *failBB = createBasicBlock();
 
-  auto NoneEnumElementDecl = getASTContext().getOptionalNoneDecl();
-  if (optional->getType().isAddress()) {
-    B.createSwitchEnumAddr(loc, optional, /*defaultDest*/contBB,
-                           { { NoneEnumElementDecl, failBB }});
+  bool hadCleanup = optional.hasCleanup();
+  bool hadLValue = optional.isLValue();
+
+  auto noneDecl = getASTContext().getOptionalNoneDecl();
+  auto someDecl = getASTContext().getOptionalSomeDecl();
+  if (optional.getType().isAddress()) {
+    // We forward in the creation routine for
+    // unchecked_take_enum_data_addr. switch_enum_addr is a +0 operation.
+    B.createSwitchEnumAddr(loc, optional.getValue(),
+                           /*defaultDest*/ nullptr,
+                           {{someDecl, contBB}, {noneDecl, failBB}});
   } else {
-    B.createSwitchEnum(loc, optional, /*defaultDest*/contBB,
-                       { { NoneEnumElementDecl, failBB }});
-    
+    B.createSwitchEnum(loc, optional.forward(*this),
+                       /*defaultDest*/ nullptr,
+                       {{someDecl, contBB}, {noneDecl, failBB}});
   }
   B.emitBlock(failBB);
 
@@ -202,6 +210,26 @@ void SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   B.createUnreachable(loc);
   B.clearInsertionPoint();
   B.emitBlock(contBB);
+
+  ManagedValue result;
+  SILType payloadType = optional.getType().getAnyOptionalObjectType();
+
+  if (payloadType.isObject()) {
+    result = B.createOwnedPHIArgument(payloadType);
+  } else {
+    result =
+        B.createUncheckedTakeEnumDataAddr(loc, optional, someDecl, payloadType);
+  }
+
+  if (hadCleanup) {
+    return result;
+  }
+
+  if (hadLValue) {
+    return ManagedValue::forLValue(result.forward(*this));
+  }
+
+  return ManagedValue::forUnmanaged(result.forward(*this));
 }
 
 SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
@@ -222,8 +250,8 @@ ManagedValue SILGenFunction::emitCheckedGetOptionalValueFrom(SILLocation loc,
                                                       ManagedValue src,
                                                       const TypeLowering &optTL,
                                                       SGFContext C) {
-  emitPreconditionOptionalHasValue(loc, src.getValue());
-  return emitUncheckedGetOptionalValueFrom(loc, src, optTL, C);
+  // TODO: Make this take optTL.
+  return emitPreconditionOptionalHasValue(loc, src);
 }
 
 ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(SILLocation loc,
@@ -461,7 +489,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
 
       auto nativeError = F(SGFContext());
 
-      WritebackScope writebackScope(*this);
+      FormalEvaluationScope writebackScope(*this);
       auto nsError =
         emitRValueForPropertyLoad(loc, nativeError, concreteFormalType,
                                   /*super*/ false, nsErrorVar,
@@ -646,28 +674,38 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       }
     }
 
-    // Allocate the existential.
-    SILValue existential =
-      getBufferForExprResult(loc, existentialTL.getLoweredType(), C);
-
-    // Allocate the concrete value inside the container.
-    SILValue valueAddr = B.createInitExistentialAddr(
-                            loc, existential,
-                            concreteFormalType,
-                            concreteTLPtr->getLoweredType(),
-                            conformances);
-    // Initialize the concrete value in-place.
-    InitializationPtr init(
-        new ExistentialInitialization(existential, valueAddr, concreteFormalType,
-                                      ExistentialRepresentation::Opaque,
-                                      *this));
-    ManagedValue mv = F(SGFContext(init.get()));
-    if (!mv.isInContext()) {
-      mv.forwardInto(*this, loc, init->getAddress());
-      init->finishInitialization(*this);
+    if (!C.getEmitInto() && !silConv.useLoweredAddresses()) {
+      // We should never create new buffers just for init_existential under
+      // opaque values mode: This is a case of an opaque value that we can
+      // "treat" as a by-value one
+      ManagedValue sub = F(SGFContext());
+      SILValue v = B.createInitExistentialOpaque(
+          loc, existentialTL.getLoweredType(), concreteFormalType,
+          sub.getValue(), conformances);
+      return ManagedValue(v, sub.getCleanup());
     }
 
-    return manageBufferForExprResult(existential, existentialTL, C);
+    // Allocate the existential.
+    return B.bufferForExpr(
+        loc, existentialTL.getLoweredType(), existentialTL, C,
+        [&](SILValue existential) {
+          // Allocate the concrete value inside the container.
+          SILValue valueAddr = B.createInitExistentialAddr(
+              loc, existential,
+              concreteFormalType,
+              concreteTLPtr->getLoweredType(),
+              conformances);
+          // Initialize the concrete value in-place.
+          InitializationPtr init(
+              new ExistentialInitialization(existential, valueAddr, concreteFormalType,
+                                            ExistentialRepresentation::Opaque,
+                                            *this));
+          ManagedValue mv = F(SGFContext(init.get()));
+          if (!mv.isInContext()) {
+            mv.forwardInto(*this, loc, init->getAddress());
+            init->finishInitialization(*this);
+          }
+        });
   }
   }
 
@@ -688,8 +726,7 @@ ManagedValue SILGenFunction::emitClassMetatypeToObject(SILLocation loc,
   
   // Convert to an object reference.
   value = B.createObjCMetatypeToObject(loc, value, resultTy);
-
-  return ManagedValue::forUnmanaged(value);
+  return emitManagedRValueWithCleanup(value);
 }
 
 ManagedValue SILGenFunction::emitExistentialMetatypeToObject(SILLocation loc,
@@ -708,7 +745,7 @@ ManagedValue SILGenFunction::emitExistentialMetatypeToObject(SILLocation loc,
   // Convert to an object reference.
   value = B.createObjCExistentialMetatypeToObject(loc, value, resultTy);
   
-  return ManagedValue::forUnmanaged(value);
+  return emitManagedRValueWithCleanup(value);
 }
 
 ManagedValue SILGenFunction::emitProtocolMetatypeToObject(SILLocation loc,
@@ -725,7 +762,7 @@ ManagedValue SILGenFunction::emitProtocolMetatypeToObject(SILLocation loc,
   // deallocate itself. It doesn't matter if we ever actually clean up that
   // retain though.
   value = B.createCopyValue(loc, value);
-  return ManagedValue::forUnmanaged(value);
+  return emitManagedRValueWithCleanup(value);
 }
 
 SILGenFunction::OpaqueValueState
@@ -733,7 +770,8 @@ SILGenFunction::emitOpenExistential(
        SILLocation loc,
        ManagedValue existentialValue,
        CanArchetypeType openedArchetype,
-       SILType loweredOpenedType) {
+       SILType loweredOpenedType,
+       AccessKind accessKind) {
   // Open the existential value into the opened archetype value.
   bool isUnique = true;
   bool canConsume;
@@ -742,23 +780,25 @@ SILGenFunction::emitOpenExistential(
   SILType existentialType = existentialValue.getType();
   switch (existentialType.getPreferredExistentialRepresentation(SGM.M)) {
   case ExistentialRepresentation::Opaque: {
+    SILValue archetypeValue;
     if (existentialType.isAddress()) {
-      SILValue archetypeValue = B.createOpenExistentialAddr(
-          loc, existentialValue.forward(*this), loweredOpenedType);
-      if (existentialValue.hasCleanup()) {
-        canConsume = true;
-        // Leave a cleanup to deinit the existential container.
-        enterDeinitExistentialCleanup(existentialValue.getValue(), CanType(),
-                                      ExistentialRepresentation::Opaque);
-        archetypeMV = emitManagedBufferWithCleanup(archetypeValue);
-      } else {
-        canConsume = false;
-        archetypeMV = ManagedValue::forUnmanaged(archetypeValue);
-      }
+      OpenedExistentialAccess allowedAccess =
+          getOpenedExistentialAccessFor(accessKind);
+      archetypeValue =
+          B.createOpenExistentialAddr(loc, existentialValue.forward(*this),
+                                      loweredOpenedType, allowedAccess);
     } else {
-      SILValue archetypeValue = B.createOpenExistentialOpaque(
+      archetypeValue = B.createOpenExistentialOpaque(
           loc, existentialValue.forward(*this), loweredOpenedType);
-      assert(!existentialValue.hasCleanup());
+    }
+
+    if (existentialValue.hasCleanup()) {
+      canConsume = true;
+      // Leave a cleanup to deinit the existential container.
+      enterDeinitExistentialCleanup(existentialValue.getValue(), CanType(),
+                                    ExistentialRepresentation::Opaque);
+      archetypeMV = emitManagedBufferWithCleanup(archetypeValue);
+    } else {
       canConsume = false;
       archetypeMV = ManagedValue::forUnmanaged(archetypeValue);
     }
