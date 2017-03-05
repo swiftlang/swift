@@ -12,6 +12,7 @@ cmake_minimum_required(VERSION 2.8.12)
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
+include(AddSwiftBenchmarkUtils)
 include(AddSwiftBenchmarkSuite)
 
 set(SWIFT_BENCH_MODULES
@@ -40,16 +41,8 @@ set(BENCH_DRIVER_LIBRARY_MODULES
     utils/TestsUtils
 )
 
-set(BENCH_DRIVER_LIBRARY_FLAGS)
-if (SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
-  set(BENCH_DRIVER_LIBRARY_FLAGS -DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
-endif()
-
 set(BENCH_LIBRARY_MODULES
 )
-
-add_definitions(-DSWIFT_EXEC -DSWIFT_LIBRARY_PATH -DONLY_PLATFORMS
-                -DSWIFT_OPTIMIZATION_LEVELS -DSWIFT_BENCHMARK_EMIT_SIB)
 
 if(NOT ONLY_PLATFORMS)
   set(ONLY_PLATFORMS "macosx" "iphoneos" "appletvos" "watchos")
@@ -106,49 +99,6 @@ set(BENCHOPTS_MULTITHREADED
     "-whole-module-optimization" "-num-threads" "4")
 set(BENCHOPTS_SINGLEFILE "")
 
-set(macosx_arch "x86_64")
-set(iphoneos_arch "arm64" "armv7")
-set(appletvos_arch "arm64")
-set(watchos_arch "armv7k")
-
-set(macosx_ver "10.9")
-set(iphoneos_ver "8.0")
-set(appletvos_ver "9.1")
-set(watchos_ver "2.0")
-
-set(macosx_triple_platform "macosx")
-set(iphoneos_triple_platform "ios")
-set(appletvos_triple_platform "tvos")
-set(watchos_triple_platform "watchos")
-
-set(sdks)
-set(platforms)
-foreach(platform ${ONLY_PLATFORMS})
-  execute_process(
-      COMMAND "xcrun" "--sdk" "${platform}" "--show-sdk-path"
-      OUTPUT_VARIABLE ${platform}_sdk
-      RESULT_VARIABLE result
-      ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if("${result}" MATCHES "0")
-    list(APPEND sdks "${${platform}_sdk}")
-    list(APPEND platforms ${platform})
-  endif()
-endforeach()
-
-message("--")
-message("-- Swift Benchmark Suite:")
-message("--   SWIFT_EXEC = ${SWIFT_EXEC}")
-message("--   SWIFT_LIBRARY_PATH = ${SWIFT_LIBRARY_PATH}")
-message("--   CLANG_EXEC = ${CLANG_EXEC}")
-message("--   SWIFT_OPTIMIZATION_LEVELS = ${SWIFT_OPTIMIZATION_LEVELS}")
-message("--   ONLY_PLATFORMS = ${ONLY_PLATFORMS}")
-
-message("--   found platforms: ${platforms}")
-message("--   found sdks:")
-foreach(sdk ${sdks})
-  message("--     ${sdk}")
-endforeach()
-
 set(executable_targets)
 
 if(SWIFT_SDKS)
@@ -163,19 +113,8 @@ else()
   set(swift-bin-dir "${CMAKE_BINARY_DIR}/bin")
 endif()
 
-set(benchmark-bin-dir "${CMAKE_CURRENT_BINARY_DIR}/bin")
-set(benchmark-lib-dir "${CMAKE_CURRENT_BINARY_DIR}/lib")
-set(benchmark-lib-swift-dir "${CMAKE_CURRENT_BINARY_DIR}/lib/swift")
-
-file(MAKE_DIRECTORY "${swift-bin-dir}")
-file(MAKE_DIRECTORY "${benchmark-bin-dir}")
-file(MAKE_DIRECTORY "${benchmark-lib-dir}")
-file(MAKE_DIRECTORY "${benchmark-lib-swift-dir}")
-
-# Compile the perf test suite for each platform
-foreach(platform ${platforms})
-  swift_benchmark_compile(PLATFORM ${platform})
-endforeach()
+# Compile the perf test suite for all platform
+swift_benchmark_compile_all_platforms()
 
 add_subdirectory(scripts)
 
