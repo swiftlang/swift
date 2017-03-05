@@ -238,9 +238,7 @@ file(MAKE_DIRECTORY "${benchmark-bin-dir}")
 file(MAKE_DIRECTORY "${benchmark-lib-dir}")
 file(MAKE_DIRECTORY "${benchmark-lib-swift-dir}")
 
-# Compile the perf test suite for each platform
-foreach(platform ${platforms})
-  swift_benchmark_compile(PLATFORM ${platform})
-endforeach()
+# Compile the perf test suite for all platform
+swift_benchmark_compile_all_platforms(${platforms})
 
 add_subdirectory(scripts)
