@@ -2,6 +2,20 @@
 include(CMakeParseArguments)
 include(AddSwiftBenchmarkUtils)
 
+# Internal Configuration Variables
+
+set(BENCH_DRIVER_LIBRARY_FLAGS)
+if (SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
+  set(BENCH_DRIVER_LIBRARY_FLAGS -DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
+endif()
+
+# Internal Compilation Configuration
+
+add_definitions(-DSWIFT_EXEC -DSWIFT_LIBRARY_PATH -DONLY_PLATFORMS
+                -DSWIFT_OPTIMIZATION_LEVELS -DSWIFT_BENCHMARK_EMIT_SIB)
+
+# Benchmark setup functions.
+
 function (swift_benchmark_compile_archopts)
   cmake_parse_arguments(BENCH_COMPILE_ARCHOPTS "" "PLATFORM;ARCH;OPT" "" ${ARGN})
   set(sdk ${${BENCH_COMPILE_ARCHOPTS_PLATFORM}_sdk})
