@@ -2102,13 +2102,13 @@ public:
   }
 
   bool hasName() const { return bool(Name); }
-  /// TODO: Rename to getSimpleName?
-  Identifier getName() const { return Name.getBaseName(); }
   bool isOperator() const { return Name.isOperator(); }
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
-    return hasName() ? getName().str() : "_";
+    // TODO: Check if this function is called for special names
+    assert(!Name.isSpecial() && "Cannot get string for special names");
+    return hasName() ? Name.getBaseName().getIdentifier().str() : "_";
   }
 
   /// Retrieve the full name of the declaration.
@@ -2118,7 +2118,7 @@ public:
 
   /// Retrieve the base name of the declaration, ignoring any argument
   /// names.
-  DeclName getBaseName() const { return Name.getBaseName(); }
+  DeclBaseName getBaseName() const { return Name.getBaseName(); }
 
   /// Retrieve the name to use for this declaration when interoperating
   /// with the Objective-C runtime.
@@ -2327,6 +2327,8 @@ protected:
   }
 
 public:
+  Identifier getName() const { return getFullName().getBaseIdentifier(); }
+
   /// The type of this declaration's values. For the type of the
   /// declaration itself, use getInterfaceType(), which returns a
   /// metatype.
@@ -4211,6 +4213,8 @@ public:
     return VarDeclBits.IsUserAccessible;
   }
 
+  Identifier getName() const { return getFullName().getBaseIdentifier(); }
+
   TypeLoc &getTypeLoc() { return typeLoc; }
   TypeLoc getTypeLoc() const { return typeLoc; }
 
@@ -4678,6 +4682,8 @@ protected:
   }
 
 public:
+  Identifier getName() const { return getFullName().getBaseIdentifier(); }
+
   /// \brief Should this declaration be treated as if annotated with transparent
   /// attribute.
   bool isTransparent() const;
@@ -5298,6 +5304,8 @@ public:
         static_cast<unsigned>(ElementRecursiveness::NotRecursive);
     EnumElementDeclBits.HasArgumentType = HasArgumentType;
   }
+
+  Identifier getName() const { return getFullName().getBaseIdentifier(); }
 
   /// \returns false if there was an error during the computation rendering the
   /// EnumElementDecl invalid, true otherwise.

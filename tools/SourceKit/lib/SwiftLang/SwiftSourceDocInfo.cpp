@@ -465,7 +465,8 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   // For now we use UnqualifiedLookup to fetch other declarations with the same
   // base name.
   auto TypeResolver = VD->getASTContext().getLazyResolver();
-  UnqualifiedLookup Lookup(VD->getName(), VD->getDeclContext(), TypeResolver);
+  UnqualifiedLookup Lookup(VD->getBaseName(), VD->getDeclContext(),
+                           TypeResolver);
   for (auto result : Lookup.Results) {
     ValueDecl *RelatedVD = result.getValueDecl();
     if (RelatedVD->getAttrs().isUnavailable(VD->getASTContext()))
@@ -928,7 +929,7 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
         getClangDeclarationName(Named->getASTContext(), Info));
       NameTranslatingInfo Result;
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
-      Result.BaseName = Name.getBaseName().str();
+      Result.BaseName = Name.getBaseIdentifier().str();
       Result.ArgNames.resize(Name.getArgumentNames().size());
       std::transform(Name.getArgumentNames().begin(),
                      Name.getArgumentNames().end(),

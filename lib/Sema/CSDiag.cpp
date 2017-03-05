@@ -698,7 +698,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
   // If we're trying to set an unapplied method, say that.
   if (auto *VD = dyn_cast_or_null<ValueDecl>(immInfo.second)) {
     std::string message = "'";
-    message += VD->getName().str().str();
+    message += VD->getBaseName().getIdentifier().str();
     message += "'";
     
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
@@ -735,9 +735,9 @@ static void diagnoseSubElementFailure(Expr *destExpr,
     else if (isa<DotSyntaxCallExpr>(AE) || isa<DotSyntaxBaseIgnoredExpr>(AE))
       name = "method call";
 
-    if (auto *DRE =
-          dyn_cast<DeclRefExpr>(AE->getFn()->getValueProvidingExpr()))
-      name = std::string("'") + DRE->getDecl()->getName().str().str() + "'";
+    if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getFn()->getValueProvidingExpr()))
+      name = std::string("'") +
+             DRE->getDecl()->getBaseName().getIdentifier().str().str() + "'";
 
     TC.diagnose(loc, diagID, name + " returns immutable value")
       .highlight(AE->getSourceRange());
@@ -1630,7 +1630,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
   // base uncurried by one level, and we refer to the name of the member, not to
   // the name of any base.
   if (auto UDE = dyn_cast<UnresolvedDotExpr>(fn)) {
-    declName = UDE->getName().getBaseName().str().str();
+    declName = UDE->getName().getBaseIdentifier().str();
     uncurryLevel = 1;
 
     // If we actually resolved the member to use, return it.
@@ -1936,7 +1936,7 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
                       CD->getResultInterfaceType(), decl->getFormalAccess());
      
     } else {
-      CS->TC.diagnose(loc, diag::candidate_inaccessible, decl->getName(),
+      CS->TC.diagnose(loc, diag::candidate_inaccessible, decl->getBaseName(),
                       decl->getFormalAccess());
     }
     for (auto cand : candidates) {
@@ -2369,7 +2369,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
     
       if (auto *DRE = dyn_cast<DeclRefExpr>(anchor)) {
         diagnose(anchor->getLoc(), diag::did_not_call_function,
-                 DRE->getDecl()->getName())
+                 DRE->getDecl()->getBaseName())
           .fixItInsertAfter(insertLoc, "()");
         return true;
       }
@@ -2377,7 +2377,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
       if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(anchor))
         if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
           diagnose(anchor->getLoc(), diag::did_not_call_method,
-                   DRE->getDecl()->getName())
+                   DRE->getDecl()->getBaseName())
             .fixItInsertAfter(insertLoc, "()");
           return true;
         }
@@ -2390,14 +2390,15 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
 
   // If this is a tuple, then the index needs to be valid.
   if (auto tuple = baseObjTy->getAs<TupleType>()) {
-    StringRef nameStr = memberName.getBaseName().str();
+    StringRef nameStr = memberName.getBaseIdentifier().str();
     int fieldIdx = -1;
     // Resolve a number reference into the tuple type.
     unsigned Value = 0;
     if (!nameStr.getAsInteger(10, Value) && Value < tuple->getNumElements()) {
       fieldIdx = Value;
     } else {
-      fieldIdx = tuple->getNamedElementId(memberName.getBaseName());
+      auto memberIdent = memberName.getBaseName().getIdentifier();
+      fieldIdx = tuple->getNamedElementId(memberIdent);
     }
 
     if (fieldIdx != -1)
@@ -2617,7 +2618,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
         // Fetch any declaration to check if the name is '~='
         ValueDecl *decl0 = overloadedFn->getDecls()[0];
 
-        if (decl0->getName() == decl0->getASTContext().Id_MatchOperator) {
+        if (decl0->getBaseName() == decl0->getASTContext().Id_MatchOperator) {
           assert(binaryExpr->getArg()->getElements().size() == 2);
 
           // If the rhs of '~=' is the enum type, a single dot suffixes
@@ -2663,8 +2664,8 @@ findCorrectEnumCaseName(Type Ty, LookupResult &Result,
       continue;
     if (!isa<EnumElementDecl>(correction.Decl))
       continue;
-    if (correctName.getBaseName().str().
-          equals_lower(memberName.getBaseName().str()))
+    if (correctName.getBaseIdentifier().str().equals_lower(
+            memberName.getBaseIdentifier().str()))
       candidates.push_back(correctName);
   }
   if (candidates.size() == 1)
@@ -2703,8 +2704,9 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
                                                        correctionResults,
                                                        memberName)) {
         diagnose(loc, diag::could_not_find_enum_case, instanceTy,
-          memberName, rightName).fixItReplace(nameLoc.getBaseNameLoc(),
-                                              rightName.getBaseName().str());
+                 memberName, rightName)
+          .fixItReplace(nameLoc.getBaseNameLoc(),
+                        rightName.getBaseIdentifier().str());
         return;
       }
       diagnose(loc, diag::could_not_find_type_member, instanceTy, memberName)
@@ -2839,7 +2841,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     case MemberLookupResult::UR_Inaccessible: {
       auto decl = result.UnviableCandidates[0].first;
       // FIXME: What if the unviable candidates have different levels of access?
-      diagnose(nameLoc, diag::candidate_inaccessible, decl->getName(),
+      diagnose(nameLoc, diag::candidate_inaccessible, decl->getBaseName(),
                decl->getFormalAccess());
       for (auto cand : result.UnviableCandidates)
         diagnose(cand.first, diag::decl_declared_here, memberName);
@@ -4709,7 +4711,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     return false;
 
   auto baseDecl = baseExpr->getDecl();
-  if (!baseExpr->isImplicit() || baseDecl->getName() != TC.Context.Id_self)
+  if (!baseExpr->isImplicit() || baseDecl->getFullName() != TC.Context.Id_self)
     return false;
 
   // Our base expression is an implicit 'self.' reference e.g.
@@ -4809,7 +4811,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     if (baseKind == DescriptiveDeclKind::Module)
       topLevelDiag = diag::fix_unqualified_access_top_level_multi;
 
-    auto name = baseName.getBaseName();
+    auto name = baseName.getBaseIdentifier();
     SmallString<32> namePlusDot = name.str();
     namePlusDot.push_back('.');
 
@@ -7709,9 +7711,9 @@ void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
   
   auto decl = resolved.getDecl();
   if (isa<FuncDecl>(decl)) {
-    auto name = decl->getName();
+    auto name = decl->getBaseName();
     auto diagID = name.isOperator() ? diag::note_call_to_operator
-    : diag::note_call_to_func;
+                                    : diag::note_call_to_func;
     tc.diagnose(decl, diagID, name);
     return;
   }
@@ -7723,7 +7725,7 @@ void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
   }
   
   if (isa<ParamDecl>(decl)) {
-    tc.diagnose(decl, diag::note_init_parameter, decl->getName());
+    tc.diagnose(decl, diag::note_init_parameter, decl->getBaseName());
     return;
   }
   

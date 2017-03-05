@@ -2753,8 +2753,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // Tuples don't have compound-name members.
     if (!memberName.isSimpleName())
       return result;  // No result.
-    
-    StringRef nameStr = memberName.getBaseName().str();
+
+    StringRef nameStr = memberName.getBaseIdentifier().str();
     int fieldIdx = -1;
     // Resolve a number reference into the tuple type.
     unsigned Value = 0;
@@ -2762,7 +2762,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         Value < baseTuple->getNumElements()) {
       fieldIdx = Value;
     } else {
-      fieldIdx = baseTuple->getNamedElementId(memberName.getBaseName());
+      fieldIdx = baseTuple->getNamedElementId(memberName.getBaseIdentifier());
     }
     
     if (fieldIdx == -1)

@@ -39,7 +39,7 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
   bool hasPrintedName = false;
   if (auto *named = dyn_cast<ValueDecl>(D)) {
     if (named->hasName()) {
-      out << '\'' << named->getName() << '\'';
+      out << '\'' << named->getBaseName() << '\'';
       hasPrintedName = true;
     } else if (auto *fn = dyn_cast<FuncDecl>(named)) {
       if (auto *ASD = fn->getAccessorStorageDecl()) {

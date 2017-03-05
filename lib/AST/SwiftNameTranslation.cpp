@@ -47,7 +47,7 @@ getNameForObjC(const ValueDecl *VD, CustomNamesOnly_t customNamesOnly) {
         return anonTypedef->getIdentifier()->getName();
   }
 
-  return VD->getName().str();
+  return VD->getBaseName().getIdentifier().str();
 }
 
 bool swift::objc_translation::
@@ -77,7 +77,7 @@ getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
     return {Identifier(), FD->getObjCSelector(Resolver, PreferredName)};
   } else if (auto *VAD = dyn_cast<VarDecl>(VD)) {
     if (PreferredName)
-      return {PreferredName.getBaseName(), ObjCSelector()};
+      return {PreferredName.getBaseIdentifier(), ObjCSelector()};
     return {VAD->getObjCPropertyName(), ObjCSelector()};
   } else if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
     return getObjCNameForSwiftDecl(SD->getGetter(), PreferredName);
@@ -85,7 +85,7 @@ getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
     SmallString<64> Buffer;
     {
       llvm::raw_svector_ostream OS(Buffer);
-      printSwiftEnumElemNameInObjC(EL, OS, PreferredName.getBaseName());
+      printSwiftEnumElemNameInObjC(EL, OS, PreferredName.getBaseIdentifier());
     }
     return {Ctx.getIdentifier(Buffer.str()), ObjCSelector()};
   } else {
@@ -94,7 +94,7 @@ getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
     if (!Name.empty())
       return {Ctx.getIdentifier(Name), ObjCSelector()};
     if (!PreferredName.getBaseName().empty())
-      return {PreferredName.getBaseName(), ObjCSelector()};
+      return {PreferredName.getBaseIdentifier(), ObjCSelector()};
     return {Ctx.getIdentifier(getNameForObjC(VD)), ObjCSelector()};
   }
 }

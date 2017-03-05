@@ -387,10 +387,10 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
   if (!canSynthesizeRawRepresentable(tc, parentDecl, enumDecl))
     return nullptr;
 
-  if (requirement->getName() == tc.Context.Id_rawValue)
+  if (requirement->getBaseName() == tc.Context.Id_rawValue)
     return deriveRawRepresentable_raw(tc, parentDecl, enumDecl);
-  
-  if (requirement->getName() == tc.Context.Id_init)
+
+  if (requirement->getBaseName() == tc.Context.Id_init)
     return deriveRawRepresentable_init(tc, parentDecl, enumDecl);
   
   tc.diagnose(requirement->getLoc(),

@@ -867,7 +867,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
       auto found = nominal->lookupDirect(current->getBaseName());
       otherDefinitions.append(found.begin(), found.end());
       if (tracker)
-        tracker->addUsedMember({nominal, current->getName()}, isCascading);
+        tracker->addUsedMember({nominal, current->getBaseName()}, isCascading);
     }
   } else {
     // Look within a module context.
@@ -875,7 +875,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
                                                 NLKind::QualifiedLookup,
                                                 otherDefinitions);
     if (tracker)
-      tracker->addTopLevelName(current->getName(), isCascading);
+      tracker->addTopLevelName(current->getBaseName(), isCascading);
   }
 
   // Compare this signature against the signature of other
@@ -2991,7 +2991,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     TC.diagnose(behavior->getLoc(),
                 diag::property_behavior_unknown_requirement,
                 behaviorProto->getName(),
-                requirement->getName());
+                requirement->getBaseName());
     TC.diagnose(requirement->getLoc(),
                 diag::property_behavior_unknown_requirement_here);
     conformance->setInvalid();
@@ -4470,7 +4470,7 @@ public:
   /// the corresponding operator declaration.
   void bindFuncDeclToOperator(FuncDecl *FD) {
     OperatorDecl *op = nullptr;
-    auto operatorName = FD->getFullName().getBaseName();
+    auto operatorName = FD->getFullName().getBaseIdentifier();
 
     // Check for static/final/class when we're in a type.
     auto dc = FD->getDeclContext();
@@ -6064,13 +6064,14 @@ public:
       if (FD->isAccessor()) {
         TC.diagnose(override, diag::override_accessor_less_available,
                     FD->getDescriptiveKind(),
-                    FD->getAccessorStorageDecl()->getName());
+                    FD->getAccessorStorageDecl()->getBaseName());
         TC.diagnose(base, diag::overridden_here);
         return true;
       }
     }
 
-    TC.diagnose(override, diag::override_less_available, override->getName());
+    TC.diagnose(override, diag::override_less_available,
+                override->getBaseName());
     TC.diagnose(base, diag::overridden_here);
 
     return true;
@@ -6089,7 +6090,7 @@ public:
       // Make sure that the overriding property doesn't have storage.
       if (overrideASD->hasStorage() && !overrideASD->hasObservers()) {
         TC.diagnose(overrideASD, diag::override_with_stored_property,
-                    overrideASD->getName());
+                    overrideASD->getBaseName());
         TC.diagnose(baseASD, diag::property_override_here);
         return true;
       }
@@ -6104,7 +6105,7 @@ public:
       }
       if (overrideASD->hasObservers() && !baseIsSettable) {
         TC.diagnose(overrideASD, diag::observing_readonly_property,
-                    overrideASD->getName());
+                    overrideASD->getBaseName());
         TC.diagnose(baseASD, diag::property_override_here);
         return true;
       }
@@ -6114,7 +6115,7 @@ public:
       // setter but override the getter, and that would be surprising at best.
       if (baseIsSettable && !override->isSettable(override->getDeclContext())) {
         TC.diagnose(overrideASD, diag::override_mutable_with_readonly_property,
-                    overrideASD->getName());
+                    overrideASD->getBaseName());
         TC.diagnose(baseASD, diag::property_override_here);
         return true;
       }
@@ -6125,7 +6126,7 @@ public:
       // property.
       if (isa<VarDecl>(baseASD) && cast<VarDecl>(baseASD)->isLet()) {
         TC.diagnose(overrideASD, diag::override_let_property,
-                    overrideASD->getName());
+                    overrideASD->getBaseName());
         TC.diagnose(baseASD, diag::property_override_here);
         return true;
       }

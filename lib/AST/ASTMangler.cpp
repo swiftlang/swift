@@ -377,7 +377,8 @@ static bool isInPrivateOrLocalContext(const ValueDecl *D) {
 
 void ASTMangler::appendDeclName(const ValueDecl *decl) {
   if (decl->isOperator()) {
-    appendIdentifier(translateOperator(decl->getBaseName().str()));
+    auto name = decl->getBaseName().getIdentifier().str();
+    appendIdentifier(translateOperator(name));
     switch (decl->getAttrs().getUnaryOperatorKind()) {
       case UnaryOperatorKind::Prefix:
         appendOperator("op");
@@ -390,7 +391,8 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
         break;
     }
   } else {
-    appendIdentifier(decl->getName().str());
+    // TODO: Handle special names
+    appendIdentifier(decl->getBaseName().getIdentifier().str());
   }
 
   if (decl->getDeclContext()->isLocalContext()) {
@@ -1763,7 +1765,7 @@ void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformanc
     appendIdentifier(
               fileUnit->getDiscriminatorForPrivateValue(behaviorStorage).str());
     appendProtocolName(conformance->getProtocol());
-    appendIdentifier(behaviorStorage->getName().str());
+    appendIdentifier(behaviorStorage->getBaseName().getIdentifier().str());
   } else {
     appendType(conformance->getInterfaceType()->getCanonicalType());
     appendProtocolName(conformance->getProtocol());

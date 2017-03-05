@@ -768,7 +768,7 @@ void Parser::diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New) {
   assert(New != Prev && "Cannot conflict with self");
   diagnose(New->getLoc(), diag::decl_redefinition, New->isDefinition());
   diagnose(Prev->getLoc(), diag::previous_decldef, Prev->isDefinition(),
-             Prev->getName());
+           Prev->getBaseName());
 }
 
 struct ParserUnit::Implementation {

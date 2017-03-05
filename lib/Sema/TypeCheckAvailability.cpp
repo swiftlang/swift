@@ -1951,10 +1951,10 @@ void TypeChecker::diagnoseUnavailableOverride(ValueDecl *override,
                                               const AvailableAttr *attr) {
   if (attr->Rename.empty()) {
     if (attr->Message.empty())
-      diagnose(override, diag::override_unavailable, override->getName());
+      diagnose(override, diag::override_unavailable, override->getBaseName());
     else
       diagnose(override, diag::override_unavailable_msg,
-               override->getName(), attr->Message);
+               override->getBaseName(), attr->Message);
     diagnose(base, diag::availability_marked_unavailable,
              base->getFullName());
     return;

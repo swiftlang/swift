@@ -192,19 +192,19 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
     while (iOperand < numElements) {
 
       if (auto *UDREOp = dyn_cast<UnresolvedDeclRefExpr>(elements[iOperator])) {
-        auto name = UDREOp->getName().getBaseName().str();
+        auto name = UDREOp->getName().getBaseName();
 
-        if (name.equals("||") || name.equals("&&")) {
+        if (name == "||" || name == "&&") {
           auto rhs = classifyConditionalCompilationExpr(elements[iOperand],
                                                         Context, D);
 
-          if (name.equals("||")) {
+          if (name == "||") {
             result = result || rhs;
             if (result.isConditionActive())
               break;
           }
 
-          if (name.equals("&&")) {
+          if (name == "&&") {
             result = result && rhs;
             if (!result.isConditionActive())
               break;
@@ -242,7 +242,7 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
 
   // Evaluate a named reference expression.
   if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(condition)) {
-    auto name = UDRE->getName().getBaseName().str();
+    auto name = UDRE->getName().getBaseIdentifier().str();
     return {Context.LangOpts.isCustomConditionalCompilationFlagSet(name),
       ConditionalCompilationExprKind::DeclRef};
   }
@@ -256,7 +256,7 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
   if (auto *PUE = dyn_cast<PrefixUnaryExpr>(condition)) {
     // If the PUE is not a negation expression, return false
     auto name =
-    cast<UnresolvedDeclRefExpr>(PUE->getFn())->getName().getBaseName().str();
+        cast<UnresolvedDeclRefExpr>(PUE->getFn())->getName().getBaseName();
     if (name != "!") {
       D.diagnose(PUE->getLoc(),
                  diag::unsupported_conditional_compilation_unary_expression);
@@ -277,7 +277,7 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
       return ConditionalCompilationExprState::error();
     }
 
-    auto fnName = fnNameExpr->getName().getBaseName().str();
+    auto fnName = fnNameExpr->getName().getBaseIdentifier().str();
 
     auto *PE = dyn_cast<ParenExpr>(CE->getArg());
     if (!PE) {
@@ -342,7 +342,7 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
 
       auto thisVersion = Context.LangOpts.EffectiveLanguageVersion;
 
-      if (!prefix->getName().getBaseName().str().equals(">=")) {
+      if (prefix->getName().getBaseName() != ">=") {
         D.diagnose(PUE->getFn()->getLoc(),
                    diag::unexpected_version_comparison_operator)
           .fixItReplace(PUE->getFn()->getLoc(), ">=");
@@ -356,7 +356,7 @@ Parser::classifyConditionalCompilationExpr(Expr *condition,
       if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(PE->getSubExpr())) {
         // The sub expression should be an UnresolvedDeclRefExpr (we won't
         // tolerate extra parens).
-        auto argumentIdent = UDRE->getName().getBaseName();
+        auto argumentIdent = UDRE->getName().getBaseIdentifier();
         auto argument = argumentIdent.str();
         PlatformConditionKind Kind =
           llvm::StringSwitch<PlatformConditionKind>(fnName)

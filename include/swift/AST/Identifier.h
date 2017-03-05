@@ -210,6 +210,8 @@ class DeclBaseName {
   Identifier Ident;
 
 public:
+  DeclBaseName() : DeclBaseName(Identifier()) {}
+
   DeclBaseName(Identifier I) : Ident(I) {}
 
   bool isSpecial() const { return false; }
@@ -223,17 +225,65 @@ public:
 
   bool empty() const { return !isSpecial() && getIdentifier().empty(); }
 
+  bool isOperator() const {
+    return !isSpecial() && getIdentifier().isOperator();
+  }
+
+  bool isEditorPlaceholder() const {
+    return !isSpecial() && getIdentifier().isEditorPlaceholder();
+  }
+
+  int compare(DeclBaseName other) const {
+    // TODO: Sort special names cleverly
+    return getIdentifier().compare(other.getIdentifier());
+  }
+
+  bool operator==(StringRef Str) const {
+    return !isSpecial() && getIdentifier().str() == Str;
+  }
+  bool operator!=(StringRef Str) const { return !(*this == Str); }
+
+  bool operator==(DeclBaseName RHS) const { return Ident == RHS.Ident; }
+  bool operator!=(DeclBaseName RHS) const { return !(*this == RHS); }
+
+  bool operator<(DeclBaseName RHS) const {
+    return Ident.get() < RHS.Ident.get();
+  }
+
   const void *getAsOpaquePointer() const { return Ident.get(); }
 
   static DeclBaseName getFromOpaquePointer(void *P) {
     // TODO: Check if P is a special name
     return Identifier::getFromOpaquePointer(P);
   }
+
+  static DeclBaseName getEmptyKey() { return Identifier::getEmptyKey(); }
+  static DeclBaseName getTombstoneKey() {
+    return Identifier::getTombstoneKey();
+  }
 };
 
 } // end namespace swift
 
 namespace llvm {
+
+raw_ostream &operator<<(raw_ostream &OS, swift::DeclBaseName D);
+
+// Identifiers hash just like pointers.
+template<> struct DenseMapInfo<swift::DeclBaseName> {
+  static swift::DeclBaseName getEmptyKey() {
+    return swift::DeclBaseName::getEmptyKey();
+  }
+  static swift::DeclBaseName getTombstoneKey() {
+    return swift::DeclBaseName::getTombstoneKey();
+  }
+  static unsigned getHashValue(swift::DeclBaseName Val) {
+    return DenseMapInfo<const void *>::getHashValue(Val.getAsOpaquePointer());
+  }
+  static bool isEqual(swift::DeclBaseName LHS, swift::DeclBaseName RHS) {
+    return LHS == RHS;
+  }
+};
 
 // A DeclBaseName is "pointer like".
 template <typename T> class PointerLikeTypeTraits;
@@ -325,14 +375,20 @@ public:
   /// Retrieve the 'base' name, i.e., the name that follows the introducer,
   /// such as the 'foo' in 'func foo(x:Int, y:Int)' or the 'bar' in
   /// 'var bar: Int'.
-  // TODO: Return DeclBaseName (remove two calls to getIdentifier)
-  Identifier getBaseName() const {
+  DeclBaseName getBaseName() const {
     if (auto compound = SimpleOrCompound.dyn_cast<CompoundDeclName*>())
-      return compound->BaseName.getIdentifier();
+      return compound->BaseName;
 
-    return SimpleOrCompound.get<BaseNameAndCompound>()
-        .getPointer()
-        .getIdentifier();
+    return SimpleOrCompound.get<BaseNameAndCompound>().getPointer();
+  }
+
+  /// Assert that the base name is not special and return its identifier.
+  Identifier getBaseIdentifier() const {
+    auto baseName = getBaseName();
+    assert(!baseName.isSpecial() &&
+           "Can't retrieve the identifier of a special base name");
+    // FIXME: Do we need this method?
+    return baseName.getIdentifier();
   }
 
   /// Retrieve the names of the arguments, if there are any.
@@ -342,6 +398,8 @@ public:
 
     return { };
   }
+
+  bool isSpecial() const { return getBaseName().isSpecial(); }
 
   explicit operator bool() const {
     if (SimpleOrCompound.dyn_cast<CompoundDeclName*>())
@@ -367,14 +425,22 @@ public:
   
   /// True if this name is a simple one-component name identical to the
   /// given identifier.
-  bool isSimpleName(Identifier name) const {
+  bool isSimpleName(DeclBaseName name) const {
     return isSimpleName() && getBaseName() == name;
   }
   
   /// True if this name is a simple one-component name equal to the
   /// given string.
   bool isSimpleName(StringRef name) const {
-    return isSimpleName() && getBaseName().str().equals(name);
+    if (isSimpleName()) {
+      if (!getBaseName().isSpecial()) {
+        return getBaseIdentifier().str().equals(name);
+      } else {
+        return false;
+      }
+    } else {
+      return false;
+    }
   }
   
   /// True if this name is an operator.

@@ -1482,8 +1482,10 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
     case AccessorKind::IsGetter:
       // Getter selectors can belong to families if their name begins with the
       // wrong thing.
-      if (FD->getAccessorStorageDecl()->isObjC() || c.isForeign)
-        return getSelectorFamily(FD->getAccessorStorageDecl()->getName());
+      if (FD->getAccessorStorageDecl()->isObjC() || c.isForeign) {
+        auto name = FD->getAccessorStorageDecl()->getBaseName().getIdentifier();
+        return getSelectorFamily(name);
+      }
       return SelectorFamily::None;
 
       // Other accessors are never selector family members.

@@ -476,7 +476,7 @@ void ModuleDecl::lookupObjCMethods(
 void BuiltinUnit::lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
                               NLKind lookupKind,
                               SmallVectorImpl<ValueDecl*> &result) const {
-  getCache().lookupValue(name.getBaseName(), lookupKind, *this, result);
+  getCache().lookupValue(name.getBaseIdentifier(), lookupKind, *this, result);
 }
 
 void BuiltinUnit::lookupObjCMethods(

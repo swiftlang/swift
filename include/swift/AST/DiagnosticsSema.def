@@ -567,7 +567,7 @@ ERROR(ambiguous_module_type,none,
       "ambiguous type name %0 in module %1", (Identifier, Identifier))
 ERROR(use_nonmatching_operator,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
-      (Identifier, unsigned))
+      (DeclBaseName, unsigned))
 ERROR(broken_associated_type_witness,none,
       "reference to invalid associated type %0 of type %1", (DeclName, Type))
 
@@ -652,7 +652,7 @@ ERROR(invalid_arg_count_for_operator,none,
 ERROR(operator_in_local_scope,none,
       "operator functions can only be declared at global or in type scope", ())
 ERROR(nonstatic_operator_in_type,none,
-      "operator %0 declared in type %1 must be 'static'", (Identifier, Type))
+      "operator %0 declared in type %1 must be 'static'", (DeclBaseName, Type))
 ERROR(nonfinal_operator_in_class,none,
       "operator %0 declared in non-final class %1 must be 'final'",
       (Identifier, Type))
@@ -723,10 +723,10 @@ ERROR(did_not_call_function_value,none,
       ())
 ERROR(did_not_call_function,none,
       "function %0 was used as a property; add () to call it",
-      (Identifier))
+      (DeclBaseName))
 ERROR(did_not_call_method,none,
       "method %0 was used as a property; add () to call it",
-      (Identifier))
+      (DeclBaseName))
 
 ERROR(init_not_instance_member,none,
       "'init' is a member of the type; use 'type(of: ...)' to initialize "
@@ -782,13 +782,13 @@ ERROR(optional_chain_isnt_chaining,none,
 ERROR(pattern_in_expr,none,
       "%0 cannot appear in an expression", (PatternKind))
 NOTE(note_call_to_operator,none,
-     "in call to operator %0", (Identifier))
+     "in call to operator %0", (DeclBaseName))
 NOTE(note_call_to_func,none,
-     "in call to function %0", (Identifier))
+     "in call to function %0", (DeclBaseName))
 NOTE(note_call_to_initializer,none,
      "in call to initializer", ())
 NOTE(note_init_parameter,none,
-     "in initialization of parameter %0", (Identifier))
+     "in initialization of parameter %0", (DeclBaseName))
 
 
 ERROR(missing_nullary_call,none,
@@ -1520,10 +1520,10 @@ NOTE(optional_req_near_match_accessibility,none,
 // Protocols and existentials
 ERROR(assoc_type_outside_of_protocol,none,
       "associated type %0 can only be used with a concrete type or "
-      "generic parameter base", (Identifier))
+      "generic parameter base", (DeclBaseName))
 ERROR(typealias_outside_of_protocol,none,
       "typealias %0 can only be used with a concrete type or "
-      "generic parameter base", (Identifier))
+      "generic parameter base", (DeclBaseName))
 
 ERROR(circular_protocol_def,none,
       "circular protocol inheritance %0", (StringRef))
@@ -1571,7 +1571,7 @@ ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
 ERROR(protocol_typealias_conflict, none,
       "typealias %0 requires types %1 and %2 to be the same",
-      (Identifier, Type, Type))
+      (DeclBaseName, Type, Type))
 WARNING(redundant_same_type_to_concrete,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
 NOTE(same_type_redundancy_here,none,
@@ -1639,22 +1639,22 @@ NOTE(multiple_override_prev,none,
      "%0 previously overridden here", (DeclName))
 
 ERROR(override_unavailable,none,
-      "cannot override %0 which has been marked unavailable", (Identifier))
+      "cannot override %0 which has been marked unavailable", (DeclBaseName))
 ERROR(override_unavailable_msg, none,
       "cannot override %0 which has been marked unavailable: %1",
-      (Identifier, StringRef))
+      (DeclBaseName, StringRef))
 
 ERROR(override_less_available,none,
       "overriding %0 must be as available as declaration it overrides",
-      (Identifier))
+      (DeclBaseName))
 
 ERROR(override_accessor_less_available,none,
       "overriding %0 for %1 must be as available as declaration it overrides",
-      (DescriptiveDeclKind, Identifier))
+      (DescriptiveDeclKind, DeclBaseName))
 
 ERROR(override_let_property,none,
       "cannot override immutable 'let' property %0 with the getter of a 'var'",
-      (Identifier))
+      (DeclBaseName))
 
 
 ERROR(override_not_accessible,none,
@@ -1699,12 +1699,12 @@ ERROR(override_property_type_mismatch,none,
       "property %0 with type %1 cannot override a property with type %2",
       (Identifier, Type, Type))
 ERROR(override_with_stored_property,none,
-      "cannot override with a stored property %0", (Identifier))
+      "cannot override with a stored property %0", (DeclBaseName))
 ERROR(observing_readonly_property,none,
-      "cannot observe read-only property %0; it can't change", (Identifier))
+      "cannot observe read-only property %0; it can't change", (DeclBaseName))
 ERROR(override_mutable_with_readonly_property,none,
       "cannot override mutable property with read-only property %0",
-      (Identifier))
+      (DeclBaseName))
 ERROR(override_argument_name_mismatch,none,
       "argument names for %select{method|initializer}0 %1 do not match those "
       "of overridden %select{method|initializer}0 %2",
@@ -1921,7 +1921,7 @@ ERROR(property_behavior_protocol_no_initStorage,none,
       (Type, Type))
 ERROR(property_behavior_unknown_requirement,none,
       "property behavior protocol %0 has non-behavior requirement %1",
-      (Identifier, Identifier))
+      (Identifier, DeclBaseName))
 NOTE(property_behavior_unknown_requirement_here,none,
      "declared here", ())
 NOTE(self_conformance_required_by_property_behavior,none,
@@ -2367,21 +2367,21 @@ ERROR(self_assignment_prop,none,
       "assigning a property to itself", ())
 ERROR(property_use_in_closure_without_explicit_self,none,
       "reference to property %0 in closure requires explicit 'self.' to make"
-      " capture semantics explicit", (Identifier))
+      " capture semantics explicit", (DeclBaseName))
 ERROR(method_call_in_closure_without_explicit_self,none,
       "call to method %0 in closure requires explicit 'self.' to make"
-      " capture semantics explicit", (Identifier))
+      " capture semantics explicit", (DeclBaseName))
 ERROR(implicit_use_of_self_in_closure,none,
       "implicit use of 'self' in closure; use 'self.' to make"
       " capture semantics explicit", ())
 ERROR(capture_before_declaration,none,
-      "cannot capture %0 before it is declared", (Identifier))
+      "cannot capture %0 before it is declared", (DeclBaseName))
 ERROR(transitive_capture_before_declaration,none,
       "cannot capture %0, which would use %1 before it is declared",
-      (Identifier, Identifier))
+      (DeclBaseName, DeclBaseName))
 NOTE(transitive_capture_through_here,none,
      "%0, declared here, captures %1",
-     (Identifier, Identifier))
+     (DeclBaseName, DeclBaseName))
 
 ERROR(closure_implicit_capture_without_noescape,none,
       "escaping closures can only capture inout parameters explicitly by value",
@@ -2424,18 +2424,18 @@ NOTE(add_self_to_type,none,
 
 WARNING(warn_unqualified_access,none,
         "use of %0 treated as a reference to %1 in %2 %3",
-        (Identifier, DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
+        (DeclBaseName, DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
 NOTE(fix_unqualified_access_member,none,
      "use 'self.' to silence this warning", ())
 NOTE(fix_unqualified_access_top_level,none,
      "use '%0' to reference the %1",
-     (StringRef, DescriptiveDeclKind, Identifier))
+     (StringRef, DescriptiveDeclKind, DeclBaseName))
 NOTE(fix_unqualified_access_top_level_multi,none,
      "use '%0' to reference the %1 in module %2",
-     (StringRef, DescriptiveDeclKind, Identifier))
+     (StringRef, DescriptiveDeclKind, DeclBaseName))
 
 ERROR(unsupported_special_decl_ref, none,
-      "referencing %0 as a function value is not implemented", (Identifier))
+      "referencing %0 as a function value is not implemented", (DeclBaseName))
 
 WARNING(bitcasting_away_noescape, none,
         "'unsafeBitCast' from non-escaping function type %0 to escaping "
@@ -2518,20 +2518,20 @@ NOTE(silence_optional_in_interpolation_segment_call,none,
 
 ERROR(invalid_noescape_use,none,
       "non-escaping %select{value|parameter}1 %0 may only be called",
-      (Identifier, bool))
+      (DeclBaseName, bool))
 NOTE(noescape_autoclosure,none,
     "parameter %0 is implicitly non-escaping because it was declared @autoclosure",
-     (Identifier))
+     (DeclBaseName))
 NOTE(noescape_parameter,none,
     "parameter %0 is implicitly non-escaping",
-     (Identifier))
+     (DeclBaseName))
 
 ERROR(closure_noescape_use,none,
       "closure use of non-escaping parameter %0 may allow it to escape",
-      (Identifier))
+      (DeclBaseName))
 ERROR(decl_closure_noescape_use,none,
       "declaration closing over non-escaping parameter %0 may allow it to escape",
-      (Identifier))
+      (DeclBaseName))
 ERROR(passing_noescape_to_escaping,none,
       "passing non-escaping parameter %0 to function expecting an @escaping closure",
       (Identifier))
@@ -2544,7 +2544,7 @@ ERROR(general_noescape_to_escaping,none,
 
 ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",
-      (DescriptiveDeclKind, Identifier))
+      (DescriptiveDeclKind, DeclBaseName))
 
 //------------------------------------------------------------------------------
 // Type Check Statements
@@ -3323,12 +3323,12 @@ ERROR(fixed_layout_attr_on_internal_type,
       none, "'@_fixed_layout' attribute can only be applied to '@_versioned' "
       "or public declarations, but %0 is "
       "%select{private|fileprivate|internal|%error|%error}1",
-      (Identifier, Accessibility))
+      (DeclBaseName, Accessibility))
 
 ERROR(versioned_attr_with_explicit_accessibility,
       none, "'@_versioned' attribute can only be applied to internal "
       "declarations, but %0 is %select{private|fileprivate|%error|public|open}1",
-      (Identifier, Accessibility))
+      (DeclBaseName, Accessibility))
 
 ERROR(versioned_attr_in_protocol,none,
       "'@_versioned' attribute cannot be used in protocols", ())
@@ -3373,7 +3373,7 @@ ERROR(inlineable_stored_property,
 ERROR(inlineable_decl_not_public,
       none, "'@_inlineable' attribute can only be applied to public declarations, "
       "but %0 is %select{private|fileprivate|internal|%error|%error}1",
-      (Identifier, Accessibility))
+      (DeclBaseName, Accessibility))
 
 //------------------------------------------------------------------------------
 // @_specialize diagnostics

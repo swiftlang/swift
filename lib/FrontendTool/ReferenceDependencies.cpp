@@ -129,8 +129,9 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
     return true;
   }
 
-  auto escape = [](Identifier name) -> std::string {
-    return llvm::yaml::escape(name.str());
+  auto escape = [](DeclBaseName name) -> std::string {
+    // TODO: Handle special names
+    return llvm::yaml::escape(name.getIdentifier().str());
   };
 
   out << "### Swift dependencies file v0 ###\n";
@@ -214,7 +215,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
           VD->getFormalAccess() <= Accessibility::FilePrivate) {
         break;
       }
-      out << "- \"" << escape(VD->getName()) << "\"\n";
+      out << "- \"" << escape(VD->getBaseName()) << "\"\n";
       break;
     }
 
@@ -268,7 +269,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
         continue;
       }
       out << "- [\"" << mangledName << "\", \""
-          << escape(VD->getName()) << "\"]\n";
+          << escape(VD->getBaseName()) << "\"]\n";
     }
   }
 
@@ -279,14 +280,15 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
     out << "provides-dynamic-lookup:\n";
     class NameCollector : public VisibleDeclConsumer {
     private:
-      SmallVector<Identifier, 16> names;
+      SmallVector<DeclBaseName, 16> names;
     public:
       void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-        names.push_back(VD->getName());
+        names.push_back(VD->getBaseName());
       }
-      ArrayRef<Identifier> getNames() {
+      ArrayRef<DeclBaseName> getNames() {
         llvm::array_pod_sort(names.begin(), names.end(),
-                             [](const Identifier *lhs, const Identifier *rhs) {
+                             [](const DeclBaseName *lhs,
+                                const DeclBaseName *rhs) {
           return lhs->compare(*rhs);
         });
         names.erase(std::unique(names.begin(), names.end()), names.end());
@@ -295,27 +297,27 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
     };
     NameCollector collector;
     SF->lookupClassMembers({}, collector);
-    for (Identifier name : collector.getNames()) {
+    for (DeclBaseName name : collector.getNames()) {
       out << "- \"" << escape(name) << "\"\n";
     }
   }
 
   ReferencedNameTracker *tracker = SF->getReferencedNameTracker();
 
-  auto sortedByIdentifier =
-      [](const llvm::DenseMap<Identifier, bool> map) ->
-        SmallVector<std::pair<Identifier, bool>, 16> {
-    SmallVector<std::pair<Identifier, bool>, 16> pairs{map.begin(), map.end()};
+  auto sortedByName =
+      [](const llvm::DenseMap<DeclBaseName, bool> map) ->
+        SmallVector<std::pair<DeclBaseName, bool>, 16> {
+    SmallVector<std::pair<DeclBaseName,bool>, 16> pairs{map.begin(), map.end()};
     llvm::array_pod_sort(pairs.begin(), pairs.end(),
-                         [](const std::pair<Identifier, bool> *first,
-                            const std::pair<Identifier, bool> *second) -> int {
+                         [](const std::pair<DeclBaseName, bool> *first,
+                            const std::pair<DeclBaseName, bool> *second) -> int{
       return first->first.compare(second->first);
     });
     return pairs;
   };
 
   out << "depends-top-level:\n";
-  for (auto &entry : sortedByIdentifier(tracker->getTopLevelNames())) {
+  for (auto &entry : sortedByName(tracker->getTopLevelNames())) {
     assert(!entry.first.empty());
     out << "- ";
     if (!entry.second)
@@ -382,7 +384,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
   }
 
   out << "depends-dynamic-lookup:\n";
-  for (auto &entry : sortedByIdentifier(tracker->getDynamicLookupNames())) {
+  for (auto &entry : sortedByName(tracker->getDynamicLookupNames())) {
     assert(!entry.first.empty());
     out << "- ";
     if (!entry.second)

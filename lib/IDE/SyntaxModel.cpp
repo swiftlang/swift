@@ -1038,8 +1038,9 @@ public:
         return { true, E };
       if (DRE->getRefKind() != DeclRefKind::Ordinary)
         return { true, E };
+      // TODO: Can the DRE be backed by a special name?
       if (!Fn(CharSourceRange(DRE->getSourceRange().Start,
-                              DRE->getName().getBaseName().getLength())))
+                              DRE->getName().getBaseIdentifier().getLength())))
         return { false, nullptr };
     }
     return { true, E };

@@ -2005,7 +2005,7 @@ ObjCKeyPathExpr::ObjCKeyPathExpr(SourceLoc keywordLoc, SourceLoc lParenLoc,
 
 Identifier ObjCKeyPathExpr::getComponentName(unsigned i) const {
   if (auto decl = getComponentDecl(i))
-    return decl->getFullName().getBaseName();
+    return decl->getFullName().getBaseIdentifier();
 
   return getComponents()[i].get<Identifier>();
 }

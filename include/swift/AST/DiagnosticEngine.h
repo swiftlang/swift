@@ -119,10 +119,12 @@ namespace swift {
       : Kind(DiagnosticArgumentKind::Unsigned), UnsignedVal(I) {
     }
 
-    DiagnosticArgument(DeclName I)
-      : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(I) {
-    }
-    
+    DiagnosticArgument(DeclName D)
+        : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(D) {}
+
+    DiagnosticArgument(DeclBaseName D)
+        : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(D) {}
+
     DiagnosticArgument(Identifier I)
       : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(I) {
     }

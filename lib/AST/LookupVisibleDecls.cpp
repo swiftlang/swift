@@ -278,7 +278,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
     LookupState LS;
     const DeclContext *CurrDC;
     LazyResolver *TypeResolver;
-    llvm::DenseSet<std::pair<Identifier, CanType>> FunctionsReported;
+    llvm::DenseSet<std::pair<DeclBaseName, CanType>> FunctionsReported;
     llvm::DenseSet<CanType> SubscriptsReported;
     llvm::DenseSet<std::pair<Identifier, CanType>> PropertiesReported;
 
@@ -349,7 +349,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
                         ->getResult()
                         ->getCanonicalType();
 
-        auto Signature = std::make_pair(D->getName(), T);
+        auto Signature = std::make_pair(D->getBaseName(), T);
         if (!FunctionsReported.insert(Signature).second)
           return;
         break;
@@ -666,7 +666,7 @@ static bool relaxedConflicting(const OverloadSignature &sig1,
 class OverrideFilteringConsumer : public VisibleDeclConsumer {
 public:
   std::set<ValueDecl *> AllFoundDecls;
-  std::map<Identifier, std::set<ValueDecl *>> FoundDecls;
+  std::map<DeclBaseName, std::set<ValueDecl *>> FoundDecls;
   llvm::SetVector<FoundDeclTy> DeclsToReport;
   Type BaseTy;
   const DeclContext *DC;
@@ -695,11 +695,11 @@ public:
     }
 
     if (VD->isInvalid()) {
-      FoundDecls[VD->getName()].insert(VD);
+      FoundDecls[VD->getBaseName()].insert(VD);
       DeclsToReport.insert(FoundDeclTy(VD, Reason));
       return;
     }
-    auto &PossiblyConflicting = FoundDecls[VD->getName()];
+    auto &PossiblyConflicting = FoundDecls[VD->getBaseName()];
 
     // Check all overridden decls.
     {

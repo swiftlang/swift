@@ -1185,7 +1185,7 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
           }
           builder.Diags.diagnose(member->getLoc(),
                                  diag::protocol_typealias_conflict,
-                                 member->getName(), first, second);
+                                 member->getBaseName(), first, second);
         };
 
         // FIXME (recursive decl validation): if the alias doesn't have an

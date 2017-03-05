@@ -159,7 +159,7 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     // Get the declared type.
     if (auto *td = dyn_cast<TypeDecl>(dre->getDecl())) {
       components.push_back(
-        new (C) SimpleIdentTypeRepr(dre->getLoc(), dre->getDecl()->getName()));
+        new (C) SimpleIdentTypeRepr(dre->getLoc(), td->getName()));
       components.back()->setValue(td);
       return true;
     }
@@ -171,7 +171,7 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     // Track the AST location of the component.
     components.push_back(
       new (C) SimpleIdentTypeRepr(udre->getLoc(),
-                                  udre->getName().getBaseName()));
+                                  udre->getName().getBaseIdentifier()));
     return true;
   }
   
@@ -183,7 +183,8 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
 
     // Track the AST location of the new component.
     components.push_back(
-      new (C) SimpleIdentTypeRepr(ude->getLoc(), ude->getName().getBaseName()));
+      new (C) SimpleIdentTypeRepr(ude->getLoc(),
+                                  ude->getName().getBaseIdentifier()));
     return true;
   }
   
@@ -404,7 +405,7 @@ public:
     return new (TC.Context) EnumElementPattern(
                               ume->getDotLoc(),
                               ume->getNameLoc().getBaseNameLoc(),
-                              ume->getName().getBaseName(),
+                              ume->getName().getBaseIdentifier(),
                               subPattern,
                               ume);
   }
@@ -431,7 +432,7 @@ public:
 
     // FIXME: Argument labels?
     EnumElementDecl *referencedElement
-      = lookupEnumMemberElement(TC, DC, ty, ude->getName().getBaseName(),
+      = lookupEnumMemberElement(TC, DC, ty, ude->getName().getBaseIdentifier(),
                                 ude->getLoc());
     if (!referencedElement)
       return nullptr;
@@ -444,7 +445,8 @@ public:
                                                ude->getDotLoc(),
                                                ude->getNameLoc()
                                                  .getBaseNameLoc(),
-                                               ude->getName().getBaseName(),
+                                               ude->getName()
+                                                 .getBaseIdentifier(),
                                                referencedElement,
                                                nullptr);
   }
@@ -472,7 +474,7 @@ public:
     // Try looking up an enum element in context.
     if (EnumElementDecl *referencedElement
         = lookupUnqualifiedEnumMemberElement(TC, DC,
-                                             ude->getName().getBaseName(),
+                                             ude->getName().getBaseIdentifier(),
                                              ude->getLoc())) {
       auto *enumDecl = referencedElement->getParentEnum();
       auto enumTy = enumDecl->getDeclaredTypeInContext();
@@ -480,7 +482,8 @@ public:
       
       return new (TC.Context) EnumElementPattern(loc, SourceLoc(),
                                                  ude->getLoc(),
-                                                 ude->getName().getBaseName(),
+                                                 ude->getName()
+                                                   .getBaseIdentifier(),
                                                  referencedElement,
                                                  nullptr);
     }

@@ -376,7 +376,7 @@ void ClangImporter::Implementation::printSwiftName(ImportedName name,
     printFullContextPrefix(name, os, *this);
 
   // Base name.
-  os << name.getDeclName().getBaseName().str();
+  os << name.getDeclName().getBaseName();
 
   // Determine the number of argument labels we'll be producing.
   auto argumentNames = name.getDeclName().getArgumentNames();

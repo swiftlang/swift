@@ -33,7 +33,7 @@ namespace {
 
   using CanTypeSet = llvm::SmallSet<CanType, 4, SortCanType>;
   using NamedCanTypeSet =
-    llvm::DenseMap<Identifier, std::pair<ResolutionKind, CanTypeSet>>;
+    llvm::DenseMap<DeclBaseName, std::pair<ResolutionKind, CanTypeSet>>;
   static_assert(ResolutionKind() == ResolutionKind::Overloadable,
                 "Entries in NamedCanTypeSet should be overloadable initially");
 } // end anonymous namespace
@@ -55,7 +55,7 @@ static bool isValidOverload(CanTypeSet &overloads, const ValueDecl *VD) {
 }
 
 static bool isValidOverload(NamedCanTypeSet &overloads, const ValueDecl *VD) {
-  auto &entry = overloads[VD->getName()];
+  auto &entry = overloads[VD->getBaseName()];
   if (entry.first != ResolutionKind::Overloadable)
     return false;
   return isValidOverload(entry.second, VD);
@@ -82,7 +82,7 @@ static bool updateOverloadSet(CanTypeSet &overloads,
 static bool updateOverloadSet(NamedCanTypeSet &overloads,
                               ArrayRef<ValueDecl *> decls) {
   for (auto result : decls) {
-    auto &entry = overloads[result->getName()];
+    auto &entry = overloads[result->getBaseName()];
     if (!isOverloadable(result))
       entry.first = ResolutionKind::Exact;
     else if (!result->hasInterfaceType())

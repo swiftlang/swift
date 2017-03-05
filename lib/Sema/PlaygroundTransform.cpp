@@ -326,7 +326,7 @@ public:
     ValueDecl *VD = nullptr;
     std::tie(RE, VD) = digForVariable(E);
     if (VD) {
-      return VD->getName().str();
+      return VD->getBaseName().getIdentifier().str();
     } else {
       return std::string("");
     }
@@ -634,7 +634,8 @@ public:
           new (Context) MemberRefExpr(B, SourceLoc(), M, DeclNameLoc(),
                                       true, // implicit
                                       AccessSemantics::Ordinary),
-          MRE->getSourceRange(), M.getDecl()->getName().str().str().c_str());
+          MRE->getSourceRange(),
+          M.getDecl()->getBaseName().getIdentifier().str().str().c_str());
     } else {
       return nullptr;
     }

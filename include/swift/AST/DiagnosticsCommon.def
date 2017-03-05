@@ -50,7 +50,7 @@ ERROR(error_no_group_info,none,
 
 NOTE(previous_decldef,none,
      "previous %select{declaration|definition}0 of %1 is here",
-     (bool, Identifier))
+     (bool, DeclBaseName))
 
 NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())

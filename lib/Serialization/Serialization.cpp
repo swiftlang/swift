@@ -74,7 +74,7 @@ namespace {
   /// Used to serialize the on-disk decl hash table.
   class DeclTableInfo {
   public:
-    using key_type = Identifier;
+    using key_type = DeclBaseName;
     using key_type_ref = key_type;
     using data_type = Serializer::DeclTableData;
     using data_type_ref = const data_type &;
@@ -83,13 +83,15 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      return llvm::HashString(key.str());
+      // TODO: Handle special names
+      return llvm::HashString(key.getIdentifier().str());
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
                                                     key_type_ref key,
                                                     data_type_ref data) {
-      uint32_t keyLength = key.str().size();
+      // TODO: Handle special names
+      uint32_t keyLength = key.getIdentifier().str().size();
       uint32_t dataLength = (sizeof(uint32_t) + 1) * data.size();
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
@@ -98,7 +100,8 @@ namespace {
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-      out << key.str();
+      // TODO: Handle special names
+      out << key.getIdentifier().str();
     }
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
@@ -1554,7 +1557,7 @@ void Serializer::writeMembers(DeclRange members, bool isClass) {
     if (isClass) {
       if (auto VD = dyn_cast<ValueDecl>(member)) {
         if (VD->canBeAccessedByDynamicLookup()) {
-          auto &list = ClassMembersByName[VD->getName()];
+          auto &list = ClassMembersByName[VD->getBaseName()];
           list.push_back({getKindForTable(VD), memberID});
         }
       }
@@ -1687,9 +1690,11 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
 
     abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
     bool isProtocolExt = SD->getDeclContext()->getAsProtocolExtensionContext();
+    // FIXME: Subscripts won't have an identifier
+    auto iid = addIdentifierRef(SD->getBaseName().getIdentifier());
     XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addTypeRef(ty),
-                                         addIdentifierRef(SD->getName()),
+                                         iid,
                                          isProtocolExt,
                                          SD->isStatic());
     break;
@@ -1701,7 +1706,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
         writeCrossReference(storage->getDeclContext(), pathLen + 2);
 
         Type ty = storage->getInterfaceType()->getCanonicalType();
-        auto nameID = addIdentifierRef(storage->getName());
+        auto nameID = addIdentifierRef(storage->getBaseName().getIdentifier());
         bool isProtocolExt = fn->getDeclContext()->getAsProtocolExtensionContext();
         abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
         XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -1819,9 +1824,11 @@ void Serializer::writeCrossReference(const Decl *D) {
   auto val = cast<ValueDecl>(D);
   auto ty = val->getInterfaceType()->getCanonicalType();
   abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
+  // FIXME: Might this be a special name?
+  auto iid = addIdentifierRef(val->getBaseName().getIdentifier());
   XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                        addTypeRef(ty),
-                                       addIdentifierRef(val->getName()),
+                                       iid,
                                        isProtocolExt,
                                        val->isStatic());
 }
@@ -2786,7 +2793,8 @@ void Serializer::writeDecl(const Decl *D) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[FuncLayout::Code];
     SmallVector<IdentifierID, 4> nameComponents;
-    nameComponents.push_back(addIdentifierRef(fn->getFullName().getBaseName()));
+    auto iid = addIdentifierRef(fn->getBaseName().getIdentifier());
+    nameComponents.push_back(iid);
     for (auto argName : fn->getFullName().getArgumentNames())
       nameComponents.push_back(addIdentifierRef(argName));
 
@@ -4211,7 +4219,8 @@ static void collectInterestingNestedDeclarations(
         // Add operator methods.
         // Note that we don't have to add operators that are already in the
         // top-level list.
-        operatorMethodDecls[memberValue->getName()].push_back({
+        auto iid = memberValue->getBaseName().getIdentifier();
+        operatorMethodDecls[iid].push_back({
           /*ignored*/0,
           S.addDeclRef(memberValue)
         });
@@ -4291,7 +4300,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
       if (auto VD = dyn_cast<ValueDecl>(D)) {
         if (!VD->hasName())
           continue;
-        topLevelDecls[VD->getName()]
+        topLevelDecls[VD->getBaseName()]
           .push_back({ getKindForTable(D), addDeclRef(D) });
       } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         Type extendedTy = ED->getExtendedType();

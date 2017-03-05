@@ -71,7 +71,7 @@ ERROR(could_not_find_pointer_pointee_property,none,
 
 ERROR(writeback_overlap_property,none,
       "inout writeback to computed property %0 occurs in multiple arguments to"
-      " call, introducing invalid aliasing", (Identifier))
+      " call, introducing invalid aliasing", (DeclBaseName))
 ERROR(writeback_overlap_subscript,none,
       "inout writeback through subscript occurs in multiple arguments to call,"
       " introducing invalid aliasing",
@@ -120,7 +120,7 @@ ERROR(self_use_before_fully_init,none,
       "use of 'self' in %select{method call|property access}1 %0 before "
       "%select{all stored properties are initialized|"
       "super.init initializes self|"
-      "self.init initializes self}2", (Identifier, bool, unsigned))
+      "self.init initializes self}2", (DeclBaseName, bool, unsigned))
 ERROR(use_of_self_before_fully_init,none,
       "'self' used before all stored properties are initialized", ())
 ERROR(use_of_self_before_fully_init_protocol,none,
@@ -166,7 +166,7 @@ NOTE(initial_value_provided_in_let_decl,none,
 ERROR(mutating_method_called_on_immutable_value,none,
       "mutating %select{method|property access|subscript|operator}1 %0 may not"
       " be used on immutable value '%2'",
-      (Identifier, unsigned, StringRef))
+      (DeclBaseName, unsigned, StringRef))
 ERROR(immutable_value_passed_inout,none,
       "immutable value '%0' may not be passed inout",
       (StringRef))

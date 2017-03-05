@@ -968,8 +968,8 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
 
     // FIXME: Lousy hack for ?? to prefer the catamorphism (flattening)
     // over the mplus (non-flattening) overload if all else is equal.
-    if (decl1->getName().str() == "??") {
-      assert(decl2->getName().str() == "??");
+    if (decl1->getBaseName() == "??") {
+      assert(decl2->getBaseName() == "??");
 
       auto check = [](const ValueDecl *VD) -> bool {
         if (!VD->getModuleContext()->isStdlibModule())

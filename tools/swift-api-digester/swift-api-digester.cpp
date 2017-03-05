@@ -1024,7 +1024,8 @@ static StringRef getPrintedName(SDKContext &Ctx, ValueDecl *VD) {
   if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
     auto DM = FD->getFullName();
 
-    Result.append(DM.getBaseName().empty() ? "_" : DM.getBaseName().str());
+    // TODO: Handle special names
+    Result.append(DM.getBaseName().empty() ? "_" :DM.getBaseIdentifier().str());
     Result.append("(");
     for (auto Arg : DM.getArgumentNames()) {
       Result.append(Arg.empty() ? "_" : Arg.str());
@@ -1034,7 +1035,8 @@ static StringRef getPrintedName(SDKContext &Ctx, ValueDecl *VD) {
     return Ctx.buffer(Result.str());
   }
   auto DM = VD->getFullName();
-  Result.append(DM.getBaseName().str());
+  // TODO: Handle special names
+  Result.append(DM.getBaseIdentifier().str());
   return Ctx.buffer(Result.str());
 }
 
@@ -1073,8 +1075,9 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty) :
     TypeAttrs.push_back(TypeAttrKind::TAK_noescape);
 }
 
+// TODO: Handle special names
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
-    Name(VD->hasName() ? VD->getName().str() : Ctx.buffer("_")),
+    Name(VD->hasName() ? VD->getBaseName().getIdentifier().str() : Ctx.buffer("_")),
     PrintedName(getPrintedName(Ctx, VD)), DKind(VD->getKind()),
     USR(calculateUsr(Ctx, VD)), Location(calculateLocation(Ctx, VD)),
     ModuleName(VD->getModuleContext()->getName().str()),
@@ -1184,7 +1187,7 @@ static bool shouldIgnore(Decl *D) {
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     if (VD->isOperator())
       return true;
-    if (VD->getName().empty())
+    if (VD->getBaseName().empty())
       return true;
     switch (VD->getFormalAccess()) {
     case Accessibility::Internal:

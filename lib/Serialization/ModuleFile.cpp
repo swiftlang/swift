@@ -299,13 +299,14 @@ namespace {
 class ModuleFile::DeclTableInfo {
 public:
   using internal_key_type = StringRef;
-  using external_key_type = Identifier;
+  using external_key_type = DeclBaseName;
   using data_type = SmallVector<std::pair<uint8_t, DeclID>, 8>;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
   internal_key_type GetInternalKey(external_key_type ID) {
-    return ID.str();
+    // TODO: Handle special names
+    return ID.getIdentifier().str();
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
@@ -323,6 +324,7 @@ public:
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    // TODO: Handle special names
     return StringRef(reinterpret_cast<const char *>(data), length);
   }
 

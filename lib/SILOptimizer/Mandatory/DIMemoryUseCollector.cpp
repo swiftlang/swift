@@ -251,11 +251,12 @@ ValueDecl *DIMemoryObjectInfo::
 getPathStringToElement(unsigned Element, std::string &Result) const {
   auto &Module = MemoryInst->getModule();
 
+  // TODO: Do we need to handle special names here?
   if (isAnyInitSelf())
     Result = "self";
   else if (ValueDecl *VD =
         dyn_cast_or_null<ValueDecl>(getLoc().getAsASTNode<Decl>()))
-    Result = VD->getName().str();
+    Result = VD->getBaseName().getIdentifier().str();
   else
     Result = "<unknown>";
 
@@ -1100,7 +1101,7 @@ static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
     if (auto *DTB = dyn_cast<DerivedToBaseExpr>(LocExpr->getArg()))
       if (auto *DRE = dyn_cast<DeclRefExpr>(DTB->getSubExpr()))
         if (DRE->getDecl()->isImplicit() &&
-            DRE->getDecl()->getName().str() == "self")
+            DRE->getDecl()->getBaseName() == "self")
           return User;
   }
 

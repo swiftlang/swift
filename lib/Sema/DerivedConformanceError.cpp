@@ -103,7 +103,7 @@ ValueDecl *DerivedConformance::deriveBridgedNSError(TypeChecker &tc,
 
   auto enumType = cast<EnumDecl>(type);
 
-  if (requirement->getName() == tc.Context.Id_nsErrorDomain)
+  if (requirement->getBaseName() == tc.Context.Id_nsErrorDomain)
     return deriveBridgedNSError_enum_nsErrorDomain(tc, parentDecl, enumType);
 
   tc.diagnose(requirement->getLoc(),

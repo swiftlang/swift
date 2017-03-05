@@ -154,6 +154,8 @@ private:
   void mangleProtocolList(ArrayRef<Type> protocols);
   void mangleIdentifier(Identifier ident,
                         OperatorFixity fixity = OperatorFixity::NotOperator);
+  void mangleIdentifier(DeclBaseName ident,
+                        OperatorFixity fixity = OperatorFixity::NotOperator);
 
   void mangleClosureComponents(Type Ty, unsigned discriminator, bool isImplicit,
                                const DeclContext *parentContext,

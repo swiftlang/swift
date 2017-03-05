@@ -778,7 +778,8 @@ public:
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                           SemaReferenceKind Kind) override {
-    if (isa<VarDecl>(D) && D->hasName() && D->getName().str() == "self")
+    if (isa<VarDecl>(D) && D->hasName() &&
+        D->getFullName() == D->getASTContext().Id_self)
       return true;
 
     // Do not annotate references to unavailable decls.

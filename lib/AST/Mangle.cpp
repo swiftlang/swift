@@ -103,6 +103,14 @@ void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
   return mangleIdentifier(str, fixity, ident.isOperator());
 }
 
+/// Mangle an identifier into the buffer.
+void Mangler::mangleIdentifier(DeclBaseName ident, OperatorFixity fixity) {
+  // TODO: Handle special names
+  StringRef str = ident.getIdentifier().str();
+  assert(!str.empty() && "mangling an empty identifier!");
+  return mangleIdentifier(str, fixity, ident.isOperator());
+}
+
 bool Mangler::tryMangleSubstitution(const void *ptr) {
   auto ir = Substitutions.find(ptr);
   if (ir == Substitutions.end()) return false;
@@ -433,7 +441,7 @@ void Mangler::mangleDeclName(const ValueDecl *decl) {
   }
 
   // decl-name ::= identifier
-  mangleIdentifier(decl->getName(), getDeclFixity(decl));
+  mangleIdentifier(decl->getBaseName(), getDeclFixity(decl));
 }
 
 void Mangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
@@ -1724,7 +1732,7 @@ void Mangler::mangleProtocolConformance(const ProtocolConformance *conformance){
     mangleIdentifier(
                     fileUnit->getDiscriminatorForPrivateValue(behaviorStorage));
     mangleContextOf(behaviorStorage);
-    mangleIdentifier(behaviorStorage->getName());
+    mangleIdentifier(behaviorStorage->getBaseName());
     mangleProtocolName(conformance->getProtocol());
     return;
   }

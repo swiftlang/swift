@@ -407,8 +407,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       bool walkToTypeReprPre(TypeRepr *T) override {
         if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
           if (auto decl = ident->getBoundDecl()) {
-            if (isa<GenericTypeParamDecl>(decl))
-              ident->overwriteIdentifier(decl->getName());
+            if (auto genericParam = dyn_cast<GenericTypeParamDecl>(decl))
+              ident->overwriteIdentifier(genericParam->getName());
           }
         }
         return true;

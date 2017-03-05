@@ -59,8 +59,8 @@ void CaptureInfo::print(raw_ostream &OS) const {
       isFirst = false;
     else
       OS << ", ";
-    OS << capture.getDecl()->getName();
-    
+    OS << capture.getDecl()->getBaseName();
+
     if (capture.isDirect())
       OS << "<direct>";
     if (capture.isNoEscape())
