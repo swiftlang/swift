@@ -396,7 +396,7 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral
 }
 
 extension ExpressibleByExtendedGraphemeClusterLiteral
-where ExtendedGraphemeClusterLiteralType == UnicodeScalarLiteralType {
+  where ExtendedGraphemeClusterLiteralType == UnicodeScalarLiteralType {
 
   @effects(readonly)
   @_transparent
