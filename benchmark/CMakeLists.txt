@@ -201,20 +201,6 @@ foreach(platform ${ONLY_PLATFORMS})
   endif()
 endforeach()
 
-message("--")
-message("-- Swift Benchmark Suite:")
-message("--   SWIFT_EXEC = ${SWIFT_EXEC}")
-message("--   SWIFT_LIBRARY_PATH = ${SWIFT_LIBRARY_PATH}")
-message("--   CLANG_EXEC = ${CLANG_EXEC}")
-message("--   SWIFT_OPTIMIZATION_LEVELS = ${SWIFT_OPTIMIZATION_LEVELS}")
-message("--   ONLY_PLATFORMS = ${ONLY_PLATFORMS}")
-
-message("--   found platforms: ${platforms}")
-message("--   found sdks:")
-foreach(sdk ${sdks})
-  message("--     ${sdk}")
-endforeach()
-
 set(executable_targets)
 
 if(SWIFT_SDKS)
@@ -229,16 +215,7 @@ else()
   set(swift-bin-dir "${CMAKE_BINARY_DIR}/bin")
 endif()
 
-set(benchmark-bin-dir "${CMAKE_CURRENT_BINARY_DIR}/bin")
-set(benchmark-lib-dir "${CMAKE_CURRENT_BINARY_DIR}/lib")
-set(benchmark-lib-swift-dir "${CMAKE_CURRENT_BINARY_DIR}/lib/swift")
-
-file(MAKE_DIRECTORY "${swift-bin-dir}")
-file(MAKE_DIRECTORY "${benchmark-bin-dir}")
-file(MAKE_DIRECTORY "${benchmark-lib-dir}")
-file(MAKE_DIRECTORY "${benchmark-lib-swift-dir}")
-
 # Compile the perf test suite for all platform
-swift_benchmark_compile_all_platforms(${platforms})
+swift_benchmark_compile_all_platforms("${platforms}" "${sdks}")
 
 add_subdirectory(scripts)
