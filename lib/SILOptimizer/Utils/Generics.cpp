@@ -861,17 +861,14 @@ static void prepareCallArguments(ApplySite AI, SILBuilder &Builder,
 
 /// Return a substituted callee function type.
 static CanSILFunctionType
-getCalleeSubstFunctionType(SILValue Callee, const ReabstractionInfo &ReInfo) {
+getCalleeSubstFunctionType(SILValue Callee, SubstitutionList Subs) {
   // Create a substituted callee type.
   auto CanFnTy =
       dyn_cast<SILFunctionType>(Callee->getType().getSwiftRValueType());
   auto CalleeSubstFnTy = CanFnTy;
 
-  if (ReInfo.getSpecializedType()->isPolymorphic() &&
-      !ReInfo.getCallerParamSubstitutions().empty()) {
-    CalleeSubstFnTy = CanFnTy->substGenericArgs(
-        ReInfo.getNonSpecializedFunction()->getModule(),
-        ReInfo.getCallerParamSubstitutions());
+  if (CanFnTy->isPolymorphic() && !Subs.empty()) {
+    CalleeSubstFnTy = CanFnTy->substGenericArgs(*Callee->getModule(), Subs);
     assert(!CalleeSubstFnTy->isPolymorphic() &&
            "Substituted callee type should not be polymorphic");
     assert(!CalleeSubstFnTy->hasTypeParameter() &&
@@ -899,7 +896,7 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
     Subs = ReInfo.getCallerParamSubstitutions();
   }
 
-  auto CalleeSubstFnTy = getCalleeSubstFunctionType(Callee, ReInfo);
+  auto CalleeSubstFnTy = getCalleeSubstFunctionType(Callee, Subs);
   auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
   SILFunctionConventions substConv(CalleeSubstFnTy, Builder.getModule());
 
@@ -988,19 +985,35 @@ public:
       Fragile = IsFragile;
 
     {
-      Mangle::Mangler M;
-      GenericSpecializationMangler OldMangler(
-          M, OrigF, ReInfo.getOriginalParamSubstitutions(), Fragile,
-          GenericSpecializationMangler::NotReabstracted);
-      OldMangler.mangle();
-      std::string Old = M.finalize();
+      if (!ReInfo.isPartialSpecialization()) {
+        Mangle::Mangler M;
+        GenericSpecializationMangler OldMangler(
+            M, OrigF, ReInfo.getOriginalParamSubstitutions(), Fragile,
+            GenericSpecializationMangler::NotReabstracted);
+        OldMangler.mangle();
+        std::string Old = M.finalize();
 
-      NewMangling::GenericSpecializationMangler NewMangler(
-        OrigF, ReInfo.getOriginalParamSubstitutions(), Fragile,
-          /*isReAbstracted*/ false);
+        NewMangling::GenericSpecializationMangler NewMangler(
+            OrigF, ReInfo.getOriginalParamSubstitutions(), Fragile,
+            /*isReAbstracted*/ false);
 
-      std::string New = NewMangler.mangle();
-      ThunkName = NewMangling::selectMangling(Old, New);
+        std::string New = NewMangler.mangle();
+        ThunkName = NewMangling::selectMangling(Old, New);
+      } else {
+        Mangle::Mangler M;
+        PartialSpecializationMangler OldMangler(
+            M, OrigF, ReInfo.getSpecializedType(), Fragile,
+            PartialSpecializationMangler::NotReabstracted);
+        OldMangler.mangle();
+        std::string Old = M.finalize();
+
+        NewMangling::PartialSpecializationMangler NewMangler(
+            OrigF, ReInfo.getSpecializedType(), Fragile,
+            /*isReAbstracted*/ false);
+
+        std::string New = NewMangler.mangle();
+        ThunkName = NewMangling::selectMangling(Old, New);
+      }
     }
   }
 
@@ -1019,6 +1032,8 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
   // Re-use an existing thunk.
   if (!Thunk->empty())
     return Thunk;
+
+  Thunk->setGenericEnvironment(ReInfo.getSpecializedGenericEnvironment());
 
   SILBasicBlock *EntryBB = Thunk->createBasicBlock();
   SILBuilder Builder(EntryBB);
@@ -1068,16 +1083,19 @@ SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
     SILBuilder &Builder) {
   SILFunction *Thunk = &Builder.getFunction();
   auto *FRI = Builder.createFunctionRef(Loc, SpecializedFunc);
+  auto Subs = Thunk->getForwardingSubstitutions();
+  auto CalleeSubstFnTy = getCalleeSubstFunctionType(FRI, Subs);
+  auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
   auto specConv = SpecializedFunc->getConventions();
   if (!SpecializedFunc->getLoweredFunctionType()->hasErrorResult()) {
-    return Builder.createApply(Loc, FRI, SpecializedFunc->getLoweredType(),
-                               specConv.getSILResultType(), {}, Arguments,
+    return Builder.createApply(Loc, FRI, CalleeSILSubstFnTy,
+                               specConv.getSILResultType(), Subs, Arguments,
                                false);
   }
   // Create the logic for calling a throwing function.
   SILBasicBlock *NormalBB = Thunk->createBasicBlock();
   SILBasicBlock *ErrorBB = Thunk->createBasicBlock();
-  Builder.createTryApply(Loc, FRI, SpecializedFunc->getLoweredType(), {},
+  Builder.createTryApply(Loc, FRI, CalleeSILSubstFnTy, Subs,
                          Arguments, NormalBB, ErrorBB);
   auto *ErrorVal = ErrorBB->createPHIArgument(specConv.getSILErrorType(),
                                               ValueOwnershipKind::Owned);
@@ -1208,11 +1226,6 @@ void swift::trySpecializeApplyOfGeneric(
   bool replacePartialApplyWithoutReabstraction = false;
   auto *PAI = dyn_cast<PartialApplyInst>(Apply);
 
-  // TODO: Partial specializations of partial applies are
-  // not supported yet.
-  if (PAI && ReInfo.getSpecializedType()->isPolymorphic())
-    return;
-
   if (PAI && ReInfo.hasConversions()) {
     // If we have a partial_apply and we converted some results/parameters from
     // indirect to direct there are 3 cases:
@@ -1289,11 +1302,12 @@ void swift::trySpecializeApplyOfGeneric(
     for (auto &Op : PAI->getArgumentOperands()) {
       Arguments.push_back(Op.get());
     }
+    auto Subs = ReInfo.getCallerParamSubstitutions();
+    auto CalleeSubstFnTy = getCalleeSubstFunctionType(FRI, Subs);
+    auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
     auto *NewPAI = Builder.createPartialApply(PAI->getLoc(), FRI,
-                                      PAI->getSubstCalleeSILType(),
-                                      {},
-                                      Arguments,
-                                      PAI->getType());
+                                              CalleeSILSubstFnTy, Subs,
+                                              Arguments, PAI->getType());
     PAI->replaceAllUsesWith(NewPAI);
     DeadApplies.insert(PAI);
     return;
