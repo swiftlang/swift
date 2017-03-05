@@ -50,16 +50,15 @@ DebugTypeInfo DebugTypeInfo::getFromTypeInfo(DeclContext *DC, swift::Type Ty,
                        Info.getBestKnownAlignment());
 }
 
-DebugTypeInfo DebugTypeInfo::getLocalVariable(DeclContext *DeclCtx,
+DebugTypeInfo DebugTypeInfo::getLocalVariable(DeclContext *DC,
                                               VarDecl *Decl, swift::Type Ty,
                                               const TypeInfo &Info,
                                               bool Unwrap) {
 
-  auto DeclType = Ty;
-  if (DeclCtx)
-    DeclType = (Decl->hasType()
-                    ? Decl->getType()
-                    : DeclCtx->mapTypeIntoContext(Decl->getInterfaceType()));
+  auto DeclType = (Decl->hasType()
+                   ? Decl->getType()
+                   : Decl->getDeclContext()->mapTypeIntoContext(
+                     Decl->getInterfaceType()));
   auto RealType = Ty;
   if (Unwrap) {
     DeclType = DeclType->getInOutObjectType();
@@ -75,7 +74,7 @@ DebugTypeInfo DebugTypeInfo::getLocalVariable(DeclContext *DeclCtx,
   // the type hasn't been mucked with by an optimization pass.
   auto *Type = DeclSelfType->isEqual(RealType) ? DeclType.getPointer()
                                                : RealType.getPointer();
-  return getFromTypeInfo(DeclCtx, Type, Info);
+  return getFromTypeInfo(DC, Type, Info);
 }
 
 DebugTypeInfo DebugTypeInfo::getMetadata(swift::Type Ty, llvm::Type *StorageTy,

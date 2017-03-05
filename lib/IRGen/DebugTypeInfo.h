@@ -37,7 +37,8 @@ class TypeInfo;
 /// for a type.
 class DebugTypeInfo {
 public:
-  /// The DeclContext if this is has an Archetype.
+  /// The DeclContext of the function. This might not be the DeclContext of
+  /// the variable if inlining took place.
   DeclContext *DeclCtx;
   /// The type we need to emit may be different from the type
   /// mentioned in the Decl, for example, stripped of qualifiers.
