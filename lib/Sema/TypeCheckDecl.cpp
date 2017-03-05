@@ -3613,9 +3613,10 @@ public:
           VD->getNameLoc().isValid() &&
           Context.SourceMgr.extractText({VD->getNameLoc(), 1}) != "`") {
         TC.diagnose(VD->getNameLoc(), diag::reserved_member_name,
-                    VD->getFullName(), VD->getNameStr());
+                    VD->getFullName(), VD->getBaseName().getIdentifier().str());
         TC.diagnose(VD->getNameLoc(), diag::backticks_to_escape)
-          .fixItReplace(VD->getNameLoc(), "`"+VD->getNameStr().str()+"`");
+            .fixItReplace(VD->getNameLoc(),
+                          "`" + VD->getBaseName().userFacingStr().str() + "`");
       }
     }
 

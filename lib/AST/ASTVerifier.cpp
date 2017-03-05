@@ -2933,7 +2933,8 @@ bool swift::shouldVerify(const Decl *D, const ASTContext &Context) {
     return true;
   }
 
-  size_t Hash = llvm::hash_value(VD->getNameStr());
+  size_t Hash =
+      llvm::DenseMapInfo<DeclBaseName>::getHashValue(VD->getBaseName());
   return Hash % ProcessCount == ProcessId;
 #else
   return false;

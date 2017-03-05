@@ -116,7 +116,7 @@ func testParseErrors3(_ c1: C1) {
 
 func testParseErrors4() {
   // Subscripts
-  _ = #selector(C1.subscript) // expected-error{{type 'C1.Type' has no subscript members}}
+  _ = #selector(C1.subscript) // expected-error{{type 'C1' has no member 'subscript'}}
 }
 
 // SR-1827

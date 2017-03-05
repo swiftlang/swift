@@ -251,12 +251,11 @@ ValueDecl *DIMemoryObjectInfo::
 getPathStringToElement(unsigned Element, std::string &Result) const {
   auto &Module = MemoryInst->getModule();
 
-  // TODO: Do we need to handle special names here?
   if (isAnyInitSelf())
     Result = "self";
   else if (ValueDecl *VD =
         dyn_cast_or_null<ValueDecl>(getLoc().getAsASTNode<Decl>()))
-    Result = VD->getBaseName().getIdentifier().str();
+    Result = VD->getBaseName().userFacingStr();
   else
     Result = "<unknown>";
 

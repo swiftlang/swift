@@ -1019,13 +1019,30 @@ static bool isFunctionTypeNoEscape(Type Ty) {
   return false;
 }
 
+/// Converts a DeclBaseName to a string by assigning special names strings and
+/// escaping identifiers that would clash with these strings using '`'
+static StringRef getEscapedName(DeclBaseName name) {
+  switch (name.getKind()) {
+  case DeclBaseName::Kind::Subscript:
+    return "subscript";
+  case DeclBaseName::Kind::Normal:
+    return llvm::StringSwitch<StringRef>(name.getIdentifier().str())
+        .Case("subscript", "`subscript`")
+        .Default(name.getIdentifier().str());
+  }
+}
+
 static StringRef getPrintedName(SDKContext &Ctx, ValueDecl *VD) {
   llvm::SmallString<32> Result;
   if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
     auto DM = FD->getFullName();
 
-    // TODO: Handle special names
-    Result.append(DM.getBaseName().empty() ? "_" :DM.getBaseIdentifier().str());
+    if (DM.getBaseName().empty()) {
+      Result.append("_");
+    } else {
+      Result.append(getEscapedName(DM.getBaseName()));
+    }
+
     Result.append("(");
     for (auto Arg : DM.getArgumentNames()) {
       Result.append(Arg.empty() ? "_" : Arg.str());
@@ -1035,8 +1052,7 @@ static StringRef getPrintedName(SDKContext &Ctx, ValueDecl *VD) {
     return Ctx.buffer(Result.str());
   }
   auto DM = VD->getFullName();
-  // TODO: Handle special names
-  Result.append(DM.getBaseIdentifier().str());
+  Result.append(getEscapedName(DM.getBaseName()));
   return Ctx.buffer(Result.str());
 }
 
@@ -1075,9 +1091,8 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty) :
     TypeAttrs.push_back(TypeAttrKind::TAK_noescape);
 }
 
-// TODO: Handle special names
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
-    Name(VD->hasName() ? VD->getBaseName().getIdentifier().str() : Ctx.buffer("_")),
+    Name(VD->hasName() ? getEscapedName(VD->getBaseName()) : Ctx.buffer("_")),
     PrintedName(getPrintedName(Ctx, VD)), DKind(VD->getKind()),
     USR(calculateUsr(Ctx, VD)), Location(calculateLocation(Ctx, VD)),
     ModuleName(VD->getModuleContext()->getName().str()),
@@ -1325,7 +1340,8 @@ public:
     llvm::array_pod_sort(ClangMacros.begin(), ClangMacros.end(),
        [](ValueDecl * const *lhs,
           ValueDecl * const *rhs) -> int {
-         return (*lhs)->getNameStr().compare((*rhs)->getNameStr());
+         return (*lhs)->getBaseName().userFacingStr().compare(
+                  (*rhs)->getBaseName().userFacingStr());
        });
 
     for (auto *VD : ClangMacros)

@@ -105,9 +105,17 @@ void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
 
 /// Mangle an identifier into the buffer.
 void Mangler::mangleIdentifier(DeclBaseName ident, OperatorFixity fixity) {
-  // TODO: Handle special names
-  StringRef str = ident.getIdentifier().str();
-  assert(!str.empty() && "mangling an empty identifier!");
+  StringRef str;
+  // FIXME: Should a serialized subscript name contain the string "substring"?
+  switch (ident.getKind()) {
+  case DeclBaseName::Kind::Normal:
+    str = ident.getIdentifier().str();
+    break;
+  case DeclBaseName::Kind::Subscript:
+    str = "subscript";
+    break;
+  }
+  assert(!str.empty() && "mangling an empty name!");
   return mangleIdentifier(str, fixity, ident.isOperator());
 }
 

@@ -51,6 +51,8 @@ enum class DeclRefKind {
 /// ASTContext.  It just wraps a nul-terminated "const char*".
 class Identifier {
   friend class ASTContext;
+  friend class DeclBaseName;
+
   const char *Pointer;
   
   /// Constructor, only accessible by ASTContext, which handles the uniquing.
@@ -206,7 +208,25 @@ namespace swift {
 
 /// Wrapper that may either be an Identifier or a special name
 /// (e.g. for subscripts)
+///
+/// The raw values of this enum are used in serialization by both
+/// BaseNameToEntitiesTable(Reader|Writer)Info and DeclTableInfo. For every
+/// reordering, deletion or insertion of any case, the major (resp. minor)
+/// version of both SwiftLookupTable AND ModuleFormat must thus be incremented.
 class DeclBaseName {
+public:
+  enum class Kind : uint8_t {
+    Normal = 0,
+    Subscript
+  };
+  
+private:
+  /// In a special DeclName represenenting a subscript, this opaque pointer
+  /// is used as the data of the base name identifier.
+  /// This is an implementation detail that should never leak outside of
+  /// DeclName.
+  static void *SubscriptIdentifierData;
+
   Identifier Ident;
 
 public:
@@ -214,7 +234,19 @@ public:
 
   DeclBaseName(Identifier I) : Ident(I) {}
 
-  bool isSpecial() const { return false; }
+  static DeclBaseName createSubscript() {
+    return DeclBaseName(Identifier((const char *)SubscriptIdentifierData));
+  }
+
+  Kind getKind() const {
+    if (Ident.get() == SubscriptIdentifierData) {
+      return Kind::Subscript;
+    } else {
+      return Kind::Normal;
+    }
+  }
+
+  bool isSpecial() const { return getKind() != Kind::Normal; }
 
   /// Return the identifier backing the name. Assumes that the name is not
   /// special.
@@ -233,9 +265,19 @@ public:
     return !isSpecial() && getIdentifier().isEditorPlaceholder();
   }
 
+  /// A representation of the name to be displayed to users. May be ambiguous
+  /// between identifiers and special names
+  StringRef userFacingStr() const {
+    switch (getKind()) {
+    case Kind::Normal:
+      return getIdentifier().str();
+    case Kind::Subscript:
+      return "subscript";
+    }
+  }
+
   int compare(DeclBaseName other) const {
-    // TODO: Sort special names cleverly
-    return getIdentifier().compare(other.getIdentifier());
+    return userFacingStr().compare(other.userFacingStr());
   }
 
   bool operator==(StringRef Str) const {
@@ -253,7 +295,6 @@ public:
   const void *getAsOpaquePointer() const { return Ident.get(); }
 
   static DeclBaseName getFromOpaquePointer(void *P) {
-    // TODO: Check if P is a special name
     return Identifier::getFromOpaquePointer(P);
   }
 
@@ -387,7 +428,6 @@ public:
     auto baseName = getBaseName();
     assert(!baseName.isSpecial() &&
            "Can't retrieve the identifier of a special base name");
-    // FIXME: Do we need this method?
     return baseName.getIdentifier();
   }
 

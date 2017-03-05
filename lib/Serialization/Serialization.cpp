@@ -82,16 +82,21 @@ namespace {
     using offset_type = unsigned;
 
     hash_value_type ComputeHash(key_type_ref key) {
-      assert(!key.empty());
-      // TODO: Handle special names
-      return llvm::HashString(key.getIdentifier().str());
+      if (key.getKind() == DeclBaseName::Kind::Normal) {
+        return llvm::HashString(key.getIdentifier().str());
+      } else {
+        return (hash_value_type)key.getKind();
+      }
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
                                                     key_type_ref key,
                                                     data_type_ref data) {
-      // TODO: Handle special names
-      uint32_t keyLength = key.getIdentifier().str().size();
+      uint32_t keyLength = sizeof(uint8_t); // For the flag of the name's kind
+      if (key.getKind() == DeclBaseName::Kind::Normal) {
+        keyLength += key.getIdentifier().str().size(); // The name's length
+      }
+
       uint32_t dataLength = (sizeof(uint32_t) + 1) * data.size();
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
@@ -100,8 +105,10 @@ namespace {
     }
 
     void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-      // TODO: Handle special names
-      out << key.getIdentifier().str();
+      endian::Writer<little> writer(out);
+      writer.write<uint8_t>((uint8_t)key.getKind());
+      if (key.getKind() == swift::DeclBaseName::Kind::Normal)
+        writer.OS << key.getIdentifier().str();
     }
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
@@ -1690,13 +1697,9 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
 
     abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
     bool isProtocolExt = SD->getDeclContext()->getAsProtocolExtensionContext();
-    // FIXME: Subscripts won't have an identifier
-    auto iid = addIdentifierRef(SD->getBaseName().getIdentifier());
     XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                         addTypeRef(ty),
-                                         iid,
-                                         isProtocolExt,
-                                         SD->isStatic());
+                                         addTypeRef(ty), SUBSCRIPT_ID,
+                                         isProtocolExt, SD->isStatic());
     break;
   }
       
@@ -1706,7 +1709,15 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
         writeCrossReference(storage->getDeclContext(), pathLen + 2);
 
         Type ty = storage->getInterfaceType()->getCanonicalType();
-        auto nameID = addIdentifierRef(storage->getBaseName().getIdentifier());
+        IdentifierID nameID;
+        switch (storage->getBaseName().getKind()) {
+        case DeclBaseName::Kind::Normal:
+          nameID = addIdentifierRef(storage->getBaseName().getIdentifier());
+          break;
+        case DeclBaseName::Kind::Subscript:
+          nameID = SUBSCRIPT_ID;
+          break;
+        }
         bool isProtocolExt = fn->getDeclContext()->getAsProtocolExtensionContext();
         abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
         XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -1824,8 +1835,15 @@ void Serializer::writeCrossReference(const Decl *D) {
   auto val = cast<ValueDecl>(D);
   auto ty = val->getInterfaceType()->getCanonicalType();
   abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
-  // FIXME: Might this be a special name?
-  auto iid = addIdentifierRef(val->getBaseName().getIdentifier());
+  IdentifierID iid;
+  switch (val->getBaseName().getKind()) {
+  case DeclBaseName::Kind::Normal:
+    iid = addIdentifierRef(val->getBaseName().getIdentifier());
+    break;
+  case DeclBaseName::Kind::Subscript:
+    iid = SUBSCRIPT_ID;
+    break;
+  }
   XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                        addTypeRef(ty),
                                        iid,
@@ -4219,8 +4237,7 @@ static void collectInterestingNestedDeclarations(
         // Add operator methods.
         // Note that we don't have to add operators that are already in the
         // top-level list.
-        auto iid = memberValue->getBaseName().getIdentifier();
-        operatorMethodDecls[iid].push_back({
+        operatorMethodDecls[memberValue->getBaseName()].push_back({
           /*ignored*/0,
           S.addDeclRef(memberValue)
         });

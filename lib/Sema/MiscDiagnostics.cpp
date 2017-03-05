@@ -2469,7 +2469,7 @@ static Expr *endConditionValueForConvertingCStyleForLoop(const ForStmt *FS,
     return nullptr;
 
   // Verify that the condition is a simple != or < comparison to the loop variable.
-  auto comparisonOpName = binaryFuncExpr->getDecl()->getNameStr();
+  auto comparisonOpName = binaryFuncExpr->getDecl()->getBaseName();
   if (comparisonOpName == "!=")
     OpKind = OperatorKind::NotEqual;
   else if (comparisonOpName == "<")
@@ -2511,7 +2511,7 @@ static bool unaryOperatorCheckForConvertingCStyleForLoop(const ForStmt *FS,
   auto unaryFuncExpr = dyn_cast<DeclRefExpr>(unaryExpr->getFn());
   if (!unaryFuncExpr)
     return false;
-  if (unaryFuncExpr->getDecl()->getNameStr() != OpName)
+  if (unaryFuncExpr->getDecl()->getBaseName() != OpName)
     return false;
   return incrementDeclRefExpr->getDecl() == loopVar;
 }
@@ -2540,7 +2540,7 @@ static bool binaryOperatorCheckForConvertingCStyleForLoop(TypeChecker &TC,
   auto binaryFuncExpr = dyn_cast<DeclRefExpr>(binaryExpr->getFn());
   if (!binaryFuncExpr)
     return false;
-  if (binaryFuncExpr->getDecl()->getNameStr() != OpName)
+  if (binaryFuncExpr->getDecl()->getBaseName() != OpName)
     return false;
   auto argTupleExpr = dyn_cast<TupleExpr>(binaryExpr->getArg());
   if (!argTupleExpr)

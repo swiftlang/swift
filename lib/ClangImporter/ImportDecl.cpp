@@ -5158,7 +5158,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       Impl.findLookupTable(*getClangSubmoduleForDecl(accessor));
   assert(lookupTable && "No lookup table?");
   bool foundAccessor = false;
-  for (auto entry : lookupTable->lookup(propertyName.str(),
+  for (auto entry : lookupTable->lookup(SerializedSwiftName(propertyName),
                                         importedName.getEffectiveContext())) {
     auto decl = entry.dyn_cast<clang::NamedDecl *>();
     if (!decl)
@@ -5991,7 +5991,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   // Build the subscript declaration.
   auto &C = Impl.SwiftContext;
   auto bodyParams = getterThunk->getParameterList(1)->clone(C);
-  DeclName name(C, C.Id_subscript, {Identifier()});
+  DeclName name(C, DeclBaseName::createSubscript(), {Identifier()});
   auto subscript = Impl.createDeclWithClangNode<SubscriptDecl>(
       getter->getClangNode(), getOverridableAccessibility(dc), name,
       decl->getLoc(), bodyParams, decl->getLoc(),

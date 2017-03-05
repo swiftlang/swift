@@ -1483,8 +1483,13 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
       // Getter selectors can belong to families if their name begins with the
       // wrong thing.
       if (FD->getAccessorStorageDecl()->isObjC() || c.isForeign) {
-        auto name = FD->getAccessorStorageDecl()->getBaseName().getIdentifier();
-        return getSelectorFamily(name);
+        auto declName = FD->getAccessorStorageDecl()->getBaseName();
+        switch (declName.getKind()) {
+        case DeclBaseName::Kind::Normal:
+          return getSelectorFamily(declName.getIdentifier());
+        case DeclBaseName::Kind::Subscript:
+          return SelectorFamily::None;
+        }
       }
       return SelectorFamily::None;
 

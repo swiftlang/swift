@@ -434,19 +434,26 @@ static unsigned getCallEditDistance(DeclName argName, DeclName paramName,
   // TODO: maybe ignore certain kinds of missing / present labels for the
   //   first argument label?
   // TODO: word-based rather than character-based?
-  // TODO: Handle special names
-  StringRef argBase = argName.getBaseIdentifier().str();
-  StringRef paramBase = paramName.getBaseIdentifier().str();
-
-  unsigned distance = argBase.edit_distance(paramBase, maxEditDistance);
-
-  // Bound the distance to UnreasonableCallEditDistance.
-  if (distance >= maxEditDistance ||
-      distance > (paramBase.size() + 2) / 3) {
+  if (argName.getBaseName().getKind() != paramName.getBaseName().getKind()) {
     return UnreasonableCallEditDistance;
   }
+  if (argName.getBaseName().getKind() == DeclBaseName::Kind::Normal) {
+    assert(argName.getBaseName().getKind() == DeclBaseName::Kind::Normal);
 
-  return distance;
+    StringRef argBase = argName.getBaseIdentifier().str();
+    StringRef paramBase = paramName.getBaseIdentifier().str();
+
+    unsigned distance = argBase.edit_distance(paramBase, maxEditDistance);
+
+    // Bound the distance to UnreasonableCallEditDistance.
+    if (distance >= maxEditDistance || distance > (paramBase.size() + 2) / 3) {
+      return UnreasonableCallEditDistance;
+    }
+
+    return distance;
+  } else {
+    return 0;
+  }
 }
 
 static bool isPlausibleTypo(DeclRefKind refKind, DeclName typedName,
@@ -576,13 +583,11 @@ diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
                         isa<FuncDecl>(decl) ? "method" :
                         "member");
 
-      // TODO: Handle special names
       return tc.diagnose(parentDecl, diag::note_typo_candidate_implicit_member,
                          decl->getBaseName().getIdentifier().str(), kind);
     }
   }
 
-  // TODO: Handle special names
   return tc.diagnose(decl, diag::note_typo_candidate,
                      decl->getBaseName().getIdentifier().str());
 }

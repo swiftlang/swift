@@ -45,6 +45,102 @@ class TypedefNameDecl;
 
 namespace swift {
 
+/// A name from a SwiftLookupTable that has not been deserialized into a
+/// DeclBaseName yet
+struct SerializedSwiftName {
+  /// The kind of the name if it is a special name
+  DeclBaseName::Kind Kind;
+  /// The name of the idenifier if it is not a special name
+  StringRef Name;
+
+  SerializedSwiftName() : Kind(DeclBaseName::Kind::Normal), Name(StringRef()) {}
+
+  explicit SerializedSwiftName(DeclBaseName::Kind Kind)
+      : Kind(Kind), Name(StringRef()) {}
+
+  explicit SerializedSwiftName(StringRef Name)
+      : Kind(DeclBaseName::Kind::Normal), Name(Name) {}
+
+  SerializedSwiftName(DeclBaseName BaseName) {
+    Kind = BaseName.getKind();
+    if (BaseName.getKind() == DeclBaseName::Kind::Normal) {
+      Name = BaseName.getIdentifier().str();
+    }
+  }
+
+  /// Deserialize the name, adding it to the context's identifier table
+  DeclBaseName toDeclBaseName(ASTContext &Context) const;
+
+  bool empty() const {
+    return Kind == DeclBaseName::Kind::Normal && Name.empty();
+  }
+
+  /// Return a string representation of the name that can be used for sorting
+  StringRef sortStr() const {
+    switch (Kind) {
+    case DeclBaseName::Kind::Normal:
+      return Name;
+    case DeclBaseName::Kind::Subscript:
+      return "subscript";
+    }
+  }
+
+  bool operator<(SerializedSwiftName RHS) const {
+    return sortStr() < RHS.sortStr();
+  }
+
+  bool operator==(SerializedSwiftName RHS) const {
+    if (Kind != RHS.Kind)
+      return false;
+
+    if (Kind == DeclBaseName::Kind::Normal) {
+      assert(RHS.Kind == DeclBaseName::Kind::Normal);
+      return Name == RHS.Name;
+    } else {
+      return true;
+    }
+  }
+};
+
+} // end namespace swift
+
+namespace llvm {
+
+using swift::SerializedSwiftName;
+
+// Inherit the DenseMapInfo from StringRef but add a few special cases for
+// special names
+template<> struct DenseMapInfo<SerializedSwiftName> {
+  static SerializedSwiftName getEmptyKey() {
+    return SerializedSwiftName(DenseMapInfo<StringRef>::getEmptyKey());
+  }
+  static SerializedSwiftName getTombstoneKey() {
+    return SerializedSwiftName(DenseMapInfo<StringRef>::getTombstoneKey());
+  }
+  static unsigned getHashValue(SerializedSwiftName Val) {
+    if (Val.Kind == swift::DeclBaseName::Kind::Normal) {
+      return DenseMapInfo<StringRef>::getHashValue(Val.Name);
+    } else {
+      return (unsigned)Val.Kind;
+    }
+  }
+  static bool isEqual(SerializedSwiftName LHS, SerializedSwiftName RHS) {
+    if (LHS.Kind != RHS.Kind)
+      return false;
+
+    if (LHS.Kind == swift::DeclBaseName::Kind::Normal) {
+      assert(RHS.Kind == swift::DeclBaseName::Kind::Normal);
+      return DenseMapInfo<StringRef>::isEqual(LHS.Name, RHS.Name);
+    } else {
+      return LHS.Kind == RHS.Kind;
+    }
+  }
+};
+
+} // end namespace llvm
+
+namespace swift {
+
 /// The context into which a Clang declaration will be imported.
 ///
 /// When the context into which a declaration will be imported matches
@@ -153,7 +249,7 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 /// Lookup table minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 14; // Swift 2 names
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 15; // Special names
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.
@@ -273,7 +369,8 @@ public:
 private:
   /// A table mapping from the base name of Swift entities to all of
   /// the C entities that have that name, in all contexts.
-  llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>> LookupTable;
+  llvm::DenseMap<SerializedSwiftName, SmallVector<FullTableEntry, 2>>
+      LookupTable;
 
   /// The list of Objective-C categories and extensions.
   llvm::SmallVector<clang::ObjCCategoryDecl *, 4> Categories;
@@ -296,9 +393,9 @@ private:
   friend class SwiftLookupTableReader;
   friend class SwiftLookupTableWriter;
 
-  /// Find or create the table entry for the given base name. 
-  llvm::DenseMap<StringRef, SmallVector<FullTableEntry, 2>>::iterator
-  findOrCreate(StringRef baseName);
+  /// Find or create the table entry for the given base name.
+  llvm::DenseMap<SerializedSwiftName, SmallVector<FullTableEntry, 2>>::iterator
+  findOrCreate(SerializedSwiftName baseName);
 
   /// Add the given entry to the list of entries, if it's not already
   /// present.
@@ -357,7 +454,8 @@ private:
   /// entities should reside. This may be None to indicate that
   /// all results from all contexts should be produced.
   SmallVector<SingleEntry, 4>
-  lookup(StringRef baseName, llvm::Optional<StoredContext> searchContext);
+  lookup(SerializedSwiftName baseName,
+         llvm::Optional<StoredContext> searchContext);
 
   /// Retrieve the set of global declarations that are going to be
   /// imported as members into the given context.
@@ -376,15 +474,16 @@ public:
   /// \param searchContext The context in which the resulting set of
   /// entities should reside. This may be None to indicate that
   /// all results from all contexts should be produced.
-  SmallVector<SingleEntry, 4>
-  lookup(StringRef baseName, EffectiveClangContext searchContext);
+  SmallVector<SingleEntry, 4> lookup(SerializedSwiftName baseName,
+                                     EffectiveClangContext searchContext);
 
   /// Retrieve the set of base names that are stored in the lookup table.
-  SmallVector<StringRef, 4> allBaseNames();
+  SmallVector<SerializedSwiftName, 4> allBaseNames();
 
   /// Lookup Objective-C members with the given base name, regardless
   /// of context.
-  SmallVector<clang::NamedDecl *, 4> lookupObjCMembers(StringRef baseName);
+  SmallVector<clang::NamedDecl *, 4>
+  lookupObjCMembers(SerializedSwiftName baseName);
 
   /// Retrieve the set of Objective-C categories and extensions.
   ArrayRef<clang::ObjCCategoryDecl *> categories();

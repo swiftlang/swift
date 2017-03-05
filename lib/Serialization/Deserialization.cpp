@@ -127,7 +127,7 @@ namespace {
       void print(raw_ostream &os) const {
         switch (kind) {
         case Kind::Value:
-          os << getDataAs<Identifier>();
+          os << getDataAs<DeclBaseName>();
           break;
         case Kind::Type:
           os << "with type " << getDataAs<Type>();
@@ -203,7 +203,7 @@ namespace {
   public:
     PrettyXRefTrace(ModuleDecl &M) : baseM(M) {}
 
-    void addValue(Identifier name) {
+    void addValue(DeclBaseName name) {
       path.push_back({ PathPiece::Kind::Value, name });
     }
 
@@ -1338,7 +1338,7 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
       XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
                                            isStatic);
 
-    Identifier name = getIdentifier(IID);
+    DeclBaseName name = getDeclBaseName(IID);
     pathTrace.addValue(name);
 
     Type filterTy = getType(TID);
@@ -1358,14 +1358,15 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
     // the "NS" prefix being added/removed. No "real" compiler mode
     // has to go through this path, but it's an option we toggle for
     // testing.
-    if (values.empty() && !retrying &&
+    if (!name.isSpecial() && values.empty() && !retrying &&
         (baseModule->getName().str() == "ObjectiveC" ||
          baseModule->getName().str() == "Foundation")) {
-      if (name.str().startswith("NS")) {
-        if (name.str().size() > 2 && name.str() != "NSCocoaError") {
-          auto known = getKnownFoundationEntity(name.str());
+      StringRef nameStr = name.getIdentifier().str();
+      if (nameStr.startswith("NS")) {
+        if (nameStr.size() > 2 && nameStr != "NSCocoaError") {
+          auto known = getKnownFoundationEntity(nameStr);
           if (!known) {
-            name = getContext().getIdentifier(name.str().substr(2));
+            name = getContext().getIdentifier(nameStr.substr(2));
             retrying = true;
             goto retry;
           }
@@ -1373,7 +1374,7 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
       } else {
         SmallString<16> buffer;
         buffer += "NS";
-        buffer += name.str();
+        buffer += nameStr;
         // FIXME: Try uppercasing for non-types.
         name = getContext().getIdentifier(buffer);
         retrying = true;
@@ -1501,7 +1502,7 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
     case XREF_VALUE_PATH_PIECE:
     case XREF_INITIALIZER_PATH_PIECE: {
       TypeID TID = 0;
-      Identifier memberName;
+      DeclBaseName memberName;
       Optional<swift::CtorInitializerKind> ctorInit;
       bool isType = false;
       bool inProtocolExt = false;
@@ -1510,7 +1511,7 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID;
         XRefTypePathPieceLayout::readRecord(scratch, IID, inProtocolExt);
-        memberName = getIdentifier(IID);
+        memberName = getDeclBaseName(IID);
         isType = true;
         break;
       }
@@ -1519,7 +1520,7 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
         IdentifierID IID;
         XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
                                              isStatic);
-        memberName = getIdentifier(IID);
+        memberName = getDeclBaseName(IID);
         break;
       }
 
@@ -1728,11 +1729,20 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
   return values.front();
 }
 
-Identifier ModuleFile::getIdentifier(IdentifierID IID) {
+DeclBaseName ModuleFile::getDeclBaseName(IdentifierID IID) {
   if (IID == 0)
     return Identifier();
 
-  size_t rawID = IID - NUM_SPECIAL_MODULES;
+  if (IID < NUM_SPECIAL_IDS) {
+    switch (static_cast<SpecialNameID>(static_cast<uint8_t>(IID))) {
+    case SUBSCRIPT_ID:
+      return DeclBaseName::createSubscript();
+    case NUM_SPECIAL_IDS:
+      llvm_unreachable("implementation detail only");
+    }
+  }
+
+  size_t rawID = IID - NUM_SPECIAL_IDS;
   assert(rawID < Identifiers.size() && "invalid identifier ID");
   auto identRecord = Identifiers[rawID];
 
@@ -1747,6 +1757,12 @@ Identifier ModuleFile::getIdentifier(IdentifierID IID) {
          "unterminated identifier string data");
 
   return getContext().getIdentifier(rawStrPtr.slice(0, terminatorOffset));
+}
+
+Identifier ModuleFile::getIdentifier(IdentifierID IID) {
+  auto name = getDeclBaseName(IID);
+  assert(!name.isSpecial());
+  return name.getIdentifier();
 }
 
 DeclContext *ModuleFile::getLocalDeclContext(DeclContextID DCID) {
@@ -3386,7 +3402,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     for (auto argNameID : argNameIDs)
       argNames.push_back(getIdentifier(argNameID));
 
-    DeclName name(ctx, ctx.Id_subscript, argNames);
+    DeclName name(ctx, DeclBaseName::createSubscript(), argNames);
     auto subscript = createDecl<SubscriptDecl>(name, SourceLoc(), nullptr,
                                                SourceLoc(), TypeLoc(),
                                                parent, genericParams);

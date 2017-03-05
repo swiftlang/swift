@@ -227,10 +227,10 @@ private:
 
   /// The last assigned IdentifierID for types from this module.
   ///
-  /// Note that special module IDs must not be valid IdentifierIDs, except that
-  /// 0 will always represent the empty identifier.
+  /// Note that special module IDs and IDs of special names must not be valid
+  /// IdentifierIDs, except that 0 will always represent the empty identifier.
   uint32_t /*IdentifierID*/ LastIdentifierID =
-      serialization::NUM_SPECIAL_MODULES - 1;
+      serialization::NUM_SPECIAL_IDS - 1;
 
   /// The last assigned GenericEnvironmentID for generic environments from this
   /// module.

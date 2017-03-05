@@ -961,7 +961,8 @@ void TypeChecker::checkForForbiddenPrefix(const Decl *D) {
   if (!hasEnabledForbiddenTypecheckPrefix())
     return;
   if (auto VD = dyn_cast<ValueDecl>(D)) {
-    checkForForbiddenPrefix(VD->getNameStr());
+    if (!VD->getBaseName().isSpecial())
+      checkForForbiddenPrefix(VD->getBaseName().getIdentifier().str());
   }
 }
 

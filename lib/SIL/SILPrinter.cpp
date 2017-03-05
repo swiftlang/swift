@@ -242,10 +242,13 @@ static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
   printFullContext(Decl->getDeclContext(), OS);
   assert(Decl->hasName());
 
-  if (Decl->isOperator())
+  if (Decl->isOperator()) {
     OS << '"' << Decl->getBaseName() << '"';
-  else
+  } else if (Decl->getBaseName() == Decl->getASTContext().Id_subscript) {
+    OS << '`' << Decl->getBaseName() << '`';
+  } else {
     OS << Decl->getBaseName();
+  }
 }
 
 /// SILDeclRef uses sigil "#" and prints the fully qualified dotted path.

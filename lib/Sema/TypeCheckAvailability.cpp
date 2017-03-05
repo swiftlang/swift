@@ -2381,8 +2381,8 @@ bool AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D,
                                                SourceRange R,
                                                const AvailableAttr *Attr) {
   // We can only produce a fixit if we're talking about ++ or --.
-  bool isInc = D->getNameStr() == "++";
-  if (!isInc && D->getNameStr() != "--")
+  bool isInc = D->getBaseName() == "++";
+  if (!isInc && D->getBaseName() != "--")
     return false;
 
   // We can only handle the simple cases of lvalue++ and ++lvalue.  This is
@@ -2442,11 +2442,15 @@ bool AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
   if (!D->getModuleContext()->isStdlibModule())
     return false;
 
-  StringRef Property = llvm::StringSwitch<StringRef>(D->getNameStr())
-    .Case("sizeof", "size")
-    .Case("alignof", "alignment")
-    .Case("strideof", "stride")
-    .Default(StringRef());
+  StringRef Property;
+  if (D->getBaseName() == "sizeof") {
+    Property = "size";
+  } else if (D->getBaseName() == "alignof") {
+    Property = "alignment";
+  } else if (D->getBaseName() == "strideof") {
+    Property = "stride";
+  }
+
   if (Property.empty())
     return false;
 

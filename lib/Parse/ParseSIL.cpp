@@ -369,9 +369,6 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
   case tok::kw_init:
     Result = P.Context.Id_init;
     break;
-  case tok::kw_subscript:
-    Result = P.Context.Id_subscript;
-    break;
   default:
     // If it's some other keyword, grab an identifier for it.
     if (P.Tok.isKeyword()) {
@@ -910,8 +907,8 @@ bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType,
 }
 
 /// Find the top-level ValueDecl or Module given a name.
-static llvm::PointerUnion<ValueDecl*, ModuleDecl*> lookupTopDecl(Parser &P,
-             Identifier Name) {
+static llvm::PointerUnion<ValueDecl *, ModuleDecl *>
+lookupTopDecl(Parser &P, DeclBaseName Name) {
   // Use UnqualifiedLookup to look through all of the imports.
   // We have to lie and say we're done with parsing to make this happen.
   assert(P.SF.ASTStage == SourceFile::Parsing &&
@@ -925,7 +922,7 @@ static llvm::PointerUnion<ValueDecl*, ModuleDecl*> lookupTopDecl(Parser &P,
 }
 
 /// Find the ValueDecl given an interface type and a member name.
-static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name,
+static ValueDecl *lookupMember(Parser &P, Type Ty, DeclBaseName Name,
                                SourceLoc Loc,
                                SmallVectorImpl<ValueDecl *> &Lookup,
                                bool ExpectMultipleResults) {
@@ -1061,13 +1058,21 @@ bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
                                    SmallVectorImpl<ValueDecl *> &values) {
   // Handle sil-dotted-path.
   Identifier Id;
-  SmallVector<Identifier, 4> FullName;
+  SmallVector<DeclBaseName, 4> FullName;
   SmallVector<SourceLoc, 4> Locs;
   do {
     Locs.push_back(P.Tok.getLoc());
-    if (parseSILIdentifier(Id, diag::expected_sil_constant))
-      return true;
-    FullName.push_back(Id);
+    switch (P.Tok.getKind()) {
+    case tok::kw_subscript:
+      P.consumeToken();
+      FullName.push_back(DeclBaseName::createSubscript());
+      break;
+    default:
+      if (parseSILIdentifier(Id, diag::expected_sil_constant))
+        return true;
+      FullName.push_back(Id);
+      break;
+    }
   } while (P.consumeIf(tok::period));
 
   // Look up ValueDecl from a dotted path.

@@ -5385,8 +5385,11 @@ static Optional<unsigned> scorePotentiallyMatchingNames(DeclName lhs,
       score = lhsFirstName.edit_distance(rhsFirstName.str(), true, limit);
     }
   } else {
-    // TODO: Handling of special names
-    score = 0;
+    if (lhs.getBaseName().getKind() == rhs.getBaseName().getKind()) {
+      score = 0;
+    } else {
+      return None;
+    }
   }
   if (score > limit) return None;
 
@@ -5516,8 +5519,7 @@ canSuppressPotentialWitnessWarningWithNonObjC(ValueDecl *requirement,
 /// argument labels.
 static unsigned getNameLength(DeclName name) {
   unsigned length = 0;
-  // TODO: What about special names?
-  if (!name.getBaseName().empty())
+  if (!name.getBaseName().empty() && !name.getBaseName().isSpecial())
     length += name.getBaseIdentifier().str().size();
   for (auto arg : name.getArgumentNames()) {
     if (!arg.empty())

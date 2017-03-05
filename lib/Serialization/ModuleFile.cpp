@@ -298,19 +298,26 @@ namespace {
 /// Used to deserialize entries in the on-disk decl hash table.
 class ModuleFile::DeclTableInfo {
 public:
-  using internal_key_type = StringRef;
+  using internal_key_type = std::pair<DeclBaseName::Kind, StringRef>;
   using external_key_type = DeclBaseName;
   using data_type = SmallVector<std::pair<uint8_t, DeclID>, 8>;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
   internal_key_type GetInternalKey(external_key_type ID) {
-    // TODO: Handle special names
-    return ID.getIdentifier().str();
+    if (ID.getKind() == DeclBaseName::Kind::Normal) {
+      return {DeclBaseName::Kind::Normal, ID.getIdentifier().str()};
+    } else {
+      return {ID.getKind(), StringRef()};
+    }
   }
 
   hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::HashString(key);
+    if (key.first == DeclBaseName::Kind::Normal) {
+      return llvm::HashString(key.second);
+    } else {
+      return (hash_value_type)key.first;
+    }
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -324,8 +331,18 @@ public:
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
-    // TODO: Handle special names
-    return StringRef(reinterpret_cast<const char *>(data), length);
+    uint8_t kind = endian::readNext<uint8_t, little, unaligned>(data);
+    switch (kind) {
+    case (uint8_t)DeclBaseName::Kind::Normal: {
+      StringRef str(reinterpret_cast<const char *>(data),
+                    length - sizeof(uint8_t));
+      return {DeclBaseName::Kind::Normal, str};
+    }
+    case (uint8_t)DeclBaseName::Kind::Subscript:
+      return {DeclBaseName::Kind::Subscript, StringRef()};
+    default:
+      llvm_unreachable("Unknown kind for DeclBaseName");
+    }
   }
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,

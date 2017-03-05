@@ -1528,7 +1528,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
   if (auto declRefExpr = dyn_cast<DeclRefExpr>(fn)) {
     auto decl = declRefExpr->getDecl();
     candidates.push_back({ decl, getCalleeLevel(decl) });
-    declName = decl->getNameStr().str();
+    declName = decl->getBaseName().userFacingStr();
     return;
   }
 
@@ -1549,7 +1549,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     }
 
     if (!candidates.empty())
-      declName = candidates[0].getDecl()->getNameStr().str();
+      declName = candidates[0].getDecl()->getBaseName().userFacingStr();
     return;
   }
 
@@ -1682,7 +1682,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     if (candidates.empty()) continue;
     
     if (declName.empty())
-      declName = candidates[0].getDecl()->getNameStr().str();
+      declName = candidates[0].getDecl()->getBaseName().userFacingStr();
     return;
   }
   
@@ -1817,7 +1817,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
   }
 
   if (!candidates.empty())
-    declName = candidates[0].getDecl()->getNameStr().str();
+    declName = candidates[0].getDecl()->getBaseName().userFacingStr();
 }
 
 
@@ -2693,7 +2693,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     };
 
     // TODO: This should handle tuple member lookups, like x.1231 as well.
-    if (memberName.isSimpleName("subscript")) {
+    if (memberName.getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
       diagnose(loc, diag::type_not_subscriptable, baseObjTy)
         .highlight(baseRange);
     } else if (auto metatypeTy = baseObjTy->getAs<MetatypeType>()) {
@@ -5362,8 +5362,8 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   auto locator =
     CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
 
-  auto subscriptName = CS->getASTContext().Id_subscript;
-  
+  auto subscriptName = DeclBaseName::createSubscript();
+
   MemberLookupResult result =
     CS->performMemberLookup(ConstraintKind::ValueMember, subscriptName,
                             baseType, FunctionRefKind::DoubleApply, locator,

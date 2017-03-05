@@ -449,7 +449,8 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
     return false;
 
   // If the name has leading underscore then it's a private symbol.
-  if (VD->getNameStr().startswith("_"))
+  if (!VD->getBaseName().isSpecial() &&
+      VD->getBaseName().getIdentifier().str().startswith("_"))
     return true;
 
   return false;

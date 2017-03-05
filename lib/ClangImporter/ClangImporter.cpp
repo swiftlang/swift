@@ -1802,7 +1802,9 @@ class DarwinBlacklistDeclConsumer : public swift::VisibleDeclConsumer {
       return false;
 
     if (clangModule->Name == "MacTypes") {
-      return llvm::StringSwitch<bool>(VD->getNameStr())
+      if (!VD->hasName() || VD->getBaseName().isSpecial())
+        return true;
+      return llvm::StringSwitch<bool>(VD->getBaseName().getIdentifier().str())
           .Cases("OSErr", "OSStatus", "OptionBits", false)
           .Cases("FourCharCode", "OSType", false)
           .Case("Boolean", false)
@@ -2706,7 +2708,7 @@ void ClangImporter::Implementation::lookupValue(
   auto &clangCtx = getClangASTContext();
   auto clangTU = clangCtx.getTranslationUnitDecl();
 
-  for (auto entry : table.lookup(name.getBaseIdentifier().str(), clangTU)) {
+  for (auto entry : table.lookup(name.getBaseName(), clangTU)) {
     // If the entry is not visible, skip it.
     if (!isVisibleClangEntry(clangCtx, entry)) continue;
 
@@ -2810,7 +2812,7 @@ void ClangImporter::Implementation::lookupVisibleDecls(
 
   // Look for namespace-scope entities with each base name.
   for (auto baseName : baseNames) {
-    lookupValue(table, SwiftContext.getIdentifier(baseName), consumer);
+    lookupValue(table, baseName.toDeclBaseName(SwiftContext), consumer);
   }
 }
 
@@ -2819,9 +2821,8 @@ void ClangImporter::Implementation::lookupObjCMembers(
        DeclName name,
        VisibleDeclConsumer &consumer) {
   auto &clangCtx = getClangASTContext();
-  auto baseName = name.getBaseIdentifier().str();
 
-  for (auto clangDecl : table.lookupObjCMembers(baseName)) {
+  for (auto clangDecl : table.lookupObjCMembers(name.getBaseName())) {
     // If the entry is not visible, skip it.
     if (!isVisibleClangEntry(clangCtx, clangDecl)) continue;
 
@@ -2868,7 +2869,7 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
 
   // Look for Objective-C members with each base name.
   for (auto baseName : baseNames) {
-    lookupObjCMembers(table, SwiftContext.getIdentifier(baseName), consumer);
+    lookupObjCMembers(table, baseName.toDeclBaseName(SwiftContext), consumer);
   }
 }
 

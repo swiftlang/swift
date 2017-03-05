@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 325; // Last change: unchecked_ownership_conver
+const uint16_t VERSION_MINOR = 326; // Last change: special decl names
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -342,6 +342,18 @@ enum SpecialModuleID : uint8_t {
   /// it should only be used to count the number of names above. As such, it
   /// is correct and necessary to add new values above this one.
   NUM_SPECIAL_MODULES
+};
+
+// Continuation of the special module IDs above for special names that don't
+// have an identifier. As above, these IDs must \em not be renumbered or
+// reordered without incrementing VERSION_MAJOR.
+enum SpecialNameID : uint8_t {
+  SUBSCRIPT_ID = NUM_SPECIAL_MODULES,
+
+  /// The number of special modules and IDs. This value should never be encoded;
+  /// it should only be used to count the number of names above. As such, it
+  /// is correct and necessary to add new values above this one.
+  NUM_SPECIAL_IDS
 };
 
 // These IDs must \em not be renumbered or reordered without incrementing

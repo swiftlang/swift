@@ -391,8 +391,15 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
         break;
     }
   } else {
-    // TODO: Handle special names
-    appendIdentifier(decl->getBaseName().getIdentifier().str());
+    // FIXME: Should a mangled subscript name contain the string "substring"?
+    switch (decl->getBaseName().getKind()) {
+    case DeclBaseName::Kind::Normal:
+      appendIdentifier(decl->getBaseName().getIdentifier().str());
+      break;
+    case DeclBaseName::Kind::Subscript:
+      appendIdentifier("subscript");
+      break;
+    }
   }
 
   if (decl->getDeclContext()->isLocalContext()) {

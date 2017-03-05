@@ -3700,7 +3700,8 @@ public:
         for (auto Ex : NTD->getExtensions()) {
           handleDeclRange(Ex->getMembers(), Reason);
         }
-      } else if (isNameHit(VD->getNameStr())) {
+      } else if (!VD->getBaseName().isSpecial() &&
+                 isNameHit(VD->getBaseName().getIdentifier().str())) {
         if (VD->hasInterfaceType())
           unboxType(VD->getInterfaceType());
       }

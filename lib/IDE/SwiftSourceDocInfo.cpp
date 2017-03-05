@@ -253,7 +253,7 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
   }
 
   for (auto &VD : DeclaredDecls) {
-    OS << "<Declared>" << VD.VD->getNameStr() << "</Declared>";
+    OS << "<Declared>" << VD.VD->getBaseName() << "</Declared>";
     OS << "<OutscopeReference>";
     if (VD.ReferredAfterRange)
       OS << "true";
@@ -262,7 +262,7 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
     OS << "</OutscopeReference>\n";
   }
   for (auto &RD : ReferencedDecls) {
-    OS << "<Referenced>" << RD.VD->getNameStr() << "</Referenced>";
+    OS << "<Referenced>" << RD.VD->getBaseName() << "</Referenced>";
     OS << "<Type>";
     RD.Ty->print(OS);
     OS << "</Type>\n";
@@ -850,8 +850,7 @@ void swift::ide::getLocationInfo(const ValueDecl *VD,
       NameLen = getCharLength(SM, R);
     } else {
       if (VD->hasName()) {
-        // TODO: Handle special names
-        NameLen = VD->getBaseName().getIdentifier().getLength();
+        NameLen = VD->getBaseName().userFacingStr().size();
       } else {
         NameLen = getCharLength(SM, VD->getLoc());
       }

@@ -93,9 +93,9 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   unsigned NameLen = 0;
 
   if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-    // TODO: Handle special names
-    if (VD->hasName())
-      NameLen = VD->getBaseName().getIdentifier().getLength();
+    if (VD->hasName()) {
+      NameLen = VD->getBaseName().userFacingStr().size();
+    }
 
   } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
     SourceRange SR = ED->getExtendedTypeLoc().getSourceRange();

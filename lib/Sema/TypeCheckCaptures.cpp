@@ -357,7 +357,7 @@ public:
       isNested = f->getDeclContext()->isLocalContext();
 
     if (isInOut && !AFR.isKnownNoEscape() && !isNested) {
-      if (D->getNameStr() == "self") {
+      if (D->getBaseName() == D->getASTContext().Id_self) {
         TC.diagnose(DRE->getLoc(),
           diag::closure_implicit_capture_mutating_self);
       } else {
