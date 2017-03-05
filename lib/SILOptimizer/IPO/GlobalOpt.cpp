@@ -240,7 +240,8 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   auto LoweredType = SILFunctionType::get(nullptr, EInfo,
       ParameterConvention::Direct_Owned, { }, Results, None,
       Store->getModule().getASTContext());
-  auto *GetterF = Store->getModule().getOrCreateFunction(Store->getLoc(),
+  auto *GetterF = Store->getModule().getOrCreateFunction(
+      Store->getLoc(),
       getterName, SILLinkage::Private, LoweredType,
       IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
       IsFragile_t::IsFragile);
@@ -493,8 +494,9 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   auto LoweredType = SILFunctionType::get(nullptr, EInfo,
       ParameterConvention::Direct_Owned, { }, Results, None,
       InitF->getASTContext());
-  auto *GetterF = InitF->getModule().getOrCreateFunction(InitF->getLocation(),
-     getterName, SILLinkage::Private, LoweredType,
+  auto *GetterF = InitF->getModule().getOrCreateFunction(
+      InitF->getLocation(),
+      getterName, SILLinkage::Private, LoweredType,
       IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
       IsFragile_t::IsFragile);
   if (InitF->hasUnqualifiedOwnership())
