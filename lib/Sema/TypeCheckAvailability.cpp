@@ -2331,15 +2331,16 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
       return true;
   }
 
-  if (R.isValid())
+  if (R.isValid()) {
     if (TC.diagnoseInlineableDeclRef(R.Start, D, DC))
       return true;
 
-  if (TC.diagnoseExplicitUnavailability(D, R, DC, call))
-    return true;
+    if (TC.diagnoseExplicitUnavailability(D, R, DC, call))
+      return true;
 
-  // Diagnose for deprecation
-  TC.diagnoseIfDeprecated(R, DC, D, call);
+    // Diagnose for deprecation
+    TC.diagnoseIfDeprecated(R, DC, D, call);
+  }
 
   if (AllowPotentiallyUnavailableProtocol && isa<ProtocolDecl>(D))
     return false;
