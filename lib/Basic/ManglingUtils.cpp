@@ -65,3 +65,15 @@ std::string NewMangling::translateOperator(StringRef Op) {
   }
   return Encoded;
 }
+
+char NewMangling::getStandardTypeSubst(StringRef TypeName) {
+#define STANDARD_TYPE(KIND, MANGLING, TYPENAME)      \
+  if (TypeName == #TYPENAME) {                       \
+    return #MANGLING[0];                             \
+  }
+
+#include "swift/Basic/StandardTypesMangling.def"
+
+  return 0;
+}
+

@@ -10,7 +10,7 @@ import def_always_inline
 
 // SIL-LABEL: sil @main
 // SIL: [[RAW:%.+]] = global_addr @_T013always_inline3rawSbv : $*Bool
-// SIL: [[FUNC:%.+]] = function_ref @_T017def_always_inline16testAlwaysInlineSbSb1x_tF : $@convention(thin) (Bool) -> Bool
+// SIL: [[FUNC:%.+]] = function_ref @_T017def_always_inline16testAlwaysInlineS2b1x_tF : $@convention(thin) (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@convention(thin) (Bool) -> Bool
 // SIL: store [[RESULT]] to [trivial] [[RAW]] : $*Bool
 var raw = testAlwaysInline(x: false)
@@ -20,7 +20,7 @@ var raw = testAlwaysInline(x: false)
 
 var a = AlwaysInlineInitStruct(x: false)
 
-// SIL-LABEL: [always_inline] @_T017def_always_inline16testAlwaysInlineSbSb1x_tF : $@convention(thin) (Bool) -> Bool
+// SIL-LABEL: [always_inline] @_T017def_always_inline16testAlwaysInlineS2b1x_tF : $@convention(thin) (Bool) -> Bool
 
 // SIL-LABEL: sil public_external [fragile] [always_inline] @_T017def_always_inline22AlwaysInlineInitStructVACSb1x_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
 

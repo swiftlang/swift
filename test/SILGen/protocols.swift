@@ -241,7 +241,7 @@ class ClassWithGetter : PropertyWithGetter {
 
 // Make sure we are generating a protocol witness that calls the class method on
 // ClassWithGetter.
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T09protocols15ClassWithGetterCAA08PropertycD0AaaDP1aSifgTW : $@convention(witness_method) (@in_guaranteed ClassWithGetter) -> Int {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T09protocols15ClassWithGetterCAA08PropertycD0A2aDP1aSifgTW : $@convention(witness_method) (@in_guaranteed ClassWithGetter) -> Int {
 // CHECK: bb0([[C:%.*]] : $*ClassWithGetter):
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $ClassWithGetter
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]
@@ -269,7 +269,7 @@ class ClassWithGetterSetter : PropertyWithGetterSetter, PropertyWithGetter {
   }
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T09protocols21ClassWithGetterSetterCAA08PropertycdE0AaaDP1bSifgTW : $@convention(witness_method) (@in_guaranteed ClassWithGetterSetter) -> Int {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T09protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSifgTW : $@convention(witness_method) (@in_guaranteed ClassWithGetterSetter) -> Int {
 // CHECK: bb0([[C:%.*]] : $*ClassWithGetterSetter):
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $ClassWithGetterSetter
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]
@@ -325,7 +325,7 @@ struct StructWithStoredProperty : PropertyWithGetter {
 // thunking code being too dumb but it is harmless to program
 // correctness.
 //
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T09protocols24StructWithStoredPropertyVAA0eC6GetterAaaDP1aSifgTW : $@convention(witness_method) (@in_guaranteed StructWithStoredProperty) -> Int {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T09protocols24StructWithStoredPropertyVAA0eC6GetterA2aDP1aSifgTW : $@convention(witness_method) (@in_guaranteed StructWithStoredProperty) -> Int {
 // CHECK: bb0([[C:%.*]] : $*StructWithStoredProperty):
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $StructWithStoredProperty
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]
@@ -355,7 +355,7 @@ struct StructWithStoredClassProperty : PropertyWithGetter {
   // CHECK-NEXT: return %2 : $Int
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T09protocols29StructWithStoredClassPropertyVAA0fC6GetterAaaDP1aSifgTW : $@convention(witness_method) (@in_guaranteed StructWithStoredClassProperty) -> Int {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T09protocols29StructWithStoredClassPropertyVAA0fC6GetterA2aDP1aSifgTW : $@convention(witness_method) (@in_guaranteed StructWithStoredClassProperty) -> Int {
 // CHECK: bb0([[C:%.*]] : $*StructWithStoredClassProperty):
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $StructWithStoredClassProperty
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]
@@ -419,23 +419,23 @@ func modifyProperty<T : PropertyWithGetterSetter>(_ x: inout T) {
 // CHECK:      apply [[CALLBACK]]<T>
 
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetter: PropertyWithGetter module protocols {
-// CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: {{.*}} : @_T09protocols15ClassWithGetterCAA08PropertycD0AaaDP1aSifgTW
+// CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: {{.*}} : @_T09protocols15ClassWithGetterCAA08PropertycD0A2aDP1aSifgTW
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetterSetter: PropertyWithGetterSetter module protocols {
-// CHECK-NEXT:  method #PropertyWithGetterSetter.b!getter.1: {{.*}} : @_T09protocols21ClassWithGetterSetterCAA08PropertycdE0AaaDP1bSifgTW
-// CHECK-NEXT:  method #PropertyWithGetterSetter.b!setter.1: {{.*}} : @_T09protocols21ClassWithGetterSetterCAA08PropertycdE0AaaDP1bSifsTW
-// CHECK-NEXT:  method #PropertyWithGetterSetter.b!materializeForSet.1: {{.*}} : @_T09protocols21ClassWithGetterSetterCAA08PropertycdE0AaaDP1bSifmTW
+// CHECK-NEXT:  method #PropertyWithGetterSetter.b!getter.1: {{.*}} : @_T09protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSifgTW
+// CHECK-NEXT:  method #PropertyWithGetterSetter.b!setter.1: {{.*}} : @_T09protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSifsTW
+// CHECK-NEXT:  method #PropertyWithGetterSetter.b!materializeForSet.1: {{.*}} : @_T09protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSifmTW
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetterSetter: PropertyWithGetter module protocols {
-// CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: {{.*}} : @_T09protocols21ClassWithGetterSetterCAA08PropertycD0AaaDP1aSifgTW
+// CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: {{.*}} : @_T09protocols21ClassWithGetterSetterCAA08PropertycD0A2aDP1aSifgTW
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_witness_table hidden StructWithStoredProperty: PropertyWithGetter module protocols {
-// CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: {{.*}} : @_T09protocols24StructWithStoredPropertyVAA0eC6GetterAaaDP1aSifgTW
+// CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: {{.*}} : @_T09protocols24StructWithStoredPropertyVAA0eC6GetterA2aDP1aSifgTW
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_witness_table hidden StructWithStoredClassProperty: PropertyWithGetter module protocols {
-// CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: {{.*}} : @_T09protocols29StructWithStoredClassPropertyVAA0fC6GetterAaaDP1aSifgTW
+// CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: {{.*}} : @_T09protocols29StructWithStoredClassPropertyVAA0fC6GetterA2aDP1aSifgTW
 // CHECK-NEXT: }

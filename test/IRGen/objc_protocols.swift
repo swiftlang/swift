@@ -12,7 +12,7 @@ import objc_protocols_Bas
 // -- Protocol "Frungible" inherits only objc protocols and should have no
 //    out-of-line inherited witnesses in its witness table.
 // CHECK: [[ZIM_FRUNGIBLE_WITNESS:@_T014objc_protocols3ZimCAA9FrungibleAAWP]] = hidden constant [1 x i8*] [
-// CHECK:    i8* bitcast (void (%T14objc_protocols3ZimC*, %swift.type*, i8**)* @_T014objc_protocols3ZimCAA9FrungibleAaaDP6frungeyyFTW to i8*)
+// CHECK:    i8* bitcast (void (%T14objc_protocols3ZimC*, %swift.type*, i8**)* @_T014objc_protocols3ZimCAA9FrungibleA2aDP6frungeyyFTW to i8*)
 // CHECK: ]
 
 protocol Ansible {

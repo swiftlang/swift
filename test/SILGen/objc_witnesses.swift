@@ -19,7 +19,7 @@ class Phoûx : NSObject, Fooable {
 }
 
 // witness for Foo.foo uses the foreign-to-native thunk:
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T0So3FooC14objc_witnesses7FooableAccDP3foo{{[_0-9a-zA-Z]*}}FTW
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T0So3FooC14objc_witnesses7FooableA2cDP3foo{{[_0-9a-zA-Z]*}}FTW
 // CHECK:         function_ref @_T0So3FooC3foo{{[_0-9a-zA-Z]*}}FTO
 
 // *NOTE* We have an extra copy here for the time being right
@@ -46,7 +46,7 @@ protocol Bells {
 extension Gizmo : Bells {
 }
 
-// CHECK: sil hidden [transparent] [thunk] @_T0So5GizmoC14objc_witnesses5BellsAccDP{{[_0-9a-zA-Z]*}}fCTW
+// CHECK: sil hidden [transparent] [thunk] @_T0So5GizmoC14objc_witnesses5BellsA2cDP{{[_0-9a-zA-Z]*}}fCTW
 // CHECK: bb0([[SELF:%[0-9]+]] : $*Gizmo, [[I:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick Gizmo.Type):
 
 // CHECK:   [[INIT:%[0-9]+]] = function_ref @_T0So5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo>
@@ -62,7 +62,7 @@ protocol Subscriptable {
   subscript(x: Int) -> Any { get }
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T0So7NSArrayC14objc_witnesses13SubscriptableAccDP9subscriptypSicfgTW : $@convention(witness_method) (Int, @in_guaranteed NSArray) -> @out Any {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T0So7NSArrayC14objc_witnesses13SubscriptableA2cDP9subscriptypSicfgTW : $@convention(witness_method) (Int, @in_guaranteed NSArray) -> @out Any {
 // CHECK:         function_ref @_T0So7NSArrayC9subscriptypSicfgTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any
 // CHECK-LABEL: sil shared [thunk] @_T0So7NSArrayC9subscriptypSicfgTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any {
 // CHECK:         class_method [volatile] {{%.*}} : $NSArray, #NSArray.subscript!getter.1.foreign
@@ -78,10 +78,10 @@ class Electron : Orbital {
   dynamic var quantumNumber: Int = 0
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T014objc_witnesses8ElectronCAA7OrbitalAaaDP13quantumNumberSifgTW
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T014objc_witnesses8ElectronCAA7OrbitalA2aDP13quantumNumberSifgTW
 // CHECK-LABEL: sil shared [transparent] [thunk] @_T014objc_witnesses8ElectronC13quantumNumberSifgTD
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T014objc_witnesses8ElectronCAA7OrbitalAaaDP13quantumNumberSifsTW
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T014objc_witnesses8ElectronCAA7OrbitalA2aDP13quantumNumberSifsTW
 // CHECK-LABEL: sil shared [transparent] [thunk] @_T014objc_witnesses8ElectronC13quantumNumberSifsTD
 
 // witness is a dynamic thunk and is public:
@@ -94,5 +94,5 @@ public class Positron : Lepton {
   public dynamic var spin: Float = 0.5
 }
 
-// CHECK-LABEL: sil [transparent] [fragile] [thunk] @_T014objc_witnesses8PositronCAA6LeptonAaaDP4spinSffgTW
+// CHECK-LABEL: sil [transparent] [fragile] [thunk] @_T014objc_witnesses8PositronCAA6LeptonA2aDP4spinSffgTW
 // CHECK-LABEL: sil shared [transparent] [fragile] [thunk] @_T014objc_witnesses8PositronC4spinSffgTD

@@ -54,11 +54,11 @@ class Foo: Fooable {
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* @"\01L_selector_data(block:)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([12 x i8], [12 x i8]* [[BLOCK_SIGNATURE_TRAD]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void (i8*, i8*, i64 (i64)*)* @_T012objc_methods3FooC5blockySiSicFTo to i8*)
+// CHECK:     i8* bitcast (void (i8*, i8*, i64 (i64)*)* @_T012objc_methods3FooC5blockyS2icFTo to i8*)
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(block2:)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([12 x i8], [12 x i8]* [[BLOCK_SIGNATURE_TRAD]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void (i8*, i8*, i64 (i64, i64)*)* @_T012objc_methods3FooC6block2ySiSi_SitcFTo to i8*)
+// CHECK:     i8* bitcast (void (i8*, i8*, i64 (i64, i64)*)* @_T012objc_methods3FooC6block2yS2i_SitcFTo to i8*)
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([20 x i8], [20 x i8]* @"\01L_selector_data(failAndReturnError:)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([12 x i8], [12 x i8]* [[FAIL_SIGNATURE]], i64 0, i64 0),

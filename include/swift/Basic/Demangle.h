@@ -484,14 +484,15 @@ public:
 
   llvm::StringRef getStringRef() const { return Stream; }
 
-  /// Returns a mutable reference to the last character added to the printer.
-  char &lastChar() { return Stream.back(); }
-
+  /// Shrinks the buffer.
+  void resetSize(size_t toPos) {
+    assert(toPos <= Stream.size());
+    Stream.resize(toPos);
+  }
 private:
   std::string Stream;
 };
 
-bool mangleStandardSubstitution(Node *node, DemanglerPrinter &Out);
 bool isSpecialized(Node *node);
 NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
 

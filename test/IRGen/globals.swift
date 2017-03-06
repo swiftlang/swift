@@ -42,7 +42,7 @@ extension A {
 
 // CHECK: @_T07globals2g0Siv = hidden global [[INT]] zeroinitializer, align 8
 // CHECK: @_T07globals2g1yt_Siyttv = hidden global <{ [[INT]] }> zeroinitializer, align 8
-// CHECK: @_T07globals2g2yt_SiSitv = hidden global <{ [[INT]], [[INT]] }> zeroinitializer, align 8
+// CHECK: @_T07globals2g2yt_S2itv = hidden global <{ [[INT]], [[INT]] }> zeroinitializer, align 8
 // CHECK: @_T07globals2g3Sbv = hidden global [[BOOL]] zeroinitializer, align 1
 // CHECK: @_T07globals2g6Sdv = hidden global [[DOUBLE]] zeroinitializer, align 8
 // CHECK: @_T07globals2g7Sfv = hidden global [[FLOAT]] zeroinitializer, align 4

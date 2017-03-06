@@ -7,7 +7,7 @@ struct A {
         // CHECK-LABEL: sil hidden @_T024call_chain_reabstraction1AV1f{{[_0-9a-zA-Z]*}}F
         // CHECK:         [[G:%.*]] = function_ref @_T024call_chain_reabstraction1AV1g{{[_0-9a-zA-Z]*}}F
         // CHECK:         [[G2:%.*]] = apply [[G]]<A>
-        // CHECK:         [[REABSTRACT_THUNK:%.*]] = function_ref @_T024call_chain_reabstraction1AVAcCIxyir_AccCIxyyd_TR
+        // CHECK:         [[REABSTRACT_THUNK:%.*]] = function_ref @_T024call_chain_reabstraction1AVA2CIxyir_A3CIxyyd_TR
         // CHECK:         [[REABSTRACT:%.*]] = partial_apply [[REABSTRACT_THUNK]]([[G2]])
         // CHECK:         apply [[REABSTRACT]]([[SELF:%.*]], [[SELF]])
         func f() {
