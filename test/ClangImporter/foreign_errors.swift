@@ -1,13 +1,16 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -parse-as-library -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -O -parse-as-library -DEMIT_SIL %s
 
 // REQUIRES: objc_interop
 
 import Foundation
 import errors
 
+#if !EMIT_SIL
 func test0() {
   try ErrorProne.fail() // expected-error {{errors thrown from here are not handled}}
 }
+#endif
 
 // Test "AndReturnError" stripping.
 // rdar://20722195
@@ -71,10 +74,12 @@ func testBlockFinal() throws {
   try ErrorProne.runSwiftly(5000, callback: {})
 }
 
+#if !EMIT_SIL
 func testNonBlockFinal() throws {
   ErrorProne.runWithError(count: 0) // expected-error {{missing argument for parameter #1 in call}}
   ErrorProne.run(count: 0) // expected-error {{incorrect argument label in call (have 'count:', expected 'callback:')}}
 }
+#endif
 
 class VeryErrorProne : ErrorProne {
   override class func fail() throws {}
@@ -107,4 +112,25 @@ func testNSErrorExhaustive() {
       e // expected-warning {{expression of type 'NSError' is unused}}
     }
   }
+}
+
+func testBadOverrides(obj: FoolishErrorSub) throws {
+  try obj.performRiskyOperation()
+  let _: FoolishErrorSub = try obj.produceRiskyOutput()
+  let _: String = try obj.produceRiskyString()
+
+  let _: NSObject = try obj.badNullResult()
+  let _: CInt = try obj.badNullResult2() // This is unfortunate but consistent.
+  let _: CInt = try obj.badZeroResult()
+  try obj.badNonzeroResult() as Void
+
+  let base = obj as SensibleErrorBase
+  try base.performRiskyOperation()
+  let _: NSObject = try base.produceRiskyOutput()
+  let _: String = try base.produceRiskyString()
+
+  let _: NSObject = try base.badNullResult()
+  let _: NSObject = try base.badNullResult2()
+  let _: CInt = try base.badZeroResult()
+  try base.badNonzeroResult() as Void
 }
