@@ -16,11 +16,79 @@
 using namespace swift;
 using namespace swift::index;
 
+static NominalTypeDecl *getNominalParent(const ValueDecl *D) {
+  Type Ty = D->getDeclContext()->getDeclaredTypeOfContext();
+  if (!Ty)
+    return nullptr;
+  return Ty->getAnyNominal();
+}
+
+/// \returns true if \c D is a subclass of 'XCTestCase'.
+static bool isUnitTestCase(const ClassDecl *D) {
+  if (!D)
+    return false;
+  while (auto *SuperD = D->getSuperclassDecl()) {
+    if (SuperD->getNameStr() == "XCTestCase")
+      return true;
+    D = SuperD;
+  }
+  return false;
+}
+
+static bool isUnitTest(const ValueDecl *D) {
+  if (!D->hasName())
+    return false;
+
+  // A 'test candidate' is:
+  // 1. An instance method...
+  auto FD = dyn_cast<FuncDecl>(D);
+  if (!FD)
+    return false;
+  if (!D->isInstanceMember())
+    return false;
+
+  // 2. ...on a class or extension (not a struct) subclass of XCTestCase...
+  auto parentNTD = getNominalParent(D);
+  if (!parentNTD)
+    return false;
+  if (!isa<ClassDecl>(parentNTD))
+    return false;
+  if (!isUnitTestCase(cast<ClassDecl>(parentNTD)))
+    return false;
+
+  // 3. ...that returns void...
+  Type RetTy = FD->getResultInterfaceType();
+  if (RetTy && !RetTy->isVoid())
+    return false;
+
+  // 4. ...takes no parameters...
+  if (FD->getParameterLists().size() != 2)
+    return false;
+  if (FD->getParameterList(1)->size() != 0)
+    return false;
+
+  // 5. ...is of at least 'internal' accessibility (unless we can use
+  //    Objective-C reflection)...
+  if (!D->getASTContext().LangOpts.EnableObjCInterop &&
+      (D->getFormalAccess() < Accessibility::Internal ||
+      parentNTD->getFormalAccess() < Accessibility::Internal))
+    return false;
+
+  // 6. ...and starts with "test".
+  if (FD->getName().str().startswith("test"))
+    return true;
+
+  return false;
+}
+
 static void setFuncSymbolInfo(const FuncDecl *FD, SymbolInfo &sym) {
   sym.Kind = SymbolKind::Function;
 
   if (FD->getAttrs().hasAttribute<IBActionAttr>())
     sym.Properties |= SymbolProperty::IBAnnotated;
+
+  if (isUnitTest(FD))
+    sym.Properties |= SymbolProperty::UnitTest;
 
   if (FD->getDeclContext()->isTypeContext()) {
     if (FD->isStatic()) {

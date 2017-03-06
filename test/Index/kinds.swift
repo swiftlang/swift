@@ -183,8 +183,13 @@ func +(a: AStruct, b: AStruct) -> AStruct { return a }
 
 class XCTestCase {}
 class MyTestCase : XCTestCase {
-  func testMe() {}
-  // CHECK: [[@LINE-1]]:8 | instance-method(test)/Swift | testMe() |
+  func callit() {}
+  func testMe() {
+  // CHECK: [[@LINE-1]]:8 | instance-method(test)/Swift | testMe() | [[MyTestCase_testMe_USR:.*]] | Def,RelChild
+    callit()
+    // CHECK: [[@LINE-1]]:5 | instance-method/Swift | callit() | s:14swift_ide_test10MyTestCaseC6callityyF | Ref,Call,Dyn,RelRec,RelCall,RelCont | rel: 2
+    // CHECK-NEXT: RelCall,RelCont | instance-method(test)/Swift | testMe() | [[MyTestCase_testMe_USR]]
+  }
   func testResult() -> Int? { return nil }
   // CHECK: [[@LINE-1]]:8 | instance-method/Swift | testResult() |
   func test(withInt: Int) {}
