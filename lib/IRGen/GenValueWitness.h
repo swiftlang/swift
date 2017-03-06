@@ -29,6 +29,7 @@ namespace swift {
   class CanType;
 
 namespace irgen {
+  class ConstantStructBuilder;
   class IRGenModule;
 
   /// True if a type has a generic-parameter-dependent value witness table.
@@ -43,8 +44,8 @@ namespace irgen {
   /// Emit the elements of a dependent value witness table template into a
   /// vector.
   void emitDependentValueWitnessTablePattern(IRGenModule &IGM,
-                                    CanType abstractType,
-                                    SmallVectorImpl<llvm::Constant*> &fields);
+                                             ConstantStructBuilder &B,
+                                             CanType abstractType);
 
   /// Build a value witness that initializes an array front-to-back.
   void emitInitializeArrayFrontToBack(IRGenFunction &IGF,

@@ -52,11 +52,12 @@ public:
 };
 
 class ConstantAggregateBuilderBase
-    : public clang::CodeGen::ConstantAggregateBuilderBase {
+       : public clang::CodeGen::ConstantAggregateBuilderBase {
+  using super = clang::CodeGen::ConstantAggregateBuilderBase;
 protected:
   ConstantAggregateBuilderBase(ConstantInitBuilder &builder,
                                ConstantAggregateBuilderBase *parent)
-    : clang::CodeGen::ConstantAggregateBuilderBase(builder, parent) {}
+    : super(builder, parent) {}
 
   ConstantInitBuilder &getBuilder() const {
     return static_cast<ConstantInitBuilder&>(Builder);
@@ -64,22 +65,48 @@ protected:
   IRGenModule &IGM() const { return getBuilder().IGM; }
 
 public:
+  void addInt16(uint16_t value) {
+    addInt(IGM().Int16Ty, value);
+  }
+
   void addInt32(uint32_t value) {
     addInt(IGM().Int32Ty, value);
   }
 
-  void addRelativeReference(llvm::Constant *target) {
-    return addRelativeOffset(IGM().RelativeAddressTy, target);
+  void addRelativeAddressOrNull(llvm::Constant *target) {
+    if (target) {
+      addRelativeAddress(target);
+    } else {
+      addInt(IGM().RelativeAddressTy, 0);
+    }
+  }
+
+  void addRelativeAddress(llvm::Constant *target) {
+    addRelativeOffset(IGM().RelativeAddressTy, target);
   }
 
   /// Add a tagged relative reference to the given address.  The direct
   /// target must be defined within the current image, but it might be
   /// a "GOT-equivalent", i.e. a pointer to an external object; if so,
   /// set the low bit of the offset to indicate that this is true.
-  void addRelativeReference(ConstantReference reference) {
-    return addTaggedRelativeOffset(IGM().RelativeAddressTy,
-                                   reference.getValue(),
-                                   unsigned(reference.isIndirect()));
+  void addRelativeAddress(ConstantReference reference) {
+    addTaggedRelativeOffset(IGM().RelativeAddressTy,
+                            reference.getValue(),
+                            unsigned(reference.isIndirect()));
+  }
+
+  void addFarRelativeAddress(llvm::Constant *target) {
+    addRelativeOffset(IGM().FarRelativeAddressTy, target);
+  }
+
+  void addFarRelativeAddress(ConstantReference reference) {
+    addTaggedRelativeOffset(IGM().FarRelativeAddressTy,
+                            reference.getValue(),
+                            unsigned(reference.isIndirect()));
+  }
+
+  Size getNextOffsetFromGlobal() const {
+    return Size(super::getNextOffsetFromGlobal().getQuantity());
   }
 };
 
