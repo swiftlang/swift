@@ -15,12 +15,19 @@ extension CopyConstructible {
 final class _StringStorage<Element: UnsignedInteger>
  : /*_SwiftNativeNSString,*/ _NSStringCore, CopyConstructible {
 
-  // NOTE: If you change these stored properties, edit the
-  // definitions in GlobalObjects.h and GlobalObject.cpp
-  var count: Int
-  var capacity: Int // Should be a let.
+  var _header = _SwiftStringBodyStorage(count: 0, capacity: 0)
+  
+  var count: Int {
+    get { return _header.count }
+    set { _header.count = newValue }
+  }
+  
+  var capacity: Int {
+    get { return _header.capacity }
+    set { _header.capacity = newValue }
+  }
 
-  internal init(DoNotCallMe: ()) { count = 0; capacity = 0 }
+  internal init(DoNotCallMe: ()) { }
 
   convenience init(count: Int, minimumCapacity: Int) {
     self.init(
