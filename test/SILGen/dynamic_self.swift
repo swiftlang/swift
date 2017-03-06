@@ -319,7 +319,7 @@ class Derived : Base {
 }
 
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {
-// CHECK: method #P.f!1: {{.*}} : @_T012dynamic_self1XCAA1PAaaDP1f{{[_0-9a-zA-Z]*}}FTW
+// CHECK: method #P.f!1: {{.*}} : @_T012dynamic_self1XCAA1PA2aDP1f{{[_0-9a-zA-Z]*}}FTW
 
 // CHECK-LABEL: sil_witness_table hidden X: CP module dynamic_self {
-// CHECK: method #CP.f!1: {{.*}} : @_T012dynamic_self1XCAA2CPAaaDP1f{{[_0-9a-zA-Z]*}}FTW
+// CHECK: method #CP.f!1: {{.*}} : @_T012dynamic_self1XCAA2CPA2aDP1f{{[_0-9a-zA-Z]*}}FTW

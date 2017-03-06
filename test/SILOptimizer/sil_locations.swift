@@ -21,7 +21,7 @@ func searchForMe(_ x: Float) -> Float {
 func testMandatoryInlining(_ x: Float, b: Bool) -> Float {
   return bar(x, b)
 // CHECK-LABEL: _T013sil_locations21testMandatoryInlining{{[_0-9a-zA-Z]*}}F
-// CHECK: function_ref @_T013sil_locations11searchForMeSfSfF : {{.*}} line:22:10:minlined
+// CHECK: function_ref @_T013sil_locations11searchForMeS2fF : {{.*}} line:22:10:minlined
 // CHECK: apply                                                  {{.*}} line:22:10:minlined
 // CHECK: br                                                     {{.*}} line:22:10:minlined
 // CHECK: br                                                     {{.*}} line:22:10:minlined

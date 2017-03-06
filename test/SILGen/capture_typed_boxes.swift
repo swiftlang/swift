@@ -15,7 +15,7 @@ func closure(_ f: @escaping (Int) -> Int) -> Int {
 
   return bar(0)
 }
-// CHECK-LABEL: sil shared @_T019capture_typed_boxes7closureSiSiSicF3barL_SiSiF : $@convention(thin) (Int, @owned { var @callee_owned (Int) -> Int }) -> Int {
+// CHECK-LABEL: sil shared @_T019capture_typed_boxes7closureS3icF3barL_S2iF : $@convention(thin) (Int, @owned { var @callee_owned (Int) -> Int }) -> Int {
 // CHECK:       bb0(%0 : $Int, %1 : ${ var @callee_owned (Int) -> Int }):
 
 func closure_generic<T>(_ f: @escaping (T) -> T, x: T) -> T {

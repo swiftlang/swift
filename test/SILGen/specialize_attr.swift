@@ -34,7 +34,7 @@ public class CC<T : PP> {
 
 // CHECK-LABEL: sil hidden [_specialize exported: false, kind: full, where T == Int, U == Float] @_T015specialize_attr0A4Thisyx_q_1utr0_lF : $@convention(thin) <T, U> (@in T, @in U) -> () {
 
-// CHECK-LABEL: sil [noinline] [_specialize exported: false, kind: full, where T == RR, U == SS] @_T015specialize_attr2CCC3fooqd___AA2GGVyxGtqd___AFyxG1gtAA2QQRd__lF : $@convention(method) <T where T : PP><U where U : QQ> (@in U, GG<T>, @guaranteed CC<T>) -> (@out U, GG<T>) {
+// CHECK-LABEL: sil [noinline] [_specialize exported: false, kind: full, where T == RR, U == SS] @_T015specialize_attr2CCC3fooqd___AA2GGVyxGtqd___AG1gtAA2QQRd__lF : $@convention(method) <T where T : PP><U where U : QQ> (@in U, GG<T>, @guaranteed CC<T>) -> (@out U, GG<T>) {
 
 // -----------------------------------------------------------------------------
 // Test user-specialized subscript accessors.

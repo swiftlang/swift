@@ -27,7 +27,7 @@ extension Array where Element == Int {
     return instanceProperty
   }
 
-  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE14instanceMethodSiSi1e_tF : $@convention(method) (Int, @guaranteed Array<Int>) -> Int
+  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE14instanceMethodS2i1e_tF : $@convention(method) (Int, @guaranteed Array<Int>) -> Int
   public func instanceMethod(e: Element) -> Element {
     return e
   }
@@ -42,8 +42,8 @@ extension Array where Element == Int {
     return staticProperty
   }
 
-  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE12staticMethodSiSiSg1e_tFZfA_ : $@convention(thin) () -> Optional<Int>
-  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE12staticMethodSiSiSg1e_tFZ : $@convention(method) (Optional<Int>, @thin Array<Int>.Type) -> Int
+  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE12staticMethodS2iSg1e_tFZfA_ : $@convention(thin) () -> Optional<Int>
+  // CHECK-LABEL: sil @_T0Sa22constrained_extensionsSiRszlE12staticMethodS2iSg1e_tFZ : $@convention(method) (Optional<Int>, @thin Array<Int>.Type) -> Int
   public static func staticMethod(e: Element? = nil) -> Element {
     return e!
   }

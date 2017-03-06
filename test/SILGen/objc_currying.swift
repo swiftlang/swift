@@ -10,19 +10,19 @@ import gizmo
 func curry_pod(_ x: CurryTest) -> (Int) -> Int {
   return x.pod
 }
-// CHECK-LABEL: sil hidden @_T013objc_currying9curry_podSiSicSo9CurryTestCF : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
+// CHECK-LABEL: sil hidden @_T013objc_currying9curry_podS2icSo9CurryTestCF : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
 // CHECK:      bb0([[ARG1:%.*]] : $CurryTest):
 // CHECK:         [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
-// CHECK:         [[THUNK:%.*]] = function_ref @[[THUNK_FOO_1:_T0So9CurryTestC3podSiSiFTcTO]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
+// CHECK:         [[THUNK:%.*]] = function_ref @[[THUNK_FOO_1:_T0So9CurryTestC3podS2iFTcTO]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
 // CHECK:         [[COPIED_ARG1:%.*]] = copy_value [[BORROWED_ARG1]]
 // CHECK:         [[FN:%.*]] = apply [[THUNK]]([[COPIED_ARG1]])
 // CHECK:         end_borrow [[BORROWED_ARG1]] from [[ARG1]]
 // CHECK:         destroy_value [[ARG1]]
 // CHECK:         return [[FN]]
-// CHECK: } // end sil function '_T013objc_currying9curry_podSiSicSo9CurryTestCF'
+// CHECK: } // end sil function '_T013objc_currying9curry_podS2icSo9CurryTestCF'
 
 // CHECK: sil shared [thunk] @[[THUNK_FOO_1]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (Int) -> Int
-// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_FOO_2:_T0So9CurryTestC3podSiSiFTO]]
+// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_FOO_2:_T0So9CurryTestC3podS2iFTO]]
 // CHECK:   [[FN:%.*]] = partial_apply [[THUNK]](%0)
 // CHECK:   return [[FN]]
 // CHECK: } // end sil function '[[THUNK_FOO_1]]'
@@ -39,20 +39,20 @@ func curry_pod(_ x: CurryTest) -> (Int) -> Int {
 func curry_bridged(_ x: CurryTest) -> (String!) -> String! {
   return x.bridged
 }
-// CHECK-LABEL: sil hidden @_T013objc_currying13curry_bridgedSQySSGSQySSGcSo9CurryTestCF : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (@owned Optional<String>) -> @owned Optional<String>
+// CHECK-LABEL: sil hidden @_T013objc_currying13curry_bridgedSQySSGACcSo9CurryTestCF : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (@owned Optional<String>) -> @owned Optional<String>
 // CHECK: bb0([[ARG1:%.*]] : $CurryTest):
 // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
-// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_BAR_1:_T0So9CurryTestC7bridgedSQySSGSQySSGFTcTO]]
+// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_BAR_1:_T0So9CurryTestC7bridgedSQySSGADFTcTO]]
 // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
 // CHECK:   [[FN:%.*]] = apply [[THUNK]]([[ARG1_COPY]])
 // CHECK:   end_borrow [[BORROWED_ARG1]] from [[ARG1]]
 // CHECK:   destroy_value [[ARG1]]
 // CHECK:   return [[FN]]
-// CHECK: } // end sil function '_T013objc_currying13curry_bridgedSQySSGSQySSGcSo9CurryTestCF'
+// CHECK: } // end sil function '_T013objc_currying13curry_bridgedSQySSGACcSo9CurryTestCF'
 
 // CHECK: sil shared [thunk] @[[THUNK_BAR_1]] : $@convention(thin) (@owned CurryTest) -> @owned @callee_owned (@owned Optional<String>) -> @owned Optional<String>
 // CHECK: bb0([[ARG1:%.*]] : $CurryTest):
-// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_BAR_2:_T0So9CurryTestC7bridgedSQySSGSQySSGFTO]]
+// CHECK:   [[THUNK:%.*]] = function_ref @[[THUNK_BAR_2:_T0So9CurryTestC7bridgedSQySSGADFTO]]
 // CHECK:   [[FN:%.*]] = partial_apply [[THUNK]]([[ARG1]])
 // CHECK:   return [[FN]]
 // CHECK: } // end sil function '[[THUNK_BAR_1]]'
@@ -128,7 +128,7 @@ func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutableRawPointer!
 // CHECK:   return [[RES]]
 // CHECK: } // end sil function '[[THUNK_RETURNSINNERPOINTER_2]]'
 
-// CHECK-LABEL: sil hidden @_T013objc_currying19curry_pod_AnyObjectSiSics0eF0_pF : $@convention(thin) (@owned AnyObject) -> @owned @callee_owned (Int) -> Int
+// CHECK-LABEL: sil hidden @_T013objc_currying19curry_pod_AnyObjectS2ics0eF0_pF : $@convention(thin) (@owned AnyObject) -> @owned @callee_owned (Int) -> Int
 // CHECK: bb0([[ANY:%.*]] : $AnyObject):
 // CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
 // CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
@@ -137,13 +137,13 @@ func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutableRawPointer!
 // CHECK:   [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
 // CHECK:   [[OPENED_ANY_COPY_2:%.*]] = copy_value [[OPENED_ANY_COPY]]
 // CHECK:   partial_apply [[METHOD]]([[OPENED_ANY_COPY_2]])
-// CHECK: } // end sil function '_T013objc_currying19curry_pod_AnyObjectSiSics0eF0_pF'
+// CHECK: } // end sil function '_T013objc_currying19curry_pod_AnyObjectS2ics0eF0_pF'
 func curry_pod_AnyObject(_ x: AnyObject) -> (Int) -> Int {
   return x.pod!
 }
 
 // normalOwnership requires a thunk to bring the method to Swift conventions
-// CHECK-LABEL: sil hidden @_T013objc_currying31curry_normalOwnership_AnyObjectSQySo9CurryTestCGSQyADGcs0fG0_pF : $@convention(thin) (@owned AnyObject) -> @owned @callee_owned (@owned Optional<CurryTest>) -> @owned Optional<CurryTest> {
+// CHECK-LABEL: sil hidden @_T013objc_currying31curry_normalOwnership_AnyObjectSQySo9CurryTestCGAEcs0fG0_pF : $@convention(thin) (@owned AnyObject) -> @owned @callee_owned (@owned Optional<CurryTest>) -> @owned Optional<CurryTest> {
 // CHECK: bb0([[ANY:%.*]] : $AnyObject):
 // CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
 // CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
@@ -152,16 +152,16 @@ func curry_pod_AnyObject(_ x: AnyObject) -> (Int) -> Int {
 // CHECK: [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (Optional<CurryTest>, @opened({{.*}}) AnyObject) -> @autoreleased Optional<CurryTest>):
 // CHECK:   [[OPENED_ANY_COPY_2:%.*]] = copy_value [[OPENED_ANY_COPY]]
 // CHECK:   [[PA:%.*]] = partial_apply [[METHOD]]([[OPENED_ANY_COPY_2]])
-// CHECK:   [[THUNK:%.*]] = function_ref @_T0So9CurryTestCSgABSgIxyo_ABSgABSgIxxo_TR
+// CHECK:   [[THUNK:%.*]] = function_ref @_T0So9CurryTestCSgACIxyo_A2CIxxo_TR
 // CHECK:   partial_apply [[THUNK]]([[PA]])
-// CHECK: } // end sil function '_T013objc_currying31curry_normalOwnership_AnyObjectSQySo9CurryTestCGSQyADGcs0fG0_pF'
+// CHECK: } // end sil function '_T013objc_currying31curry_normalOwnership_AnyObjectSQySo9CurryTestCGAEcs0fG0_pF'
 func curry_normalOwnership_AnyObject(_ x: AnyObject) -> (CurryTest!) -> CurryTest! {
   return x.normalOwnership!
 }
 
 // weirdOwnership is NS_RETURNS_RETAINED and NS_CONSUMES_SELF so already
 // follows Swift conventions
-// CHECK-LABEL: sil hidden @_T013objc_currying30curry_weirdOwnership_AnyObjectSQySo9CurryTestCGSQyADGcs0fG0_pF : $@convention(thin) (@owned AnyObject) -> @owned @callee_owned (@owned Optional<CurryTest>) -> @owned Optional<CurryTest>
+// CHECK-LABEL: sil hidden @_T013objc_currying30curry_weirdOwnership_AnyObjectSQySo9CurryTestCGAEcs0fG0_pF : $@convention(thin) (@owned AnyObject) -> @owned @callee_owned (@owned Optional<CurryTest>) -> @owned Optional<CurryTest>
 // CHECK: bb0([[ANY:%.*]] : $AnyObject):
 // CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
 // CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
@@ -170,13 +170,13 @@ func curry_normalOwnership_AnyObject(_ x: AnyObject) -> (CurryTest!) -> CurryTes
 // CHECK: bb1([[METHOD:%.*]] : $@convention(objc_method) (@owned Optional<CurryTest>, @owned @opened({{.*}}) AnyObject) -> @owned Optional<CurryTest>):
 // CHECK:   [[OPENED_ANY_COPY_2:%.*]] = copy_value [[OPENED_ANY_COPY]]
 // CHECK:   partial_apply [[METHOD]]([[OPENED_ANY_COPY_2]])
-// CHECK: } // end sil function '_T013objc_currying30curry_weirdOwnership_AnyObjectSQySo9CurryTestCGSQyADGcs0fG0_pF'
+// CHECK: } // end sil function '_T013objc_currying30curry_weirdOwnership_AnyObjectSQySo9CurryTestCGAEcs0fG0_pF'
 func curry_weirdOwnership_AnyObject(_ x: AnyObject) -> (CurryTest!) -> CurryTest! {
   return x.weirdOwnership!
 }
 
 // bridged requires a thunk to handle bridging conversions
-// CHECK-LABEL: sil hidden @_T013objc_currying23curry_bridged_AnyObjectSQySSGSQySSGcs0eF0_pF : $@convention(thin) (@owned AnyObject) -> @owned @callee_owned (@owned Optional<String>) -> @owned Optional<String>
+// CHECK-LABEL: sil hidden @_T013objc_currying23curry_bridged_AnyObjectSQySSGACcs0eF0_pF : $@convention(thin) (@owned AnyObject) -> @owned @callee_owned (@owned Optional<String>) -> @owned Optional<String>
 // CHECK: bb0([[ANY:%.*]] : $AnyObject):
 // CHECK:    [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
 // CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
@@ -185,9 +185,9 @@ func curry_weirdOwnership_AnyObject(_ x: AnyObject) -> (CurryTest!) -> CurryTest
 // CHECK: [[HAS_METHOD]]([[METHOD:%.*]] : $@convention(objc_method) (Optional<NSString>, @opened({{.*}}) AnyObject) -> @autoreleased Optional<NSString>):
 // CHECK:   [[OPENED_ANY_COPY_2:%.*]] = copy_value [[OPENED_ANY_COPY]]
 // CHECK:   [[PA:%.*]] = partial_apply [[METHOD]]([[OPENED_ANY_COPY_2]])
-// CHECK:   [[THUNK:%.*]] = function_ref @_T0So8NSStringCSgABSgIxyo_SSSgSSSgIxxo_TR
+// CHECK:   [[THUNK:%.*]] = function_ref @_T0So8NSStringCSgACIxyo_SSSgADIxxo_TR
 // CHECK:   partial_apply [[THUNK]]([[PA]])
-// CHECK: } // end sil function '_T013objc_currying23curry_bridged_AnyObjectSQySSGSQySSGcs0eF0_pF'
+// CHECK: } // end sil function '_T013objc_currying23curry_bridged_AnyObjectSQySSGACcs0eF0_pF'
 func curry_bridged_AnyObject(_ x: AnyObject) -> (String!) -> String! {
   return x.bridged!
 }

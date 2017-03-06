@@ -11,7 +11,7 @@ func a(i i: Int) -> (Int) -> Int {
 }
 
 // -- Closure entry point
-// CHECK: define linkonce_odr hidden swiftcc i64 @_T07closure1aSiSicSi1i_tFSiSicfU_(i64, i64)
+// CHECK: define linkonce_odr hidden swiftcc i64 @_T07closure1aS2icSi1i_tFS2icfU_(i64, i64)
 
 protocol Ordinable {
   func ord() -> Int
@@ -22,14 +22,14 @@ func b<T : Ordinable>(seq seq: T) -> (Int) -> Int {
 }
 
 // -- partial_apply stub
-// CHECK: define internal swiftcc i64 @_T07closure1aSiSicSi1i_tFSiSicfU_TA(i64, %swift.refcounted* swiftself)
+// CHECK: define internal swiftcc i64 @_T07closure1aS2icSi1i_tFS2icfU_TA(i64, %swift.refcounted* swiftself)
 // CHECK: }
 
 // -- Closure entry point
-// CHECK: define linkonce_odr hidden swiftcc i64 @_T07closure1bSiSicx3seq_tAA9OrdinableRzlFSiSicfU_(i64, %swift.refcounted*, %swift.type* %T, i8** %T.Ordinable) {{.*}} {
+// CHECK: define linkonce_odr hidden swiftcc i64 @_T07closure1bS2icx3seq_tAA9OrdinableRzlFS2icfU_(i64, %swift.refcounted*, %swift.type* %T, i8** %T.Ordinable) {{.*}} {
 
 // -- partial_apply stub
-// CHECK: define internal swiftcc i64 @_T07closure1bSiSicx3seq_tAA9OrdinableRzlFSiSicfU_TA(i64, %swift.refcounted* swiftself) {{.*}} {
+// CHECK: define internal swiftcc i64 @_T07closure1bS2icx3seq_tAA9OrdinableRzlFS2icfU_TA(i64, %swift.refcounted* swiftself) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[CONTEXT:%.*]] = bitcast %swift.refcounted* %1 to <{ %swift.refcounted, [16 x i8], %swift.refcounted* }>*
 // CHECK:   [[BINDINGSADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [16 x i8], %swift.refcounted* }>, <{ %swift.refcounted, [16 x i8], %swift.refcounted* }>* [[CONTEXT]], i32 0, i32 1
@@ -42,7 +42,7 @@ func b<T : Ordinable>(seq seq: T) -> (Int) -> Int {
 // CHECK:   [[BOX:%.*]] = load %swift.refcounted*, %swift.refcounted** [[BOXADDR]], align 8
 // CHECK:   call void @swift_rt_swift_retain(%swift.refcounted* [[BOX]])
 // CHECK:   call void @swift_rt_swift_release(%swift.refcounted* %1)
-// CHECK:   [[RES:%.*]] = tail call swiftcc i64 @_T07closure1bSiSicx3seq_tAA9OrdinableRzlFSiSicfU_(i64 %0, %swift.refcounted* [[BOX]], %swift.type* [[TYPE]], i8** [[WITNESS]])
+// CHECK:   [[RES:%.*]] = tail call swiftcc i64 @_T07closure1bS2icx3seq_tAA9OrdinableRzlFS2icfU_(i64 %0, %swift.refcounted* [[BOX]], %swift.type* [[TYPE]], i8** [[WITNESS]])
 // CHECK:   ret i64 [[RES]]
 // CHECK: }
 

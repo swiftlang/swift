@@ -226,7 +226,7 @@ func hasLocalizationKey2() {}
 // RUN: %sourcekitd-test -req=cursor -pos=9:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK2 %s
 // CHECK2:      source.lang.swift.ref.function.operator.infix ()
 // CHECK2-NEXT: +
-// CHECK2-NEXT: s:s1poiSiSi_SitF
+// CHECK2-NEXT: s:s1poiS2i_SitF
 // CHECK2-NEXT: (Int, Int) -> Int{{$}}
 // CHECK2-NEXT: _TtFTSiSi_Si
 // CHECK2-NEXT: Swift{{$}}
@@ -459,7 +459,7 @@ func hasLocalizationKey2() {}
 // RUN: %sourcekitd-test -req=cursor -pos=86:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK37
 // CHECK37: source.lang.swift.decl.function.free (86:6-86:111)
 // CHECK37-NEXT: nonDefaultArgNames(external1:_:external3:external4:_:)
-// CHECK37-NEXT: s:11cursor_info18nonDefaultArgNamesySi9external1_SiSi9external3Si9external4SitF
+// CHECK37-NEXT: s:11cursor_info18nonDefaultArgNamesySi9external1_S2i9external3Si9external4SitF
 // CHECK37-NEXT: (Int, Int, Int, Int, Int) -> ()
 // CHECK37: <Declaration>func nonDefaultArgNames(external1 local1: <Type usr="s:Si">Int</Type>, _ local2: <Type usr="s:Si">Int</Type>, external3 local3: <Type usr="s:Si">Int</Type>, external4 _: <Type usr="s:Si">Int</Type>, _: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK37-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>nonDefaultArgNames</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>external1</decl.var.parameter.argument_label> <decl.var.parameter.name>local1</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>local2</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>external3</decl.var.parameter.argument_label> <decl.var.parameter.name>local3</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>external4</decl.var.parameter.argument_label> <decl.var.parameter.name>_</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
@@ -470,7 +470,7 @@ func hasLocalizationKey2() {}
 // RUN: %sourcekitd-test -req=cursor -pos=91:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK39
 // CHECK39: source.lang.swift.decl.enumelement (91:8-91:10)
 // CHECK39-NEXT: C1
-// CHECK39-NEXT: s:11cursor_info2E2O2C1AcCmF
+// CHECK39-NEXT: s:11cursor_info2E2O2C1A2CmF
 // CHECK39-NEXT: (E2.Type) -> E2
 // CHECK39: <Declaration>case C1</Declaration>
 // CHECK39-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C1</decl.name></decl.enumelement>
@@ -495,7 +495,7 @@ func hasLocalizationKey2() {}
 // RUN: %sourcekitd-test -req=cursor -pos=96:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK42
 // CHECK42: source.lang.swift.decl.enumelement (96:8-96:9)
 // CHECK42-NEXT: C
-// CHECK42-NEXT: s:11cursor_info2E3O1CAcCmF
+// CHECK42-NEXT: s:11cursor_info2E3O1CA2CmF
 // CHECK42-NEXT: (E3.Type) -> E3
 // CHECK42: <Declaration>case C = &quot;a&quot;</Declaration>
 // CHECK42-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C</decl.name> = <syntaxtype.string>&quot;a&quot;</syntaxtype.string></decl.enumelement>
