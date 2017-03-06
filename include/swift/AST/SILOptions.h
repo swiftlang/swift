@@ -18,6 +18,7 @@
 #ifndef SWIFT_AST_SILOPTIONS_H
 #define SWIFT_AST_SILOPTIONS_H
 
+#include "swift/Basic/Sanitizers.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
 #include <climits>
@@ -122,6 +123,12 @@ public:
 
   /// Assume that code will be executed in a single-threaded environment.
   bool AssumeSingleThreaded = false;
+
+  /// Indicates which sanitizer is turned on.
+  SanitizerKind Sanitize : 2;
+
+  SILOptions() : Sanitize(SanitizerKind::None) {}
+
 };
 
 } // end namespace swift
