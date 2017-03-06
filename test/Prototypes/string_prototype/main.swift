@@ -1,72 +1,11 @@
 // Run the tests for the whole String prototype
-// RUN: %target-build-swift %s %S/String.swift %S/StringStorage.swift %S/Unicode.swift %S/StringComparison.swift -parse-stdlib -Xfrontend -disable-access-control -Onone -o %t
+// RUN: %target-build-swift %s %S/String.swift %S/StringStorage.swift %S/Unicode.swift %S/Latin1String.swift %S/CanonicalString.swift %S/StringComparison.swift -parse-stdlib -Xfrontend -disable-access-control -Onone -o %t
 // RUN: %target-run %t
 // REQUIRES: executable_test
 
 import Swift
 import SwiftShims
 import StdlibUnittest
-
-//
-// The following is a left over prototype, it's here for test purposes but might
-// end up not existing in the new String
-//
-struct Latin1String<Base : RandomAccessCollection> : Unicode
-where Base.Iterator.Element == UInt8, 
-Base.Index == Base.SubSequence.Index,
-Base.SubSequence.SubSequence == Base.SubSequence,
-Base.SubSequence : RandomAccessCollection,
-Base.SubSequence.Iterator.Element == Base.Iterator.Element {
-  typealias Encoding = Latin1
-  typealias CodeUnits = Base
-  typealias Storage = UnicodeStorage<Base, Latin1>
-  let storage: Storage
-  let _isASCII: Bool?
-  var codeUnits: CodeUnits { return storage.codeUnits }
-
-  init(_ codeUnits: CodeUnits, isASCII: Bool? = nil) {
-    self.storage = UnicodeStorage(codeUnits)
-    self._isASCII = isASCII
-  }
-
-  typealias Characters = LazyMapRandomAccessCollection<CodeUnits, Character>
-  var utf8: ValidUTF8View { return ValidUTF8View(codeUnits) }
-
-  typealias ExtendedASCII = LazyMapRandomAccessCollection<CodeUnits, UInt32>
-  var utf16: ValidUTF16View { return ValidUTF16View(codeUnits) }
-
-  typealias ValidUTF32View = Storage.TranscodedView<UTF32>
-  var utf32: ValidUTF32View { return ValidUTF32View(codeUnits) }
-
-  typealias ValidUTF16View = Storage.TranscodedView<UTF16>
-  var extendedASCII: ExtendedASCII {
-    return codeUnits.lazy.map { UInt32($0) }
-  }
-
-  typealias ValidUTF8View = Storage.TranscodedView<UTF8>
-  var characters: Characters {
-    return codeUnits.lazy.map {
-      Character(UnicodeScalar(UInt32($0))!)
-    }
-  }
-
-  func isASCII(scan: Bool = true) -> Bool {
-    if let result = _isASCII { return result }
-    return scan && !codeUnits.contains { $0 > 0x7f }
-  }
-  func isLatin1(scan: Bool = true) -> Bool {
-    return true
-  }
-  func isNormalizedNFC(scan: Bool = true) -> Bool {
-    return true
-  }
-  func isNormalizedNFD(scan: Bool = true) -> Bool {
-    return true
-  }
-  func isInFastCOrDForm(scan: Bool = true) -> Bool {
-    return true
-  }
-}
 
 var testSuite = TestSuite("t")
 
@@ -123,25 +62,18 @@ testSuite.test("basic") {
   expectTrue(s8.reversed().elementsEqual(s16to8.reversed()))
   expectTrue(s16.reversed().elementsEqual(s8to16.reversed()))
   expectTrue(s16.reversed().elementsEqual(s8Vto16.reversed()))
+  
+  
 
   do {
     // We happen to know that alphabet is non-ASCII, but we're not going to say
     // anything about that.
-    let alphabet = Latin1String(s8.prefix(27))
-    expectTrue(alphabet.isASCII())
+    let alphabet = String(latin1: Latin1String(codeUnits: s8.prefix(27), encodedWith: Latin1.self))
+    expectTrue(alphabet.isASCII(scan: true))
     expectFalse(alphabet.isASCII(scan: false))
 
     // We know that if you interpret s8 as Latin1, it has a lot of non-ASCII
-    let nonASCII = Latin1String(s8)
-    expectFalse(nonASCII.isASCII(scan: true))
-    expectFalse(nonASCII.isASCII(scan: false))
-  }
-
-  do {
-    let alphabet = Latin1String(s8.prefix(27), isASCII: true)
-    let nonASCII = Latin1String(s8, isASCII: false)
-    expectTrue(alphabet.isASCII())
-    expectTrue(alphabet.isASCII(scan: false))
+    let nonASCII = String(latin1: Latin1String(codeUnits: s8, encodedWith: Latin1.self))
     expectFalse(nonASCII.isASCII(scan: true))
     expectFalse(nonASCII.isASCII(scan: false))
   }
@@ -164,22 +96,22 @@ testSuite.test("SwiftCanonicalString") {
   let s8to16 = UnicodeStorage.TranscodedView(s8, from: UTF8.self, to: UTF16.self)
   let _ = UnicodeStorage.TranscodedView(s8, from: ValidUTF8.self, to: UTF16.self)
 
-  let sncFrom32 = String(SwiftCanonicalString(
+  let sncFrom32 = String(canonical: SwiftCanonicalString(
     codeUnits: s32.map { $0 }, encodedWith: UTF32.self
   ))
-  let sncFrom16 = String(SwiftCanonicalString(
+  let sncFrom16 = String(canonical: SwiftCanonicalString(
     codeUnits: s16, encodedWith: UTF16.self
   ))
-  let sncFrom8 = String(SwiftCanonicalString(
+  let sncFrom8 = String(canonical: SwiftCanonicalString(
     codeUnits: s8.map { $0 }, encodedWith: UTF8.self
   ))
-  let sncFrom16to32 = String(SwiftCanonicalString(
+  let sncFrom16to32 = String(canonical: SwiftCanonicalString(
     codeUnits: s16to32.map { $0 }, encodedWith: UTF32.self
   ))
-  let sncFrom16to8 = String(SwiftCanonicalString(
+  let sncFrom16to8 = String(canonical: SwiftCanonicalString(
     codeUnits: s16to8.map { $0 }, encodedWith: UTF8.self
   ))
-  let sncFrom8to16 = String(SwiftCanonicalString(
+  let sncFrom8to16 = String(canonical: SwiftCanonicalString(
     codeUnits: s8to16.map { $0 }, encodedWith: UTF16.self
   ))
 

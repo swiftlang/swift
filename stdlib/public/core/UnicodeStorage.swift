@@ -441,22 +441,19 @@ extension UnicodeStorage {
     public var endIndex: Index { return storage.codeUnits.endIndex }
 
     public subscript(i: Index) -> Character {
-      // _debugLog("subscript: i=\(i)")
       let j = index(after: i)
-      // _debugLog("subscript: j=\(j)")
-      
-      let charSlice = storage.codeUnits[i..<j]
-      let utf8 = _UnicodeStorage(
-        charSlice, Encoding.self).transcoded(to: UTF8.self)
+      let contents = UnicodeStorage<
+                       // explicit generic parameters shouldn't be needed
+                       // rdar://...
+                       CodeUnits.SubSequence,Encoding
+                     >(storage.codeUnits[i..<j], Encoding.self)
         
-      if let small = Character(_smallUtf8: utf8) {
+      if let small = Character(_smallUtf8: contents.transcoded(to: UTF8.self)) {
         return small
       }
       else {
         // FIXME: there is undoubtley a less ridiculous way to do this
-        let scalars = _UnicodeStorage(
-          charSlice, Encoding.self
-        ).scalars.lazy.map(UnicodeScalar.init)
+        let scalars = contents.scalars.lazy.map(UnicodeScalar.init)
         let string = Swift.String(Swift.String.UnicodeScalarView(scalars))
         return Character(_largeRepresentationString: string)
       }
