@@ -2189,6 +2189,100 @@ bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*GenContai
   unreachable
 }
 
+// CHECK-LABEL: sil @combine_cast_of_materializeForSet_function
+// CHECK: bb0
+// CHECK: [[FUN:%.*]] = function_ref @materializeForSetClosure
+// CHECK: apply [[FUN]]<Int>(
+// CHECK: return
+
+sil @combine_cast_of_materializeForSet_function : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer<Int>) -> () {
+bbO(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2: $*GenContainer<Int>):
+  %3 = metatype $@thick GenContainer<Int>.Type
+  %4 = function_ref @materializeForSetClosure : $@convention(thin) <τ_0_0> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer<τ_0_0>, @thick GenContainer<τ_0_0>.Type) -> ()
+  %5 = thin_function_to_pointer %4 : $@convention(thin) <τ_0_0> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer<τ_0_0>, @thick GenContainer<τ_0_0>.Type) -> () to $Builtin.RawPointer
+  %6 = pointer_to_thin_function %5 : $Builtin.RawPointer to $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer<Int>, @thick GenContainer<Int>.Type) -> ()
+  %7 = apply %6(%0, %1, %2, %3) : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer<Int>, @thick GenContainer<Int>.Type) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+protocol AnForwardIndexType {
+}
+
+protocol AnIndexable {
+  associatedtype Index = AnForwardIndexType
+}
+
+struct GenContainer2<T : AnIndexable> {
+}
+
+struct ConcreteForwardIndexType : AnForwardIndexType {
+}
+
+struct ConcreteIndexable : AnIndexable {
+  typealias Index = ConcreteForwardIndexType
+}
+
+
+sil public_external [fragile] @materializeForSetClosure2 : $@convention(thin) <T: AnIndexable> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<T>, @thick GenContainer2<T>.Type) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*GenContainer2<T>, %3 : $@thick GenContainer2<T>.Type):
+  unreachable
+}
+
+// CHECK-LABEL: sil @combine_cast_of_materializeForSet_function
+// CHECK: bb0
+// CHECK: [[FUN:%.*]] = function_ref @materializeForSetClosure
+// CHECK: apply [[FUN]]<ConcreteIndexable, ConcreteForwardIndexType>(
+// CHECK: return
+
+sil @combine_cast_of_materializeForSet_function_nested_substitutions : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<ConcreteIndexable>) -> () {
+bbO(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2: $*GenContainer2<ConcreteIndexable>):
+  %3 = metatype $@thick GenContainer2<ConcreteIndexable>.Type
+  %4 = function_ref @materializeForSetClosure2 : $@convention(thin) <τ_0_0 : AnIndexable> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<τ_0_0>, @thick GenContainer2<τ_0_0>.Type) -> ()
+  %5 = thin_function_to_pointer %4 : $@convention(thin) <τ_0_0 : AnIndexable> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<τ_0_0>, @thick GenContainer2<τ_0_0>.Type) -> () to $Builtin.RawPointer
+  %6 = pointer_to_thin_function %5 : $Builtin.RawPointer to $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<ConcreteIndexable>, @thick GenContainer2<ConcreteIndexable>.Type) -> ()
+  %7 = apply %6(%0, %1, %2, %3) : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<ConcreteIndexable>, @thick GenContainer2<ConcreteIndexable>.Type) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL:   sil @thin_function_to_pointer_identity
+// CHECK:         bb0([[Ref:%.*]]: $Builtin.RawPointer):
+// CHECK-NOT:       pointer_to_thin_function
+// CHECK-NOT:       thin_function_to_pointer
+// CHECK:           return [[Ref]]
+
+sil @thin_function_to_pointer_identity : $@convention(thin) (Builtin.RawPointer) -> (Builtin.RawPointer) {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = pointer_to_thin_function %0 : $Builtin.RawPointer to $@convention(thin) () -> ()
+  %2 = thin_function_to_pointer %1 : $@convention(thin) () -> () to $Builtin.RawPointer
+  return %2 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL:   sil @pointer_to_thin_function_identity
+// CHECK:         bb0([[Ref:%.*]]: $@convention(thin) () -> ()):
+// CHECK-NOT:       thin_function_to_pointer
+// CHECK-NOT:       pointer_to_thin_function
+// CHECK:           return [[Ref]]
+
+sil @pointer_to_thin_function_identity : $@convention(thin) (@convention(thin) () -> ()) -> (@convention(thin) () -> ()) {
+bb0(%0 : $@convention(thin) () -> ()):
+  %1 = thin_function_to_pointer %0 : $@convention(thin) () -> () to $Builtin.RawPointer
+  %2 = pointer_to_thin_function %1 : $Builtin.RawPointer to $@convention(thin) () -> ()
+  return %2 : $@convention(thin) () -> ()
+}
+
+// CHECK-LABEL:   sil @pointer_to_thin_function_different_type
+// CHECK:           thin_function_to_pointer
+// CHECK-NEXT:      pointer_to_thin_function
+// CHECK-NEXT:      return
+
+sil @pointer_to_thin_function_different_type : $@convention(thin) (@convention(thin) (Builtin.Int8) -> ()) -> (@convention(thin) () -> ()) {
+bb0(%0 : $@convention(thin) (Builtin.Int8) -> ()):
+  %1 = thin_function_to_pointer %0 : $@convention(thin) (Builtin.Int8) -> () to $Builtin.RawPointer
+  %2 = pointer_to_thin_function %1 : $Builtin.RawPointer to $@convention(thin) () -> ()
+  return %2 : $@convention(thin) () -> ()
+}
 
 // CHECK-LABEL:   sil @remove_dead_code_after_cond_fail
 // CHECK:           [[Ref:%.*]] = integer_literal $Builtin.Int1, -1
