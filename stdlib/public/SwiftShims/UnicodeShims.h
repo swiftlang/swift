@@ -476,38 +476,38 @@ __swift_stdlib_unorm2_close(__swift_stdlib_UNormalizer2 *norm2);
 
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int32_t
+__swift_int32_t
 __swift_stdlib_unorm2_normalize(const __swift_stdlib_UNormalizer2 *norm2,
-                 const __swift_stdlib_UChar *src, int32_t length,
-                 __swift_stdlib_UChar *dest, int32_t capacity,
+                 const __swift_stdlib_UChar *src, __swift_int32_t length,
+                 __swift_stdlib_UChar *dest, __swift_int32_t capacity,
                  __swift_stdlib_UErrorCode *pErrorCode);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int32_t
+__swift_int32_t
 __swift_stdlib_unorm2_normalizeSecondAndAppend(const __swift_stdlib_UNormalizer2 *norm2,
-                                __swift_stdlib_UChar *first, int32_t firstLength, int32_t firstCapacity,
-                                const __swift_stdlib_UChar *second, int32_t secondLength,
+                                __swift_stdlib_UChar *first, __swift_int32_t firstLength, __swift_int32_t firstCapacity,
+                                const __swift_stdlib_UChar *second, __swift_int32_t secondLength,
                                 __swift_stdlib_UErrorCode *pErrorCode);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int32_t
+__swift_int32_t
 __swift_stdlib_unorm2_append(const __swift_stdlib_UNormalizer2 *norm2,
-              __swift_stdlib_UChar *first, int32_t firstLength, int32_t firstCapacity,
-              const __swift_stdlib_UChar *second, int32_t secondLength,
+              __swift_stdlib_UChar *first, __swift_int32_t firstLength, __swift_int32_t firstCapacity,
+              const __swift_stdlib_UChar *second, __swift_int32_t secondLength,
               __swift_stdlib_UErrorCode *pErrorCode);
 
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int32_t
+__swift_int32_t
 __swift_stdlib_unorm2_getDecomposition(const __swift_stdlib_UNormalizer2 *norm2,
-                        __swift_stdlib_UChar32 c, __swift_stdlib_UChar *decomposition, int32_t capacity,
+                        __swift_stdlib_UChar32 c, __swift_stdlib_UChar *decomposition, __swift_int32_t capacity,
                         __swift_stdlib_UErrorCode *pErrorCode);
 
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int32_t
+__swift_int32_t
 __swift_stdlib_unorm2_getRawDecomposition(const __swift_stdlib_UNormalizer2 *norm2,
-                           __swift_stdlib_UChar32 c, __swift_stdlib_UChar *decomposition, int32_t capacity,
+                           __swift_stdlib_UChar32 c, __swift_stdlib_UChar *decomposition, __swift_int32_t capacity,
                            __swift_stdlib_UErrorCode *pErrorCode);
 
 
@@ -524,21 +524,21 @@ __swift_stdlib_unorm2_getCombiningClass(const __swift_stdlib_UNormalizer2 *norm2
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_stdlib_UBool
 __swift_stdlib_unorm2_isNormalized(const __swift_stdlib_UNormalizer2 *norm2,
-                    const __swift_stdlib_UChar *s, int32_t length,
+                    const __swift_stdlib_UChar *s, __swift_int32_t length,
                     __swift_stdlib_UErrorCode *pErrorCode);
 
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_stdlib_UNormalizationCheckResult
 __swift_stdlib_unorm2_quickCheck(const __swift_stdlib_UNormalizer2 *norm2,
-                  const __swift_stdlib_UChar *s, int32_t length,
+                  const __swift_stdlib_UChar *s, __swift_int32_t length,
                   __swift_stdlib_UErrorCode *pErrorCode);
 
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int32_t
+__swift_int32_t
 __swift_stdlib_unorm2_spanQuickCheckYes(const __swift_stdlib_UNormalizer2 *norm2,
-                         const __swift_stdlib_UChar *s, int32_t length,
+                         const __swift_stdlib_UChar *s, __swift_int32_t length,
                          __swift_stdlib_UErrorCode *pErrorCode);
 
 
@@ -553,7 +553,7 @@ __swift_stdlib_unorm2_hasBoundaryAfter(const __swift_stdlib_UNormalizer2 *norm2,
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_stdlib_UBool
-unorm2_isInert(const UNormalizer2 *norm2, UChar32 c);
+__swift_stdlib_unorm2_isInert(const __swift_stdlib_UNormalizer2 *norm2, __swift_stdlib_UChar32 c);
     
 #ifdef __cplusplus
 }} // extern "C", namespace swift
