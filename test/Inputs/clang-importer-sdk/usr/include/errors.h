@@ -59,3 +59,28 @@
 - (BOOL) obliterate: (NSError**) error;
 - (BOOL) invigorate: (NSError**) error callback: (void(^)(void)) block;
 @end
+
+
+@interface SensibleErrorBase: NSObject
+- (BOOL)performRiskyOperationAndReturnError:(NSError **)error;
+- (nullable NSObject *)produceRiskyOutputAndReturnError:(NSError **)error;
+- (nullable NSString *)produceRiskyStringAndReturnError:(NSError **)error;
+
+- (nullable NSObject *)badNullResult:(NSError **)err __attribute__((swift_error(null_result)));
+- (nullable NSObject *)badNullResult2:(NSError **)err __attribute__((swift_error(null_result)));
+- (int)badZeroResult:(NSError **)err __attribute__((swift_error(zero_result)));
+- (int)badNonzeroResult:(NSError **)err __attribute__((swift_error(nonzero_result)));
+@end
+
+@interface FoolishErrorSub : SensibleErrorBase
+// This is invalid, but Swift shouldn't crash when it sees it.
+- (void)performRiskyOperationAndReturnError:(NSError **)error;
+// This should technically be valid in Objective-C as a covariant return.
+- (nonnull FoolishErrorSub *)produceRiskyOutputAndReturnError:(NSError **)error;
+- (nonnull NSString *)produceRiskyStringAndReturnError:(NSError **)error;
+
+- (void)badNullResult:(NSError **)err;
+- (int)badNullResult2:(NSError **)err;
+- (void)badZeroResult:(NSError **)err;
+- (void)badNonzeroResult:(NSError **)err;
+@end
