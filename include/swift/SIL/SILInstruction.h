@@ -461,8 +461,8 @@ public:
     }
   }
 
-  size_t
-      numTrailingObjects(SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(Operand)) const {
+  size_t numTrailingObjects(
+  	  typename TrailingObjects::template OverloadToken<Operand>) const {
     return NumOperands;
   }
 
@@ -2300,8 +2300,8 @@ public:
   SILType getBoundType() const { return BoundType ; }
 
   // Implement llvm::TrailingObjects.
-  size_t
-      numTrailingObjects(SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(Operand)) const {
+  size_t numTrailingObjects(
+  	  typename TrailingObjects::template OverloadToken<Operand>) const {
     return NumOperands;
   }
 

@@ -25,7 +25,6 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Availability.h"
-#include "swift/Basic/Compiler.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace llvm {
@@ -659,6 +658,14 @@ public:
 template<typename Derived>
 class TrailingCallArguments
     : private llvm::TrailingObjects<Derived, Identifier, SourceLoc> {
+  // We need to friend TrailingObjects twice here to work around an MSVC bug.
+  // If we have two functions of the same name with the parameter
+  // typename TrailingObjectsIdentifier::template OverloadToken<T> where T is
+  // different for each function, then MSVC reports a "member function already
+  // defined or declared" error, which is incorrect.
+  using TrailingObjectsIdentifier = llvm::TrailingObjects<Derived, Identifier>;
+  friend TrailingObjectsIdentifier;
+
   using TrailingObjects = llvm::TrailingObjects<Derived, Identifier, SourceLoc>;
   friend TrailingObjects;
 
@@ -671,12 +678,14 @@ class TrailingCallArguments
   }
 
   size_t numTrailingObjects(
-      SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(Identifier)) const {
+      typename TrailingObjectsIdentifier::template OverloadToken<Identifier>)
+      const {
     return asDerived().getNumArguments();
   }
 
   size_t numTrailingObjects(
-      SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(SourceLoc)) const {
+      typename TrailingObjectsIdentifier::template OverloadToken<SourceLoc>)
+      const {
     return asDerived().hasArgumentLabelLocs() ? asDerived().getNumArguments()
                                               : 0;
   }
