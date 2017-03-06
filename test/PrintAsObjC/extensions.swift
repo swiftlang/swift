@@ -77,17 +77,6 @@ extension A5 {
   var notObjC: NotObjC { return NotObjC() }
 }
 
-// NEGATIVE-NOT: @protocol A6Protocol
-protocol A6Protocol {}
-
-// CHECK-LABEL: @interface A6{{$}}
-// CHECK-NEXT: init
-// CHECK-NEXT: @end
-@objc class A6 {}
-
-// NEGATIVE-NOT: @interface A6 (SWIFT_EXTENSION(extensions))
-extension A6: A6Protocol {}
-
 // CHECK-LABEL: @interface CustomName{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
