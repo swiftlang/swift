@@ -11,23 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Foundation // Clang module
-
-@_silgen_name("NS_Swift_NSFileManager_replaceItemAtURL_withItemAtURL_backupItemName_options")
-internal func NS_Swift_NSFileManager_replaceItemAtURL_withItemAtURL_backupItemName_options(
-    _ self_: AnyObject,
-    _ originalItemURL: AnyObject,
-    _ newItemURL: AnyObject,
-    _ backupItemName: NSString?,
-    _ options: FileManager.ItemReplacementOptions,
-    _ error: NSErrorPointer) -> NSURL?
-
-@_silgen_name("NS_Swift_NSFileManager_enumeratorAt_includingPropertiesForKeys_options_errorHandler")
-internal func NS_Swift_NSFileManager_enumeratorAt_includingPropertiesForKeys_options_errorHandler(
-    _ self_ : AnyObject,
-    _ url: AnyObject,
-    _ keys: NSArray?,
-    _ options: FileManager.DirectoryEnumerationOptions,
-    _ errorHandler: @escaping @convention(block) (NSURL, NSError) -> Bool) -> FileManager.DirectoryEnumerator?
+import _SwiftFoundationOverlayShims
 
 extension FileManager {
     /*
@@ -37,25 +21,30 @@ extension FileManager {
     
     @available(*, deprecated, renamed:"replaceItemAt(_:withItemAt:backupItemName:options:)")
     public func replaceItemAtURL(originalItemURL: NSURL, withItemAtURL newItemURL: NSURL, backupItemName: String? = nil, options: FileManager.ItemReplacementOptions = []) throws -> NSURL? {
-        var error: NSError?
-        if let result = NS_Swift_NSFileManager_replaceItemAtURL_withItemAtURL_backupItemName_options(self, originalItemURL, newItemURL, backupItemName as NSString?, options, &error) {
-            return result
-        }
-        throw error!
+        var error: NSError? = nil
+        guard let result = __NSFileManagerReplaceItemAtURL(self, originalItemURL as URL, newItemURL as URL, backupItemName, options, &error) else { throw error! }
+        return result as NSURL
     }
 
+    @available(swift, obsoleted: 4)
     @available(OSX 10.6, iOS 4.0, *)
     public func replaceItemAt(_ originalItemURL: URL, withItemAt newItemURL: URL, backupItemName: String? = nil, options: FileManager.ItemReplacementOptions = []) throws -> NSURL? {
         var error: NSError?
-        if let result = NS_Swift_NSFileManager_replaceItemAtURL_withItemAtURL_backupItemName_options(self, originalItemURL as NSURL, newItemURL as NSURL, backupItemName as NSString?, options, &error) {
-            return result
-        }
-        throw error!
+        guard let result = __NSFileManagerReplaceItemAtURL(self, originalItemURL, newItemURL , backupItemName, options, &error) else { throw error! }
+        return result as NSURL
     }
     
+    @available(swift, introduced: 4)
+    @available(OSX 10.6, iOS 4.0, *)
+    public func replaceItemAt(_ originalItemURL: URL, withItemAt newItemURL: URL, backupItemName: String? = nil, options: FileManager.ItemReplacementOptions = []) throws -> URL? {
+        var error: NSError?
+        guard let result = __NSFileManagerReplaceItemAtURL(self, originalItemURL, newItemURL , backupItemName, options, &error) else { throw error! }
+        return result
+    }
+
     @available(OSX 10.6, iOS 4.0, *)
     public func enumerator(at url: URL, includingPropertiesForKeys keys: [URLResourceKey]?, options mask: FileManager.DirectoryEnumerationOptions = [], errorHandler handler: ((URL, Error) -> Bool)? = nil) -> FileManager.DirectoryEnumerator? {
-        return NS_Swift_NSFileManager_enumeratorAt_includingPropertiesForKeys_options_errorHandler(self, url as NSURL, keys as NSArray?, mask, { (url, error) in
+        return __NSFileManagerEnumeratorAtURL(self, url, keys, mask, { (url, error) in
             var errorResult = true
             if let h = handler {
                 errorResult = h(url as URL, error)
@@ -63,5 +52,4 @@ extension FileManager {
             return errorResult
         })
     }
-
 }
