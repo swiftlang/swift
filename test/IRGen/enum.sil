@@ -122,7 +122,7 @@ import Swift
 // CHECK:   i32 1, i32 0
 // CHECK: }>
 
-// CHECK: @_T04enum16DynamicSingletonOMP = hidden global <{ {{.*}}* }> <{
+// CHECK: @_T04enum16DynamicSingletonOMP = hidden global <{ {{.*}}, [26 x i8*] }> <{
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_DynamicSingleton
 // CHECK:   @_T04enum16DynamicSingletonOMn
 // CHECK:   i8* null
@@ -166,7 +166,7 @@ import Swift
 // CHECK: ]
 
 
-// CHECK: @_T04enum20DynamicSinglePayloadOMP = hidden global <{ {{.*}}* }> <{
+// CHECK: @_T04enum20DynamicSinglePayloadOMP = hidden global <{ {{.*}}, [26 x i8*] }> <{
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_DynamicSinglePayload
 // CHECK:   i8* null
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_T04enum20DynamicSinglePayloadOwxs to i8*)

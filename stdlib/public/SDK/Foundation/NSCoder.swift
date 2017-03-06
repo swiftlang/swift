@@ -11,37 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Foundation // Clang module
-
+import _SwiftFoundationOverlayShims
 
 //===----------------------------------------------------------------------===//
 // NSCoder
 //===----------------------------------------------------------------------===//
-
-@_silgen_name("NS_Swift_NSCoder_decodeObject")
-internal func NS_Swift_NSCoder_decodeObject(
-  _ self_: AnyObject,
-  _ error: NSErrorPointer) -> AnyObject?
-
-@_silgen_name("NS_Swift_NSCoder_decodeObjectForKey")
-internal func NS_Swift_NSCoder_decodeObjectForKey(
-  _ self_: AnyObject,
-  _ key: AnyObject,
-  _ error: NSErrorPointer) -> AnyObject?
-
-@_silgen_name("NS_Swift_NSCoder_decodeObjectOfClassForKey")
-internal func NS_Swift_NSCoder_decodeObjectOfClassForKey(
-  _ self_: AnyObject,
-  _ cls: AnyObject,
-  _ key: AnyObject,
-  _ error: NSErrorPointer) -> AnyObject?
-
-@_silgen_name("NS_Swift_NSCoder_decodeObjectOfClassesForKey")
-internal func NS_Swift_NSCoder_decodeObjectOfClassesForKey(
-  _ self_: AnyObject,
-  _ classes: NSSet?,
-  _ key: AnyObject,
-  _ error: NSErrorPointer) -> AnyObject?
-
 
 @available(OSX 10.11, iOS 9.0, *)
 internal func resolveError(_ error: NSError?) throws {
@@ -63,7 +37,7 @@ extension NSCoder {
     of cls: DecodedObjectType.Type, forKey key: String
   ) -> DecodedObjectType?
     where DecodedObjectType : NSCoding, DecodedObjectType : NSObject {
-    let result = NS_Swift_NSCoder_decodeObjectOfClassForKey(self as AnyObject, cls as AnyObject, key as AnyObject, nil)
+    let result = __NSCoderDecodeObjectOfClassForKey(self, cls, key, nil)
     return result as? DecodedObjectType
   }
 
@@ -79,14 +53,14 @@ extension NSCoder {
     if let theClasses = classes {
       classesAsNSObjects = NSSet(array: theClasses.map { $0 as AnyObject })
     }
-    return NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classesAsNSObjects, key as AnyObject, nil).map { $0 as Any }
+    return __NSCoderDecodeObjectOfClassesForKey(self, classesAsNSObjects, key, nil).map { $0 as Any }
   }
 
   @nonobjc
   @available(OSX 10.11, iOS 9.0, *)
   public func decodeTopLevelObject() throws -> Any? {
     var error: NSError?
-    let result = NS_Swift_NSCoder_decodeObject(self as AnyObject, &error)
+    let result = __NSCoderDecodeObject(self, &error)
     try resolveError(error)
     return result.map { $0 as Any }
   }
@@ -97,10 +71,21 @@ extension NSCoder {
   }
 
   @nonobjc
+  @available(swift, obsoleted: 4)
   @available(OSX 10.11, iOS 9.0, *)
   public func decodeTopLevelObject(forKey key: String) throws -> AnyObject? {
     var error: NSError?
-    let result = NS_Swift_NSCoder_decodeObjectForKey(self as AnyObject, key as AnyObject, &error)
+    let result = __NSCoderDecodeObjectForKey(self, key, &error)
+    try resolveError(error)
+    return result as AnyObject?
+  }
+
+  @nonobjc
+  @available(swift, introduced: 4)
+  @available(OSX 10.11, iOS 9.0, *)
+  public func decodeTopLevelObject(forKey key: String) throws -> Any? {
+    var error: NSError?
+    let result = __NSCoderDecodeObjectForKey(self, key, &error)
     try resolveError(error)
     return result
   }
@@ -119,7 +104,7 @@ extension NSCoder {
   ) throws -> DecodedObjectType?
     where DecodedObjectType : NSCoding, DecodedObjectType : NSObject {
     var error: NSError?
-    let result = NS_Swift_NSCoder_decodeObjectOfClassForKey(self as AnyObject, cls as AnyObject, key as AnyObject, &error)
+    let result = __NSCoderDecodeObjectOfClassForKey(self, cls, key, &error)
     try resolveError(error)
     return result as? DecodedObjectType
   }
@@ -138,7 +123,7 @@ extension NSCoder {
     if let theClasses = classes {
       classesAsNSObjects = NSSet(array: theClasses.map { $0 as AnyObject })
     }
-    let result = NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classesAsNSObjects, key as AnyObject, &error)
+    let result = __NSCoderDecodeObjectOfClassesForKey(self, classesAsNSObjects, key, &error)
     try resolveError(error)
     return result.map { $0 as Any }
   }
@@ -148,18 +133,23 @@ extension NSCoder {
 // NSKeyedUnarchiver
 //===----------------------------------------------------------------------===//
 
-@_silgen_name("NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData")
-internal func NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(
-  _ self_: AnyObject,
-  _ data: AnyObject,
-  _ error: NSErrorPointer) -> AnyObject?
-
 extension NSKeyedUnarchiver {
-  @available(OSX 10.11, iOS 9.0, *)
   @nonobjc
+  @available(swift, obsoleted: 4)
+  @available(OSX 10.11, iOS 9.0, *)
   public class func unarchiveTopLevelObjectWithData(_ data: NSData) throws -> AnyObject? {
     var error: NSError?
-    let result = NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(self, data as AnyObject, &error)
+    let result = __NSKeyedUnarchiverUnarchiveObject(self, data, &error)
+    try resolveError(error)
+    return result as AnyObject?
+  }
+
+  @nonobjc
+  @available(swift, introduced: 4)
+  @available(OSX 10.11, iOS 9.0, *)
+  public class func unarchiveTopLevelObjectWithData(_ data: NSData) throws -> Any? {
+    var error: NSError?
+    let result = __NSKeyedUnarchiverUnarchiveObject(self, data, &error)
     try resolveError(error)
     return result
   }

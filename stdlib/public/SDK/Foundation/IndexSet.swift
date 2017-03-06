@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Foundation // Clang module
+import _SwiftFoundationOverlayShims
 
 extension IndexSet.Index {
     public static func ==(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
@@ -896,15 +897,6 @@ extension NSIndexSet : _HasCustomAnyHashableRepresentation {
         return AnyHashable(self as IndexSet)
     }
 }
-
-@_silgen_name("__NSIndexSetRangeCount")
-internal func __NSIndexSetRangeCount(_ indexSet: NSIndexSet) -> UInt
-
-@_silgen_name("__NSIndexSetRangeAtIndex")
-internal func __NSIndexSetRangeAtIndex(_ indexSet: NSIndexSet, _ index: UInt, _ location : UnsafeMutablePointer<UInt>, _ length : UnsafeMutablePointer<UInt>)
-
-@_silgen_name("__NSIndexSetIndexOfRangeContainingIndex")
-internal func __NSIndexSetIndexOfRangeContainingIndex(_ indexSet: NSIndexSet, _ index: UInt) -> UInt
 
 // MARK: Protocol
 

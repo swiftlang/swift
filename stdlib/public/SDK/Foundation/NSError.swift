@@ -13,6 +13,7 @@
 @_exported import Foundation // Clang module
 import CoreFoundation
 import Darwin
+import _SwiftFoundationOverlayShims
 
 //===----------------------------------------------------------------------===//
 // NSError (as an out parameter).
@@ -64,13 +65,6 @@ public extension LocalizedError {
   var helpAnchor: String? { return nil }
 }
 
-@_silgen_name("NS_Swift_performErrorRecoverySelector")
-internal func NS_Swift_performErrorRecoverySelector(
-  delegate: AnyObject?,
-  selector: Selector,
-  success: ObjCBool,
-  contextInfo: UnsafeMutableRawPointer?)
-
 /// Class that implements the informal protocol
 /// NSErrorRecoveryAttempting, which is used by NSError when it
 /// attempts recovery from an error.
@@ -83,11 +77,7 @@ class _NSErrorRecoveryAttempter {
                        contextInfo: UnsafeMutableRawPointer?) {
     let error = nsError as Error as! RecoverableError
     error.attemptRecovery(optionIndex: recoveryOptionIndex) { success in
-      NS_Swift_performErrorRecoverySelector(
-        delegate: delegate,
-        selector: didRecoverSelector,
-        success: ObjCBool(success),
-        contextInfo: contextInfo)
+      __NSErrorPerformRecoverySelector(delegate, didRecoverSelector, success, contextInfo)
     }
   }
 
