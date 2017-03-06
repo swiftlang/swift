@@ -4960,19 +4960,16 @@ static bool isUnsatisfiedReq(NormalProtocolConformance *conformance,
 class ConformanceGroupedChecker {
   TypeChecker &TC;
   SmallVectorImpl<ValueDecl*> &unsatisfiedReqs;
-  bool AnyInvalid;
   llvm::SmallVector<NormalProtocolConformance*, 4> AllConformances;
   llvm::SetVector<ValueDecl*> MissingWitnesses;
   llvm::SmallVector<ConformanceChecker, 4> AllCheckers;
   ProtocolConformance * checkIndividualConformance(
     NormalProtocolConformance *conformance, bool issueFixit);
-  ConformanceChecker &createChecker(NormalProtocolConformance *conformance,
-                                    bool suppressDiagnostics);
+
 public:
   ConformanceGroupedChecker(TypeChecker &TC,
                             SmallVectorImpl<ValueDecl*> &unsatisfiedReqs):
-                              TC(TC), unsatisfiedReqs(unsatisfiedReqs),
-                              AnyInvalid(false) {}
+                              TC(TC), unsatisfiedReqs(unsatisfiedReqs) {}
   void addConformance(NormalProtocolConformance *conformance) {
     AllConformances.push_back(conformance);
   }
@@ -4983,11 +4980,6 @@ void ConformanceGroupedChecker::checkAllConformances() {
   for(unsigned I = 0, N = AllConformances.size(); I < N; I ++) {
     auto *conformance = AllConformances[I];
     checkIndividualConformance(conformance, I == N - 1);
-    if (AnyInvalid || conformance->isInvalid()) {
-      AnyInvalid = true;
-      return;
-    }
-
     // Check whether there are any unsatisfied requirements.
     auto proto = conformance->getProtocol();
     for (auto member : proto->getMembers()) {
@@ -5004,14 +4996,6 @@ void ConformanceGroupedChecker::checkAllConformances() {
   };
 }
 
-ConformanceChecker &ConformanceGroupedChecker::
-createChecker(NormalProtocolConformance *conformance,
-                bool suppressDiagnostics) {
-  AllCheckers.emplace_back(TC, conformance, MissingWitnesses,
-                           suppressDiagnostics);
-  return AllCheckers.back();
-}
-
 /// \brief Determine whether the type \c T conforms to the protocol \c Proto,
 /// recording the complete witness table if it does.
 ProtocolConformance *ConformanceGroupedChecker::
@@ -5021,7 +5005,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   case ProtocolConformanceState::Incomplete:
     if (conformance->isInvalid()) {
       // Emit any delayed diagnostics and return.
-      createChecker(conformance, false).emitDelayedDiags();
+      ConformanceChecker(TC, conformance, MissingWitnesses, false).
+        emitDelayedDiags();
     }
 
     // Check the rest of the conformance below.
@@ -5036,7 +5021,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     if (conformance->isInvalid()) {
       // Emit any delayed diagnostics and return.
       // FIXME: Should we complete checking to emit more diagnostics?
-      createChecker(conformance, false).emitDelayedDiags();
+      ConformanceChecker(TC, conformance, MissingWitnesses, false).
+        emitDelayedDiags();
     }
     return conformance;
   }
@@ -5128,7 +5114,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     return conformance;
 
   // The conformance checker we're using.
-  ConformanceChecker &checker = createChecker(conformance, true);
+  ConformanceChecker checker(TC, conformance, MissingWitnesses);
   checker.checkConformance(issueFixit);
   return conformance;
 }
