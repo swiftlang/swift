@@ -35,7 +35,10 @@
 /// argument of the _getElement call.
 ///   let token = _checkSubscript(index, ... )
 ///   return _getElement(index, ... , matchingSubscriptCheck: token)
-internal struct _DependenceToken {}
+///
+/// This is public because it is used by the public function _checkSubscript.
+public // @testable
+struct _DependenceToken {}
 
 %{
   arrayTypes = [
