@@ -513,7 +513,8 @@ func returnsArray() -> [Int] { return [] }
 
 returnsArray().flatMap { $0 }.flatMap { }
 // expected-warning@-1 {{expression of type 'Int' is unused}}
-// expected-warning@-2 {{result of call to 'flatMap' is unused}}
+// expected-warning@-2 {{Please use map instead.}}
+// expected-warning@-3 {{result of call to 'flatMap' is unused}}
 
 // rdar://problem/30271695
 _ = ["hi"].flatMap { $0.isEmpty ? nil : $0 }
