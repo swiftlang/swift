@@ -107,10 +107,14 @@ extension GenericClass {
 class NotObjC {}
 extension NotObjC {}
 
-// NEGATIVE-NOT: @interface NSObject (SWIFT_EXTENSION(extensions))
 // NEGATIVE-NOT: @interface NSObject{{$}}
 // NEGATIVE-NOT: @class NSObject
-extension NSObject {}
+// CHECK-LABEL: @interface NSObject (SWIFT_EXTENSION(extensions))
+// CHECK-DAG: @property (nonatomic, readonly) NSInteger some;
+// CHECK-NEXT: @end
+extension NSObject {
+  var some: Int { return 1 }
+}
 
 // NEGATIVE-NOT: @class NSString;
 // CHECK: @class NSColor;
