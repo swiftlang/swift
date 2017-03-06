@@ -18,7 +18,9 @@ public func run_StringWithCString(_ N: Int) {
   }
 }
 
+// FIXME(string)
 public func run_StringHasPrefix(_ N: Int) {
+#if _runtime(_ObjC)
   let prefix = "prefix"
   let testString = "prefixedString"
   for _ in 0 ..< N {
@@ -28,9 +30,12 @@ public func run_StringHasPrefix(_ N: Int) {
       }
     }
   }
+#endif
 }
 
+// FIXME(string)
 public func run_StringHasSuffix(_ N: Int) {
+#if _runtime(_ObjC)
   let suffix = "Suffixed"
   let testString = "StringSuffixed"
   for _ in 0 ..< N {
@@ -40,9 +45,12 @@ public func run_StringHasSuffix(_ N: Int) {
       }
     }
   }
+#endif
 }
 
+// FIXME(string)
 public func run_StringHasPrefixUnicode(_ N: Int) {
+#if _runtime(_ObjC)
   let prefix = "❄️prefix"
   let testString = "❄️prefixedString"
   for _ in 0 ..< N {
@@ -52,9 +60,12 @@ public func run_StringHasPrefixUnicode(_ N: Int) {
       }
     }
   }
+#endif
 }
 
+// FIXME(string)
 public func run_StringHasSuffixUnicode(_ N: Int) {
+#if _runtime(_ObjC)
   let suffix = "❄️Suffixed"
   let testString = "String❄️Suffixed"
   for _ in 0 ..< N {
@@ -64,6 +75,7 @@ public func run_StringHasSuffixUnicode(_ N: Int) {
       }
     }
   }
+#endif
 }
 
 @inline(never)

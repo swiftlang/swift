@@ -13,6 +13,7 @@
 import TestsUtils
 import Foundation
 
+#if _runtime(_ObjC)
 @inline(never)
 public func forcedCast<NS, T>(_ ns: NS) -> T {
   return ns as! T
@@ -22,10 +23,12 @@ public func forcedCast<NS, T>(_ ns: NS) -> T {
 public func conditionalCast<NS, T>(_ ns: NS) -> T? {
   return ns as? T
 }
+#endif
 
 
 // === String === //
 
+#if _runtime(_ObjC)
 func createNSString() -> NSString {
   return NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
 }
@@ -44,14 +47,18 @@ func testObjectiveCBridgeFromNSString() {
   }
   CheckResults(s != nil && s == "NSString that does not fit in tagged pointer", "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeFromNSString(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSString()
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeFromNSStringForced() {
   let nsString = createNSString()
@@ -63,14 +70,18 @@ func testObjectiveCBridgeFromNSStringForced() {
   }
   CheckResults(s != nil && s == "NSString that does not fit in tagged pointer", "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeFromNSStringForced(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSStringForced()
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeToNSString() {
   let nativeString = "Native"
@@ -82,16 +93,20 @@ func testObjectiveCBridgeToNSString() {
   }
   CheckResults(s != nil && s == "Native", "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeToNSString(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeToNSString()
   }
+#endif
 }
 
 // === Array === //
 
+#if _runtime(_ObjC)
 func createNSArray() -> NSArray {
   let nsMutableArray = NSMutableArray()
   let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
@@ -121,14 +136,18 @@ func testObjectiveCBridgeFromNSArrayAnyObject() {
   }
   CheckResults(nativeString != nil && nativeString! == "NSString that does not fit in tagged pointer", "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeFromNSArrayAnyObject(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSArrayAnyObject()
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeFromNSArrayAnyObjectForced() {
   let nsArray = createNSArray()
@@ -140,14 +159,18 @@ func testObjectiveCBridgeFromNSArrayAnyObjectForced() {
   }
   CheckResults(nativeString != nil && nativeString! == "NSString that does not fit in tagged pointer", "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeFromNSArrayAnyObjectForced(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSArrayAnyObjectForced()
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeToNSArray() {
   let nativeArray = ["abcde", "abcde", "abcde", "abcde", "abcde",
@@ -160,14 +183,18 @@ func testObjectiveCBridgeToNSArray() {
   }
   CheckResults(nsString != nil && (nsString! as! NSString).isEqual("abcde"), "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeToNSArray(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeToNSArray()
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeFromNSArrayAnyObjectToString() {
   let nsArray = createNSArray()
@@ -180,14 +207,18 @@ func testObjectiveCBridgeFromNSArrayAnyObjectToString() {
   }
   CheckResults(nativeString != nil && nativeString == "NSString that does not fit in tagged pointer", "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeFromNSArrayAnyObjectToString(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSArrayAnyObjectToString()
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeFromNSArrayAnyObjectToStringForced() {
   let nsArray = createNSArray()
@@ -199,16 +230,20 @@ func testObjectiveCBridgeFromNSArrayAnyObjectToStringForced() {
   }
   CheckResults(nativeString != nil && nativeString == "NSString that does not fit in tagged pointer", "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeFromNSArrayAnyObjectToStringForced(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSArrayAnyObjectToStringForced()
   }
+#endif
 }
 
 // === Dictionary === //
 
+#if _runtime(_ObjC)
 func createNSDictionary() -> NSDictionary {
   let nsMutableDictionary = NSMutableDictionary()
   let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
@@ -248,14 +283,18 @@ func testObjectiveCBridgeFromNSDictionaryAnyObject() {
   }
   CheckResults(nativeInt != nil && nativeInt == 1, "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeFromNSDictionaryAnyObject(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSDictionaryAnyObject()
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeFromNSDictionaryAnyObjectForced() {
   let nsDictionary = createNSDictionary()
@@ -269,14 +308,18 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectForced() {
   }
   CheckResults(nativeInt != nil && nativeInt == 1, "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectForced(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSDictionaryAnyObjectForced()
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeToNSDictionary() {
   let nativeDictionary = ["abcde1": 1, "abcde2": 2, "abcde3": 3, "abcde4": 4,
@@ -291,14 +334,18 @@ func testObjectiveCBridgeToNSDictionary() {
   }
   CheckResults(nsNumber != nil && (nsNumber as! Int) == 1, "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeToNSDictionary(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeToNSDictionary()
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeFromNSDictionaryAnyObjectToString() {
   let nsDictionary = createNSDictionary()
@@ -313,14 +360,18 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectToString() {
   }
   CheckResults(nativeInt != nil && nativeInt == 1, "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSDictionaryAnyObjectToString()
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced() {
   let nsDictionary = createNSDictionary()
@@ -335,16 +386,20 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced() {
   }
   CheckResults(nativeInt != nil && nativeInt == 1, "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced()
   }
+#endif
 }
 
 // === Set === //
 
+#if _runtime(_ObjC)
 func createNSSet() -> NSSet {
   let nsMutableSet = NSMutableSet()
   let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
@@ -385,14 +440,18 @@ func testObjectiveCBridgeFromNSSetAnyObject() {
   }
   CheckResults(result != nil && result!, "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeFromNSSetAnyObject(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSSetAnyObject()
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeFromNSSetAnyObjectForced() {
   let nsSet = createNSSet()
@@ -406,14 +465,18 @@ func testObjectiveCBridgeFromNSSetAnyObjectForced() {
   }
   CheckResults(result != nil && result!, "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeFromNSSetAnyObjectForced(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSSetAnyObjectForced()
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeToNSSet() {
   let nativeSet = Set<String>(["abcde1", "abcde2", "abcde3", "abcde4", "abcde5",
@@ -427,14 +490,18 @@ func testObjectiveCBridgeToNSSet() {
   }
   CheckResults(nsString != nil && (nsString as! String) == "abcde1", "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeToNSSet(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeToNSSet()
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeFromNSSetAnyObjectToString() {
   let nsString = NSString(cString: "NSString that does not fit in tagged pointer", encoding: String.Encoding.utf8.rawValue)!
@@ -449,14 +516,18 @@ func testObjectiveCBridgeFromNSSetAnyObjectToString() {
   }
   CheckResults(result != nil && result!, "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeFromNSSetAnyObjectToString(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSSetAnyObjectToString()
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeFromNSSetAnyObjectToStringForced() {
   let nsSet = createNSSet()
@@ -471,10 +542,13 @@ func testObjectiveCBridgeFromNSSetAnyObjectToStringForced() {
   }
   CheckResults(result != nil && result!, "Expected results did not match")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced(_ N: Int) {
+#if _runtime(_ObjC)
   for _ in 0 ..< N {
     testObjectiveCBridgeFromNSSetAnyObjectToStringForced()
   }
+#endif
 }
