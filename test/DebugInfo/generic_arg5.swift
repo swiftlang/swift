@@ -17,7 +17,7 @@ public func foo<Type>(_ values : [S<Type>])
   // CHECK: ![[TY]] = !DICompositeType({{.*}}identifier: "_T012generic_arg51SVyAA3fooySayACyxGGlFQq_GD")
   // CHECK: ![[EXPR]] = !DIExpression(DW_OP_deref)
   let _ = values.flatMap { arg in
-    return arg
+    return .some(arg)
   }
  
 }
