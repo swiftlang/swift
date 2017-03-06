@@ -6,4 +6,5 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -emit-ir
+// REQUIRES: deterministic-behavior
 protocol A.init(UInt=_=1 + 1){{let c{extension{lazy var f={
