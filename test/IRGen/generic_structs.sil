@@ -26,7 +26,7 @@ import Builtin
 // --       generic parameter count, primary counts; generic parameter witness counts
 // CHECK:   i32 1, i32 1, i32 0
 // CHECK: }>
-// CHECK: @_T015generic_structs13SingleDynamicVMP = hidden global <{{[{].*\* [}]}}> <{
+// CHECK: @_T015generic_structs13SingleDynamicVMP = hidden global <{ {{.*}} }> <{
 // -- template header
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_SingleDynamic,
 // CHECK:   i32 240, i16 1, i16 8, [{{[0-9]+}} x i8*] zeroinitializer,
@@ -44,7 +44,7 @@ import Builtin
 // -- extra inhabitants
 // CHECK:   i8* null,
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_T015generic_structs13SingleDynamicVwxs to i8*),
-// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_T015generic_structs13SingleDynamicVwxg to i8*) }>
+// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_T015generic_structs13SingleDynamicVwxg to i8*)] }>
 // CHECK-NOT: @_T015generic_structs13SingleDynamicVWV
 
 // -- Nominal type descriptor for generic struct with protocol requirements
@@ -68,7 +68,7 @@ import Builtin
 // CHECK-SAME: i32 4, i32 2, i32 0
 // CHECK-SAME: }>
 
-// CHECK: @_T015generic_structs23DynamicWithRequirementsVMP = hidden global <{ {{.*}}* }> <{
+// CHECK: @_T015generic_structs23DynamicWithRequirementsVMP = hidden global <{ {{.*}} }> <{
 // -- field offset vector; generic parameter vector
 // CHECK:   i64 0, i64 0, %swift.type* null, %swift.type* null, i8** null, i8** null,
 // CHECK: }>

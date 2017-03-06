@@ -72,8 +72,7 @@ class Foo: Fooable {
 // CHECK: [[ARRAY_SIGNATURE_EXT:@.*]] = private unnamed_addr constant [29 x i8] c"@\22NSArray\2224@0:8@\22NSArray\2216\00"
 // CHECK: [[DICT_SIGNATURE_EXT:@.*]] = private unnamed_addr constant [39 x i8] c"@\22NSDictionary\2224@0:8@\22NSDictionary\2216\00"
 // CHECK: [[SET_SIGNATURE_EXT:@.*]] = private unnamed_addr constant [25 x i8] c"@\22NSSet\2224@0:8@\22NSSet\2216\00"
-// CHECK: @_PROTOCOL_METHOD_TYPES__TtP12objc_methods7Fooable_ = private constant { [6 x i8*] } {
-// CHECK:   [6 x i8*] [
+// CHECK: @_PROTOCOL_METHOD_TYPES__TtP12objc_methods7Fooable_ = private constant [6 x i8*] [
 // CHECK:     i8* getelementptr inbounds ([18 x i8], [18 x i8]* [[BLOCK_SIGNATURE_EXT_1]], i64 0, i64 0)
 // CHECK:     i8* getelementptr inbounds ([19 x i8], [19 x i8]* [[BLOCK_SIGNATURE_EXT_2]], i64 0, i64 0)
 // CHECK:     i8* getelementptr inbounds ([31 x i8], [31 x i8]* [[STRING_SIGNATURE_EXT]], i64 0, i64 0)
@@ -81,7 +80,6 @@ class Foo: Fooable {
 // CHECK:     i8* getelementptr inbounds ([39 x i8], [39 x i8]* [[DICT_SIGNATURE_EXT]], i64 0, i64 0)
 // CHECK:     i8* getelementptr inbounds ([25 x i8], [25 x i8]* [[SET_SIGNATURE_EXT]], i64 0, i64 0)
 // CHECK:   ]
-// CHECK: }
 
 
 // rdar://16006333 - observing properties don't work in @objc classes

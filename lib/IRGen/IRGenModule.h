@@ -69,6 +69,7 @@ namespace clang {
   class Type;
   namespace CodeGen {
     class CGFunctionInfo;
+    class CodeGenModule;
   }
 }
 
@@ -606,6 +607,8 @@ public:
     return *ClangASTContext;
   }
 
+  clang::CodeGen::CodeGenModule &getClangCGM() const;
+
   bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion);
   ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
@@ -900,7 +903,7 @@ public:
                                         ValueWitness index,
                                         ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType,
-                                         llvm::Type *definitionType = nullptr);
+                                             ConstantInit init = ConstantInit());
   Optional<llvm::Function*> getAddrOfIVarInitDestroy(ClassDecl *cd,
                                                      bool isDestroyer,
                                                      bool isForeign,
@@ -909,8 +912,7 @@ public:
                                   bool isIndirect,
                                   bool isPattern,
                                   bool isConstant,
-                                  llvm::Constant *init,
-                                  std::unique_ptr<llvm::GlobalVariable> replace,
+                                  ConstantInitFuture init,
                                   llvm::StringRef section = {});
 
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType, bool isPattern);
@@ -926,10 +928,10 @@ public:
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);
   llvm::Constant *getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
-                                        llvm::Type *definitionType);
+                                                 ConstantInitFuture definition);
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,
-                                              ForDefinition_t forDefinition,
-                                              llvm::Type *definitionType);
+                                              ConstantInit definition =
+                                                ConstantInit());
   llvm::Constant *getAddrOfObjCClass(ClassDecl *D,
                                      ForDefinition_t forDefinition);
   Address getAddrOfObjCClassRef(ClassDecl *D);
@@ -956,7 +958,7 @@ public:
                                                CanType conformingType,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfWitnessTable(const NormalProtocolConformance *C,
-                                        llvm::Type *definitionTy = nullptr);
+                                    ConstantInit definition = ConstantInit());
   llvm::Constant *
   getAddrOfGenericWitnessTableCache(const NormalProtocolConformance *C,
                                     ForDefinition_t forDefinition);
@@ -1005,7 +1007,7 @@ public:
 private:
   llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,
                                         Alignment alignment,
-                                        llvm::Type *definitionType,
+                                        ConstantInit definition,
                                         llvm::Type *defaultType,
                                         DebugTypeInfo debugType);
   llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,
@@ -1015,7 +1017,7 @@ private:
                                         DebugTypeInfo debugType);
   ConstantReference getAddrOfLLVMVariable(LinkEntity entity,
                                         Alignment alignment,
-                                        llvm::Type *definitionType,
+                                        ConstantInit definition,
                                         llvm::Type *defaultType,
                                         DebugTypeInfo debugType,
                                         SymbolReferenceKind refKind);

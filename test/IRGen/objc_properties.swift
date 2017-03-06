@@ -76,26 +76,8 @@ class Class17127126 {
   static var sharedInstance: AnyObject { get set }
 }
 
-
-
-// CHECK: [[READONLY_NAME:@.*]] = private unnamed_addr constant [9 x i8] c"readonly\00"
-// CHECK: [[READONLY_ATTRS:@.*]] = private unnamed_addr constant [42 x i8] c"T@\22_TtC15objc_properties10SomeObject\22,N,R\00"
-
-// CHECK: [[GETTER_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
-
-// CHECK: [[READWRITE_NAME:@.*]] = private unnamed_addr constant [10 x i8] c"readwrite\00"
-// CHECK: [[READWRITE_ATTRS:@.*]] = private unnamed_addr constant [42 x i8] c"T@\22_TtC15objc_properties10SomeObject\22,N,&\00"
-
-// CHECK: [[SETTER_SIGNATURE:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
-
-// CHECK: [[BAREIVAR_NAME:@.*]] = private unnamed_addr constant [9 x i8] c"bareIvar\00"
-// CHECK: [[BAREIVAR_ATTRS:@.*]] = private unnamed_addr constant [52 x i8] c"T@\22_TtC15objc_properties10SomeObject\22,N,&,VbareIvar\00"
-
-// CHECK: [[WIBBLE_NAME:@.*]] = private unnamed_addr constant [7 x i8] c"wobble\00"
-// CHECK: [[WIBBLE_ATTRS:@.*]] = private unnamed_addr constant [50 x i8] c"T@\22_TtC15objc_properties10SomeObject\22,N,&,Vwibble\00"
-
-// CHECK: [[SHARED_NAME:@.*]] = private unnamed_addr constant [11 x i8] c"sharedProp\00"
-// CHECK: [[SHARED_ATTRS:@.*]] = private unnamed_addr constant [17 x i8] c"Tq,N,VsharedProp\00"
+// CHECK-NEW: [[SHARED_NAME:@.*]] = private unnamed_addr constant [11 x i8] c"sharedProp\00"
+// CHECK-NEW: [[SHARED_ATTRS:@.*]] = private unnamed_addr constant [17 x i8] c"Tq,N,VsharedProp\00"
 
 // CHECK-NEW: @_CLASS_PROPERTIES__TtC15objc_properties10SomeObject = private constant { {{.*}}] } {
 // CHECK-NEW:   i32 16,
@@ -115,6 +97,9 @@ class Class17127126 {
 // CHECK-NEW-SAME:   { {{.+}} }* @_CLASS_PROPERTIES__TtC15objc_properties10SomeObject
 // CHECK-OLD-SAME:   i8* null
 // CHECK-SAME: }, section "__DATA, __objc_const", align 8
+
+// CHECK: [[GETTER_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
+// CHECK: [[SETTER_SIGNATURE:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
 
 // CHECK: @_INSTANCE_METHODS__TtC15objc_properties10SomeObject = private constant { {{.*}}] } {
 // CHECK:   i32 24,
@@ -154,6 +139,20 @@ class Class17127126 {
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
+// This appears earlier because it's also used in an ivar description.
+// CHECK: [[BAREIVAR_NAME:@.*]] = private unnamed_addr constant [9 x i8] c"bareIvar\00"
+
+// CHECK: [[READONLY_NAME:@.*]] = private unnamed_addr constant [9 x i8] c"readonly\00"
+// CHECK: [[READONLY_ATTRS:@.*]] = private unnamed_addr constant [42 x i8] c"T@\22_TtC15objc_properties10SomeObject\22,N,R\00"
+
+// CHECK: [[READWRITE_NAME:@.*]] = private unnamed_addr constant [10 x i8] c"readwrite\00"
+// CHECK: [[READWRITE_ATTRS:@.*]] = private unnamed_addr constant [42 x i8] c"T@\22_TtC15objc_properties10SomeObject\22,N,&\00"
+
+// CHECK: [[BAREIVAR_ATTRS:@.*]] = private unnamed_addr constant [52 x i8] c"T@\22_TtC15objc_properties10SomeObject\22,N,&,VbareIvar\00"
+
+// CHECK: [[WIBBLE_NAME:@.*]] = private unnamed_addr constant [7 x i8] c"wobble\00"
+// CHECK: [[WIBBLE_ATTRS:@.*]] = private unnamed_addr constant [50 x i8] c"T@\22_TtC15objc_properties10SomeObject\22,N,&,Vwibble\00"
+
 // CHECK: @_PROPERTIES__TtC15objc_properties10SomeObject = private constant { {{.*}}] } {
 // CHECK:   i32 16,
 // CHECK:   i32 4,
@@ -183,11 +182,6 @@ class Class17127126 {
 // CHECK:   { {{.+}} }* @_PROPERTIES__TtC15objc_properties10SomeObject
 // CHECK: }, section "__DATA, __objc_const", align 8
 
-// CHECK: [[EXTENSIONPROPERTY_NAME:@.*]] = private unnamed_addr constant [18 x i8] c"extensionProperty\00"
-
-// CHECK: [[EXTENSIONCLASSPROPERTY_NAME:@.*]] = private unnamed_addr constant [19 x i8] c"extensionClassProp\00"
-// CHECK: [[EXTENSIONCLASSPROPERTY_ATTRS:@.*]] = private unnamed_addr constant [7 x i8] c"T#,N,R\00"
-
 // CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.*}}] } {
 // CHECK:   i32 24,
 // CHECK:   i32 2,
@@ -202,6 +196,8 @@ class Class17127126 {
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
+// CHECK: [[EXTENSIONPROPERTY_NAME:@.*]] = private unnamed_addr constant [18 x i8] c"extensionProperty\00"
+
 // CHECK: @"_CATEGORY_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.*}}] } {
 // CHECK:   i32 16,
 // CHECK:   i32 1,
@@ -210,6 +206,9 @@ class Class17127126 {
 // CHECK:     i8* getelementptr inbounds ([42 x i8], [42 x i8]* [[READWRITE_ATTRS]], i64 0, i64 0)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
+
+// CHECK-NEW: [[EXTENSIONCLASSPROPERTY_NAME:@.*]] = private unnamed_addr constant [19 x i8] c"extensionClassProp\00"
+// CHECK-NEW: [[EXTENSIONCLASSPROPERTY_ATTRS:@.*]] = private unnamed_addr constant [7 x i8] c"T#,N,R\00"
 
 // CHECK-NEW: @"_CATEGORY_CLASS_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.*}}] } {
 // CHECK-NEW:   i32 16,
@@ -251,7 +250,7 @@ class Class17127126 {
 // CHECK:   i8* null,
 // CHECK:   { {{.+}} }* @_PROTOCOL_PROPERTIES__TtP15objc_properties5Proto_,
 // CHECK:   i32 96, i32 1,
-// CHECK:   { {{.+}} }* @_PROTOCOL_METHOD_TYPES__TtP15objc_properties5Proto_,
+// CHECK:   [{{.+}}]* @_PROTOCOL_METHOD_TYPES__TtP15objc_properties5Proto_,
 // CHECK:   i8* null,
 // CHECK-NEW:   { {{.+}} }* @_PROTOCOL_CLASS_PROPERTIES__TtP15objc_properties5Proto_
 // CHECK-OLD:   i8* null
@@ -261,9 +260,6 @@ class Class17127126 {
 // CHECK: [[PROTOCOLPROPERTY_NAME:@.+]] = private unnamed_addr constant [6 x i8] c"value\00"
 // CHECK: [[PROTOCOLPROPERTY_ATTRS:@.+]] = private unnamed_addr constant [7 x i8] c"Tq,N,R\00"
 
-// CHECK: [[PROTOCOLCLASSPROPERTY_NAME:@.+]] = private unnamed_addr constant [15 x i8] c"sharedInstance\00"
-// CHECK: [[PROTOCOLCLASSPROPERTY_ATTRS:@.+]] = private unnamed_addr constant [7 x i8] c"T@,N,&\00"
-
 // CHECK: @_PROTOCOL_PROPERTIES__TtP15objc_properties5Proto_ = private constant { {{.*}}] } {
 // CHECK:   i32 16,
 // CHECK:   i32 1,
@@ -272,6 +268,9 @@ class Class17127126 {
 // CHECK:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[PROTOCOLPROPERTY_ATTRS]], i64 0, i64 0)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
+
+// CHECK-NEW: [[PROTOCOLCLASSPROPERTY_NAME:@.+]] = private unnamed_addr constant [15 x i8] c"sharedInstance\00"
+// CHECK-NEW: [[PROTOCOLCLASSPROPERTY_ATTRS:@.+]] = private unnamed_addr constant [7 x i8] c"T@,N,&\00"
 
 // CHECK-NEW: @_PROTOCOL_CLASS_PROPERTIES__TtP15objc_properties5Proto_ = private constant { {{.*}}] } {
 // CHECK-NEW:   i32 16,
