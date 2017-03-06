@@ -388,6 +388,12 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
     Lowering::GenericContextScope GenericScope(M.Types,
                                                CanSpecializedGenericSig);
     FnTy = OrigF->getLoweredFunctionType()->substGenericArgs(M, SubstMap);
+    // Some of the added new requirements may not have been taken into account
+    // by the substGenericArgs. So, canonicalize in the context of the
+    // specialized signature.
+    FnTy = cast<SILFunctionType>(
+        CanSpecializedGenericSig->getCanonicalTypeInContext(
+            FnTy, *M.getSwiftModule()));
   }
   assert(FnTy);
 
