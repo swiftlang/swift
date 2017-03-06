@@ -141,8 +141,9 @@ func test10(_ g: Gizmo) -> AnyClass {
   // CHECK-NEXT: [[NS_G_COPY:%[0-9]+]] = upcast [[G_COPY]] : $Gizmo to $NSObject
   // CHECK-NEXT: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G_COPY]] : $NSObject, #NSObject.classProp!getter.1.foreign : (NSObject) -> () -> AnyObject.Type!, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
   // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_COPY]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
-  // CHECK:      select_enum [[OPT_OBJC]]
-  // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
+  // CHECK-NEXT: switch_enum [[OPT_OBJC]] : $Optional<{{.*}}>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+  //
+  // CHECK: [[SOME_BB]]([[OBJC:%.*]] : $@objc_metatype AnyObject.Type):
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
   // CHECK:      [[T0:%.*]] = enum $Optional<@thick AnyObject.Type>, #Optional.some!enumelt.1, [[THICK]]
   // CHECK:   bb5([[RES:%.*]] : $@thick AnyObject.Type):
@@ -160,8 +161,9 @@ func test11(_ g: Gizmo) -> AnyClass {
   // CHECK: [[NS_G_COPY:%[0-9]+]] = upcast [[G_COPY:%[0-9]+]] : $Gizmo to $NSObject
   // CHECK: [[GETTER:%[0-9]+]] = class_method [volatile] [[NS_G_COPY]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : (NSObject) -> () -> NSAnsing.Type!, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
   // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_COPY]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
-  // CHECK:      select_enum [[OPT_OBJC]]
-  // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
+  // CHECK-NEXT: switch_enum [[OPT_OBJC]] : $Optional<{{.*}}>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+  //
+  // CHECK: [[SOME_BB]]([[OBJC:%.*]] : $@objc_metatype NSAnsing.Type):
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
   // CHECK:      [[T0:%.*]] = enum $Optional<@thick NSAnsing.Type>, #Optional.some!enumelt.1, [[THICK]]
   // CHECK:   bb5([[RES:%.*]] : $@thick NSAnsing.Type):
