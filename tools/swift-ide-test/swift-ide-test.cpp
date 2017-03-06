@@ -2714,6 +2714,8 @@ namespace {
       for (auto Relation : symbol.Relations) {
         OS << "  ";
         clang::index::printSymbolRoles(Relation.roles, OS);
+        OS << " | ";
+        printSymbolInfo(Relation.symInfo);
         OS << " | " << Relation.name << " | " << Relation.USR << "\n";
       }
       return Continue;
