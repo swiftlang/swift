@@ -1114,7 +1114,8 @@ static void PrintArg(raw_ostream &OS, const char *Arg, bool Quote) {
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                          IRGenOptions &IRGenOpts,
                          FrontendOptions &FEOpts,
-                         DiagnosticEngine &Diags) {
+                         DiagnosticEngine &Diags,
+                         const llvm::Triple &Triple) {
   using namespace options;
 
   if (const Arg *A = Args.getLastArg(OPT_sil_inline_threshold)) {
@@ -1228,6 +1229,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       BaseName = FEOpts.ModuleName;
     Opts.SILOutputFileNameForDebugging = BaseName.str();
   }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
+    Opts.Sanitize = parseSanitizerArgValues(A, Triple, Diags);
+    IRGenOpts.Sanitize = Opts.Sanitize;
+  }
+
   return false;
 }
 
@@ -1403,10 +1410,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
-  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
-    Opts.Sanitize = parseSanitizerArgValues(A, Triple, Diags);
-  }
-
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
     Opts.SanitizeCoverage =
         parseSanitizerCoverageArgValue(A, Triple, Diags, Opts.Sanitize);
@@ -1474,7 +1477,8 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts, Diags)) {
+  if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts, Diags,
+                   LangOpts.Target)) {
     return true;
   }
 
