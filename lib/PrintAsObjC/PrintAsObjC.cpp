@@ -331,10 +331,8 @@ private:
 
   bool isEmptyExtensionDecl(ExtensionDecl *ED) {
     auto members = ED->getMembers();
-    SmallVector<Decl *, 4> includedMembers;
-    std::copy_if(members.begin(), members.end(),
-                 std::back_inserter(includedMembers),
-                 [this](const Decl *D) -> bool {
+    auto hasMembers = std::any_of(members.begin(), members.end(),
+                                  [this](const Decl *D) -> bool {
       if (auto VD = dyn_cast<ValueDecl>(D))
         if (shouldInclude(VD))
           return true;
@@ -342,14 +340,12 @@ private:
     });
 
     auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
-    SmallVector<ProtocolDecl *, 4> includedProtocols;
-    std::copy_if(protocols.begin(), protocols.end(),
-                 std::back_inserter(includedProtocols),
-                 [this](const ProtocolDecl *PD) -> bool {
+    auto hasProtocols = std::any_of(protocols.begin(), protocols.end(),
+                                    [this](const ProtocolDecl *PD) -> bool {
       return shouldInclude(PD);
     });
 
-    return (includedMembers.empty() && includedProtocols.empty());
+    return (!hasMembers && !hasProtocols);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
