@@ -261,14 +261,12 @@ extension String {
 }
 
 extension String {
-  //@available(swift, obsoleted: 4)
-  @available(*, unavailable, message: "")
+  @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String {
     return String(characters[bounds])
   }
 
-  //@available(swift, obsoleted: 4)
-  @available(*, unavailable, message: "")
+  @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
     return String(characters[bounds])
   }
