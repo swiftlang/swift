@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILGEN_SILGENBUILDER_H
 #define SWIFT_SILGEN_SILGENBUILDER_H
 
+#include "JumpDest.h"
 #include "ManagedValue.h"
 #include "swift/SIL/SILBuilder.h"
 
@@ -51,6 +52,7 @@ public:
       : SILGenBuilder(gen, &*insertBB, insertInst) {}
 
   SILGenModule &getSILGenModule() const;
+  SILGenFunction &getSILGenFunction() const { return gen; }
 
   // Metatype instructions use the conformances necessary to instantiate the
   // type.
@@ -232,8 +234,88 @@ public:
                                SILBasicBlock *falseBlock);
 
   using SILBuilder::createUpcast;
-  ManagedValue createUpcast(SILLocation Loc, ManagedValue Original,
-                            SILType Type);
+  ManagedValue createUpcast(SILLocation loc, ManagedValue original,
+                            SILType type);
+
+  using SILBuilder::createUncheckedRefCast;
+  ManagedValue createUncheckedRefCast(SILLocation loc, ManagedValue original,
+                                      SILType type);
+
+  using SILBuilder::createOpenExistentialRef;
+  ManagedValue createOpenExistentialRef(SILLocation loc, ManagedValue arg,
+                                        SILType openedType);
+
+  using SILBuilder::createOptionalSome;
+  ManagedValue createOptionalSome(SILLocation Loc, ManagedValue Arg);
+  ManagedValue createManagedOptionalNone(SILLocation Loc, SILType Type);
+};
+
+class SwitchCaseFullExpr;
+
+/// A class for building switch enums that handles all of the ownership
+/// requirements for the user.
+///
+/// It assumes that the user passes in a block that takes in a ManagedValue and
+/// returns a ManagedValue for the blocks exit argument. Should return an empty
+/// ManagedValue to signal no result.
+class SwitchEnumBuilder {
+public:
+  using NormalCaseHandler =
+      std::function<void(ManagedValue, SwitchCaseFullExpr &)>;
+  using DefaultCaseHandler =
+      std::function<void(ManagedValue, SwitchCaseFullExpr &)>;
+
+private:
+  struct NormalCaseData {
+    EnumElementDecl *decl;
+    SILBasicBlock *block;
+    NullablePtr<SILBasicBlock> contBlock;
+    NormalCaseHandler handler;
+
+    NormalCaseData(EnumElementDecl *decl, SILBasicBlock *block,
+                   NullablePtr<SILBasicBlock> contBlock,
+                   NormalCaseHandler handler)
+        : decl(decl), block(block), contBlock(contBlock), handler(handler) {}
+    ~NormalCaseData() = default;
+  };
+
+  struct DefaultCaseData {
+    SILBasicBlock *block;
+    NullablePtr<SILBasicBlock> contBlock;
+    DefaultCaseHandler handler;
+
+    DefaultCaseData(SILBasicBlock *block, NullablePtr<SILBasicBlock> contBlock,
+                    DefaultCaseHandler handler)
+        : block(block), contBlock(contBlock), handler(handler) {}
+    ~DefaultCaseData() = default;
+  };
+
+  SILGenBuilder &builder;
+  SILLocation loc;
+  ManagedValue optional;
+  llvm::Optional<DefaultCaseData> defaultBlockData;
+  llvm::SmallVector<NormalCaseData, 8> caseDataArray;
+
+public:
+  SwitchEnumBuilder(SILGenBuilder &builder, SILLocation loc,
+                    ManagedValue optional)
+      : builder(builder), loc(loc), optional(optional) {}
+
+  void addDefaultCase(SILBasicBlock *defaultBlock,
+                      NullablePtr<SILBasicBlock> contBlock,
+                      DefaultCaseHandler handle) {
+    defaultBlockData.emplace(defaultBlock, contBlock, handle);
+  }
+
+  void addCase(EnumElementDecl *decl, SILBasicBlock *caseBlock,
+               NullablePtr<SILBasicBlock> contBlock, NormalCaseHandler handle) {
+    caseDataArray.emplace_back(decl, caseBlock, contBlock, handle);
+  }
+
+  void emit() &&;
+
+private:
+  SILGenFunction &getSGF() const { return builder.getSILGenFunction(); }
 };
 
 } // namespace Lowering
