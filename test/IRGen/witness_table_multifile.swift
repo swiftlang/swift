@@ -11,3 +11,9 @@ func bar() {
   // CHECK-NEXT: getelementptr inbounds i8*, i8** [[WITNESS_TABLE]], i32 3
   go().foo()
 }
+
+// Ensure that protocols from other files get fully validated even
+// when they're only used as types.
+func useAProtocol() -> ProtocolOnlyUsedAsAType? {
+  return nil
+}

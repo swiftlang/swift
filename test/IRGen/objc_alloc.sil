@@ -2,7 +2,7 @@
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
-// REQUIRES: CPU=i386 || CPU=x86_64
+// REQUIRES: CPU=i386_or_x86_64
 // REQUIRES: objc_interop
 
 sil_stage canonical

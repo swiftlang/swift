@@ -510,6 +510,16 @@ SWIFT_RT_ENTRY_VISIBILITY
 void swift_unownedRelease(HeapObject *value)
     SWIFT_CC(RegisterPreservingCC);
 
+/// Increment the unowned retain count.
+SWIFT_RT_ENTRY_VISIBILITY
+void swift_nonatomic_unownedRetain(HeapObject *value)
+    SWIFT_CC(RegisterPreservingCC);
+
+/// Decrement the unowned retain count.
+SWIFT_RT_ENTRY_VISIBILITY
+void swift_nonatomic_unownedRelease(HeapObject *value)
+    SWIFT_CC(RegisterPreservingCC);
+
 /// Increment the unowned retain count by n.
 SWIFT_RT_ENTRY_VISIBILITY
 void swift_unownedRetain_n(HeapObject *value, int n)
@@ -520,10 +530,26 @@ SWIFT_RT_ENTRY_VISIBILITY
 void swift_unownedRelease_n(HeapObject *value, int n)
     SWIFT_CC(RegisterPreservingCC);
 
+/// Increment the unowned retain count by n.
+SWIFT_RT_ENTRY_VISIBILITY
+void swift_nonatomic_unownedRetain_n(HeapObject *value, int n)
+    SWIFT_CC(RegisterPreservingCC);
+
+/// Decrement the unowned retain count by n.
+SWIFT_RT_ENTRY_VISIBILITY
+void swift_nonatomic_unownedRelease_n(HeapObject *value, int n)
+    SWIFT_CC(RegisterPreservingCC);
+
 /// Increment the strong retain count of an object, aborting if it has
 /// been deallocated.
 SWIFT_RT_ENTRY_VISIBILITY
 void swift_unownedRetainStrong(HeapObject *value)
+    SWIFT_CC(RegisterPreservingCC);
+
+/// Increment the strong retain count of an object, aborting if it has
+/// been deallocated.
+SWIFT_RT_ENTRY_VISIBILITY
+void swift_nonatomic_unownedRetainStrong(HeapObject *value)
     SWIFT_CC(RegisterPreservingCC);
 
 /// Increment the strong retain count of an object which may have been
@@ -531,6 +557,13 @@ void swift_unownedRetainStrong(HeapObject *value)
 /// unowned reference count.
 SWIFT_RT_ENTRY_VISIBILITY
 void swift_unownedRetainStrongAndRelease(HeapObject *value)
+    SWIFT_CC(RegisterPreservingCC);
+
+/// Increment the strong retain count of an object which may have been
+/// deallocated, aborting if it has been deallocated, and decrement its
+/// unowned reference count.
+SWIFT_RT_ENTRY_VISIBILITY
+void swift_nonatomic_unownedRetainStrongAndRelease(HeapObject *value)
     SWIFT_CC(RegisterPreservingCC);
 
 /// Aborts if the object has been deallocated.

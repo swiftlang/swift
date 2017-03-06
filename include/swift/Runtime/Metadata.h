@@ -1993,7 +1993,7 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
       return nullptr;
 
     auto asWords = reinterpret_cast<
-      ConstTargetMetadataPointer<Runtime, TargetMetadata> const *>(this);
+      ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> const *>(this);
     return (asWords + Description->GenericParams.Offset);
   }
 

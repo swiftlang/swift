@@ -55,16 +55,7 @@ bool Syntax::isExpr() const {
   return Data->isExpr();
 }
 
-#pragma mark - unknown-syntax API
-
-UnknownSyntax::UnknownSyntax(const RC<SyntaxData> Root,
-                             UnknownSyntaxData *Data)
-  : Syntax(Root, Data) {}
-
-UnknownSyntax UnknownSyntax::make(RC<RawSyntax> Raw) {
-  auto Data = UnknownSyntaxData::make(Raw);
-  return UnknownSyntax {
-    Data, Data.get()
-  };
+bool Syntax::isUnknown() const {
+  return Data->isUnknown();
 }
 

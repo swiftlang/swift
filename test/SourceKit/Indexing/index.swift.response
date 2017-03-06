@@ -76,7 +76,7 @@
         {
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "instanceFunc0(_:b:)",
-          key.usr: "s:5index2CCC13instanceFunc0SiSi_Sf1btF",
+          key.usr: "s:5index2CCC13instanceFunc0S2i_Sf1btF",
           key.line: 10,
           key.column: 8,
           key.entities: [
@@ -106,7 +106,7 @@
         {
           key.kind: source.lang.swift.decl.function.method.instance,
           key.name: "instanceFunc1(a:b:)",
-          key.usr: "s:5index2CCC13instanceFunc1SiSi1a_Sf1btF",
+          key.usr: "s:5index2CCC13instanceFunc1S2i1a_Sf1btF",
           key.line: 13,
           key.column: 8,
           key.entities: [
@@ -205,7 +205,7 @@
         {
           key.kind: source.lang.swift.decl.enumelement,
           key.name: "EElem",
-          key.usr: "s:5index1EO5EElemAcCmF",
+          key.usr: "s:5index1EO5EElemA2CmF",
           key.line: 29,
           key.column: 8
         }
@@ -330,7 +330,7 @@
         {
           key.kind: source.lang.swift.ref.enumelement,
           key.name: "EElem",
-          key.usr: "s:5index1EO5EElemAcCmF",
+          key.usr: "s:5index1EO5EElemA2CmF",
           key.line: 41,
           key.column: 9
         },
@@ -689,28 +689,28 @@
         {
           key.kind: source.lang.swift.decl.function.subscript,
           key.name: "subscript(_:)",
-          key.usr: "s:5index3CC2C9subscriptSiSici",
+          key.usr: "s:5index3CC2C9subscriptS2ici",
           key.line: 81,
           key.column: 3,
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
               key.name: "getter:subscript(_:)",
-              key.usr: "s:5index3CC2C9subscriptSiSicfg",
+              key.usr: "s:5index3CC2C9subscriptS2icfg",
               key.line: 82,
               key.column: 5
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
               key.name: "setter:subscript(_:)",
-              key.usr: "s:5index3CC2C9subscriptSiSicfs",
+              key.usr: "s:5index3CC2C9subscriptS2icfs",
               key.line: 85,
               key.column: 5,
               key.entities: [
                 {
                   key.kind: source.lang.swift.ref.function.operator.infix,
                   key.name: "+(_:_:)",
-                  key.usr: "s:s1poiSiSi_SitF",
+                  key.usr: "s:s1poiS2i_SitF",
                   key.line: 86,
                   key.column: 8
                 }
@@ -795,7 +795,7 @@
         {
           key.kind: source.lang.swift.ref.function.operator.prefix,
           key.name: "++(_:)",
-          key.usr: "s:s2ppopSiSizF",
+          key.usr: "s:s2ppopS2izF",
           key.line: 95,
           key.column: 3
         },
@@ -827,13 +827,13 @@
         {
           key.kind: source.lang.swift.ref.function.subscript,
           key.name: "subscript(_:)",
-          key.usr: "s:5index3CC2C9subscriptSiSici",
+          key.usr: "s:5index3CC2C9subscriptS2ici",
           key.line: 96,
           key.column: 10,
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.getter,
-              key.usr: "s:5index3CC2C9subscriptSiSicfg",
+              key.usr: "s:5index3CC2C9subscriptS2icfg",
               key.line: 96,
               key.column: 10,
               key.receiver_usr: "s:5index3CC2C",
@@ -844,13 +844,13 @@
         {
           key.kind: source.lang.swift.ref.function.subscript,
           key.name: "subscript(_:)",
-          key.usr: "s:5index3CC2C9subscriptSiSici",
+          key.usr: "s:5index3CC2C9subscriptS2ici",
           key.line: 97,
           key.column: 6,
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.setter,
-              key.usr: "s:5index3CC2C9subscriptSiSicfs",
+              key.usr: "s:5index3CC2C9subscriptS2icfs",
               key.line: 97,
               key.column: 6,
               key.receiver_usr: "s:5index3CC2C",
@@ -861,20 +861,20 @@
         {
           key.kind: source.lang.swift.ref.function.operator.prefix,
           key.name: "++(_:)",
-          key.usr: "s:s2ppopSiSizF",
+          key.usr: "s:s2ppopS2izF",
           key.line: 98,
           key.column: 3
         },
         {
           key.kind: source.lang.swift.ref.function.subscript,
           key.name: "subscript(_:)",
-          key.usr: "s:5index3CC2C9subscriptSiSici",
+          key.usr: "s:5index3CC2C9subscriptS2ici",
           key.line: 98,
           key.column: 8,
           key.entities: [
             {
               key.kind: source.lang.swift.ref.function.accessor.getter,
-              key.usr: "s:5index3CC2C9subscriptSiSicfg",
+              key.usr: "s:5index3CC2C9subscriptS2icfg",
               key.line: 98,
               key.column: 8,
               key.receiver_usr: "s:5index3CC2C",
@@ -882,7 +882,7 @@
             },
             {
               key.kind: source.lang.swift.ref.function.accessor.setter,
-              key.usr: "s:5index3CC2C9subscriptSiSicfs",
+              key.usr: "s:5index3CC2C9subscriptS2icfs",
               key.line: 98,
               key.column: 8,
               key.receiver_usr: "s:5index3CC2C",

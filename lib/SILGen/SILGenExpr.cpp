@@ -57,6 +57,9 @@ ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
   assert(lowering.getLoweredType() == v->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
+  if (v->getType().isObject() &&
+      v.getOwnershipKind() == ValueOwnershipKind::Trivial)
+    return ManagedValue::forUnmanaged(v);
   assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
 
   v = lowering.emitCopyValue(B, loc, v);
@@ -73,6 +76,8 @@ ManagedValue SILGenFunction::emitManagedLoadCopy(SILLocation loc, SILValue v,
   assert(lowering.getLoweredType().getAddressType() == v->getType());
   v = lowering.emitLoadOfCopy(B, loc, v, IsNotTake);
   if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(v);
+  if (v.getOwnershipKind() == ValueOwnershipKind::Trivial)
     return ManagedValue::forUnmanaged(v);
   assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
   return emitManagedRValueWithCleanup(v, lowering);
@@ -107,7 +112,8 @@ ManagedValue SILGenFunction::emitManagedStoreBorrow(SILLocation loc, SILValue v,
 ManagedValue SILGenFunction::emitManagedStoreBorrow(
     SILLocation loc, SILValue v, SILValue addr, const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getObjectType() == v->getType());
-  if (lowering.isTrivial()) {
+  if (lowering.isTrivial() ||
+      v.getOwnershipKind() == ValueOwnershipKind::Trivial) {
     lowering.emitStore(B, loc, v, addr, StoreOwnershipQualifier::Trivial);
     return ManagedValue::forUnmanaged(v);
   }
@@ -118,8 +124,6 @@ ManagedValue SILGenFunction::emitManagedStoreBorrow(
 
 ManagedValue SILGenFunction::emitManagedBeginBorrow(SILLocation loc,
                                                     SILValue v) {
-  if (v.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
-    return ManagedValue::forUnmanaged(v);
   auto &lowering = F.getTypeLowering(v->getType());
   return emitManagedBeginBorrow(loc, v, lowering);
 }
@@ -131,8 +135,13 @@ SILGenFunction::emitManagedBeginBorrow(SILLocation loc, SILValue v,
          v->getType().getObjectType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
+
+  if (v.getOwnershipKind() == ValueOwnershipKind::Trivial)
+    return ManagedValue::forUnmanaged(v);
+
   if (v.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
     return ManagedValue::forUnmanaged(v);
+
   auto *bbi = B.createBeginBorrow(loc, v);
   return emitManagedBorrowedRValueWithCleanup(v, bbi, lowering);
 }
@@ -263,9 +272,14 @@ ManagedValue SILGenFunction::emitManagedBorrowedRValueWithCleanup(
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(borrowed);
 
+  if (original->getType().isObject() &&
+      original.getOwnershipKind() == ValueOwnershipKind::Trivial)
+    return ManagedValue::forUnmanaged(borrowed);
+
   if (borrowed->getType().isObject()) {
     Cleanups.pushCleanup<EndBorrowCleanup>(original, borrowed);
   }
+
   return ManagedValue(borrowed, CleanupHandle::invalid());
 }
 
@@ -279,7 +293,10 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
   assert(lowering.getLoweredType() == v->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
-  
+  if (v->getType().isObject() &&
+      v.getOwnershipKind() == ValueOwnershipKind::Trivial) {
+    return ManagedValue::forUnmanaged(v);
+  }
   return ManagedValue(v, enterDestroyCleanup(v));
 }
 
@@ -290,7 +307,8 @@ ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v) {
 
 ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v,
                                                const TypeLowering &lowering) {
-  assert(lowering.getLoweredType().getAddressType() == v->getType());
+  assert(lowering.getLoweredType().getAddressType() == v->getType() ||
+         !silConv.useLoweredAddresses());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
 
@@ -856,7 +874,7 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
   case AddressorKind::NativePinning:
     // Emit the unpin immediately.
     SGF.B.createStrongUnpin(loc, addressorResult.second.forward(SGF),
-                            Atomicity::Atomic);
+                            SGF.B.getDefaultAtomicity());
     break;
   }
   
@@ -1669,8 +1687,14 @@ ManagedValue SILGenFunction::getManagedValue(SILLocation loc,
   if (valueTL.isTrivial())
     return ManagedValue::forUnmanaged(value.getValue());
 
-  // If it's an object, retain and enter a release cleanup.
+  // If it's an object...
   if (valueTy.isObject()) {
+    // See if we have more accurate information from the ownership kind. This
+    // detects trivial cases of enums.
+    if (value.getOwnershipKind() == ValueOwnershipKind::Trivial)
+      return ManagedValue::forUnmanaged(value.getValue());
+
+    // Otherwise, retain and enter a release cleanup.
     valueTL.emitCopyValue(B, loc, value.getValue());
     return emitManagedRValueWithCleanup(value.getValue(), valueTL);
   }
@@ -3618,15 +3642,18 @@ public:
   
   RValue get(SILGenFunction &gen, SILLocation loc,
              ManagedValue base, SGFContext c) && override {
+    FullExpr TightBorrowScope(gen.Cleanups, CleanupLocation::get(loc));
+
     // Load the value at +0.
-    SILValue owned = gen.B.createLoadBorrow(loc, base.getUnmanagedValue());
+    ManagedValue loadedBase = gen.B.createLoadBorrow(loc, base);
 
     // Convert it to unowned.
-    auto refType = owned->getType().getSwiftRValueType();
+    auto refType = loadedBase.getType().getSwiftRValueType();
     auto unownedType = SILType::getPrimitiveObjectType(
                                         CanUnmanagedStorageType::get(refType));
-    SILValue unowned = gen.B.createRefToUnmanaged(loc, owned, unownedType);
-    
+    SILValue unowned = gen.B.createRefToUnmanaged(
+        loc, loadedBase.getUnmanagedValue(), unownedType);
+
     // A reference type should never be exploded.
     return RValue::withPreExplodedElements(ManagedValue::forUnmanaged(unowned),
                                            refType);

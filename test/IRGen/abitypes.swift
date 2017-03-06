@@ -418,19 +418,19 @@ class Foo {
     return g.negate(b)
   }
 
-  // x86_64-macosx: define hidden swiftcc i1 @_T08abitypes3FooC7negate3SbSbF(i1, %T8abitypes3FooC* swiftself) {{.*}} {
+  // x86_64-macosx: define hidden swiftcc i1 @_T08abitypes3FooC7negate3S2bF(i1, %T8abitypes3FooC* swiftself) {{.*}} {
   // x86_64-macosx: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(invert:)", align 8
   // x86_64-macosx: [[NEG:%[0-9]+]] = call zeroext i1 bitcast (void ()* @objc_msgSend to i1 (%1*, i8*, i1)*)(%1* [[RECEIVER:%[0-9]+]], i8* [[SEL]], i1 zeroext %0)
   // x86_64-macosx: ret i1 [[NEG]]
   // x86_64-macosx: }
 
-  // x86_64-ios: define hidden swiftcc i1 @_T08abitypes3FooC7negate3SbSbF(i1, %T8abitypes3FooC* swiftself) {{.*}} {
+  // x86_64-ios: define hidden swiftcc i1 @_T08abitypes3FooC7negate3S2bF(i1, %T8abitypes3FooC* swiftself) {{.*}} {
   // x86_64-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(invert:)", align 8
   // x86_64-ios: [[NEG:%[0-9]+]] = call zeroext i1 bitcast (void ()* @objc_msgSend to i1 (%1*, i8*, i1)*)(%1* [[RECEIVER:%[0-9]+]], i8* [[SEL]], i1 zeroext %0)
   // x86_64-ios: ret i1 [[NEG]]
   // x86_64-ios: }
 
-  // i386-ios: define hidden swiftcc i1 @_T08abitypes3FooC7negate3SbSbF(i1, %T8abitypes3FooC* swiftself) {{.*}} {
+  // i386-ios: define hidden swiftcc i1 @_T08abitypes3FooC7negate3S2bF(i1, %T8abitypes3FooC* swiftself) {{.*}} {
   // i386-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(invert:)", align 4
   // i386-ios: [[NEG:%[0-9]+]] = call zeroext i1 bitcast (void ()* @objc_msgSend to i1 (%1*, i8*, i1)*)(%1* [[RECEIVER:%[0-9]+]], i8* [[SEL]], i1 zeroext %0)
   // i386-ios: ret i1 [[NEG]]

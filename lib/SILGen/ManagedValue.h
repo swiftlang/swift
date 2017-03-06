@@ -76,6 +76,10 @@ public:
   ManagedValue(SILValue value, CleanupHandle cleanup)
     : valueAndFlag(value, false), cleanup(cleanup) {
     assert(value && "No value specified?!");
+    assert((!getType().isObject() ||
+            value.getOwnershipKind() != ValueOwnershipKind::Trivial ||
+            !hasCleanup()) &&
+           "Objects with trivial ownership should never have a cleanup");
   }
 
   /// Create a managed value for a +0 rvalue.
@@ -230,12 +234,6 @@ public:
     return M;
   }
 
-  CanType getSwiftType() const {
-    return isLValue()
-      ? getType().getSwiftType()
-      : getType().getSwiftRValueType();
-  }
-  
   /// Emit a copy of this value with independent ownership.
   ManagedValue copy(SILGenFunction &gen, SILLocation loc);
 
@@ -350,6 +348,9 @@ public:
 
   SILType getType() const { return Value.getType(); }
   SILValue getValue() const { return Value.getValue(); }
+  ValueOwnershipKind getOwnershipKind() const {
+    return Value.getOwnershipKind();
+  }
 
   /// Return a managed value appropriate for the final use of this CMV.
   ManagedValue getFinalManagedValue() const { return Value; }

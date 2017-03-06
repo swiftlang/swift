@@ -887,7 +887,8 @@ public:
   void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *i);
   void visitInitExistentialRefInst(InitExistentialRefInst *i);
   void visitDeinitExistentialAddrInst(DeinitExistentialAddrInst *i);
-  
+  void visitDeinitExistentialOpaqueInst(DeinitExistentialOpaqueInst *i);
+
   void visitAllocExistentialBoxInst(AllocExistentialBoxInst *i);
   void visitOpenExistentialBoxInst(OpenExistentialBoxInst *i);
   void visitProjectExistentialBoxInst(ProjectExistentialBoxInst *i);
@@ -897,6 +898,13 @@ public:
   void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *i);
   
   void visitFixLifetimeInst(FixLifetimeInst *i);
+  void visitEndLifetimeInst(EndLifetimeInst *i) {
+    llvm_unreachable("unimplemented");
+  }
+  void
+  visitUncheckedOwnershipConversionInst(UncheckedOwnershipConversionInst *i) {
+    llvm_unreachable("unimplemented");
+  }
   void visitBeginBorrowInst(BeginBorrowInst *i) {
     llvm_unreachable("unimplemented");
   }
@@ -2424,7 +2432,7 @@ emitSwitchValueDispatch(IRGenSILFunction &IGF,
     defaultDest = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
   }
 
-  if (ty.getAs<BuiltinIntegerType>()) {
+  if (ty.is<BuiltinIntegerType>()) {
     auto *discriminator = value.claimNext();
     auto *i = IGF.Builder.CreateSwitch(discriminator, defaultDest,
                                      dests.size());
@@ -2434,7 +2442,7 @@ emitSwitchValueDispatch(IRGenSILFunction &IGF,
     // Get the value we're testing, which is a function.
     llvm::Value *val;
     llvm::BasicBlock *nextTest = nullptr;
-    if (ty.getSwiftType()->is<SILFunctionType>()) {
+    if (ty.is<SILFunctionType>()) {
       val = value.claimNext();   // Function pointer.
       //values.claimNext();         // Ignore the data pointer.
     } else {
@@ -2445,7 +2453,7 @@ emitSwitchValueDispatch(IRGenSILFunction &IGF,
       auto casePair = dests[i];
       llvm::Value *caseval;
       auto casevalue = IGF.getLoweredExplosion(casePair.first);
-      if (casePair.first->getType().getSwiftType()->is<SILFunctionType>()) {
+      if (casePair.first->getType().is<SILFunctionType>()) {
         caseval = casevalue.claimNext();   // Function pointer.
         //values.claimNext();         // Ignore the data pointer.
       } else {
@@ -3003,7 +3011,7 @@ void IRGenSILFunction::visitCopyValueInst(swift::CopyValueInst *i) {
   Explosion in = getLoweredExplosion(i->getOperand());
   Explosion out;
   cast<LoadableTypeInfo>(getTypeInfo(i->getOperand()->getType()))
-      .copy(*this, in, out, irgen::Atomicity::Atomic);
+      .copy(*this, in, out, getDefaultAtomicity());
   setLoweredExplosion(i, out);
 }
 
@@ -3061,7 +3069,7 @@ void IRGenSILFunction::visitReleaseValueInst(swift::ReleaseValueInst *i) {
 void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {
   Explosion in = getLoweredExplosion(i->getOperand());
   cast<LoadableTypeInfo>(getTypeInfo(i->getOperand()->getType()))
-      .consume(*this, in, irgen::Atomicity::Atomic);
+      .consume(*this, in, getDefaultAtomicity());
 }
 
 void IRGenSILFunction::visitStructInst(swift::StructInst *i) {
@@ -3266,21 +3274,16 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   StringRef Name = getVarName(i);
   DebugTypeInfo DbgTy;
   SILType SILTy = SILVal->getType();
-  // An inout/lvalue type that is described by a debug value has been
-  // promoted by an optimization pass. Unwrap the type.
-  bool Unwrap = true;
-  auto RealTy = SILVal->getType().getSwiftType();
+  auto RealTy = SILVal->getType().getSwiftRValueType();
   if (VarDecl *Decl = i->getDecl()) {
     DbgTy = DebugTypeInfo::getLocalVariable(
         CurSILFn->getDeclContext(), Decl, RealTy,
-        getTypeInfo(SILVal->getType()), Unwrap);
+        getTypeInfo(SILVal->getType()), /*Unwrap=*/false);
   } else if (i->getFunction()->isBare() &&
-             !SILTy.getSwiftType()->hasArchetype() && !Name.empty()) {
+             !SILTy.hasArchetype() && !Name.empty()) {
     // Preliminary support for .sil debug information.
     DbgTy = DebugTypeInfo::getFromTypeInfo(CurSILFn->getDeclContext(), RealTy,
                                            getTypeInfo(SILTy));
-    if (Unwrap)
-      DbgTy.unwrapLValueOrInOutType();
   } else
     return;
 
@@ -3307,7 +3310,9 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   StringRef Name = getVarName(i);
   auto Addr = getLoweredAddress(SILVal).getAddress();
   SILType SILTy = SILVal->getType();
-  auto RealType = SILTy.getSwiftType();
+  auto RealType = SILTy.getSwiftRValueType();
+  if (SILTy.isAddress())
+    RealType = CanInOutType::get(RealType);
   // Unwrap implicitly indirect types and types that are passed by
   // reference only at the SIL level and below.
   //
@@ -3316,7 +3321,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   // 'Unwrap' set to false.
   bool Unwrap =
       i->getVarInfo().Constant ||
-      RealType->getLValueOrInOutObjectType()->is<ArchetypeType>();
+      SILTy.is<ArchetypeType>();
   auto DbgTy = DebugTypeInfo::getLocalVariable(
       CurSILFn->getDeclContext(), Decl, RealType,
       getTypeInfo(SILVal->getType()), Unwrap);
@@ -3435,19 +3440,22 @@ void IRGenSILFunction::
 visitStrongRetainUnownedInst(swift::StrongRetainUnownedInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   auto &ti = getReferentTypeInfo(*this, i->getOperand()->getType());
-  ti.strongRetainUnowned(*this, lowered);
+  ti.strongRetainUnowned(*this, lowered, i->isAtomic() ? irgen::Atomicity::Atomic
+                                                       : irgen::Atomicity::NonAtomic);
 }
 
 void IRGenSILFunction::visitUnownedRetainInst(swift::UnownedRetainInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   auto &ti = getReferentTypeInfo(*this, i->getOperand()->getType());
-  ti.unownedRetain(*this, lowered);
+  ti.unownedRetain(*this, lowered, i->isAtomic() ? irgen::Atomicity::Atomic
+                                                 : irgen::Atomicity::NonAtomic);
 }
 
 void IRGenSILFunction::visitUnownedReleaseInst(swift::UnownedReleaseInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   auto &ti = getReferentTypeInfo(*this, i->getOperand()->getType());
-  ti.unownedRelease(*this, lowered);
+  ti.unownedRelease(*this, lowered, i->isAtomic() ? irgen::Atomicity::Atomic
+                                                  : irgen::Atomicity::NonAtomic);
 }
 
 void IRGenSILFunction::visitLoadUnownedInst(swift::LoadUnownedInst *i) {
@@ -3587,14 +3595,10 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
           Pattern->getKind() != PatternKind::OptionalSome)
         return;
 
-    // Discard any inout or lvalue qualifiers. Since the object itself
-    // is stored in the alloca, emitting it as a reference type would
-    // be wrong.
-    bool Unwrap = true;
     SILType SILTy = i->getType();
-    auto RealType = SILTy.getSwiftType().getLValueOrInOutObjectType();
+    auto RealType = SILTy.getSwiftRValueType();
     auto DbgTy = DebugTypeInfo::getLocalVariable(CurSILFn->getDeclContext(),
-                                                 Decl, RealType, type, Unwrap);
+                                                 Decl, RealType, type, false);
     StringRef Name = getVarName(i);
     if (auto DS = i->getDebugScope())
       emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, Decl, Name,
@@ -3775,10 +3779,13 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 
     assert(i->getBoxType()->getLayout()->getFields().size() == 1
            && "box for a local variable should only have one field");
+    auto SILTy = i->getBoxType()->getFieldType(IGM.getSILModule(), 0);
+    auto RealType = SILTy.getSwiftRValueType();
+    if (SILTy.isAddress())
+      RealType = CanInOutType::get(RealType);
     auto DbgTy = DebugTypeInfo::getLocalVariable(
         CurSILFn->getDeclContext(), Decl,
-        i->getBoxType()->getFieldType(IGM.getSILModule(), 0).getSwiftType(),
-          type, /*Unwrap=*/false);
+        RealType, type, /*Unwrap=*/false);
 
     if (isInlinedGeneric(Decl, i->getDebugScope()))
       return;
@@ -4333,7 +4340,7 @@ void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {
   llvm::Value *val;
   const LoweredValue &lv = getLoweredValue(i->getOperand());
   
-  if (i->getOperand()->getType().getSwiftType()->is<SILFunctionType>()) {
+  if (i->getOperand()->getType().is<SILFunctionType>()) {
     Explosion values = lv.getExplosion(*this);
     val = values.claimNext();   // Function pointer.
     values.claimNext();         // Ignore the data pointer.
@@ -4499,6 +4506,11 @@ void IRGenSILFunction::visitDeinitExistentialAddrInst(
   Address container = getLoweredAddress(i->getOperand());
   emitOpaqueExistentialContainerDeinit(*this, container,
                                        i->getOperand()->getType());
+}
+
+void IRGenSILFunction::visitDeinitExistentialOpaqueInst(
+    swift::DeinitExistentialOpaqueInst *i) {
+  llvm_unreachable("unsupported instruction during IRGen");
 }
 
 void IRGenSILFunction::visitOpenExistentialAddrInst(OpenExistentialAddrInst *i) {

@@ -1057,7 +1057,7 @@ func testOptionalPattern(_ value : Int?) {
 
 // x? and .none should both be considered "similar" and thus handled in the same
 // switch on the enum kind.  There should be no unreachable generated.
-// CHECK-LABEL: sil hidden @_T06switch19testOptionalEnumMixSiSiSgF
+// CHECK-LABEL: sil hidden @_T06switch19testOptionalEnumMixS2iSgF
 func testOptionalEnumMix(_ a : Int?) -> Int {
   // CHECK: debug_value %0 : $Optional<Int>, let, name "a"
   // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
@@ -1079,7 +1079,7 @@ func testOptionalEnumMix(_ a : Int?) -> Int {
 
 // x? and nil should both be considered "similar" and thus handled in the same
 // switch on the enum kind.  There should be no unreachable generated.
-// CHECK-LABEL: sil hidden @_T06switch26testOptionalEnumMixWithNilSiSiSgF
+// CHECK-LABEL: sil hidden @_T06switch26testOptionalEnumMixWithNilS2iSgF
 func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
   // CHECK: debug_value %0 : $Optional<Int>, let, name "a"
   // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]

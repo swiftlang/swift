@@ -28,6 +28,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
@@ -3604,6 +3605,36 @@ static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx,
   }
 
   return nullptr;
+}
+
+bool ForeignRepresentationInfo::isRepresentableAsOptional() const {
+  switch (getKind()) {
+  case ForeignRepresentableKind::None:
+    llvm_unreachable("this type is not representable");
+
+  case ForeignRepresentableKind::Trivial:
+    return Storage.getPointer() != 0;
+
+  case ForeignRepresentableKind::Bridged: {
+    auto KPK_ObjectiveCBridgeable = KnownProtocolKind::ObjectiveCBridgeable;
+    ProtocolDecl *proto = getConformance()->getProtocol();
+    assert(proto->isSpecificProtocol(KPK_ObjectiveCBridgeable) &&
+           "unknown protocol; does it support optional?");
+    (void)proto;
+    (void)KPK_ObjectiveCBridgeable;
+
+    return true;
+  }
+
+  case ForeignRepresentableKind::BridgedError:
+    return true;
+
+  case ForeignRepresentableKind::Object:
+  case ForeignRepresentableKind::StaticBridged:
+    llvm_unreachable("unexpected kind in ForeignRepresentableCacheEntry");
+  }
+
+  llvm_unreachable("Unhandled ForeignRepresentableKind in switch.");
 }
 
 ForeignRepresentationInfo

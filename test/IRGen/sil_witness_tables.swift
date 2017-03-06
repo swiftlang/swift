@@ -39,13 +39,13 @@ struct Conformer: Q, QQ {
 // CHECK: [[EXTERNAL_CONFORMER_EXTERNAL_P_WITNESS_TABLE:@_T039sil_witness_tables_external_conformance17ExternalConformerVAA0F1PAAWP]] = external global i8*, align 8
 // CHECK: [[CONFORMER_Q_WITNESS_TABLE:@_T018sil_witness_tables9ConformerVAA1QAAWP]] = hidden constant [2 x i8*] [
 // CHECK:   i8* bitcast ([4 x i8*]* [[CONFORMER_P_WITNESS_TABLE:@_T018sil_witness_tables9ConformerVAA1PAAWP]] to i8*),
-// CHECK:   i8* bitcast (void (%T18sil_witness_tables9ConformerV*, %swift.type*, i8**)* @_T018sil_witness_tables9ConformerVAA1QAaaDP7qMethod{{[_0-9a-zA-Z]*}}FTW to i8*)
+// CHECK:   i8* bitcast (void (%T18sil_witness_tables9ConformerV*, %swift.type*, i8**)* @_T018sil_witness_tables9ConformerVAA1QA2aDP7qMethod{{[_0-9a-zA-Z]*}}FTW to i8*)
 // CHECK: ]
 // CHECK: [[CONFORMER_P_WITNESS_TABLE]] = hidden constant [4 x i8*] [
 // CHECK:   i8* bitcast (%swift.type* ()* @_T018sil_witness_tables14AssocConformerVMa to i8*),
 // CHECK:   i8* bitcast (i8** ()* @_T018sil_witness_tables14AssocConformerVAA1AAAWa to i8*)
-// CHECK:   i8* bitcast (void (%swift.type*, %swift.type*, i8**)* @_T018sil_witness_tables9ConformerVAA1PAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW to i8*),
-// CHECK:   i8* bitcast (void (%T18sil_witness_tables9ConformerV*, %swift.type*, i8**)* @_T018sil_witness_tables9ConformerVAA1PAaaDP14instanceMethod{{[_0-9a-zA-Z]*}}FTW to i8*)
+// CHECK:   i8* bitcast (void (%swift.type*, %swift.type*, i8**)* @_T018sil_witness_tables9ConformerVAA1PA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW to i8*),
+// CHECK:   i8* bitcast (void (%T18sil_witness_tables9ConformerV*, %swift.type*, i8**)* @_T018sil_witness_tables9ConformerVAA1PA2aDP14instanceMethod{{[_0-9a-zA-Z]*}}FTW to i8*)
 // CHECK: ]
 // CHECK: [[CONFORMER2_P_WITNESS_TABLE:@_T018sil_witness_tables10Conformer2VAA1PAAWP]] = hidden constant [4 x i8*]
 

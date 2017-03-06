@@ -86,6 +86,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/StringSwitch.h"
 
+#include "ConstantBuilder.h"
 #include "EnumPayload.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
@@ -252,7 +253,7 @@ namespace {
       Address dataAddr = projectData(IGF, address);
       auto data = IGF.Builder.CreateLoad(dataAddr);
       if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRetain(data);
+        IGF.emitNativeStrongRetain(data, IGF.getDefaultAtomicity());
       e.add(data);
     }
 
@@ -333,20 +334,24 @@ namespace {
         IGF.emitNativeStrongRelease(context, atomicity);
     }
 
-    void strongRetainUnowned(IRGenFunction &IGF, Explosion &e) const override {
+    void strongRetainUnowned(IRGenFunction &IGF, Explosion &e,
+                             Atomicity atomicity) const override {
       llvm_unreachable("unowned references to functions are not supported");
     }
 
     void strongRetainUnownedRelease(IRGenFunction &IGF,
-                                    Explosion &e) const override {
-      llvm_unreachable("unowned references to functions are not supported");
-    }
-    
-    void unownedRetain(IRGenFunction &IGF, Explosion &e) const override {
+                                    Explosion &e,
+                                    Atomicity atomicity) const override {
       llvm_unreachable("unowned references to functions are not supported");
     }
 
-    void unownedRelease(IRGenFunction &IGF, Explosion &e) const override {
+    void unownedRetain(IRGenFunction &IGF, Explosion &e,
+                       Atomicity atomicity) const override {
+      llvm_unreachable("unowned references to functions are not supported");
+    }
+
+    void unownedRelease(IRGenFunction &IGF, Explosion &e,
+                        Atomicity atomicity) const override {
       llvm_unreachable("unowned references to functions are not supported");
     }
 
@@ -373,7 +378,7 @@ namespace {
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       auto data = IGF.Builder.CreateLoad(projectData(IGF, addr));
       if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRelease(data);
+        IGF.emitNativeStrongRelease(data, IGF.getDefaultAtomicity());
     }
 
     void packIntoEnumPayload(IRGenFunction &IGF,
@@ -899,7 +904,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     switch (argConvention) {
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Direct_Owned:
-      if (!consumesContext) subIGF.emitNativeStrongRetain(rawData);
+      if (!consumesContext) subIGF.emitNativeStrongRetain(rawData, subIGF.getDefaultAtomicity());
       break;
 
     case ParameterConvention::Indirect_In_Guaranteed:
@@ -907,7 +912,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       dependsOnContextLifetime = true;
       if (outType->getCalleeConvention() ==
             ParameterConvention::Direct_Unowned) {
-        subIGF.emitNativeStrongRetain(rawData);
+        subIGF.emitNativeStrongRetain(rawData, subIGF.getDefaultAtomicity());
         consumesContext = true;
       }
       break;
@@ -1048,7 +1053,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // so we can tail call. The safety of this assumes that neither this release
     // nor any of the loads can throw.
     if (consumesContext && !dependsOnContextLifetime && rawData)
-      subIGF.emitNativeStrongRelease(rawData);
+      subIGF.emitNativeStrongRelease(rawData, subIGF.getDefaultAtomicity());
   }
 
   // Derive the callee function pointer.  If we found a function
@@ -1145,7 +1150,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   
   // If the parameters depended on the context, consume the context now.
   if (rawData && consumesContext && dependsOnContextLifetime)
-    subIGF.emitNativeStrongRelease(rawData);
+    subIGF.emitNativeStrongRelease(rawData, subIGF.getDefaultAtomicity());
   
   // FIXME: Reabstract the result value as substituted.
 
@@ -1212,24 +1217,20 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     argValTypes.push_back(argType);
     argConventions.push_back(param.getConvention());
     
-    CanType argLoweringTy;
+    auto argLoweringTy = argType.getSwiftRValueType();
     switch (param.getConvention()) {
     // Capture value parameters by value, consuming them.
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed:
-      argLoweringTy = argType.getSwiftRValueType();
-      break;
-      
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed:
-      argLoweringTy = argType.getSwiftRValueType();
       break;
       
     // Capture inout parameters by pointer.
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
-      argLoweringTy = argType.getSwiftType();
+      argLoweringTy = CanInOutType::get(argLoweringTy);
       break;
     }
     
@@ -1573,39 +1574,33 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   
   auto flagsVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags);
   
-  //
   // Collect the reserved and invoke pointer fields.
   auto reserved = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
   auto invokeVal = llvm::ConstantExpr::getBitCast(invokeFunction,
                                                   IGF.IGM.FunctionPtrTy);
   
-  //
   // Build the block descriptor.
-  SmallVector<llvm::Constant*, 5> descriptorFields;
-  descriptorFields.push_back(llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0));
-  descriptorFields.push_back(llvm::ConstantInt::get(IGF.IGM.IntPtrTy,
-                                         storageTL.getFixedSize().getValue()));
+  ConstantInitBuilder builder(IGF.IGM);
+  auto descriptorFields = builder.beginStruct();
+  descriptorFields.addInt(IGF.IGM.IntPtrTy, 0);
+  descriptorFields.addInt(IGF.IGM.IntPtrTy,
+                          storageTL.getFixedSize().getValue());
   
   if (!isPOD) {
     // Define the copy and dispose helpers.
-    descriptorFields.push_back(emitBlockCopyHelper(IGF.IGM, blockTy, storageTL));
-    descriptorFields.push_back(emitBlockDisposeHelper(IGF.IGM, blockTy, storageTL));
+    descriptorFields.add(emitBlockCopyHelper(IGF.IGM, blockTy, storageTL));
+    descriptorFields.add(emitBlockDisposeHelper(IGF.IGM, blockTy, storageTL));
   }
   
-  //
   // Build the descriptor signature.
-  // TODO
-  descriptorFields.push_back(getBlockTypeExtendedEncoding(IGF.IGM, invokeTy));
+  descriptorFields.add(getBlockTypeExtendedEncoding(IGF.IGM, invokeTy));
   
-  //
   // Create the descriptor.
-  auto descriptorInit = llvm::ConstantStruct::getAnon(descriptorFields);
-  auto descriptor = new llvm::GlobalVariable(*IGF.IGM.getModule(),
-                                             descriptorInit->getType(),
-                                             /*constant*/ true,
-                                             llvm::GlobalValue::InternalLinkage,
-                                             descriptorInit,
-                                             "block_descriptor");
+  auto descriptor =
+    descriptorFields.finishAndCreateGlobal("block_descriptor",
+                                           IGF.IGM.getPointerAlignment(),
+                                           /*constant*/ true);
+
   auto descriptorVal = llvm::ConstantExpr::getBitCast(descriptor,
                                                       IGF.IGM.Int8PtrTy);
   

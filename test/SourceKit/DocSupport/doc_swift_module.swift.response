@@ -863,7 +863,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "Self",
-    key.usr: "s:4cake4ProtPAaaBRzSi7ElementRtzlE4Selfxmfp",
+    key.usr: "s:4cake4ProtPA2aBRzSi7ElementRtzlE4Selfxmfp",
     key.offset: 1028,
     key.length: 4
   },
@@ -1221,7 +1221,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.function.subscript,
         key.name: "subscript(_:)",
-        key.usr: "s:4cake2C1C9subscriptSiSici",
+        key.usr: "s:4cake2C1C9subscriptS2ici",
         key.offset: 85,
         key.length: 38,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>index</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.function.subscript>",
@@ -1270,7 +1270,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
           {
             key.kind: source.lang.swift.decl.enumelement,
             key.name: "case1",
-            key.usr: "s:4cake2C1C0B5CasesO5case1AeEmF",
+            key.usr: "s:4cake2C1C0B5CasesO5case1A2EmF",
             key.offset: 205,
             key.length: 10,
             key.fully_annotated_decl: "<decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>case1</decl.name></decl.enumelement>"
@@ -1289,8 +1289,8 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "extfoo()",
-        key.usr: "s:4cake4ProtPAaaBRzSi7ElementRtzlE6extfooyyF::SYNTHESIZED::s:4cake2C1C",
-        key.original_usr: "s:4cake4ProtPAaaBRzSi7ElementRtzlE6extfooyyF",
+        key.usr: "s:4cake4ProtPA2aBRzSi7ElementRtzlE6extfooyyF::SYNTHESIZED::s:4cake2C1C",
+        key.original_usr: "s:4cake4ProtPA2aBRzSi7ElementRtzlE6extfooyyF",
         key.offset: 244,
         key.length: 13,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>extfoo</decl.name>()</decl.function.method.instance>"
@@ -1298,8 +1298,8 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.function.subscript,
         key.name: "subscript(_:)",
-        key.usr: "s:4cake4ProtPAAE9subscriptSiSici::SYNTHESIZED::s:4cake2C1C",
-        key.original_usr: "s:4cake4ProtPAAE9subscriptSiSici",
+        key.usr: "s:4cake4ProtPAAE9subscriptS2ici::SYNTHESIZED::s:4cake2C1C",
+        key.original_usr: "s:4cake4ProtPAAE9subscriptS2ici",
         key.offset: 263,
         key.length: 38,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>index</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.function.subscript>",
@@ -1411,7 +1411,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
           {
             key.kind: source.lang.swift.decl.enumelement,
             key.name: "case1",
-            key.usr: "s:4cake2C1C0B5CasesO5case1AeEmF",
+            key.usr: "s:4cake2C1C0B5CasesO5case1A2EmF",
             key.offset: 476,
             key.length: 10,
             key.fully_annotated_decl: "<decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>case1</decl.name></decl.enumelement>"
@@ -1430,8 +1430,8 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "extfoo()",
-        key.usr: "s:4cake4ProtPAaaBRzSi7ElementRtzlE6extfooyyF::SYNTHESIZED::s:4cake2C2C",
-        key.original_usr: "s:4cake4ProtPAaaBRzSi7ElementRtzlE6extfooyyF",
+        key.usr: "s:4cake4ProtPA2aBRzSi7ElementRtzlE6extfooyyF::SYNTHESIZED::s:4cake2C2C",
+        key.original_usr: "s:4cake4ProtPA2aBRzSi7ElementRtzlE6extfooyyF",
         key.offset: 515,
         key.length: 13,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>extfoo</decl.name>()</decl.function.method.instance>"
@@ -1439,8 +1439,8 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.function.subscript,
         key.name: "subscript(_:)",
-        key.usr: "s:4cake4ProtPAAE9subscriptSiSici::SYNTHESIZED::s:4cake2C2C",
-        key.original_usr: "s:4cake4ProtPAAE9subscriptSiSici",
+        key.usr: "s:4cake4ProtPAAE9subscriptS2ici::SYNTHESIZED::s:4cake2C2C",
+        key.original_usr: "s:4cake4ProtPAAE9subscriptS2ici",
         key.offset: 534,
         key.length: 38,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>index</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.function.subscript>",
@@ -1530,7 +1530,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.enumelement,
         key.name: "Blah",
-        key.usr: "s:4cake6MyEnumO4BlahAcCmF",
+        key.usr: "s:4cake6MyEnumO4BlahA2CmF",
         key.offset: 698,
         key.length: 9,
         key.fully_annotated_decl: "<decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>Blah</decl.name></decl.enumelement>"
@@ -1646,7 +1646,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.function.subscript,
         key.name: "subscript(_:)",
-        key.usr: "s:4cake4ProtPAAE9subscriptSiSici",
+        key.usr: "s:4cake4ProtPAAE9subscriptS2ici",
         key.offset: 965,
         key.length: 38,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>index</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.function.subscript>",
@@ -1680,7 +1680,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "extfoo()",
-        key.usr: "s:4cake4ProtPAaaBRzSi7ElementRtzlE6extfooyyF",
+        key.usr: "s:4cake4ProtPA2aBRzSi7ElementRtzlE6extfooyyF",
         key.offset: 1055,
         key.length: 13,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>extfoo</decl.name>()</decl.function.method.instance>"
@@ -1706,7 +1706,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
           {
             key.kind: source.lang.swift.decl.enumelement,
             key.name: "a",
-            key.usr: "s:4cake2S1V2SEO1aAeEmF",
+            key.usr: "s:4cake2S1V2SEO1aA2EmF",
             key.offset: 1108,
             key.length: 6,
             key.fully_annotated_decl: "<decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>a</decl.name></decl.enumelement>"
@@ -1714,7 +1714,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
           {
             key.kind: source.lang.swift.decl.enumelement,
             key.name: "b",
-            key.usr: "s:4cake2S1V2SEO1bAeEmF",
+            key.usr: "s:4cake2S1V2SEO1bA2EmF",
             key.offset: 1124,
             key.length: 6,
             key.fully_annotated_decl: "<decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>b</decl.name></decl.enumelement>"
@@ -1722,7 +1722,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
           {
             key.kind: source.lang.swift.decl.enumelement,
             key.name: "c",
-            key.usr: "s:4cake2S1V2SEO1cAeEmF",
+            key.usr: "s:4cake2S1V2SEO1cA2EmF",
             key.offset: 1140,
             key.length: 6,
             key.fully_annotated_decl: "<decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>c</decl.name></decl.enumelement>"

@@ -1626,7 +1626,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     }
 
     // Figure out the name for this parameter.
-    Identifier bodyName = importFullName(param, ImportNameVersion::Swift3)
+    Identifier bodyName = importFullName(param, CurrentVersion)
                               .getDeclName()
                               .getBaseName();
 
@@ -1771,15 +1771,28 @@ adjustResultTypeForThrowingFunction(ForeignErrorConvention::Info errorInfo,
   switch (errorInfo.TheKind) {
   case ForeignErrorConvention::ZeroResult:
   case ForeignErrorConvention::NonZeroResult:
+    // Check for a bad override.
+    if (resultTy->isVoid())
+      return Type();
     return TupleType::getEmpty(resultTy->getASTContext());
 
   case ForeignErrorConvention::NilResult:
-    resultTy = resultTy->getAnyOptionalObjectType();
-    assert(resultTy &&
-           "result type of NilResult convention was not imported as optional");
+    if (Type unwrappedTy = resultTy->getAnyOptionalObjectType())
+      return unwrappedTy;
+    // Check for a bad override.
+    if (resultTy->isVoid())
+      return Type();
+    // It's possible an Objective-C method overrides the base method to never
+    // fail, and marks the method _Nonnull to indicate that. Swift can't
+    // represent that, but it shouldn't fall over either.
     return resultTy;
 
   case ForeignErrorConvention::ZeroPreservedResult:
+    // Check for a bad override.
+    if (resultTy->isVoid())
+      return Type();
+    return resultTy;
+
   case ForeignErrorConvention::NonNilError:
     return resultTy;
   }
@@ -2037,7 +2050,7 @@ Type ClangImporter::Implementation::importMethodType(
     }
 
     // Figure out the name for this parameter.
-    Identifier bodyName = importFullName(param, ImportNameVersion::Swift3)
+    Identifier bodyName = importFullName(param, CurrentVersion)
                               .getDeclName()
                               .getBaseName();
 
@@ -2194,7 +2207,7 @@ Type ClangImporter::Implementation::importAccessorMethodType(
 
   } else {
     const clang::ParmVarDecl *param = clangDecl->parameters().front();
-    ImportedName fullBodyName = importFullName(param,ImportNameVersion::Swift3);
+    ImportedName fullBodyName = importFullName(param, CurrentVersion);
     Identifier bodyName = fullBodyName.getDeclName().getBaseName();
     SourceLoc nameLoc = importSourceLoc(param->getLocation());
     Identifier argLabel = functionName.getDeclName().getArgumentNames().front();

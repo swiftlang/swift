@@ -24,17 +24,8 @@
 // https://connect.microsoft.com/VisualStudio/feedback/details/3116505
 #define SWIFT_DELETE_OPERATOR_DELETED                                          \
   { llvm_unreachable("Delete operator should not be called."); }
-
-// Work around MSVC bug: can't infer llvm::trailing_objects_internal,
-// even though we granted friend access to it.
-// https://connect.microsoft.com/VisualStudio/feedback/details/3116517
-#define SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(TokenType)                       \
-  llvm::trailing_objects_internal::TrailingObjectsBase::OverloadToken<TokenType>
 #else
 #define SWIFT_DELETE_OPERATOR_DELETED = delete;
-
-#define SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(TokenType)                       \
-  typename TrailingObjects::template OverloadToken<TokenType>
 #endif
 
 #endif // SWIFT_BASIC_COMPILER_H

@@ -27,7 +27,7 @@ StmtSyntax::StmtSyntax(const RC<SyntaxData> Root, const StmtSyntaxData *Data)
 UnknownStmtSyntaxData::UnknownStmtSyntaxData(RC<RawSyntax> Raw,
                                              const SyntaxData *Parent,
                                              CursorIndex IndexInParent)
-  : StmtSyntaxData(Raw, Parent, IndexInParent) {
+  : UnknownSyntaxData(Raw, Parent, IndexInParent) {
   assert(Raw->Kind == SyntaxKind::UnknownStmt);
 }
 
@@ -35,9 +35,11 @@ RC<UnknownStmtSyntaxData>
 UnknownStmtSyntaxData::make(RC<RawSyntax> Raw,
                             const SyntaxData *Parent,
                             CursorIndex IndexInParent) {
+  auto UnknownRaw = RawSyntax::make(SyntaxKind::UnknownStmt, Raw->Layout,
+                                    Raw->Presence);
   return RC<UnknownStmtSyntaxData> {
     new UnknownStmtSyntaxData {
-      Raw, Parent, IndexInParent
+      UnknownRaw, Parent, IndexInParent
     }
   };
 }
@@ -46,7 +48,7 @@ UnknownStmtSyntaxData::make(RC<RawSyntax> Raw,
 
 UnknownStmtSyntax::UnknownStmtSyntax(const RC<SyntaxData> Root,
                                      const UnknownStmtSyntaxData *Data)
-  : StmtSyntax(Root, Data) {}
+  : UnknownSyntax(Root, Data) {}
 
 #pragma mark fallthrough-statement Data
 
@@ -378,58 +380,3 @@ ReturnStmtSyntax::withExpression(ExprSyntax NewExpression) const {
 CodeBlockStmtSyntax::CodeBlockStmtSyntax(const RC<SyntaxData> Root,
                                          CodeBlockStmtSyntaxData *Data)
     : StmtSyntax(Root, Data) {}
-
-
-#pragma mark statements Data
-
-StmtListSyntaxData::StmtListSyntaxData(RC<RawSyntax> Raw,
-                                       const SyntaxData *Parent,
-                                       CursorIndex IndexInParent)
-    : StmtSyntaxData(Raw, Parent, IndexInParent) {
-  assert(Raw->Kind == SyntaxKind::StmtList);
-}
-
-RC<StmtListSyntaxData> StmtListSyntaxData::make(RC<RawSyntax> Raw,
-                                                const SyntaxData *Parent,
-                                                CursorIndex IndexInParent) {
-  return RC<StmtListSyntaxData> {
-    new StmtListSyntaxData { Raw, Parent, IndexInParent }
-  };
-}
-
-RC<StmtListSyntaxData> StmtListSyntaxData::makeBlank() {
-  return make(RawSyntax::make(SyntaxKind::StmtList,
-                              {},
-                              SourcePresence::Present));
-}
-
-#pragma mark statements API
-
-StmtListSyntax::StmtListSyntax(const RC<SyntaxData> Root,
-                               const StmtListSyntaxData *Data)
-  : Syntax(Root, Data) {}
-
-StmtListSyntax
-StmtListSyntax::withAddedStatement(Syntax AdditionalStatement) const {
-  auto Layout = getRaw()->Layout;
-  Layout.push_back(AdditionalStatement.getRaw());
-  auto NewRaw = RawSyntax::make(SyntaxKind::StmtList, Layout,
-                                getRaw()->Presence);
-  return Data->replaceSelf<StmtListSyntax>(NewRaw);
-}
-
-#pragma mark statements Builder
-
-StmtListSyntaxBuilder &
-StmtListSyntaxBuilder::addStatement(Syntax Statement) {
-  StmtListLayout.push_back(Statement.getRaw());
-  return *this;
-}
-
-StmtListSyntax StmtListSyntaxBuilder::build() const {
-  auto Raw = RawSyntax::make(SyntaxKind::StmtList, StmtListLayout,
-                             SourcePresence::Present);
-  auto Data = StmtListSyntaxData::make(Raw);
-  return StmtListSyntax { Data, Data.get() };
-}
-

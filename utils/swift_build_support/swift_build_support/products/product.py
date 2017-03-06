@@ -26,7 +26,7 @@ class Product(object):
 
         The name of the source code directory of this product.
         It provides a customization point for Product subclasses. It is set to
-        the value of product_name() by default for this reason. 
+        the value of product_name() by default for this reason.
         """
         return cls.product_name()
 

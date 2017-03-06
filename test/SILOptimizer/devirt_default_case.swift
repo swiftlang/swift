@@ -40,7 +40,7 @@ private class Derived2 : Base2 {
 
 // Check that call to Base2.middle can be devirtualized
 //
-// CHECK-LABEL: sil @_T019devirt_default_case9callOuterSiSiF
+// CHECK-LABEL: sil @_T019devirt_default_case9callOuterS2iF
 // CHECK: function_ref @_T019devirt_default_case5Base233_{{.*}}5inner
 // CHECK: function_ref @_T019devirt_default_case8Derived233_{{.*}}6middle
 // CHECK-NOT: class_method

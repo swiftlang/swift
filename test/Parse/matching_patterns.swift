@@ -100,7 +100,7 @@ enum Voluntary<T> : Equatable {
     }
 
     switch foo {
-    case .Naught: // expected-error{{enum case 'Naught' not found in type 'Foo'}}
+    case .Naught: // expected-error{{pattern cannot match values of type 'Foo'}}
       ()
     case .A, .B, .C:
       ()
@@ -137,7 +137,7 @@ case .Twain,
 var notAnEnum = 0
 
 switch notAnEnum {
-case .Foo: // expected-error{{enum case 'Foo' not found in type 'Int'}}
+case .Foo: // expected-error{{pattern cannot match values of type 'Int'}}
   ()
 }
 
@@ -264,10 +264,8 @@ case +++(_, var d, 3):
 // expected-error@-1{{'+++' is not a prefix unary operator}}
   ()
 case (_, var e, 3) +++ (1, 2, 3):
-// expected-error@-1{{binary operator '+++' cannot be applied to operands of type '(_, <<error type>>, Int)' and '(Int, Int, Int)'}}
-// expected-note@-2{{expected an argument list of type '((Int, Int, Int), (Int, Int, Int))'}}
-// expected-error@-3{{'var' binding pattern cannot appear in an expression}}
-// expected-error@-4{{'var' binding pattern cannot appear in an expression}}
+// expected-error@-1{{'_' can only appear in a pattern}}
+// expected-error@-2{{'var' binding pattern cannot appear in an expression}}
   ()
 }
 

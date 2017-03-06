@@ -48,6 +48,7 @@ set(SWIFT_BENCH_MODULES
     single-source/GlobalClass
     single-source/Hanoi
     single-source/Hash
+    single-source/HashQuadratic
     single-source/Histogram
     single-source/Integrate
     single-source/IterateData

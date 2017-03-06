@@ -820,17 +820,19 @@ public:
   }
 
   UnmanagedRetainValueInst *createUnmanagedRetainValue(SILLocation Loc,
-                                                       SILValue operand) {
+                                                       SILValue operand,
+                                                       Atomicity atomicity) {
     assert(F.hasQualifiedOwnership());
     return insert(new (F.getModule()) UnmanagedRetainValueInst(
-        getSILDebugLocation(Loc), operand));
+        getSILDebugLocation(Loc), operand, atomicity));
   }
 
   UnmanagedReleaseValueInst *createUnmanagedReleaseValue(SILLocation Loc,
-                                                         SILValue operand) {
+                                                         SILValue operand,
+                                                         Atomicity atomicity) {
     assert(F.hasQualifiedOwnership());
     return insert(new (F.getModule()) UnmanagedReleaseValueInst(
-        getSILDebugLocation(Loc), operand));
+        getSILDebugLocation(Loc), operand, atomicity));
   }
 
   CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand) {
@@ -857,9 +859,10 @@ public:
   }
 
   UnmanagedAutoreleaseValueInst *
-  createUnmanagedAutoreleaseValue(SILLocation Loc, SILValue operand) {
+  createUnmanagedAutoreleaseValue(SILLocation Loc, SILValue operand,
+                                  Atomicity atomicity) {
     return insert(new (F.getModule()) UnmanagedAutoreleaseValueInst(
-                      getSILDebugLocation(Loc), operand));
+                      getSILDebugLocation(Loc), operand, atomicity));
   }
 
   SetDeallocatingInst *createSetDeallocating(SILLocation Loc,
@@ -1176,6 +1179,12 @@ public:
         getSILDebugLocation(Loc), Existential));
   }
 
+  DeinitExistentialOpaqueInst *
+  createDeinitExistentialOpaque(SILLocation Loc, SILValue Existential) {
+    return insert(new (F.getModule()) DeinitExistentialOpaqueInst(
+        getSILDebugLocation(Loc), Existential));
+  }
+
   ProjectBlockStorageInst *createProjectBlockStorage(SILLocation Loc,
                                                      SILValue Storage) {
     auto CaptureTy = Storage->getType()
@@ -1269,6 +1278,18 @@ public:
                                            Atomicity atomicity) {
     return insert(new (F.getModule()) UnownedReleaseInst(
         getSILDebugLocation(Loc), Operand, atomicity));
+  }
+
+  EndLifetimeInst *createEndLifetime(SILLocation Loc, SILValue Operand) {
+    return insert(new (F.getModule())
+                      EndLifetimeInst(getSILDebugLocation(Loc), Operand));
+  }
+
+  UncheckedOwnershipConversionInst *
+  createUncheckedOwnershipConversion(SILLocation Loc, SILValue Operand,
+                                     ValueOwnershipKind Kind) {
+    return insert(new (F.getModule()) UncheckedOwnershipConversionInst(
+        getSILDebugLocation(Loc), Operand, Kind));
   }
 
   FixLifetimeInst *createFixLifetime(SILLocation Loc, SILValue Operand) {
@@ -1529,6 +1550,11 @@ public:
   //===--------------------------------------------------------------------===//
   // Memory management helpers
   //===--------------------------------------------------------------------===//
+
+  /// Returns the default atomicity of the module.
+  Atomicity getDefaultAtomicity() {
+    return getModule().isDefaultAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
+  }
 
   /// Try to fold a destroy_addr operation into the previous instructions, or
   /// generate an explicit one if that fails.  If this inserts a new

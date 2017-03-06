@@ -145,7 +145,7 @@ bool PartialApplyCombiner::allocateTemporaries() {
   // by apply instructions.
   bool needsReleases = false;
   CanSILFunctionType PAITy =
-      dyn_cast<SILFunctionType>(PAI->getCallee()->getType().getSwiftType());
+    PAI->getCallee()->getType().getAs<SILFunctionType>();
 
   // Emit a destroy value for each captured closure argument.
   ArrayRef<SILParameterInfo> Params = PAITy->getParameters();
@@ -228,7 +228,7 @@ void PartialApplyCombiner::releaseTemporaries() {
       if (!TmpType.isAddressOnly(PAI->getModule())) {
         auto *Load = Builder.createLoad(PAI->getLoc(), Op,
                                         LoadOwnershipQualifier::Unqualified);
-        Builder.createReleaseValue(PAI->getLoc(), Load, Atomicity::Atomic);
+        Builder.createReleaseValue(PAI->getLoc(), Load, Builder.getDefaultAtomicity());
       } else {
         Builder.createDestroyAddr(PAI->getLoc(), Op);
       }
@@ -320,20 +320,20 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
     for (auto Arg : ToBeReleasedArgs) {
       Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
-    Builder.createStrongRelease(AI.getLoc(), PAI, Atomicity::Atomic);
+    Builder.createStrongRelease(AI.getLoc(), PAI, Builder.getDefaultAtomicity());
     Builder.setInsertionPoint(TAI->getErrorBB()->begin());
     // Release the non-consumed parameters.
     for (auto Arg : ToBeReleasedArgs) {
       Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
-    Builder.createStrongRelease(AI.getLoc(), PAI, Atomicity::Atomic);
+    Builder.createStrongRelease(AI.getLoc(), PAI, Builder.getDefaultAtomicity());
     Builder.setInsertionPoint(AI.getInstruction());
   } else {
     // Release the non-consumed parameters.
     for (auto Arg : ToBeReleasedArgs) {
       Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
-    Builder.createStrongRelease(AI.getLoc(), PAI, Atomicity::Atomic);
+    Builder.createStrongRelease(AI.getLoc(), PAI, Builder.getDefaultAtomicity());
   }
 
   SilCombiner->replaceInstUsesWith(*AI.getInstruction(), NAI.getInstruction());
@@ -519,7 +519,7 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
           Builder.createDestroyAddr(FAS.getLoc(), Arg);
           break;
         case ParameterConvention::Direct_Owned:
-          Builder.createReleaseValue(FAS.getLoc(), Arg, Atomicity::Atomic);
+          Builder.createReleaseValue(FAS.getLoc(), Arg, Builder.getDefaultAtomicity());
           break;
         case ParameterConvention::Indirect_In_Guaranteed:
         case ParameterConvention::Indirect_Inout:
@@ -692,39 +692,26 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
   // replaced by a concrete type.
   SmallVector<Substitution, 8> Substitutions;
   for (auto Subst : AI.getSubstitutions()) {
-    auto *A = Subst.getReplacement()->getAs<ArchetypeType>();
-    if (A && A == OpenedArchetype) {
-      auto Conformances = AI.getModule().getASTContext()
-                            .AllocateUninitialized<ProtocolConformanceRef>(1);
-      Conformances[0] = Conformance;
-      Substitution NewSubst(ConcreteType, Conformances);
-      Substitutions.push_back(NewSubst);
-    } else
-      Substitutions.push_back(Subst);
+    auto NewSubst = Subst.subst(
+      AI.getModule().getSwiftModule(),
+      [&](SubstitutableType *type) -> Type {
+        if (type == OpenedArchetype)
+          return ConcreteType;
+        return type;
+      },
+      [&](Type origTy, Type substTy, ProtocolType *protoType)
+        -> Optional<ProtocolConformanceRef> {
+        assert(origTy->isEqual(OpenedArchetype));
+        return Conformance;
+      });
+    Substitutions.push_back(NewSubst);
   }
-
-  SILType SubstCalleeType = AI.getSubstCalleeSILType();
-
-  SILType NewSubstCalleeType;
 
   auto FnTy = AI.getCallee()->getType().castTo<SILFunctionType>();
-  if (FnTy->isPolymorphic()) {
-    // Handle polymorphic functions by properly substituting
-    // their parameter types.
-    CanSILFunctionType SFT = FnTy->substGenericArgs(
-                                        AI.getModule(),
-                                        Substitutions);
-    NewSubstCalleeType = SILType::getPrimitiveObjectType(SFT);
-  } else {
-    NewSubstCalleeType =
-      SubstCalleeType.subst(AI.getModule(),
-                            [&](SubstitutableType *type) -> Type {
-                              if (type == OpenedArchetype)
-                                return ConcreteType;
-                              return type;
-                            },
-                            MakeAbstractConformanceForGenericType());
-  }
+  assert(FnTy->isPolymorphic());
+
+  auto SFT = FnTy->substGenericArgs(AI.getModule(), Substitutions);
+  auto NewSubstCalleeType = SILType::getPrimitiveObjectType(SFT);
 
   FullApplySite NewAI;
   Builder.setCurrentDebugScope(AI.getDebugScope());
@@ -732,14 +719,14 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
 
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
     NewAI = Builder.createTryApply(AI.getLoc(), AI.getCallee(),
-                                    NewSubstCalleeType,
-                                    Substitutions, Args,
-                                    TAI->getNormalBB(), TAI->getErrorBB());
+                                   NewSubstCalleeType,
+                                   Substitutions, Args,
+                                   TAI->getNormalBB(), TAI->getErrorBB());
   else
     NewAI = Builder.createApply(AI.getLoc(), AI.getCallee(),
-                                 NewSubstCalleeType,
-                                 AI.getType(), Substitutions, Args,
-                                 cast<ApplyInst>(AI)->isNonThrowing());
+                                NewSubstCalleeType,
+                                AI.getType(), Substitutions, Args,
+                                cast<ApplyInst>(AI)->isNonThrowing());
 
   if (isa<ApplyInst>(NewAI))
     replaceInstUsesWith(*AI.getInstruction(), NewAI.getInstruction());
@@ -886,21 +873,6 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
   if (WMI->getConformance().isConcrete())
     return nullptr;
 
-  // Don't specialize Apply instructions that return the Self type.
-  // Notice that it is sufficient to compare the return type to the
-  // substituted type because types that depend on the Self type are
-  // not allowed (for example [Self] is not allowed).
-  if (AI.getType().getSwiftRValueType() == WMI->getLookupType())
-    return nullptr;
-
-  // We need to handle the Self return type.
-  // In we find arguments that are not the 'self' argument and if
-  // they are of the Self type then we abort the optimization.
-  for (auto Arg : AI.getArgumentsWithoutSelf()) {
-    if (Arg->getType().getSwiftRValueType() == WMI->getLookupType())
-      return nullptr;
-  }
-
   // The lookup type is not an opened existential type,
   // thus it cannot be made more concrete.
   if (!WMI->getLookupType()->isOpenedExistential())
@@ -916,10 +888,10 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
     // Keep around the dependence on the open instruction unless we've
     // actually eliminated the use.
     auto *NewWMI = Builder.createWitnessMethod(WMI->getLoc(),
-                                                ConcreteType,
-                                                Conformance, WMI->getMember(),
-                                                WMI->getType(),
-                                                WMI->isVolatile());
+                                               ConcreteType,
+                                               Conformance, WMI->getMember(),
+                                               WMI->getType(),
+                                               WMI->isVolatile());
     // Replace only uses of the witness_method in the apply that is going to
     // be changed.
     MutableArrayRef<Operand> Operands = AI.getInstruction()->getAllOperands();
@@ -956,15 +928,6 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI) {
   }
   if (!Self)
     return nullptr;
-
-  // We need to handle the Self return type.
-  // In we find arguments that are not the 'self' argument and if
-  // they are of the Self type then we abort the optimization.
-  for (auto Arg : AI.getArgumentsWithoutSelf()) {
-    if (Arg->getType().getSwiftType().getLValueOrInOutObjectType() ==
-        AI.getArguments().back()->getType().getSwiftRValueType())
-      return nullptr;
-  }
 
   // Obtain the protocol whose which should be used by the conformance.
   auto *AFD = dyn_cast<AbstractFunctionDecl>(Callee->getDeclContext());
@@ -1044,7 +1007,7 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
 
   // Emit a retain for the @owned return.
   SILBuilderWithScope Builder(Call);
-  Builder.createRetainValue(Call->getLoc(), OnX, Atomicity::Atomic);
+  Builder.createRetainValue(Call->getLoc(), OnX, Builder.getDefaultAtomicity());
 
   // Emit a release for the @owned parameter, or none for a @guaranteed
   // parameter.
@@ -1056,7 +1019,7 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
          ParamInfo == ParameterConvention::Direct_Guaranteed);
 
   if (ParamInfo == ParameterConvention::Direct_Owned)
-    Builder.createReleaseValue(Call->getLoc(), OnX, Atomicity::Atomic);
+    Builder.createReleaseValue(Call->getLoc(), OnX, Builder.getDefaultAtomicity());
 }
 
 /// Replace an application of a cast composition f_inverse(f(x)) by x.
@@ -1097,14 +1060,16 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
     // X might not be strong_retain/release'able. Replace it by a
     // retain/release_value on X instead.
     if (isa<StrongRetainInst>(User)) {
-      SILBuilderWithScope(User).createRetainValue(User->getLoc(), X,
-                                                  Atomicity::Atomic);
+      SILBuilderWithScope Builder(User);
+      Builder.createRetainValue(User->getLoc(), X,
+                                cast<StrongRetainInst>(User)->getAtomicity());
       eraseInstFromFunction(*User);
       continue;
     }
     if (isa<StrongReleaseInst>(User)) {
-      SILBuilderWithScope(User).createReleaseValue(User->getLoc(), X,
-                                                   Atomicity::Atomic);
+      SILBuilderWithScope Builder(User);
+      Builder.createReleaseValue(User->getLoc(), X,
+                                 cast<StrongReleaseInst>(User)->getAtomicity());
       eraseInstFromFunction(*User);
       continue;
     }

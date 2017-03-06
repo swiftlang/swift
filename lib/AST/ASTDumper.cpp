@@ -29,6 +29,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
@@ -207,6 +208,8 @@ getSILFunctionTypeRepresentationString(SILFunctionType::Representation value) {
   case SILFunctionType::Representation::WitnessMethod: return "witness_method";
   case SILFunctionType::Representation::Closure: return "closure";
   }
+
+  llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
 static StringRef
 getAbstractStorageDeclKindString(AbstractStorageDecl::StorageKindTy value) {
@@ -230,6 +233,8 @@ getAbstractStorageDeclKindString(AbstractStorageDecl::StorageKindTy value) {
   case AbstractStorageDecl::Computed:
     return "computed";
   }
+
+  llvm_unreachable("Unhandled AbstractStorageDecl in switch.");
 }
 static StringRef getImportKindString(ImportKind value) {
   switch (value) {
@@ -242,6 +247,8 @@ static StringRef getImportKindString(ImportKind value) {
   case ImportKind::Var: return "var";
   case ImportKind::Func: return "func";
   }
+  
+  llvm_unreachable("Unhandled ImportKind in switch.");
 }
 static StringRef getAccessibilityString(Accessibility value) {
   switch (value) {
@@ -251,6 +258,8 @@ static StringRef getAccessibilityString(Accessibility value) {
   case Accessibility::Public: return "public";
   case Accessibility::Open: return "open";
   }
+
+  llvm_unreachable("Unhandled Accessibility in switch.");
 }
 static StringRef
 getForeignErrorConventionKindString(ForeignErrorConvention::Kind value) {
@@ -261,6 +270,8 @@ getForeignErrorConventionKindString(ForeignErrorConvention::Kind value) {
   case ForeignErrorConvention::NilResult: return "NilResult";
   case ForeignErrorConvention::NonNilError: return "NonNilError";
   }
+
+  llvm_unreachable("Unhandled ForeignErrorConvention in switch.");
 }
 static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
   switch (value) {
@@ -276,6 +287,8 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
     case DefaultArgumentKind::EmptyDictionary: return "[:]";
     case DefaultArgumentKind::Normal: return "normal";
   }
+
+  llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
 }
 static StringRef getAccessorKindString(AccessorKind value) {
   switch (value) {
@@ -288,6 +301,8 @@ static StringRef getAccessorKindString(AccessorKind value) {
     case AccessorKind::IsAddressor: return "addressor";
     case AccessorKind::IsMutableAddressor: return "mutableAddressor";
   }
+
+  llvm_unreachable("Unhandled AccessorKind in switch.");
 }
 static StringRef getAccessKindString(AccessKind value) {
   switch (value) {
@@ -295,6 +310,8 @@ static StringRef getAccessKindString(AccessKind value) {
     case AccessKind::Write: return "write";
     case AccessKind::ReadWrite: return "readwrite";
   }
+
+  llvm_unreachable("Unhandled AccessKind in switch.");
 }
 static StringRef
 getMagicIdentifierLiteralExprKindString(MagicIdentifierLiteralExpr::Kind value) {
@@ -305,6 +322,8 @@ getMagicIdentifierLiteralExprKindString(MagicIdentifierLiteralExpr::Kind value) 
     case MagicIdentifierLiteralExpr::Column: return "#column";
     case MagicIdentifierLiteralExpr::DSOHandle: return "#dsohandle";
   }
+
+  llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 static StringRef
 getObjCSelectorExprKindString(ObjCSelectorExpr::ObjCSelectorKind value) {
@@ -313,6 +332,8 @@ getObjCSelectorExprKindString(ObjCSelectorExpr::ObjCSelectorKind value) {
     case ObjCSelectorExpr::Getter: return "getter";
     case ObjCSelectorExpr::Setter: return "setter";
   }
+
+  llvm_unreachable("Unhandled ObjCSelectorExpr in switch.");
 }
 static StringRef getAccessSemanticsString(AccessSemantics value) {
   switch (value) {
@@ -321,6 +342,8 @@ static StringRef getAccessSemanticsString(AccessSemantics value) {
     case AccessSemantics::DirectToAccessor: return "direct_to_accessor";
     case AccessSemantics::BehaviorInitialization: return "behavior_init";
   }
+
+  llvm_unreachable("Unhandled AccessSemantics in switch.");
 }
 static StringRef getMetatypeRepresentationString(MetatypeRepresentation value) {
   switch (value) {
@@ -328,6 +351,8 @@ static StringRef getMetatypeRepresentationString(MetatypeRepresentation value) {
     case MetatypeRepresentation::Thick: return "thick";
     case MetatypeRepresentation::ObjC: return "@objc";
   }
+
+  llvm_unreachable("Unhandled MetatypeRepresentation in switch.");
 }
 static StringRef
 getStringLiteralExprEncodingString(StringLiteralExpr::Encoding value) {
@@ -336,6 +361,8 @@ getStringLiteralExprEncodingString(StringLiteralExpr::Encoding value) {
     case StringLiteralExpr::UTF16: return "utf16";
     case StringLiteralExpr::OneUnicodeScalar: return "unicodeScalar";
   }
+
+  llvm_unreachable("Unhandled StringLiteral in switch.");
 }
 static StringRef getCtorInitializerKindString(CtorInitializerKind value) {
   switch (value) {
@@ -344,6 +371,8 @@ static StringRef getCtorInitializerKindString(CtorInitializerKind value) {
     case CtorInitializerKind::ConvenienceFactory: return "convenience_factory";
     case CtorInitializerKind::Factory: return "factory";
   }
+
+  llvm_unreachable("Unhandled CtorInitializerKind in switch.");
 }
 static StringRef getOptionalTypeKindString(OptionalTypeKind value) {
   switch (value) {
@@ -351,6 +380,8 @@ static StringRef getOptionalTypeKindString(OptionalTypeKind value) {
     case OTK_Optional: return "Optional";
     case OTK_ImplicitlyUnwrappedOptional: return "ImplicitlyUnwrappedOptional";
   }
+
+  llvm_unreachable("Unhandled OptionalTypeKind in switch.");
 }
 static StringRef getAssociativityString(Associativity value) {
   switch (value) {
@@ -358,6 +389,8 @@ static StringRef getAssociativityString(Associativity value) {
     case Associativity::Left: return "left";
     case Associativity::Right: return "right";
   }
+
+  llvm_unreachable("Unhandled Associativity in switch.");
 }
 
 //===----------------------------------------------------------------------===//
@@ -365,11 +398,11 @@ static StringRef getAssociativityString(Associativity value) {
 //===----------------------------------------------------------------------===//
 
 // Print a name.
-static void printName(raw_ostream &os, Identifier name) {
-  if (name.empty())
+static void printName(raw_ostream &os, DeclName name) {
+  if (!name)
     os << "<anonymous>";
   else
-    os << name.str();
+    os << name;
 }
 
 namespace {
@@ -1004,7 +1037,7 @@ namespace {
           OS << "#else:\n";
         }
 
-        for (auto D : Clause.Members) {
+        for (auto D : Clause.Elements) {
           OS << '\n';
           printRec(D);
         }
@@ -1148,7 +1181,7 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
         break;
       }
     }
-    os << "extension";
+    os << " extension";
     break;
 
   case DeclContextKind::Initializer:
@@ -1166,18 +1199,12 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     os << "top-level code";
     break;
 
-  case DeclContextKind::AbstractFunctionDecl: {
-    auto *AFD = cast<AbstractFunctionDecl>(dc);
-    if (isa<FuncDecl>(AFD))
-      os << "func decl";
-    if (isa<ConstructorDecl>(AFD))
-      os << "init";
-    if (isa<DestructorDecl>(AFD))
-      os << "deinit";
+  case DeclContextKind::AbstractFunctionDecl:
+    printName(os, cast<AbstractFunctionDecl>(dc)->getFullName());
     break;
-  }
+
   case DeclContextKind::SubscriptDecl:
-    os << "subscript decl";
+    printName(os, cast<SubscriptDecl>(dc)->getFullName());
     break;
   }
 }
@@ -2621,10 +2648,18 @@ void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   };
 
   switch (getKind()) {
-  case ProtocolConformanceKind::Normal:
+  case ProtocolConformanceKind::Normal: {
+    auto normal = cast<NormalProtocolConformance>(this);
+
     printCommon("normal");
     // Maybe print information about the conforming context?
+
+    for (auto conformance : normal->getSignatureConformances()) {
+      out << '\n';
+      conformance.dump(out, indent + 2);
+    }
     break;
+  }
 
   case ProtocolConformanceKind::Inherited: {
     auto conf = cast<InheritedProtocolConformance>(this);
@@ -3115,13 +3150,17 @@ void TypeBase::dump(raw_ostream &os, unsigned indent) const {
   Type(const_cast<TypeBase *>(this)).dump(os, indent);
 }
 
-void GenericEnvironment::dump() const {
-  llvm::errs() << "Generic environment:\n";
+void GenericEnvironment::dump(raw_ostream &os) const {
+  os << "Generic environment:\n";
   for (auto gp : getGenericParams()) {
-    gp->dump();
-    mapTypeIntoContext(gp)->dump();
+    gp->dump(os);
+    mapTypeIntoContext(gp)->dump(os);
   }
-  llvm::errs() << "Generic parameters:\n";
+  os << "Generic parameters:\n";
   for (auto paramTy : getGenericParams())
-    paramTy->dump();
+    paramTy->dump(os);
+}
+
+void GenericEnvironment::dump() const {
+  dump(llvm::errs());
 }

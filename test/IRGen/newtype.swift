@@ -132,14 +132,14 @@ public func anchor() -> Bool {
 }
 
 class ObjCTest {
-  // CHECK-LABEL: define hidden %0* @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAFSgFTo
+  // CHECK-LABEL: define hidden %0* @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAGFTo
   // CHECK: [[CASTED:%.+]] = ptrtoint %0* %2 to i{{32|64}}
-  // CHECK: [[RESULT:%.+]] = call swiftcc i{{32|64}} @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAFSgF(i{{32|64}} [[CASTED]], %T7newtype8ObjCTestC* swiftself {{%.+}})
+  // CHECK: [[RESULT:%.+]] = call swiftcc i{{32|64}} @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAGF(i{{32|64}} [[CASTED]], %T7newtype8ObjCTestC* swiftself {{%.+}})
   // CHECK: [[OPAQUE_RESULT:%.+]] = inttoptr i{{32|64}} [[RESULT]] to %0*
   // CHECK: ret %0* [[OPAQUE_RESULT]]
   // CHECK: {{^}$}}
 
-  // OPT-LABEL: define hidden %0* @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAFSgFTo
+  // OPT-LABEL: define hidden %0* @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAGFTo
   // OPT: ret %0* %2
   // OPT: {{^}$}}
   @objc func optionalPassThrough(_ ed: ErrorDomain?) -> ErrorDomain? {

@@ -45,11 +45,6 @@ NOTE(decl_declared_here,none,
 NOTE(extended_type_declared_here,none,
      "extended type declared here", ())
 
-NOTE(while_converting_default_tuple_value,none,
-     "while converting default tuple value to element type %0", (Type))
-NOTE(while_converting_subscript_index,none,
-     "while converting subscript index to expected type %0", (Type))
-
 //------------------------------------------------------------------------------
 // Constraint solver diagnostics
 //------------------------------------------------------------------------------
@@ -164,6 +159,9 @@ ERROR(value_type_comparison_with_nil_illegal,none,
 ERROR(cannot_match_expr_pattern_with_value,none,
       "expression pattern of type %0 cannot match values of type %1",
       (Type, Type))
+ERROR(cannot_match_unresolved_expr_pattern_with_value,none,
+      "pattern cannot match values of type %0",
+      (Type))
 
 ERROR(cannot_reference_compare_types,none,
       "cannot check reference equality of functions; operands here have types "
@@ -912,8 +910,6 @@ ERROR(c_function_pointer_from_function_with_context,none,
       "%select{local function|closure}0 that captures "
       "%select{context|generic parameters|dynamic Self type}1",
       (bool, unsigned))
-NOTE(c_function_pointer_captures_here,none,
-     "%0 captured here", (Identifier))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations
@@ -1505,8 +1501,6 @@ NOTE(declared_protocol_conformance_here,none,
 
 ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, DeclName))
-NOTE(protocol_conformance_implied_here,none,
-     "implied protocol conformance %0 here can be made explicit", (Identifier))
 
 // "Near matches"
 WARNING(optional_req_near_match,none,
@@ -1514,9 +1508,6 @@ WARNING(optional_req_near_match,none,
         (DescriptiveDeclKind, DeclName, DeclName, DeclName))
 NOTE(optional_req_nonobjc_near_match_add_objc,none,
      "add '@objc' to provide an Objective-C entrypoint", ())
-NOTE(optional_req_nonobjc_to_objc,none,
-     "rename to %0 to satisfy this requirement",
-     (DeclName))
 NOTE(optional_req_near_match_move,none,
      "move %0 to %select{an|another}1 extension to silence this warning",
      (DeclName, unsigned))
@@ -1562,9 +1553,6 @@ ERROR(requires_generic_params_made_equal,none,
 ERROR(requires_generic_param_made_equal_to_concrete,none,
       "same-type requirement makes generic parameter %0 non-generic",
       (Type))
-ERROR(requires_superclass_conflict,none,
-      "%select{generic parameter |protocol |}0%1 cannot be a subclass of both "
-      "%2 and %3", (unsigned, Type, Type, Type))
 ERROR(recursive_type_reference,none,
       "%0 %1 references itself", (DescriptiveDeclKind, Identifier))
 ERROR(recursive_requirement_reference,none,
@@ -1586,8 +1574,16 @@ ERROR(protocol_typealias_conflict, none,
       (Identifier, Type, Type))
 WARNING(redundant_same_type_to_concrete,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
-NOTE(redundancy_here,none,
+NOTE(same_type_redundancy_here,none,
      "same-type constraint %1 == %2 %select{written here|implied here}0",
+     (bool, Type, Type))
+ERROR(requires_superclass_conflict,none,
+      "%select{generic parameter |protocol |}0%1 cannot be a subclass of both "
+      "%2 and %3", (unsigned, Type, Type, Type))
+WARNING(redundant_superclass_constraint,none,
+        "redundant superclass constraint %0 : %1", (Type, Type))
+NOTE(superclass_redundancy_here,none,
+     "superclass constraint %1 : %2 %select{written here|implied here}0",
      (bool, Type, Type))
 
 ERROR(mutiple_layout_constraints,none,
@@ -1767,8 +1763,6 @@ ERROR(decl_already_final,none,
       "static declarations are already final", ())
 ERROR(open_decl_cannot_be_final,none,
       "%0 cannot be declared both 'final' and 'open'", (DescriptiveDeclKind))
-NOTE(decl_init_here,none,
-     "initial value is here", ())
 
 
 // Inheritance
@@ -2061,9 +2055,6 @@ ERROR(nscopying_doesnt_conform,none,
 #define SELECT_APPLICATION_MAIN "select{'UIApplicationMain'|'NSApplicationMain'}"
 #define SELECT_APPLICATION_DELEGATE "select{'UIApplicationDelegate'|'NSApplicationDelegate'}"
 
-ERROR(attr_ApplicationMain_not_class,none,
-      "%" SELECT_APPLICATION_MAIN "0 attribute may only be used on classes",
-      (unsigned))
 ERROR(attr_ApplicationMain_not_ApplicationDelegate,none,
       "%" SELECT_APPLICATION_MAIN "0 class must conform to the %" SELECT_APPLICATION_DELEGATE "0 protocol",
       (unsigned))
@@ -2117,17 +2108,7 @@ NOTE(found_candidate,none,
      "found this candidate", ())
 NOTE(found_candidate_type,none,
      "found candidate with type %0", (Type))
-NOTE(first_declaration,none,
-     "first declaration", ())
-NOTE(second_declaration,none,
-     "second declaration", ())
 
-ERROR(no_IntegerLiteralType_found,none,
-      "standard library error: IntegerLiteralType not defined", ())
-ERROR(no_FloatLiteralType_found,none,
-      "standard library error: FloatLiteralType not defined", ())
-ERROR(no_StringLiteralType_found,none,
-      "standard library error: StringLiteralType not defined", ())
 ERROR(no_MaxBuiltinIntegerType_found,none,
    "standard library error: _MaxBuiltinIntegerType is not properly defined", ())
 ERROR(no_MaxBuiltinFloatType_found,none,
@@ -2232,9 +2213,6 @@ ERROR(try_if_rhs_noncovering,none,
 ERROR(try_assign_rhs_noncovering,none,
       "'" TRY_KIND_SELECT(0) "' following assignment operator does not cover "
       "everything to its right", (unsigned))
-
-NOTE(subscript_decl_here,none,
-     "subscript operator declared here", ())
 
 ERROR(broken_bool,none, "type 'Bool' is broken", ())
 
@@ -3456,10 +3434,6 @@ WARNING(variable_never_mutated, none,
 WARNING(variable_never_read, none,
         "%select{variable|parameter}1 %0 was written to, but never read",
         (Identifier, unsigned))
-
-WARNING(extraneous_default_args_in_call, none,
-        "call to %0 has extraneous arguments that could use defaults",
-        (DeclName))
 
 //------------------------------------------------------------------------------
 // Circular reference diagnostics

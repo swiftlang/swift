@@ -6,7 +6,7 @@ enum AnEnumeration {
 
   // EnumElement
   case Element
-  // CHECK: [[@LINE-1]]:8 | enumerator/Swift | Element | s:14swift_ide_test13AnEnumerationO7ElementAcCmF | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:8 | enumerator/Swift | Element | s:14swift_ide_test13AnEnumerationO7ElementA2CmF | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | AnEnumeration | s:14swift_ide_test13AnEnumerationO
 }
 
@@ -18,21 +18,21 @@ struct AStruct {
 
   // Subscript
   subscript(index: Int) -> Int {
-    // CHECK: [[@LINE-1]]:3 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructV9subscriptSiSici | Def,RelChild | rel: 1
+    // CHECK: [[@LINE-1]]:3 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2ici | Def,RelChild | rel: 1
     // CHECK-NEXT: RelChild | AStruct | s:14swift_ide_test7AStructV
 
     // Accessor + AccessorAddressor
     unsafeAddress {
-      // CHECK: [[@LINE-1]]:5 | instance-method/acc-addr/Swift |  | s:14swift_ide_test7AStructV9subscriptSiSicflu | Def,RelChild,RelAcc | rel: 1
-      // CHECK-NEXT: RelChild,RelAcc | subscript(_:) | s:14swift_ide_test7AStructV9subscriptSiSici
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-addr/Swift |  | s:14swift_ide_test7AStructV9subscriptS2icflu | Def,RelChild,RelAcc | rel: 1
+      // CHECK-NEXT: RelChild,RelAcc | subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2ici
 
       return UnsafePointer(base)
     }
 
     // Accessor + AccessorMutableAddressor
     unsafeMutableAddress {
-      // CHECK: [[@LINE-1]]:5 | instance-method/acc-mutaddr/Swift |  | s:14swift_ide_test7AStructV9subscriptSiSicfau | Def,RelChild,RelAcc | rel: 1
-      // CHECK-NEXT: RelChild,RelAcc | subscript(_:) | s:14swift_ide_test7AStructV9subscriptSiSici
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-mutaddr/Swift |  | s:14swift_ide_test7AStructV9subscriptS2icfau | Def,RelChild,RelAcc | rel: 1
+      // CHECK-NEXT: RelChild,RelAcc | subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2ici
 
       return base
     }
@@ -43,10 +43,16 @@ struct AStruct {
 class AClass {
   // CHECK: [[@LINE-1]]:7 | class/Swift | AClass | s:14swift_ide_test6AClassC | Def | rel: 0
 
-  // InstanceMethod
-  func instanceMethod() {}
-  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | instanceMethod() | s:14swift_ide_test6AClassC14instanceMethodyyF | Def,RelChild | rel: 1
-  // CHECK-NEXT:  RelChild | AClass | s:14swift_ide_test6AClassC
+  // InstanceMethod + Parameters
+  func instanceMethod(a: Int, b b: Int, _ c: Int, d _: Int, _: Int) {}
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitF | Def,RelChild | rel: 1
+  // CHECK-NEXT: RelChild | AClass | s:14swift_ide_test6AClassC
+  // CHECK: [[@LINE-3]]:23 | param/Swift | a | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitFAEL_Siv | Def,RelChild | rel: 1
+  // CHECK-NEXT: RelChild | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitF
+  // CHECK-NOT: [[@LINE-5]]:33 | param/Swift | b | s:{{.*}} | Def,RelChild | rel: 1
+  // CHECK-NOT: [[@LINE-6]]:43 | param/Swift | c | s:{{.*}} | Def,RelChild | rel: 1
+  // CHECK-NOT: [[@LINE-7]]:53 | param/Swift | d | s:{{.*}} | Def,RelChild | rel: 1
+  // CHECK-NOT: [[@LINE-8]]:61 | param/Swift | _ | s:{{.*}} | Def,RelChild | rel: 1
 
   // ClassMethod
   class func classMethod() {}
@@ -208,3 +214,13 @@ class AttrAnnots {
   @GKInspectable var gkString = "gk"
   // CHECK: [[@LINE-1]]:22 | instance-property(GKI)/Swift | gkString |
 }
+
+// CHECK: [[@LINE+1]]:7 | class/Swift | C1 | [[C1_USR:.*]] | Def | rel: 0
+class C1 {}
+// CHECK: [[@LINE+1]]:11 | type-alias/Swift | C1Alias | [[C1Alias_USR:.*]] | Def | rel: 0
+typealias C1Alias = C1
+// CHECK: [[@LINE+4]]:7 | class/Swift | SubC1 | [[SubC1_USR:.*]] | Def | rel: 0
+// CHECK: [[@LINE+3]]:15 | type-alias/Swift | C1Alias | [[C1Alias_USR]] | Ref | rel: 0
+// CHECK: [[@LINE+2]]:15 | class/Swift | C1 | [[C1_USR]] | Ref,Impl,RelBase | rel: 1
+// CHECK-NEXT: RelBase | SubC1 | [[SubC1_USR]]
+class SubC1 : C1Alias {}

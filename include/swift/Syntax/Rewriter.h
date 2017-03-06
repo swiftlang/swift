@@ -24,9 +24,11 @@
 
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/DeclSyntax.h"
+#include "swift/Syntax/GenericSyntax.h"
 #include "swift/Syntax/ExprSyntax.h"
 #include "swift/Syntax/StmtSyntax.h"
 #include "swift/Syntax/Syntax.h"
+#include "swift/Syntax/UnknownSyntax.h"
 
 namespace swift {
 namespace syntax {

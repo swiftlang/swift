@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s
 
-// REQUIRES: CPU=i386 || CPU=x86_64
+// REQUIRES: CPU=i386_or_x86_64
 
 // CHECK: define hidden swiftcc void @_T015indirect_return11generic_get{{[_0-9a-zA-Z]*}}F
 func generic_get<T>(p: UnsafeMutablePointer<T>) -> T {

@@ -52,92 +52,110 @@ public:
 };
 
 /// A witness to a specific element of a protocol.  Every
-/// ProtocolTypeInfo stores one of these for each declaration in the
-/// protocol.
-/// 
-/// The structure of a witness varies by the type of declaration:
-///   - a function requires a single witness, the function;
-///   - a variable requires two witnesses, a getter and a setter;
-///   - a subscript requires two witnesses, a getter and a setter;
-///   - a type requires a pointer to the metadata for that type and
-///     to witness tables for each of the protocols it obeys.
+/// ProtocolTypeInfo stores one of these for each requirement
+/// introduced by the protocol.
 class WitnessTableEntry {
-  Decl *Member;
-  WitnessIndex BeginIndex;
+public:
+  void *MemberOrAssociatedType;
+  ProtocolDecl *Protocol;
 
- WitnessTableEntry(Decl *member, WitnessIndex begin)
-   : Member(member), BeginIndex(begin) {}
+  WitnessTableEntry(void *member, ProtocolDecl *protocol)
+    : MemberOrAssociatedType(member), Protocol(protocol) {}
 
 public:
   WitnessTableEntry() = default;
 
-  Decl *getMember() const {
-    return Member;
-  }
-
-  static WitnessTableEntry forPrefixBase(ProtocolDecl *proto) {
-    return WitnessTableEntry(proto, WitnessIndex(0, /*isPrefix=*/ true));
-  }
-
-  static WitnessTableEntry forOutOfLineBase(ProtocolDecl *proto,
-                                            WitnessIndex index) {
-    return WitnessTableEntry(proto, index);
+  static WitnessTableEntry forOutOfLineBase(ProtocolDecl *proto) {
+    assert(proto != nullptr);
+    return WitnessTableEntry(nullptr, proto);
   }
 
   /// Is this a base-protocol entry?
-  bool isBase() const { return isa<ProtocolDecl>(Member); }
+  bool isBase() const { return MemberOrAssociatedType == nullptr; }
 
-  /// Is the table for this base-protocol entry "out of line",
-  /// i.e. there is a witness which indirectly points to it, or is
-  /// it a prefix of the layout of this protocol?
+  bool matchesBase(ProtocolDecl *proto) const {
+    assert(proto != nullptr);
+    return MemberOrAssociatedType == nullptr && Protocol == proto;
+  }
+
+  /// Given that this is a base-protocol entry, is the table
+  /// "out of line"?
   bool isOutOfLineBase() const {
     assert(isBase());
-    return !BeginIndex.isPrefix();
+    return true;
   }
 
-  /// Return the index at which to find the table for this
-  /// base-protocol entry.
-  WitnessIndex getOutOfLineBaseIndex() const {
-    assert(isOutOfLineBase());
-    return BeginIndex;
+  ProtocolDecl *getBase() const {
+    assert(isBase());
+    return Protocol;
   }
 
-  static WitnessTableEntry forFunction(AbstractFunctionDecl *func,
-                                       WitnessIndex index) {
-    return WitnessTableEntry(func, index);
+  static WitnessTableEntry forFunction(AbstractFunctionDecl *func) {
+    assert(func != nullptr);
+    return WitnessTableEntry(func, nullptr);
   }
   
-  bool isFunction() const { return isa<AbstractFunctionDecl>(Member); }
+  bool isFunction() const {
+    return Protocol == nullptr &&
+           isa<AbstractFunctionDecl>(
+             static_cast<Decl*>(MemberOrAssociatedType));
+  }
 
-  WitnessIndex getFunctionIndex() const {
+  bool matchesFunction(AbstractFunctionDecl *func) const {
+    assert(func != nullptr);
+    return MemberOrAssociatedType == func && Protocol == nullptr;
+  }
+
+  AbstractFunctionDecl *getFunction() const {
     assert(isFunction());
-    return BeginIndex;
-  }
-  
-  static WitnessTableEntry forAssociatedType(AssociatedTypeDecl *ty,
-                                             WitnessIndex index) {
-    return WitnessTableEntry(ty, index);
-  }
-  
-  bool isAssociatedType() const { return isa<AssociatedTypeDecl>(Member); }
-  
-  WitnessIndex getAssociatedTypeIndex() const {
-    assert(isAssociatedType());
-    return BeginIndex;
+    return static_cast<AbstractFunctionDecl*>(MemberOrAssociatedType);
   }
 
-  WitnessIndex
-  getAssociatedTypeWitnessTableIndex(ProtocolDecl *target) const {
-    assert(!BeginIndex.isPrefix());
-    auto index = BeginIndex.getValue() + 1;
-    for (auto protocol :
-           cast<AssociatedTypeDecl>(Member)->getConformingProtocols()) {
-      if (protocol == target) {
-        return WitnessIndex(index, false);
-      }
-      index++;
-    }
-    llvm_unreachable("protocol not in direct conformance list?");
+  static WitnessTableEntry forAssociatedType(AssociatedTypeDecl *ty) {
+    return WitnessTableEntry(ty, nullptr);
+  }
+  
+  bool isAssociatedType() const {
+    return Protocol == nullptr &&
+           isa<AssociatedTypeDecl>(
+             static_cast<Decl*>(MemberOrAssociatedType));
+  }
+
+  bool matchesAssociatedType(AssociatedTypeDecl *assocType) const {
+    assert(assocType != nullptr);
+    return MemberOrAssociatedType == assocType && Protocol == nullptr;
+  }
+
+  AssociatedTypeDecl *getAssociatedType() const {
+    assert(isAssociatedType());
+    return static_cast<AssociatedTypeDecl*>(MemberOrAssociatedType);
+  }
+
+  static WitnessTableEntry forAssociatedConformance(CanType path,
+                                                    ProtocolDecl *requirement) {
+    assert(path && requirement != nullptr);
+    return WitnessTableEntry(path.getPointer(), requirement);
+  }
+
+  bool isAssociatedConformance() const {
+    return Protocol != nullptr && MemberOrAssociatedType != nullptr;
+  }
+
+  bool matchesAssociatedConformance(CanType path,
+                                    ProtocolDecl *requirement) const {
+    assert(path && requirement != nullptr);
+    return MemberOrAssociatedType == path.getPointer() &&
+           Protocol == requirement;
+  }
+
+  CanType getAssociatedConformancePath() const {
+    assert(isAssociatedConformance());
+    return CanType(static_cast<TypeBase *>(MemberOrAssociatedType));
+  }
+
+  ProtocolDecl *getAssociatedConformanceRequirement() const {
+    assert(isAssociatedConformance());
+    return Protocol;
   }
 };
 
@@ -150,9 +168,6 @@ class ProtocolInfo final :
   const ProtocolInfo *NextConverted;
   friend class TypeConverter;
 
-  /// The number of witnesses in the protocol.
-  unsigned NumWitnesses;
-
   /// The number of table entries in this protocol layout.
   unsigned NumTableEntries;
 
@@ -161,14 +176,13 @@ class ProtocolInfo final :
   mutable llvm::SmallDenseMap<const ProtocolConformance*, ConformanceInfo*, 2>
     Conformances;
 
-  ProtocolInfo(unsigned numWitnesses, ArrayRef<WitnessTableEntry> table)
-    : NumWitnesses(numWitnesses), NumTableEntries(table.size()) {
+  ProtocolInfo(ArrayRef<WitnessTableEntry> table)
+      : NumTableEntries(table.size()) {
     std::uninitialized_copy(table.begin(), table.end(),
                             getTrailingObjects<WitnessTableEntry>());
   }
 
-  static ProtocolInfo *create(unsigned numWitnesses,
-                              ArrayRef<WitnessTableEntry> table);
+  static ProtocolInfo *create(ArrayRef<WitnessTableEntry> table);
 
 public:
   const ConformanceInfo &getConformance(IRGenModule &IGM,
@@ -178,20 +192,53 @@ public:
   /// The number of witness slots in a conformance to this protocol;
   /// in other words, the size of the table in words.
   unsigned getNumWitnesses() const {
-    return NumWitnesses;
+    return NumTableEntries;
   }
 
   ArrayRef<WitnessTableEntry> getWitnessEntries() const {
     return {getTrailingObjects<WitnessTableEntry>(), NumTableEntries};
   }
 
-  const WitnessTableEntry &getWitnessEntry(Decl *member) const {
-    // FIXME: do a binary search if the number of witnesses is large
-    // enough.
-    for (auto &witness : getWitnessEntries())
-      if (witness.getMember() == member)
-        return witness;
-    llvm_unreachable("didn't find entry for member!");
+  WitnessIndex getBaseIndex(ProtocolDecl *protocol) const {
+    auto entries = getWitnessEntries();
+    for (auto &witness : entries) {
+      if (witness.matchesBase(protocol)) {
+        if (witness.isOutOfLineBase()) {
+          return WitnessIndex(&witness - entries.begin(), false);
+        } else {
+          return WitnessIndex(0, true);
+        }
+      }
+    }
+    llvm_unreachable("didn't find entry for base");
+  }
+
+  WitnessIndex getFunctionIndex(AbstractFunctionDecl *function) const {
+    auto entries = getWitnessEntries();
+    for (auto &witness : entries) {
+      if (witness.matchesFunction(function))
+        return WitnessIndex(&witness - entries.begin(), false);
+    }
+    llvm_unreachable("didn't find entry for function");
+  }
+
+  WitnessIndex getAssociatedTypeIndex(AssociatedTypeDecl *assocType) const {
+    auto entries = getWitnessEntries();
+    for (auto &witness : entries) {
+      if (witness.matchesAssociatedType(assocType))
+        return WitnessIndex(&witness - entries.begin(), false);
+    }
+    llvm_unreachable("didn't find entry for associated type");
+  }
+
+  WitnessIndex getAssociatedConformanceIndex(CanType path,
+                                             ProtocolDecl *requirement) const {
+    auto entries = getWitnessEntries();
+    for (auto &witness : entries) {
+      if (witness.matchesAssociatedConformance(path, requirement))
+        return WitnessIndex(&witness - entries.begin(), false);
+    }
+    llvm_unreachable("didn't find entry for associated conformance");
   }
 
   ~ProtocolInfo();

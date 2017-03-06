@@ -151,7 +151,7 @@
 //
 // @convention(method) <T, U, V> (..., Foo<T, U>.Type)
 // @convention(witness_method) <T, U, V> (..., Foo<T, U>.Type)
-// @convention(witness_method) <Self : P, T, U, V> (..., Self.Type)
+// @convention(witness_method) <Self : P, V> (..., Self.Type)
 //
 //===----------------------------------------------------------------------===//
 
@@ -451,29 +451,22 @@ public:
     CanType witnessSelfType =
       Witness->computeInterfaceSelfType()->getCanonicalType();
     witnessSelfType = getSubstWitnessInterfaceType(witnessSelfType);
-    if (auto selfTuple = dyn_cast<TupleType>(witnessSelfType)) {
-      assert(selfTuple->getNumElements() == 1);
-      witnessSelfType = selfTuple.getElementType(0);
-    }
-    witnessSelfType = witnessSelfType.getLValueOrInOutObjectType();
+    witnessSelfType = witnessSelfType->getInOutObjectType()
+      ->getCanonicalType();
 
     // Eagerly loading here could cause an unnecessary
     // load+materialize in some cases, but it's not really important.
-    SILValue selfValue = self.getValue();
-    if (selfValue->getType().isAddress()) {
-      // SEMANTIC ARC TODO: We are returning self as a borrowed value. Is this
-      // correct?
-      selfValue = gen.B.createLoadBorrow(loc, selfValue);
+    if (self.getType().isAddress()) {
+      self = gen.B.createLoadBorrow(loc, self);
     }
 
     // Do a derived-to-base conversion if necessary.
     if (witnessSelfType != SubstSelfType) {
       auto selfSILType = gen.getLoweredType(witnessSelfType);
-      selfValue = gen.B.createUpcast(loc, selfValue, selfSILType);
+      self = gen.B.createUpcast(loc, self, selfSILType);
     }
 
     // Recreate as a borrowed value.
-    self = ManagedValue::forUnmanaged(selfValue);
     return LValue::forValue(self, witnessSelfType);
   }
 
@@ -826,7 +819,7 @@ MaterializeForSetEmitter::createAddressorCallback(SILFunction &F,
       break;
 
     case AddressorKind::NativePinning:
-      gen.B.createStrongUnpin(loc, owner, Atomicity::Atomic);
+      gen.B.createStrongUnpin(loc, owner, gen.B.getDefaultAtomicity());
       break;
     }
 
@@ -930,7 +923,7 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
       // ownership of it.
       SILValue indicesV =
         gen.B.createProjectValueBuffer(loc, indicesTy, callbackBuffer);
-      if (indicesTL->isLoadable())
+      if (indicesTL->isLoadable() || !gen.silConv.useLoweredAddresses())
         indicesV = indicesTL->emitLoad(gen.B, loc, indicesV,
                                        LoadOwnershipQualifier::Take);
       ManagedValue mIndices =
@@ -951,7 +944,7 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
     auto &valueTL = gen.getTypeLowering(lvalue.getTypeOfRValue());
     value = gen.B.createPointerToAddress(
       loc, value, valueTL.getLoweredType().getAddressType(), /*isStrict*/ true);
-    if (valueTL.isLoadable())
+    if (valueTL.isLoadable() || !gen.silConv.useLoweredAddresses())
       value = valueTL.emitLoad(gen.B, loc, value, LoadOwnershipQualifier::Take);
     ManagedValue mValue = gen.emitManagedRValueWithCleanup(value, valueTL);
     RValue rvalue(gen, loc, lvalue.getSubstFormalType(), mValue);

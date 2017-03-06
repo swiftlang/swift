@@ -2517,7 +2517,8 @@ buildThunkSignature(SILGenFunction &gen,
   builder.addGenericParameter(newGenericParam);
   Requirement newRequirement(RequirementKind::Conformance, newGenericParam,
                              openedExistential->getOpenedExistentialType());
-  auto source = RequirementSource::forAbstract(builder);
+  auto source =
+    GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   builder.addRequirement(newRequirement, source);
 
   builder.finalize(SourceLoc(), {newGenericParam},

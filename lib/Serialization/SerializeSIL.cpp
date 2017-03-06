@@ -315,7 +315,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   FuncTable[Ctx.getIdentifier(F.getName())] = NextFuncID++;
   Funcs.push_back(Out.GetCurrentBitNo());
   unsigned abbrCode = SILAbbrCodes[SILFunctionLayout::Code];
-  TypeID FnID = S.addTypeRef(F.getLoweredType().getSwiftType());
+  TypeID FnID = S.addTypeRef(F.getLoweredType().getSwiftRValueType());
   DEBUG(llvm::dbgs() << "SILFunction " << F.getName() << " @ BitNo "
                      << Out.GetCurrentBitNo() << " abbrCode " << abbrCode
                      << " FnID " << FnID << "\n");
@@ -581,7 +581,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       break;
     }
     case ValueKind::InitExistentialOpaqueInst: {
-      auto &IEOI = cast<InitExistentialRefInst>(SI);
+      auto &IEOI = cast<InitExistentialOpaqueInst>(SI);
       operand = IEOI.getOperand();
       Ty = IEOI.getType();
       FormalConcreteType = IEOI.getFormalConcreteType();
@@ -1047,6 +1047,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::DeallocStackInst:
   case ValueKind::DeallocRefInst:
   case ValueKind::DeinitExistentialAddrInst:
+  case ValueKind::DeinitExistentialOpaqueInst:
   case ValueKind::DestroyAddrInst:
   case ValueKind::IsNonnullInst:
   case ValueKind::LoadInst:
@@ -1056,6 +1057,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::LoadWeakInst:
   case ValueKind::MarkUninitializedInst:
   case ValueKind::FixLifetimeInst:
+  case ValueKind::EndLifetimeInst:
   case ValueKind::CopyBlockInst:
   case ValueKind::StrongPinInst:
   case ValueKind::StrongReleaseInst:
@@ -1067,6 +1069,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::IsUniqueInst:
   case ValueKind::IsUniqueOrPinnedInst:
   case ValueKind::ReturnInst:
+  case ValueKind::UncheckedOwnershipConversionInst:
   case ValueKind::ThrowInst: {
     unsigned Attr = 0;
     if (auto *LI = dyn_cast<LoadInst>(&SI))
@@ -1081,6 +1084,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = (unsigned)DRI->canAllocOnStack();
     else if (auto *RCI = dyn_cast<RefCountingInst>(&SI))
       Attr = RCI->isNonAtomic();
+    else if (auto *UOCI = dyn_cast<UncheckedOwnershipConversionInst>(&SI)) {
+      Attr = unsigned(SILValue(UOCI).getOwnershipKind());
+    }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
   }
@@ -1785,7 +1791,7 @@ void SILSerializer::writeIndexTables() {
 void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
   GlobalVarList[Ctx.getIdentifier(g.getName())] = NextGlobalVarID++;
   GlobalVarOffset.push_back(Out.GetCurrentBitNo());
-  TypeID TyID = S.addTypeRef(g.getLoweredType().getSwiftType());
+  TypeID TyID = S.addTypeRef(g.getLoweredType().getSwiftRValueType());
   DeclID dID = S.addDeclRef(g.getDecl());
   SILGlobalVarLayout::emitRecord(Out, ScratchRecord,
                                  SILAbbrCodes[SILGlobalVarLayout::Code],
@@ -1850,7 +1856,7 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
       WitnessAssocProtocolLayout::emitRecord(
         Out, ScratchRecord,
         SILAbbrCodes[WitnessAssocProtocolLayout::Code],
-        S.addDeclRef(assoc.Requirement),
+        S.addTypeRef(assoc.Requirement),
         S.addDeclRef(assoc.Protocol));
           
       S.writeConformance(assoc.Witness, SILAbbrCodes);

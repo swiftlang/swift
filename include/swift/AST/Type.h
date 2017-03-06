@@ -361,7 +361,6 @@ class CanType : public Type {
                                               OptionalTypeKind &kind);
   static CanType getReferenceStorageReferentImpl(CanType type);
   static CanType getLValueOrInOutObjectTypeImpl(CanType type);
-  static ClassDecl *getClassBoundImpl(CanType type);
 
 public:
   explicit CanType(TypeBase *P = 0) : Type(P) {
@@ -437,15 +436,6 @@ public:
   /// this type. If this type does not represent a layout constraint,
   /// it returns an empty LayoutConstraint.
   LayoutConstraint getLayoutConstraint() const;
-
-  /// \brief Retrieve the most-specific class bound of this type,
-  /// which is either a class, a bound-generic class, or a class-bounded
-  /// archetype.
-  ///
-  /// Returns nil if this is an archetype with a non-specific class bound.
-  ClassDecl *getClassBound() const {
-    return getClassBoundImpl(*this);
-  }
 
   CanType getAnyOptionalObjectType() const {
     OptionalTypeKind kind;

@@ -21,6 +21,22 @@ set(sources
   XCTestOverlayShims.h
   XPCOverlayShims.h
 
+  CoreFoundationOverlayShims.h
+
+  FoundationOverlayShims.h
+  FoundationShimSupport.h
+  NSCalendarShims.h
+  NSCoderShims.h
+  NSDataShims.h
+  NSDictionaryShims.h
+  NSErrorShims.h
+  NSFileManagerShims.h
+  NSIndexSetShims.h
+  NSKeyedArchiverShims.h
+  NSLocaleShims.h
+  NSTimeZoneShims.h
+  NSUndoManagerShims.h
+
   module.modulemap
   )
 set(output_dir "${SWIFTLIB_DIR}/shims")

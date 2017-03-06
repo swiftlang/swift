@@ -18,6 +18,7 @@
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/UnknownSyntax.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -33,6 +34,51 @@ SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<RC<TokenSyntax>> Tokens) {
 }
 
 #pragma mark - Declarations
+
+#pragma mark - declaration-modifier
+
+DeclModifierSyntax SyntaxFactory::makeDeclModifier(RC<TokenSyntax> Name,
+                                                   RC<TokenSyntax> LeftParen,
+                                                   RC<TokenSyntax> Argument,
+                                                   RC<TokenSyntax> RightParen) {
+  auto Raw = RawSyntax::make(SyntaxKind::DeclModifier,
+                             {
+                               Name,
+                               LeftParen,
+                               Argument,
+                               RightParen,
+                             },
+                             SourcePresence::Present);
+  auto Data = DeclModifierSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+DeclModifierSyntax SyntaxFactory::makeBlankDeclModifier() {
+  auto Data = DeclModifierSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
+#pragma mark - declaration-modifier-list
+
+DeclModifierListSyntax SyntaxFactory::
+makeDeclModifierList(const std::vector<DeclModifierSyntax> &Modifiers) {
+  RawSyntax::LayoutList Layout;
+  for (auto Modifier : Modifiers) {
+    Layout.push_back(Modifier.getRaw());
+  }
+
+  auto Raw = RawSyntax::make(SyntaxKind::DeclModifierList, Layout,
+                             SourcePresence::Present);
+  auto Data = DeclModifierListSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+DeclModifierListSyntax SyntaxFactory::makeBlankDeclModifierList() {
+  auto Data = DeclModifierListSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
+#pragma mark - struct-declaration
 
 StructDeclSyntax
 SyntaxFactory::makeStructDecl(RC<TokenSyntax> StructToken,
@@ -65,6 +111,8 @@ StructDeclSyntax SyntaxFactory::makeBlankStructDecl() {
   };
 }
 
+#pragma mark - type-alias-declaration
+
 TypeAliasDeclSyntax SyntaxFactory::makeTypealiasDecl(
     RC<TokenSyntax> TypealiasToken, RC<TokenSyntax> Identifier,
     GenericParameterClauseSyntax GenericParams, RC<TokenSyntax> AssignmentToken,
@@ -87,130 +135,128 @@ DeclMembersSyntax SyntaxFactory::makeBlankDeclMembers() {
   return DeclMembersSyntax { Data, Data.get() };
 }
 
-TypeIdentifierSyntax
-SyntaxFactory::makeTypeIdentifier(OwnedString Name,
-                                  const Trivia &LeadingTrivia,
-                                  const Trivia &TrailingTrivia) {
-  auto Raw = RawSyntax::make(
-      SyntaxKind::TypeIdentifier,
-      {
-          SyntaxFactory::makeIdentifier(Name, LeadingTrivia, TrailingTrivia),
-          RawSyntax::missing(SyntaxKind::GenericArgumentClause),
-          TokenSyntax::missingToken(tok::period, "."),
-          RawSyntax::missing(SyntaxKind::TypeIdentifier),
-      },
-      SourcePresence::Present);
-  auto Data = TypeIdentifierSyntaxData::make(Raw);
-  return TypeIdentifierSyntax { Data, Data.get() };
-}
+#pragma mark - function-parameter
 
-TupleTypeElementSyntax
-SyntaxFactory::makeTupleTypeElement(TypeSyntax ElementType) {
-  auto Data = TupleTypeElementSyntaxData::makeBlank();
-  return TupleTypeElementSyntax { Data, Data.get() }
-      .withTypeSyntax(ElementType);
-}
-
-TypeIdentifierSyntax
-SyntaxFactory::makeTypeIdentifier(RC<TokenSyntax> Identifier,
-                                  GenericArgumentClauseSyntax GenericArgs) {
-  auto Raw = RawSyntax::make(SyntaxKind::TypeIdentifier,
+FunctionParameterSyntax SyntaxFactory::
+makeFunctionParameter(RC<TokenSyntax> ExternalName,
+                      RC<TokenSyntax> LocalName,
+                      RC<TokenSyntax> Colon,
+                      llvm::Optional<TypeSyntax> ParameterTypeSyntax,
+                      RC<TokenSyntax> Ellipsis,
+                      RC<TokenSyntax> Equal,
+                      llvm::Optional<ExprSyntax> DefaultValue,
+                      RC<TokenSyntax> TrailingComma) {
+  auto Raw = RawSyntax::make(SyntaxKind::FunctionParameter,
                              {
-                                 Identifier, GenericArgs.getRaw(),
-                                 TokenSyntax::missingToken(tok::period, "."),
-                                 RawSyntax::missing(SyntaxKind::TypeIdentifier),
+                               ExternalName,
+                               LocalName,
+                               Colon,
+                               ParameterTypeSyntax.hasValue()
+                                 ? ParameterTypeSyntax.getValue().getRaw()
+                                 : RawSyntax::missing(SyntaxKind::MissingType),
+                               Ellipsis,
+                               Equal,
+                               DefaultValue.hasValue()
+                                 ? DefaultValue.getValue().getRaw()
+                                 : RawSyntax::missing(SyntaxKind::MissingExpr),
+                               TrailingComma,
                              },
                              SourcePresence::Present);
-  auto Data = TypeIdentifierSyntaxData::make(Raw);
-  return TypeIdentifierSyntax { Data, Data.get() };
+  auto Data = FunctionParameterSyntaxData::make(Raw);
+  return { Data, Data.get() };
 }
 
-OptionalTypeSyntax
-SyntaxFactory::makeOptionalType(TypeSyntax BaseType,
-                                const Trivia &TrailingTrivia) {
-  auto Raw = RawSyntax::make(SyntaxKind::OptionalType,
-    {
-     BaseType.getRaw(),
-     SyntaxFactory::makeQuestionPostfixToken(TrailingTrivia),
-    },
-    SourcePresence::Present);
-
-  auto Data = OptionalTypeSyntaxData::make(Raw);
-  return OptionalTypeSyntax { Data, Data.get() };
+FunctionParameterSyntax SyntaxFactory::makeBlankFunctionParameter() {
+  auto Data = FunctionParameterSyntaxData::makeBlank();
+  return { Data, Data.get() };
 }
 
-OptionalTypeSyntax SyntaxFactory::makeBlankOptionalType() {
-  auto Data = OptionalTypeSyntaxData::makeBlank();
-  return OptionalTypeSyntax { Data, Data.get() };
+#pragma mark - function-parameter-list
+
+FunctionParameterListSyntax SyntaxFactory::makeFunctionParameterList(
+    const std::vector<FunctionParameterSyntax> &Parameters) {
+  RawSyntax::LayoutList Layout;
+  for (auto Param : Parameters) {
+    Layout.push_back(Param.getRaw());
+  }
+
+  auto Raw = RawSyntax::make(SyntaxKind::FunctionParameterList, Layout,
+                             SourcePresence::Present);
+  auto Data = FunctionParameterListSyntaxData::make(Raw);
+  return { Data, Data.get() };
 }
 
-ImplicitlyUnwrappedOptionalTypeSyntax
-SyntaxFactory::makeImplicitlyUnwrappedOptionalType(
-    TypeSyntax BaseType, const Trivia &TrailingTrivia) {
-  auto Raw = RawSyntax::make(SyntaxKind::ImplicitlyUnwrappedOptionalType,
-    {
-        BaseType.getRaw(), SyntaxFactory::makeExclaimPostfixToken(
-                           TrailingTrivia),
-    },
-    SourcePresence::Present);
-  auto Data = ImplicitlyUnwrappedOptionalTypeSyntaxData::make(Raw);
-  return ImplicitlyUnwrappedOptionalTypeSyntax { Data, Data.get() };
+FunctionParameterListSyntax SyntaxFactory::makeBlankFunctionParameterList() {
+  auto Data = FunctionParameterListSyntaxData::makeBlank();
+  return { Data, Data.get() };
 }
 
-ImplicitlyUnwrappedOptionalTypeSyntax
-SyntaxFactory::makeBlankImplicitlyUnwrappedOptionalType() {
-  auto Data = ImplicitlyUnwrappedOptionalTypeSyntaxData::makeBlank();
-  return ImplicitlyUnwrappedOptionalTypeSyntax { Data, Data.get() };
-}
+#pragma mark - function-signature
 
-MetatypeTypeSyntax SyntaxFactory::makeMetatypeType(TypeSyntax BaseType,
-                                                   RC<TokenSyntax> DotToken,
-                                                   RC<TokenSyntax> TypeToken) {
-  auto Raw = RawSyntax::make(SyntaxKind::MetatypeType,
-                      {
-                        BaseType.getRaw(),
-                        DotToken,
-                        TypeToken
-                      },
-                      SourcePresence::Present);
-  auto Data = MetatypeTypeSyntaxData::make(Raw);
-  return MetatypeTypeSyntax { Data, Data.get() };
-}
-
-MetatypeTypeSyntax SyntaxFactory::makeBlankMetatypeType() {
-  auto Data = MetatypeTypeSyntaxData::makeBlank();
-  return MetatypeTypeSyntax { Data, Data.get() };
-}
-
-TypeIdentifierSyntax SyntaxFactory::makeAnyTypeIdentifier() {
-  auto Data = TypeIdentifierSyntaxData::makeBlank();
-  return TypeIdentifierSyntax { Data, Data.get() }
-    .withIdentifier(makeIdentifier("Any", {}, {}));
-}
-
-TypeIdentifierSyntax SyntaxFactory::makeSelfTypeIdentifier() {
-  auto Data = TypeIdentifierSyntaxData::makeBlank();
-  return TypeIdentifierSyntax { Data, Data.get() }
-    .withIdentifier(makeIdentifier("Self", {}, {}));
-}
-
-SameTypeRequirementSyntax SyntaxFactory::makeSameTypeRequirement(
-    TypeIdentifierSyntax LeftTypeIdentifier, RC<TokenSyntax> EqualityToken,
-    TypeSyntax RightType) {
-  auto Raw = RawSyntax::make(SyntaxKind::SameTypeRequirement,
+FunctionSignatureSyntax
+SyntaxFactory::makeFunctionSignature(RC<TokenSyntax> LeftParen,
+                                     FunctionParameterListSyntax ParameterList,
+                                     RC<TokenSyntax> RightParen,
+                                     RC<TokenSyntax> ThrowsOrRethrows,
+                                     RC<TokenSyntax> Arrow,
+                                     TypeAttributesSyntax ReturnTypeAttributes,
+                                     TypeSyntax ReturnTypeSyntax) {
+  auto Raw = RawSyntax::make(SyntaxKind::FunctionSignature,
                              {
-                               LeftTypeIdentifier.getRaw(),
-                               EqualityToken,
-                               RightType.getRaw()
+                               LeftParen,
+                               ParameterList.getRaw(),
+                               RightParen,
+                               ThrowsOrRethrows,
+                               Arrow,
+                               ReturnTypeAttributes.getRaw(),
+                               ReturnTypeSyntax.getRaw()
                              },
                              SourcePresence::Present);
-  auto Data = SameTypeRequirementSyntaxData::make(Raw);
-  return SameTypeRequirementSyntax { Data, Data.get() };
+  auto Data = FunctionSignatureSyntaxData::make(Raw);
+  return { Data, Data.get() };
 }
 
-SameTypeRequirementSyntax SyntaxFactory::makeBlankSameTypeRequirement() {
-  auto Data = SameTypeRequirementSyntaxData::makeBlank();
-  return SameTypeRequirementSyntax { Data, Data.get() };
+FunctionSignatureSyntax SyntaxFactory::makeBlankFunctionSignature() {
+  auto Data = FunctionSignatureSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
+#pragma mark - function-declaration
+
+FunctionDeclSyntax SyntaxFactory::
+makeFunctionDecl(TypeAttributesSyntax Attributes,
+                 DeclModifierListSyntax Modifiers,
+                 RC<TokenSyntax> FuncKeyword,
+                 RC<TokenSyntax> Identifier,
+                 llvm::Optional<GenericParameterClauseSyntax> GenericParams,
+                 FunctionSignatureSyntax Signature,
+                 llvm::Optional<GenericWhereClauseSyntax> GenericWhereClause,
+                 llvm::Optional<CodeBlockStmtSyntax> Body) {
+  auto Raw = RawSyntax::make(SyntaxKind::FunctionDecl,
+    {
+      Attributes.getRaw(),
+      Modifiers.getRaw(),
+      FuncKeyword,
+      Identifier,
+      GenericParams.hasValue()
+       ? GenericParams.getValue().getRaw()
+       : SyntaxFactory::makeBlankGenericParameterClause().getRaw(),
+      Signature.getRaw(),
+      GenericWhereClause.hasValue()
+        ? GenericWhereClause.getValue().getRaw()
+        : SyntaxFactory::makeBlankGenericWhereClause().getRaw(),
+      Body.hasValue()
+       ? Body.getValue().getRaw()
+       : SyntaxFactory::makeBlankCodeBlock().getRaw()
+    },
+    SourcePresence::Present);
+  auto Data = FunctionDeclSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+FunctionDeclSyntax SyntaxFactory::makeBlankFunctionDecl() {
+  auto Data = FunctionDeclSyntaxData::makeBlank();
+  return { Data, Data.get() };
 }
 
 #pragma mark - Statements
@@ -322,7 +368,30 @@ ReturnStmtSyntax SyntaxFactory::makeBlankReturnStmt() {
   return { Data, Data.get() };
 }
 
+/// Make a statement list from a loosely connected list of statements.
+StmtListSyntax
+SyntaxFactory::makeStmtList(const std::vector<StmtSyntax> &Statements) {
+  RawSyntax::LayoutList Layout;
+  for (auto Stmt : Statements) {
+    Layout.push_back(Stmt.getRaw());
+  }
+
+  auto Raw = RawSyntax::make(SyntaxKind::StmtList, Layout,
+                             SourcePresence::Present);
+  auto Data = StmtListSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+/// Make an empty statement list.
+StmtListSyntax SyntaxFactory::makeBlankStmtList() {
+  auto Raw = RawSyntax::make(SyntaxKind::StmtList, {}, SourcePresence::Present);
+  auto Data = StmtListSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
 #pragma mark - Expressions
+
+#pragma mark - integer-literal-expression
 
 IntegerLiteralExprSyntax
 SyntaxFactory::makeIntegerLiteralExpr(RC<TokenSyntax> Sign,
@@ -348,8 +417,126 @@ IntegerLiteralExprSyntax SyntaxFactory::makeBlankIntegerLiteralExpr() {
   return { Data, Data.get() };
 }
 
+#pragma mark - symbolic-reference
+
+SymbolicReferenceExprSyntax
+SyntaxFactory::makeSymbolicReferenceExpr(RC<TokenSyntax> Identifier,
+  llvm::Optional<GenericArgumentClauseSyntax> GenericArgs) {
+  auto Raw = RawSyntax::make(SyntaxKind::SymbolicReferenceExpr,
+    {
+      Identifier,
+      GenericArgs.hasValue()
+        ? GenericArgs.getValue().getRaw()
+        : RawSyntax::missing(SyntaxKind::GenericArgumentClause)
+    },
+    SourcePresence::Present);
+  auto Data = SymbolicReferenceExprSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+SymbolicReferenceExprSyntax SyntaxFactory::makeBlankSymbolicReferenceExpr() {
+  auto Data = SymbolicReferenceExprSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
+#pragma mark - function-call-argument
+
+FunctionCallArgumentSyntax SyntaxFactory::makeBlankFunctionCallArgument() {
+  auto Data = FunctionCallArgumentSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
+FunctionCallArgumentSyntax
+SyntaxFactory::makeFunctionCallArgument(RC<TokenSyntax> Label,
+                                        RC<TokenSyntax> Colon,
+                                        ExprSyntax ExpressionArgument,
+                                        RC<TokenSyntax> TrailingComma) {
+  auto Raw = RawSyntax::make(SyntaxKind::FunctionCallArgument,
+                             {
+                               Label,
+                               Colon,
+                               ExpressionArgument.getRaw(),
+                               TrailingComma
+                             },
+                             SourcePresence::Present);
+  auto Data = FunctionCallArgumentSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+#pragma mark - function-call-argument-list
+
+/// Make a function call argument list with the given arguments.
+FunctionCallArgumentListSyntax
+SyntaxFactory::makeFunctionCallArgumentList(
+  std::vector<FunctionCallArgumentSyntax> Arguments) {
+  RawSyntax::LayoutList Layout;
+  for (const auto &Arg : Arguments) {
+    Layout.push_back(Arg.getRaw());
+  }
+
+  auto Raw = RawSyntax::make(SyntaxKind::FunctionCallArgumentList, Layout,
+                             SourcePresence::Present);
+  auto Data = FunctionCallArgumentListSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+
+FunctionCallArgumentListSyntax
+SyntaxFactory::makeBlankFunctionCallArgumentList() {
+  auto Data = FunctionCallArgumentListSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
+
+#pragma mark - function-call-expression
+
+FunctionCallExprSyntax
+SyntaxFactory::makeFunctionCallExpr(ExprSyntax CalledExpr,
+                                    RC<TokenSyntax> LeftParen,
+                                    FunctionCallArgumentListSyntax Arguments,
+                                    RC<TokenSyntax> RightParen) {
+  auto Raw = RawSyntax::make(SyntaxKind::FunctionCallExpr,
+                             {
+                               CalledExpr.getRaw(),
+                               LeftParen,
+                               Arguments.getRaw(),
+                               RightParen
+                             },
+                             SourcePresence::Present);
+  auto Data = FunctionCallExprSyntaxData::make(Raw);
+  return { Data, Data.get() };
+}
+
+
+FunctionCallExprSyntax SyntaxFactory::makeBlankFunctionCallExpr() {
+  auto Data = FunctionCallExprSyntaxData::makeBlank();
+  return { Data, Data.get() };
+}
 
 #pragma mark - Tokens
+
+RC<TokenSyntax>
+SyntaxFactory::makeStaticKeyword(const Trivia &LeadingTrivia,
+                                 const Trivia &TrailingTrivia) {
+  return TokenSyntax::make(tok::kw_static, "static",
+                           SourcePresence::Present,
+                           LeadingTrivia, TrailingTrivia);
+}
+
+RC<TokenSyntax>
+SyntaxFactory::makePublicKeyword(const Trivia &LeadingTrivia,
+                                 const Trivia &TrailingTrivia) {
+  return TokenSyntax::make(tok::kw_public, "public",
+                           SourcePresence::Present,
+                           LeadingTrivia, TrailingTrivia);
+}
+
+RC<TokenSyntax>
+SyntaxFactory::makeFuncKeyword(const Trivia &LeadingTrivia,
+                                      const Trivia &TrailingTrivia) {
+  return TokenSyntax::make(tok::kw_func, "func",
+                           SourcePresence::Present,
+                           LeadingTrivia, TrailingTrivia);
+}
 
 RC<TokenSyntax>
 SyntaxFactory::makeFallthroughKeyword(const Trivia &LeadingTrivia,
@@ -414,6 +601,19 @@ RC<TokenSyntax>
 SyntaxFactory::makeRightParenToken(const Trivia &LeadingTrivia,
                                    const Trivia &TrailingTrivia) {
   return TokenSyntax::make(tok::r_paren, ")", SourcePresence::Present,
+                           LeadingTrivia, TrailingTrivia);
+}
+RC<TokenSyntax>
+SyntaxFactory::makeLeftBraceToken(const Trivia &LeadingTrivia,
+                                  const Trivia &TrailingTrivia) {
+  return TokenSyntax::make(tok::l_brace, "{", SourcePresence::Present,
+                           LeadingTrivia, TrailingTrivia);
+}
+
+RC<TokenSyntax>
+SyntaxFactory::makeRightBraceToken(const Trivia &LeadingTrivia,
+                                   const Trivia &TrailingTrivia) {
+  return TokenSyntax::make(tok::r_brace, "}", SourcePresence::Present,
                            LeadingTrivia, TrailingTrivia);
 }
 
@@ -633,30 +833,6 @@ SyntaxFactory::makeIntegerLiteralToken(OwnedString Digits,
   };
 }
 
-TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
-  auto Raw = RawSyntax::make(SyntaxKind::TupleType,
-    {
-        SyntaxFactory::makeLeftParenToken({}, {}),
-        RawSyntax::missing(SyntaxKind::TypeArgumentList),
-        SyntaxFactory::makeRightParenToken({}, {}),
-    },
-    SourcePresence::Present);
-  auto Data = TupleTypeSyntaxData::make(std::move(Raw));
-  return TupleTypeSyntax {
-    Data, Data.get()
-  };
-}
-
-TupleTypeElementSyntax
-SyntaxFactory::makeTupleTypeElement(RC<TokenSyntax> Name,
-                                    TypeSyntax ElementTypeSyntax) {
-  auto Data = TupleTypeElementSyntaxData::makeBlank();
-  return TupleTypeElementSyntax { Data, Data.get() }
-    .withLabel(Name)
-    .withColonToken(SyntaxFactory::makeColonToken({}, Trivia::spaces(1)))
-    .withTypeSyntax(ElementTypeSyntax);
-}
-
 #pragma mark - Generics
 
 GenericParameterClauseSyntax
@@ -693,48 +869,41 @@ SyntaxFactory::makeGenericParameter(OwnedString TypeName,
   return GenericParameterSyntax { Data, Data.get() };
 }
 
-ArrayTypeSyntax
-SyntaxFactory::makeArrayType(RC<TokenSyntax> LeftSquareBracket,
-                             TypeSyntax ElementType,
-                             RC<TokenSyntax> RightSquareBracket) {
-  auto Raw = RawSyntax::make(SyntaxKind::ArrayType,
+SameTypeRequirementSyntax SyntaxFactory::
+makeSameTypeRequirement( TypeIdentifierSyntax LeftTypeIdentifier,
+                        RC<TokenSyntax> EqualityToken,
+                        TypeSyntax RightType) {
+  auto Raw = RawSyntax::make(SyntaxKind::SameTypeRequirement,
                              {
-                               LeftSquareBracket,
-                               ElementType.getRaw(),
-                               RightSquareBracket
+                               LeftTypeIdentifier.getRaw(),
+                               EqualityToken,
+                               RightType.getRaw()
                              },
                              SourcePresence::Present);
-  auto Data = ArrayTypeSyntaxData::make(Raw);
-  return ArrayTypeSyntax { Data, Data.get() };
+  auto Data = SameTypeRequirementSyntaxData::make(Raw);
+  return SameTypeRequirementSyntax { Data, Data.get() };
 }
 
-ArrayTypeSyntax SyntaxFactory::makeBlankArrayType() {
-  auto Data = ArrayTypeSyntaxData::makeBlank();
-  return ArrayTypeSyntax { Data, Data.get() };
+SameTypeRequirementSyntax SyntaxFactory::makeBlankSameTypeRequirement() {
+  auto Data = SameTypeRequirementSyntaxData::makeBlank();
+  return SameTypeRequirementSyntax { Data, Data.get() };
 }
 
-DictionaryTypeSyntax
-SyntaxFactory::makeDictionaryType(RC<TokenSyntax> LeftSquareBracket,
-                                  TypeSyntax KeyType,
-                                  RC<TokenSyntax> Colon,
-                                  TypeSyntax ValueType,
-                                  RC<TokenSyntax> RightSquareBracket) {
-  auto Raw = RawSyntax::make(SyntaxKind::DictionaryType,
-                             {
-                               LeftSquareBracket,
-                               KeyType.getRaw(),
-                               Colon,
-                               ValueType.getRaw(),
-                               RightSquareBracket
-                             },
+GenericRequirementListSyntax SyntaxFactory::
+makeGenericRequirementList(std::vector<GenericRequirementSyntax> &Requirements){
+  RawSyntax::LayoutList Layout;
+  for (auto Req : Requirements) {
+    Layout.push_back(Req.getRaw());
+  }
+  auto Raw = RawSyntax::make(SyntaxKind::GenericRequirementList, Layout,
                              SourcePresence::Present);
-  auto Data = DictionaryTypeSyntaxData::make(Raw);
-  return DictionaryTypeSyntax { Data, Data.get() };
+  auto Data = GenericRequirementListSyntaxData::make(Raw);
+  return { Data, Data.get() };
 }
 
-DictionaryTypeSyntax SyntaxFactory::makeBlankDictionaryType() {
-  auto Data = DictionaryTypeSyntaxData::makeBlank();
-  return DictionaryTypeSyntax { Data, Data.get() };
+GenericRequirementListSyntax SyntaxFactory::makeBlankGenericRequirementList() {
+  auto Data = GenericRequirementListSyntaxData::makeBlank();
+  return { Data, Data.get() };
 }
 
 #pragma mark - Operators
@@ -771,16 +940,7 @@ SyntaxFactory::makeTypeAttribute(RC<TokenSyntax> AtSignToken,
 }
 
 TypeAttributeSyntax SyntaxFactory::makeBlankTypeAttribute() {
-  auto Raw = RawSyntax::make(SyntaxKind::TypeAttribute,
-                             {
-                               TokenSyntax::missingToken(tok::at_sign, "@"),
-                               TokenSyntax::missingToken(tok::identifier, ""),
-                               TokenSyntax::missingToken(tok::l_paren, "("),
-                               RawSyntax::missing(SyntaxKind::BalancedTokens),
-                               TokenSyntax::missingToken(tok::r_paren, ")"),
-                             },
-                             SourcePresence::Present);
-  auto Data = TypeAttributeSyntaxData::make(Raw);
+  auto Data = TypeAttributeSyntaxData::makeBlank();
   return TypeAttributeSyntax { Data, Data.get() };
 }
 
@@ -798,11 +958,150 @@ SyntaxFactory::makeBalancedTokens(RawSyntax::LayoutList Tokens) {
 }
 
 BalancedTokensSyntax SyntaxFactory::makeBlankBalancedTokens() {
-  auto Raw = RawSyntax::make(SyntaxKind::BalancedTokens,
-                             {},
-                             SourcePresence::Present);
-  auto Data = BalancedTokensSyntaxData::make(Raw);
+  auto Data = BalancedTokensSyntaxData::makeBlank();
   return BalancedTokensSyntax { Data, Data.get() };
+}
+
+#pragma mark - type-identifier
+
+TypeIdentifierSyntax
+SyntaxFactory::makeTypeIdentifier(OwnedString Name,
+                                  const Trivia &LeadingTrivia,
+                                  const Trivia &TrailingTrivia) {
+  auto Raw = RawSyntax::make(
+                             SyntaxKind::TypeIdentifier,
+                             {
+                               SyntaxFactory::makeIdentifier(Name, LeadingTrivia, TrailingTrivia),
+                               RawSyntax::missing(SyntaxKind::GenericArgumentClause),
+                               TokenSyntax::missingToken(tok::period, "."),
+                               RawSyntax::missing(SyntaxKind::TypeIdentifier),
+                             },
+                             SourcePresence::Present);
+  auto Data = TypeIdentifierSyntaxData::make(Raw);
+  return TypeIdentifierSyntax { Data, Data.get() };
+}
+
+TypeIdentifierSyntax SyntaxFactory::makeAnyTypeIdentifier() {
+  auto Data = TypeIdentifierSyntaxData::makeBlank();
+  return TypeIdentifierSyntax { Data, Data.get() }
+  .withIdentifier(makeIdentifier("Any", {}, {}));
+}
+
+TypeIdentifierSyntax SyntaxFactory::makeSelfTypeIdentifier() {
+  auto Data = TypeIdentifierSyntaxData::makeBlank();
+  return TypeIdentifierSyntax { Data, Data.get() }
+  .withIdentifier(makeIdentifier("Self", {}, {}));
+}
+
+TypeIdentifierSyntax
+SyntaxFactory::makeTypeIdentifier(RC<TokenSyntax> Identifier,
+                                  GenericArgumentClauseSyntax GenericArgs) {
+  auto Raw = RawSyntax::make(SyntaxKind::TypeIdentifier,
+                             {
+                               Identifier, GenericArgs.getRaw(),
+                               TokenSyntax::missingToken(tok::period, "."),
+                               RawSyntax::missing(SyntaxKind::TypeIdentifier),
+                             },
+                             SourcePresence::Present);
+  auto Data = TypeIdentifierSyntaxData::make(Raw);
+  return TypeIdentifierSyntax { Data, Data.get() };
+}
+
+#pragma mark - tuple-type
+
+TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
+  auto Raw = RawSyntax::make(SyntaxKind::TupleType,
+    {
+      SyntaxFactory::makeLeftParenToken({}, {}),
+      RawSyntax::missing(SyntaxKind::TypeArgumentList),
+      SyntaxFactory::makeRightParenToken({}, {}),
+    },
+    SourcePresence::Present);
+  auto Data = TupleTypeSyntaxData::make(std::move(Raw));
+  return TupleTypeSyntax {
+    Data, Data.get()
+  };
+}
+
+TupleTypeElementSyntax
+SyntaxFactory::makeTupleTypeElement(RC<TokenSyntax> Name,
+                                    TypeSyntax ElementTypeSyntax) {
+  auto Data = TupleTypeElementSyntaxData::makeBlank();
+  return TupleTypeElementSyntax { Data, Data.get() }
+    .withLabel(Name)
+    .withColonToken(SyntaxFactory::makeColonToken({}, Trivia::spaces(1)))
+    .withTypeSyntax(ElementTypeSyntax);
+}
+
+
+TupleTypeElementSyntax
+SyntaxFactory::makeTupleTypeElement(TypeSyntax ElementType) {
+  auto Data = TupleTypeElementSyntaxData::makeBlank();
+  return TupleTypeElementSyntax { Data, Data.get() }
+  .withTypeSyntax(ElementType);
+}
+
+#pragma mark - optional-type
+
+OptionalTypeSyntax
+SyntaxFactory::makeOptionalType(TypeSyntax BaseType,
+                                const Trivia &TrailingTrivia) {
+  auto Raw = RawSyntax::make(SyntaxKind::OptionalType,
+  {
+    BaseType.getRaw(),
+    SyntaxFactory::makeQuestionPostfixToken(TrailingTrivia),
+  },
+  SourcePresence::Present);
+
+  auto Data = OptionalTypeSyntaxData::make(Raw);
+  return OptionalTypeSyntax { Data, Data.get() };
+}
+
+OptionalTypeSyntax SyntaxFactory::makeBlankOptionalType() {
+  auto Data = OptionalTypeSyntaxData::makeBlank();
+  return OptionalTypeSyntax { Data, Data.get() };
+}
+
+#pragma mark - implicitly-unwrapped-optional-type
+
+ImplicitlyUnwrappedOptionalTypeSyntax SyntaxFactory::
+makeImplicitlyUnwrappedOptionalType(TypeSyntax BaseType,
+                                    const Trivia &TrailingTrivia) {
+  auto Raw = RawSyntax::make(SyntaxKind::ImplicitlyUnwrappedOptionalType,
+    {
+      BaseType.getRaw(),
+      SyntaxFactory::makeExclaimPostfixToken(TrailingTrivia),
+    },
+    SourcePresence::Present);
+  auto Data = ImplicitlyUnwrappedOptionalTypeSyntaxData::make(Raw);
+  return ImplicitlyUnwrappedOptionalTypeSyntax { Data, Data.get() };
+}
+
+ImplicitlyUnwrappedOptionalTypeSyntax
+SyntaxFactory::makeBlankImplicitlyUnwrappedOptionalType() {
+  auto Data = ImplicitlyUnwrappedOptionalTypeSyntaxData::makeBlank();
+  return ImplicitlyUnwrappedOptionalTypeSyntax { Data, Data.get() };
+}
+
+#pragma mark - metatype-type
+
+MetatypeTypeSyntax SyntaxFactory::makeMetatypeType(TypeSyntax BaseType,
+                                                   RC<TokenSyntax> DotToken,
+                                                   RC<TokenSyntax> TypeToken) {
+  auto Raw = RawSyntax::make(SyntaxKind::MetatypeType,
+                             {
+                               BaseType.getRaw(),
+                               DotToken,
+                               TypeToken
+                             },
+                             SourcePresence::Present);
+  auto Data = MetatypeTypeSyntaxData::make(Raw);
+  return MetatypeTypeSyntax { Data, Data.get() };
+}
+
+MetatypeTypeSyntax SyntaxFactory::makeBlankMetatypeType() {
+  auto Data = MetatypeTypeSyntaxData::makeBlank();
+  return MetatypeTypeSyntax { Data, Data.get() };
 }
 
 #pragma mark - function-type
@@ -833,8 +1132,7 @@ FunctionTypeSyntax SyntaxFactory::makeBlankFunctionType() {
   return FunctionTypeSyntax { Data, Data.get() };
 }
 
-#pragma mark -
-#pragma mark function-type-argument
+#pragma mark - function-type-argument
 
 FunctionTypeArgumentSyntax SyntaxFactory::
 makeFunctionTypeArgument(RC<TokenSyntax> ExternalParameterName,
@@ -900,3 +1198,53 @@ TypeArgumentListSyntax SyntaxFactory::makeBlankTypeArgumentList() {
   auto Data =  TypeArgumentListSyntaxData::makeBlank();
   return TypeArgumentListSyntax { Data, Data.get() };
 }
+
+#pragma mark - array-type
+
+ArrayTypeSyntax
+SyntaxFactory::makeArrayType(RC<TokenSyntax> LeftSquareBracket,
+                             TypeSyntax ElementType,
+                             RC<TokenSyntax> RightSquareBracket) {
+  auto Raw = RawSyntax::make(SyntaxKind::ArrayType,
+                             {
+                               LeftSquareBracket,
+                               ElementType.getRaw(),
+                               RightSquareBracket
+                             },
+                             SourcePresence::Present);
+  auto Data = ArrayTypeSyntaxData::make(Raw);
+  return ArrayTypeSyntax { Data, Data.get() };
+}
+
+ArrayTypeSyntax SyntaxFactory::makeBlankArrayType() {
+  auto Data = ArrayTypeSyntaxData::makeBlank();
+  return ArrayTypeSyntax { Data, Data.get() };
+}
+
+#pragma mark - dictionary-type
+
+DictionaryTypeSyntax
+SyntaxFactory::makeDictionaryType(RC<TokenSyntax> LeftSquareBracket,
+                                  TypeSyntax KeyType,
+                                  RC<TokenSyntax> Colon,
+                                  TypeSyntax ValueType,
+                                  RC<TokenSyntax> RightSquareBracket) {
+  auto Raw = RawSyntax::make(SyntaxKind::DictionaryType,
+                             {
+                               LeftSquareBracket,
+                               KeyType.getRaw(),
+                               Colon,
+                               ValueType.getRaw(),
+                               RightSquareBracket
+                             },
+                             SourcePresence::Present);
+  auto Data = DictionaryTypeSyntaxData::make(Raw);
+  return DictionaryTypeSyntax { Data, Data.get() };
+}
+
+DictionaryTypeSyntax SyntaxFactory::makeBlankDictionaryType() {
+  auto Data = DictionaryTypeSyntaxData::makeBlank();
+  return DictionaryTypeSyntax { Data, Data.get() };
+}
+
+

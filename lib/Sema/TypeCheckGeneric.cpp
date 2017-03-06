@@ -20,6 +20,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 
@@ -126,6 +127,43 @@ void GenericTypeToArchetypeResolver::recordParamType(ParamDecl *decl, Type type)
   if (!decl->hasInterfaceType())
     decl->setInterfaceType(GenericEnvironment::mapTypeOutOfContext(
         GenericEnv, type));
+}
+
+Type ProtocolRequirementTypeResolver::resolveGenericTypeParamType(
+    GenericTypeParamType *gp) {
+  assert(gp->isEqual(Proto->getSelfInterfaceType()) &&
+         "found non-Self-shaped GTPT when resolving protocol requirement");
+  return gp;
+}
+
+Type ProtocolRequirementTypeResolver::resolveDependentMemberType(
+    Type baseTy, DeclContext *DC, SourceRange baseRange,
+    ComponentIdentTypeRepr *ref) {
+  return DependentMemberType::get(baseTy, ref->getIdentifier());
+}
+
+Type ProtocolRequirementTypeResolver::resolveSelfAssociatedType(
+    Type selfTy, AssociatedTypeDecl *assocType) {
+  assert(selfTy->isEqual(Proto->getSelfInterfaceType()));
+  return assocType->getDeclaredInterfaceType();
+}
+
+Type ProtocolRequirementTypeResolver::resolveTypeOfContext(DeclContext *dc) {
+  return dc->getSelfInterfaceType();
+}
+
+Type ProtocolRequirementTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
+  return decl->getDeclaredInterfaceType();
+}
+
+bool ProtocolRequirementTypeResolver::areSameType(Type type1, Type type2) {
+  return type1->isEqual(type2);
+}
+
+void ProtocolRequirementTypeResolver::recordParamType(ParamDecl *decl,
+                                                      Type type) {
+  llvm_unreachable(
+      "recording a param type of a protocol requirement doesn't make sense");
 }
 
 Type CompleteGenericTypeResolver::resolveGenericTypeParamType(
@@ -276,8 +314,6 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
       builder->addGenericParameter(param);
   }
 
-  unsigned depth = genericParams->getDepth();
-
   // Now, check the inheritance clauses of each parameter.
   for (auto param : *genericParams) {
     checkInheritanceClause(param, resolver);
@@ -287,9 +323,7 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
 
       // Infer requirements from the inherited types.
       for (const auto &inherited : param->getInherited()) {
-        builder->inferRequirements(inherited,
-                                   /*minDepth=*/depth,
-                                   /*maxDepth=*/depth);
+        builder->inferRequirements(inherited);
       }
     }
   }
@@ -298,71 +332,76 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
   // Add the requirements clause to the builder, validating the types in
   // the requirements clause along the way.
   for (auto &req : genericParams->getRequirements()) {
-    if (req.isInvalid())
+    if (validateRequirement(genericParams->getWhereLoc(), req, lookupDC,
+                            options, resolver))
       continue;
 
-    switch (req.getKind()) {
-    case RequirementReprKind::TypeConstraint: {
-      // Validate the types.
-      if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
-        req.setInvalid();
-        continue;
-      }
-
-      if (validateType(req.getConstraintLoc(), lookupDC, options,
-                       resolver)) {
-        req.setInvalid();
-        continue;
-      }
-
-      // FIXME: Feels too early to perform this check.
-      if (!req.getConstraint()->isExistentialType() &&
-          !req.getConstraint()->getClassOrBoundGenericClass()) {
-        diagnose(genericParams->getWhereLoc(),
-                 diag::requires_conformance_nonprotocol,
-                 req.getSubjectLoc(), req.getConstraintLoc());
-        req.getConstraintLoc().setInvalidType(Context);
-        req.setInvalid();
-        continue;
-      }
-
-      break;
-    }
-
-    case RequirementReprKind::LayoutConstraint: {
-      // Validate the types.
-      if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
-        req.setInvalid();
-        continue;
-      }
-
-      if (req.getLayoutConstraintLoc().isNull()) {
-        req.setInvalid();
-        continue;
-      }
-
-      break;
-    }
-
-    case RequirementReprKind::SameType:
-      if (validateType(req.getFirstTypeLoc(), lookupDC, options,
-                       resolver)) {
-        req.setInvalid();
-        continue;
-      }
-
-      if (validateType(req.getSecondTypeLoc(), lookupDC, options,
-                       resolver)) {
-        req.setInvalid();
-        continue;
-      }
-      
-      break;
-    }
-    
     if (builder && builder->addRequirement(&req))
       req.setInvalid();
   }
+}
+
+bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
+                                      DeclContext *lookupDC,
+                                      TypeResolutionOptions options,
+                                      GenericTypeResolver *resolver) {
+  if (req.isInvalid())
+    return true;
+
+  switch (req.getKind()) {
+  case RequirementReprKind::TypeConstraint: {
+    // Validate the types.
+    if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
+      req.setInvalid();
+      return true;
+    }
+
+    if (validateType(req.getConstraintLoc(), lookupDC, options, resolver)) {
+      req.setInvalid();
+      return true;
+    }
+
+    // FIXME: Feels too early to perform this check.
+    if (!req.getConstraint()->isExistentialType() &&
+        !req.getConstraint()->getClassOrBoundGenericClass()) {
+      diagnose(whereLoc, diag::requires_conformance_nonprotocol,
+               req.getSubjectLoc(), req.getConstraintLoc());
+      req.getConstraintLoc().setInvalidType(Context);
+      req.setInvalid();
+      return true;
+    }
+    return false;
+  }
+
+  case RequirementReprKind::LayoutConstraint: {
+    // Validate the types.
+    if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
+      req.setInvalid();
+      return true;
+    }
+
+    if (req.getLayoutConstraintLoc().isNull()) {
+      req.setInvalid();
+      return true;
+    }
+    return false;
+  }
+
+  case RequirementReprKind::SameType: {
+    if (validateType(req.getFirstTypeLoc(), lookupDC, options, resolver)) {
+      req.setInvalid();
+      return true;
+    }
+
+    if (validateType(req.getSecondTypeLoc(), lookupDC, options, resolver)) {
+      req.setInvalid();
+      return true;
+    }
+    return false;
+  }
+  }
+
+  llvm_unreachable("Unhandled RequirementKind in switch.");
 }
 
 void
@@ -488,10 +527,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
       // Infer requirements from it.
       if (builder && genericParams &&
           fn->getBodyResultTypeLoc().getTypeRepr()) {
-        unsigned depth = genericParams->getDepth();
-        builder->inferRequirements(fn->getBodyResultTypeLoc(),
-                                   /*minDepth=*/depth,
-                                   /*maxDepth=*/depth);
+        builder->inferRequirements(fn->getBodyResultTypeLoc());
       }
     }
   }
@@ -827,10 +863,7 @@ static bool checkGenericSubscriptSignature(TypeChecker &tc,
   // Infer requirements from it.
   if (genericParams && builder &&
       subscript->getElementTypeLoc().getTypeRepr()) {
-    unsigned depth = genericParams->getDepth();
-    builder->inferRequirements(subscript->getElementTypeLoc(),
-                               /*minDepth=*/depth,
-                               /*maxDepth=*/depth);
+    builder->inferRequirements(subscript->getElementTypeLoc());
   }
 
   // Check the indices.
@@ -1089,34 +1122,34 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
 
 std::pair<bool, bool> TypeChecker::checkGenericArguments(
     DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
-    GenericSignature *genericSig, const TypeSubstitutionMap &substitutions,
+    GenericSignature *genericSig, TypeSubstitutionFn substitutions,
+    LookupConformanceFn conformances,
     UnsatisfiedDependency *unsatisfiedDependency,
     ConformanceCheckOptions conformanceOptions,
     GenericRequirementsCheckListener *listener) {
-  // Check each of the requirements.
-  ModuleDecl *module = dc->getParentModule();
-  for (const auto &req : genericSig->getRequirements()) {
-    Type firstType = req.getFirstType().subst(
-        QueryTypeSubstitutionMap{substitutions},
-        LookUpConformanceInModule(module));
-    if (firstType.isNull()) {
+  bool valid = true;
+
+  for (const auto &rawReq : genericSig->getRequirements()) {
+    auto req = rawReq.subst(substitutions, conformances);
+    if (!req) {
       // Another requirement will fail later; just continue.
+      valid = false;
       continue;
     }
 
-    Type secondType;
-    if (req.getKind() != RequirementKind::Layout)
-      secondType = req.getSecondType();
-    if (secondType) {
-      secondType = secondType.subst(QueryTypeSubstitutionMap{substitutions},
-                                    LookUpConformanceInModule(module));
-      if (secondType.isNull()) {
-        // Another requirement will fail later; just continue.
+    auto kind = req->getKind();
+    Type rawFirstType = rawReq.getFirstType();
+    Type firstType = req->getFirstType();
+    Type rawSecondType, secondType;
+    if (kind != RequirementKind::Layout) {
+      rawSecondType = rawReq.getSecondType();
+      secondType = req->getSecondType().subst(substitutions, conformances);
+      if (!secondType) {
+        valid = false;
         continue;
       }
     }
 
-    auto kind = req.getKind();
     if (listener && !listener->shouldCheck(kind, firstType, secondType))
       continue;
 
@@ -1140,6 +1173,12 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
       if (!result.second)
         return std::make_pair(false, false);
 
+      // Report the conformance.
+      if (listener) {
+        listener->satisfiedConformance(rawReq.getFirstType(), firstType,
+                                       *result.second);
+      }
+      
       continue;
     }
 
@@ -1157,10 +1196,10 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
         diagnose(loc, diag::type_does_not_inherit, owner, firstType,
                  secondType);
 
-        diagnose(noteLoc, diag::type_does_not_inherit_requirement,
-                 req.getFirstType(), req.getSecondType(),
+        diagnose(noteLoc, diag::type_does_not_inherit_requirement, rawFirstType,
+                 rawSecondType,
                  genericSig->gatherGenericParamBindingsText(
-                     {req.getFirstType(), req.getSecondType()}, substitutions));
+                     {rawFirstType, rawSecondType}, substitutions));
 
         return std::make_pair(false, false);
       }
@@ -1171,10 +1210,10 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
         // FIXME: Better location info for both diagnostics.
         diagnose(loc, diag::types_not_equal, owner, firstType, secondType);
 
-        diagnose(noteLoc, diag::types_not_equal_requirement, req.getFirstType(),
-                 req.getSecondType(),
+        diagnose(noteLoc, diag::types_not_equal_requirement, rawFirstType,
+                 rawSecondType,
                  genericSig->gatherGenericParamBindingsText(
-                     {req.getFirstType(), req.getSecondType()}, substitutions));
+                     {rawFirstType, rawSecondType}, substitutions));
 
         return std::make_pair(false, false);
       }
@@ -1182,5 +1221,5 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
     }
   }
 
-  return std::make_pair(false, true);
+  return std::make_pair(false, valid);
 }

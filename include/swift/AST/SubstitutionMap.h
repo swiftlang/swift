@@ -83,12 +83,6 @@ public:
   /// Retrieve the conformances for the given type.
   ArrayRef<ProtocolConformanceRef> getConformances(CanType type) const;
 
-  /// Look up the replacement for the given type parameter or interface type.
-  /// Note that this only finds replacements for maps that are directly
-  /// stored inside the map. In most cases, you should call Type::subst()
-  /// instead, since that will resolve member types also.
-  Type lookupSubstitution(CanSubstitutableType type) const;
-
   bool empty() const {
     return subMap.empty();
   }
@@ -149,6 +143,13 @@ public:
 private:
   friend class GenericSignature;
   friend class GenericEnvironment;
+  friend struct QuerySubstitutionMap;
+
+  /// Look up the replacement for the given type parameter or interface type.
+  /// Note that this only finds replacements for maps that are directly
+  /// stored inside the map. In most cases, you should call Type::subst()
+  /// instead, since that will resolve member types also.
+  Type lookupSubstitution(CanSubstitutableType type) const;
 
   // You should not need to call these directly to build SubstitutionMaps;
   // instead, use GenericSignature::getSubstitutionMap() or

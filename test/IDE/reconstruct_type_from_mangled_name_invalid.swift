@@ -1,5 +1,5 @@
 // RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | %FileCheck %s -implicit-check-not="FAILURE"
-// REQUIRES: rdar://problem/30680565
+// REQUIRES: rdar30680565
 
 struct GS<T> {
 // CHECK: decl: struct GS<T> for 'GS'

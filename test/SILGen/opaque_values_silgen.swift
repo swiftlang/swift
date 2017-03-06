@@ -45,18 +45,22 @@ func s030______assigninout<T>(_ a: inout T, _ b: T) {
 
 // Test that we no longer use copy_addr or tuple_element_addr when copy by value is possible
 // ---
-// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s040___tupleReturnIntSiSi_xtlF : $@convention(thin) <T> (Int, @in T) -> Int {
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s040___tupleReturnIntS2i_xtlF : $@convention(thin) <T> (Int, @in T) -> Int {
 // CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $T):
 // CHECK:   [[TPL:%.*]] = tuple ([[ARG0]] : $Int, [[ARG1]] : $T)
 // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[TPL]] : $(Int, T)
 // CHECK:   [[CPY:%.*]] = copy_value [[BORROWED_ARG1]] : $(Int, T)
-// CHECK:   [[INT:%.*]] = tuple_extract [[CPY]] : $(Int, T), 0
-// CHECK:   [[GEN:%.*]] = tuple_extract [[CPY]] : $(Int, T), 1
-// CHECK:   destroy_value [[GEN]] : $T
+// CHECK:   [[BORROWED_CPY:%.*]] = begin_borrow [[CPY]]
+// CHECK:   [[INT:%.*]] = tuple_extract [[BORROWED_CPY]] : $(Int, T), 0
+// CHECK:   [[GEN:%.*]] = tuple_extract [[BORROWED_CPY]] : $(Int, T), 1
+// CHECK:   [[COPY_GEN:%.*]] = copy_value [[GEN]]
+// CHECK:   destroy_value [[COPY_GEN]]
+// CHECK:   end_borrow [[BORROWED_CPY]] from [[CPY]]
+// CHECK:   destroy_value [[CPY]]
 // CHECK:   end_borrow [[BORROWED_ARG1]] from [[TPL]] : $(Int, T), $(Int, T)
 // CHECK:   destroy_value [[TPL]] : $(Int, T)
 // CHECK:   return [[INT]]
-// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s040___tupleReturnIntSiSi_xtlF'
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s040___tupleReturnIntS2i_xtlF'
 func s040___tupleReturnInt<T>(_ x: (Int, T)) -> Int {
   let y = x.0
   return y
@@ -156,12 +160,12 @@ func s100_________identity<T>(t: T) -> T {
 
 // Test a guaranteed opaque parameter.
 // ---
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T020opaque_values_silgen21s110___GuaranteedSelfVAA3FooAaaDP3fooyyFTW : $@convention(witness_method) (@in_guaranteed s110___GuaranteedSelf) -> () {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T020opaque_values_silgen21s110___GuaranteedSelfVAA3FooA2aDP3fooyyFTW : $@convention(witness_method) (@in_guaranteed s110___GuaranteedSelf) -> () {
 // CHECK: bb0(%0 : $s110___GuaranteedSelf):
 // CHECK:   %[[F:.*]] = function_ref @_T020opaque_values_silgen21s110___GuaranteedSelfV3fooyyF : $@convention(method) (s110___GuaranteedSelf) -> ()
 // CHECK:   apply %[[F]](%0) : $@convention(method) (s110___GuaranteedSelf) -> ()
 // CHECK:   return
-// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s110___GuaranteedSelfVAA3FooAaaDP3fooyyFTW'
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s110___GuaranteedSelfVAA3FooA2aDP3fooyyFTW'
 struct s110___GuaranteedSelf : Foo {
   func foo() {}
 }
@@ -289,4 +293,94 @@ var foo_var : Foo = s180_______return_foo()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s190___return_foo_varAA3Foo_pyF'
 func s190___return_foo_var() -> Foo {
   return foo_var
+}
+
+// Tests deinit of opaque existentials
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s200______use_foo_varyyF : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[GLOBAL:%.*]] = global_addr {{.*}} : $*Foo
+// CHECK:   [[LOAD_GLOBAL:%.*]] = load [copy] [[GLOBAL]] : $*Foo
+// CHECK:   [[OPEN_VAR:%.*]] = open_existential_opaque [[LOAD_GLOBAL]] : $Foo
+// CHECK:   [[WITNESS:%.*]] = witness_method $@opened
+// CHECK:   apply [[WITNESS]]
+// CHECK:   destroy_value [[OPEN_VAR]]
+// CHECK:   deinit_existential_opaque [[LOAD_GLOBAL]] : $Foo
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s200______use_foo_varyyF'
+func s200______use_foo_var() {
+  foo_var.foo()
+}
+
+// Tests composition erasure of opaque existentials + copy into of opaques
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s210______compErasures5Error_psAC_AA3FoopF : $@convention(thin) (@in Error & Foo) -> @owned Error {
+// CHECK: bb0([[ARG:%.*]] : $Error & Foo):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_opaque [[BORROWED_ARG]] : $Error & Foo to $@opened({{.*}}) Error & Foo
+// CHECK:   [[EXIST_BOX:%.*]] = alloc_existential_box $Error, $@opened({{.*}}) Error & Foo
+// CHECK:   [[PROJ_BOX:%.*]] = project_existential_box $@opened({{.*}}) Error & Foo in [[EXIST_BOX]]
+// CHECK:   [[COPY_OPAQUE:%.*]] = copy_value [[OPAQUE_ARG]] : $@opened({{.*}}) Error & Foo
+// CHECK:   store [[COPY_OPAQUE]] to [init] [[PROJ_BOX]] : $*@opened({{.*}}) Error & Foo
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK:   destroy_value [[ARG]] : $Error & Foo
+// CHECK:   return [[EXIST_BOX]] : $Error
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s210______compErasures5Error_psAC_AA3FoopF'
+func s210______compErasure(_ x: Foo & Error) -> Error {
+  return x
+}
+
+// Tests that existential boxes can contain opaque types
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s220_____openExistBoxSSs5Error_pF : $@convention(thin) (@owned Error) -> @owned String {
+// CHECK: bb0([[ARG:%.*]] : $Error):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[BORROWED_ARG]] : $Error to $@opened({{.*}}) Error
+// CHECK:   [[RET_STRING:%.*]] = apply{{.*}}<@opened({{.*}}) Error>([[OPAQUE_ARG]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> @owned String
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK:   destroy_value [[ARG]] : $Error
+// CHECK:   return [[RET_STRING]] : $String
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s220_____openExistBoxSSs5Error_pF'
+func s220_____openExistBox(_ x: Error) -> String {
+  return x._domain
+}
+
+// Tests LogicalPathComponent's writeback for opaque value types
+// ---
+// CHECK-LABEL: sil @_T0s10DictionaryV20opaque_values_silgenE22inoutAccessOfSubscriptyq_3key_tF : $@convention(method) <Key, Value where Key : Hashable> (@in Value, @inout Dictionary<Key, Value>) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $Value, [[ARG1:%.*]] : $*Dictionary<Key, Value>):
+// CHECK:   [[OPTIONAL_ALLOC:%.*]] = alloc_stack $Optional<Value>
+// CHECK:   switch_enum_addr [[OPTIONAL_ALLOC]] : $*Optional<Value>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+// CHECK: bb2:
+// CHECK:   [[OPTIONAL_LOAD:%.*]] = load [take] [[OPTIONAL_ALLOC]] : $*Optional<Value>
+// CHECK:   apply {{.*}}<Key, Value>([[OPTIONAL_LOAD]], {{.*}}, [[ARG1]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_1, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T0s10DictionaryV20opaque_values_silgenE22inoutAccessOfSubscriptyq_3key_tF'
+
+// Tests materializeForSet's createSetterCallback for opaque values
+// ---
+// CHECK-LABEL: sil [transparent] [fragile] @_T0s10DictionaryV20opaque_values_silgenE9subscriptq_Sgq_cfmytfU_ : $@convention(method) <Key, Value where Key : Hashable> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Dictionary<Key, Value>, @thick Dictionary<Key, Value>.Type) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $Builtin.RawPointer, [[ARG1:%.*]] : $*Builtin.UnsafeValueBuffer, [[ARG2:%.*]] : $*Dictionary<Key, Value>, [[ARG3:%.*]] : $@thick Dictionary<Key, Value>.Type):
+// CHECK:   [[PROJ_VAL1:%.*]] = project_value_buffer $Value in [[ARG1]] : $*Builtin.UnsafeValueBuffer
+// CHECK:   [[LOAD_VAL1:%.*]] = load [take] [[PROJ_VAL1]] : $*Value
+// CHECK:   [[ADDR_VAL0:%.*]] = pointer_to_address [[ARG0]] : $Builtin.RawPointer to [strict] $*Optional<Value>
+// CHECK:   [[LOAD_VAL0:%.*]] = load [take] [[ADDR_VAL0]] : $*Optional<Value>
+// CHECK:   apply {{.*}}<Key, Value>([[LOAD_VAL0]], [[LOAD_VAL1]], [[ARG2]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_1, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T0s10DictionaryV20opaque_values_silgenE9subscriptq_Sgq_cfmytfU_'
+extension Dictionary {
+  public subscript(key: Value) -> Value? {
+    @inline(__always)
+    get {
+      return key
+    }
+    set(newValue) {
+    }
+  }
+  
+  public mutating func inoutAccessOfSubscript(key: Value) {
+    func increment(x: inout Value) { }
+
+    increment(x: &self[key]!)
+  }
 }

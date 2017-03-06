@@ -21,14 +21,14 @@ import resilient_protocol
 
 // Protocol is public -- needs resilient witness table
 
-// CHECK: @_T019protocol_resilience17ResilientProtocolMp = {{(protected )?}}constant <{{.*}}> <{
+// CHECK: @_T019protocol_resilience17ResilientProtocolMp = {{(protected )?}}constant { {{.*}} } {
 // CHECK-SAME:   i32 1031,
 // CHECK-SAME:   i16 4,
 // CHECK-SAME:   i16 4,
 // CHECK-SAME:   i32 0,
 // CHECK-SAME:   void (%swift.opaque*, %swift.type*, i8**)* @defaultC,
 // CHECK-SAME:   void (%swift.opaque*, %swift.type*, i8**)* @defaultD
-// CHECK-SAME: }>
+// CHECK-SAME: }
 
 
 public protocol ResilientProtocol {

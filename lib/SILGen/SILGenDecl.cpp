@@ -83,7 +83,7 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
   // A scalar value is being copied into the tuple, break it into elements
   // and assign/init each element in turn.
   SILValue value = valueMV.forward(SGF);
-  auto sourceType = cast<TupleType>(valueMV.getSwiftType());
+  auto sourceType = valueMV.getType().castTo<TupleType>();
   auto sourceSILType = value->getType();
   for (unsigned i = 0, e = sourceType->getNumElements(); i != e; ++i) {
     SILType fieldTy = sourceSILType.getTupleElementType(i);
@@ -813,9 +813,10 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   
   // Reabstract to the substituted type, if needed.
   CanType substEltTy =
-    value.getSwiftType()->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
-                                      ElementDecl,
-                                      ElementDecl->getArgumentInterfaceType())
+    value.getType().getSwiftRValueType()
+      ->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
+                        ElementDecl,
+                        ElementDecl->getArgumentInterfaceType())
       ->getCanonicalType();
 
   AbstractionPattern origEltTy =
@@ -1233,7 +1234,11 @@ namespace {
       case ExistentialRepresentation::Metatype:
         llvm_unreachable("cannot cleanup existential");
       case ExistentialRepresentation::Opaque:
-        gen.B.createDeinitExistentialAddr(l, existentialAddr);
+        if (gen.silConv.useLoweredAddresses()) {
+          gen.B.createDeinitExistentialAddr(l, existentialAddr);
+        } else {
+          gen.B.createDeinitExistentialOpaque(l, existentialAddr);
+        }
         break;
       case ExistentialRepresentation::Boxed:
         gen.B.createDeallocExistentialBox(l, concreteFormalType,
@@ -1720,56 +1725,23 @@ public:
                     SILWitnessTable::MethodWitness{requirementRef, witnessFn});
   }
 
-  void addAssociatedType(AssociatedTypeDecl *td,
-                         ArrayRef<ProtocolDecl *> protos) {
+  void addAssociatedType(AssociatedTypeDecl *td) {
     // Find the substitution info for the witness type.
     const auto &witness = Conformance->getTypeWitness(td, /*resolver=*/nullptr);
 
     // Emit the record for the type itself.
     Entries.push_back(SILWitnessTable::AssociatedTypeWitness{td,
-                                witness.getReplacement()->getCanonicalType()});
+                                witness.getReplacement()->getCanonicalType()});    
+  }
 
-    // Emit records for the protocol requirements on the type.
-    assert(protos.size() == witness.getConformances().size()
-           && "number of conformances in assoc type substitution do not match "
-              "number of requirements on assoc type");
-    // The conformances should be all abstract or all concrete.
-    assert(witness.getConformances().empty()
-           || (witness.getConformances()[0].isConcrete()
-                 ? std::all_of(witness.getConformances().begin(),
-                               witness.getConformances().end(),
-                               [&](const ProtocolConformanceRef C) -> bool {
-                                 return C.isConcrete();
-                               })
-                 : std::all_of(witness.getConformances().begin(),
-                               witness.getConformances().end(),
-                               [&](const ProtocolConformanceRef C) -> bool {
-                                 return C.isAbstract();
-                               })));
+  void addAssociatedConformance(CanType dependentType, ProtocolDecl *protocol) {
+    auto assocConformance =
+      Conformance->getAssociatedConformance(dependentType, protocol);
 
-    for (auto *protocol : protos) {
-      // Only reference the witness if the protocol requires it.
-      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
-        continue;
+    SGM.useConformance(assocConformance);
 
-      ProtocolConformanceRef conformance(protocol);
-      // If the associated type requirement is satisfied by an associated type,
-      // these will all be abstract conformances.
-      if (witness.getConformances()[0].isConcrete()) {
-        auto foundConformance = std::find_if(witness.getConformances().begin(),
-                                        witness.getConformances().end(),
-                                        [&](ProtocolConformanceRef c) {
-                                          return c.getRequirement() == protocol;
-                                        });
-        assert(foundConformance != witness.getConformances().end());
-        conformance = *foundConformance;
-      }
-      SGM.useConformance(conformance);
-
-      Entries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
-        td, protocol, conformance
-      });
-    }
+    Entries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
+        dependentType, protocol, assocConformance});
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *d) {
@@ -2093,18 +2065,13 @@ public:
     DefaultWitnesses.push_back(entry);
   }
 
-  void addAssociatedType(AssociatedTypeDecl *ty,
-                         ArrayRef<ProtocolDecl *> protos) {
-    // Add a dummy entry for the metatype itself, and then for each conformance.
+  void addAssociatedType(AssociatedTypeDecl *ty) {
+    // Add a dummy entry for the metatype itself.
     addMissingDefault();
+  }
 
-    for (auto *protocol : protos) {
-      // Only reference the witness if the protocol requires it.
-      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
-        continue;
-
-      addMissingDefault();
-    }
+  void addAssociatedConformance(CanType type, ProtocolDecl *requirement) {
+    addMissingDefault();
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *d) {

@@ -40,8 +40,9 @@ ABSTRACT_SYNTAX(DeclSyntax, Syntax)
   SYNTAX(UnknownDecl, DeclSyntax)
   SYNTAX(StructDecl, DeclSyntax)
   SYNTAX(TypeAliasDecl, DeclSyntax)
+  SYNTAX(FunctionDecl, DeclSyntax)
 
-SYNTAX_RANGE(Decl, MissingDecl, TypeAliasDecl)
+SYNTAX_RANGE(Decl, MissingDecl, FunctionDecl)
 
 SYNTAX(DeclMembers, Syntax)
 SYNTAX(GenericParameter, Syntax)
@@ -52,8 +53,9 @@ SYNTAX(GenericWhereClause, Syntax)
 SYNTAX(GenericRequirementList, Syntax)
 SYNTAX(GenericArgumentClause, Syntax)
 SYNTAX(GenericArgumentList, Syntax)
-SYNTAX(ConformanceRequirement, Syntax)
-SYNTAX(SameTypeRequirement, Syntax)
+ABSTRACT_SYNTAX(GenericRequirementSyntax, Syntax)
+  SYNTAX(ConformanceRequirement, GenericRequirementSyntax)
+  SYNTAX(SameTypeRequirement, GenericRequirementSyntax)
 SYNTAX(TypeArgumentList, Syntax)
 
 // Types
@@ -86,13 +88,23 @@ ABSTRACT_SYNTAX(ExprSyntax, Syntax)
   MISSING_SYNTAX(MissingExpr, ExprSyntax)
   SYNTAX(UnknownExpr, ExprSyntax)
   SYNTAX(IntegerLiteralExpr, ExprSyntax)
-SYNTAX_RANGE(Expr, MissingExpr, IntegerLiteralExpr)
+  SYNTAX(FunctionCallExpr, ExprSyntax)
+  SYNTAX(SymbolicReferenceExpr, ExprSyntax)
+SYNTAX_RANGE(Expr, MissingExpr, SymbolicReferenceExpr)
 
+// Other stuff
 SYNTAX(BalancedTokens, Syntax)
 SYNTAX(TypeAttribute, Syntax)
 SYNTAX(TypeAttributes, Syntax)
 SYNTAX(TupleTypeElement, Syntax)
 SYNTAX(FunctionTypeArgument, Syntax)
+SYNTAX(FunctionCallArgumentList, Syntax)
+SYNTAX(FunctionCallArgument, Syntax)
+SYNTAX(FunctionSignature, Syntax)
+SYNTAX(FunctionParameterList, Syntax)
+SYNTAX(FunctionParameter, Syntax)
+SYNTAX(DeclModifier, Syntax)
+SYNTAX(DeclModifierList, Syntax)
 
 #undef ABSTRACT_SYNTAX
 #undef DECL

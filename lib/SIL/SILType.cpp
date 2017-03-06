@@ -376,7 +376,6 @@ SILType SILType::getMetatypeInstanceType(SILModule &M) const {
   assert(MetatypeType->is<AnyMetatypeType>() &&
          "This method should only be called on SILTypes with an underlying "
          "metatype type.");
-  assert(isObject() && "Should only be called on object types.");
   Type instanceType =
     MetatypeType->castTo<AnyMetatypeType>()->getInstanceType();
 
@@ -569,21 +568,13 @@ SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
   
   // Apply generic arguments if the layout is generic.
   if (!getGenericArgs().empty()) {
-    // FIXME: Map the field type into the layout's generic context because
-    // SIL TypeLowering currently expects to lower abstract generic parameters
-    // with a generic context pushed, but nested generic contexts are not
-    // supported by TypeLowering. If TypeLowering were properly
-    // de-contextualized and plumbed through the generic signature, this could
-    // be avoided.
-    auto *env = getLayout()->getGenericSignature()
-      .getGenericEnvironment(*M.getSwiftModule());
-    auto substMap =
-      env->getSubstitutionMap(getGenericArgs());
-    fieldTy = env->mapTypeIntoContext(fieldTy)
-      ->getCanonicalType();
-    
-    fieldTy = SILType::getPrimitiveObjectType(fieldTy)
-      .subst(M, substMap)
+    auto sig = getLayout()->getGenericSignature();
+    auto subs = sig->getSubstitutionMap(getGenericArgs());
+    return SILType::getPrimitiveObjectType(fieldTy)
+      .subst(M,
+             QuerySubstitutionMap{subs},
+             LookUpConformanceInSubstitutionMap(subs),
+             sig)
       .getSwiftRValueType();
   }
   return fieldTy;

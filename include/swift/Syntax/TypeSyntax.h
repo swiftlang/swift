@@ -32,8 +32,7 @@ class GenericArgumentClauseSyntaxData;
 class GenericParameterClauseSyntax;
 class GenericParameterClauseSyntaxData;
 
-#pragma mark -
-#pragma mark balanced-tokens Data
+#pragma mark - balanced-tokens Data
 
 class BalancedTokensSyntaxData final : public SyntaxData {
   friend class SyntaxData;
@@ -52,8 +51,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark balanced-tokens API
+#pragma mark - balanced-tokens API
 
 /// balanced-tokens -> Any identifier, keyword, literal, or operator
 ///                  | Any punctuation except (, ), [, ], {, or }
@@ -77,8 +75,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark type-attribute Data
+#pragma mark - type-attribute Data
 
 class TypeAttributeSyntaxData final : public SyntaxData {
   friend class SyntaxData;
@@ -99,8 +96,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark type-attribute API
+#pragma mark - type-attribute API
 
 /// type-attribute -> '@' identifier attribute-argument-clause?
 /// attribute-argument-clause -> '(' balanced-tokens ')'
@@ -162,8 +158,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark type-attributes Data
+#pragma mark - type-attributes Data
 
 class TypeAttributesSyntaxData final : public SyntaxData {
   friend class SyntaxData;
@@ -183,8 +178,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark type-attributes API
+#pragma mark - type-attributes API
 
 /// type-attributes -> type-attribute
 ///                  | type-attribute type-attributes
@@ -192,13 +186,16 @@ class TypeAttributesSyntax final : public Syntax {
   friend struct SyntaxFactory;
   friend class TypeAttributesSyntaxData;
   friend class SyntaxData;
+  friend class FunctionSignatureSyntax;
+  friend class FunctionDeclSyntax;
 
   using DataType = TypeAttributesSyntaxData;
 
   TypeAttributesSyntax(RC<SyntaxData> Root,
                        const TypeAttributesSyntaxData *Data);
 public:
-  // TODO: TODO: TypeAttributesSyntax::getAttribute
+  // TODO: Convert to SyntaxCollection
+  // 
 
   TypeAttributesSyntax
   addTypeAttribute(TypeAttributeSyntax NewTypeAttribute) const;
@@ -208,8 +205,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark type-syntax Data
+#pragma mark - type-syntax Data
 
 class TypeSyntaxData : public SyntaxData {
   friend class SyntaxData;
@@ -226,8 +222,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark type-syntax API
+#pragma mark - type-syntax API
 
 /// type -> array-type
 ///       | dictionary-type
@@ -243,6 +238,8 @@ public:
 class TypeSyntax : public Syntax {
   using DataType = TypeSyntaxData;
   friend class SyntaxData;
+  friend class FunctionParameterSyntax;
+  friend class FunctionSignatureSyntax;
 protected:
   TypeSyntax(const RC<SyntaxData> Root, const TypeSyntaxData *Data);
 public:
@@ -251,8 +248,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark type-identifier Data
+#pragma mark - type-identifier Data
 
 class TypeIdentifierSyntaxData final : public TypeSyntaxData {
   friend struct SyntaxFactory;
@@ -276,8 +272,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark type-identifier API
+#pragma mark - type-identifier API
 
 /// type-identifier -> type-name generic-argument-clause?
 ///                  | type-name generic-argument-clause '.' type-identifier
@@ -320,8 +315,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark type-argument-list Data
+#pragma mark - type-argument-list Data
 
 class TypeArgumentListSyntaxData final : public SyntaxData {
   friend class SyntaxData;
@@ -342,8 +336,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark tuple-type-element Data
+#pragma mark - tuple-type-element Data
 
 class TupleTypeElementSyntaxData final : public SyntaxData {
   friend class SyntaxData;
@@ -362,8 +355,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark tuple-type-element API
+#pragma mark - tuple-type-element API
 
 /// tuple-type-element -> (identifier ':')? type-attributes? 'inout'? type
 ///
@@ -425,8 +417,7 @@ public:
 };
 
 
-#pragma mark -
-#pragma mark type-argument-list API
+#pragma mark - type-argument-list API
 
 /// type-argument-list
 ///   -> function-type-argument
@@ -451,8 +442,8 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark tuple-type Data
+#pragma mark - tuple-type Data
+
 class TupleTypeSyntaxData final : public TypeSyntaxData {
   friend class SyntaxData;
   friend struct SyntaxFactory;
@@ -472,8 +463,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark tuple-type API
+#pragma mark - tuple-type API
 
 /// tuple-type -> '(' tuple-type-element-list ')'
 class TupleTypeSyntax final : public TypeSyntax {
@@ -513,8 +503,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark tuple-type Builder
+#pragma mark - tuple-type Builder
 
 /// Incrementally builds tuple type syntax.
 class TupleTypeSyntaxBuilder final {
@@ -543,8 +532,7 @@ public:
   TupleTypeSyntax build() const;
 };
 
-#pragma mark -
-#pragma mark metatype-type Data
+#pragma mark - metatype-type Data
 
 class MetatypeTypeSyntaxData final : public TypeSyntaxData {
   friend struct SyntaxFactory;
@@ -562,8 +550,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark metatype-type API
+#pragma mark - metatype-type API
 
 /// metatype-type -> type '.' 'Type'
 ///                | type '.' 'Protocol'
@@ -605,8 +592,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark optional-type Data
+#pragma mark - optional-type Data
 
 class OptionalTypeSyntaxData final : public TypeSyntaxData {
   friend class SyntaxData;
@@ -624,8 +610,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark optional-type API
+#pragma mark - optional-type API
 
 /// optional-type -> type '?'
 class OptionalTypeSyntax final : public TypeSyntax {
@@ -661,8 +646,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark implicitly-unwrapped-optional-type Data
+#pragma mark - implicitly-unwrapped-optional-type Data
 
 class ImplicitlyUnwrappedOptionalTypeSyntaxData final : public TypeSyntaxData {
   friend struct SyntaxFactory;
@@ -682,8 +666,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark implicitly-unwrapped-optional-type API
+#pragma mark - implicitly-unwrapped-optional-type API
 
 /// implicitly-unwrapped-optional-type -> type '!'
 class ImplicitlyUnwrappedOptionalTypeSyntax final : public TypeSyntax {
@@ -722,8 +705,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark array-type Data
+#pragma mark - array-type Data
 
 class ArrayTypeSyntaxData final : public TypeSyntaxData {
   friend class SyntaxData;
@@ -744,8 +726,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark array-type API
+#pragma mark - array-type API
 
 // array-type -> '[' type ']'
 class ArrayTypeSyntax final : public TypeSyntax {
@@ -788,8 +769,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark dictionary-type Data
+#pragma mark - dictionary-type Data
 
 class DictionaryTypeSyntaxData final : public TypeSyntaxData {
   friend class SyntaxData;
@@ -813,8 +793,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark dictionary-type API
+#pragma mark - dictionary-type API
 
 // dictionary-type -> '[' type ':' type ']'
 class DictionaryTypeSyntax final : public TypeSyntax {
@@ -875,8 +854,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark function-type-argument Data
+#pragma mark - function-type-argument Data
 
 class FunctionTypeArgumentSyntaxData final : public SyntaxData {
   friend class SyntaxData;
@@ -897,8 +875,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark function-type-argument API
+#pragma mark - function-type-argument API
 
 class FunctionTypeArgumentSyntax final : public Syntax {
   friend struct SyntaxFactory;
@@ -925,8 +902,7 @@ public:
 };
 
 
-#pragma mark -
-#pragma mark function-type Data
+#pragma mark - function-type Data
 
 class FunctionTypeSyntaxData final : public TypeSyntaxData {
   friend class SyntaxData;
@@ -947,8 +923,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark function-type API
+#pragma mark - function-type API
 
 /// function-type ->
 ///   type-attributes? function-type-argument-clause 'throws'? '->' type
@@ -1045,8 +1020,7 @@ public:
   }
 };
 
-#pragma mark -
-#pragma mark function-type Builder
+#pragma mark - function-type Builder
 
 /// Incrementally builds function type syntax.
 class FunctionTypeSyntaxBuilder final {

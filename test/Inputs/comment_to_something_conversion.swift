@@ -11,11 +11,11 @@
 
 /// Aaa.  init().
 public init() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>init()</Name><USR>c:objc(cs)A010_AttachToEntities(cm)init</USR><Declaration>public init()</Declaration><Abstract><Para>Aaa.  init().</Para></Abstract></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>init()</Name><USR>c:objc(cs)A010_AttachToEntities(im)init</USR><Declaration>public init()</Declaration><Abstract><Para>Aaa.  init().</Para></Abstract></Function>]
 
 /// Aaa.  subscript(i: Int).
 public subscript(i: Int) -> Int {
-// CHECK: {{.*}}DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>subscript(_:)</Name><USR>s:14swift_ide_test21A010_AttachToEntitiesC9subscriptSiSici</USR><Declaration>public subscript(i: Int) -&gt; Int { get set }</Declaration><Abstract><Para>Aaa.  subscript(i: Int).</Para></Abstract></Other>]
+// CHECK: {{.*}}DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>subscript(_:)</Name><USR>s:14swift_ide_test21A010_AttachToEntitiesC9subscriptS2ici</USR><Declaration>public subscript(i: Int) -&gt; Int { get set }</Declaration><Abstract><Para>Aaa.  subscript(i: Int).</Para></Abstract></Other>]
     get {
 // CHECK: {{.*}}DocCommentAsXML=none
       return 0

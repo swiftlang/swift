@@ -37,6 +37,7 @@
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <memory>
 
@@ -79,6 +80,8 @@ unsigned importer::majorVersionNumberForNameVersion(ImportNameVersion version) {
   case ImportNameVersion::Swift4:
     return 4;
   }
+
+  llvm_unreachable("Unhandled ImportNameVersion in switch.");
 }
 
 

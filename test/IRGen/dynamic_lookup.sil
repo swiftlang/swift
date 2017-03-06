@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
-// REQUIRES: CPU=i386 || CPU=x86_64
+// REQUIRES: CPU=i386_or_x86_64
 // REQUIRES: objc_interop
 
 import Swift
@@ -30,7 +30,7 @@ bb0(%0 : $@thick X.Type):
   return %14 : $()
 }
 
-sil @_T014dynamic_lookup1XC9subscriptSiSicfgTo : $@convention(objc_method) (Int, X) -> Int {
+sil @_T014dynamic_lookup1XC9subscriptS2icfgTo : $@convention(objc_method) (Int, X) -> Int {
 bb0(%0 : $Int, %1 : $X):
   %4 = function_ref @_T0Si33_convertFromBuiltinIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
   %5 = metatype $@thin Int.Type

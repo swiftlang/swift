@@ -14,6 +14,7 @@ import has_xref
 
 numeric(42)
 conditional(true)
+conditional2(true)
 longInt(42)
 numericArray([42])
 

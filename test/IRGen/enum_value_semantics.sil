@@ -125,7 +125,7 @@ enum GenericFixedLayout<T> {
 
 
 // CHECK-LABEL: @_TMfO20enum_value_semantics20SinglePayloadTrivial =
-// CHECK-SAME:   internal constant {{.*}} <{
+// CHECK-SAME:   internal constant <{ {{.*}} }> <{
 // CHECK-SAME:   i8** getelementptr inbounds ([26 x i8*], [26 x i8*]* @_TWVO20enum_value_semantics20SinglePayloadTrivial, i32 0, i32 0),
 // CHECK-SAME:   i64 2,
 // CHECK-SAME:   {{.*}}* @_TMnO20enum_value_semantics20SinglePayloadTrivial
@@ -167,7 +167,7 @@ enum GenericFixedLayout<T> {
 
 
 // CHECK-LABEL: @_TMfO20enum_value_semantics23SinglePayloadNontrivial =
-// CHECK-SAME: internal constant {{.*}} <{
+// CHECK-SAME: internal constant <{ {{.*}} }> <{
 // CHECK-SAME:   i8** getelementptr inbounds ([26 x i8*], [26 x i8*]* @_TWVO20enum_value_semantics23SinglePayloadNontrivial, i32 0, i32 0),
 // CHECK-SAME:   i64 2,
 // CHECK-SAME:   {{.*}}* @_TMnO20enum_value_semantics23SinglePayloadNontrivial

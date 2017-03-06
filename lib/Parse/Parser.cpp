@@ -620,7 +620,6 @@ bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,
   return false;
 }
 
-
 /// parseAnyIdentifier - Consume an identifier or operator if present and return
 /// its name in Result.  Otherwise, emit an error and return true.
 bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,

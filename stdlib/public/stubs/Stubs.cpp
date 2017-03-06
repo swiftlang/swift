@@ -396,7 +396,7 @@ __muloti4(ti_int a, ti_int b, int* overflow)
 // some other lower-level architecture issue that I'm
 // missing.  Perhaps relevant bug report:
 // FIXME: https://llvm.org/bugs/show_bug.cgi?id=14469
-#if __has_attribute(__mode__(DI))
+#if __has_attribute(__mode__)
 #define SWIFT_MODE_DI __attribute__((__mode__(DI)))
 #else
 #define SWIFT_MODE_DI

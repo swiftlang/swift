@@ -15,6 +15,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -172,6 +173,23 @@ public:
     ASTVisitor::visit(const_cast<Decl *>(D));
   }
 
+  void maybePrintObjCGenericParameters(const ClassDecl *importedClass) {
+    auto *clangDecl = importedClass->getClangDecl();
+    auto *objcClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(clangDecl);
+    if (!objcClass)
+      return;
+    if (!objcClass->getTypeParamList())
+      return;
+    assert(objcClass->getTypeParamList()->size() != 0);
+    os << "<";
+    interleave(*objcClass->getTypeParamList(),
+               [this](const clang::ObjCTypeParamDecl *param) {
+                 os << param->getName();
+               },
+               [this] { os << ", "; });
+    os << ">";
+  }
+
   void printAdHocCategory(iterator_range<const ValueDecl * const *> members) {
     assert(members.begin() != members.end());
 
@@ -182,8 +200,10 @@ public:
       baseClass = extendedTy->getClassOrBoundGenericClass();
     }
 
-    os << "@interface " << getNameForObjC(baseClass)
-    << " (SWIFT_EXTENSION(" << origDC->getParentModule()->getName() << "))\n";
+    os << "@interface " << getNameForObjC(baseClass);
+    maybePrintObjCGenericParameters(baseClass);
+    os << " (SWIFT_EXTENSION(" << origDC->getParentModule()->getName()
+       << "))\n";
     printMembers</*allowDelayed*/true>(members);
     os << "@end\n\n";
   }
@@ -312,8 +332,9 @@ private:
   void visitExtensionDecl(ExtensionDecl *ED) {
     auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
 
-    os << "@interface " << getNameForObjC(baseClass)
-       << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
+    os << "@interface " << getNameForObjC(baseClass);
+    maybePrintObjCGenericParameters(baseClass);
+    os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
     printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
     printMembers(ED->getMembers());
@@ -1573,6 +1594,30 @@ private:
     } else {
       visitType(MT, optionalKind);
     }
+  }
+
+  void visitGenericTypeParamType(GenericTypeParamType *type,
+                                 Optional<OptionalTypeKind> optionalKind) {
+    const GenericTypeParamDecl *decl = type->getDecl();
+    assert(decl && "can't print canonicalized GenericTypeParamType");
+
+    if (auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+      const ClassDecl *extendedClass =
+          extension->getAsClassOrClassExtensionContext();
+      assert(extendedClass->isGeneric());
+      assert(extension->getGenericParams()->size() ==
+             extendedClass->getGenericParams()->size() &&
+             "extensions with custom generic parameters?");
+      assert(extension->getGenericSignature()->getCanonicalSignature() ==
+             extendedClass->getGenericSignature()->getCanonicalSignature() &&
+             "constrained extensions or custom generic parameters?");
+      type = extendedClass->getGenericEnvironment()->getSugaredType(type);
+      decl = type->getDecl();
+    }
+
+    assert(decl->getClangDecl() && "can only handle imported ObjC generics");
+    os << cast<clang::ObjCTypeParamDecl>(decl->getClangDecl())->getName();
+    printNullability(optionalKind);
   }
                       
   void printFunctionType(FunctionType *FT, char pointerSigil,

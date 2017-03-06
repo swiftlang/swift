@@ -1527,16 +1527,16 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
     innerFailure = &specializedFailure;
   
   // Perform a conditional cast branch.
-  SGF.emitCheckedCastBranch(loc, castOperand,
-                            sourceType, targetType, SGFContext(),
-    // Success block: recurse.
-    [&](ManagedValue castValue) {
-      handleCase(ConsumableManagedValue::forOwned(castValue),
-                 specializedRows, *innerFailure);
-      assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
-    },
-    // Failure block: branch out to the continuation block.
-    [&] { (*innerFailure)(loc); });
+  SGF.emitCheckedCastBranchOld(
+      loc, castOperand, sourceType, targetType, SGFContext(),
+      // Success block: recurse.
+      [&](ManagedValue castValue) {
+        handleCase(ConsumableManagedValue::forOwned(castValue), specializedRows,
+                   *innerFailure);
+        assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
+      },
+      // Failure block: branch out to the continuation block.
+      [&] { (*innerFailure)(loc); });
 }
 
 /// Perform specialized dispatch for a sequence of EnumElementPattern or an
@@ -1792,8 +1792,11 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
         SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue->getType());
-        if (eltTL->isLoadable())
-          boxedValue = SGF.B.createLoadBorrow(loc, boxedValue);
+        if (eltTL->isLoadable()) {
+          ManagedValue newLoadedBoxValue = SGF.B.createLoadBorrow(
+              loc, ManagedValue::forUnmanaged(boxedValue));
+          boxedValue = newLoadedBoxValue.getUnmanagedValue();
+        }
 
         // The boxed value may be shared, so we always have to copy it.
         eltCMV = getManagedSubobject(SGF, boxedValue, *eltTL,

@@ -5,6 +5,6 @@
 // CHECK: Total Execution Time: {{[0-9]+}}.{{[0-9]+}} seconds ({{[0-9]+}}.{{[0-9]+}} wall clock)
 // CHECK: ---Wall Time---
 // CHECK: --- Name ---
-// CHECK: compile {{.*}}driver-time-compilation.swift
-// CHECK-MULTIPLE: compile {{.*}}empty.swift
+// CHECK: {compile: {{.*}}driver-time-compilation.swift}
+// CHECK-MULTIPLE: {compile: {{.*}}empty.swift}
 // CHECK: {{[0-9]+}}.{{[0-9]+}} (100.0%)  Total

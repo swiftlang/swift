@@ -114,6 +114,11 @@ struct ValueOwnershipKind {
   ValueOwnershipKind(SILModule &M, SILType Type,
                      SILArgumentConvention Convention);
 
+  /// Parse Value into a ValueOwnershipKind.
+  ///
+  /// *NOTE* Emits an unreachable if an invalid value is passed in.
+  explicit ValueOwnershipKind(StringRef Value);
+
   operator innerty() const { return Value; }
 
   Optional<ValueOwnershipKind> merge(ValueOwnershipKind RHS) const;

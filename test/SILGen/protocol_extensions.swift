@@ -69,9 +69,9 @@ class C : P1 {
 }
 
 //   (materializeForSet test from above)
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T019protocol_extensions1CCAA2P1AaaDP9subscriptSiSicfmTW
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T019protocol_extensions1CCAA2P1A2aDP9subscriptS2icfmTW
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $Int, %3 : $*C):
-// CHECK: function_ref @_T019protocol_extensions2P1PAAE9subscriptSiSicfg
+// CHECK: function_ref @_T019protocol_extensions2P1PAAE9subscriptS2icfg
 // CHECK: return
 
 class D : C { }
@@ -546,7 +546,7 @@ func testExistentialsGetters(_ p1: P1) {
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]] :
-  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE9subscriptSbSbcfg
+  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE9subscriptS2bcfg
   // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[B]], [[POPENED_COPY]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @in_guaranteed τ_0_0) -> Bool
   let b2: Bool = p1[b]
 }
@@ -565,7 +565,7 @@ func testExistentialSetters(_ p1: P1, b: Bool) {
   p1.prop2 = b
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr mutable_access [[PBP]] : $*P1 to $*@opened([[UUID:".*"]]) P1
-  // CHECK: [[SUBSETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE9subscriptSbSbcfs
+  // CHECK: [[SUBSETTER:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE9subscriptS2bcfs
   // CHECK: apply [[SUBSETTER]]<@opened([[UUID]]) P1>([[B]], [[B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, Bool, @inout τ_0_0) -> ()
   // CHECK-NOT: deinit_existential_addr [[PB]] : $*P1
   p1[b] = b
@@ -769,7 +769,7 @@ class ObjCInitClass {
 protocol ProtoDelegatesToObjC { }
 
 extension ProtoDelegatesToObjC where Self : ObjCInitClass {
-  // CHECK-LABEL: sil hidden @_T019protocol_extensions20ProtoDelegatesToObjCPAaA0F10CInitClassC{{[_0-9a-zA-Z]*}}fC
+  // CHECK-LABEL: sil hidden @_T019protocol_extensions20ProtoDelegatesToObjCPA2A0F10CInitClassC{{[_0-9a-zA-Z]*}}fC
   // CHECK: bb0([[STR:%[0-9]+]] : $String, [[SELF_META:%[0-9]+]] : $@thick Self.Type):
   init(string: String) {
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : ObjCInitClass, τ_0_0 : ProtoDelegatesToObjC> { var τ_0_0 } <Self>
@@ -795,7 +795,7 @@ class RequiredInitClass {
 protocol ProtoDelegatesToRequired { }
 
 extension ProtoDelegatesToRequired where Self : RequiredInitClass {
-  // CHECK-LABEL: sil hidden @_T019protocol_extensions24ProtoDelegatesToRequiredPAaA0F9InitClassC{{[_0-9a-zA-Z]*}}fC 
+  // CHECK-LABEL: sil hidden @_T019protocol_extensions24ProtoDelegatesToRequiredPA2A0F9InitClassC{{[_0-9a-zA-Z]*}}fC 
   // CHECK: bb0([[STR:%[0-9]+]] : $String, [[SELF_META:%[0-9]+]] : $@thick Self.Type):
   init(string: String) {
   // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : RequiredInitClass, τ_0_0 : ProtoDelegatesToRequired> { var τ_0_0 } <Self>

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
-// REQUIRES: CPU=i386 || CPU=x86_64
+// REQUIRES: CPU=i386_or_x86_64
 
 @_silgen_name("atan2") func atan2test(_ a: Double, _ b: Double) -> Double
 

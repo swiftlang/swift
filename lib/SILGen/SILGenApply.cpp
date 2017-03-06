@@ -32,17 +32,15 @@ using namespace swift;
 using namespace Lowering;
 
 /// Retrieve the type to use for a method found via dynamic lookup.
-static CanAnyFunctionType getDynamicMethodFormalType(SILGenModule &SGM,
-                                                     SILValue proto,
+static CanAnyFunctionType getDynamicMethodFormalType(SILValue proto,
                                                      ValueDecl *member,
-                                                     SILDeclRef methodName,
                                                      Type memberType) {
-  auto &ctx = SGM.getASTContext();
+  auto &ctx = member->getASTContext();
   CanType selfTy;
   if (member->isInstanceMember()) {
     selfTy = ctx.TheUnknownObjectType;
   } else {
-    selfTy = proto->getType().getSwiftType();
+    selfTy = proto->getType().getSwiftRValueType();
   }
   auto extInfo = FunctionType::ExtInfo()
                    .withRepresentation(FunctionType::Representation::Thin);
@@ -99,7 +97,7 @@ static CanSILFunctionType getDynamicMethodLoweredType(SILGenFunction &gen,
     selfTy = proto->getType().getSwiftRValueType();
     assert(selfTy->is<ArchetypeType>() && "Dynamic lookup needs an archetype");
   } else {
-    selfTy = proto->getType().getSwiftType();
+    selfTy = proto->getType().getSwiftRValueType();
   }
 
   // Replace the 'self' parameter type in the method type with it.
@@ -189,9 +187,6 @@ private:
   SILValue SelfValue;
   SubstitutionList Substitutions;
   CanAnyFunctionType OrigFormalInterfaceType;
-  CanFunctionType SubstFormalType;
-  Optional<SILLocation> SpecializeLoc;
-  bool HasSubstitutions = false;
   Optional<SmallVector<ManagedValue, 2>> Captures;
 
   // The pointer back to the AST node that produced the callee.
@@ -201,28 +196,24 @@ private:
 
   Callee(ManagedValue indirectValue,
          CanAnyFunctionType origFormalType,
-         CanFunctionType substFormalType,
          SILLocation L)
     : kind(Kind::IndirectValue),
       IndirectValue(indirectValue),
       OrigFormalInterfaceType(origFormalType),
-      SubstFormalType(substFormalType),
       Loc(L)
   {}
 
   static CanAnyFunctionType getConstantFormalInterfaceType(SILGenFunction &gen,
-                                                  SILDeclRef fn) {
+                                                           SILDeclRef fn) {
     return gen.SGM.Types.getConstantInfo(fn.atUncurryLevel(0))
              .FormalInterfaceType;
   }
 
   Callee(SILGenFunction &gen, SILDeclRef standaloneFunction,
-         CanFunctionType substFormalType,
          SILLocation l)
     : kind(Kind::StandaloneFunction), Constant(standaloneFunction),
       OrigFormalInterfaceType(getConstantFormalInterfaceType(gen,
                                                            standaloneFunction)),
-      SubstFormalType(substFormalType),
       Loc(l)
   {
   }
@@ -231,170 +222,86 @@ private:
          SILGenFunction &gen,
          SILValue selfValue,
          SILDeclRef methodName,
-         CanFunctionType substFormalType,
          SILLocation l)
     : kind(methodKind), Constant(methodName), SelfValue(selfValue),
       OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, methodName)),
-      SubstFormalType(substFormalType),
       Loc(l)
   {
   }
 
-  /// Build a clause that looks like 'origParamType' but uses 'selfType'
-  /// in place of the underlying archetype.
-  static CanType buildSubstSelfType(CanType origParamType, CanType selfType,
-                                    ASTContext &ctx) {
-    assert(!isa<LValueType>(origParamType) && "Self can't be @lvalue");
-    if (auto lv = dyn_cast<InOutType>(origParamType)) {
-      selfType = buildSubstSelfType(lv.getObjectType(), selfType, ctx);
-      return CanInOutType::get(selfType);
-    }
-
-    if (auto tuple = dyn_cast<TupleType>(origParamType)) {
-      assert(tuple->getNumElements() == 1);
-      selfType = buildSubstSelfType(tuple.getElementType(0), selfType, ctx);
-
-      auto field = tuple->getElement(0).getWithType(selfType);
-      return CanType(TupleType::get(field, ctx));
-    }
-
-    assert(isa<MetatypeType>(origParamType) == isa<MetatypeType>(selfType));
-    assert(origParamType->getRValueInstanceType()->isTypeParameter());
-    assert(selfType->getRValueInstanceType()->is<ArchetypeType>());
-
-    return selfType;
-  }
-
   CanArchetypeType getWitnessMethodSelfType() const {
-    return cast<ArchetypeType>(SubstFormalType.getInput()
+    return cast<ArchetypeType>(getSubstFormalType().getInput()
         ->getRValueInstanceType()
         ->getCanonicalType());
   }
 
   CanSILFunctionType getSubstFunctionType(SILGenModule &SGM,
                                           CanSILFunctionType origFnType) const {
-    if (!HasSubstitutions) return origFnType;
-    
     return origFnType->substGenericArgs(SGM.M, Substitutions);
-  }
-
-  /// Add the 'self' clause back to the substituted formal type of
-  /// this protocol method.
-  void addProtocolSelfToFormalType(SILGenModule &SGM, SILDeclRef name,
-                                   CanType protocolSelfType) {
-    // The result types of the expressions yielding protocol values
-    // (reflected in SubstFormalType) reflect an implicit level of
-    // function application, including some extra polymorphic
-    // substitution.
-    HasSubstitutions = true;
-
-    auto &ctx = SGM.getASTContext();
-
-    // Add the 'self' parameter back.  We want it to look like a
-    // substitution of the appropriate clause from the original type.
-    auto selfType = OrigFormalInterfaceType.getInput();
-    auto substSelfType =
-      buildSubstSelfType(selfType, protocolSelfType, ctx);
-
-    auto extInfo = FunctionType::ExtInfo(FunctionType::Representation::Thin,
-                                         /*throws*/ OrigFormalInterfaceType->throws());
-
-    SubstFormalType = CanFunctionType::get(substSelfType, SubstFormalType,
-                                           extInfo);
   }
 
   /// Add the 'self' type to the substituted function type of this
   /// dynamic callee.
-  void addDynamicCalleeSelfToFormalType(SILGenModule &SGM,
-                                        CanAnyFunctionType substFormalType) {
+  void addDynamicCalleeSelfToFormalType(Type substFormalType) {
     assert(kind == Kind::DynamicMethod);
 
-    // Add the dynamic self type to the substituted type. Even if the dynamic
-    // callee came from a generic ObjC class, when we find it on AnyObject the
-    // parameters should be substituted with their upper bound types.
     OrigFormalInterfaceType
-      = getDynamicMethodFormalType(SGM, SelfValue,
+      = getDynamicMethodFormalType(SelfValue,
                                    Constant.getDecl(),
-                                   Constant, substFormalType);
+                                   substFormalType);
     assert(!OrigFormalInterfaceType->hasTypeParameter());
-
-    // Add a self clause to the substituted type.
-    auto selfType = OrigFormalInterfaceType.getInput();
-    SubstFormalType
-      = CanFunctionType::get(selfType, SubstFormalType,
-                             OrigFormalInterfaceType->getExtInfo());
   }
 
 public:
 
   static Callee forIndirect(ManagedValue indirectValue,
                             CanAnyFunctionType origFormalType,
-                            CanFunctionType substFormalType,
                             SILLocation l) {
-    return Callee(indirectValue,
-                  origFormalType,
-                  substFormalType,
-                  l);
+    return Callee(indirectValue, origFormalType, l);
   }
   static Callee forDirect(SILGenFunction &gen, SILDeclRef c,
-                          CanFunctionType substFormalType,
                           SILLocation l) {
-    return Callee(gen, c, substFormalType, l);
+    return Callee(gen, c, l);
   }
   static Callee forEnumElement(SILGenFunction &gen, SILDeclRef c,
-                               CanFunctionType substFormalType,
                                SILLocation l) {
     assert(isa<EnumElementDecl>(c.getDecl()));
-    return Callee(Kind::EnumElement, gen, SILValue(),
-                  c, substFormalType, l);
+    return Callee(Kind::EnumElement, gen, SILValue(), c, l);
   }
   static Callee forClassMethod(SILGenFunction &gen, SILValue selfValue,
                                SILDeclRef name,
-                               CanFunctionType substFormalType,
                                SILLocation l) {
-    return Callee(Kind::ClassMethod, gen, selfValue, name,
-                  substFormalType, l);
+    return Callee(Kind::ClassMethod, gen, selfValue, name, l);
   }
   static Callee forSuperMethod(SILGenFunction &gen, SILValue selfValue,
                                SILDeclRef name,
-                               CanFunctionType substFormalType,
                                SILLocation l) {
     while (auto *UI = dyn_cast<UpcastInst>(selfValue))
       selfValue = UI->getOperand();
 
-    return Callee(Kind::SuperMethod, gen, selfValue, name,
-                  substFormalType, l);
+    return Callee(Kind::SuperMethod, gen, selfValue, name, l);
   }
   static Callee forArchetype(SILGenFunction &gen,
                              SILValue optOpeningInstruction,
                              CanType protocolSelfType,
                              SILDeclRef name,
-                             CanFunctionType substFormalType,
                              SILLocation l) {
-    Callee callee(Kind::WitnessMethod, gen, optOpeningInstruction, name,
-                  substFormalType, l);
-    callee.addProtocolSelfToFormalType(gen.SGM, name, protocolSelfType);
+    Callee callee(Kind::WitnessMethod, gen, optOpeningInstruction, name, l);
     return callee;
   }
   static Callee forDynamic(SILGenFunction &gen, SILValue proto,
-                           SILDeclRef name, CanFunctionType substFormalType,
+                           SILDeclRef name, Type substFormalType,
                            SILLocation l) {
-    Callee callee(Kind::DynamicMethod, gen, proto, name,
-                  substFormalType, l);
-    callee.addDynamicCalleeSelfToFormalType(gen.SGM, substFormalType);
+    Callee callee(Kind::DynamicMethod, gen, proto, name, l);
+    callee.addDynamicCalleeSelfToFormalType(substFormalType);
     return callee;
   }
   Callee(Callee &&) = default;
   Callee &operator=(Callee &&) = default;
 
-  void setSubstitutions(SILGenFunction &gen,
-                        SILLocation loc,
-                        SubstitutionList newSubs) {
+  void setSubstitutions(SubstitutionList newSubs) {
     assert(Substitutions.empty() && "Already have substitutions?");
     Substitutions = newSubs;
-
-    SpecializeLoc = loc;
-    HasSubstitutions = true;
   }
   
   void setCaptures(SmallVectorImpl<ManagedValue> &&captures) {
@@ -416,7 +323,13 @@ public:
   }
 
   CanFunctionType getSubstFormalType() const {
-    return SubstFormalType;
+    if (auto *gft = OrigFormalInterfaceType->getAs<GenericFunctionType>()) {
+      return cast<FunctionType>(
+        gft->substGenericArgs(getSubstitutions())
+          ->getCanonicalType());
+    }
+
+    return cast<FunctionType>(OrigFormalInterfaceType);
   }
 
   unsigned getNaturalUncurryLevel() const {
@@ -452,7 +365,7 @@ public:
     case Kind::IndirectValue:
       assert(level == 0 && "can't curry indirect function");
       mv = IndirectValue;
-      assert(!HasSubstitutions);
+      assert(Substitutions.empty());
       break;
 
     case Kind::StandaloneFunction: {
@@ -566,8 +479,9 @@ public:
       constant = Constant.atUncurryLevel(level);
       // Lower the substituted type from the AST, which should have any generic
       // parameters in the original signature erased to their upper bounds.
-      auto objcFormalType = SubstFormalType.withExtInfo(
-         SubstFormalType->getExtInfo()
+      auto substFormalType = getSubstFormalType();
+      auto objcFormalType = substFormalType.withExtInfo(
+         substFormalType->getExtInfo()
            .withSILRepresentation(SILFunctionTypeRepresentation::ObjCMethod));
       auto fnType = gen.SGM.M.Types
         .getUncachedSILFunctionTypeForConstant(*constant, objcFormalType);
@@ -655,7 +569,6 @@ class ArchetypeCalleeBuilder {
   SILGenFunction &gen;
   SILLocation loc;
   ArgumentSource &selfValue;
-  CanFunctionType substFnType;
   SILParameterInfo selfParam;
   AbstractFunctionDecl *fd;
   ProtocolDecl *protocol;
@@ -663,9 +576,8 @@ class ArchetypeCalleeBuilder {
 
 public:
   ArchetypeCalleeBuilder(SILGenFunction &gen, SILLocation loc,
-                         SILDeclRef inputConstant, ArgumentSource &selfValue,
-                         CanFunctionType substFnType)
-      : gen(gen), loc(loc), selfValue(selfValue), substFnType(substFnType),
+                         SILDeclRef inputConstant, ArgumentSource &selfValue)
+      : gen(gen), loc(loc), selfValue(selfValue),
         selfParam(), fd(cast<AbstractFunctionDecl>(inputConstant.getDecl())),
         protocol(cast<ProtocolDecl>(fd->getDeclContext())),
         constant(inputConstant.asForeign(protocol->isObjC())) {}
@@ -687,11 +599,7 @@ public:
       setSelfValueToAddress(selfLoc, address);
     }
 
-    // The protocol self is implicitly decurried.
-    substFnType = cast<FunctionType>(substFnType.getResult());
-
-    return Callee::forArchetype(gen, openingSite, getSelfType(), constant,
-                                substFnType, loc);
+    return Callee::forArchetype(gen, openingSite, getSelfType(), constant, loc);
   }
 
 private:
@@ -773,10 +681,9 @@ private:
 static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
                                      SILDeclRef constant,
                                      ArgumentSource &selfValue,
-                                     CanFunctionType substFnType,
                                      SubstitutionList &substitutions) {
   // Construct an archetype call.
-  ArchetypeCalleeBuilder Builder{gen, loc, constant, selfValue, substFnType};
+  ArchetypeCalleeBuilder Builder{gen, loc, constant, selfValue};
   return Builder.build();
 }
 
@@ -863,70 +770,18 @@ public:
     visit(e);
   }
 
-  /// Get the type of the function for substitution purposes.
-  ///
-  /// \param otherCtorRefUsesAllocating If true, the OtherConstructorDeclRef
-  /// refers to the initializing
-  CanFunctionType getSubstFnType(bool otherCtorRefUsesAllocating = false) {
-    // TODO: optimize this if there are no specializes in play
-    auto getSiteType = [&](ApplyExpr *site, bool otherCtorRefUsesAllocating) {
-      if (otherCtorRefUsesAllocating) {
-        // We have a reference to an initializing constructor, but we will
-        // actually be using the allocating constructor. Update the type
-        // appropriately.
-        // FIXME: Re-derive the type from the declaration + substitutions?
-        auto ctorRef = cast<OtherConstructorDeclRefExpr>(site->getSemanticFn());
-        auto fnType = ctorRef->getType()->castTo<FunctionType>();
-        auto selfTy = MetatypeType::get(
-                        fnType->getInput()->getInOutObjectType());
-        return CanFunctionType::get(selfTy->getCanonicalType(),
-                                    fnType->getResult()->getCanonicalType(),
-                                    fnType->getExtInfo());
-      }
-
-      return cast<FunctionType>(site->getFn()->getType()->getCanonicalType());
-    };
-
-    CanFunctionType fnType;
-
-    auto addSite = [&](ApplyExpr *site, bool otherCtorRefUsesAllocating) {
-      auto siteType = getSiteType(site, otherCtorRefUsesAllocating);
-
-      // If this is the first call site, use its formal type directly.
-      if (!fnType) {
-        fnType = siteType;
-        return;
-      }
-
-      fnType = CanFunctionType::get(siteType.getInput(), fnType,
-                                    siteType->getExtInfo());
-    };
-
-    for (auto callSite : CallSites) {
-      addSite(callSite, false);
-    }
-
-    // The self application might be a DynamicMemberRefExpr.
-    if (auto selfApply = dyn_cast_or_null<ApplyExpr>(SelfApplyExpr)) {
-      addSite(selfApply, otherCtorRefUsesAllocating);
-    }
-
-    assert(fnType && "found no call sites?");
-    return fnType;
-  }
-
   /// Fall back to an unknown, indirect callee.
   void visitExpr(Expr *e) {
     ManagedValue fn = SGF.emitRValueAsSingleValue(e);
     auto origType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
-    setCallee(Callee::forIndirect(fn, origType, getSubstFnType(), e));
+    setCallee(Callee::forIndirect(fn, origType, e));
   }
 
   void visitLoadExpr(LoadExpr *e) {
     // TODO: preserve the function pointer at its original abstraction level
     ManagedValue fn = SGF.emitRValueAsSingleValue(e);
     auto origType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
-    setCallee(Callee::forIndirect(fn, origType, getSubstFnType(), e));
+    setCallee(Callee::forIndirect(fn, origType, e));
   }
 
   /// Add a call site to the curry.
@@ -1005,7 +860,6 @@ public:
         // to the +0 value in memory.  We just pass in the address since
         // archetypes are address-only.
 
-        auto substFnType = getSubstFnType();
         assert(!CallSites.empty());
         ApplyExpr *thisCallSite = CallSites.back();
         CallSites.pop_back();
@@ -1039,7 +893,7 @@ public:
 
         // Prepare the callee.  This can modify both selfValue and subs.
         Callee theCallee = prepareArchetypeCallee(SGF, e, constant, selfValue,
-                                                  substFnType, subs);
+                                                  subs);
         AssumedPlusZeroSelf = selfValue.isRValue()
           && selfValue.forceAndPeekRValue(SGF).peekIsPlusZeroRValueOrTrivial();
 
@@ -1048,7 +902,7 @@ public:
 
         // If there are substitutions, add them now.
         if (!subs.empty())
-          ApplyCallee->setSubstitutions(SGF, e, subs);
+          ApplyCallee->setSubstitutions(subs);
 
         return;
       }
@@ -1127,13 +981,11 @@ public:
                             SILDeclRef::ConstructAtNaturalUncurryLevel,
                             requiresForeignEntryPoint(afd));
 
-        setCallee(Callee::forClassMethod(SGF, selfValue,
-                                         constant, getSubstFnType(), e));
+        setCallee(Callee::forClassMethod(SGF, selfValue, constant, e));
 
         // If there are substitutions, add them.
         if (e->getDeclRef().isSpecialized()) {
-          ApplyCallee->setSubstitutions(SGF, e,
-                                        e->getDeclRef().getSubstitutions());
+          ApplyCallee->setSubstitutions(e->getDeclRef().getSubstitutions());
         }
 
         return;
@@ -1154,29 +1006,18 @@ public:
                           && requiresForeignEntryPoint(e->getDecl()));
 
     // Otherwise, we have a statically-dispatched call.
-    CanFunctionType substFnType = getSubstFnType();
-
-    auto afd = dyn_cast<AbstractFunctionDecl>(e->getDecl());
-    if (afd) {
-      // If there are captures, put the placeholder curry level in the formal
-      // type.
-      // TODO: Eliminate the need for this.
-      if (SGF.SGM.M.Types.hasLoweredLocalCaptures(afd))
-        substFnType = CanFunctionType::get(
-          SGF.getASTContext().TheEmptyTupleType, substFnType);
-    }
-
     SubstitutionList subs;
     if (e->getDeclRef().isSpecialized())
       subs = e->getDeclRef().getSubstitutions();
 
     // Enum case constructor references are open-coded.
     if (isa<EnumElementDecl>(e->getDecl()))
-      setCallee(Callee::forEnumElement(SGF, constant, substFnType, e));
+      setCallee(Callee::forEnumElement(SGF, constant, e));
     else
-      setCallee(Callee::forDirect(SGF, constant, substFnType, e));
+      setCallee(Callee::forDirect(SGF, constant, e));
     
     // If the decl ref requires captures, emit the capture params.
+    auto afd = dyn_cast<AbstractFunctionDecl>(e->getDecl());
     if (afd) {
       // FIXME: We should be checking hasLocalCaptures() on the lowered
       // captures in the constant info too, to generate more efficient
@@ -1195,7 +1036,7 @@ public:
         (!afd ||
          !afd->getDeclContext()->isLocalContext() ||
          afd->getCaptureInfo().hasGenericParamCaptures()))
-      ApplyCallee->setSubstitutions(SGF, e, subs);
+      ApplyCallee->setSubstitutions(subs);
   }
   
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
@@ -1217,24 +1058,10 @@ public:
     if (e->getCaptureInfo().hasGenericParamCaptures())
       subs = SGF.getForwardingSubstitutions();
 
-    CanFunctionType substFnType = getSubstFnType();
-    
-    // FIXME: We should be checking hasLocalCaptures() on the lowered
-    // captures in the constant info above, to generate more efficient
-    // code for mutually recursive local functions which otherwise
-    // capture no state.
-
-    // If there are captures, put the placeholder curry level in the formal
-    // type.
-    // TODO: Eliminate the need for this.
-    bool hasCaptures = SGF.SGM.M.Types.hasLoweredLocalCaptures(e);
-    if (hasCaptures)
-      substFnType = CanFunctionType::get(
-                         SGF.getASTContext().TheEmptyTupleType, substFnType);
-
-    setCallee(Callee::forDirect(SGF, constant, substFnType, e));
+    setCallee(Callee::forDirect(SGF, constant, e));
     
     // If the closure requires captures, emit them.
+    bool hasCaptures = SGF.SGM.M.Types.hasLoweredLocalCaptures(e);
     if (hasCaptures) {
       SmallVector<ManagedValue, 4> captures;
       SGF.emitCaptures(e, e, CaptureEmission::ImmediateApplication,
@@ -1243,7 +1070,7 @@ public:
     }
     // If there are substitutions, add them.
     if (!subs.empty())
-      ApplyCallee->setSubstitutions(SGF, e, subs);
+      ApplyCallee->setSubstitutions(subs);
   }
   
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *e) {
@@ -1251,12 +1078,11 @@ public:
     // constructors imported from Clang (which won't have a direct entry point)
     // or to delegate to a designated initializer.
     setCallee(Callee::forDirect(SGF,
-                SILDeclRef(e->getDecl(), SILDeclRef::Kind::Initializer),
-                                getSubstFnType(), e));
+                SILDeclRef(e->getDecl(), SILDeclRef::Kind::Initializer), e));
 
     // If there are substitutions, add them.
     if (e->getDeclRef().isSpecialized())
-      ApplyCallee->setSubstitutions(SGF, e, e->getDeclRef().getSubstitutions());
+      ApplyCallee->setSubstitutions(e->getDeclRef().getSubstitutions());
   }
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e) {
     setSideEffect(e->getLHS());
@@ -1338,16 +1164,15 @@ public:
 
     if (!canUseStaticDispatch(SGF, constant)) {
       // ObjC super calls require dynamic dispatch.
-      setCallee(Callee::forSuperMethod(SGF, super.getValue(), constant,
-                                       getSubstFnType(), fn));
+      setCallee(Callee::forSuperMethod(SGF, super.getValue(), constant, fn));
     } else {
       // Native Swift super calls to final methods are direct.
-      setCallee(Callee::forDirect(SGF, constant, getSubstFnType(), fn));
+      setCallee(Callee::forDirect(SGF, constant, fn));
     }
 
     // If there are any substitutions for the callee, apply them now.
     if (!substitutions.empty())
-      ApplyCallee->setSubstitutions(SGF, fn, substitutions);
+      ApplyCallee->setSubstitutions(substitutions);
   }
 
   /// Walk the given \c selfArg expression that produces the appropriate
@@ -1367,8 +1192,7 @@ public:
 
         // If the 'self' value is a metatype, update the target type
         // accordingly.
-        if (auto selfMetaTy
-                    = selfValue.getSwiftType()->getAs<AnyMetatypeType>()) {
+        if (auto selfMetaTy = selfValue.getType().getAs<AnyMetatypeType>()) {
           resultTy = CanMetatypeType::get(resultTy,
                                           selfMetaTy->getRepresentation());
         }
@@ -1509,9 +1333,7 @@ public:
                              SILDeclRef::ConstructAtNaturalUncurryLevel,
                              requiresForeignEntryPoint(ctorRef->getDecl()));
       setCallee(Callee::forArchetype(SGF, SILValue(),
-                     self.getType().getSwiftRValueType(), constant,
-                     cast<FunctionType>(expr->getType()->getCanonicalType()),
-                     expr));
+                     self.getType().getSwiftRValueType(), constant, expr));
     } else if (getMethodDispatch(ctorRef->getDecl())
                  == MethodDispatch::Class) {
       // Dynamic dispatch to the initializer.
@@ -1525,7 +1347,7 @@ public:
                              SILDeclRef::ConstructAtBestResilienceExpansion,
                              SILDeclRef::ConstructAtNaturalUncurryLevel,
                              requiresForeignEntryPoint(ctorRef->getDecl())),
-                  getSubstFnType(), fn));
+                  fn));
     } else {
       // Directly call the peer constructor.
       setCallee(
@@ -1538,13 +1360,12 @@ public:
                      SILDeclRef::ConstructAtBestResilienceExpansion,
                      SILDeclRef::ConstructAtNaturalUncurryLevel,
                      requiresForeignEntryPoint(ctorRef->getDecl())),
-            getSubstFnType(useAllocatingCtor), fn));
+            fn));
     }
 
     // Set up the substitutions, if we have any.
     if (ctorRef->getDeclRef().isSpecialized())
-      ApplyCallee->setSubstitutions(SGF, fn,
-                                    ctorRef->getDeclRef().getSubstitutions());
+      ApplyCallee->setSubstitutions(ctorRef->getDeclRef().getSubstitutions());
 
     return true;
   }
@@ -1635,8 +1456,10 @@ public:
                         SILDeclRef::ConstructAtNaturalUncurryLevel,
                         /*isObjC=*/true);
 
+      auto substFormalType = dynamicMemberRef->getType()
+          ->getAnyOptionalObjectType();
       setCallee(Callee::forDynamic(SGF, base.getValue(), member,
-                                   getSubstFnType(), e));
+                                   substFormalType, e));
     };
 
     // When we have an open existential, open it and then emit the
@@ -1809,9 +1632,9 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
   };
 
   TupleTypeElt TypeEltsArray[] = {
-    EltsArray[0].getSwiftType(),
-    EltsArray[1].getSwiftType(),
-    EltsArray[2].getSwiftType()
+    EltsArray[0].getType().getSwiftRValueType(),
+    EltsArray[1].getType().getSwiftRValueType(),
+    EltsArray[2].getType().getSwiftRValueType()
   };
 
   ArrayRef<ManagedValue> Elts;
@@ -2486,7 +2309,7 @@ RValue SILGenFunction::emitApply(
       assert(lifetimeExtendedSelf
              && "did not save lifetime-extended self param");
       if (!hasAlreadyLifetimeExtendedSelf) {
-        B.createAutoreleaseValue(loc, lifetimeExtendedSelf, Atomicity::Atomic);
+        B.createAutoreleaseValue(loc, lifetimeExtendedSelf, B.getDefaultAtomicity());
         hasAlreadyLifetimeExtendedSelf = true;
       }
       LLVM_FALLTHROUGH;
@@ -3453,7 +3276,7 @@ namespace {
           emittedArg = ManagedValue(erased, emittedArg.getCleanup());
         }
         
-        assert(isAnyObjectType(emittedArg.getSwiftType()));
+        assert(isAnyObjectType(emittedArg.getType().getSwiftRValueType()));
         return emittedArg;
       };
       
@@ -4713,19 +4536,12 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                                             SubstitutionList subs,
                                             ArrayRef<ManagedValue> args,
                                             SGFContext ctx) {
+  auto callee = Callee::forDirect(*this, SILDeclRef(fn), loc);
+  callee.setSubstitutions(subs);
+
   auto origFormalType =
     cast<AnyFunctionType>(fn->getInterfaceType()->getCanonicalType());
-  CanFunctionType substFormalType;
-  if (!subs.empty()) {
-    auto genericFnType = cast<GenericFunctionType>(origFormalType);
-    auto applied = genericFnType->substGenericArgs(subs);
-    substFormalType = cast<FunctionType>(applied->getCanonicalType());
-  } else {
-    substFormalType = cast<FunctionType>(origFormalType);
-  }
-
-  auto callee = Callee::forDirect(*this, SILDeclRef(fn), substFormalType, loc);
-  callee.setSubstitutions(*this, loc, subs);
+  auto substFormalType = callee.getSubstFormalType();
 
   ManagedValue mv;
   CanSILFunctionType substFnType;
@@ -4772,36 +4588,11 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
                      SILDeclRef::ConstructAtBestResilienceExpansion,
                      SILDeclRef::ConstructAtNaturalUncurryLevel,
                      requiresForeignEntryPoint(ctor));
-  SILConstantInfo initConstant = SGF.getConstantInfo(initRef);
+  auto initConstant = SGF.getConstantInfo(initRef);
+  auto subs = init.getSubstitutions();
 
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(SGF);
-
-  // Determine the formal and substituted types.
-  CanFunctionType substFormalType;
-  auto subs = init.getSubstitutions();
-  if (!subs.empty()) {
-    auto genericFnType = cast<GenericFunctionType>(
-        initConstant.FormalInterfaceType);
-    auto applied = genericFnType->substGenericArgs(subs);
-    substFormalType = cast<FunctionType>(applied->getCanonicalType());
-  } else {
-    substFormalType = cast<FunctionType>(initConstant.FormalInterfaceType);
-  }
-
-  // For an inheritable initializer, determine whether we'll need to adjust the
-  // result type.
-  bool requiresDowncast = false;
-  if (ctor->isInheritable() && overriddenSelfType) {
-    CanType substResultType = substFormalType;
-    for (unsigned i : range(ctor->getNumParameterLists())) {
-      (void)i;
-      substResultType = cast<FunctionType>(substResultType).getResult();
-    }
-
-    if (!substResultType->isEqual(overriddenSelfType))
-      requiresDowncast = true;
-  }
 
   // Form the metatype argument.
   ManagedValue selfMetaVal;
@@ -4842,13 +4633,28 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
                               RValue(SGF, loc,
                                      selfMetaVal.getType().getSwiftRValueType(),
                                      selfMetaVal));
-    callee.emplace(prepareArchetypeCallee(SGF, loc, initRef, selfSource,
-                                          substFormalType, subs));
+    callee.emplace(prepareArchetypeCallee(SGF, loc, initRef, selfSource, subs));
   } else {
-    callee.emplace(Callee::forDirect(SGF, initRef, substFormalType, loc));
+    callee.emplace(Callee::forDirect(SGF, initRef, loc));
   }
   if (!subs.empty())
-    callee->setSubstitutions(SGF, loc, subs);
+    callee->setSubstitutions(subs);
+
+  auto substFormalType = callee->getSubstFormalType();
+
+  // For an inheritable initializer, determine whether we'll need to adjust the
+  // result type.
+  bool requiresDowncast = false;
+  if (ctor->isInheritable() && overriddenSelfType) {
+    CanType substResultType = substFormalType;
+    for (unsigned i : range(ctor->getNumParameterLists())) {
+      (void)i;
+      substResultType = cast<FunctionType>(substResultType).getResult();
+    }
+
+    if (!substResultType->isEqual(overriddenSelfType))
+      requiresDowncast = true;
+  }
 
   // Form the call emission.
   CallEmission emission(SGF, std::move(*callee), std::move(writebackScope));
@@ -5046,7 +4852,6 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                          ArgumentSource &selfValue,
                                          bool isSuper,
                                          bool isDirectUse,
-                                         CanFunctionType substAccessorType,
                                          SubstitutionList &substitutions){
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
 
@@ -5056,7 +4861,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
     assert(!isSuper && "super call to protocol method?");
 
     return prepareArchetypeCallee(gen, loc, constant, selfValue,
-                                  substAccessorType, substitutions);
+                                  substitutions);
   }
 
   bool isClassDispatch = false;
@@ -5073,20 +4878,20 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
 
   // Dispatch in a struct/enum or to a final method is always direct.
   if (!isClassDispatch || decl->isFinal())
-    return Callee::forDirect(gen, constant, substAccessorType, loc);
+    return Callee::forDirect(gen, constant, loc);
 
   // Otherwise, if we have a non-final class dispatch to a normal method,
   // perform a dynamic dispatch.
   auto self = selfValue.forceAndPeekRValue(gen).peekScalarValue();
   if (!isSuper)
-    return Callee::forClassMethod(gen, self, constant, substAccessorType, loc);
+    return Callee::forClassMethod(gen, self, constant, loc);
 
   // If this is a "super." dispatch, we do a dynamic dispatch for objc methods
   // or non-final native Swift methods.
   if (!canUseStaticDispatch(gen, constant))
-    return Callee::forSuperMethod(gen, self, constant, substAccessorType, loc);
+    return Callee::forSuperMethod(gen, self, constant, loc);
 
-  return Callee::forDirect(gen, constant, substAccessorType, loc);
+  return Callee::forDirect(gen, constant, loc);
 }
 
 static Callee
@@ -5098,23 +4903,11 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
                                    bool isSuper,
                                    bool isDirectUse)
 {
-  SILConstantInfo constantInfo = gen.getConstantInfo(constant);
-
-  // Apply substitutions to the callee type.
-  CanFunctionType substAccessorType;
-  if (!substitutions.empty()) {
-    auto genericFn = cast<GenericFunctionType>(constantInfo.FormalInterfaceType);
-    auto substFn = genericFn->substGenericArgs(substitutions);
-    substAccessorType = cast<FunctionType>(substFn->getCanonicalType());
-  } else {
-    substAccessorType = cast<FunctionType>(constantInfo.FormalInterfaceType);
-  }
-
   // Get the accessor function. The type will be a polymorphic function if
   // the Self type is generic.
   Callee callee = getBaseAccessorFunctionRef(gen, loc, constant, selfValue,
                                              isSuper, isDirectUse,
-                                             substAccessorType, substitutions);
+                                             substitutions);
   
   // Collect captures if the accessor has them.
   auto accessorFn = cast<AbstractFunctionDecl>(constant.getDecl());
@@ -5127,10 +4920,8 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   }
 
   // If there are substitutions, specialize the generic accessor.
-  // FIXME: Generic subscript operator could add another layer of
-  // substitutions.
   if (!substitutions.empty()) {
-    callee.setSubstitutions(gen, loc, substitutions);
+    callee.setSubstitutions(substitutions);
   }
   return callee;
 }

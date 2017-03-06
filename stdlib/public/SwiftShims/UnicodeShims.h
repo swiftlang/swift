@@ -63,21 +63,21 @@ const __swift_uint16_t *
 _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix;
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-__attribute__((__pure__)) __swift_int32_t
+SWIFT_READONLY __swift_int32_t
 _swift_stdlib_unicode_compare_utf16_utf16(const __swift_uint16_t *Left,
                                           __swift_int32_t LeftLength,
                                           const __swift_uint16_t *Right,
                                           __swift_int32_t RightLength);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-__attribute__((__pure__)) __swift_int32_t
+SWIFT_READONLY __swift_int32_t
 _swift_stdlib_unicode_compare_utf8_utf16(const unsigned char *Left,
                                          __swift_int32_t LeftLength,
                                          const __swift_uint16_t *Right,
                                          __swift_int32_t RightLength);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-__attribute__((__pure__)) __swift_int32_t
+SWIFT_READONLY __swift_int32_t
 _swift_stdlib_unicode_compare_utf8_utf8(const unsigned char *Left,
                                         __swift_int32_t LeftLength,
                                         const unsigned char *Right,

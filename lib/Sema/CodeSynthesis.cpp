@@ -23,6 +23,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"

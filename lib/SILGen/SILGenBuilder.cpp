@@ -209,7 +209,7 @@ SILGenBuilder::createUnsafeCopyUnownedValue(SILLocation loc,
   SILValue result = SILBuilder::createUnmanagedToRef(
       loc, originalValue.getValue(),
       SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
-  SILBuilder::createUnmanagedRetainValue(loc, result);
+  SILBuilder::createUnmanagedRetainValue(loc, result, getDefaultAtomicity());
   return gen.emitManagedRValueWithCleanup(result);
 }
 
@@ -489,3 +489,64 @@ ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
   return gen.emitManagedRValueWithCleanup(result);
 }
 
+ManagedValue SILGenBuilder::createUnconditionalCheckedCastOpaque(
+    SILLocation loc, ManagedValue operand, SILType type) {
+  SILValue result = SILBuilder::createUnconditionalCheckedCastOpaque(
+      loc, operand.forward(gen), type);
+  return gen.emitManagedRValueWithCleanup(result);
+}
+
+ManagedValue SILGenBuilder::createUnconditionalCheckedCast(SILLocation loc,
+                                                           ManagedValue operand,
+                                                           SILType type) {
+  SILValue result = SILBuilder::createUnconditionalCheckedCast(
+      loc, operand.forward(gen), type);
+  return gen.emitManagedRValueWithCleanup(result);
+}
+
+void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
+                                            ManagedValue operand, SILType type,
+                                            SILBasicBlock *trueBlock,
+                                            SILBasicBlock *falseBlock) {
+  SILBuilder::createCheckedCastBranch(loc, isExact, operand.forward(gen), type,
+                                      trueBlock, falseBlock);
+}
+
+ManagedValue SILGenBuilder::createUpcast(SILLocation Loc, ManagedValue Original,
+                                         SILType Type) {
+  bool hadCleanup = Original.hasCleanup();
+  bool isLValue = Original.isLValue();
+
+  SILValue convertedValue =
+      SILBuilder::createUpcast(Loc, Original.forward(gen), Type);
+
+  if (isLValue) {
+    return ManagedValue::forLValue(convertedValue);
+  }
+
+  if (!hadCleanup) {
+    return ManagedValue::forUnmanaged(convertedValue);
+  }
+
+  if (Type.isAddress()) {
+    return gen.emitManagedBufferWithCleanup(convertedValue);
+  }
+
+  return gen.emitManagedRValueWithCleanup(convertedValue);
+}
+
+ManagedValue SILGenBuilder::createTupleElementAddr(SILLocation Loc,
+                                                   ManagedValue Base,
+                                                   unsigned Index,
+                                                   SILType Type) {
+  SILValue TupleEltAddr =
+      SILBuilder::createTupleElementAddr(Loc, Base.getValue(), Index, Type);
+  return ManagedValue::forUnmanaged(TupleEltAddr);
+}
+
+ManagedValue SILGenBuilder::createTupleElementAddr(SILLocation Loc,
+                                                   ManagedValue Value,
+                                                   unsigned Index) {
+  SILType Type = Value.getType().getTupleElementType(Index);
+  return createTupleElementAddr(Loc, Value, Index, Type);
+}
