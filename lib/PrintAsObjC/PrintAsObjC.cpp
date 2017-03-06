@@ -330,15 +330,17 @@ private:
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
+    auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
     auto members = ED->getMembers();
-    if (members.empty()) return;
+
+    if (protocols.empty() && members.empty()) return;
 
     auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
 
     os << "@interface " << getNameForObjC(baseClass);
     maybePrintObjCGenericParameters(baseClass);
     os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
-    printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
+    printProtocols(protocols);
     os << "\n";
     printMembers(members);
     os << "@end\n";
