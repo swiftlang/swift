@@ -1898,11 +1898,14 @@ namespace {
   }
 
   void MultiConformanceChecker::checkAllConformances() {
+    bool anyInvalid = false;
     for(unsigned I = 0, N = AllConformances.size(); I < N; I ++) {
       auto *conformance = AllConformances[I];
       // Check this conformance and emit fixits if this is the last one in the pool.
       checkIndividualConformance(conformance, I == N - 1);
-
+      anyInvalid |= conformance->isInvalid();
+      if (anyInvalid)
+        continue;
       // Check whether there are any unsatisfied requirements.
       auto proto = conformance->getProtocol();
       for (auto member : proto->getMembers()) {
