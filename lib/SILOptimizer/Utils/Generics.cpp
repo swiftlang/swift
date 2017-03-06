@@ -130,12 +130,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   bool HasConcreteGenericParams = false;
   bool HasNonArchetypeGenericParams = false;
   HasUnboundGenericParams = false;
-  auto *SM = Apply.getModule().getSwiftModule();
-  for (auto GP : CalleeGenericSig->getGenericParams()) {
-    // Don't take into account any generic parameters known
-    // to be concrete.
-    if (CalleeGenericSig->isConcreteType(Type(GP), *SM))
-      continue;
+  for (auto GP : CalleeGenericSig->getSubstitutableParams()) {
     // Check only the substitutions for the generic parameters.
     // Ignore any dependent types, etc.
     auto Replacement = Type(GP).subst(InterfaceSubs);
@@ -388,8 +383,8 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
     Lowering::GenericContextScope GenericScope(M.Types,
                                                CanSpecializedGenericSig);
     FnTy = OrigF->getLoweredFunctionType()->substGenericArgs(M, SubstMap);
-    // Some of the added new requirements may not have been taken into account
-    // by the substGenericArgs. So, canonicalize in the context of the
+    // FIXME: Some of the added new requirements may not have been taken into
+    // account by the substGenericArgs. So, canonicalize in the context of the
     // specialized signature.
     FnTy = cast<SILFunctionType>(
         CanSpecializedGenericSig->getCanonicalTypeInContext(
