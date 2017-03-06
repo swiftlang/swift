@@ -179,6 +179,8 @@ public:
 
   void emitDeallocBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
 
+  void emitTSanInoutAccessCall(llvm::Value *address);
+
   llvm::Value *emitProjectBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
 
   // Emit a reference to the canonical type metadata record for the given AST
