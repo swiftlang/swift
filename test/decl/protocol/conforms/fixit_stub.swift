@@ -176,3 +176,19 @@ protocol ProtocolParallel2 {
 }
 
 class Adopter16 : ProtocolParallel1, ProtocolParallel2 {} // expected-error {{type 'Adopter16' does not conform to protocol 'ProtocolParallel1'}} expected-error {{type 'Adopter16' does not conform to protocol 'ProtocolParallel2'}}
+
+protocol ProtocolParallel3 {
+  func foo1() // expected-note{{protocol requires function 'foo1()' with type '() -> ()'; do you want to add a stub?}}{{56-56=\n    func foo1() {\n        <#code#>\n    \}\n\n    func foo2() {\n        <#code#>\n    \}\n}}
+  func foo2() // expected-note{{protocol requires function 'foo2()' with type '() -> ()'; do you want to add a stub?}}{{56-56=\n    func foo1() {\n        <#code#>\n    \}\n\n    func foo2() {\n        <#code#>\n    \}\n}}
+}
+
+protocol ProtocolParallel4 {
+  func bar1()
+  func bar2()
+}
+
+class Adopter17: ProtocolParallel3, ProtocolParallel4 { // expected-error {{type 'Adopter17' does not conform to protocol 'ProtocolParallel3'}}
+  func bar1() {}
+  func bar2() {}
+}
+
