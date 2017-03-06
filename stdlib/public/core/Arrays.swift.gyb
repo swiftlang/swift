@@ -26,7 +26,16 @@
 
 /// This type is used as a result of the _checkSubscript call to associate the
 /// call with the array access call it guards.
-public struct _DependenceToken {}
+///
+/// When the optimizer performs optimizations based on @_semantic calls, it
+/// sometimes wants to find calls that are semantically belonging together.
+/// For example, in an array subscript operation, it wants to find the
+/// _checkSubscript call that logically goes with the _getElement call.
+/// To do this we assign a return value from the _checkSubscript call to an
+/// argument of the _getElement call.
+///   let token = _checkSubscript(index, ... )
+///   return _getElement(index, ... , matchingSubscriptCheck: token)
+internal struct _DependenceToken {}
 
 %{
   arrayTypes = [
