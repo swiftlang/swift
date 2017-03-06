@@ -329,20 +329,41 @@ private:
     os << "@end\n";
   }
 
-  void visitExtensionDecl(ExtensionDecl *ED) {
-    auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
+  bool isEmptyExtensionDecl(ExtensionDecl *ED) {
     auto members = ED->getMembers();
+    SmallVector<Decl *, 4> includedMembers;
+    std::copy_if(members.begin(), members.end(),
+                 std::back_inserter(includedMembers),
+                 [this](const Decl *D) -> bool {
+      if (auto VD = dyn_cast<ValueDecl>(D))
+        if (shouldInclude(VD))
+          return true;
+      return false;
+    });
 
-    if (protocols.empty() && members.empty()) return;
+    auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
+    SmallVector<ProtocolDecl *, 4> includedProtocols;
+    std::copy_if(protocols.begin(), protocols.end(),
+                 std::back_inserter(includedProtocols),
+                 [this](const ProtocolDecl *PD) -> bool {
+      return shouldInclude(PD);
+    });
+
+    return (includedMembers.empty() && includedProtocols.empty());
+  }
+
+  void visitExtensionDecl(ExtensionDecl *ED) {
+    if (isEmptyExtensionDecl(ED))
+      return;
 
     auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
 
     os << "@interface " << getNameForObjC(baseClass);
     maybePrintObjCGenericParameters(baseClass);
     os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
-    printProtocols(protocols);
+    printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
-    printMembers(members);
+    printMembers(ED->getMembers());
     os << "@end\n";
   }
 
