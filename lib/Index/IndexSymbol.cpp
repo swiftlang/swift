@@ -144,8 +144,12 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
   switch (D->getKind()) {
     case DeclKind::Enum:             info.Kind = SymbolKind::Enum; break;
     case DeclKind::Struct:           info.Kind = SymbolKind::Struct; break;
-    case DeclKind::Class:            info.Kind = SymbolKind::Class; break;
     case DeclKind::Protocol:         info.Kind = SymbolKind::Protocol; break;
+    case DeclKind::Class:
+      info.Kind = SymbolKind::Class;
+      if (isUnitTestCase(cast<ClassDecl>(D)))
+        info.Properties |= SymbolProperty::UnitTest;
+      break;
     case DeclKind::Extension: {
       info.Kind = SymbolKind::Extension;
       auto *ED = cast<ExtensionDecl>(D);
@@ -156,9 +160,11 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
         break;
       if (isa<StructDecl>(NTD))
         info.SubKind = SymbolSubKind::SwiftExtensionOfStruct;
-      else if (isa<ClassDecl>(NTD))
+      else if (auto *CD = dyn_cast<ClassDecl>(NTD)) {
         info.SubKind = SymbolSubKind::SwiftExtensionOfClass;
-      else if (isa<EnumDecl>(NTD))
+        if (isUnitTestCase(CD))
+          info.Properties |= SymbolProperty::UnitTest;
+      } else if (isa<EnumDecl>(NTD))
         info.SubKind = SymbolSubKind::SwiftExtensionOfEnum;
       else if (isa<ProtocolDecl>(NTD))
         info.SubKind = SymbolSubKind::SwiftExtensionOfProtocol;

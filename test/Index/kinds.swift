@@ -183,6 +183,7 @@ func +(a: AStruct, b: AStruct) -> AStruct { return a }
 
 class XCTestCase {}
 class MyTestCase : XCTestCase {
+// CHECK: [[@LINE-1]]:7 | class(test)/Swift | MyTestCase |
   func callit() {}
   func testMe() {
   // CHECK: [[@LINE-1]]:8 | instance-method(test)/Swift | testMe() | [[MyTestCase_testMe_USR:.*]] | Def,RelChild
@@ -196,10 +197,14 @@ class MyTestCase : XCTestCase {
   // CHECK: [[@LINE-1]]:8 | instance-method/Swift | test(withInt:) |
 }
 class SubTestCase : MyTestCase {
+// CHECK: [[@LINE-1]]:7 | class(test)/Swift | SubTestCase | [[SubTestCase_USR:.*]] | Def | rel: 0
   func testIt2() {}
   // CHECK: [[@LINE-1]]:8 | instance-method(test)/Swift | testIt2() |
 }
 extension SubTestCase {
+// CHECK: [[@LINE-1]]:11 | extension/ext-class(test)/Swift | SubTestCase | [[SubTestCaseExt_USR:.*]] | Def | rel: 0
+// CHECK: [[@LINE-2]]:11 | class(test)/Swift | SubTestCase | [[SubTestCase_USR]] | Ref,RelExt | rel: 1
+// CHECK-NEXT: RelExt | extension/ext-class(test)/Swift | SubTestCase | [[SubTestCaseExt_USR]]
   func testIt3() {}
   // CHECK: [[@LINE-1]]:8 | instance-method(test)/Swift | testIt3() |
 }
