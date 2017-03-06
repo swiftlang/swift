@@ -1702,9 +1702,12 @@ namespace {
       ReferencedAssociatedTypes;
 
     /// Keep track of missing witnesses, either type or value, for later
-    /// diagnosis emits.
-    llvm::SetVector<ValueDecl*> &MissingWitnesses;
+    /// diagnosis emits. This may contain witnesses that are external to the
+    /// protocol under checking.
+    llvm::SetVector<ValueDecl*> &GlobalMissingWitnesses;
 
+    /// Keep track of the slice in GlobalMissingWitnesses that is local to
+    /// this protocol under checking.
     unsigned LocalMissingWitnessesStartIndex;
 
     /// True if we shouldn't complain about problems with this conformance
@@ -1789,9 +1792,9 @@ namespace {
     void addUsedConformances(ProtocolConformance *conformance);
 
     ArrayRef<ValueDecl*> getLocalMissingWitness() {
-      return MissingWitnesses.getArrayRef().
+      return GlobalMissingWitnesses.getArrayRef().
         slice(LocalMissingWitnessesStartIndex,
-              MissingWitnesses.size() - LocalMissingWitnessesStartIndex);
+              GlobalMissingWitnesses.size() - LocalMissingWitnessesStartIndex);
     }
 
   public:
@@ -1801,13 +1804,13 @@ namespace {
     void emitDelayedDiags();
 
     ConformanceChecker(TypeChecker &tc, NormalProtocolConformance *conformance,
-                       llvm::SetVector<ValueDecl*> &MissingWitnesses,
+                       llvm::SetVector<ValueDecl*> &GlobalMissingWitnesses,
                        bool suppressDiagnostics = true)
         : WitnessChecker(tc, conformance->getProtocol(), conformance->getType(),
                          conformance->getDeclContext()),
           Conformance(conformance), Loc(conformance->getLoc()),
-          MissingWitnesses(MissingWitnesses),
-          LocalMissingWitnessesStartIndex(MissingWitnesses.size()),
+          GlobalMissingWitnesses(GlobalMissingWitnesses),
+          LocalMissingWitnessesStartIndex(GlobalMissingWitnesses.size()),
           SuppressDiagnostics(suppressDiagnostics) {
       // The protocol may have only been validatedDeclForNameLookup'd until
       // here, so fill in any information that's missing.
@@ -2450,8 +2453,8 @@ void ConformanceChecker::diagnoseMissingWitnesses(bool issueFixit) {
   }
 
   // Make sure we clear the missing witness bucket when exiting.
-  SWIFT_DEFER { MissingWitnesses.clear(); };
-  llvm::SetVector<ValueDecl*> MissingWitnesses = this->MissingWitnesses;
+  SWIFT_DEFER { GlobalMissingWitnesses.clear(); };
+  llvm::SetVector<ValueDecl*> MissingWitnesses = GlobalMissingWitnesses;
   diagnoseOrDefer(LocalMissing[0], true,
     [MissingWitnesses](NormalProtocolConformance *Conf) {
       DeclContext *DC = Conf->getDeclContext();
@@ -2814,7 +2817,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
   if (!numViable) {
     // Save the missing requirement for later diagnosis.
-    MissingWitnesses.insert(requirement);
+    GlobalMissingWitnesses.insert(requirement);
     diagnoseOrDefer(requirement, true,
       [requirement, matches](NormalProtocolConformance *conformance) {
         auto dc = conformance->getDeclContext();
@@ -2905,7 +2908,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
     return ResolveWitnessResult::Success;
   }
   // Save the missing requirement for later diagnosis.
-  MissingWitnesses.insert(requirement);
+  GlobalMissingWitnesses.insert(requirement);
   return ResolveWitnessResult::ExplicitFailed;
 }
 
@@ -3000,7 +3003,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     return ResolveWitnessResult::ExplicitFailed;
   }
   // Save the missing type witness for later diagnosis.
-  MissingWitnesses.insert(assocType);
+  GlobalMissingWitnesses.insert(assocType);
 
   // None of the candidates were viable.
   diagnoseOrDefer(assocType, true,
@@ -4352,7 +4355,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
     }
 
     // Save the missing type witnesses for later diagnosis.
-    MissingWitnesses.insert(unresolvedAssocTypes.begin(),
+    GlobalMissingWitnesses.insert(unresolvedAssocTypes.begin(),
                             unresolvedAssocTypes.end());
 
     return;
@@ -4943,9 +4946,41 @@ void ConformanceChecker::emitDelayedDiags() {
   }
 }
 
-/// Determine whether the given requirement was left unsatisfied.
-static bool isUnsatisfiedReq(NormalProtocolConformance *conformance,
-                             ValueDecl *req) {
+/// This is a wrapper of multiple instances of ConformanceChecker to allow us
+/// to diagnose and fix code from a more global perspective; for instance, having
+/// this wrapper can help issue a fixit that inserts protocol stubs from
+/// multiple protocols under checking.
+class MultiConformanceChecker {
+  TypeChecker &TC;
+  llvm::SmallVector<ValueDecl*, 16> UnsatisfiedReqs;
+  llvm::SmallVector<NormalProtocolConformance*, 4> AllConformances;
+  llvm::SetVector<ValueDecl*> MissingWitnesses;
+
+  /// Check one conformance.
+  ProtocolConformance * checkIndividualConformance(
+    NormalProtocolConformance *conformance, bool issueFixit);
+
+  /// Determine whether the given requirement was left unsatisfied.
+  bool isUnsatisfiedReq(NormalProtocolConformance *conformance, ValueDecl *req);
+public:
+  MultiConformanceChecker(TypeChecker &TC): TC(TC){}
+
+  /// Add a conformance into the batched checker.
+  void addConformance(NormalProtocolConformance *conformance) {
+    AllConformances.push_back(conformance);
+  }
+
+  /// Peek the unsatisfied requirements collected during conformance checking.
+  ArrayRef<ValueDecl*> getUnsatisfiedRequirements() {
+    return llvm::makeArrayRef(UnsatisfiedReqs);
+  }
+
+  /// Check all conformances and emit diagnosis globally.
+  void checkAllConformances();
+};
+
+bool MultiConformanceChecker::
+isUnsatisfiedReq(NormalProtocolConformance *conformance, ValueDecl *req) {
   if (conformance->isInvalid()) return false;
   if (isa<TypeDecl>(req)) return false;
 
@@ -4957,29 +4992,12 @@ static bool isUnsatisfiedReq(NormalProtocolConformance *conformance,
   return false;
 }
 
-class ConformanceGroupedChecker {
-  TypeChecker &TC;
-  SmallVectorImpl<ValueDecl*> &unsatisfiedReqs;
-  llvm::SmallVector<NormalProtocolConformance*, 4> AllConformances;
-  llvm::SetVector<ValueDecl*> MissingWitnesses;
-  llvm::SmallVector<ConformanceChecker, 4> AllCheckers;
-  ProtocolConformance * checkIndividualConformance(
-    NormalProtocolConformance *conformance, bool issueFixit);
-
-public:
-  ConformanceGroupedChecker(TypeChecker &TC,
-                            SmallVectorImpl<ValueDecl*> &unsatisfiedReqs):
-                              TC(TC), unsatisfiedReqs(unsatisfiedReqs) {}
-  void addConformance(NormalProtocolConformance *conformance) {
-    AllConformances.push_back(conformance);
-  }
-  void checkAllConformances();
-};
-
-void ConformanceGroupedChecker::checkAllConformances() {
+void MultiConformanceChecker::checkAllConformances() {
   for(unsigned I = 0, N = AllConformances.size(); I < N; I ++) {
     auto *conformance = AllConformances[I];
+    // Check this conformance and emit fixits if this is the last one in the pool.
     checkIndividualConformance(conformance, I == N - 1);
+
     // Check whether there are any unsatisfied requirements.
     auto proto = conformance->getProtocol();
     for (auto member : proto->getMembers()) {
@@ -4989,7 +5007,7 @@ void ConformanceGroupedChecker::checkAllConformances() {
       // If the requirement is unsatisfied, we might want to warn
       // about near misses; record it.
       if (isUnsatisfiedReq(conformance, req)) {
-        unsatisfiedReqs.push_back(req);
+        UnsatisfiedReqs.push_back(req);
         continue;
       }
     }
@@ -4998,7 +5016,7 @@ void ConformanceGroupedChecker::checkAllConformances() {
 
 /// \brief Determine whether the type \c T conforms to the protocol \c Proto,
 /// recording the complete witness table if it does.
-ProtocolConformance *ConformanceGroupedChecker::
+ProtocolConformance *MultiConformanceChecker::
 checkIndividualConformance(NormalProtocolConformance *conformance,
                            bool issueFixit) {
   switch (conformance->getState()) {
@@ -5387,8 +5405,7 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
-  SmallVector<ValueDecl *, 4> unsatisfiedReqs;
-  ConformanceGroupedChecker checker(*this, unsatisfiedReqs);
+  MultiConformanceChecker checker(*this);
   checker.addConformance(conformance);
   checker.checkAllConformances();
 }
@@ -5721,11 +5738,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   auto conformances = dc->getLocalConformances(ConformanceLookupKind::All,
                                                &diagnostics,
                                                /*sorted=*/true);
-  // Catalog all of members of this declaration context that satisfy
-  // requirements of conformances in this context.
-  SmallVector<ValueDecl *, 16> unsatisfiedReqs;
 
-  ConformanceGroupedChecker groupChecker(*this, unsatisfiedReqs);
+  // The conformance checker bundle that checks all conformances in the context.
+  MultiConformanceChecker groupChecker(*this);
 
   bool anyInvalid = false;
   for (auto conformance : conformances) {
@@ -5739,8 +5754,14 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
                              defaultAccessibility > Accessibility::FilePrivate);
   }
 
-  // Check all conformances in a batch.
+  // Check all conformances.
   groupChecker.checkAllConformances();
+
+  // Catalog all of members of this declaration context that satisfy
+  // requirements of conformances in this context.
+  SmallVector<ValueDecl *, 16>
+    unsatisfiedReqs(groupChecker.getUnsatisfiedRequirements().begin(),
+                    groupChecker.getUnsatisfiedRequirements().end());
 
   // Diagnose any conflicts attributed to this declaration context.
   for (const auto &diag : diagnostics) {
