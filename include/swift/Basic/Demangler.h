@@ -172,8 +172,16 @@ public:
 
   /// Creates a node of kind \p K with a \p Text payload.
   ///
+  /// The \p Text string must be already allocted with the Factory and therefore
+  /// it is _not_ copied.
+  NodePointer createNodeWithAllocatedText(Node::Kind K, llvm::StringRef Text);
+
+  /// Creates a node of kind \p K with a \p Text payload.
+  ///
   /// The \p Text string is copied.
-  NodePointer createNode(Node::Kind K, llvm::StringRef Text);
+  NodePointer createNode(Node::Kind K, llvm::StringRef Text) {
+    return createNodeWithAllocatedText(K, Text.copy(*this));
+  }
 
   /// Creates a node of kind \p K with a \p Text payload.
   ///
@@ -387,7 +395,7 @@ private:
   NodePointer demangleOperatorIdentifier();
 
   NodePointer demangleMultiSubstitutions();
-  NodePointer createSwiftType(Node::Kind typeKind, StringRef name);
+  NodePointer createSwiftType(Node::Kind typeKind, const char *name);
   NodePointer demangleKnownType();
   NodePointer demangleLocalIdentifier();
 
