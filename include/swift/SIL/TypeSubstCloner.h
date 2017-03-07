@@ -93,7 +93,7 @@ protected:
   }
 
   CanType remapASTType(CanType ty) {
-    return ty.subst(SubsMap, None)->getCanonicalType();
+    return ty.subst(SubsMap)->getCanonicalType();
   }
 
   Substitution remapSubstitution(Substitution sub) {
@@ -102,7 +102,7 @@ protected:
         getASTTypeInClonedContext(sub.getReplacement()->getCanonicalType()),
         sub.getConformances());
     // Now remap the substitution. 
-    return sub.subst(SwiftMod, SubsMap);
+    return sub.subst(SubsMap);
   }
 
   ProtocolConformanceRef remapConformance(CanType type,
@@ -212,7 +212,7 @@ protected:
   void visitWitnessMethodInst(WitnessMethodInst *Inst) {
     // Specialize the Self substitution of the witness_method.
     auto sub = Inst->getSelfSubstitution();
-    sub = sub.subst(Inst->getModule().getSwiftModule(), SubsMap);
+    sub = sub.subst(SubsMap);
 
     assert(sub.getConformances().size() == 1 &&
            "didn't get conformance from substitution?!");

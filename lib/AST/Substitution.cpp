@@ -43,14 +43,12 @@ Substitution::Substitution(Type Replacement,
          && "cannot substitute with a non-materializable type");
 }
 
-Substitution Substitution::subst(ModuleDecl *module,
-                                 const SubstitutionMap &subMap) const {
-  return subst(module, QuerySubstitutionMap{subMap},
+Substitution Substitution::subst(const SubstitutionMap &subMap) const {
+  return subst(QuerySubstitutionMap{subMap},
                LookUpConformanceInSubstitutionMap(subMap));
 }
 
-Substitution Substitution::subst(ModuleDecl *module,
-                                 TypeSubstitutionFn subs,
+Substitution Substitution::subst(TypeSubstitutionFn subs,
                                  LookupConformanceFn conformances) const {
   // Substitute the replacement.
   Type substReplacement = Replacement.subst(subs, conformances,
@@ -73,7 +71,7 @@ Substitution Substitution::subst(ModuleDecl *module,
     // If we have a concrete conformance, we need to substitute the
     // conformance to apply to the new type.
     if (c.isConcrete()) {
-      auto substC = c.getConcrete()->subst(module, substReplacement,
+      auto substC = c.getConcrete()->subst(substReplacement,
                                            subs, conformances);
       substConformances.push_back(ProtocolConformanceRef(substC));
       if (c != substConformances.back())

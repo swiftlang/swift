@@ -1043,10 +1043,11 @@ RequirementEnvironment::RequirementEnvironment(
         ProtocolConformance *specialized = conformance;
         if (conformance && conformance->getGenericSignature()) {
           auto concreteSubs =
-            concreteType->gatherAllSubstitutions(conformanceDC->getParentModule(),
-                                                 &tc, nullptr);
+            concreteType->getContextSubstitutionMap(
+              conformanceDC->getParentModule(), conformanceDC);
           specialized =
-            ctx.getSpecializedConformance(concreteType, conformance, concreteSubs);
+            ctx.getSpecializedConformance(concreteType, conformance,
+                                          concreteSubs);
         }
 
         if (specialized)

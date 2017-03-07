@@ -546,10 +546,10 @@ bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
   return true;
 }
 
-ProtocolConformance *ProtocolConformance::subst(ModuleDecl *module,
-                                       Type substType,
-                                       TypeSubstitutionFn subs,
-                                       LookupConformanceFn conformances) const {
+ProtocolConformance *
+ProtocolConformance::subst(Type substType,
+                           TypeSubstitutionFn subs,
+                           LookupConformanceFn conformances) const {
   if (getType()->isEqual(substType))
     return const_cast<ProtocolConformance *>(this);
   
@@ -561,10 +561,37 @@ ProtocolConformance *ProtocolConformance::subst(ModuleDecl *module,
       assert(getType()->getNominalOrBoundGenericNominal()
                == substType->getNominalOrBoundGenericNominal()
              && "substitution mapped to different nominal?!");
+
+      // Since this is a normal conformance, the substitution maps archetypes
+      // in the environment of the conformance to types containing archetypes
+      // of some other generic environment.
+      //
+      // ASTContext::getSpecializedConformance() wants a substitution map
+      // with interface types as keys, so do the mapping here.
+      //
+      // Once the type of a normal conformance becomes an interface type,
+      // we can remove this.
+      SubstitutionMap subMap;
+      if (auto *genericSig = getGenericSignature()) {
+        auto *genericEnv = getGenericEnvironment();
+        subMap = genericSig->getSubstitutionMap(
+          [&](SubstitutableType *t) -> Type {
+            return genericEnv->mapTypeIntoContext(
+              t).subst(subs, conformances);
+          },
+          [&](CanType origType, Type substType, ProtocolType *protoType)
+            -> Optional<ProtocolConformanceRef> {
+            origType = CanType(
+              genericEnv->mapTypeIntoContext(
+                origType)->castTo<ArchetypeType>());
+            return conformances(origType, substType, protoType);
+          });
+      }
+
       return substType->getASTContext()
         .getSpecializedConformance(substType,
-                           const_cast<ProtocolConformance *>(this),
-                           substType->gatherAllSubstitutions(module, nullptr));
+                                   const_cast<ProtocolConformance *>(this),
+                                   subMap);
     }
     assert(substType->isEqual(getType())
            && "substitution changed non-specialized type?!");
@@ -576,8 +603,7 @@ ProtocolConformance *ProtocolConformance::subst(ModuleDecl *module,
       = cast<InheritedProtocolConformance>(this)->getInheritedConformance();
     ProtocolConformance *newBase;
     if (inheritedConformance->getType()->isSpecialized()) {
-      newBase = inheritedConformance->subst(module, substType,
-                                            subs, conformances);
+      newBase = inheritedConformance->subst(substType, subs, conformances);
     } else {
       newBase = inheritedConformance;
     }
@@ -591,13 +617,11 @@ ProtocolConformance *ProtocolConformance::subst(ModuleDecl *module,
     SmallVector<Substitution, 8> newSubs;
     newSubs.reserve(spec->getGenericSubstitutions().size());
     for (auto &sub : spec->getGenericSubstitutions())
-      newSubs.push_back(sub.subst(module, subs, conformances));
-    
-    auto ctxNewSubs = substType->getASTContext().AllocateCopy(newSubs);
+      newSubs.push_back(sub.subst(subs, conformances));
     
     return substType->getASTContext()
       .getSpecializedConformance(substType, spec->getGenericConformance(),
-                                 ctxNewSubs);
+                                 newSubs);
   }
   }
   llvm_unreachable("bad ProtocolConformanceKind");
@@ -617,15 +641,11 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
            && "inherited conformance doesn't match type?!");
     
     auto subs = spec->getGenericSubstitutions();
-
     auto *conformingDC = spec->getDeclContext();
-    auto *conformingModule = conformingDC->getParentModule();
-
     auto *env = conformingDC->getGenericEnvironmentOfContext();
-
     auto subMap = env->getSubstitutionMap(subs);
 
-    auto r = inherited->subst(conformingModule, getType(),
+    auto r = inherited->subst(getType(),
                               QuerySubstitutionMap{subMap},
                               LookUpConformanceInSubstitutionMap(subMap));
     assert(getType()->isEqual(r->getType())

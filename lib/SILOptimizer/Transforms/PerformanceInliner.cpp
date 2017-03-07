@@ -204,8 +204,7 @@ static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
         for (auto PAISub : PAISubs) {
           if (!PAISub.getReplacement()->hasArchetype())
             continue;
-          auto NewPAISub =
-              PAISub.subst(AI.getModule().getSwiftModule(), SubsMap);
+          auto NewPAISub = PAISub.subst(SubsMap);
           if (NewPAISub.getReplacement()->hasOpenedExistential())
             return true;
         }
@@ -351,6 +350,11 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
   int BaseBenefit = RemovedCallBenefit;
 
   SubstitutionMap CalleeSubstMap;
+  if (IsGeneric) {
+    CalleeSubstMap = Callee->getGenericEnvironment()
+      ->getSubstitutionMap(AI.getSubstitutions());
+  }
+
   const SILOptions &Opts = Callee->getModule().getOptions();
 
   // For some reason -Ounchecked can accept a higher base benefit without
@@ -395,28 +399,15 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
             !isa<WitnessMethodInst>(def))
           continue;
 
-        SmallVector<Substitution, 32> NewSubs;
-        SubstitutionMap SubstMap;
-
         // It is a generic call inside the callee. Check if after inlining
         // it will be possible to perform a generic specialization or
         // devirtualization of this call.
 
         // Create the list of substitutions as they will be after
         // inlining.
+        SmallVector<Substitution, 4> NewSubs;
         for (auto Sub : Subs) {
-          if (!Sub.getReplacement()->hasArchetype()) {
-            // This substitution is a concrete type.
-            NewSubs.push_back(Sub);
-            continue;
-          }
-          // This substitution is not a concrete type.
-          if (IsGeneric && CalleeSubstMap.empty()) {
-            CalleeSubstMap =
-                Callee->getGenericEnvironment()->getSubstitutionMap(
-                    AI.getSubstitutions());
-          }
-          auto NewSub = Sub.subst(AI.getModule().getSwiftModule(), CalleeSubstMap);
+          auto NewSub = Sub.subst(CalleeSubstMap);
           NewSubs.push_back(NewSub);
         }
 

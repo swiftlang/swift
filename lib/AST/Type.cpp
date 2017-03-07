@@ -2907,8 +2907,7 @@ static Type substType(Type derivedType,
       
       SmallVector<Substitution, 4> substArgs;
       for (auto &arg : boxTy->getGenericArgs()) {
-        substArgs.push_back(arg.subst(nullptr, substitutions,
-                                      lookupConformances));
+        substArgs.push_back(arg.subst(substitutions, lookupConformances));
       }
       for (auto &arg : substArgs) {
         arg = Substitution(arg.getReplacement()->getCanonicalType(),

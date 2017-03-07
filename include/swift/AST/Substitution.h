@@ -57,10 +57,8 @@ public:
   
   /// Apply a substitution to this substitution's replacement type and
   /// conformances.
-  Substitution subst(ModuleDecl *module,
-                     const SubstitutionMap &subMap) const;
-  Substitution subst(ModuleDecl *module,
-                     TypeSubstitutionFn subs,
+  Substitution subst(const SubstitutionMap &subMap) const;
+  Substitution subst(TypeSubstitutionFn subs,
                      LookupConformanceFn conformances) const;
 
 private:

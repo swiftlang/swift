@@ -802,12 +802,10 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
     if (!explicitConformanceType->isEqual(type)) {
       // Gather the substitutions we need to map the generic conformance to
       // the specialized conformance.
-      auto substitutions = type->gatherAllSubstitutions(this, resolver,
-                                                        explicitConformanceDC);
+      auto subMap = type->getContextSubstitutionMap(this, explicitConformanceDC);
 
       // Create the specialized conformance entry.
-      auto result = ctx.getSpecializedConformance(type, conformance,
-                                                  substitutions);
+      auto result = ctx.getSpecializedConformance(type, conformance, subMap);
       return ProtocolConformanceRef(result);
     }
   }
