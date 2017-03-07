@@ -1,5 +1,5 @@
 // Run the tests for the whole String prototype
-// RUN: %target-build-swift %s %S/String.swift %S/StringStorage.swift %S/Unicode.swift %S/Latin1String.swift %S/CanonicalString.swift %S/StringComparison.swift -parse-stdlib -Xfrontend -disable-access-control -Onone -o %t
+// RUN: %target-build-swift %s %S/String.swift %S/StringStorage.swift %S/Unicode.swift %S/Latin1String.swift %S/CanonicalString.swift %S/StringComparison.swift %S/StringCompatibility.swift -parse-stdlib -Xfrontend -disable-access-control -Onone -o %t
 // RUN: %target-run %t
 // REQUIRES: executable_test
 
