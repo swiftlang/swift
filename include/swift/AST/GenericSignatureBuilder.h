@@ -96,6 +96,14 @@ public:
 
   /// Describes an equivalence class of potential archetypes.
   struct EquivalenceClass {
+    /// The list of protocols to which this equivalence class conforms.
+    ///
+    /// The keys form the (semantic) list of protocols to which this type
+    /// conforms. The values are the conformance constraints as written on
+    /// this equivalence class.
+    llvm::MapVector<ProtocolDecl *, std::vector<Constraint<ProtocolDecl *>>>
+      conformsTo;
+
     /// Concrete type to which this equivalence class is equal.
     ///
     /// This is the semantic concrete type; the constraints as written
@@ -134,7 +142,11 @@ public:
     Optional<ConcreteConstraint>
     findAnySuperclassConstraintAsWritten(
                               PotentialArchetype *preferredPA = nullptr) const;
-};
+
+    /// Determine whether conformance to the given protocol is satisfied by
+    /// a superclass requirement.
+    bool isConformanceSatisfiedBySuperclass(ProtocolDecl *proto) const;
+  };
 
   friend class RequirementSource;
 
@@ -166,13 +178,9 @@ private:
   /// queried.
   ///
   /// \param proto The protocol to which we are establishing conformance.
-  ///
-  /// \param protoSource The requirement source for the conformance to the
-  /// given protocol.
   const RequirementSource *resolveSuperConformance(
                             GenericSignatureBuilder::PotentialArchetype *pa,
-                            ProtocolDecl *proto,
-                            const RequirementSource *&protoSource);
+                            ProtocolDecl *proto);
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype conforms to the given protocol.
@@ -459,6 +467,12 @@ private:
   /// Check for redundant superclass constraints within the equivalence
   /// class of the given potential archetype.
   void checkRedundantSuperclassConstraints(
+                            ArrayRef<GenericTypeParamType *> genericParams,
+                            PotentialArchetype *pa);
+
+  /// Check conformance constraints within the equivalence class of the
+  /// given potential archetype.
+  void checkConformanceConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
                             PotentialArchetype *pa);
 
@@ -1016,9 +1030,6 @@ class GenericSignatureBuilder::PotentialArchetype {
   llvm::MapVector<PotentialArchetype *, const RequirementSource *>
     SameTypeConstraints;
 
-  /// \brief The list of protocols to which this archetype will conform.
-  llvm::MapVector<ProtocolDecl *, const RequirementSource *> ConformsTo;
-
   /// \brief The layout constraint of this archetype, if specified.
   LayoutConstraint Layout;
 
@@ -1215,16 +1226,23 @@ public:
     return dyn_cast<TypeAliasDecl>(identifier.assocTypeOrAlias);
   }
 
-  /// Retrieve the set of protocols to which this type conforms.
-  llvm::MapVector<ProtocolDecl *, const RequirementSource *> &
-  getConformsTo() {
-    return ConformsTo;
+  /// Retrieve the set of protocols to which this potential archetype
+  /// conforms.
+  SmallVector<ProtocolDecl *, 4> getConformsTo() const {
+    SmallVector<ProtocolDecl *, 4> result;
+
+    if (auto equiv = getEquivalenceClassIfPresent()) {
+      for (const auto &entry : equiv->conformsTo)
+        result.push_back(entry.first);
+    }
+
+    return result;
   }
 
   /// Add a conformance to this potential archetype.
   ///
   /// \returns true if the conformance was new, false if it already existed.
-  bool addConformance(ProtocolDecl *proto, bool updateExistingSource,
+  bool addConformance(ProtocolDecl *proto,
                       const RequirementSource *source,
                       GenericSignatureBuilder &builder);
 
