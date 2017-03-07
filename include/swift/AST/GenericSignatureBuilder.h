@@ -339,9 +339,11 @@ public:
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  bool addRequirement(const Requirement &req, FloatingRequirementSource source);
+  bool addRequirement(const Requirement &req, FloatingRequirementSource source,
+                      const SubstitutionMap *subMap = nullptr);
 
   bool addRequirement(const Requirement &req, FloatingRequirementSource source,
+                      const SubstitutionMap *subMap,
                       llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
 
   /// \brief Add a new requirement.
@@ -371,7 +373,7 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(TypeLoc type);
+  void inferRequirements(ModuleDecl &module, TypeLoc type);
 
   /// Infer requirements from the given pattern, recursively.
   ///
@@ -385,7 +387,8 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(ParameterList *params,GenericParamList *genericParams);
+  void inferRequirements(ModuleDecl &module, ParameterList *params,
+                         GenericParamList *genericParams);
 
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.
@@ -820,6 +823,9 @@ public:
     return getTrailingObjects<WrittenRequirementLoc>()[0]
              .dyn_cast<const RequirementRepr *>();
   }
+
+  /// Retrieve the type stored in this requirement.
+  Type getStoredType() const;
 
   /// Retrieve the protocol for this requirement, if there is one.
   ProtocolDecl *getProtocolDecl() const;
