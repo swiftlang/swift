@@ -15,19 +15,46 @@ extension CopyConstructible {
 final class _StringStorage<Element: UnsignedInteger>
  : /*_SwiftNativeNSString,*/ _NSStringCore, CopyConstructible {
 
-  var _header = _SwiftStringBodyStorage(count: 0, capacity: 0)
+  var _header: _SwiftStringBodyStorage
   
   var count: Int {
-    get { return _header.count }
-    set { _header.count = newValue }
+    get { return numericCast(_header.count) }
+    set { _header.count = numericCast(newValue) }
   }
   
   var capacity: Int {
-    get { return _header.capacity }
-    set { _header.capacity = newValue }
+    get { return numericCast(_header.capacity) }
+    set { _header.capacity = numericCast(newValue) }
   }
 
-  internal init(DoNotCallMe: ()) { }
+  var isKnownLatin1: Bool {
+    get { return _header.flags & 1<<0 as UInt8 != 0 }
+    set {
+      if newValue { _header.flags |= 1<<0 as UInt8 }
+      else { _header.flags &= ~(1<<0) as UInt8 }
+    }
+  }
+  
+  var isKnownASCII: Bool {
+    get { return _header.flags & 1<<1 as UInt8 != 0 }
+    set {
+      if newValue { _header.flags |= 1<<1 as UInt8 }
+      else { _header.flags &= ~(1<<1) }
+    }
+  }
+
+  var isKnownFCCNormalized: Bool {
+    get { return _header.flags & 1<<2 as UInt8 != 0 }
+    set {
+      if newValue { _header.flags |= 1<<2 as UInt8 }
+      else { _header.flags &= ~(1<<2) as UInt8 }
+    }
+  }
+
+  /// Satisfies the compiler's need for a designated initializer.
+  internal init(_NeverActuallyCalled: ()) {
+    _header = _SwiftStringBodyStorage(count: 0, capacity: 0, flags: 0)
+  }
 
   convenience init(count: Int, minimumCapacity: Int) {
     self.init(
@@ -43,8 +70,8 @@ final class _StringStorage<Element: UnsignedInteger>
 
     // All stored properties are uninitialized, but we can use assignment
     // because they're trivial types.
-    self.count = count
-    self.capacity = realCapacity
+    self._header = _SwiftStringBodyStorage(
+      count: numericCast(count), capacity: numericCast(realCapacity), flags: 0)
   }
 
   /// The empty singleton that is used for every single empty String.
@@ -56,7 +83,7 @@ final class _StringStorage<Element: UnsignedInteger>
 
 /*
 }
-// TODO: JIRA for error: @objc is not supported within extensions of generic classes
+  https://bugs.swift.org/browse/SR-4173 @objc is not supported within extensions of generic classes
 extension _StringStorage : _NSStringCore {
 */
 

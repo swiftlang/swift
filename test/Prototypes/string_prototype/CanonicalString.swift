@@ -9,11 +9,15 @@ struct SwiftCanonicalString {
   typealias Storage = UnicodeStorage<CodeUnits, Encoding>
   var _storage: Storage
 
-  // Store some bits TODO: should be packed into our storage ref?
-  //
   // Always set at construction time, conservatively updated at modification
-  var isKnownASCII: Bool
-  var isKnownLatin1: Bool
+  var isKnownASCII: Bool {
+    get { return _storage.codeUnits._storage.isKnownASCII }
+    set { _storage.codeUnits._storage.isKnownASCII = newValue }
+  }
+  var isKnownLatin1: Bool {
+    get { return _storage.codeUnits._storage.isKnownLatin1 }
+    set { _storage.codeUnits._storage.isKnownLatin1 = newValue }
+  }
 
   // Perform a copy, transcoding, and normalization of the supplied code units
   init<OtherCodeUnits, OtherEncoding>(
@@ -30,6 +34,11 @@ struct SwiftCanonicalString {
       count: newCount, minimumCapacity: newCount
     )
 
+    self._storage = UnicodeStorage(
+      CodeUnits(newStringStorage),
+      Encoding.self
+    )
+    
     // Start off as true, we will unset when we find a violation
     self.isKnownASCII = true
     self.isKnownLatin1 = true
@@ -45,26 +54,21 @@ struct SwiftCanonicalString {
       }
       newStringStorage[idx] = elt
     }
-
-    _storage = UnicodeStorage(
-      CodeUnits(newStringStorage),
-      Encoding.self
-    )
   }
 
   init() {
+    self._storage = UnicodeStorage(CodeUnits(), Encoding.self)
     // Empty strings have all the encodings!
     self.isKnownASCII = true
     self.isKnownLatin1 = true
-    _storage = UnicodeStorage(CodeUnits(), Encoding.self)
   }
 
   init(uninitializedCount count: Int) {
-    self.isKnownASCII = true
-    self.isKnownLatin1 = true
-    _storage = UnicodeStorage(
+    self._storage = UnicodeStorage(
       CodeUnits(_uninitializedCount: count, minimumCapacity: count), 
       Encoding.self)
+    self.isKnownASCII = true
+    self.isKnownLatin1 = true
   }
 }
 

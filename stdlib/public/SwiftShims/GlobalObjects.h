@@ -42,8 +42,9 @@ struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
 
 
 struct _SwiftStringBodyStorage {
-  __swift_intptr_t count;
-  __swift_intptr_t capacity;
+  __swift_uint32_t count;
+  __swift_uint32_t capacity;
+  __swift_uint8_t flags;
 };
 
 struct _SwiftEmptyStringStorage {

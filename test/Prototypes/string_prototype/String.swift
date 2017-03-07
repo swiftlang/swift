@@ -10,6 +10,7 @@ struct String {
     // 8-bit Latin1
     case latin1(Latin1String)
 
+    #if false
     // Unknown: we are a buffer of bytes representing code units and an
     // associated encoding
     case mystery(UnsafeRawPointer, AnyUnicodeEncoding.Type) // TODO: AnyCodeUnits?
@@ -21,6 +22,7 @@ struct String {
     case smol2(UInt)
     case smol3(UInt)
     case smol4(UInt)
+    #endif
   }
 
   var contents: Contents

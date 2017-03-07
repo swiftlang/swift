@@ -60,7 +60,8 @@ swift::_SwiftEmptyStringStorage swift::_swiftEmptyStringStorage = {
   // _SwiftStringBodyStorage body;
   {
     0, // int count;
-    0  // int capacity;
+    0, // int capacity;
+    0xFF // uint8 flags;
   }
 };
 

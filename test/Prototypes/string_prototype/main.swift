@@ -268,6 +268,7 @@ testSuite.test("string-compare-hash") {
 
 testSuite.test("replaceSubrange") {
   let initial: String = "hello world!"
+  expectEqual(MemoryLayout<Int64>.size, MemoryLayout<String>.size)
 
   let cases: [(Int, String, String, String)] = 
     [(0, "hello", "goodbye", "goodbye world!"),        // Edit start
