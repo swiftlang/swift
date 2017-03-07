@@ -125,7 +125,7 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
                                           : CharSourceRange();
   ShouldVisitChildren = SEWalker.walkToDeclPre(D, Range);
   if (ShouldVisitChildren && IsExtension) {
-    ExtDecls.push_back(ED);
+    ExtDecls.push_back(static_cast<ExtensionDecl*>(D));
   }
   return ShouldVisitChildren;
 }
