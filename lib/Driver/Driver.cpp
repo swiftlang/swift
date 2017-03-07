@@ -2020,7 +2020,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     }
   }
 
-  if (isa<CompileJobAction>(JA)) {
+  if (isa<CompileJobAction>(JA) || isa<GeneratePCHJobAction>(JA)) {
     // Choose the serialized diagnostics output path.
     if (C.getArgs().hasArg(options::OPT_serialize_diagnostics)) {
       addAuxiliaryOutput(C, *Output, types::TY_SerializedDiagnostics, OI,
