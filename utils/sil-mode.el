@@ -74,7 +74,7 @@
 
    ;; SIL Instructions - Borrowing
    `(,(regexp-opt '("load_borrow" "begin_borrow" "store_borrow" "end_borrow_argument") 'words) . font-lock-keyword-face)
-   '("\\(end_borrow\\) %[[:alnum:]] \\(from\\)" (1 font-lock-keyword-face) (2 font-lock-keyword-face))
+   '("\\(end_borrow\\) %[[:alnum:]]+ \\(from\\)" (1 font-lock-keyword-face) (2 font-lock-keyword-face))
 
    ;; SIL Instructions - ownership
    `(,(regexp-opt '("unchecked_ownership_conversion") 'words) . font-lock-keyword-face)
