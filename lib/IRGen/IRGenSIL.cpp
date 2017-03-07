@@ -998,6 +998,7 @@ public:
   void visitSwitchEnumAddrInst(SwitchEnumAddrInst *i);
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *i);
   void visitCheckedCastBranchInst(CheckedCastBranchInst *i);
+  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *i);
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
 };
 
@@ -4277,6 +4278,11 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
 
 void IRGenSILFunction::visitUnconditionalCheckedCastOpaqueInst(
     swift::UnconditionalCheckedCastOpaqueInst *i) {
+  llvm_unreachable("unsupported instruction during IRGen");
+}
+
+void IRGenSILFunction::visitCheckedCastValueBranchInst(
+    swift::CheckedCastValueBranchInst *i) {
   llvm_unreachable("unsupported instruction during IRGen");
 }
 

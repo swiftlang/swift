@@ -322,6 +322,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::AssignInst:
     case ValueKind::BranchInst:
     case ValueKind::CheckedCastBranchInst:
+    case ValueKind::CheckedCastValueBranchInst:
     case ValueKind::CheckedCastAddrBranchInst:
     case ValueKind::ClassMethodInst:
     case ValueKind::CondBranchInst:
