@@ -368,6 +368,12 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Out << '\'' << Arg.getAsObjCSelector() << '\'';
     break;
 
+  case DiagnosticArgumentKind::ValueDecl:
+    Out << '\'';
+    Arg.getAsValueDecl()->getFullName().printPretty(Out);
+    Out << '\'';
+    break;
+
   case DiagnosticArgumentKind::Type: {
     assert(Modifier.empty() && "Improper modifier for Type argument");
     

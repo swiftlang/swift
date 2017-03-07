@@ -44,6 +44,8 @@ namespace {
     FloatingRequirementSource;
   typedef GenericSignatureBuilder::PotentialArchetype PotentialArchetype;
   typedef GenericSignatureBuilder::ConcreteConstraint ConcreteConstraint;
+  template<typename T> using Constraint =
+    GenericSignatureBuilder::Constraint<T>;
   typedef GenericSignatureBuilder::EquivalenceClass EquivalenceClass;
 
 } // end anonymous namespace
@@ -410,15 +412,20 @@ const RequirementSource *RequirementSource::viaParent(
 
 #undef REQUIREMENT_SOURCE_FACTORY_BODY
 
-PotentialArchetype *RequirementSource::getRootPotentialArchetype() const {
-  /// Find the root.
+const RequirementSource *RequirementSource::getRoot() const {
   auto root = this;
   while (auto parent = root->parent)
     root = parent;
+  return root;
+}
+
+PotentialArchetype *RequirementSource::getRootPotentialArchetype() const {
+  /// Find the root.
+  auto root = getRoot();
 
   // We're at the root, so it's in the inline storage.
   assert(storageKind == StorageKind::RootArchetype);
-  return storage.rootArchetype;
+  return root->storage.rootArchetype;
 }
 
 Type RequirementSource::getStoredType() const {
@@ -769,7 +776,7 @@ EquivalenceClass::findAnySuperclassConstraintAsWritten(
   Optional<ConcreteConstraint> result;
   for (const auto &constraint : superclassConstraints) {
     if (constraint.source->getLoc().isValid() &&
-        constraint.concreteType->isEqual(superclass)) {
+        constraint.value->isEqual(superclass)) {
       result = constraint;
 
       if (!preferredPA || constraint.archetype == preferredPA)
@@ -1607,7 +1614,7 @@ void GenericSignatureBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
       if (constraint.archetype != this) continue;
 
       Out << " : ";
-      constraint.concreteType.print(Out);
+      constraint.value.print(Out);
 
       Out << " ";
       if (!constraint.source->isDerivedRequirement())
@@ -1624,7 +1631,7 @@ void GenericSignatureBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
       if (constraint.archetype != this) continue;
 
       Out << " == ";
-      constraint.concreteType.print(Out);
+      constraint.value.print(Out);
 
       Out << " ";
       if (!constraint.source->isDerivedRequirement())
@@ -2817,7 +2824,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
                          diag::recursive_same_type_constraint,
                          archetype->getDependentType(genericParams,
                                                      /*allowUnresolved=*/true),
-                         constraint->concreteType);
+                         constraint->value);
         }
 
         archetype->RecursiveConcreteType = true;
@@ -2957,7 +2964,8 @@ bool GenericSignatureBuilder::diagnoseRemainingRenames(
 }
 
 namespace swift {
-  bool operator<(const ConcreteConstraint &lhs, const ConcreteConstraint &rhs) {
+  template<typename T>
+  bool operator<(const Constraint<T> &lhs, const Constraint<T> &rhs) {
     auto lhsPA = lhs.archetype;
     auto rhsPA = rhs.archetype;
     if (int result = compareDependentTypes(&lhsPA, &rhsPA))
@@ -2969,28 +2977,37 @@ namespace swift {
     return false;
   }
 
-  bool operator==(const ConcreteConstraint &lhs, const ConcreteConstraint &rhs){
+  template<typename T>
+  bool operator==(const Constraint<T> &lhs, const Constraint<T> &rhs){
     return lhs.archetype == rhs.archetype &&
-           lhs.concreteType->isEqual(rhs.concreteType) &&
+           lhs.value == rhs.value &&
+           lhs.source == rhs.source;
+  }
+
+  template<>
+  bool operator==(const Constraint<Type> &lhs, const Constraint<Type> &rhs){
+    return lhs.archetype == rhs.archetype &&
+           lhs.value->isEqual(rhs.value) &&
            lhs.source == rhs.source;
   }
 }
 
-ConcreteConstraint GenericSignatureBuilder::checkConstraintList(
+template<typename T>
+Constraint<T> GenericSignatureBuilder::checkConstraintList(
                            ArrayRef<GenericTypeParamType *> genericParams,
-                           std::vector<ConcreteConstraint> &constraints,
-                           llvm::function_ref<bool(const ConcreteConstraint &)>
+                           std::vector<Constraint<T>> &constraints,
+                           llvm::function_ref<bool(const Constraint<T> &)>
                              isSuitableRepresentative,
-                           llvm::function_ref<ConstraintRelation(Type)>
+                           llvm::function_ref<ConstraintRelation(const T&)>
                              checkConstraint,
-                           Optional<Diag<unsigned, Type, Type, Type>>
+                           Optional<Diag<unsigned, Type, T, T>>
                              conflictingDiag,
-                           Diag<Type, Type> redundancyDiag,
-                           Diag<bool, Type, Type> otherNoteDiag) {
+                           Diag<Type, T> redundancyDiag,
+                           Diag<bool, Type, T> otherNoteDiag) {
   // Remove self-derived constraints.
   constraints.erase(
     std::remove_if(constraints.begin(), constraints.end(),
-                   [&](const ConcreteConstraint &constraint) {
+                   [&](const Constraint<T> &constraint) {
                      return constraint.source->isSelfDerivedSource(
                               constraint.archetype);
                    }),
@@ -3000,7 +3017,7 @@ ConcreteConstraint GenericSignatureBuilder::checkConstraintList(
   llvm::array_pod_sort(constraints.begin(), constraints.end());
 
   // Find a representative constraint.
-  Optional<ConcreteConstraint> representativeConstraint;
+  Optional<Constraint<T>> representativeConstraint;
   for (const auto &constraint : constraints) {
     // If this isn't a suitable representative constraint, ignore it.
     if (!isSuitableRepresentative(constraint))
@@ -3011,6 +3028,16 @@ ConcreteConstraint GenericSignatureBuilder::checkConstraintList(
     // compared.
     if (!representativeConstraint) {
       representativeConstraint = constraint;
+      continue;
+    }
+
+    // We prefer constraints rooted at explicit requirements to ones rooted
+    // on inferred requirements.
+    bool thisIsInferred = constraint.source->isInferredRequirement();
+    bool representativeIsInferred = representativeConstraint->source->isInferredRequirement();
+    if (thisIsInferred != representativeIsInferred) {
+      if (representativeIsInferred)
+        representativeConstraint = constraint;
       continue;
     }
 
@@ -3050,7 +3077,7 @@ ConcreteConstraint GenericSignatureBuilder::checkConstraintList(
                    representativeConstraint->source->isDerivedRequirement(),
                    representativeConstraint->archetype->
                      getDependentType(genericParams, /*allowUnresolved=*/true),
-                   representativeConstraint->concreteType);
+                   representativeConstraint->value);
   };
 
   // Go through the concrete constraints looking for redundancies.
@@ -3059,7 +3086,7 @@ ConcreteConstraint GenericSignatureBuilder::checkConstraintList(
     // Leave the representative alone.
     if (constraint == *representativeConstraint) continue;
 
-    switch (checkConstraint(constraint.concreteType)) {
+    switch (checkConstraint(constraint.value)) {
     case ConstraintRelation::Unrelated:
       continue;
 
@@ -3067,8 +3094,8 @@ ConcreteConstraint GenericSignatureBuilder::checkConstraintList(
       // Figure out what kind of subject we have; it will affect the
       // diagnostic.
       auto getSubjectType =
-        [&](PotentialArchetype *T) -> std::pair<unsigned, Type> {
-          auto subjectType = T->getDependentType(genericParams, true);
+        [&](PotentialArchetype *pa) -> std::pair<unsigned, Type> {
+          auto subjectType = pa->getDependentType(genericParams, true);
           unsigned kind;
           if (auto gp = subjectType->getAs<GenericTypeParamType>()) {
             if (gp->getDecl() &&
@@ -3093,8 +3120,8 @@ ConcreteConstraint GenericSignatureBuilder::checkConstraintList(
         auto subject = getSubjectType(constraint.archetype);
         Diags.diagnose(constraint.source->getLoc(), *conflictingDiag,
                        subject.first, subject.second,
-                       constraint.concreteType,
-                       representativeConstraint->concreteType);
+                       constraint.value,
+                       representativeConstraint->value);
 
         noteRepresentativeConstraint();
         break;
@@ -3108,8 +3135,8 @@ ConcreteConstraint GenericSignatureBuilder::checkConstraintList(
         Diags.diagnose(representativeConstraint->source->getLoc(),
                        *conflictingDiag,
                        subject.first, subject.second,
-                       representativeConstraint->concreteType,
-                       constraint.concreteType);
+                       representativeConstraint->value,
+                       constraint.value);
 
         diagnosedConflictingRepresentative = true;
         break;
@@ -3118,15 +3145,17 @@ ConcreteConstraint GenericSignatureBuilder::checkConstraintList(
     }
 
     case ConstraintRelation::Redundant:
-      // If this requirement is not derived (but has a useful location),
-      // complain that it is redundant.
+      // If this requirement is not derived or inferred (but has a useful
+      // location) complain that it is redundant.
       if (!constraint.source->isDerivedRequirement() &&
+          !constraint.source->isInferredRequirement() &&
+          !representativeConstraint->source->isInferredRequirement() &&
           constraint.source->getLoc().isValid()) {
         Diags.diagnose(constraint.source->getLoc(),
                        redundancyDiag,
                        constraint.archetype->getDependentType(
                          genericParams, /*allowUnresolved=*/true),
-                       constraint.concreteType);
+                       constraint.value);
 
         noteRepresentativeConstraint();
       }
@@ -3143,7 +3172,7 @@ void GenericSignatureBuilder::checkRedundantConcreteTypeConstraints(
   auto equivClass = representative->getOrCreateEquivalenceClass();
   assert(equivClass->concreteType && "No concrete type to check");
 
-  checkConstraintList(
+  checkConstraintList<Type>(
     genericParams, equivClass->concreteTypeConstraints,
     [](const ConcreteConstraint &constraint) {
       return true;
@@ -3182,10 +3211,10 @@ void GenericSignatureBuilder::checkRedundantSuperclassConstraints(
   // check.
 
   auto representativeConstraint =
-    checkConstraintList(
+    checkConstraintList<Type>(
       genericParams, equivClass->superclassConstraints,
       [&](const ConcreteConstraint &constraint) {
-        return constraint.concreteType->isEqual(equivClass->superclass);
+        return constraint.value->isEqual(equivClass->superclass);
       },
       [&](Type superclass) {
         // If this class is a superclass of the "best"
@@ -3211,7 +3240,7 @@ void GenericSignatureBuilder::checkRedundantSuperclassConstraints(
                        existing->archetype->getDependentType(
                                                    genericParams,
                                                    /*allowUnresolved=*/true),
-                       existing->concreteType, equivClass->superclass);
+                       existing->value, equivClass->superclass);
 
         // FIXME: Note the representative constraint.
       } else if (representativeConstraint.source->getLoc().isValid()) {
@@ -3229,7 +3258,7 @@ void GenericSignatureBuilder::checkRedundantSuperclassConstraints(
                      representativeConstraint.archetype->getDependentType(
                                                   genericParams,
                                                   /*allowUnresolved=*/true),
-                     representativeConstraint.concreteType);
+                     representativeConstraint.value);
 
       if (auto existing = equivClass->findAnyConcreteConstraintAsWritten(
                             representativeConstraint.archetype)) {
@@ -3239,7 +3268,7 @@ void GenericSignatureBuilder::checkRedundantSuperclassConstraints(
                        existing->archetype->getDependentType(
                                                    genericParams,
                                                    /*allowUnresolved=*/true),
-                       existing->concreteType);
+                       existing->value);
       }
     }
   }
