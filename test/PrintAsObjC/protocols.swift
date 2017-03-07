@@ -89,7 +89,7 @@ class MyObject : NSObject, NSCoding {
 protocol NotObjC : class {}
 
 
-// CHECK-LABEL: @interface NSString (SWIFT_EXTENSION(protocols)){{$}}
+// NEGATIVE-NOT: @interface NSString (SWIFT_EXTENSION(protocols)){{$}}
 extension NSString : NotObjC {}
 
 // CHECK-LABEL: @protocol ZZZ{{$}}

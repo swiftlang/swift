@@ -21,16 +21,26 @@ import objc_generics
 // CHECK-NEXT: @end
 @objc class A1 {}
 
-// CHECK-LABEL: @interface A1 (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: @end
+// NEGATIVE-NOT: @interface A1 (SWIFT_EXTENSION(extensions))
 extension A1 {}
+
+extension A1 {
+  private func invisible() {}
+}
+
+private extension A1 {
+  func invisible2() {} 
+}
 
 // CHECK-LABEL: @interface A2{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 // CHECK-LABEL: @interface A2 (SWIFT_EXTENSION(extensions))
+// CHECK-NEXT: - (void)foo;
 // CHECK-NEXT: @end
-extension A2 {}
+extension A2 {
+  func foo() {}
+}
 @objc class A2 {}
 
 // CHECK-LABEL: @interface A3{{$}}
@@ -56,8 +66,7 @@ extension A3 {
 // CHECK-NEXT: @end
 @objc class A4 {}
 
-// CHECK-LABEL: @interface A4 (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: @end
+// NEGATIVE-NOT: @interface A4 (SWIFT_EXTENSION(extensions))
 extension A4 {
   // CHECK-LABEL: @interface Inner
   // CHECK-NEXT: init
@@ -96,10 +105,13 @@ class NotObjC {}
 extension NotObjC {}
 
 // CHECK-LABEL: @interface NSObject (SWIFT_EXTENSION(extensions))
+// CHECK-NEXT: - (void)foo;
 // CHECK-NEXT: @end
 // NEGATIVE-NOT: @interface NSObject{{$}}
 // NEGATIVE-NOT: @class NSObject
-extension NSObject {}
+extension NSObject {
+  func foo() {}
+}
 
 // NEGATIVE-NOT: @class NSString;
 // CHECK: @class NSColor;

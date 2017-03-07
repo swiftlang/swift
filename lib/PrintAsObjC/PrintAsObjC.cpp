@@ -329,7 +329,26 @@ private:
     os << "@end\n";
   }
 
+  /// Checks if given extension would have any content when printed.
+  bool hasPrintableContent(const ExtensionDecl *ED) {
+    for (const Decl *member : ED->getMembers()) {
+      auto VD = dyn_cast<ValueDecl>(member);
+      if (!VD || !shouldInclude(VD) || isa<TypeDecl>(VD))
+        continue;
+      return true;
+    }
+
+    for (const ProtocolDecl *proto : ED->getLocalProtocols())
+      if (shouldInclude(proto))
+        return true;
+
+    return false;
+  }
+
   void visitExtensionDecl(ExtensionDecl *ED) {
+    if (!hasPrintableContent(ED))
+      return;
+
     auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
 
     os << "@interface " << getNameForObjC(baseClass);
