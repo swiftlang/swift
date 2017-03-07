@@ -421,6 +421,20 @@ PotentialArchetype *RequirementSource::getRootPotentialArchetype() const {
   return storage.rootArchetype;
 }
 
+Type RequirementSource::getStoredType() const {
+  switch (storageKind) {
+  case StorageKind::RootArchetype:
+  case StorageKind::ProtocolConformance:
+  case StorageKind::AssociatedTypeDecl:
+    return Type();
+
+  case StorageKind::StoredType:
+    return storage.type;
+  }
+
+  llvm_unreachable("Unhandled StorageKind in switch.");
+}
+
 ProtocolDecl *RequirementSource::getProtocolDecl() const {
   switch (storageKind) {
   case StorageKind::RootArchetype:
@@ -1845,10 +1859,8 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
 
     auto innerSource =
       FloatingRequirementSource::viaProtocolRequirement(Source, Proto);
-    for (auto rawReq : reqSig->getRequirements()) {
-      auto req = rawReq.subst(protocolSubMap);
-      assert(req && "substituting Self in requirement shouldn't fail");
-      if (addRequirement(*req, innerSource, Visited))
+    for (auto req : reqSig->getRequirements()) {
+      if (addRequirement(req, innerSource, &protocolSubMap, Visited))
         return true;
     }
 
@@ -2423,6 +2435,7 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
     return t;
   };
 
+
   switch (Req->getKind()) {
   case RequirementReprKind::LayoutConstraint: {
     // FIXME: Need to do something here.
@@ -2454,7 +2467,7 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
 
     // Check whether this is a supertype requirement.
     if (Req->getConstraint()->getClassOrBoundGenericClass()) {
-      return addSuperclassRequirement(PA, Req->getConstraint(),
+      return addSuperclassRequirement(PA, subst(Req->getConstraint()),
                                       source.getSource(PA, Req->getSubject()));
     }
 
@@ -2494,18 +2507,29 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
 }
 
 bool GenericSignatureBuilder::addRequirement(const Requirement &req,
-                                             FloatingRequirementSource source) {
-  llvm::SmallPtrSet<ProtocolDecl *, 8> Visited;
-  return addRequirement(req, source, Visited);
+                                             FloatingRequirementSource source,
+                                             const SubstitutionMap *subMap) {
+  llvm::SmallPtrSet<ProtocolDecl *, 8> visited;
+  return addRequirement(req, source, subMap, visited);
 }
 
 bool GenericSignatureBuilder::addRequirement(
-    const Requirement &req, FloatingRequirementSource source,
-    llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited) {
+                            const Requirement &req,
+                            FloatingRequirementSource source,
+                            const SubstitutionMap *subMap,
+                            llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited) {
+  auto subst = [&](Type t) {
+    if (subMap)
+      return t.subst(*subMap);
+
+    return t;
+  };
+
+
   switch (req.getKind()) {
   case RequirementKind::Superclass: {
     // FIXME: Diagnose this.
-    PotentialArchetype *pa = resolveArchetype(req.getFirstType());
+    PotentialArchetype *pa = resolveArchetype(subst(req.getFirstType()));
     if (!pa) return false;
 
     assert(req.getSecondType()->getClassOrBoundGenericClass());
@@ -2515,7 +2539,7 @@ bool GenericSignatureBuilder::addRequirement(
 
   case RequirementKind::Layout: {
     // FIXME: Diagnose this.
-    PotentialArchetype *pa = resolveArchetype(req.getFirstType());
+    PotentialArchetype *pa = resolveArchetype(subst(req.getFirstType()));
     if (!pa) return false;
 
     return addLayoutRequirement(pa, req.getLayoutConstraint(),
@@ -2524,7 +2548,7 @@ bool GenericSignatureBuilder::addRequirement(
 
   case RequirementKind::Conformance: {
     // FIXME: Diagnose this.
-    PotentialArchetype *pa = resolveArchetype(req.getFirstType());
+    PotentialArchetype *pa = resolveArchetype(subst(req.getFirstType()));
     if (!pa) return false;
 
     SmallVector<ProtocolDecl *, 4> conformsTo;
@@ -2533,8 +2557,9 @@ bool GenericSignatureBuilder::addRequirement(
     // Add each of the protocols.
     for (auto proto : conformsTo) {
       if (Visited.count(proto)) {
-        markPotentialArchetypeRecursive(pa, proto,
-                                        source.getSource(pa, req.getFirstType()));
+        markPotentialArchetypeRecursive(
+                                    pa, proto,
+                                    source.getSource(pa, req.getFirstType()));
         continue;
       }
       if (addConformanceRequirement(pa, proto,
@@ -2548,7 +2573,7 @@ bool GenericSignatureBuilder::addRequirement(
 
   case RequirementKind::SameType:
     return addSameTypeRequirement(
-        req.getFirstType(), req.getSecondType(), source,
+        subst(req.getFirstType()), subst(req.getSecondType()), source,
         [&](Type type1, Type type2) {
           if (source.getLoc().isValid())
             Diags.diagnose(source.getLoc(), diag::requires_same_concrete_type,

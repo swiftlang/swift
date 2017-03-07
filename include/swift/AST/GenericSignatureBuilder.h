@@ -339,9 +339,11 @@ public:
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  bool addRequirement(const Requirement &req, FloatingRequirementSource source);
+  bool addRequirement(const Requirement &req, FloatingRequirementSource source,
+                      const SubstitutionMap *subMap = nullptr);
 
   bool addRequirement(const Requirement &req, FloatingRequirementSource source,
+                      const SubstitutionMap *subMap,
                       llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
 
   /// \brief Add a new requirement.
@@ -820,6 +822,9 @@ public:
     return getTrailingObjects<WrittenRequirementLoc>()[0]
              .dyn_cast<const RequirementRepr *>();
   }
+
+  /// Retrieve the type stored in this requirement.
+  Type getStoredType() const;
 
   /// Retrieve the protocol for this requirement, if there is one.
   ProtocolDecl *getProtocolDecl() const;
