@@ -5121,6 +5121,27 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
       sf->addUsedConformance(normalConf);
     }
   }
+
+  // Debugging aid: display the conformance access path for archetype
+  // conformances.
+  if (Context.LangOpts.DebugGenericSignatures && InExpression &&
+      T->is<ArchetypeType>() && lookupResult->isAbstract() &&
+      T->castTo<ArchetypeType>()->getGenericEnvironment()
+        == DC->getGenericEnvironmentOfContext()) {
+    auto interfaceType = DC->mapTypeOutOfContext(T);
+    if (interfaceType->isTypeParameter()) {
+      llvm::errs() << "Conformance access path for ";
+      T.print(llvm::errs());
+      llvm::errs() << ": " << Proto->getName() << " is ";
+
+      auto genericSig = DC->getGenericSignatureOfContext();
+      genericSig->getConformanceAccessPath(interfaceType, Proto,
+                                           *DC->getParentModule())
+        .print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+  }
+
   return lookupResult;
 }
 
