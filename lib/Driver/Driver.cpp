@@ -448,6 +448,16 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
   }
 }
 
+// warn if -embed-bitcode is set and the output type is not an object
+static void validateEmbedBitcode(DerivedArgList &Args, OutputInfo &OI,
+                                 DiagnosticEngine &Diags) {
+  if (Args.hasArg(options::OPT_embed_bitcode) &&
+      OI.CompilerOutputType != types::TY_Object) {
+    Diags.diagnose(SourceLoc(), diag::warn_ignore_embed_bitcode);
+    Args.eraseArg(options::OPT_embed_bitcode);
+  }
+}
+
 std::unique_ptr<Compilation> Driver::buildCompilation(
     ArrayRef<const char *> Args) {
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
@@ -535,6 +545,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
   assert(OI.CompilerOutputType != types::ID::TY_INVALID &&
          "buildOutputInfo() must set a valid output type!");
+  
+  validateEmbedBitcode(*TranslatedArgList, OI, Diags);
 
   if (OI.CompilerMode == OutputInfo::Mode::REPL)
     // REPL mode expects no input files, so suppress the error.
