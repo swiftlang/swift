@@ -91,6 +91,7 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
 
   SourceLoc Loc = D->getLoc();
   unsigned NameLen = 0;
+  bool IsExtension = false;
 
   if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
     if (VD->hasName())
@@ -101,6 +102,7 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
     Loc = SR.Start;
     if (Loc.isValid())
       NameLen = ED->getASTContext().SourceMgr.getByteDistance(SR.Start, SR.End);
+    IsExtension = true;
   } else if (auto Import = dyn_cast<ImportDecl>(D)) {
     if (!handleImports(Import))
       return false;
@@ -122,10 +124,8 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   CharSourceRange Range = (Loc.isValid()) ? CharSourceRange(Loc, NameLen)
                                           : CharSourceRange();
   ShouldVisitChildren = SEWalker.walkToDeclPre(D, Range);
-  if (ShouldVisitChildren) {
-    if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
-       ExtDecls.push_back(ED);
-    }
+  if (ShouldVisitChildren && IsExtension) {
+    ExtDecls.push_back(ED);
   }
   return ShouldVisitChildren;
 }
