@@ -80,9 +80,6 @@ public:
                 CanType type, ProtocolDecl *proto,
                 llvm::SmallPtrSetImpl<CanType> *visitedParents = nullptr) const;
 
-  /// Retrieve the conformances for the given type.
-  ArrayRef<ProtocolConformanceRef> getConformances(CanType type) const;
-
   bool empty() const {
     return subMap.empty();
   }

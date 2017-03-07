@@ -209,13 +209,6 @@ addConformance(CanType type, ProtocolConformanceRef conformance) {
   conformanceMap[type.getPointer()].push_back(conformance);
 }
 
-ArrayRef<ProtocolConformanceRef> SubstitutionMap::
-getConformances(CanType type) const {
-  auto known = conformanceMap.find(type.getPointer());
-  if (known == conformanceMap.end()) return { };
-  return known->second;
-}
-
 void SubstitutionMap::
 addParent(CanType type, CanType parent, AssociatedTypeDecl *assocType) {
   assert(type && parent && assocType);
