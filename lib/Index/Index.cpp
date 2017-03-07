@@ -939,71 +939,10 @@ static NominalTypeDecl *getNominalParent(ValueDecl *D) {
   return Ty->getAnyNominal();
 }
 
-/// \returns true if \c D is a subclass of 'XCTestCase'.
-static bool isUnitTestCase(const ClassDecl *D) {
-  if (!D)
-    return false;
-  while (auto *SuperD = D->getSuperclassDecl()) {
-    if (SuperD->getNameStr() == "XCTestCase")
-      return true;
-    D = SuperD;
-  }
-  return false;
-}
-
-static bool isUnitTest(ValueDecl *D) {
-  if (!D->hasName())
-    return false;
-
-  // A 'test candidate' is:
-  // 1. An instance method...
-  auto FD = dyn_cast<FuncDecl>(D);
-  if (!FD)
-    return false;
-  if (!D->isInstanceMember())
-    return false;
-
-  // 2. ...on a class or extension (not a struct) subclass of XCTestCase...
-  auto parentNTD = getNominalParent(D);
-  if (!parentNTD)
-    return false;
-  if (!isa<ClassDecl>(parentNTD))
-    return false;
-  if (!isUnitTestCase(cast<ClassDecl>(parentNTD)))
-    return false;
-
-  // 3. ...that returns void...
-  Type RetTy = FD->getResultInterfaceType();
-  if (RetTy && !RetTy->isVoid())
-    return false;
-
-  // 4. ...takes no parameters...
-  if (FD->getParameterLists().size() != 2)
-    return false;
-  if (FD->getParameterList(1)->size() != 0)
-    return false;
-
-  // 5. ...is of at least 'internal' accessibility (unless we can use
-  //    Objective-C reflection)...
-  if (!D->getASTContext().LangOpts.EnableObjCInterop &&
-      (D->getFormalAccess() < Accessibility::Internal ||
-      parentNTD->getFormalAccess() < Accessibility::Internal))
-    return false;
-
-  // 6. ...and starts with "test".
-  if (FD->getName().str().startswith("test"))
-    return true;
-
-  return false;
-}
-
 bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
                                                   IndexSymbol &Info) {
   if (initIndexSymbol(D, D->getLoc(), /*IsRef=*/false, Info))
     return true;
-
-  if (isUnitTest(D))
-    Info.symInfo.Properties |= SymbolProperty::UnitTest;
 
   if (D->getAttrs().hasAttribute<IBActionAttr>()) {
     // Relate with type of the first parameter using RelationIBTypeOf.
