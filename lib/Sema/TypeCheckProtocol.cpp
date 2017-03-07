@@ -1804,6 +1804,11 @@ namespace {
               GlobalMissingWitnesses.size() - LocalMissingWitnessesStartIndex);
     }
 
+    void clearGlobalMissingWitnesses() {
+      GlobalMissingWitnesses.clear();
+      LocalMissingWitnessesStartIndex = GlobalMissingWitnesses.size();
+    }
+
   public:
     /// Call this to diagnose currently known missing witnesses.
     void diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind);
@@ -2713,7 +2718,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   switch (Kind) {
   case MissingWitnessDiagnosisKind::ErrorFixIt: {
     diagnoseOrDefer(LocalMissing[0], true, InsertFixitCallback);
-    GlobalMissingWitnesses.clear();
+    clearGlobalMissingWitnesses();
     return;
   }
   case MissingWitnessDiagnosisKind::ErrorOnly: {
@@ -2723,7 +2728,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   }
   case MissingWitnessDiagnosisKind::FixItOnly:
     InsertFixitCallback(Conformance);
-    GlobalMissingWitnesses.clear();
+    clearGlobalMissingWitnesses();
     return;
   }
 }
@@ -4868,8 +4873,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
 
   // Diagnose missing type witnesses for now.
   diagnoseMissingWitnesses(Kind);
-  // Diagnose missing value witnesses later.
-  SWIFT_DEFER { diagnoseMissingWitnesses(Kind); };
 
   // Resolution attempts to have the witnesses be correct by construction, but
   // this isn't guaranteed, so let's double check.
@@ -4888,6 +4891,9 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
     Conformance->setInvalid();
     return;
   }
+
+  // Diagnose missing value witnesses later.
+  SWIFT_DEFER { diagnoseMissingWitnesses(Kind); };
 
   // Ensure the associated type conformances are used.
   addUsedConformances(Conformance);
