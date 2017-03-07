@@ -572,14 +572,13 @@ public func _setTrappingExpectationFailedCallback(callback: @escaping () -> Void
 extension ProcessTerminationStatus {
   var isSwiftTrap: Bool {
     switch self {
-    case .exit(_):
-      return false
     case .signal(let signal):
       return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
     default:
       // This default case is needed for standard library builds where
       // resilience is enabled.
-      // FIXME: Need a way to suppress when not.
+      // FIXME: Add the .exit case when there is a way to suppress when not.
+      //   case .exit(_): return false
       return false
     }
   }
