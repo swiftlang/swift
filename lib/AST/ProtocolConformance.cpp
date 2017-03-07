@@ -95,6 +95,67 @@ ProtocolConformanceRef::getInherited(ProtocolDecl *parent) const {
   llvm_unreachable("unhandled ProtocolConformanceRef");
 }
 
+ProtocolConformanceRef
+ProtocolConformanceRef::subst(Type origType,
+                              TypeSubstitutionFn subs,
+                              LookupConformanceFn conformances) const {
+  auto substType = origType.subst(subs, conformances,
+                                  SubstFlags::UseErrorType);
+
+  if (substType->isOpenedExistential())
+    return *this;
+
+  // If we have a concrete conformance, we need to substitute the
+  // conformance to apply to the new type.
+  if (isConcrete())
+    return ProtocolConformanceRef(
+      getConcrete()->subst(substType, subs, conformances));
+
+  auto *proto = getRequirement();
+
+  // If the original type was an archetype, check the conformance map.
+  if (origType->is<SubstitutableType>()
+      || origType->is<DependentMemberType>()) {
+    if (auto result = conformances(origType->getCanonicalType(),
+                                   substType,
+                                   proto->getDeclaredType())) {
+      return *result;
+    }
+  }
+
+  // If that didn't find anything, we can still synthesize AnyObject
+  // conformances from thin air.  FIXME: gross.
+  if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
+    if (substType->isExistentialType())
+      return *this;
+
+    ClassDecl *classDecl = nullptr;
+    auto archetype = substType->getAs<ArchetypeType>();
+
+    if (archetype) {
+      if (archetype->getSuperclass())
+        classDecl = archetype->getSuperclass()->getClassOrBoundGenericClass();
+
+      // A class-constrained archetype without a superclass constraint
+      // conforms to AnyObject abstractly.
+      if (!classDecl && archetype->requiresClass())
+        return ProtocolConformanceRef(proto);
+    } else {
+      classDecl = substType->getClassOrBoundGenericClass();
+    }
+
+    assert(classDecl);
+
+    // Create a concrete conformance based on the conforming class.
+    SmallVector<ProtocolConformance *, 1> lookupResults;
+    classDecl->lookupConformance(classDecl->getParentModule(), proto,
+                                 lookupResults);
+    return ProtocolConformanceRef(lookupResults.front());
+  }
+
+  llvm_unreachable("Invalid conformance substitution");
+}
+
 Type
 ProtocolConformanceRef::getTypeWitnessByName(Type type,
                                              ProtocolConformanceRef conformance,

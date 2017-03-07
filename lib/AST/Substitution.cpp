@@ -68,59 +68,10 @@ Substitution Substitution::subst(TypeSubstitutionFn subs,
   substConformances.reserve(Conformance.size());
 
   for (auto c : Conformance) {
-    // If we have a concrete conformance, we need to substitute the
-    // conformance to apply to the new type.
-    if (c.isConcrete()) {
-      auto substC = c.getConcrete()->subst(substReplacement,
-                                           subs, conformances);
-      substConformances.push_back(ProtocolConformanceRef(substC));
-      if (c != substConformances.back())
-        conformancesChanged = true;
-      continue;
-    }
-
-    // Otherwise, we may need to fill in the conformance.
-    ProtocolDecl *proto = c.getAbstract();
-    Optional<ProtocolConformanceRef> conformance;
-
-    // If the original type was an archetype, check the conformance map.
-    if (Replacement->is<SubstitutableType>()
-        || Replacement->is<DependentMemberType>()) {
-      conformance = conformances(Replacement->getCanonicalType(),
-                                 substReplacement,
-                                 proto->getDeclaredType());
-    }
-
-    // If that didn't find anything, we can still synthesize AnyObject
-    // conformances from thin air.  FIXME: gross.
-    if (!conformance &&
-        proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-      auto archetype =
-        dyn_cast<ArchetypeType>(substReplacement->getCanonicalType());
-      // If classDecl is not nullptr, it is a concrete class.
-      auto classDecl = substReplacement->getClassOrBoundGenericClass();
-      if (!classDecl && archetype->getSuperclass()) {
-        // Replacement type is an archetype with a superclass constraint.
-        classDecl = archetype->getSuperclass()->getClassOrBoundGenericClass();
-        assert(classDecl);
-      }
-      if (classDecl) {
-        // Create a concrete conformance based on the conforming class.
-        SmallVector<ProtocolConformance *, 1> lookupResults;
-        classDecl->lookupConformance(classDecl->getParentModule(), proto,
-                                     lookupResults);
-        conformance = ProtocolConformanceRef(lookupResults.front());
-      } else if (archetype && archetype->requiresClass()) {
-        // Replacement type is an archetype with a class constraint.
-        // Create an abstract conformance.
-        conformance = ProtocolConformanceRef(proto);
-      }
-    }
-
-    assert(conformance);
-    if (conformance->isConcrete())
+    auto newC = c.subst(Replacement, subs, conformances);
+    if (c != newC)
       conformancesChanged = true;
-    substConformances.push_back(*conformance);
+    substConformances.push_back(newC);
   }
   assert(substConformances.size() == Conformance.size());
 

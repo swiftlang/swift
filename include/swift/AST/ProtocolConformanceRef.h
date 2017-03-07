@@ -91,6 +91,11 @@ public:
   /// conformance represents.
   ProtocolConformanceRef getInherited(ProtocolDecl *parent) const;
 
+  /// Apply a substitution to the conforming type.
+  ProtocolConformanceRef subst(Type origType,
+                               TypeSubstitutionFn subs,
+                               LookupConformanceFn conformances) const;
+
   void dump() const;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
 
