@@ -35,7 +35,8 @@ func _insertionSort<C>(
       // moving elements forward to make room.
       var i = sortedEnd
       repeat {
-        let predecessor: C.Iterator.Element = elements[elements.index(before: i)]
+        let predecessor: C.Iterator.Element =
+          elements[elements.index(before: i)]
 
         // if x doesn't belong before y, we've found its position
         if !areInIncreasingOrder(x, predecessor) {
@@ -197,7 +198,8 @@ func _introSort<C>(
   // Set max recursion depth to 2*floor(log(N)), as suggested in the introsort
   // paper: http://www.cs.rpi.edu/~musser/gp/introsort.ps
   let depthLimit = 2 * _floorLog2(Int64(count))
-  _introSortImpl(&elements, subRange: range,  by: areInIncreasingOrder, depthLimit: depthLimit)
+  _introSortImpl(&elements, subRange: range, by: areInIncreasingOrder,
+    depthLimit: depthLimit)
 }
 
 func _introSortImpl<C>(
@@ -221,9 +223,12 @@ func _introSortImpl<C>(
   // Partition and sort.
   // We don't check the depthLimit variable for underflow because this variable
   // is always greater than zero (see check above).
-  let partIdx: C.Index = _partition(&elements, subRange: range, by: areInIncreasingOrder)
-  _introSortImpl(&elements, subRange: range.lowerBound..<partIdx, by: areInIncreasingOrder, depthLimit: depthLimit &- 1)
-  _introSortImpl(&elements, subRange: partIdx..<range.upperBound, by: areInIncreasingOrder, depthLimit: depthLimit &- 1)
+  let partIdx: C.Index = _partition(&elements, subRange: range,
+    by: areInIncreasingOrder)
+  _introSortImpl(&elements, subRange: range.lowerBound..<partIdx,
+    by: areInIncreasingOrder, depthLimit: depthLimit &- 1)
+  _introSortImpl(&elements, subRange: partIdx..<range.upperBound,
+    by: areInIncreasingOrder, depthLimit: depthLimit &- 1)
 }
 
 func _siftDown<C>(
@@ -257,7 +262,8 @@ func _siftDown<C>(
   // down.
   if largest != index {
     swap(&elements[index], &elements[largest])
-    _siftDown(&elements, index: largest, subRange: range, by: areInIncreasingOrder)
+    _siftDown(&elements, index: largest, subRange: range,
+      by: areInIncreasingOrder)
   }
 }
 
