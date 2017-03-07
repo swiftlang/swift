@@ -4,6 +4,7 @@
 // REQUIRES: executable_test
 
 import Swift
+import Darwin
 import SwiftShims
 import StdlibUnittest
 
@@ -293,6 +294,13 @@ testSuite.test("replaceSubrange") {
 
   // Make sure the initial value wasn't mutated
   expectEqual(initial, "hello world!")
+}
+
+testSuite.test("cstring") {
+  let s1: String = "abracadabra"
+  expectEqual(s1.withCString(strlen), 11)
+  let s2: String = "3.14159"
+  expectEqual(3.14159,s2.withCString(atof))
 }
 
 runAllTests()

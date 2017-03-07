@@ -444,7 +444,7 @@ extension UnicodeStorage {
       let j = index(after: i)
       let contents = UnicodeStorage<
                        // explicit generic parameters shouldn't be needed
-                       // rdar://...
+                       // <rdar://problem/30882312>
                        CodeUnits.SubSequence,Encoding
                      >(storage.codeUnits[i..<j], Encoding.self)
         

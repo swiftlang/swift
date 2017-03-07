@@ -365,4 +365,42 @@ extension String : CustomDebugStringConvertible {
 }
 
 
+extension String {
+  /// Constructs a `String` having the same contents as `nulTerminatedUTF8`.
+  ///
+  /// - Parameter nulTerminatedUTF8: a sequence of contiguous UTF-8 encoded 
+  ///   bytes ending just before the first zero byte (NUL character).
+  init(cString nulTerminatedUTF8: UnsafePointer<CChar>) {
+    fatalError("TODO")
+  }
+  
+  /// Constructs a `String` having the same contents as `nulTerminatedCodeUnits`.
+  ///
+  /// - Parameter nulTerminatedCodeUnits: a sequence of contiguous code units in
+  ///   the given `encoding`, ending just before the first zero code unit.
+  /// - Parameter encoding: describes the encoding in which the code units
+  ///   should be interpreted.
+  init<Encoding: UnicodeEncoding>(
+    cString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
+    encoding: Encoding) {
+      fatalError("TODO")      
+    }
+    
+  /// Invokes the given closure on the contents of the string, represented as a
+  /// pointer to a null-terminated sequence of UTF-8 code units.
+  func withCString<Result>(
+    _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
+        // TODO: improve for Latin1 case
+        var result = ContiguousArray<CChar>()
+        result.reserveCapacity(utf8.count + 1)
+        for c in utf8 {
+          result.append(CChar(bitPattern: c))
+        }
+        result.append(0)
+        return try result.withUnsafeBufferPointer {
+          try body($0.baseAddress!)
+        }
+    }
+}
+
 
