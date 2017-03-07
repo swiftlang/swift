@@ -477,7 +477,8 @@ TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
 
       return false;
     });
-    assert(!typeVariables.empty() && "Did not find type variables!");
+    assert((!typeVariables.empty() || hasError()) &&
+           "Did not find type variables!");
   }
 }
 
