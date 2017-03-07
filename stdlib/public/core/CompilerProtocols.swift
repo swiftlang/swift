@@ -398,7 +398,6 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral
 extension ExpressibleByExtendedGraphemeClusterLiteral
   where ExtendedGraphemeClusterLiteralType == UnicodeScalarLiteralType {
 
-  @effects(readonly)
   @_transparent
   public init(unicodeScalarLiteral value: ExtendedGraphemeClusterLiteralType) {
     self.init(extendedGraphemeClusterLiteral: value)
@@ -464,7 +463,6 @@ public protocol ExpressibleByStringLiteral
 extension ExpressibleByStringLiteral
   where StringLiteralType == ExtendedGraphemeClusterLiteralType {
 
-  @effects(readonly)
   @_transparent
   public init(extendedGraphemeClusterLiteral value: StringLiteralType) {
     self.init(stringLiteral: value)

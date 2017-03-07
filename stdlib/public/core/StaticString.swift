@@ -194,6 +194,16 @@ public struct StaticString
     self = StaticString(unicodeScalar: value)
   }
 
+  /// Creates an instance initialized to a single Unicode scalar.
+  ///
+  /// Do not call this initializer directly. It may be used by the compiler
+  /// when you initialize a static string with a Unicode scalar.
+  @effects(readonly)
+  @_transparent
+  public init(unicodeScalarLiteral value: StaticString) {
+    self = value
+  }
+
   @effects(readonly)
   @_transparent
   public init(
@@ -206,6 +216,17 @@ public struct StaticString
       utf8CodeUnitCount: utf8CodeUnitCount,
       isASCII: isASCII
     )
+  }
+
+  /// Creates an instance initialized to a single character that is made up of
+  /// one or more Unicode code points.
+  ///
+  /// Do not call this initializer directly. It may be used by the compiler
+  /// when you initialize a static string using an extended grapheme cluster.
+  @effects(readonly)
+  @_transparent
+  public init(extendedGraphemeClusterLiteral value: StaticString) {
+    self = value
   }
 
   @effects(readonly)
