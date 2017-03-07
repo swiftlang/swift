@@ -795,9 +795,13 @@ func refcast_any_punknown(_ o: AnyObject) -> PUnknown {
 // CHECK:   [[BORROWED_P:%.*]] = begin_borrow [[P]]
 // CHECK:   [[P_COPY:%.*]] = copy_value  [[BORROWED_P]]
 // CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<A>([[P_COPY]] : $A)
-// CHECK:   [[R:%.*]] = tuple_extract [[T]] : $(A, Builtin.Int8), 0
-// CHECK:   [[K:%.*]] = tuple_extract [[T]] : $(A, Builtin.Int8), 1
-// CHECK:   destroy_value [[R]] : $A
+// CHECK:   [[BORROWED_T:%.*]] = begin_borrow [[T]]
+// CHECK:   [[R:%.*]] = tuple_extract [[BORROWED_T]] : $(A, Builtin.Int8), 0
+// CHECK:   [[COPY_R:%.*]] = copy_value [[R]]
+// CHECK:   [[K:%.*]] = tuple_extract [[BORROWED_T]] : $(A, Builtin.Int8), 1
+// CHECK:   destroy_value [[COPY_R]] : $A
+// CHECK:   end_borrow [[BORROWED_T]] from [[T]]
+// CHECK:   destroy_value [[T]]
 // CHECK:   end_borrow [[BORROWED_P]] from [[P]]
 // CHECK:   [[BORROWED_P:%.*]] = begin_borrow [[P]]
 // CHECK:   [[P_COPY:%.*]] = copy_value [[BORROWED_P]]
@@ -817,9 +821,13 @@ func unsafeGuaranteed_class(_ a: A) -> A {
 // CHECK:   [[BORROWED_P:%.*]] = begin_borrow [[P]]
 // CHECK:   [[P_COPY:%.*]] = copy_value  [[BORROWED_P]]
 // CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<T>([[P_COPY]] : $T)
-// CHECK:   [[R:%.*]] = tuple_extract [[T]] : $(T, Builtin.Int8), 0
-// CHECK:   [[K:%.*]] = tuple_extract [[T]] : $(T, Builtin.Int8), 1
-// CHECK:   destroy_value [[R]] : $T
+// CHECK:   [[BORROWED_T:%.*]] = begin_borrow [[T]]
+// CHECK:   [[R:%.*]] = tuple_extract [[BORROWED_T]] : $(T, Builtin.Int8), 0
+// CHECK:   [[COPY_R:%.*]] = copy_value [[R]]
+// CHECK:   [[K:%.*]] = tuple_extract [[BORROWED_T]] : $(T, Builtin.Int8), 1
+// CHECK:   destroy_value [[COPY_R]] : $T
+// CHECK:   end_borrow [[BORROWED_T]] from [[T]]
+// CHECK:   destroy_value [[T]]
 // CHECK:   end_borrow [[BORROWED_P]] from [[P]]
 // CHECK:   [[BORROWED_P:%.*]] = begin_borrow [[P]]
 // CHECK:   [[P_RETURN:%.*]] = copy_value [[BORROWED_P]]
@@ -837,11 +845,15 @@ func unsafeGuaranteed_generic<T: AnyObject> (_ a: T) -> T {
 // CHECK:   [[BORROWED_P:%.*]] = begin_borrow [[P]]
 // CHECK:   [[P_COPY:%.*]] = copy_value [[BORROWED_P]]
 // CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<T>([[P_COPY]] : $T)
-// CHECK:   [[R]] = tuple_extract [[T]] : $(T, Builtin.Int8), 0
-// CHECK:   [[K]] = tuple_extract [[T]] : $(T, Builtin.Int8), 1
+// CHECK:   [[BORROWED_T:%.*]] = begin_borrow [[T]]
+// CHECK:   [[R]] = tuple_extract [[BORROWED_T]] : $(T, Builtin.Int8), 0
+// CHECK:   [[COPY_R:%.*]] = copy_value [[R]]
+// CHECK:   [[K]] = tuple_extract [[BORROWED_T]] : $(T, Builtin.Int8), 1
+// CHECK:   end_borrow [[BORROWED_T]] from [[T]]
+// CHECK:   destroy_value [[T]]
 // CHECK:   end_borrow [[BORROWED_P]] from [[P]]
 // CHECK:   destroy_value [[P]]
-// CHECK:   [[S:%.*]] = tuple ([[R]] : $T, [[K]] : $Builtin.Int8)
+// CHECK:   [[S:%.*]] = tuple ([[COPY_R]] : $T, [[K]] : $Builtin.Int8)
 // CHECK:   return [[S]] : $(T, Builtin.Int8)
 // CHECK: }
 func unsafeGuaranteed_generic_return<T: AnyObject> (_ a: T) -> (T, Builtin.Int8) {

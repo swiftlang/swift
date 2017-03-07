@@ -1364,6 +1364,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(Return)
   UNARY_INSTRUCTION(Throw)
   UNARY_INSTRUCTION(FixLifetime)
+  UNARY_INSTRUCTION(EndLifetime)
   UNARY_INSTRUCTION(CopyBlock)
   UNARY_INSTRUCTION(LoadBorrow)
   UNARY_INSTRUCTION(BeginBorrow)
@@ -1378,6 +1379,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   UNARY_INSTRUCTION(IsUniqueOrPinned)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
+
+  case ValueKind::UncheckedOwnershipConversionInst: {
+    auto Ty = MF->getType(TyID);
+    auto ResultKind = ValueOwnershipKind(Attr);
+    ResultVal = Builder.createUncheckedOwnershipConversion(
+        Loc, getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory)),
+        ResultKind);
+    break;
+  }
 
   case ValueKind::LoadInst: {
     auto Ty = MF->getType(TyID);
@@ -2404,13 +2414,14 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
         proto, conformance.getConcrete()
       });
     } else if (kind == SIL_WITNESS_ASSOC_PROTOCOL) {
-      DeclID assocId, protoId;
+      TypeID assocId;
+      DeclID protoId;
       WitnessAssocProtocolLayout::readRecord(scratch, assocId, protoId);
+      CanType type = MF->getType(assocId)->getCanonicalType();
       ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
       auto conformance = MF->readConformance(SILCursor);
       witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
-        cast<AssociatedTypeDecl>(MF->getDecl(assocId)), proto,
-        conformance
+        type, proto, conformance
       });
     } else if (kind == SIL_WITNESS_ASSOC_ENTRY) {
       DeclID assocId;

@@ -301,80 +301,12 @@ withTrailingComma(RC<TokenSyntax> NewTrailingComma) const {
     FunctionCallArgumentSyntax::Cursor::Comma);
 }
 
-#pragma mark - function-call-argument-list Data
-
-FunctionCallArgumentListSyntaxData::
-FunctionCallArgumentListSyntaxData(const RC<RawSyntax> Raw,
-                                   const SyntaxData *Parent,
-                                   CursorIndex IndexInParent)
-  : SyntaxData(Raw, Parent, IndexInParent) {
-#ifndef NDEBUG
-  for (auto Child : Raw->Layout) {
-    assert(Child->Kind == SyntaxKind::FunctionCallArgument);
-  }
-#endif
-  for (size_t i = 0; i < Raw->Layout.size(); ++i) {
-    CachedArguments.emplace_back(nullptr);
-  }
-}
-
-RC<FunctionCallArgumentListSyntaxData>
-FunctionCallArgumentListSyntaxData::make(RC<RawSyntax> Raw,
-                                         const SyntaxData *Parent,
-                                         CursorIndex IndexInParent) {
-  return RC<FunctionCallArgumentListSyntaxData> {
-    new FunctionCallArgumentListSyntaxData {
-      Raw, Parent, IndexInParent
-    }
-  };
-}
-
-RC<FunctionCallArgumentListSyntaxData>
-FunctionCallArgumentListSyntaxData::makeBlank() {
-  auto Raw = RawSyntax::make(SyntaxKind::FunctionCallArgumentList, {},
-                             SourcePresence::Present);
-  return make(Raw);
-}
-
 #pragma mark - function-call-argument-list API
 
 FunctionCallArgumentListSyntax::
 FunctionCallArgumentListSyntax(const RC<SyntaxData> Root,
                                const DataType *Data)
-  : Syntax(Root, Data) {}
-
-size_t
-FunctionCallArgumentListSyntax::getNumArguments() const {
-  return getRaw()->Layout.size();
-}
-
-FunctionCallArgumentSyntax
-FunctionCallArgumentListSyntax::getArgument(size_t Index) const {
-  assert(Index <= getRaw()->Layout.size());
-
-  auto RawArg = getRaw()->Layout[Index];
-
-  auto *MyData = getUnsafeData<FunctionCallArgumentListSyntax>();
-
-  auto &ChildPtr = *reinterpret_cast<std::atomic<uintptr_t>*>(
-    MyData->CachedArguments.data() + Index);
-
-  SyntaxData::realizeSyntaxNode<FunctionCallArgumentSyntax>(ChildPtr, RawArg,
-                                                            MyData,
-                                                            Index);
-
-  return FunctionCallArgumentSyntax {
-    Root,
-    MyData->CachedArguments[Index].get()
-  };
-}
-
-FunctionCallArgumentListSyntax
-FunctionCallArgumentListSyntax::withAdditionalArgument(
-  FunctionCallArgumentSyntax AdditionalArgument) const {
-  auto NewRaw = getRaw()->append(AdditionalArgument.getRaw());
-  return Data->replaceSelf<FunctionCallArgumentListSyntax>(NewRaw);
-}
+  : SyntaxCollection(Root, Data) {}
 
 #pragma mark - function-call-expression Data
 

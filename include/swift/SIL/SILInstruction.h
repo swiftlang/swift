@@ -461,8 +461,8 @@ public:
     }
   }
 
-  size_t
-      numTrailingObjects(SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(Operand)) const {
+  size_t numTrailingObjects(
+  	  typename TrailingObjects::template OverloadToken<Operand>) const {
     return NumOperands;
   }
 
@@ -2300,8 +2300,8 @@ public:
   SILType getBoundType() const { return BoundType ; }
 
   // Implement llvm::TrailingObjects.
-  size_t
-      numTrailingObjects(SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(Operand)) const {
+  size_t numTrailingObjects(
+  	  typename TrailingObjects::template OverloadToken<Operand>) const {
     return NumOperands;
   }
 
@@ -4335,6 +4335,48 @@ class FixLifetimeInst :
 
   FixLifetimeInst(SILDebugLocation DebugLoc, SILValue Operand)
       : UnaryInstructionBase(DebugLoc, Operand) {}
+};
+
+/// EndLifetimeInst - An artificial end lifetime use of a value for the purpose
+/// of working around verification problems.
+///
+/// Specifically, the signature of destroying deinit takes self at +0 and
+/// returns self at +1. This is an issue since a deallocating deinit takes in
+/// self at +1. Previously, we could rely on the deallocating bit being set in
+/// the object header to allow SILGen to statically balance the +1 from the
+/// deallocating deinit. This is because deallocating values used to be
+/// immortal. The runtime now asserts if we release a deallocating value,
+/// meaning such an approach does not work. This instruction acts as a "fake"
+/// lifetime ending use allowing for static verification of deallocating
+/// destroyers, without an actual release being emitted (avoiding the runtime
+/// assert).
+class EndLifetimeInst
+    : public UnaryInstructionBase<ValueKind::EndLifetimeInst, SILInstruction,
+                                  /*HAS_RESULT*/ false> {
+  friend SILBuilder;
+
+  EndLifetimeInst(SILDebugLocation DebugLoc, SILValue Operand)
+      : UnaryInstructionBase(DebugLoc, Operand) {}
+};
+
+/// An unsafe conversion in between ownership kinds.
+///
+/// This is used today in destructors where due to objective-c legacy
+/// constraints, we need to be able to convert a guaranteed paramter to an owned
+/// parameter.
+class UncheckedOwnershipConversionInst
+    : public UnaryInstructionBase<ValueKind::UncheckedOwnershipConversionInst> {
+  friend SILBuilder;
+
+  ValueOwnershipKind Kind;
+
+  UncheckedOwnershipConversionInst(SILDebugLocation DebugLoc, SILValue operand,
+                                   ValueOwnershipKind Kind)
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()),
+        Kind(Kind) {}
+
+public:
+  ValueOwnershipKind getConversionOwnershipKind() const { return Kind; }
 };
 
 /// MarkDependenceInst - Marks that one value depends on another for

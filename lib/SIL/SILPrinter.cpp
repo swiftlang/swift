@@ -1240,6 +1240,13 @@ public:
     *this << getIDAndType(operand) << " to " << CI->getType();
   }
 
+  void visitUncheckedOwnershipConversionInst(
+      UncheckedOwnershipConversionInst *UOCI) {
+    *this << getIDAndType(UOCI->getOperand()) << ", "
+          << "@" << UOCI->getOperand().getOwnershipKind() << " to "
+          << "@" << UOCI->getConversionOwnershipKind();
+  }
+
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
   }
@@ -1555,6 +1562,11 @@ public:
   void visitFixLifetimeInst(FixLifetimeInst *RI) {
     *this << getIDAndType(RI->getOperand());
   }
+
+  void visitEndLifetimeInst(EndLifetimeInst *ELI) {
+    *this << getIDAndType(ELI->getOperand());
+  }
+
   void visitMarkDependenceInst(MarkDependenceInst *MDI) {
     *this << getIDAndType(MDI->getValue()) << " on "
           << getIDAndType(MDI->getBase());
@@ -2252,6 +2264,19 @@ void SILVTable::dump() const {
   print(llvm::errs());
 }
 
+/// Returns true if anything was printed.
+static bool printAssociatedTypePath(llvm::raw_ostream &OS, CanType path) {
+  if (auto memberType = dyn_cast<DependentMemberType>(path)) {
+    if (printAssociatedTypePath(OS, memberType.getBase()))
+      OS << '.';
+    OS << memberType->getName().str();
+    return true;
+  } else {
+    assert(isa<GenericTypeParamType>(path));
+    return false;
+  }
+}
+
 void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   PrintOptions Options = PrintOptions::printSIL();
   PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
@@ -2307,9 +2332,9 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
     case AssociatedTypeProtocol: {
       // associated_type_protocol (AssociatedTypeName: Protocol): <conformance>
       auto &assocProtoWitness = witness.getAssociatedTypeProtocolWitness();
-      OS << "associated_type_protocol ("
-         << assocProtoWitness.Requirement->getName() << ": "
-         << assocProtoWitness.Protocol->getName() << "): ";
+      OS << "associated_type_protocol (";
+      (void) printAssociatedTypePath(OS, assocProtoWitness.Requirement);
+      OS << ": " << assocProtoWitness.Protocol->getName() << "): ";
       if (assocProtoWitness.Witness.isConcrete())
         assocProtoWitness.Witness.getConcrete()->printName(OS, Options);
       else

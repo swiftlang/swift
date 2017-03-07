@@ -33,6 +33,12 @@ enum E2 {
   case e1(a: Int, s: Int)
   case e2(a: Int)
   case e3(a: Int)
+  case e4(_: Int)
+  case e5(_: Int, _: Int)
+  case e6(a : Int, _: Int)
+  case e7
+  case e8(a : Int, Int, Int)
+  case e9(Int, Int, Int)
 }
 
 func foo4(_ e : E2) -> Int {

@@ -27,12 +27,10 @@ func testNullable(_ obj: Test) -> [Any]? {
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] [[BORROWED_ARG]] : $Test, #Test.nullableArray!getter.1.foreign : (Test) -> () -> [Any]?, $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[BORROWED_ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
-  
-  // CHECK: [[IS_NON_NIL:%[0-9]+]] = select_enum [[COCOA_VAL]] : $Optional<NSArray>
-  // CHECK: cond_br [[IS_NON_NIL]], [[CASE_NON_NIL:[^, ]+]], [[CASE_NIL:[^, ]+]]
-
-  // CHECK: [[CASE_NON_NIL]]:
-  // CHECK: [[COCOA_VAL_NON_NIL:%[0-9]+]] = unchecked_enum_data [[COCOA_VAL]] : $Optional<NSArray>, #Optional.some!enumelt.1
+  // CHECK: switch_enum [[COCOA_VAL]] : $Optional<NSArray>, case #Optional.some!enumelt.1: [[CASE_NON_NIL:bb[0-9]+]], case #Optional.none!enumelt: [[CASE_NIL:bb[0-9]+]]
+  //
+  // CHECK: [[CASE_NON_NIL]]([[COCOA_VAL_NON_NIL:%.*]] : $NSArray):
+  // CHECK-NOT: unchecked_enum_data
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_T0Sa10FoundationE36_unconditionallyBridgeFromObjectiveCSayxGSo7NSArrayCSgFZ
   // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[COCOA_VAL_NON_NIL]]
   // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<Any>.Type
@@ -57,11 +55,10 @@ func testNullUnspecified(_ obj: Test) -> [Any]! {
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [volatile] [[BORROWED_ARG]] : $Test, #Test.nullUnspecifiedArray!getter.1.foreign : (Test) -> () -> [Any]!, $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[BORROWED_ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
-  // CHECK: [[IS_NON_NIL:%[0-9]+]] = select_enum [[COCOA_VAL]] : $Optional<NSArray>
-  // CHECK: cond_br [[IS_NON_NIL]], [[CASE_NON_NIL:[^, ]+]], [[CASE_NIL:[^, ]+]]
+  // CHECK: switch_enum [[COCOA_VAL]] : $Optional<NSArray>, case #Optional.some!enumelt.1: [[CASE_NON_NIL:bb[0-9]+]], case #Optional.none!enumelt: [[CASE_NIL:bb[0-9]+]]
 
-  // CHECK: [[CASE_NON_NIL]]:
-  // CHECK: [[COCOA_VAL_NON_NIL:%[0-9]+]] = unchecked_enum_data [[COCOA_VAL]] : $Optional<NSArray>, #Optional.some!enumelt.1
+  // CHECK: [[CASE_NON_NIL]]([[COCOA_VAL_NON_NIL:%.*]] : $NSArray):
+  // CHECK-NOT: unchecked_enum_data
   // CHECK: [[CONVERT:%[0-9]+]] = function_ref @_T0Sa10FoundationE36_unconditionallyBridgeFromObjectiveCSayxGSo7NSArrayCSgFZ
   // CHECK: [[COCOA_SOME_VAL:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[COCOA_VAL_NON_NIL]]
   // CHECK: [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<Any>.Type

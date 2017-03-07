@@ -168,7 +168,7 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 ///           "out of \(tempsFahrenheit.count) observations.")
 ///     // Prints "Average: 74.84°F in 5 out of 7 observations."
 public protocol FloatingPoint: Comparable, Arithmetic,
-  SignedNumber, Strideable {
+  SignedNumber, Strideable, Hashable {
 
   /// A type that represents any written exponent.
   associatedtype Exponent: SignedInteger

@@ -30,6 +30,7 @@
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Statistic.h"
@@ -4047,7 +4048,7 @@ public:
 
       TC.validateDecl(ED);
 
-      TC.ValidatedTypes.remove(ED);
+      TC.TypesToFinalize.remove(ED);
 
       {
         // Check for circular inheritance of the raw type.
@@ -4103,7 +4104,7 @@ public:
       checkUnsupportedNestedType(SD);
 
       TC.validateDecl(SD);
-      TC.ValidatedTypes.remove(SD);
+      TC.TypesToFinalize.remove(SD);
       TC.addImplicitConstructors(SD);
     }
 
@@ -4235,7 +4236,7 @@ public:
       if (!CD->hasValidSignature())
         return;
 
-      TC.ValidatedTypes.remove(CD);
+      TC.TypesToFinalize.remove(CD);
 
       {
         // Check for circular inheritance.
@@ -7090,7 +7091,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         checkEnumRawValues(*this, ED);
     }
 
-    ValidatedTypes.insert(nominal);
+    TypesToFinalize.insert(nominal);
     break;
   }
 
@@ -7130,7 +7131,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       markAsObjC(*this, proto, isObjC);
     }
 
-    ValidatedTypes.insert(proto);
+    TypesToFinalize.insert(proto);
     break;
   }
 
@@ -7301,6 +7302,9 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
         validateDeclForNameLookup(ATD);
       }
     }
+
+    // Make sure the protocol is fully validated by the end of Sema.
+    TypesToFinalize.insert(proto);
     break;
   }
   case DeclKind::AssociatedType: {

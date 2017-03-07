@@ -81,7 +81,7 @@ bb0(%0 : $*Container, %1 : $*Container.Elt, %2 : $G<Container>):
 }
 
 // getGenericContainer<A where ...> (G<A>, e : A.Elt) -> A
-sil [_specialize where T == S] @_T016eager_specialize19getGenericContainerxAA1GVyxG_3EltQz1etAA03HasF0RzAA02AnF0AFRQlF : $@convention(thin) <T where T : HasElt, T.Elt : AnElt> (G<T>, @in T.Elt) -> @out T {
+sil [_specialize where T == S] @_T016eager_specialize19getGenericContainerxAA1GVyxG_3EltQz1etAA03HasF0RzAA02AnF0AGRQlF : $@convention(thin) <T where T : HasElt, T.Elt : AnElt> (G<T>, @in T.Elt) -> @out T {
 bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
   // function_ref G.getContainer(A.Elt) -> A
   %5 = function_ref @_T016eager_specialize1GV12getContainerx3EltQzF : $@convention(method) <τ_0_0 where τ_0_0 : HasElt> (@in τ_0_0.Elt, G<τ_0_0>) -> @out τ_0_0
@@ -92,13 +92,13 @@ bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
 
 // Specialization getGenericContainer<S, X>
 //
-// CHECK-LABEL: sil shared @_T016eager_specialize19getGenericContainerxAA1GVyxG_3EltQz1etAA03HasF0RzAA02AnF0AFRQlF4main1SV_Tg5 : $@convention(thin) (G<S>, X) -> S {
+// CHECK-LABEL: sil shared @_T016eager_specialize19getGenericContainerxAA1GVyxG_3EltQz1etAA03HasF0RzAA02AnF0AGRQlF4main1SV_Tg5 : $@convention(thin) (G<S>, X) -> S {
 // CHECK: bb0(%0 : $G<S>, %1 : $X):
 // CHECK:   return %{{.*}} : $S
 
 // Generic with specialized dispatch. No more [specialize] attribute.
 //
-// CHECK-LABEL: sil @_T016eager_specialize19getGenericContainerxAA1GVyxG_3EltQz1etAA03HasF0RzAA02AnF0AFRQlF : $@convention(thin) <T where T : HasElt, T.Elt : AnElt> (G<T>, @in T.Elt) -> @out T {
+// CHECK-LABEL: sil @_T016eager_specialize19getGenericContainerxAA1GVyxG_3EltQz1etAA03HasF0RzAA02AnF0AGRQlF : $@convention(thin) <T where T : HasElt, T.Elt : AnElt> (G<T>, @in T.Elt) -> @out T {
 // CHECK: bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
 // CHECK:   %3 = metatype $@thick T.Type
 // CHECK:   %4 = metatype $@thick S.Type
@@ -122,7 +122,7 @@ bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
 // CHECK:   %16 = unchecked_addr_cast %2 : $*T.Elt to $*X
 // CHECK:   %17 = load %16 : $*X
   // function_ref specialized getGenericContainer<A where ...> (G<A>, e : A.Elt) -> A
-// CHECK:   %18 = function_ref @_T016eager_specialize19getGenericContainerxAA1GVyxG_3EltQz1etAA03HasF0RzAA02AnF0AFRQlF4main1SV_Tg5 : $@convention(thin) (G<S>, X) -> S
+// CHECK:   %18 = function_ref @_T016eager_specialize19getGenericContainerxAA1GVyxG_3EltQz1etAA03HasF0RzAA02AnF0AGRQlF4main1SV_Tg5 : $@convention(thin) (G<S>, X) -> S
 // CHECK:   %19 = apply %18(%15, %17) : $@convention(thin) (G<S>, X) -> S
 // CHECK:   store %19 to %14 : $*S
 // CHECK:   %21 = tuple ()

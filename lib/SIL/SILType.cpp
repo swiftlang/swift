@@ -376,7 +376,6 @@ SILType SILType::getMetatypeInstanceType(SILModule &M) const {
   assert(MetatypeType->is<AnyMetatypeType>() &&
          "This method should only be called on SILTypes with an underlying "
          "metatype type.");
-  assert(isObject() && "Should only be called on object types.");
   Type instanceType =
     MetatypeType->castTo<AnyMetatypeType>()->getInstanceType();
 
@@ -625,4 +624,14 @@ bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
 
 bool SILFunctionType::isNoReturnFunction() {
   return getDirectFormalResultsType().getSwiftRValueType()->isUninhabited();
+}
+
+SILType SILType::wrapAnyOptionalType(SILFunction &F) const {
+  SILModule &M = F.getModule();
+  EnumDecl *OptionalDecl = M.getASTContext().getOptionalDecl(OTK_Optional);
+  BoundGenericType *BoundEnumDecl =
+      BoundGenericType::get(OptionalDecl, Type(), {getSwiftRValueType()});
+  AbstractionPattern Pattern(F.getLoweredFunctionType()->getGenericSignature(),
+                             BoundEnumDecl->getCanonicalType());
+  return M.Types.getLoweredType(Pattern, BoundEnumDecl);
 }

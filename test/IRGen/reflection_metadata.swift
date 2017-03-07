@@ -37,7 +37,7 @@
 // CHECK-DAG: private constant [3 x i8] c"GS\00", section "{{[^"]*}}swift3_reflstr{{[^"]*}}"
 // CHECK-DAG: private constant [3 x i8] c"GE\00", section "{{[^"]*}}swift3_reflstr{{[^"]*}}"
 
-// CHECK-DAG: @"\01l__swift3_reflection_descriptor" = private constant <{ {{.*}} }> <{ i32 1, i32 1, i32 2, {{.*}} }>
+// CHECK-DAG: @"\01l__swift3_reflection_descriptor" = private constant { {{.*}} } { i32 1, i32 1, i32 2, {{.*}} }
 
 // CHECK-DAG: @_T019reflection_metadata10MyProtocol_pMF = internal constant {{.*}}swift3_fieldmd
 // CHECK-DAG: @_T019reflection_metadata7MyClassCMF = internal constant {{.*}}swift3_fieldmd

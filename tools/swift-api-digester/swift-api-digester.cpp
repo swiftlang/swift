@@ -737,16 +737,10 @@ StringRef SDKNodeAbstractFunc::getTypeRoleDescription(SDKContext &Ctx,
                                                       unsigned Index) {
   if (Index == 0) {
     return Ctx.buffer("return");
-  } else if (Index == 1) {
-    return Ctx.buffer("1st parameter");
-  } else if (Index == 2) {
-    return Ctx.buffer("2nd parameter");
-  } else if (Index == 3) {
-    return Ctx.buffer("3rd parameter");
   } else {
     llvm::SmallString<4> Buffer;
-    Buffer += std::to_string(Index);
-    Buffer += "th parameter";
+    Buffer += "parameter ";
+    Buffer += std::to_string(Index - 1);
     return Ctx.buffer(Buffer.str());
   }
 }
@@ -3497,14 +3491,18 @@ static int prepareForDump(const char *Main,
   options::ModuleCachePath;
 
   if (!options::SwiftVersion.empty()) {
-    if (auto Version = version::Version::
-        parseVersionString(options::SwiftVersion, SourceLoc(), nullptr)) {
-      if (Version.getValue().isValidEffectiveLanguageVersion())
-        InitInvok.getLangOptions().EffectiveLanguageVersion = Version.getValue();
-      else {
-        llvm::errs() << "Unsupported Swift Version.\n";
-        return 1;
+    using version::Version;
+    bool isValid = false;
+    if (auto Version = Version::parseVersionString(options::SwiftVersion,
+                                                   SourceLoc(), nullptr)) {
+      if (auto Effective = Version.getValue().getEffectiveLanguageVersion()) {
+        InitInvok.getLangOptions().EffectiveLanguageVersion = *Effective;
+        isValid = true;
       }
+    }
+    if (!isValid) {
+      llvm::errs() << "Unsupported Swift Version.\n";
+      return 1;
     }
   }
 

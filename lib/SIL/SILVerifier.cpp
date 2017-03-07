@@ -1260,13 +1260,17 @@ public:
               "store [init] or store [assign] can only be applied to "
               "non-trivial types");
       break;
-    case StoreOwnershipQualifier::Trivial:
+    case StoreOwnershipQualifier::Trivial: {
       require(
           F.hasQualifiedOwnership(),
           "Inst with qualified ownership in a function that is not qualified");
-      require(SI->getSrc()->getType().isTrivial(SI->getModule()),
-              "A store with trivial ownership must store a trivial type");
+      SILValue Src = SI->getSrc();
+      require(Src->getType().isTrivial(SI->getModule()) ||
+              Src.getOwnershipKind() == ValueOwnershipKind::Trivial,
+              "A store with trivial ownership must store a type with trivial "
+              "ownership");
       break;
+    }
     }
   }
 
@@ -1649,14 +1653,8 @@ public:
   }
 
   // Is a SIL type a potential lowering of a formal type?
-  static bool isLoweringOf(SILType loweredType,
-                           CanType formalType) {
-    
-    
-    // Dynamic self has the same lowering as its contained type.
-    if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalType))
-      formalType = CanType(dynamicSelf->getSelfType());
-
+  bool isLoweringOf(SILType loweredType,
+                    CanType formalType) {
     // Optional lowers its contained type. The difference between Optional
     // and IUO is lowered away.
     SILType loweredObjectType = loweredType
@@ -1670,9 +1668,10 @@ public:
     }
 
     // Metatypes preserve their instance type through lowering.
-    if (auto loweredMT = loweredType.getAs<MetatypeType>()) {
+    if (loweredType.is<MetatypeType>()) {
       if (auto formalMT = dyn_cast<MetatypeType>(formalType)) {
-        return loweredMT.getInstanceType() == formalMT.getInstanceType();
+        return isLoweringOf(loweredType.getMetatypeInstanceType(F.getModule()),
+                            formalMT.getInstanceType());
       }
     }
     if (auto loweredEMT = loweredType.getAs<ExistentialMetatypeType>()) {
@@ -1701,7 +1700,11 @@ public:
         }
         return true;
       }
-    
+
+    // Dynamic self has the same lowering as its contained type.
+    if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalType))
+      formalType = dynamicSelf.getSelfType();
+
     // Other types are preserved through lowering.
     return loweredType.getSwiftRValueType() == formalType;
   }
@@ -3030,7 +3033,7 @@ public:
   void checkSwitchValueInst(SwitchValueInst *SVI) {
     // TODO: Type should be either integer or function
     auto Ty = SVI->getOperand()->getType();
-    require(Ty.getAs<BuiltinIntegerType>() || Ty.getAs<SILFunctionType>(),
+    require(Ty.is<BuiltinIntegerType>() || Ty.is<SILFunctionType>(),
             "switch_value operand should be either of an integer "
             "or function type");
 

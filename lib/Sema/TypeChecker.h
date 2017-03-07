@@ -351,6 +351,14 @@ public:
   ///
   /// \returns true if it's ok to validate requirement, false otherwise.
   virtual bool shouldCheck(RequirementKind kind, Type first, Type second);
+
+  /// Callback to report the result of a satisfied conformance requirement.
+  ///
+  /// \param depTy The dependent type, from the signature.
+  /// \param replacementTy The type \c depTy was replaced with.
+  /// \param conformance The conformance itself.
+  virtual void satisfiedConformance(Type depTy, Type replacementTy,
+                                    ProtocolConformanceRef conformance);
 };
 
 /// Flags that describe the context of type checking a pattern or
@@ -543,9 +551,10 @@ public:
   /// completed before type checking is considered complete.
   llvm::SetVector<NormalProtocolConformance *> UsedConformances;
 
-  /// The list of nominal type declarations that have been validated
-  /// during type checking.
-  llvm::SetVector<NominalTypeDecl *> ValidatedTypes;
+  /// The list of nominal type declarations that we've done at least
+  /// partial validation of during type-checking and which will need
+  /// to be finalized before we can hand off to SILGen etc.
+  llvm::SetVector<NominalTypeDecl *> TypesToFinalize;
 
   using TypeAccessScopeCacheMap = llvm::DenseMap<const ValueDecl *, AccessScope>;
 

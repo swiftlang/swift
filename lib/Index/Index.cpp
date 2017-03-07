@@ -355,7 +355,7 @@ private:
   bool startEntity(Decl *D, IndexSymbol &Info);
   bool startEntityDecl(ValueDecl *D);
 
-  bool reportRelatedRef(ValueDecl *D, SourceLoc Loc, SymbolRoleSet Relations, Decl *Related);
+  bool reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isImplicit, SymbolRoleSet Relations, Decl *Related);
   bool reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations, Decl *Related);
   bool reportInheritedTypeRefs(ArrayRef<TypeLoc> Inherited, Decl *Inheritee);
   NominalTypeDecl *getTypeLocAsNominalTypeDecl(const TypeLoc &Ty);
@@ -624,13 +624,16 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
   return startEntity(D, Info);
 }
 
-bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, SymbolRoleSet Relations, Decl *Related) {
+bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isImplicit,
+                                           SymbolRoleSet Relations, Decl *Related) {
   if (!shouldIndex(D))
     return true;
 
   IndexSymbol Info;
   if (addRelation(Info, Relations, Related))
     return true;
+  if (isImplicit)
+    Info.roles |= (unsigned)SymbolRole::Implicit;
 
   // don't report this ref again when visitDeclReference reports it
   repressRefAtLoc(Loc);
@@ -655,9 +658,24 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
 
   if (IdentTypeRepr *T = dyn_cast_or_null<IdentTypeRepr>(Ty.getTypeRepr())) {
     auto Comps = T->getComponentRange();
-    if (auto NTD =
-            dyn_cast_or_null<NominalTypeDecl>(Comps.back()->getBoundDecl())) {
-      if (!reportRelatedRef(NTD, Comps.back()->getIdLoc(), Relations, Related))
+    SourceLoc IdLoc = Comps.back()->getIdLoc();
+    NominalTypeDecl *NTD = nullptr;
+    bool isImplicit = false;
+    if (auto *VD = Comps.back()->getBoundDecl()) {
+      if (auto *TAD = dyn_cast<TypeAliasDecl>(VD)) {
+        IndexSymbol Info;
+        if (!reportRef(TAD, IdLoc, Info))
+          return false;
+        if (auto Ty = TAD->getUnderlyingTypeLoc().getType()) {
+          NTD = Ty->getAnyNominal();
+          isImplicit = true;
+        }
+      } else {
+        NTD = dyn_cast<NominalTypeDecl>(VD);
+      }
+    }
+    if (NTD) {
+      if (!reportRelatedRef(NTD, IdLoc, isImplicit, Relations, Related))
         return false;
     }
     return true;
@@ -665,7 +683,7 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
 
   if (Ty.getType()) {
     if (auto nominal = Ty.getType()->getAnyNominal())
-      if (!reportRelatedRef(nominal, Ty.getLoc(), Relations, Related))
+      if (!reportRelatedRef(nominal, Ty.getLoc(), /*isImplicit=*/false, Relations, Related))
         return false;
   }
   return true;
@@ -752,8 +770,8 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
   if (!startEntity(D, Info))
     return false;
 
-  if (!reportRelatedRef(NTD, Loc, (SymbolRoleSet)SymbolRole::RelationExtendedBy,
-                        D))
+  if (!reportRelatedRef(NTD, Loc, /*isImplicit=*/false,
+                        (SymbolRoleSet)SymbolRole::RelationExtendedBy, D))
       return false;
   if (!reportInheritedTypeRefs(D->getInherited(), D))
       return false;

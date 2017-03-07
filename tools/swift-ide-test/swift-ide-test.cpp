@@ -2957,7 +2957,8 @@ int main(int argc, char *argv[]) {
     if (auto swiftVersion =
           version::Version::parseVersionString(options::SwiftVersion,
                                                SourceLoc(), nullptr)) {
-      InitInvok.getLangOptions().EffectiveLanguageVersion = *swiftVersion;
+      if (auto actual = swiftVersion.getValue().getEffectiveLanguageVersion())
+        InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();
     }
   }
   InitInvok.getClangImporterOptions().ModuleCachePath =

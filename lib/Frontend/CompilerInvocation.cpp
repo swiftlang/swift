@@ -802,7 +802,7 @@ static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
 
   // Check for an unneeded minor version, otherwise just list valid versions
   if (vers.hasValue() && !vers.getValue().empty() &&
-      vers.getValue().asMajorVersion().isValidEffectiveLanguageVersion()) {
+      vers.getValue().asMajorVersion().getEffectiveLanguageVersion()) {
     diags.diagnose(SourceLoc(), diag::note_swift_version_major,
                    vers.getValue()[0]);
   } else {
@@ -822,12 +822,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (auto A = Args.getLastArg(OPT_swift_version)) {
     auto vers = version::Version::parseVersionString(
       A->getValue(), SourceLoc(), &Diags);
-    if (vers.hasValue() &&
-        vers.getValue().isValidEffectiveLanguageVersion()) {
-      Opts.EffectiveLanguageVersion = vers.getValue();
-    } else {
-      diagnoseSwiftVersion(vers, A, Args, Diags);
+    bool isValid = false;
+    if (vers.hasValue()) {
+      if (auto effectiveVers = vers.getValue().getEffectiveLanguageVersion()) {
+        Opts.EffectiveLanguageVersion = effectiveVers.getValue();
+        isValid = true;
+      }
     }
+    if (!isValid)
+      diagnoseSwiftVersion(vers, A, Args, Diags);
   }
 
   Opts.AttachCommentsToDecls |= Args.hasArg(OPT_dump_api_path);
@@ -1111,7 +1114,8 @@ static void PrintArg(raw_ostream &OS, const char *Arg, bool Quote) {
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                          IRGenOptions &IRGenOpts,
                          FrontendOptions &FEOpts,
-                         DiagnosticEngine &Diags) {
+                         DiagnosticEngine &Diags,
+                         const llvm::Triple &Triple) {
   using namespace options;
 
   if (const Arg *A = Args.getLastArg(OPT_sil_inline_threshold)) {
@@ -1225,6 +1229,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       BaseName = FEOpts.ModuleName;
     Opts.SILOutputFileNameForDebugging = BaseName.str();
   }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
+    Opts.Sanitize = parseSanitizerArgValues(A, Triple, Diags);
+    IRGenOpts.Sanitize = Opts.Sanitize;
+  }
+
   return false;
 }
 
@@ -1400,10 +1410,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
-  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
-    Opts.Sanitize = parseSanitizerArgValues(A, Triple, Diags);
-  }
-
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
     Opts.SanitizeCoverage =
         parseSanitizerCoverageArgValue(A, Triple, Diags, Opts.Sanitize);
@@ -1471,7 +1477,8 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts, Diags)) {
+  if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts, Diags,
+                   LangOpts.Target)) {
     return true;
   }
 

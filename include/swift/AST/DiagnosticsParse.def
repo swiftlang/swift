@@ -448,6 +448,10 @@ ERROR(expected_sil_constant,none,
       "expected constant in SIL code", ())
 ERROR(referenced_value_no_accessor,none,
       "referenced declaration has no %select{getter|setter}0", (unsigned))
+ERROR(expected_sil_value_ownership_kind,none,
+      "expected value ownership kind in SIL code", ())
+ERROR(expected_sil_colon,none,
+      "expected ':' before %0", (StringRef))
 
 // SIL Values
 ERROR(sil_value_redefinition,none,
@@ -591,6 +595,8 @@ ERROR(sil_witness_protocol_not_found,none,
       "sil protocol not found %0", (Identifier))
 ERROR(sil_witness_assoc_not_found,none,
       "sil associated type decl not found %0", (Identifier))
+ERROR(sil_witness_assoc_conf_not_found,none,
+      "sil associated type path for conformance not found %0", (StringRef))
 ERROR(sil_witness_protocol_conformance_not_found,none,
       "sil protocol conformance not found", ())
 
@@ -749,8 +755,6 @@ ERROR(no_default_arg_subscript,none,
       "default arguments are not allowed in subscripts", ())
 ERROR(no_default_arg_curried,none,
       "default arguments are not allowed in curried parameter lists", ())
-WARNING(let_on_param_is_redundant, none,
-      "'let' keyword is unnecessary; function parameters are immutable by default", (unsigned))
 ERROR(var_pattern_in_var,none,
       "'%select{var|let}0' cannot appear nested inside another 'var' or "
       "'let' pattern", (unsigned))

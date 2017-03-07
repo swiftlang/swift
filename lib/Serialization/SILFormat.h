@@ -200,7 +200,7 @@ namespace sil_block {
 
   using WitnessAssocProtocolLayout = BCRecordLayout<
     SIL_WITNESS_ASSOC_PROTOCOL,
-    DeclIDField, // ID of AssociatedTypeDecl
+    TypeIDField, // ID of associated type
     DeclIDField  // ID of ProtocolDecl
     // Trailed by the conformance itself if appropriate.
   >;

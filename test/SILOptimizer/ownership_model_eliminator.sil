@@ -174,3 +174,22 @@ bb3:
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil @end_lifetime_test : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: end_lifetime {{%.*}} : $Builtin.NativeObject
+sil @end_lifetime_test : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  end_lifetime %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @unchecked_ownership_conversion_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Builtin.NativeObject):
+// CHECK: return [[ARG]] : $Builtin.NativeObject
+sil @unchecked_ownership_conversion_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = unchecked_ownership_conversion %0 : $Builtin.NativeObject, @guaranteed to @owned
+  return %1 : $Builtin.NativeObject
+}
+

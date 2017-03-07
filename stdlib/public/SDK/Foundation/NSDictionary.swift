@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Foundation // Clang module
+import _SwiftFoundationOverlayShims
 
 //===----------------------------------------------------------------------===//
 // Dictionaries
@@ -231,24 +232,13 @@ extension NSDictionary {
 
     let valueBuffer = buffer.bindMemory(to: AnyObject.self, capacity: numElems)
     let buffer2 = buffer + singleSize
-    let keyBuffer = buffer2.bindMemory(to: AnyObject.self, capacity: numElems)
 
-    _stdlib_NSDictionary_getObjects(
-      nsDictionary: otherDictionary,
-      objects: valueBuffer,
-      andKeys: keyBuffer)
+    __NSDictionaryGetObjects(otherDictionary, buffer, buffer2, UInt(numElems))
 
     let keyBufferCopying = buffer2.assumingMemoryBound(to: NSCopying.self)
     self.init(objects: valueBuffer, forKeys: keyBufferCopying, count: numElems)
   }
 }
-
-@_silgen_name("__NSDictionaryGetObjects")
-func _stdlib_NSDictionary_getObjects(
-  nsDictionary: NSDictionary,
-  objects: UnsafeMutablePointer<AnyObject>?,
-  andKeys keys: UnsafeMutablePointer<AnyObject>?
-)
 
 extension NSDictionary : CustomReflectable {
   public var customMirror: Mirror {

@@ -15,7 +15,7 @@ public extension P where Foo == DefaultFoo<Self> {
   }
 }
 
-// CHECK: define{{( protected)?}} swiftcc void @_T021same_type_constraints1PPAaaBRzAA10DefaultFooVyxG0E0RtzlE3fooAEyxGyF
+// CHECK: define{{( protected)?}} swiftcc void @_T021same_type_constraints1PPA2aBRzAA10DefaultFooVyxG0E0RtzlE3fooAFyF
 
 // <rdar://26873036> IRGen crash with derived class declaring same-type constraint on constrained associatedtype.
 public class C1<T: Equatable> { }

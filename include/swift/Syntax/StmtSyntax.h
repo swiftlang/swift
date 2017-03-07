@@ -57,9 +57,11 @@ public:
 ///            | do-statement ';'?
 ///            | compiler-control-statement ';'?
 class StmtSyntax : public Syntax {
+  friend class Syntax;
 protected:
   StmtSyntax(const RC<SyntaxData> Root, const StmtSyntaxData *Data);
 public:
+  using DataType = StmtSyntaxData;
   static bool classof(const Syntax *S) {
     return S->isStmt();
   }
@@ -130,6 +132,7 @@ class CodeBlockStmtSyntax : public StmtSyntax {
   };
   friend struct SyntaxFactory;
   friend class CodeBlockStmtSyntaxData;
+  friend class FunctionDeclSyntax;
 
   CodeBlockStmtSyntax(const RC<SyntaxData> Root, CodeBlockStmtSyntaxData *Data);
 
@@ -166,55 +169,30 @@ public:
 #pragma mark -
 #pragma mark statements Data
 
-class StmtListSyntaxData final : public StmtSyntaxData {
-  friend class SyntaxData;
-  friend class StmtListSyntax;
-  friend class StmtListSyntaxBuilder;
-
-  StmtListSyntaxData(RC<RawSyntax> Raw,
-                     const SyntaxData *Parent = nullptr,
-                     CursorIndex IndexInParent = 0);
-  static RC<StmtListSyntaxData> make(RC<RawSyntax> Raw,
-                                     const SyntaxData *Parent = nullptr,
-                                     CursorIndex IndexInParent = 0);
-  static RC<StmtListSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *SD) {
-    return SD->getKind() == SyntaxKind::StmtList;
-  }
-};
+using StmtListSyntaxData =
+  SyntaxCollectionData<SyntaxKind::StmtList, StmtSyntax>;
 
 #pragma mark -
 #pragma mark statements API
 
 /// statements -> statement
 ///             | statement statements
-class StmtListSyntax final : public Syntax {
+class StmtListSyntax final
+    : public SyntaxCollection<SyntaxKind::StmtList, StmtSyntax> {
   friend struct SyntaxFactory;
-  friend class StmtListSyntaxBuilder;
+  friend class Syntax;
   friend class SyntaxData;
+  friend class FunctionDeclSyntax;
 
   using DataType = StmtListSyntaxData;
 
-  StmtListSyntax(const RC<SyntaxData> Root, const StmtListSyntaxData *Data);
-public:
-  /// Returns a new statement list with an additional statement.
-  StmtListSyntax withAddedStatement(Syntax AdditionalStatement) const;
+  StmtListSyntax(const RC<SyntaxData> Root, const DataType *Data)
+    : SyntaxCollection(Root, Data) {}
 
+public:
   static bool classof(const Syntax *S) {
     return S->getKind() == SyntaxKind::StmtList;
   }
-};
-
-#pragma mark -
-#pragma mark statements Builder
-
-class StmtListSyntaxBuilder final {
-  RawSyntax::LayoutList StmtListLayout;
-public:
-  StmtListSyntaxBuilder &addStatement(Syntax Statement);
-  StmtListSyntax build() const;
 };
 
 #pragma mark -

@@ -383,6 +383,7 @@ CONSTANT_OWNERSHIP_INST(Owned, true, StrongUnpin)
 CONSTANT_OWNERSHIP_INST(Owned, true, UnownedRelease)
 CONSTANT_OWNERSHIP_INST(Owned, true, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(Owned, true, OpenExistentialOpaque)
+CONSTANT_OWNERSHIP_INST(Owned, true, EndLifetime)
 CONSTANT_OWNERSHIP_INST(Trivial, false, AddressToPointer)
 CONSTANT_OWNERSHIP_INST(Trivial, false, BindMemory)
 CONSTANT_OWNERSHIP_INST(Trivial, false, CheckedCastAddrBranch)
@@ -477,6 +478,7 @@ ACCEPTS_ANY_OWNERSHIP_INST(DynamicMethodBranch)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedTrivialBitCast)
 ACCEPTS_ANY_OWNERSHIP_INST(ExistentialMetatype)
 ACCEPTS_ANY_OWNERSHIP_INST(ValueMetatype)
+ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
 // Trivial if trivial typed, otherwise must accept owned?

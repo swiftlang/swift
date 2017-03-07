@@ -252,6 +252,25 @@ AbstractStorageDecl *ProtocolConformance::getBehaviorDecl() const {
   return getRootNormalConformance()->getBehaviorDecl();
 }
 
+void NormalProtocolConformance::setSignatureConformances(
+                               ArrayRef<ProtocolConformanceRef> conformances) {
+  auto &ctx = getProtocol()->getASTContext();
+  SignatureConformances = ctx.AllocateCopy(conformances);
+
+#if !NDEBUG
+  unsigned idx = 0;
+  for (auto req : getProtocol()->getRequirementSignature()->getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance) {
+      assert(idx < conformances.size());
+      assert(conformances[idx].getRequirement() ==
+               req.getSecondType()->castTo<ProtocolType>()->getDecl());
+      ++idx;
+    }
+  }
+  assert(idx == conformances.size() && "Too many conformances");
+#endif
+}
+
 void NormalProtocolConformance::resolveLazyInfo() const {
   assert(Resolver);
   assert(isComplete());
@@ -317,6 +336,61 @@ void NormalProtocolConformance::setTypeWitness(
   TypeWitnesses[assocType] = std::make_pair(substitution, typeDecl);
 }
 
+Type NormalProtocolConformance::getAssociatedType(Type assocType,
+                                                LazyResolver *resolver) const {
+  assert(assocType->isTypeParameter() &&
+         "associated type must be a type parameter");
+
+  auto type = assocType->getCanonicalType();
+  auto proto = getProtocol();
+
+#if false
+  // Fast path for generic parameters.
+  if (isa<GenericTypeParamType>(type)) {
+    assert(type->isEqual(proto->getSelfInterfaceType()) &&
+           "type parameter in protocol was not Self");
+    return getType();
+  }
+
+  // Fast path for dependent member types on 'Self' of our associated types.
+  auto memberType = cast<DependentMemberType>(type);
+  if (memberType.getBase()->isEqual(proto->getProtocolSelfType()) &&
+      memberType->getAssocType()->getProtocol() == proto)
+    return getTypeWitness(memberType->getAssocType(), nullptr).getReplacement();
+#endif
+
+  // General case: consult the substitution map.
+  auto self = const_cast<NormalProtocolConformance *>(this);
+  auto substMap =
+    SubstitutionMap::getProtocolSubstitutions(proto, getType(),
+                                              ProtocolConformanceRef(self));
+  return type.subst(substMap);
+}
+
+ProtocolConformanceRef
+NormalProtocolConformance::getAssociatedConformance(Type assocType,
+                                                    ProtocolDecl *protocol,
+                                                LazyResolver *resolver) const {
+  assert(assocType->isTypeParameter() &&
+         "associated type must be a type parameter");
+
+  unsigned conformanceIndex = 0;
+  for (auto &reqt :
+         getProtocol()->getRequirementSignature()->getRequirements()) {
+    if (reqt.getKind() == RequirementKind::Conformance) {
+      // Is this the conformance we're looking for?
+      if (reqt.getFirstType()->isEqual(assocType) &&
+          reqt.getSecondType()->castTo<ProtocolType>()->getDecl() == protocol)
+        return getSignatureConformances()[conformanceIndex];
+
+      ++conformanceIndex;
+    }
+  }
+
+  llvm_unreachable(
+    "requested conformance was not a direct requirement of the protocol");
+}
+
   /// Retrieve the value witness corresponding to the given requirement.
 Witness NormalProtocolConformance::getWitness(ValueDecl *requirement,
                                               LazyResolver *resolver) const {
@@ -347,7 +421,11 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
   assert(getProtocol() == cast<ProtocolDecl>(requirement->getDeclContext()) &&
          "requirement in wrong protocol");
   assert(Mapping.count(requirement) == 0 && "Witness already known");
-  assert((!isComplete() || isInvalid()) && "Conformance already complete?");
+  assert((!isComplete() || isInvalid() ||
+          requirement->getAttrs().hasAttribute<OptionalAttr>() ||
+          requirement->getAttrs().isUnavailable(
+                                        requirement->getASTContext())) &&
+				 "Conformance already complete?");
   Mapping[requirement] = witness;
 }
 

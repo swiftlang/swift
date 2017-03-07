@@ -10,7 +10,7 @@ import def_noinline
 
 // SIL-LABEL: sil @main
 // SIL: [[RAW:%.+]] = global_addr @_T08noinline3rawSbv : $*Bool
-// SIL: [[FUNC:%.+]] = function_ref @_T012def_noinline12testNoinlineSbSb1x_tF : $@convention(thin) (Bool) -> Bool
+// SIL: [[FUNC:%.+]] = function_ref @_T012def_noinline12testNoinlineS2b1x_tF : $@convention(thin) (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@convention(thin) (Bool) -> Bool
 // SIL: store [[RESULT]] to [trivial] [[RAW]] : $*Bool
 var raw = testNoinline(x: false)
@@ -20,6 +20,6 @@ var raw = testNoinline(x: false)
 
 var a = NoInlineInitStruct(x: false)
 
-// SIL-LABEL: [fragile] [noinline] @_T012def_noinline12testNoinlineSbSb1x_tF : $@convention(thin) (Bool) -> Bool
+// SIL-LABEL: [fragile] [noinline] @_T012def_noinline12testNoinlineS2b1x_tF : $@convention(thin) (Bool) -> Bool
 
 // SIL-LABEL: sil public_external [fragile] [noinline] @_T012def_noinline18NoInlineInitStructVACSb1x_tcfC : $@convention(method) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct {

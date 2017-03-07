@@ -1,0 +1,34 @@
+//===-- StandardTypesMangling.def ----Mangling Metaprogramming --*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+/// STANDARD_TYPE(KIND, MANGLING, TYPENAME)
+///   The 1-character MANGLING for a known TYPENAME of KIND.
+
+STANDARD_TYPE(Structure, a, Array)
+STANDARD_TYPE(Structure, b, Bool)
+STANDARD_TYPE(Structure, c, UnicodeScalar)
+STANDARD_TYPE(Structure, d, Double)
+STANDARD_TYPE(Structure, f, Float)
+STANDARD_TYPE(Structure, i, Int)
+STANDARD_TYPE(Structure, V, UnsafeRawPointer)
+STANDARD_TYPE(Structure, v, UnsafeMutableRawPointer)
+STANDARD_TYPE(Structure, P, UnsafePointer)
+STANDARD_TYPE(Structure, p, UnsafeMutablePointer)
+STANDARD_TYPE(Structure, R, UnsafeBufferPointer)
+STANDARD_TYPE(Structure, r, UnsafeMutableBufferPointer)
+STANDARD_TYPE(Structure, S, String)
+STANDARD_TYPE(Structure, u, UInt)
+
+STANDARD_TYPE(Enum, q, Optional)
+STANDARD_TYPE(Enum, Q, ImplicitlyUnwrappedOptional)
+
+#undef STANDARD_TYPE

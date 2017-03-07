@@ -32,10 +32,10 @@ func generic_get_func<T>(_ t1: T, _ b: Bool) -> (T) -> T {
 	return generic
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_T04test7testit1SiSicSbF : $@convention(thin) (Bool) -> @owned @callee_owned (Int) -> Int {
+// CHECK-LABEL: sil hidden [noinline] @_T04test7testit1S2icSbF : $@convention(thin) (Bool) -> @owned @callee_owned (Int) -> Int {
 // CHECK: [[F:%[0-9]+]] = function_ref @_T04test16generic_get_funcxxcx_SbtlFSi_Tg5 : $@convention(thin) (Int, Bool) -> @owned @callee_owned (@in Int) -> @out Int
 // CHECK: [[CL:%[0-9]+]] = apply [[F]](%{{[0-9]+}}, %0) : $@convention(thin) (Int, Bool) -> @owned @callee_owned (@in Int) -> @out Int
-// CHECK: [[TH:%[0-9]+]] = function_ref @_T0SiSiIxir_SiSiIxyd_TR : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> @out Int) -> Int
+// CHECK: [[TH:%[0-9]+]] = function_ref @_T0S2iIxir_S2iIxyd_TR : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> @out Int) -> Int
 // CHECK: [[RET:%[0-9]+]] = partial_apply [[TH]]([[CL]]) : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> @out Int) -> Int
 // CHECK: return [[RET]] : $@callee_owned (Int) -> Int
 @inline(never)
@@ -52,7 +52,7 @@ func generic2<T>(_ t1: T, t2: T, b: Bool) -> T {
 // No reabstraction thunk is needed because the returned closure expects direct
 // args/result anyway.
 
-// CHECK-LABEL: sil hidden [noinline] @_T04test17concrete_get_funcSiSi_SiSbtcyF : $@convention(thin) () -> @owned @callee_owned (Int, Int, Bool) -> Int {
+// CHECK-LABEL: sil hidden [noinline] @_T04test17concrete_get_funcS2i_SiSbtcyF : $@convention(thin) () -> @owned @callee_owned (Int, Int, Bool) -> Int {
 // CHECK: [[F:%[0-9]+]] = function_ref @_T04test8generic2xx_x2t2Sb1btlFSi_Tg5 : $@convention(thin) (Int, Int, Bool) -> Int
 // CHECK: [[RET:%[0-9]+]] = thin_to_thick_function [[F]] : $@convention(thin) (Int, Int, Bool) -> Int to $@callee_owned (Int, Int, Bool) -> Int
 // CHECK: return [[RET]] : $@callee_owned (Int, Int, Bool) -> Int
@@ -106,10 +106,10 @@ func generic_get_func_throwing<T>(_ b: Bool) -> (T) throws -> T {
 	return generic
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_T04test16testit1_throwingSiSiKcSbF : $@convention(thin) (Bool) -> @owned @callee_owned (Int) -> (Int, @error Error) {
+// CHECK-LABEL: sil hidden [noinline] @_T04test16testit1_throwingS2iKcSbF : $@convention(thin) (Bool) -> @owned @callee_owned (Int) -> (Int, @error Error) {
 // CHECK: [[F:%[0-9]+]] = function_ref @_T04test25generic_get_func_throwingxxKcSblFSi_Tg5 : $@convention(thin) (Bool) -> @owned @callee_owned (@in Int) -> (@out Int, @error Error)
 // CHECK: [[CL:%[0-9]+]] = apply [[F]](%0) : $@convention(thin) (Bool) -> @owned @callee_owned (@in Int) -> (@out Int, @error Error)
-// CHECK: [[TH:%[0-9]+]] = function_ref @_T0SiSis5Error_pIxirzo_SiSisAA_pIxydzo_TR : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> (@out Int, @error Error)) -> (Int, @error Error)
+// CHECK: [[TH:%[0-9]+]] = function_ref @_T0S2is5Error_pIxirzo_S2isAA_pIxydzo_TR : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> (@out Int, @error Error)) -> (Int, @error Error)
 // CHECK: [[RET:%[0-9]+]] = partial_apply [[TH]]([[CL]]) : $@convention(thin) (Int, @owned @callee_owned (@in Int) -> (@out Int, @error Error)) -> (Int, @error Error)
 // CHECK: return [[RET]] : $@callee_owned (Int) -> (Int, @error Error)
 @inline(never)
@@ -129,7 +129,7 @@ func generic2_throwing<T>(_ t1: T, b: Bool) throws -> T {
 // No reabstraction thunk is needed because the returned closure expects direct
 // args/result anyway.
 
-// CHECK-LABEL: sil hidden [noinline] @_T04test26concrete_get_func_throwingSiSi_SbtKcyF : $@convention(thin) () -> @owned @callee_owned (Int, Bool) -> (Int, @error Error) {
+// CHECK-LABEL: sil hidden [noinline] @_T04test26concrete_get_func_throwingS2i_SbtKcyF : $@convention(thin) () -> @owned @callee_owned (Int, Bool) -> (Int, @error Error) {
 // CHECK: [[F:%[0-9]+]] = function_ref @_T04test17generic2_throwingxx_Sb1btKlFSi_Tg5 : $@convention(thin) (Int, Bool) -> (Int, @error Error)
 // CHECK: [[RET:%[0-9]+]] = thin_to_thick_function [[F]] : $@convention(thin) (Int, Bool) -> (Int, @error Error) to $@callee_owned (Int, Bool) -> (Int, @error Error)
 // CHECK: return [[RET]] : $@callee_owned (Int, Bool) -> (Int, @error Error)

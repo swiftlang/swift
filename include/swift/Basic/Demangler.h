@@ -35,6 +35,8 @@ using llvm::StringRef;
 namespace swift {
 namespace Demangle {
 
+class CharVector;
+  
 /// The allocator for demangling nodes and other demangling-internal stuff.
 ///
 /// It implements a simple bump-pointer allocator.
@@ -77,15 +79,15 @@ public:
 #endif
   }
   
-  ~NodeFactory() {
+  virtual ~NodeFactory() {
     freeSlabs(CurrentSlab);
 #ifdef NODE_FACTORY_DEBUGGING
     std::cerr << "Delete NodeFactory " << this << "\n";
 #endif
   }
   
-  void clear();
-
+  virtual void clear();
+  
   /// Allocates an object of type T or an array of objects of type T.
   template<typename T> T *Allocate(size_t NumObjects = 1) {
     size_t ObjectSize = NumObjects * sizeof(T);
@@ -170,14 +172,114 @@ public:
 
   /// Creates a node of kind \p K with a \p Text payload.
   ///
-  /// The \p Text string is copied.
-  NodePointer createNode(Node::Kind K, llvm::StringRef Text);
+  /// The \p Text string must be already allocted with the Factory and therefore
+  /// it is _not_ copied.
+  NodePointer createNodeWithAllocatedText(Node::Kind K, llvm::StringRef Text);
 
+  /// Creates a node of kind \p K with a \p Text payload.
+  ///
+  /// The \p Text string is copied.
+  NodePointer createNode(Node::Kind K, llvm::StringRef Text) {
+    return createNodeWithAllocatedText(K, Text.copy(*this));
+  }
+
+  /// Creates a node of kind \p K with a \p Text payload.
+  ///
+  /// The \p Text string is already allocted with the Factory and therefore
+  /// it is _not_ copied.
+  NodePointer createNode(Node::Kind K, const CharVector &Text);
+  
   /// Creates a node of kind \p K with a \p Text payload, which must be a C
   /// string literal.
   ///
   /// The \p Text string is _not_ copied.
   NodePointer createNode(Node::Kind K, const char *Text);
+};
+
+/// A vector with a storage managed by a NodeFactory.
+///
+/// This Vector class only provides the minimal functionality needed by the
+/// Demangler.
+template<typename T> class Vector {
+
+protected:
+  T *Elems = nullptr;
+  size_t NumElems = 0;
+  size_t Capacity = 0;
+
+public:
+  
+  typedef T *iterator;
+
+  Vector() { }
+
+  /// Construct a vector with an inital capacity.
+  explicit Vector(NodeFactory &Factory, size_t InitialCapacity) {
+    init(Factory, InitialCapacity);
+  }
+
+  /// Clears the content and re-allocates the buffer with an initial capacity.
+  void init(NodeFactory &Factory, size_t InitialCapacity) {
+    Elems = Factory.Allocate<T>(InitialCapacity);
+    NumElems = 0;
+    Capacity = InitialCapacity;
+  }
+  
+  void free() {
+    Capacity = 0;
+    Elems = 0;
+  }
+  
+  iterator begin() { return Elems; }
+  iterator end() { return Elems + NumElems; }
+  
+  T &operator[](size_t Idx) {
+    assert(Idx < NumElems);
+    return Elems[Idx];
+  }
+
+  const T &operator[](size_t Idx) const {
+    assert(Idx < NumElems);
+    return Elems[Idx];
+  }
+  
+  size_t size() const { return NumElems; }
+
+  bool empty() const { return NumElems == 0; }
+
+  T &back() { return (*this)[NumElems - 1]; }
+
+  void push_back(const T &NewElem, NodeFactory &Factory) {
+    if (NumElems >= Capacity)
+      Factory.Reallocate(Elems, Capacity, /*Growth*/ 1);
+    assert(NumElems < Capacity);
+    Elems[NumElems++] = NewElem;
+  }
+
+  T pop_back_val() {
+    if (empty())
+      return T();
+    T Val = (*this)[NumElems - 1];
+    NumElems--;
+    return Val;
+  }
+};
+
+/// A vector of chars (a string) with a storage managed by a NodeFactory.
+///
+/// This CharVector class only provides the minimal functionality needed by the
+/// Demangler.
+class CharVector : public Vector<char> {
+public:
+  // Append another string.
+  void append(StringRef Rhs, NodeFactory &Factory);
+
+  // Append an integer as readable number.
+  void append(int Number, NodeFactory &Factory);
+
+  StringRef str() const {
+    return StringRef(Elems, NumElems);
+  }
 };
 
 /// The demangler.
@@ -194,21 +296,13 @@ private:
     size_t Pos;
   };
 
-  std::vector<NodeWithPos> NodeStack;
-  std::vector<NodePointer> Substitutions;
-  std::vector<unsigned> PendingSubstitutions;
+  Vector<NodeWithPos> NodeStack;
+  Vector<NodePointer> Substitutions;
+  Vector<unsigned> PendingSubstitutions;
 
   static const int MaxNumWords = 26;
   StringRef Words[MaxNumWords];
   int NumWords = 0;
-
-  static NodePointer pop_back_val(std::vector<NodePointer> &NodeVector) {
-    if (NodeVector.empty())
-      return nullptr;
-    NodePointer Val = NodeVector.back();
-    NodeVector.pop_back();
-    return Val;
-  }
 
   bool nextIf(StringRef str) {
     if (!Text.substr(Pos).startswith(str)) return false;
@@ -241,16 +335,11 @@ private:
   }
 
   void pushNode(NodePointer Nd) {
-    NodeStack.push_back({ Nd, Pos });
+    NodeStack.push_back({ Nd, Pos }, *this);
   }
 
   NodePointer popNode() {
-    if (!NodeStack.empty()) {
-      NodePointer Val = NodeStack.back().Node;
-      NodeStack.pop_back();
-      return Val;
-    }
-    return nullptr;
+    return NodeStack.pop_back_val().Node;
   }
 
   NodePointer popNode(Node::Kind kind) {
@@ -279,7 +368,7 @@ private:
   
   void addSubstitution(NodePointer Nd) {
     if (Nd)
-      Substitutions.push_back(Nd);
+      Substitutions.push_back(Nd, *this);
   }
 
   NodePointer addChild(NodePointer Parent, NodePointer Child);
@@ -306,8 +395,10 @@ private:
   NodePointer demangleOperatorIdentifier();
 
   NodePointer demangleMultiSubstitutions();
-  NodePointer createSwiftType(Node::Kind typeKind, StringRef name);
-  NodePointer demangleKnownType();
+  NodePointer pushMultiSubstitutions(int RepeatCount, size_t SubstIdx);
+  NodePointer createSwiftType(Node::Kind typeKind, const char *name);
+  NodePointer demangleStandardSubstitution();
+  NodePointer createStandardSubstitution(char Subst);
   NodePointer demangleLocalIdentifier();
 
   NodePointer popModule();
@@ -326,7 +417,7 @@ private:
   NodePointer popProtocol();
   NodePointer demangleBoundGenericType();
   NodePointer demangleBoundGenericArgs(NodePointer nominalType,
-                                    const std::vector<NodePointer> &TypeLists,
+                                    const Vector<NodePointer> &TypeLists,
                                     size_t TypeListIdx);
   NodePointer demangleInitializer();
   NodePointer demangleImplParamConvention();
@@ -367,6 +458,8 @@ private:
 
 public:
   Demangler() {}
+  
+  void clear() override;
 
   /// Demangle the given symbol and return the parse tree.
   ///

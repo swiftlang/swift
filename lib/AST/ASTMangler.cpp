@@ -589,18 +589,24 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::BoundGenericEnum:
     case TypeKind::BoundGenericStruct:
       if (type->isSpecialized()) {
+        // Try to mangle the entire name as a substitution.
+        if (tryMangleSubstitution(type.getPointer()))
+          return;
+
         NominalTypeDecl *NDecl = type->getAnyNominal();
         if (isStdlibType(NDecl) && NDecl->getName().str() == "Optional") {
           auto GenArgs = type->castTo<BoundGenericType>()->getGenericArgs();
           assert(GenArgs.size() == 1);
           appendType(GenArgs[0]);
-          return appendOperator("Sg");
+          appendOperator("Sg");
+        } else {
+          appendNominalType(NDecl);
+          bool isFirstArgList = true;
+          appendBoundGenericArgs(type, isFirstArgList);
+          appendOperator("G");
         }
-
-        appendNominalType(NDecl);
-        bool isFirstArgList = true;
-        appendBoundGenericArgs(type, isFirstArgList);
-        return appendOperator("G");
+        addSubstitution(type.getPointer());
+        return;
       }
       appendNominalType(tybase->getAnyNominal());
       return;
@@ -1577,54 +1583,10 @@ bool ASTMangler::tryAppendStandardSubstitution(const NominalTypeDecl *decl) {
   if (!isStdlibType(decl))
     return false;
 
-  StringRef name = decl->getName().str();
-  if (name == "Int") {
-    appendOperator("Si");
-    return true;
-  } else if (name == "UInt") {
-    appendOperator("Su");
-    return true;
-  } else if (name == "Bool") {
-    appendOperator("Sb");
-    return true;
-  } else if (name == "UnicodeScalar") {
-    appendOperator("Sc");
-    return true;
-  } else if (name == "Double") {
-    appendOperator("Sd");
-    return true;
-  } else if (name == "Float") {
-    appendOperator("Sf");
-    return true;
-  } else if (name == "UnsafeRawPointer") {
-    appendOperator("SV");
-    return true;
-  } else if (name == "UnsafeMutableRawPointer") {
-    appendOperator("Sv");
-    return true;
-  } else if (name == "UnsafePointer") {
-    appendOperator("SP");
-    return true;
-  } else if (name == "UnsafeMutablePointer") {
-    appendOperator("Sp");
-    return true;
-  } else if (name == "Optional") {
-    appendOperator("Sq");
-    return true;
-  } else if (name == "ImplicitlyUnwrappedOptional") {
-    appendOperator("SQ");
-    return true;
-  } else if (name == "UnsafeBufferPointer") {
-    appendOperator("SR");
-    return true;
-  } else if (name == "UnsafeMutableBufferPointer") {
-    appendOperator("Sr");
-    return true;
-  } else if (name == "Array") {
-    appendOperator("Sa");
-    return true;
-  } else if (name == "String") {
-    appendOperator("SS");
+  if (char Subst = getStandardTypeSubst(decl->getName().str())) {
+    if (!SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ true)) {
+      appendOperator("S", StringRef(&Subst, 1));
+    }
     return true;
   }
   return false;

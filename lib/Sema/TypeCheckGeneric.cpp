@@ -20,6 +20,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 
@@ -399,6 +400,8 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
     return false;
   }
   }
+
+  llvm_unreachable("Unhandled RequirementKind in switch.");
 }
 
 void
@@ -1124,10 +1127,13 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
     UnsatisfiedDependency *unsatisfiedDependency,
     ConformanceCheckOptions conformanceOptions,
     GenericRequirementsCheckListener *listener) {
+  bool valid = true;
+
   for (const auto &rawReq : genericSig->getRequirements()) {
     auto req = rawReq.subst(substitutions, conformances);
     if (!req) {
       // Another requirement will fail later; just continue.
+      valid = false;
       continue;
     }
 
@@ -1138,8 +1144,10 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
     if (kind != RequirementKind::Layout) {
       rawSecondType = rawReq.getSecondType();
       secondType = req->getSecondType().subst(substitutions, conformances);
-      if (!secondType)
+      if (!secondType) {
+        valid = false;
         continue;
+      }
     }
 
     if (listener && !listener->shouldCheck(kind, firstType, secondType))
@@ -1165,6 +1173,12 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
       if (!result.second)
         return std::make_pair(false, false);
 
+      // Report the conformance.
+      if (listener) {
+        listener->satisfiedConformance(rawReq.getFirstType(), firstType,
+                                       *result.second);
+      }
+      
       continue;
     }
 
@@ -1207,5 +1221,5 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
     }
   }
 
-  return std::make_pair(false, true);
+  return std::make_pair(false, valid);
 }

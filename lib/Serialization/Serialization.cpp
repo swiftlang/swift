@@ -1318,6 +1318,10 @@ void Serializer::writeNormalConformance(
                                               numInheritedConformances,
                                               data);
 
+  // Write requirement signature conformances.
+  for (auto reqConformance : conformance->getSignatureConformances())
+    writeConformance(reqConformance, DeclTypeAbbrCodes);
+  
   // Write inherited conformances.
   for (auto inheritedProto : inheritedProtos) {
     writeConformance(conformance->getInheritedConformance(inheritedProto),
@@ -3287,7 +3291,7 @@ void Serializer::writeType(Type ty) {
 
 #ifndef NDEBUG
     if (auto sig = boxTy->getLayout()->getGenericSignature()) {
-      assert(sig->getAllDependentTypes().size()
+      assert(sig->getSubstitutionListSize()
                == boxTy->getGenericArgs().size());
     }
 #endif

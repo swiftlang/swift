@@ -46,3 +46,11 @@ module _SwiftXCTestOverlayShims {
 module _SwiftXPCOverlayShims {
   header "XPCOverlayShims.h"
 }
+
+module _SwiftCoreFoundationOverlayShims {
+  header "CoreFoundationOverlayShims.h"
+}
+
+module _SwiftFoundationOverlayShims {
+  header "FoundationOverlayShims.h"
+}

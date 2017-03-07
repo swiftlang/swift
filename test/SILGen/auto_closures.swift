@@ -59,7 +59,7 @@ public class Sub : Base {
 // CHECK: }
 // CHECK-LABEL: sil shared [transparent] @_T013auto_closures20closureInAutoclosureAA4BoolVAD_ADtFADyXKfu_ : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
-// CHECK-LABEL: sil shared @_T013auto_closures20closureInAutoclosureAA4BoolVAD_ADtFADyXKfu_AdDcfU_ : $@convention(thin) (Bool, Bool) -> Bool {
+// CHECK-LABEL: sil shared @_T013auto_closures20closureInAutoclosureAA4BoolVAD_ADtFADyXKfu_A2DcfU_ : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
 func compareBool(_ lhs: Bool, _ rhs: Bool) -> Bool { return false_ }
 func testBool(_ x: Bool, _ pred: (Bool) -> Bool) -> Bool {

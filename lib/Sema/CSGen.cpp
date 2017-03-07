@@ -2507,8 +2507,13 @@ namespace {
       if (!selfDecl->hasType())
         return ErrorType::get(tc.Context);
 
-      Type declaredType = selfDecl->getType()->getRValueInstanceType();
-      Type superclassTy = declaredType->getSuperclass(&tc);
+      // If the method returns 'Self', the type of 'self' is a
+      // DynamicSelfType. Unwrap it before getting the superclass.
+      auto selfTy = selfDecl->getType()->getRValueInstanceType();
+      if (auto *dynamicSelfTy = selfTy->getAs<DynamicSelfType>())
+        selfTy = dynamicSelfTy->getSelfType();
+
+      auto superclassTy = selfTy->getSuperclass(&tc);
 
       if (selfDecl->getType()->is<MetatypeType>())
         superclassTy = MetatypeType::get(superclassTy);
@@ -3367,9 +3372,11 @@ void swift::collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                     llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap) {
   Type BaseTy = PD->getDeclaredInterfaceType();
   DeclContext *DC = PD->getDeclContext();
+  std::unique_ptr<TypeChecker> CreatedTC;
   auto *TC = static_cast<TypeChecker*>(DC->getASTContext().getLazyResolver());
   if (!TC) {
-    TC = new TypeChecker(DC->getASTContext());
+    CreatedTC.reset(new TypeChecker(DC->getASTContext()));
+    TC = CreatedTC.get();
   }
   for (Decl *D : PD->getMembers()) {
     ValueDecl *VD = dyn_cast<ValueDecl>(D);

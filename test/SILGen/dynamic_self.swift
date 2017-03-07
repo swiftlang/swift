@@ -165,8 +165,8 @@ func testOptionalResult(v : OptionalResultInheritor) {
 // CHECK:      [[CAST_COPY_ARG:%.*]] = upcast [[COPY_ARG]]
 // CHECK:      [[T0:%.*]] = class_method [[CAST_COPY_ARG]] : $OptionalResult, #OptionalResult.foo!1 : (OptionalResult) -> () -> @dynamic_self OptionalResult?, $@convention(method) (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
 // CHECK-NEXT: [[RES:%.*]] = apply [[T0]]([[CAST_COPY_ARG]])
-// CHECK:      select_enum [[RES]]
-// CHECK:      [[T1:%.*]] = unchecked_enum_data [[RES]]
+// CHECK:      switch_enum [[RES]] : $Optional<OptionalResult>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]]
+// CHECK: [[SOME_BB]]([[T1:%.*]] : $OptionalResult):
 // CHECK-NEXT: [[T4:%.*]] = unchecked_ref_cast [[T1]] : $OptionalResult to $OptionalResultInheritor
 // CHECK-NEXT: enum $Optional<OptionalResultInheritor>, #Optional.some!enumelt.1, [[T4]]
 
@@ -249,8 +249,77 @@ func partialApplySelfReturn(c: Factory, t: Factory.Type) {
   _ = Factory.staticNewInstance
 }
 
+class FactoryFactory {
+
+  // CHECK-LABEL: sil hidden @_T012dynamic_self07FactoryC0C11newInstanceACXDyFZ : $@convention(method) (@thick FactoryFactory.Type) -> @owned FactoryFactory
+  static func newInstance() -> Self {
+    // CHECK: bb0(%0 : $@thick FactoryFactory.Type):
+
+    // CHECK: [[METATYPE:%.*]] = value_metatype $@thick @dynamic_self FactoryFactory.Type.Type, %0 : $@thick FactoryFactory.Type
+    // CHECK: [[ANY:%.*]] = init_existential_metatype [[METATYPE]] : $@thick @dynamic_self FactoryFactory.Type.Type, $@thick Any.Type
+    let _: Any.Type = type(of: self)
+
+    // CHECK: unreachable
+  }
+}
+
+// Super call to a method returning Self
+class Base {
+  required init() {}
+
+  func returnsSelf() -> Self {
+    return self
+  }
+
+  static func returnsSelfStatic() -> Self {
+    return self.init()
+  }
+}
+
+class Derived : Base {
+  // CHECK-LABEL: sil hidden @_T012dynamic_self7DerivedC9superCallyyF : $@convention(method) (@guaranteed Derived) -> ()
+  // CHECK: [[SELF:%.*]] = copy_value %0
+  // CHECK: [[SUPER:%.*]] = upcast [[SELF]] : $Derived to $Base
+  // CHECK: [[METHOD:%.*]] = function_ref @_T012dynamic_self4BaseC11returnsSelfACXDyF
+  // CHECK: apply [[METHOD]]([[SUPER]])
+  // CHECK: return
+  func superCall() {
+    super.returnsSelf()
+  }
+
+  // CHECK-LABEL: sil hidden @_T012dynamic_self7DerivedC15superCallStaticyyFZ : $@convention(method) (@thick Derived.Type) -> ()
+  // CHECK: [[SUPER:%.*]] = upcast %0 : $@thick Derived.Type to $@thick Base.Type
+  // CHECK: [[METHOD:%.*]] = function_ref @_T012dynamic_self4BaseC17returnsSelfStaticACXDyFZ
+  // CHECK: apply [[METHOD]]([[SUPER]])
+  // CHECK: return
+  static func superCallStatic() {
+    super.returnsSelfStatic()
+  }
+
+  // CHECK-LABEL: sil hidden @_T012dynamic_self7DerivedC32superCallFromMethodReturningSelfACXDyF : $@convention(method) (@guaranteed Derived) -> @owned Derived
+  // CHECK: [[SELF:%.*]] = copy_value %0
+  // CHECK: [[SUPER:%.*]] = upcast [[SELF]] : $Derived to $Base
+  // CHECK: [[METHOD:%.*]] = function_ref @_T012dynamic_self4BaseC11returnsSelfACXDyF
+  // CHECK: apply [[METHOD]]([[SUPER]])
+  // CHECK: return
+  func superCallFromMethodReturningSelf() -> Self {
+    super.returnsSelf()
+    return self
+  }
+
+  // CHECK-LABEL: sil hidden @_T012dynamic_self7DerivedC38superCallFromMethodReturningSelfStaticACXDyFZ : $@convention(method) (@thick Derived.Type) -> @owned Derived
+  // CHECK: [[SUPER:%.*]] = upcast %0 : $@thick Derived.Type to $@thick Base.Type
+  // CHECK: [[METHOD:%.*]] = function_ref @_T012dynamic_self4BaseC17returnsSelfStaticACXDyFZ
+  // CHECK: apply [[METHOD]]([[SUPER]])
+  // CHECK: return
+  static func superCallFromMethodReturningSelfStatic() -> Self {
+    super.returnsSelfStatic()
+    return self.init()
+  }
+}
+
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {
-// CHECK: method #P.f!1: {{.*}} : @_T012dynamic_self1XCAA1PAaaDP1f{{[_0-9a-zA-Z]*}}FTW
+// CHECK: method #P.f!1: {{.*}} : @_T012dynamic_self1XCAA1PA2aDP1f{{[_0-9a-zA-Z]*}}FTW
 
 // CHECK-LABEL: sil_witness_table hidden X: CP module dynamic_self {
-// CHECK: method #CP.f!1: {{.*}} : @_T012dynamic_self1XCAA2CPAaaDP1f{{[_0-9a-zA-Z]*}}FTW
+// CHECK: method #CP.f!1: {{.*}} : @_T012dynamic_self1XCAA2CPA2aDP1f{{[_0-9a-zA-Z]*}}FTW

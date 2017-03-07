@@ -11,18 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Foundation // Clang module
-
-@_silgen_name("__NSCalendarIsAutoupdating")
-internal func __NSCalendarIsAutoupdating(_ calendar: NSCalendar) -> Bool
-
-@_silgen_name("__NSCalendarAutoupdating")
-internal func __NSCalendarAutoupdating() -> NSCalendar
-
-@_silgen_name("__NSCalendarCurrent")
-internal func __NSCalendarCurrent() -> NSCalendar
-
-@_silgen_name("__NSCalendarInit")
-internal func __NSCalendarInit(_ identifier : NSString) -> NSCalendar?
+import _SwiftFoundationOverlayShims
 
 /**
  `Calendar` encapsulates information about systems of reckoning time in which the beginning, length, and divisions of a year are defined. It provides information about the calendar and support for calendrical computations such as determining the range of a given calendrical unit and adding units to a given absolute time.
@@ -90,7 +79,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     ///
     /// This calendar does not track changes that the user makes to their preferences.
     public static var current : Calendar {
-        return Calendar(adoptingReference: __NSCalendarCurrent(), autoupdating: false)
+        return Calendar(adoptingReference: __NSCalendarCurrent() as! NSCalendar, autoupdating: false)
     }
     
     /// A Calendar that tracks changes to user's preferred calendar.
@@ -99,7 +88,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     ///
     /// - note: The autoupdating Calendar will only compare equal to another autoupdating Calendar.
     public static var autoupdatingCurrent : Calendar {
-        return Calendar(adoptingReference: __NSCalendarAutoupdating(), autoupdating: true)
+        return Calendar(adoptingReference: __NSCalendarAutoupdating() as! NSCalendar, autoupdating: true)
     }
 
     // MARK: -
@@ -109,8 +98,8 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     ///
     /// - parameter identifier: The kind of calendar to use.
     public init(identifier: Identifier) {
-        let result = __NSCalendarInit(Calendar._toNSCalendarIdentifier(identifier).rawValue as NSString)!
-        _handle = _MutableHandle(adoptingReference: result)
+        let result = __NSCalendarCreate(Calendar._toNSCalendarIdentifier(identifier))
+        _handle = _MutableHandle(adoptingReference: result as! NSCalendar)
         _autoupdating = false
     }
     

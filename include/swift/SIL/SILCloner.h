@@ -1700,9 +1700,30 @@ SILCloner<ImplClass>::visitFixLifetimeInst(FixLifetimeInst *Inst) {
                                    getOpValue(Inst->getOperand())));
 }
 
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitMarkDependenceInst(MarkDependenceInst *Inst) {
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitEndLifetimeInst(EndLifetimeInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+                getBuilder().createEndLifetime(getOpLocation(Inst->getLoc()),
+                                               getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitUncheckedOwnershipConversionInst(
+    UncheckedOwnershipConversionInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  ValueOwnershipKind Kind = SILValue(Inst).getOwnershipKind();
+  if (getOpValue(Inst->getOperand()).getOwnershipKind() ==
+      ValueOwnershipKind::Trivial) {
+    Kind = ValueOwnershipKind::Trivial;
+  }
+  doPostProcess(Inst, getBuilder().createUncheckedOwnershipConversion(
+                          getOpLocation(Inst->getLoc()),
+                          getOpValue(Inst->getOperand()), Kind));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitMarkDependenceInst(MarkDependenceInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
     getBuilder().createMarkDependence(getOpLocation(Inst->getLoc()),

@@ -31,18 +31,11 @@ internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ le
 #else
 
 @_exported import Foundation // Clang module
+import _SwiftFoundationOverlayShims
+import _SwiftCoreFoundationOverlayShims
 
-@_silgen_name("__NSDataInvokeDeallocatorVM")
-internal func __NSDataInvokeDeallocatorVM(_ mem: UnsafeMutableRawPointer, _ length: Int)
-
-@_silgen_name("__NSDataInvokeDeallocatorUnmap")
-internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutableRawPointer, _ length: Int)
-
-@_silgen_name("__NSDataInvokeDeallocatorFree")
-internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ length: Int)
-
-@_silgen_name("_NSWriteDataToFile_Swift")
-internal func _NSWriteDataToFile_Swift(url: NSURL, data: NSData, options: UInt, error: NSErrorPointer) -> Bool
+@_silgen_name("__NSDataWriteToURL")
+internal func __NSDataWriteToURL(_ data: NSData, _ url: NSURL, _ options: UInt, _ error: NSErrorPointer) -> Bool
 
 #endif
 
@@ -882,11 +875,11 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 #else
             switch self {
             case .virtualMemory:
-                return { __NSDataInvokeDeallocatorVM($0, $1) }
+                return { NSDataDeallocatorVM($0, UInt($1)) }
             case .unmap:
-                return { __NSDataInvokeDeallocatorUnmap($0, $1) }
+                return { NSDataDeallocatorUnmap($0, UInt($1)) }
             case .free:
-                return { __NSDataInvokeDeallocatorFree($0, $1) }
+                return { NSDataDeallocatorFree($0, UInt($1)) }
             case .none:
                 return { _, _ in }
             case .custom(let b):
@@ -1206,10 +1199,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             try $0.write(to: url, options: WritingOptions(rawValue: options.rawValue))
 #else
             if _shouldUseNonAtomicWriteReimplementation(options: options) {
-                var error : NSError?
-                if !_NSWriteDataToFile_Swift(url: url._bridgeToObjectiveC(), data: $0, options: options.rawValue, error: &error) {
-                    throw error!
-                }
+                var error: NSError? = nil
+                guard __NSDataWriteToURL($0, url as NSURL, options.rawValue, &error) else { throw error! }
             } else {
                 try $0.write(to: url, options: WritingOptions(rawValue: options.rawValue))
             }

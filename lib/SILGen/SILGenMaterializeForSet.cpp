@@ -456,21 +456,17 @@ public:
 
     // Eagerly loading here could cause an unnecessary
     // load+materialize in some cases, but it's not really important.
-    SILValue selfValue = self.getValue();
-    if (selfValue->getType().isAddress()) {
-      // SEMANTIC ARC TODO: We are returning self as a borrowed value. Is this
-      // correct?
-      selfValue = gen.B.createLoadBorrow(loc, selfValue);
+    if (self.getType().isAddress()) {
+      self = gen.B.createLoadBorrow(loc, self);
     }
 
     // Do a derived-to-base conversion if necessary.
     if (witnessSelfType != SubstSelfType) {
       auto selfSILType = gen.getLoweredType(witnessSelfType);
-      selfValue = gen.B.createUpcast(loc, selfValue, selfSILType);
+      self = gen.B.createUpcast(loc, self, selfSILType);
     }
 
     // Recreate as a borrowed value.
-    self = ManagedValue::forUnmanaged(selfValue);
     return LValue::forValue(self, witnessSelfType);
   }
 

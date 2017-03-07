@@ -36,7 +36,7 @@ using namespace swift;
 
 - (NSString*)description {
   return [NSString stringWithFormat:@"<%@ %p depth = %u>", [self class],
-                                                           self,
+                                                           (void*)self,
                                                            self->depth];
 }
 
