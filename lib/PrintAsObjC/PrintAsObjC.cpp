@@ -329,7 +329,29 @@ private:
     os << "@end\n";
   }
 
+  bool isEmptyExtensionDecl(ExtensionDecl *ED) {
+    auto members = ED->getMembers();
+    auto hasMembers = std::any_of(members.begin(), members.end(),
+                                  [this](const Decl *D) -> bool {
+      if (auto VD = dyn_cast<ValueDecl>(D))
+        if (shouldInclude(VD))
+          return true;
+      return false;
+    });
+
+    auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
+    auto hasProtocols = std::any_of(protocols.begin(), protocols.end(),
+                                    [this](const ProtocolDecl *PD) -> bool {
+      return shouldInclude(PD);
+    });
+
+    return (!hasMembers && !hasProtocols);
+  }
+
   void visitExtensionDecl(ExtensionDecl *ED) {
+    if (isEmptyExtensionDecl(ED))
+      return;
+
     auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
 
     os << "@interface " << getNameForObjC(baseClass);
