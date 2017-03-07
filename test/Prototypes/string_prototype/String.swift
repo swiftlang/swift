@@ -371,7 +371,14 @@ extension String {
   /// - Parameter nulTerminatedUTF8: a sequence of contiguous UTF-8 encoded 
   ///   bytes ending just before the first zero byte (NUL character).
   init(cString nulTerminatedUTF8: UnsafePointer<CChar>) {
-    fatalError("TODO")
+    let len = UTF8._nullCodeUnitOffset(in: nulTerminatedUTF8)
+    self = nulTerminatedUTF8.withMemoryRebound(to: UInt8.self, capacity: len) {
+      // TODO: use String.init that detects optimal storage
+      String(canonical: SwiftCanonicalString(
+        codeUnits: UnsafeBufferPointer(start: $0, count: len),
+        encodedWith: UTF8.self
+      ))
+    }
   }
   
   /// Constructs a `String` having the same contents as `nulTerminatedCodeUnits`.
@@ -383,8 +390,13 @@ extension String {
   init<Encoding: UnicodeEncoding>(
     cString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     encoding: Encoding) {
-      fatalError("TODO")      
-    }
+      let len = Encoding._nullCodeUnitOffset(in: nulTerminatedCodeUnits)
+      // TODO: use String.init that detects optimal storage
+      self = String(canonical: SwiftCanonicalString(
+        codeUnits: UnsafeBufferPointer(start: nulTerminatedCodeUnits, count: len),
+        encodedWith: Encoding.self
+      ))
+  }
     
   /// Invokes the given closure on the contents of the string, represented as a
   /// pointer to a null-terminated sequence of UTF-8 code units.

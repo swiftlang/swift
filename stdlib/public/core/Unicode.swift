@@ -135,13 +135,6 @@ public protocol UnicodeCodec : UnicodeEncoding {
     _ input: UnicodeScalar,
     into processCodeUnit: (CodeUnit) -> Void
   )
-
-  /// Searches for the first occurrence of a `CodeUnit` that is equal to 0.
-  ///
-  /// Is an equivalent of `strlen` for C-strings.
-  ///
-  /// - Complexity: O(*n*)
-  static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int
 }
 
 //===--- Swift 3 compatibility --------------------------------------------===//
@@ -948,7 +941,7 @@ extension UnicodeScalar {
   }
 }
 
-extension UnicodeCodec where EncodedScalar.Iterator.Element : UnsignedInteger {
+extension UnicodeEncoding where EncodedScalar.Iterator.Element : UnsignedInteger {
   public static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int {
     var length = 0
     while input[length] != 0 {
@@ -958,7 +951,7 @@ extension UnicodeCodec where EncodedScalar.Iterator.Element : UnsignedInteger {
   }
 }
 
-extension UnicodeCodec {
+extension UnicodeEncoding {
   public static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int {
     fatalError("_nullCodeUnitOffset(in:) implementation should be provided")
   }

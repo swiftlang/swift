@@ -301,6 +301,19 @@ testSuite.test("cstring") {
   expectEqual(s1.withCString(strlen), 11)
   let s2: String = "3.14159"
   expectEqual(3.14159,s2.withCString(atof))
+  
+  let s3: Swift.String = "some string"
+  s3.withCString {
+    let s = String(cString: $0)
+    expectEqual("some string", s)
+  }
+  
+  // FIXME not compiling
+  // var utf16 = Array(s3.utf16) + [0]
+  // utf16.withUnsafeBufferPointer {
+  //   let s = String(cString: $0.baseAddress!, encoding: UTF16.self)
+  //   expectEqual(s, "some stringz")
+  // }
 }
 
 runAllTests()
