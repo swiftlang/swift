@@ -71,7 +71,8 @@
           key.column: 8,
           key.is_test_candidate: 1
         }
-      ]
+      ],
+      key.is_test_candidate: 1
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -159,7 +160,8 @@
           key.column: 8,
           key.is_test_candidate: 1
         }
-      ]
+      ],
+      key.is_test_candidate: 1
     }
   ]
 }
