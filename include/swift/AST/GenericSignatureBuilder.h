@@ -82,12 +82,17 @@ public:
 
   class FloatingRequirementSource;
 
-  /// Describes a constraint that is bounded on one side by a concrete type.
-  struct ConcreteConstraint {
+  /// Describes a specific constraint on a potential archetype.
+  template<typename T>
+  struct Constraint {
     PotentialArchetype *archetype;
-    Type concreteType;
+    T value;
     const RequirementSource *source;
   };
+
+  /// Describes a concrete constraint on a potential archetype where, where the
+  /// other parameter is a concrete type.
+  typedef Constraint<Type> ConcreteConstraint;
 
   /// Describes an equivalence class of potential archetypes.
   struct EquivalenceClass {
@@ -421,7 +426,7 @@ private:
     Conflicting,
   };
 
-  /// Check a list of concrete constraints, removing self-derived constraints
+  /// Check a list of constraints, removing self-derived constraints
   /// and diagnosing redundant constraints.
   ///
   /// \param isSuitableRepresentative Determines whether the given constraint
@@ -432,17 +437,18 @@ private:
   /// emitted.
   ///
   /// \returns the representative constraint.
-  ConcreteConstraint checkConstraintList(
+  template<typename T>
+  Constraint<T> checkConstraintList(
                            ArrayRef<GenericTypeParamType *> genericParams,
-                           std::vector<ConcreteConstraint> &constraints,
-                           llvm::function_ref<bool(const ConcreteConstraint &)>
+                           std::vector<Constraint<T>> &constraints,
+                           llvm::function_ref<bool(const Constraint<T> &)>
                              isSuitableRepresentative,
-                           llvm::function_ref<ConstraintRelation(Type)>
+                           llvm::function_ref<ConstraintRelation(const T&)>
                              checkConstraint,
-                           Optional<Diag<unsigned, Type, Type, Type>>
+                           Optional<Diag<unsigned, Type, T, T>>
                              conflictingDiag,
-                           Diag<Type, Type> redundancyDiag,
-                           Diag<bool, Type, Type> otherNoteDiag);
+                           Diag<Type, T> redundancyDiag,
+                           Diag<bool, Type, T> otherNoteDiag);
 
   /// Check for redundant concrete type constraints within the equivalence
   /// class of the given potential archetype.
@@ -777,8 +783,17 @@ public:
   const RequirementSource *viaParent(GenericSignatureBuilder &builder,
                                      AssociatedTypeDecl *assocType) const;
 
+  /// Retrieve the root requirement source.
+  const RequirementSource *getRoot() const;
+
   /// Retrieve the potential archetype at the root.
   PotentialArchetype *getRootPotentialArchetype() const;
+
+  /// Whether the requirement is inferred or derived from an inferred
+  /// requirment.
+  bool isInferredRequirement() const {
+    return getRoot()->kind == Inferred;
+  }
 
   /// Whether the requirement can be derived from something in its path.
   ///
