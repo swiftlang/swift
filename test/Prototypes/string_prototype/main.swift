@@ -98,22 +98,22 @@ testSuite.test("SwiftCanonicalString") {
   let _ = UnicodeStorage.TranscodedView(s8, from: ValidUTF8.self, to: UTF16.self)
 
   let sncFrom32 = String(canonical: SwiftCanonicalString(
-    codeUnits: s32.map { $0 }, encodedWith: UTF32.self
+    codeUnits: Array(s32), encodedWith: UTF32.self
   ))
   let sncFrom16 = String(canonical: SwiftCanonicalString(
     codeUnits: s16, encodedWith: UTF16.self
   ))
   let sncFrom8 = String(canonical: SwiftCanonicalString(
-    codeUnits: s8.map { $0 }, encodedWith: UTF8.self
+    codeUnits: Array(s8), encodedWith: UTF8.self
   ))
   let sncFrom16to32 = String(canonical: SwiftCanonicalString(
-    codeUnits: s16to32.map { $0 }, encodedWith: UTF32.self
+    codeUnits: Array(s16to32), encodedWith: UTF32.self
   ))
   let sncFrom16to8 = String(canonical: SwiftCanonicalString(
-    codeUnits: s16to8.map { $0 }, encodedWith: UTF8.self
+    codeUnits: Array(s16to8), encodedWith: UTF8.self
   ))
   let sncFrom8to16 = String(canonical: SwiftCanonicalString(
-    codeUnits: s8to16.map { $0 }, encodedWith: UTF16.self
+    codeUnits: Array(s8to16), encodedWith: UTF16.self
   ))
 
   expectEqual(sncFrom32, sncFrom16)
@@ -209,10 +209,10 @@ testSuite.test("string-compare") {
   let s4 = "abcd\(UnicodeScalar(0x113)!)z"
 
   typealias UTF16String = UnicodeStorage<[UInt16], UTF16>
-  let s1u16 = UTF16String(s1.utf16.map { $0 })
-  let s2u16 = UTF16String(s2.utf16.map { $0 })
-  let s3u16 = UTF16String(s3.utf16.map { $0 })
-  let s4u16 = UTF16String(s4.utf16.map { $0 })
+  let s1u16 = UTF16String(Array(s1.utf16))
+  let s2u16 = UTF16String(Array(s2.utf16))
+  let s3u16 = UTF16String(Array(s3.utf16))
+  let s4u16 = UTF16String(Array(s4.utf16))
 
   // FIXME: doesn't work, as UInt16 is not FixedWidthInteger...
   //
@@ -237,10 +237,10 @@ testSuite.test("string-compare-hash") {
   let s4 = "abcd\(UnicodeScalar(0x113)!)z"
 
   typealias UTF16String = UnicodeStorage<[UInt16], UTF16>
-  let s1u16 = UTF16String(s1.utf16.map { $0 })
-  let s2u16 = UTF16String(s2.utf16.map { $0 })
-  let s3u16 = UTF16String(s3.utf16.map { $0 })
-  let s4u16 = UTF16String(s4.utf16.map { $0 })
+  let s1u16 = UTF16String(Array(s1.utf16))
+  let s2u16 = UTF16String(Array(s2.utf16))
+  let s3u16 = UTF16String(Array(s3.utf16))
+  let s4u16 = UTF16String(Array(s4.utf16))
 
   // FIXME: doesn't work, as UInt16 is not FixedWidthInteger...
   //
@@ -308,7 +308,7 @@ testSuite.test("cstring") {
     expectEqual("some string", s)
   }
 
-  var utf16 = Array(s3.utf16) + [0]
+  let utf16 = Array(s3.utf16) + [0]
   let s4 = utf16.withUnsafeBufferPointer {
     String(cString: $0.baseAddress!, encoding: UTF16.self)
   }
