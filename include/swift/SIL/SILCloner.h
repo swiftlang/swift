@@ -2009,6 +2009,18 @@ SILCloner<ImplClass>::visitCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
                                             OpSuccBB, OpFailBB));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitCheckedCastValueBranchInst(
+    CheckedCastValueBranchInst *Inst) {
+  SILBasicBlock *OpSuccBB = getOpBasicBlock(Inst->getSuccessBB());
+  SILBasicBlock *OpFailBB = getOpBasicBlock(Inst->getFailureBB());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst, getBuilder().createCheckedCastValueBranch(
+                          getOpLocation(Inst->getLoc()),
+                          getOpValue(Inst->getOperand()),
+                          getOpType(Inst->getCastType()), OpSuccBB, OpFailBB));
+}
+
 template<typename ImplClass>
 void SILCloner<ImplClass>::visitCheckedCastAddrBranchInst(
                                              CheckedCastAddrBranchInst *Inst) {

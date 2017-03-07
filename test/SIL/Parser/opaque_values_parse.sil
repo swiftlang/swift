@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all -emit-sorted-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-opaque-values -enable-sil-verify-all -emit-sorted-sil %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -21,6 +21,25 @@ struct S : Foo {
 sil @castOpaque : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %c = unconditional_checked_cast_opaque %0 : $Int to $Foo
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @condCastOpaque : $@convention(thin) (Int) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Int):
+// CHECK:  checked_cast_value_br [[ARG]] : $Int to $Int
+// CHECK-LABEL: } // end sil function 'condCastOpaque'
+sil @condCastOpaque : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %c = checked_cast_value_br %0 : $Int to $Int, bb2, bb1
+
+bb1:
+  br bb3
+
+bb2(%i : $Int):
+  br bb3
+
+bb3:
   %t = tuple ()
   return %t : $()
 }

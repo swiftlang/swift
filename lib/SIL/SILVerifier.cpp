@@ -2466,7 +2466,8 @@ public:
     }
   }
 
-  void verifyCheckedCast(bool isExact, SILType fromTy, SILType toTy) {
+  void verifyCheckedCast(bool isExact, SILType fromTy, SILType toTy,
+                         bool isOpaque = false) {
     // Verify common invariants.
     require(fromTy.isObject() && toTy.isObject(),
             "value checked cast src and dest must be objects");
@@ -2474,8 +2475,8 @@ public:
     auto fromCanTy = fromTy.getSwiftRValueType();
     auto toCanTy = toTy.getSwiftRValueType();
 
-    require(canUseScalarCheckedCastInstructions(F.getModule(),
-                                                fromCanTy, toCanTy),
+    require(isOpaque || canUseScalarCheckedCastInstructions(F.getModule(),
+                                                            fromCanTy, toCanTy),
             "invalid value checked cast src or dest types");
 
     // Peel off metatypes. If two types are checked-cast-able, so are their
@@ -2523,6 +2524,8 @@ public:
 
   void checkUnconditionalCheckedCastOpaqueInst(
       UnconditionalCheckedCastOpaqueInst *CI) {
+    verifyCheckedCast(/*exact*/ false, CI->getOperand()->getType(),
+                      CI->getType(), true);
     verifyOpenedArchetype(CI, CI->getType().getSwiftRValueType());
   }
 
@@ -2581,6 +2584,22 @@ public:
             "failure dest block argument must match type of original type in "
             "ownership qualified sil");
 #endif
+  }
+
+  void checkCheckedCastValueBranchInst(CheckedCastValueBranchInst *CBI) {
+    verifyCheckedCast(false, CBI->getOperand()->getType(), CBI->getCastType(),
+                      true);
+    verifyOpenedArchetype(CBI, CBI->getCastType().getSwiftRValueType());
+
+    require(CBI->getSuccessBB()->args_size() == 1,
+            "success dest of checked_cast_value_br must take one argument");
+    require(CBI->getSuccessBB()->args_begin()[0]->getType() ==
+                CBI->getCastType(),
+            "success dest block argument of checked_cast_value_br must match "
+            "type of cast");
+    require(F.hasQualifiedOwnership() || CBI->getFailureBB()->args_empty(),
+            "failure dest of checked_cast_value_br in unqualified ownership "
+            "sil must take no arguments");
   }
 
   void checkCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {

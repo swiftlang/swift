@@ -973,6 +973,7 @@ bool TermInst::isFunctionExiting() const {
     case TermKind::SwitchEnumAddrInst:
     case TermKind::DynamicMethodBranchInst:
     case TermKind::CheckedCastBranchInst:
+    case TermKind::CheckedCastValueBranchInst:
     case TermKind::CheckedCastAddrBranchInst:
     case TermKind::UnreachableInst:
     case TermKind::TryApplyInst:
@@ -1801,6 +1802,22 @@ CheckedCastBranchInst *CheckedCastBranchInst::create(
   return ::new (Buffer) CheckedCastBranchInst(DebugLoc, IsExact, Operand,
                                               TypeDependentOperands, DestTy,
                                               SuccessBB, FailureBB);
+}
+
+CheckedCastValueBranchInst *
+CheckedCastValueBranchInst::create(SILDebugLocation DebugLoc, SILValue Operand,
+                                   SILType DestTy, SILBasicBlock *SuccessBB,
+                                   SILBasicBlock *FailureBB, SILFunction &F,
+                                   SILOpenedArchetypesState &OpenedArchetypes) {
+  SILModule &Mod = F.getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               DestTy.getSwiftRValueType());
+  unsigned size =
+      totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+  void *Buffer = Mod.allocateInst(size, alignof(CheckedCastValueBranchInst));
+  return ::new (Buffer) CheckedCastValueBranchInst(
+      DebugLoc, Operand, TypeDependentOperands, DestTy, SuccessBB, FailureBB);
 }
 
 MetatypeInst *MetatypeInst::create(SILDebugLocation Loc, SILType Ty,

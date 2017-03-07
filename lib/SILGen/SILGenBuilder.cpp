@@ -550,6 +550,15 @@ void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
                                       trueBlock, falseBlock);
 }
 
+void SILGenBuilder::createCheckedCastValueBranch(SILLocation loc,
+                                                 ManagedValue operand,
+                                                 SILType type,
+                                                 SILBasicBlock *trueBlock,
+                                                 SILBasicBlock *falseBlock) {
+  SILBuilder::createCheckedCastValueBranch(loc, operand.forward(gen), type,
+                                           trueBlock, falseBlock);
+}
+
 ManagedValue SILGenBuilder::createUpcast(SILLocation loc, ManagedValue original,
                                          SILType type) {
   CleanupCloner cloner(*this, original);

@@ -5363,6 +5363,47 @@ public:
 };
 
 /// Perform a checked cast operation and branch on whether the cast succeeds.
+/// The success branch destination block receives the cast result as a BB
+/// argument.
+class CheckedCastValueBranchInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          ValueKind::CheckedCastValueBranchInst, CheckedCastValueBranchInst,
+          TermInst, false> {
+  friend SILBuilder;
+
+  SILType DestTy;
+
+  SILSuccessor DestBBs[2];
+
+  CheckedCastValueBranchInst(SILDebugLocation DebugLoc, SILValue Operand,
+                             ArrayRef<SILValue> TypeDependentOperands,
+                             SILType DestTy, SILBasicBlock *SuccessBB,
+                             SILBasicBlock *FailureBB)
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                                                      TypeDependentOperands),
+        DestTy(DestTy), DestBBs{{this, SuccessBB}, {this, FailureBB}} {}
+
+  static CheckedCastValueBranchInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy,
+         SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB, SILFunction &F,
+         SILOpenedArchetypesState &OpenedArchetypes);
+
+public:
+  SuccessorListTy getSuccessors() { return DestBBs; }
+
+  SILType getCastType() const { return DestTy; }
+
+  SILBasicBlock *getSuccessBB() { return DestBBs[0]; }
+  const SILBasicBlock *getSuccessBB() const { return DestBBs[0]; }
+  SILBasicBlock *getFailureBB() { return DestBBs[1]; }
+  const SILBasicBlock *getFailureBB() const { return DestBBs[1]; }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::CheckedCastValueBranchInst;
+  }
+};
+
+/// Perform a checked cast operation and branch on whether the cast succeeds.
 /// The result of the checked cast is left in the destination address.
 class CheckedCastAddrBranchInst : public TermInst {
   friend SILBuilder;

@@ -1537,6 +1537,15 @@ public:
         OpenedArchetypes));
   }
 
+  CheckedCastValueBranchInst *
+  createCheckedCastValueBranch(SILLocation Loc, SILValue op, SILType destTy,
+                               SILBasicBlock *successBB,
+                               SILBasicBlock *failureBB) {
+    return insertTerminator(CheckedCastValueBranchInst::create(
+        getSILDebugLocation(Loc), op, destTy, successBB, failureBB, F,
+        OpenedArchetypes));
+  }
+
   CheckedCastAddrBranchInst *
   createCheckedCastAddrBranch(SILLocation Loc, CastConsumptionKind consumption,
                               SILValue src, CanType sourceType, SILValue dest,

@@ -233,6 +233,11 @@ public:
                                SILBasicBlock *trueBlock,
                                SILBasicBlock *falseBlock);
 
+  using SILBuilder::createCheckedCastValueBranch;
+  void createCheckedCastValueBranch(SILLocation loc, ManagedValue operand,
+                                    SILType type, SILBasicBlock *trueBlock,
+                                    SILBasicBlock *falseBlock);
+
   using SILBuilder::createUpcast;
   ManagedValue createUpcast(SILLocation loc, ManagedValue original,
                             SILType type);
