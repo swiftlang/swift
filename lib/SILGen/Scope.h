@@ -62,6 +62,8 @@ public:
   ~Scope() {
     if (Depth.isValid()) popImpl();
   }
+
+  bool isValid() const { return Depth.isValid(); }
 };
 
 /// A FullExpr is a RAII object recording that a full-expression has

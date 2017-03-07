@@ -133,23 +133,29 @@ namespace {
       SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
 
       // Emit the branch.
-      ManagedValue scalarOperandValue;
+      ManagedValue operandValue;
       SILValue resultBuffer;
-      if (Strategy == CastStrategy::Address) {
+      if (Strategy == CastStrategy::Address &&
+          SGF.silConv.useLoweredAddresses()) {
         assert(operand.getType().isAddress());
         resultBuffer =
             createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
         SGF.B.createCheckedCastAddrBranch(
             Loc, consumption, operand.forward(SGF), SourceType, resultBuffer,
             TargetType, trueBB, falseBB);
+      } else if (Strategy == CastStrategy::Address) {
+        // Opaque value mode
+        operandValue = std::move(operand);
+        SGF.B.createCheckedCastValueBranch(
+            Loc, operandValue, origTargetTL.getLoweredType(), trueBB, falseBB);
       } else {
         // Tolerate being passed an address here.  It comes up during switch
         // emission.
-        scalarOperandValue = std::move(operand);
-        if (scalarOperandValue.getType().isAddress()) {
-          scalarOperandValue = SGF.B.createLoadTake(Loc, scalarOperandValue);
+        operandValue = std::move(operand);
+        if (operandValue.getType().isAddress()) {
+          operandValue = SGF.B.createLoadTake(Loc, operandValue);
         }
-        SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, scalarOperandValue,
+        SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, operandValue,
                                       origTargetTL.getLoweredType(), trueBB,
                                       falseBB);
       }
@@ -160,7 +166,8 @@ namespace {
         FullExpr scope(SGF.Cleanups, CleanupLocation::get(Loc));
 
         ManagedValue result;
-        if (Strategy == CastStrategy::Address) {
+        if (Strategy == CastStrategy::Address &&
+            SGF.silConv.useLoweredAddresses()) {
           result = finishFromResultBuffer(hasAbstraction, resultBuffer,
                                           abstraction, origTargetTL, ctx);
         } else {
@@ -200,7 +207,7 @@ namespace {
         if (shouldDestroyOnFailure(consumption)) {
           {
             FullExpr argScope(SGF.Cleanups, CleanupLocation::get(Loc));
-            SGF.B.createOwnedPHIArgument(scalarOperandValue.getType());
+            SGF.B.createOwnedPHIArgument(operandValue.getType());
           }
           handleFalse(None);
           assert(!SGF.B.hasValidInsertionPoint() &&
@@ -208,7 +215,7 @@ namespace {
           return;
         }
 
-        handleFalse(SGF.B.createOwnedPHIArgument(scalarOperandValue.getType()));
+        handleFalse(SGF.B.createOwnedPHIArgument(operandValue.getType()));
         assert(!SGF.B.hasValidInsertionPoint() && "handler did not end block");
       }
     }
@@ -635,7 +642,9 @@ adjustForConditionalCheckedCastOperand(SILLocation loc, ManagedValue src,
   bool hasAbstraction = (src.getType() != srcAbstractTL.getLoweredType());
   
   // Fast path: no re-abstraction required.
-  if (!hasAbstraction && (!requiresAddress || src.getType().isAddress())) {
+  if (!hasAbstraction &&
+      (!requiresAddress ||
+       (src.getType().isAddress() || !SGF.silConv.useLoweredAddresses()))) {
     return src;
   }
   

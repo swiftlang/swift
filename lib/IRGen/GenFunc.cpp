@@ -86,6 +86,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/StringSwitch.h"
 
+#include "ConstantBuilder.h"
 #include "EnumPayload.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
@@ -1573,39 +1574,33 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   
   auto flagsVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags);
   
-  //
   // Collect the reserved and invoke pointer fields.
   auto reserved = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
   auto invokeVal = llvm::ConstantExpr::getBitCast(invokeFunction,
                                                   IGF.IGM.FunctionPtrTy);
   
-  //
   // Build the block descriptor.
-  SmallVector<llvm::Constant*, 5> descriptorFields;
-  descriptorFields.push_back(llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0));
-  descriptorFields.push_back(llvm::ConstantInt::get(IGF.IGM.IntPtrTy,
-                                         storageTL.getFixedSize().getValue()));
+  ConstantInitBuilder builder(IGF.IGM);
+  auto descriptorFields = builder.beginStruct();
+  descriptorFields.addInt(IGF.IGM.IntPtrTy, 0);
+  descriptorFields.addInt(IGF.IGM.IntPtrTy,
+                          storageTL.getFixedSize().getValue());
   
   if (!isPOD) {
     // Define the copy and dispose helpers.
-    descriptorFields.push_back(emitBlockCopyHelper(IGF.IGM, blockTy, storageTL));
-    descriptorFields.push_back(emitBlockDisposeHelper(IGF.IGM, blockTy, storageTL));
+    descriptorFields.add(emitBlockCopyHelper(IGF.IGM, blockTy, storageTL));
+    descriptorFields.add(emitBlockDisposeHelper(IGF.IGM, blockTy, storageTL));
   }
   
-  //
   // Build the descriptor signature.
-  // TODO
-  descriptorFields.push_back(getBlockTypeExtendedEncoding(IGF.IGM, invokeTy));
+  descriptorFields.add(getBlockTypeExtendedEncoding(IGF.IGM, invokeTy));
   
-  //
   // Create the descriptor.
-  auto descriptorInit = llvm::ConstantStruct::getAnon(descriptorFields);
-  auto descriptor = new llvm::GlobalVariable(*IGF.IGM.getModule(),
-                                             descriptorInit->getType(),
-                                             /*constant*/ true,
-                                             llvm::GlobalValue::InternalLinkage,
-                                             descriptorInit,
-                                             "block_descriptor");
+  auto descriptor =
+    descriptorFields.finishAndCreateGlobal("block_descriptor",
+                                           IGF.IGM.getPointerAlignment(),
+                                           /*constant*/ true);
+
   auto descriptorVal = llvm::ConstantExpr::getBitCast(descriptor,
                                                       IGF.IGM.Int8PtrTy);
   

@@ -261,6 +261,17 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     return;
   }
 
+  case TermKind::CheckedCastValueBranchInst: {
+    auto CBI = dyn_cast<CheckedCastValueBranchInst>(T);
+    assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
+    auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
+    auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
+    B.createCheckedCastValueBranch(CBI->getLoc(), CBI->getOperand(),
+                                   CBI->getCastType(), SuccessBB, FailureBB);
+    CBI->eraseFromParent();
+    return;
+  }
+
   case TermKind::CheckedCastAddrBranchInst: {
     auto CBI = dyn_cast<CheckedCastAddrBranchInst>(T);
     assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
@@ -414,6 +425,20 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
     auto FailureBB = OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();
     B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), CBI->getOperand(),
         CBI->getCastType(), SuccessBB, FailureBB);
+    CBI->eraseFromParent();
+    return;
+  }
+
+  case TermKind::CheckedCastValueBranchInst: {
+    auto CBI = cast<CheckedCastValueBranchInst>(T);
+    assert(OldDest == CBI->getSuccessBB() ||
+           OldDest == CBI->getFailureBB() && "Invalid edge index");
+    auto SuccessBB =
+        OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
+    auto FailureBB =
+        OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();
+    B.createCheckedCastValueBranch(CBI->getLoc(), CBI->getOperand(),
+                                   CBI->getCastType(), SuccessBB, FailureBB);
     CBI->eraseFromParent();
     return;
   }

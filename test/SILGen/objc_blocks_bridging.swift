@@ -7,43 +7,43 @@
 import Foundation
 
 @objc class Foo {
-// CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3fooSiSiSic_Si1xtFTo :
+// CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3fooS3ic_Si1xtFTo :
   // CHECK: bb0([[ARG1:%.*]] : $@convention(block) (Int) -> Int, {{.*}}, [[SELF:%.*]] : $Foo):
   // CHECK:         [[ARG1_COPY:%.*]] = copy_block [[ARG1]]
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
-  // CHECK:         [[THUNK:%.*]] = function_ref @_T0SiSiIyByd_SiSiIxyd_TR
+  // CHECK:         [[THUNK:%.*]] = function_ref @_T0S2iIyByd_S2iIxyd_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[ARG1_COPY]])
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @_T020objc_blocks_bridging3FooC3foo{{[_0-9a-zA-Z]*}}F : $@convention(method) (@owned @callee_owned (Int) -> Int, Int, @guaranteed Foo) -> Int
   // CHECK:         apply [[NATIVE]]([[BRIDGED]], {{.*}}, [[BORROWED_SELF_COPY]])
   // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
-  // CHECK: } // end sil function '_T020objc_blocks_bridging3FooC3fooSiSiSic_Si1xtFTo'
+  // CHECK: } // end sil function '_T020objc_blocks_bridging3FooC3fooS3ic_Si1xtFTo'
   dynamic func foo(_ f: (Int) -> Int, x: Int) -> Int {
     return f(x)
   }
 
-  // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3barSSSSSSc_SS1xtFTo : $@convention(objc_method) (@convention(block) (NSString) -> @autoreleased NSString, NSString, Foo) -> @autoreleased NSString {
+  // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3barS3Sc_SS1xtFTo : $@convention(objc_method) (@convention(block) (NSString) -> @autoreleased NSString, NSString, Foo) -> @autoreleased NSString {
   // CHECK:       bb0([[BLOCK:%.*]] : $@convention(block) (NSString) -> @autoreleased NSString, [[NSSTRING:%.*]] : $NSString, [[SELF:%.*]] : $Foo):
   // CHECK:         [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK:         [[NSSTRING_COPY:%.*]] = copy_value [[NSSTRING]]
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
-  // CHECK:         [[THUNK:%.*]] = function_ref @_T0So8NSStringCABIyBya_SSSSIxxo_TR
+  // CHECK:         [[THUNK:%.*]] = function_ref @_T0So8NSStringCABIyBya_S2SIxxo_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[BLOCK_COPY]])
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @_T020objc_blocks_bridging3FooC3bar{{[_0-9a-zA-Z]*}}F : $@convention(method) (@owned @callee_owned (@owned String) -> @owned String, @owned String, @guaranteed Foo) -> @owned String
   // CHECK:         apply [[NATIVE]]([[BRIDGED]], {{%.*}}, [[BORROWED_SELF_COPY]])
   // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
-  // CHECK: } // end sil function '_T020objc_blocks_bridging3FooC3barSSSSSSc_SS1xtFTo'
+  // CHECK: } // end sil function '_T020objc_blocks_bridging3FooC3barS3Sc_SS1xtFTo'
   dynamic func bar(_ f: (String) -> String, x: String) -> String {
     return f(x)
   }
 
-  // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3basSSSgSSSgSSSgc_SSSg1xtFTo : $@convention(objc_method) (@convention(block) (Optional<NSString>) -> @autoreleased Optional<NSString>, Optional<NSString>, Foo) -> @autoreleased Optional<NSString> {
+  // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC3basSSSgA2Ec_AE1xtFTo : $@convention(objc_method) (@convention(block) (Optional<NSString>) -> @autoreleased Optional<NSString>, Optional<NSString>, Foo) -> @autoreleased Optional<NSString> {
   // CHECK:       bb0([[BLOCK:%.*]] : $@convention(block) (Optional<NSString>) -> @autoreleased Optional<NSString>, [[OPT_STRING:%.*]] : $Optional<NSString>, [[SELF:%.*]] : $Foo):
   // CHECK:         [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK:         [[OPT_STRING_COPY:%.*]] = copy_value [[OPT_STRING]]
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
-  // CHECK:         [[THUNK:%.*]] = function_ref @_T0So8NSStringCSgABSgIyBya_SSSgSSSgIxxo_TR
+  // CHECK:         [[THUNK:%.*]] = function_ref @_T0So8NSStringCSgACIyBya_SSSgADIxxo_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[BLOCK_COPY]])
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @_T020objc_blocks_bridging3FooC3bas{{[_0-9a-zA-Z]*}}F : $@convention(method) (@owned @callee_owned (@owned Optional<String>) -> @owned Optional<String>, @owned Optional<String>, @guaranteed Foo) -> @owned Optional<String>
@@ -67,10 +67,12 @@ import Foundation
 
   // Blocks and C function pointers must not be reabstracted when placed in optionals.
   // CHECK-LABEL: sil hidden [thunk] @_T020objc_blocks_bridging3FooC7optFunc{{[_0-9a-zA-Z]*}}FTo
-  // CHECK:         [[COPY:%.*]] = copy_block %0
-  // CHECK:         [[BLOCK:%.*]] = unchecked_enum_data [[COPY]]
+  // CHECK: bb0([[ARG0:%.*]] : $Optional<@convention(block) (NSString) -> @autoreleased NSString>,
+  // CHECK:         [[COPY:%.*]] = copy_block [[ARG0]]
+  // CHECK:         switch_enum [[COPY]] : $Optional<@convention(block) (NSString) -> @autoreleased NSString>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+  // CHECK: [[SOME_BB]]([[BLOCK:%.*]] : $@convention(block) (NSString) -> @autoreleased NSString):
   // TODO: redundant reabstractions here
-  // CHECK:         [[BLOCK_THUNK:%.*]] = function_ref @_T0So8NSStringCABIyBya_SSSSIxxo_TR
+  // CHECK:         [[BLOCK_THUNK:%.*]] = function_ref @_T0So8NSStringCABIyBya_S2SIxxo_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[BLOCK_THUNK]]([[BLOCK]])
   // CHECK:         enum $Optional<@callee_owned (@owned String) -> @owned String>, #Optional.some!enumelt.1, [[BRIDGED]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @_T020objc_blocks_bridging3FooC7optFunc{{[_0-9a-zA-Z]*}}F : $@convention(method) (@owned Optional<@callee_owned (@owned String) -> @owned String>, @owned String, @guaranteed Foo) -> @owned Optional<String>
@@ -102,21 +104,21 @@ func callBlocks(_ x: Foo,
   // CHECK: [[F_BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage
   // CHECK: [[F_BLOCK_CAPTURE:%.*]] = project_block_storage [[F_BLOCK_STORAGE]]
   // CHECK: store [[CLOSURE_COPY]] to [init] [[F_BLOCK_CAPTURE]]
-  // CHECK: [[F_BLOCK_INVOKE:%.*]] = function_ref @_T0SiSiIxyd_SiSiIyByd_TR
+  // CHECK: [[F_BLOCK_INVOKE:%.*]] = function_ref @_T0S2iIxyd_S2iIyByd_TR
   // CHECK: [[F_STACK_BLOCK:%.*]] = init_block_storage_header [[F_BLOCK_STORAGE]] : {{.*}}, invoke [[F_BLOCK_INVOKE]]
   // CHECK: [[F_BLOCK:%.*]] = copy_block [[F_STACK_BLOCK]]
   // CHECK: apply [[FOO]]([[F_BLOCK]]
 
   // CHECK: [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
   // CHECK: [[BAR:%.*]] = class_method [volatile] [[BORROWED_ARG0]] : $Foo, #Foo.bar!1.foreign
-  // CHECK: [[G_BLOCK_INVOKE:%.*]] = function_ref @_T0SSSSIxxo_So8NSStringCABIyBya_TR
+  // CHECK: [[G_BLOCK_INVOKE:%.*]] = function_ref @_T0S2SIxxo_So8NSStringCABIyBya_TR
   // CHECK: [[G_STACK_BLOCK:%.*]] = init_block_storage_header {{.*}}, invoke [[G_BLOCK_INVOKE]]
   // CHECK: [[G_BLOCK:%.*]] = copy_block [[G_STACK_BLOCK]]
   // CHECK: apply [[BAR]]([[G_BLOCK]]
 
   // CHECK: [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
   // CHECK: [[BAS:%.*]] = class_method [volatile] [[BORROWED_ARG0]] : $Foo, #Foo.bas!1.foreign
-  // CHECK: [[H_BLOCK_INVOKE:%.*]] = function_ref @_T0SSSgSSSgIxxo_So8NSStringCSgABSgIyBya_TR
+  // CHECK: [[H_BLOCK_INVOKE:%.*]] = function_ref @_T0SSSgAAIxxo_So8NSStringCSgADIyBya_TR
   // CHECK: [[H_STACK_BLOCK:%.*]] = init_block_storage_header {{.*}}, invoke [[H_BLOCK_INVOKE]]
   // CHECK: [[H_BLOCK:%.*]] = copy_block [[H_STACK_BLOCK]]
   // CHECK: apply [[BAS]]([[H_BLOCK]]
@@ -131,7 +133,7 @@ class Test: NSObject {
   func blockTakesBlock() -> ((Int) -> Int) -> Int {}
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0SiSiIxyd_SiIxxd_SiSiIyByd_SiIyByd_TR
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0S2iIxyd_SiIxxd_S2iIyByd_SiIyByd_TR
 // CHECK:         [[BLOCK_COPY:%.*]] = copy_block [[ORIG_BLOCK:%.*]] :
 // CHECK:         [[CLOSURE:%.*]] = partial_apply {{%.*}}([[BLOCK_COPY]])
 // CHECK:         [[RESULT:%.*]] = apply {{%.*}}([[CLOSURE]])

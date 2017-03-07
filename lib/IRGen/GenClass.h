@@ -36,6 +36,7 @@ namespace swift {
   class VarDecl;
 
 namespace irgen {
+  class ConstantStructBuilder;
   class HeapLayout;
   class IRGenFunction;
   class IRGenModule;
@@ -62,10 +63,15 @@ namespace irgen {
                                        SILType baseType, VarDecl *field);
 
 
-  std::tuple<llvm::Constant * /*classData*/,
-             llvm::Constant * /*metaclassData*/,
-             Size>
-  emitClassPrivateDataFields(IRGenModule &IGM, ClassDecl *cls);
+  enum ForMetaClass_t : bool {
+    ForClass = false,
+    ForMetaClass = true
+  };
+
+  std::pair<Size,Size>
+  emitClassPrivateDataFields(IRGenModule &IGM,
+                             ConstantStructBuilder &builder,
+                             ClassDecl *cls);
   
   llvm::Constant *emitClassPrivateData(IRGenModule &IGM, ClassDecl *theClass);
   void emitGenericClassPrivateDataTemplate(IRGenModule &IGM,

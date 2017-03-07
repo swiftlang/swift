@@ -167,6 +167,13 @@ static void addCommonFrontendArgs(const ToolChain &TC,
 
   if (llvm::sys::Process::StandardErrHasColors())
     arguments.push_back("-color-diagnostics");
+
+  const std::string &SerializedDiagnosticsPath =
+    output.getAdditionalOutputForType(types::TY_SerializedDiagnostics);
+  if (!SerializedDiagnosticsPath.empty()) {
+    arguments.push_back("-serialize-diagnostics-path");
+    arguments.push_back(SerializedDiagnosticsPath.c_str());
+  }
 }
 
 
@@ -359,13 +366,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
     Arguments.push_back("-emit-objc-header-path");
     Arguments.push_back(ObjCHeaderOutputPath.c_str());
-  }
-
-  const std::string &SerializedDiagnosticsPath =
-    context.Output.getAdditionalOutputForType(types::TY_SerializedDiagnostics);
-  if (!SerializedDiagnosticsPath.empty()) {
-    Arguments.push_back("-serialize-diagnostics-path");
-    Arguments.push_back(SerializedDiagnosticsPath.c_str());
   }
 
   const std::string &DependenciesPath =

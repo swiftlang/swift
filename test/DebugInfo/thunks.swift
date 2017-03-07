@@ -13,14 +13,14 @@ let foo = Foo()
 let y = 3 as Int64
 let i = foo.foo(-, x: y)
 
-// CHECK: define {{.*}}@_T0s5Int64VABIyByd_AbBIxyd_TR
+// CHECK: define {{.*}}@_T0s5Int64VABIyByd_A2BIxyd_TR
 // CHECK-NOT: ret
 // CHECK: call {{.*}}, !dbg ![[LOC:.*]]
-// CHECK: ![[THUNK:.*]] = distinct !DISubprogram(linkageName: "_T0s5Int64VABIyByd_AbBIxyd_TR"
+// CHECK: ![[THUNK:.*]] = distinct !DISubprogram(linkageName: "_T0s5Int64VABIyByd_A2BIxyd_TR"
 // CHECK-NOT:                           line:
 // CHECK-SAME:                          ){{$}}
 // CHECK: ![[LOC]] = !DILocation(line: 0, scope: ![[THUNK]])
 
-// SIL-CHECK: sil shared {{.*}}@_T0s5Int64VABIyByd_AbBIxyd_TR
+// SIL-CHECK: sil shared {{.*}}@_T0s5Int64VABIyByd_A2BIxyd_TR
 // SIL-CHECK-NOT: return
 // SIL-CHECK: apply {{.*}}auto_gen

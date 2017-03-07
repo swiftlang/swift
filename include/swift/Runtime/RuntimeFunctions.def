@@ -1179,6 +1179,13 @@ FUNCTION(GetErrorValue, swift_getErrorValue, C_CC,
          ARGS(ErrorPtrTy, Int8PtrPtrTy, OpenedErrorTriplePtrTy),
          ATTRS(NoUnwind))
 
+// void __tsan_write1(void *addr);
+// This is a Thread Sanitizer instrumentation entry point in compiler-rt.
+FUNCTION(TSanInoutAccess, __tsan_write1, C_CC,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
+
 #if SWIFT_OBJC_INTEROP || !defined(SWIFT_RUNTIME_GENERATE_GLOBAL_SYMBOLS)
 
 // Put here all definitions of runtime functions which are:

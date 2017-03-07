@@ -1186,7 +1186,7 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
         << OriginalIndent;
   }
 
-  TC.diagnose(ReferenceRange.Start, diag::availability_add_attribute,
+  TC.diagnose(D, diag::availability_add_attribute,
               KindForDiagnostic)
       .fixItInsert(InsertLoc, AttrText);
 }

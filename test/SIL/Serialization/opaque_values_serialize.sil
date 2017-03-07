@@ -2,9 +2,9 @@
 // RUN: rm -rfv %t
 // RUN: mkdir %t
 // FIXME: <rdar://problem/29281364> sil-opt -verify is broken
-// RUN: %target-sil-opt %s -enable-sil-opaque-values -emit-sib -o %t/tmp.sib -module-name opaqueval
-// RUN: %target-sil-opt %t/tmp.sib -enable-sil-opaque-values -verify -o %t/tmp.2.sib -module-name opaqueval
-// RUN: %target-sil-opt %t/tmp.2.sib -enable-sil-opaque-values -emit-sorted-sil -verify -module-name opaqueval | %FileCheck %s
+// RUN: %target-sil-opt %s -assume-parsing-unqualified-ownership-sil -enable-sil-opaque-values -emit-sib -o %t/tmp.sib -module-name opaqueval
+// RUN: %target-sil-opt %t/tmp.sib -assume-parsing-unqualified-ownership-sil -enable-sil-opaque-values -verify -o %t/tmp.2.sib -module-name opaqueval
+// RUN: %target-sil-opt %t/tmp.2.sib -assume-parsing-unqualified-ownership-sil -enable-sil-opaque-values -emit-sorted-sil -verify -module-name opaqueval | %FileCheck %s
 
 sil_stage canonical
 
@@ -27,6 +27,25 @@ struct S : Foo {
 sil @castOpaque : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %c = unconditional_checked_cast_opaque %0 : $Int to $Foo
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @condCastOpaque : $@convention(thin) (Int) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Int):
+// CHECK:  checked_cast_value_br [[ARG]] : $Int to $Int
+// CHECK-LABEL: } // end sil function 'condCastOpaque'
+sil @condCastOpaque : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %c = checked_cast_value_br %0 : $Int to $Int, bb2, bb1
+
+bb1:
+  br bb3
+
+bb2(%i : $Int):
+  br bb3
+
+bb3:
   %t = tuple ()
   return %t : $()
 }

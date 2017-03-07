@@ -527,6 +527,10 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
           kind != ConstraintKind::LiteralConformsTo &&
           kind != ConstraintKind::SelfObjectOfProtocol) ||
          second->is<ProtocolType>());
+  
+  // Bridging constraints require bridging to be enabled.
+  assert(kind != ConstraintKind::BridgingConversion
+         || cs.TC.Context.LangOpts.EnableObjCInterop);
 
   // Create the constraint.
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());

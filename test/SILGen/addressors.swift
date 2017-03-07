@@ -145,7 +145,7 @@ struct CArray<T> {
 
 func id_int(_ i: Int32) -> Int32 { return i }
 
-// CHECK-LABEL: sil hidden @_T010addressors11test_carrays5Int32VAA6CArrayVyAdDcGzF : $@convention(thin) (@inout CArray<(Int32) -> Int32>) -> Int32 {
+// CHECK-LABEL: sil hidden @_T010addressors11test_carrays5Int32VAA6CArrayVyA2DcGzF : $@convention(thin) (@inout CArray<(Int32) -> Int32>) -> Int32 {
 // CHECK: bb0([[ARRAY:%.*]] : $*CArray<(Int32) -> Int32>):
 func test_carray(_ array: inout CArray<(Int32) -> Int32>) -> Int32 {
 // CHECK:   [[T0:%.*]] = function_ref @_T010addressors6CArrayV9subscriptxSicfau :

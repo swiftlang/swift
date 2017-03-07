@@ -1907,6 +1907,23 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                                 successBB, failureBB);
     break;
   }
+  case ValueKind::CheckedCastValueBranchInst: {
+    // Format: the cast kind, a typed value, a BasicBlock ID for success,
+    // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout.
+    assert(ListOfValues.size() == 5 &&
+           "expect 6 numbers for CheckedCastValueBranchInst");
+    SILType opTy = getSILType(MF->getType(ListOfValues[1]),
+                              (SILValueCategory)ListOfValues[2]);
+    SILValue op = getLocalValue(ListOfValues[0], opTy);
+    SILType castTy =
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
+    auto *successBB = getBBForReference(Fn, ListOfValues[3]);
+    auto *failureBB = getBBForReference(Fn, ListOfValues[4]);
+
+    ResultVal = Builder.createCheckedCastValueBranch(Loc, op, castTy, successBB,
+                                                     failureBB);
+    break;
+  }
   case ValueKind::UnconditionalCheckedCastOpaqueInst: {
     SILValue Val = getLocalValue(
         ValID, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));

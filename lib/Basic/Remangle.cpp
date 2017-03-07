@@ -296,6 +296,7 @@ namespace {
     void mangleEntityGenericType(Node *node, EntityContext &ctx);
 
     bool trySubstitution(Node *node, SubstitutionEntry &entry);
+    bool mangleStandardSubstitution(Node *node);
     void addSubstitution(const SubstitutionEntry &entry);
     void resetSubstitutions();
 
@@ -320,7 +321,7 @@ void Remangler::resetSubstitutions() {
 }
 
 bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
-  if (Demangle::mangleStandardSubstitution(node, Out))
+  if (mangleStandardSubstitution(node))
     return true;
 
   // Go ahead and initialize the substitution entry.
@@ -334,6 +335,67 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
   Out << 'S';
   mangleIndex(it->second);
   return true;
+}
+
+static bool isInSwiftModule(Node *node) {
+  Node *context = node->getFirstChild();
+  return (context->getKind() == Node::Kind::Module &&
+          context->getText() == STDLIB_NAME);
+};
+
+bool Remangler::mangleStandardSubstitution(Node *node) {
+  // Look for known substitutions.
+  switch (node->getKind()) {
+#define SUCCESS_IF_IS(VALUE, EXPECTED, SUBSTITUTION)            \
+    do {                                                        \
+      if ((VALUE) == (EXPECTED)) {                              \
+        Out << SUBSTITUTION;                                    \
+        return true;                                            \
+      }                                                         \
+    } while (0)
+#define SUCCESS_IF_TEXT_IS(EXPECTED, SUBSTITUTION)              \
+    SUCCESS_IF_IS(node->getText(), EXPECTED, SUBSTITUTION)
+#define SUCCESS_IF_DECLNAME_IS(EXPECTED, SUBSTITUTION)          \
+    SUCCESS_IF_IS(node->getChild(1)->getText(), EXPECTED, SUBSTITUTION)
+
+    case Node::Kind::Module:
+      SUCCESS_IF_TEXT_IS(STDLIB_NAME, "s");
+      SUCCESS_IF_TEXT_IS(MANGLING_MODULE_OBJC, "So");
+      SUCCESS_IF_TEXT_IS(MANGLING_MODULE_C, "SC");
+      break;
+    case Node::Kind::Structure:
+      if (isInSwiftModule(node)) {
+        SUCCESS_IF_DECLNAME_IS("Array", "Sa");
+        SUCCESS_IF_DECLNAME_IS("Bool", "Sb");
+        SUCCESS_IF_DECLNAME_IS("UnicodeScalar", "Sc");
+        SUCCESS_IF_DECLNAME_IS("Double", "Sd");
+        SUCCESS_IF_DECLNAME_IS("Float", "Sf");
+        SUCCESS_IF_DECLNAME_IS("Int", "Si");
+        SUCCESS_IF_DECLNAME_IS("UnsafeRawPointer", "SV");
+        SUCCESS_IF_DECLNAME_IS("UnsafeMutableRawPointer", "Sv");
+        SUCCESS_IF_DECLNAME_IS("UnsafePointer", "SP");
+        SUCCESS_IF_DECLNAME_IS("UnsafeMutablePointer", "Sp");
+        SUCCESS_IF_DECLNAME_IS("UnsafeBufferPointer", "SR");
+        SUCCESS_IF_DECLNAME_IS("UnsafeMutableBufferPointer", "Sr");
+        SUCCESS_IF_DECLNAME_IS("String", "SS");
+        SUCCESS_IF_DECLNAME_IS("UInt", "Su");
+      }
+      break;
+    case Node::Kind::Enum:
+      if (isInSwiftModule(node)) {
+        SUCCESS_IF_DECLNAME_IS("Optional", "Sq");
+        SUCCESS_IF_DECLNAME_IS("ImplicitlyUnwrappedOptional", "SQ");
+      }
+      break;
+
+    default:
+      break;
+
+#undef SUCCESS_IF_DECLNAME_IS
+#undef SUCCESS_IF_TEXT_IS
+#undef SUCCESS_IF_IS
+  }
+  return false;
 }
 
 void Remangler::addSubstitution(const SubstitutionEntry &entry) {

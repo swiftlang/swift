@@ -12,6 +12,7 @@
 
 @_exported import Foundation // Clang module
 import Darwin.uuid
+import _SwiftCoreFoundationOverlayShims
 
 /// Represents UUID strings, which can be used to uniquely identify types, interfaces, and other items.
 @available(OSX 10.8, iOS 6.0, *)

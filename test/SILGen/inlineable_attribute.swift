@@ -14,7 +14,7 @@ public struct MySt {
     return 5
   }
 
-  // CHECK-LABEL: sil [fragile] @_T020inlineable_attribute4MyStV9subscriptSiSicfg : $@convention(method) (Int, MySt) -> Int
+  // CHECK-LABEL: sil [fragile] @_T020inlineable_attribute4MyStV9subscriptS2icfg : $@convention(method) (Int, MySt) -> Int
   @_inlineable public subscript(x: Int) -> Int {
     return x
   }

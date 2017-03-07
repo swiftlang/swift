@@ -3596,6 +3596,7 @@ public:
                                         bool IncludeTopLevel = false,
                                         bool RequestCache = true,
                                         bool LiteralCompletions = true) {
+    ExprType = Type();
     Kind = LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
     FilteredDeclConsumer Consumer(*this, Filter);

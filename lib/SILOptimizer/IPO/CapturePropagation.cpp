@@ -248,7 +248,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
                                  SILFunctionType::Representation::Thin);
   SILFunction *NewF = OrigF->getModule().createFunction(
       SILLinkage::Shared, Name, NewFTy,
-      /*contextGenericParams*/ nullptr, OrigF->getLocation(), OrigF->isBare(),
+      OrigF->getGenericEnvironment(), OrigF->getLocation(), OrigF->isBare(),
       OrigF->isTransparent(), Fragile, OrigF->isThunk(),
       OrigF->getClassVisibility(), OrigF->getInlineStrategy(),
       OrigF->getEffectsKind(),
