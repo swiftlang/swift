@@ -47,6 +47,22 @@ func load_raw_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
   return Builtin.loadRaw(x)
 }
 
+// CHECK-LABEL: sil hidden @_T08builtins18load_invariant_pod{{[_0-9a-zA-Z]*}}F
+func load_invariant_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [invariant] $*Builtin.Int64
+  // CHECK: [[VAL:%.*]] = load [trivial] [[ADDR]]
+  // CHECK: return [[VAL]]
+  return Builtin.loadInvariant(x)
+}
+
+// CHECK-LABEL: sil hidden @_T08builtins18load_invariant_obj{{[_0-9a-zA-Z]*}}F
+func load_invariant_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [invariant] $*Builtin.NativeObject
+  // CHECK: [[VAL:%.*]] = load [copy] [[ADDR]]
+  // CHECK: return [[VAL]]
+  return Builtin.loadInvariant(x)
+}
+
 // CHECK-LABEL: sil hidden @_T08builtins8load_gen{{[_0-9a-zA-Z]*}}F
 func load_gen<T>(_ x: Builtin.RawPointer) -> T {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T

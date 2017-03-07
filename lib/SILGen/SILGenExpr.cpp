@@ -1796,7 +1796,9 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &gen, SILLocation loc,
 
   // Turn the pointer into an address.
   basePtr = gen.B.createPointerToAddress(
-    loc, basePtr, baseTL.getLoweredType().getAddressType(), /*isStrict*/ true);
+    loc, basePtr, baseTL.getLoweredType().getAddressType(),
+    /*isStrict*/ true,
+    /*isInvariant*/ false);
 
   return VarargsInfo(array, abortCleanup, basePtr, baseTL, baseAbstraction);
 }

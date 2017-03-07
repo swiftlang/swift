@@ -913,12 +913,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
     bool isStrict = Attr & 0x01;
+    bool isInvariant = Attr & 0x02;
     ResultVal = Builder.createPointerToAddress(
       Loc,
       getLocalValue(ValID, getSILType(MF->getType(TyID2),
                                       (SILValueCategory)TyCategory2)),
       getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
-      isStrict);
+      isStrict, isInvariant);
     break;
   }
   case ValueKind::DeallocExistentialBoxInst: {

@@ -108,7 +108,7 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
     // address.
     addr = B.createPointerToAddress(
       loc, addr, getLoweredType(var->getInterfaceType()).getAddressType(),
-      /*isStrict*/ true);
+      /*isStrict*/ true, /*isInvariant*/ false);
     return ManagedValue::forLValue(addr);
   }
 
