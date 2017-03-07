@@ -493,12 +493,29 @@ SourceLoc RequirementSource::getLoc() const {
   return SourceLoc();
 }
 
+/// Compute the path length of a requirement source, counting only the number
+/// of \c ProtocolRequirement elements.
+static unsigned sourcePathLength(const RequirementSource *source) {
+  unsigned count = 0;
+  for (; source; source = source->parent) {
+    if (source->kind == RequirementSource::ProtocolRequirement)
+      ++count;
+  }
+  return count;
+}
+
 int RequirementSource::compare(const RequirementSource *other) const {
   // Prefer the derived option, if there is one.
   bool thisIsDerived = this->isDerivedRequirement();
   bool otherIsDerived = other->isDerivedRequirement();
   if (thisIsDerived != otherIsDerived)
     return thisIsDerived ? -1 : +1;
+
+  // Prefer the shorter path.
+  unsigned thisLength = sourcePathLength(this);
+  unsigned otherLength = sourcePathLength(other);
+  if (thisLength != otherLength)
+    return thisLength < otherLength ? -1 : +1;
 
   // FIXME: Arbitrary hack to allow later requirement sources to stomp on
   // earlier ones. We need a proper ordering here.
