@@ -2586,13 +2586,15 @@ bool GenericSignatureBuilder::addRequirement(
 
 /// AST walker that infers requirements from type representations.
 class GenericSignatureBuilder::InferRequirementsWalker : public TypeWalker {
+  ModuleDecl &module;
   GenericSignatureBuilder &Builder;
   TypeRepr *typeRepr;
 
 public:
-  InferRequirementsWalker(GenericSignatureBuilder &builder,
+  InferRequirementsWalker(ModuleDecl &module,
+                          GenericSignatureBuilder &builder,
                           TypeRepr *typeRepr)
-    : Builder(builder), typeRepr(typeRepr) { }
+    : module(module), Builder(builder), typeRepr(typeRepr) { }
 
   Action walkToTypePost(Type ty) override {
     auto boundGeneric = ty->getAs<BoundGenericType>();
@@ -2603,49 +2605,39 @@ public:
     if (!genericSig)
       return Action::Stop;
 
-    /// Retrieves the type substitution.
-    auto args = boundGeneric->getGenericArgs();
-    auto genericSigDepth =
-      genericSig->getInnermostGenericParams().front()->getDepth();
-    auto getTypeSubstitution = [&](SubstitutableType *dependentType) -> Type {
-      if (auto gp = dyn_cast<GenericTypeParamType>(dependentType)) {
-        if (gp->getDepth() == genericSigDepth)
-          return args[gp->getIndex()];
-
-        return gp;
-      }
-
-      return dependentType;
-    };
+    /// Retrieve the substitution.
+    auto allSubs = boundGeneric->gatherAllSubstitutions(&module, nullptr);
+    auto subMap = genericSig->getSubstitutionMap(allSubs);
 
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.
     auto source = FloatingRequirementSource::forInferred(typeRepr);
-    for (const auto &rawReq : genericSig->getRequirements()) {
-      if (auto req = rawReq.subst(getTypeSubstitution,
-                                  Builder.getLookupConformanceFn()))
-        Builder.addRequirement(*req, source);
+    for (const auto &req : genericSig->getRequirements()) {
+      Builder.addRequirement(req, source, &subMap);
     }
 
     return Action::Continue;
   }
 };
 
-void GenericSignatureBuilder::inferRequirements(TypeLoc type) {
+void GenericSignatureBuilder::inferRequirements(ModuleDecl &module,
+                                                TypeLoc type) {
   if (!type.getType())
     return;
   // FIXME: Crummy source-location information.
-  InferRequirementsWalker walker(*this, type.getTypeRepr());
+  InferRequirementsWalker walker(module, *this, type.getTypeRepr());
   type.getType().walk(walker);
 }
 
-void GenericSignatureBuilder::inferRequirements(ParameterList *params,
-                                         GenericParamList *genericParams) {
+void GenericSignatureBuilder::inferRequirements(
+                                          ModuleDecl &module,
+                                          ParameterList *params,
+                                          GenericParamList *genericParams) {
   if (genericParams == nullptr)
     return;
 
   for (auto P : *params)
-    inferRequirements(P->getTypeLoc());
+    inferRequirements(module, P->getTypeLoc());
 }
 
 /// Perform typo correction on the given nested type, producing the

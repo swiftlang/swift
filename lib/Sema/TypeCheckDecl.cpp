@@ -7464,7 +7464,8 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
 
   // Local function used to infer requirements from the extended type.
   auto inferExtendedTypeReqs = [&](GenericSignatureBuilder &builder) {
-    builder.inferRequirements(TypeLoc::withoutLoc(extInterfaceType));
+    builder.inferRequirements(*ext->getModuleContext(),
+                              TypeLoc::withoutLoc(extInterfaceType));
   };
 
   // Validate the generic type signature.
