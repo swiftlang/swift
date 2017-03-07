@@ -404,7 +404,8 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
     TypeCheckerDebug(new StderrTypeCheckerDebugConsumer()),
     TheErrorType(
-      new (*this, AllocationArena::Permanent) ErrorType(*this, Type())),
+      new (*this, AllocationArena::Permanent)
+        ErrorType(*this, Type(), RecursiveTypeProperties::HasError)),
     TheUnresolvedType(new (*this, AllocationArena::Permanent)
                       UnresolvedType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
@@ -2424,8 +2425,8 @@ Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }
 Type ErrorType::get(Type originalType) {
   assert(originalType);
 
-  auto properties = originalType->getRecursiveProperties();
-  auto arena = getArena(properties);
+  auto originalProperties = originalType->getRecursiveProperties();
+  auto arena = getArena(originalProperties);
 
   auto &ctx = originalType->getASTContext();
   auto &entry = ctx.Impl.getArena(arena).ErrorTypesWithOriginal[originalType];
@@ -2433,7 +2434,10 @@ Type ErrorType::get(Type originalType) {
 
   void *mem = ctx.Allocate(sizeof(ErrorType) + sizeof(Type),
                            alignof(ErrorType), arena);
-  return entry = new (mem) ErrorType(ctx, originalType);
+  RecursiveTypeProperties properties = RecursiveTypeProperties::HasError;
+  if (originalProperties.hasTypeVariable())
+    properties |= RecursiveTypeProperties::HasTypeVariable;
+  return entry = new (mem) ErrorType(ctx, originalType, properties);
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
