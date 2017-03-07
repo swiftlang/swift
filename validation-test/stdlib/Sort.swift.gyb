@@ -99,7 +99,6 @@ class OffsetCollection : MutableCollection, RandomAccessCollection {
 %   for p in withPredicateValues:
 // workaround for <rdar://problem/18900352> gyb miscompiles nested loops
 %     comparePredicate = "<" if p else ""
-%     commaComparePredicate = ", by: <" if p else ""
 %     name = "lessPredicate" if p else "noPredicate"
 
 Algorithm.test("${t}/sorted/${name}") {
@@ -120,7 +119,7 @@ Algorithm.test("${t}/sorted/${name}") {
   let i1 = 400
   let i2 = 700
   sortedAry2 = ary
-  _introSort(&sortedAry2, subRange: i1..<i2${commaComparePredicate})
+  _introSort(&sortedAry2, subRange: i1..<i2, by: <)
 
   expectEqual(ary[0..<i1], sortedAry2[0..<i1])
   expectSortedCollection(sortedAry2[i1..<i2], ary[i1..<i2])
