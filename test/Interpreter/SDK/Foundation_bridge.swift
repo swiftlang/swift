@@ -116,8 +116,8 @@ do {
 }
 
 // CHECK:      dictionary bridges to {
-// CHECK-NEXT:   2 = World;
 // CHECK-NEXT:   1 = Hello;
+// CHECK-NEXT:   2 = World;
 // CHECK-NEXT: }
 do {
   var dict2 = [1: "Hello", 2: "World"]
@@ -126,8 +126,8 @@ do {
 }
 
 // CHECK: dictionary bridges to {
-// CHECK-NEXT:   2 = "(\"World\", 2)";
 // CHECK-NEXT:   1 = "(\"Hello\", 1)";
+// CHECK-NEXT:   2 = "(\"World\", 2)";
 // CHECK-NEXT: }
 do {
   var dict3 = [1: ("Hello", 1), 2: ("World", 2)]

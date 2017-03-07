@@ -3890,14 +3890,14 @@ DictionaryTestSuite.test("getObjects:andKeys:") {
   d.available_getObjects(null, andKeys: null) // don't segfault
 
   d.available_getObjects(null, andKeys: kp)
-  expectEqual([2, 1] as [NSNumber], Array(keys))
+  expectEqual([1, 2] as [NSNumber], Array(keys))
 
   d.available_getObjects(vp, andKeys: null)
-  expectEqual(["two", "one"] as [NSString], Array(values))
+  expectEqual(["one", "two"] as [NSString], Array(values))
 
   d.available_getObjects(vp, andKeys: kp)
-  expectEqual([2, 1] as [NSNumber], Array(keys))
-  expectEqual(["two", "one"] as [NSString], Array(values))
+  expectEqual([1, 2] as [NSNumber], Array(keys))
+  expectEqual(["one", "two"] as [NSString], Array(values))
 }
 #endif
 
