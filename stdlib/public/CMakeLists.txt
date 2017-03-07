@@ -22,16 +22,16 @@ endif()
 
 # C++ code in the runtime and standard library should generally avoid
 # introducing static constructors or destructors.
-check_cxx_compiler_flag("-Werror -Wglobal-constructors" CXX_SUPPORTS_GLOBAL_CONSTRUCTORS_WARNING)
+check_cxx_compiler_flag("-Werror=global-constructors" CXX_SUPPORTS_GLOBAL_CONSTRUCTORS_WARNING)
 if(CXX_SUPPORTS_GLOBAL_CONSTRUCTORS_WARNING)
-  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-Wglobal-constructors")
+  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-Werror=global-constructors")
 endif()
 
 # C++ code in the runtime and standard library should generally avoid
 # introducing static constructors or destructors.
-check_cxx_compiler_flag("-Wexit-time-destructors" CXX_SUPPORTS_EXIT_TIME_DESTRUCTORS_WARNING)
+check_cxx_compiler_flag("-Werror=exit-time-destructors" CXX_SUPPORTS_EXIT_TIME_DESTRUCTORS_WARNING)
 if(CXX_SUPPORTS_EXIT_TIME_DESTRUCTORS_WARNING)
-  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-Wexit-time-destructors")
+  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-Werror=exit-time-destructors")
 endif()
 
 # We don't want runtime C++ code to export symbols we didn't explicitly
