@@ -93,6 +93,15 @@ public:
   /// Query whether any replacement type sin the map contain dynamic Self.
   bool hasDynamicSelf() const;
 
+  /// Apply a substitution to all replacement types in the map. Does not
+  /// change keys.
+  SubstitutionMap subst(const SubstitutionMap &subMap) const;
+
+  /// Apply a substitution to all replacement types in the map. Does not
+  /// change keys.
+  SubstitutionMap subst(TypeSubstitutionFn subs,
+                        LookupConformanceFn conformances) const;
+
   /// Create a substitution map for a protocol conformance.
   static SubstitutionMap
   getProtocolSubstitutions(ProtocolDecl *protocol,

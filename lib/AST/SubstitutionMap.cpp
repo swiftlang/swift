@@ -222,6 +222,38 @@ addParent(CanType type, CanType parent, AssociatedTypeDecl *assocType) {
   parentMap[type.getPointer()].push_back(std::make_pair(parent, assocType));
 }
 
+
+SubstitutionMap SubstitutionMap::subst(const SubstitutionMap &subMap) const {
+  return subst(QuerySubstitutionMap{subMap},
+               LookUpConformanceInSubstitutionMap(subMap));
+}
+
+SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
+                                       LookupConformanceFn conformances) const {
+  SubstitutionMap result(*this);
+
+  for (auto iter = result.subMap.begin(),
+            end = result.subMap.end();
+       iter != end; ++iter) {
+    iter->second = iter->second.subst(subs, conformances,
+                                      SubstFlags::UseErrorType);
+  }
+
+  for (auto iter = result.conformanceMap.begin(),
+            end = result.conformanceMap.end();
+       iter != end; ++iter) {
+    auto origType = Type(iter->first).subst(
+        *this, SubstFlags::UseErrorType);
+    for (auto citer = iter->second.begin(),
+              cend = iter->second.end();
+         citer != cend; ++citer) {
+      *citer = citer->subst(origType, subs, conformances);
+    }
+  }
+
+  return result;
+}
+
 SubstitutionMap
 SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
                                           Type selfType,

@@ -638,7 +638,7 @@ ProtocolConformance::subst(Type substType,
         subMap = genericSig->getSubstitutionMap(
           [&](SubstitutableType *t) -> Type {
             return genericEnv->mapTypeIntoContext(
-              t).subst(subs, conformances);
+              t).subst(subs, conformances, SubstFlags::UseErrorType);
           },
           [&](CanType origType, Type substType, ProtocolType *protoType)
             -> Optional<ProtocolConformanceRef> {
@@ -675,14 +675,15 @@ ProtocolConformance::subst(Type substType,
   case ProtocolConformanceKind::Specialized: {
     // Substitute the substitutions in the specialized conformance.
     auto spec = cast<SpecializedProtocolConformance>(this);
-    SmallVector<Substitution, 8> newSubs;
-    newSubs.reserve(spec->getGenericSubstitutions().size());
-    for (auto &sub : spec->getGenericSubstitutions())
-      newSubs.push_back(sub.subst(subs, conformances));
-    
+    auto genericConformance
+      = cast<SpecializedProtocolConformance>(this)->getGenericConformance();
+    auto subMap =
+      genericConformance->getGenericSignature()
+        ->getSubstitutionMap(spec->getGenericSubstitutions());
+
     return substType->getASTContext()
-      .getSpecializedConformance(substType, spec->getGenericConformance(),
-                                 newSubs);
+      .getSpecializedConformance(substType, genericConformance,
+                                 subMap.subst(subs, conformances));
   }
   }
   llvm_unreachable("bad ProtocolConformanceKind");
@@ -713,7 +714,7 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
            && "substitution didn't produce conformance for same type?!");
     return r;
   }
-    
+
   case ProtocolConformanceKind::Inherited: {
     auto classInherited = cast<InheritedProtocolConformance>(this);
     auto protoInherited = classInherited->getInheritedConformance()
