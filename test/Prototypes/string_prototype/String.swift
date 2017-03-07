@@ -389,7 +389,7 @@ extension String {
   ///   should be interpreted.
   init<Encoding: UnicodeEncoding>(
     cString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
-    encoding: Encoding) {
+    encoding: Encoding.Type) {
       let len = Encoding._nullCodeUnitOffset(in: nulTerminatedCodeUnits)
       // TODO: use String.init that detects optimal storage
       self = String(canonical: SwiftCanonicalString(

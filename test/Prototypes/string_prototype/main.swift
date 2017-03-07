@@ -307,13 +307,12 @@ testSuite.test("cstring") {
     let s = String(cString: $0)
     expectEqual("some string", s)
   }
-  
-  // FIXME not compiling
-  // var utf16 = Array(s3.utf16) + [0]
-  // utf16.withUnsafeBufferPointer {
-  //   let s = String(cString: $0.baseAddress!, encoding: UTF16.self)
-  //   expectEqual(s, "some stringz")
-  // }
+
+  var utf16 = Array(s3.utf16) + [0]
+  let s4 = utf16.withUnsafeBufferPointer {
+    String(cString: $0.baseAddress!, encoding: UTF16.self)
+  }
+  expectEqual(s4, "some string")
 }
 
 runAllTests()
