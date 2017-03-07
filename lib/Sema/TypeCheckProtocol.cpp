@@ -2662,7 +2662,8 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   if (LocalMissing.empty())
     return;
 
-  llvm::SetVector<ValueDecl*> MissingWitnesses = GlobalMissingWitnesses;
+  llvm::SetVector<ValueDecl*> MissingWitnesses(GlobalMissingWitnesses.begin(),
+                                               GlobalMissingWitnesses.end());
   auto InsertFixitCallback = [MissingWitnesses](NormalProtocolConformance *Conf) {
     DeclContext *DC = Conf->getDeclContext();
     // The location where to insert stubs.
