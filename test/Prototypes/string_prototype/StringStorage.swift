@@ -43,11 +43,19 @@ final class _StringStorage<Element: UnsignedInteger>
     }
   }
 
-  var isKnownFCCNormalized: Bool {
+  var isKnownValidEncoding: Bool {
     get { return _header.flags & 1<<2 as UInt8 != 0 }
     set {
       if newValue { _header.flags |= 1<<2 as UInt8 }
       else { _header.flags &= ~(1<<2) as UInt8 }
+    }
+  }
+  
+  var isKnownFCCNormalized: Bool {
+    get { return _header.flags & 1<<3 as UInt8 != 0 }
+    set {
+      if newValue { _header.flags |= 1<<3 as UInt8 }
+      else { _header.flags &= ~(1<<3) as UInt8 }
     }
   }
 
