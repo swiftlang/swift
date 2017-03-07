@@ -425,7 +425,7 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
           requirement->getAttrs().hasAttribute<OptionalAttr>() ||
           requirement->getAttrs().isUnavailable(
                                         requirement->getASTContext())) &&
-				 "Conformance already complete?");
+         "Conformance already complete?");
   Mapping[requirement] = witness;
 }
 
