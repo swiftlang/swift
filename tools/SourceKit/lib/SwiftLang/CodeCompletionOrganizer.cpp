@@ -158,7 +158,7 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
     CodeCompletion::SwiftResult swiftResult(
         CodeCompletion::SwiftResult::ResultKind::Pattern,
         SemanticContextKind::ExpressionSpecific,
-        /*numBytesToErase=*/0, completionString);
+        /*NumBytesToErase=*/0, completionString);
 
     CompletionBuilder builder(sink, swiftResult);
     builder.setCustomKind(customCompletion.Kind);
@@ -1356,7 +1356,6 @@ NameStyle::NameStyle(StringRef name)
   unsigned underscores = 0;
   unsigned caseCount[3] = {0, 0, 0};
   Case leadingCase = None;
-  Case prevCase = None;
   for (; pos < center.size(); ++pos) {
     char c = center[pos];
     Case curCase = caseOf(c);
@@ -1365,7 +1364,6 @@ NameStyle::NameStyle(StringRef name)
 
     underscores += (c == '_');
     caseCount[curCase] += 1;
-    prevCase = curCase;
   }
 
   assert(caseCount[leadingCase] > 0);

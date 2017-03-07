@@ -462,7 +462,7 @@ public:
   }
 
   size_t numTrailingObjects(
-  	  typename TrailingObjects::template OverloadToken<Operand>) const {
+    typename TrailingObjects::template OverloadToken<Operand>) const {
     return NumOperands;
   }
 
@@ -2301,7 +2301,7 @@ public:
 
   // Implement llvm::TrailingObjects.
   size_t numTrailingObjects(
-  	  typename TrailingObjects::template OverloadToken<Operand>) const {
+    typename TrailingObjects::template OverloadToken<Operand>) const {
     return NumOperands;
   }
 

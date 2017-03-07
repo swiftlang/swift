@@ -70,7 +70,7 @@ namespace {
 
     return TokensInRange;
   }
-}
+} // namespace
 
 Optional<Syntax>
 syntax::transformAST(ASTNode Node,
@@ -1284,7 +1284,6 @@ syntax::findTokenSyntax(tok ExpectedKind,
     auto Pos = TokAndPos.second;
 
     auto TokStart = Pos.getOffset();
-    auto TokEnd = TokStart + Tok->getText().size();
 
     if (Offset == TokStart) {
       if (Tok->getTokenKind() == ExpectedKind &&

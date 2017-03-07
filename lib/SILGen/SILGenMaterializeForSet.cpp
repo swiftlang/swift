@@ -692,9 +692,9 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
                          genericEnv, SILLocation(Witness),
                          IsBare, F.isTransparent(), F.isFragile(),
                          IsNotThunk,
-                         /*ClassVisibility=*/SILFunction::NotRelevant,
-                         /*InlineStrategy=*/InlineDefault,
-                         /*EffectsKind=*/EffectsKind::Unspecified,
+                         /*classVisibility=*/SILFunction::NotRelevant,
+                         /*inlineStrategy=*/InlineDefault,
+                         /*EK=*/EffectsKind::Unspecified,
                          /*InsertBefore=*/&F);
 
   callback->setDebugScope(new (SGM.M) SILDebugScope(Witness, callback));
