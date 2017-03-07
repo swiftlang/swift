@@ -380,15 +380,20 @@ const RequirementSource *RequirementSource::viaParent(
 
 #undef REQUIREMENT_SOURCE_FACTORY_BODY
 
-PotentialArchetype *RequirementSource::getRootPotentialArchetype() const {
-  /// Find the root.
+const RequirementSource *RequirementSource::getRoot() const {
   auto root = this;
   while (auto parent = root->parent)
     root = parent;
+  return root;
+}
+
+PotentialArchetype *RequirementSource::getRootPotentialArchetype() const {
+  /// Find the root.
+  auto root = getRoot();
 
   // We're at the root, so it's in the inline storage.
   assert(storageKind == StorageKind::RootArchetype);
-  return storage.rootArchetype;
+  return root->storage.rootArchetype;
 }
 
 ProtocolDecl *RequirementSource::getProtocolDecl() const {
@@ -2936,6 +2941,16 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
       continue;
     }
 
+    // We prefer constraints rooted at explicit requirements to ones rooted
+    // on inferred requirements.
+    bool thisIsInferred = constraint.source->isInferredRequirement();
+    bool representativeIsInferred = representativeConstraint->source->isInferredRequirement();
+    if (thisIsInferred != representativeIsInferred) {
+      if (representativeIsInferred)
+        representativeConstraint = constraint;
+      continue;
+    }
+
     // We prefer derived constraints to non-derived constraints.
     bool thisIsDerived = constraint.source->isDerivedRequirement();
     bool representativeIsDerived =
@@ -3040,9 +3055,11 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
     }
 
     case ConstraintRelation::Redundant:
-      // If this requirement is not derived (but has a useful location),
-      // complain that it is redundant.
+      // If this requirement is not derived or inferred (but has a useful
+      // location) complain that it is redundant.
       if (!constraint.source->isDerivedRequirement() &&
+          !constraint.source->isInferredRequirement() &&
+          !representativeConstraint->source->isInferredRequirement() &&
           constraint.source->getLoc().isValid()) {
         Diags.diagnose(constraint.source->getLoc(),
                        redundancyDiag,

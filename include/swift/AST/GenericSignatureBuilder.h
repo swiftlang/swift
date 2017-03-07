@@ -765,8 +765,17 @@ public:
   const RequirementSource *viaParent(GenericSignatureBuilder &builder,
                                      AssociatedTypeDecl *assocType) const;
 
+  /// Retrieve the root requirement source.
+  const RequirementSource *getRoot() const;
+
   /// Retrieve the potential archetype at the root.
   PotentialArchetype *getRootPotentialArchetype() const;
+
+  /// Whether the requirement is inferred or derived from an inferred
+  /// requirment.
+  bool isInferredRequirement() const {
+    return getRoot()->kind == Inferred;
+  }
 
   /// Whether the requirement can be derived from something in its path.
   ///
