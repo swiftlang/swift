@@ -62,9 +62,10 @@ final class _StringStorage<Element: UnsignedInteger>
       _StringStorage.self,
         Swift.max(count, minimumCapacity)._builtinWordValue, Element.self))
 
-    let storageAddr = UnsafeMutableRawPointer(
+    let storageAddr = UnsafeRawPointer(
       Builtin.projectTailElems(self, Element.self))
-    let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
+    let startAddr = UnsafeRawPointer(Builtin.bridgeToRawPointer(self))
+    let endAddr = startAddr + _swift_stdlib_malloc_size(startAddr)
     let realCapacity = endAddr.assumingMemoryBound(to: Element.self)
       - storageAddr.assumingMemoryBound(to: Element.self)
 
