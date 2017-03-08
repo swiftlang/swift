@@ -369,4 +369,7 @@ def enable_class_resilience : Flag<["-"], "enable-class-resilience">,
 def group_info_path : Separate<["-"], "group-info-path">,
   HelpText<"The path to collect the group information of the compiled module">;
 
+def diagnostics_editor_mode : Flag<["-"], "diagnostics-editor-mode">,
+HelpText<"Diagnostics will be used in editor">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
