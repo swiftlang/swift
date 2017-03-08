@@ -397,7 +397,7 @@ extern "C" NSDictionary *swift_stdlib_getErrorUserInfoNSDictionary(
                            const WitnessTable *Error);
 
 //@_silgen_name("swift_stdlib_getErrorDefaultUserInfo")
-//public func _stdlib_getErrorDefaultUserInfo<T : Error>(_ x: UnsafePointer<T>) -> AnyObject
+//public func _stdlib_getErrorDefaultUserInfo<T : Error>(_ x: T) -> AnyObject
 SWIFT_CC(swift) SWIFT_RT_ENTRY_VISIBILITY
 extern "C" NSDictionary *swift_stdlib_getErrorDefaultUserInfo(
                            OpaqueValue *error,
