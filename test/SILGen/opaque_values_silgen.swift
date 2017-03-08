@@ -219,12 +219,13 @@ func s130_____________wrap<T>(_ x: T) -> T? {
 // CHECK-NOT: alloc_stack $Optional<Int>
 // CHECK:   [[APPLY_ARG3:%.*]] = apply %{{.*}}<CountableRange<Int>>
 // CHECK-NOT: dealloc_stack
-// CHECK:   [[ENUM_ARG:%.*]] = select_enum [[APPLY_ARG3]] : $Optional<Int>
-// CHECK:   cond_br [[ENUM_ARG]], bb3, bb2
+// CHECK:   switch_enum [[APPLY_ARG3]]
 // CHECK: bb2:
-// CHECK:   return %{{.*}} : $()
+// CHECK:   br bb3
 // CHECK: bb3:
-// CHECK:   unchecked_enum_data [[APPLY_ARG3]]
+// CHECK:   return %{{.*}} : $()
+// CHECK: bb4([[ENUM_ARG:%.*]] : $Int):
+// CHECK-NOT:   unchecked_enum_data
 // CHECK:   br bb1
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s140______forEachStmtyyF'
 func s140______forEachStmt() {
