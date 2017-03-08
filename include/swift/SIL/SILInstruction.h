@@ -2838,20 +2838,19 @@ public:
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
 /// The result of the checked cast is left in the destination.
-class UnconditionalCheckedCastOpaqueInst final
+class UnconditionalCheckedCastValueInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
-          ValueKind::UnconditionalCheckedCastOpaqueInst,
-          UnconditionalCheckedCastOpaqueInst, ConversionInst, true> {
+          ValueKind::UnconditionalCheckedCastValueInst,
+          UnconditionalCheckedCastValueInst, ConversionInst, true> {
   friend SILBuilder;
 
-  UnconditionalCheckedCastOpaqueInst(SILDebugLocation DebugLoc,
-                                     SILValue Operand,
-                                     ArrayRef<SILValue> TypeDependentOperands,
-                                     SILType DestTy)
+  UnconditionalCheckedCastValueInst(SILDebugLocation DebugLoc, SILValue Operand,
+                                    ArrayRef<SILValue> TypeDependentOperands,
+                                    SILType DestTy)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, DestTy) {}
 
-  static UnconditionalCheckedCastOpaqueInst *
+  static UnconditionalCheckedCastValueInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 };

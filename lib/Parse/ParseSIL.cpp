@@ -2477,7 +2477,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
   // Checked Conversion instructions.
   case ValueKind::UnconditionalCheckedCastInst:
-  case ValueKind::UnconditionalCheckedCastOpaqueInst:
+  case ValueKind::UnconditionalCheckedCastValueInst:
   case ValueKind::CheckedCastValueBranchInst:
   case ValueKind::CheckedCastBranchInst: {
     SILType ty;
@@ -2501,10 +2501,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
         return true;
       ResultVal = B.createUnconditionalCheckedCast(InstLoc, Val, ty);
       break;
-    } else if (Opcode == ValueKind::UnconditionalCheckedCastOpaqueInst) {
+    } else if (Opcode == ValueKind::UnconditionalCheckedCastValueInst) {
       if (parseSILDebugLocation(InstLoc, B))
         return true;
-      ResultVal = B.createUnconditionalCheckedCastOpaque(InstLoc, Val, ty);
+      ResultVal = B.createUnconditionalCheckedCastValue(InstLoc, Val, ty);
       break;
     }
     // The conditional cast still needs its branch destinations.

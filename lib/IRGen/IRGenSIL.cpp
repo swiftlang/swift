@@ -973,8 +973,8 @@ public:
   void visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *i);
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *i);
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *i);
-  void visitUnconditionalCheckedCastOpaqueInst(
-      UnconditionalCheckedCastOpaqueInst *i);
+  void
+  visitUnconditionalCheckedCastValueInst(UnconditionalCheckedCastValueInst *i);
   void visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *i);
   void visitObjCExistentialMetatypeToObjectInst(
                                         ObjCExistentialMetatypeToObjectInst *i);
@@ -4276,8 +4276,8 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
                   i->getConsumptionKind(), CheckedCastMode::Unconditional);
 }
 
-void IRGenSILFunction::visitUnconditionalCheckedCastOpaqueInst(
-    swift::UnconditionalCheckedCastOpaqueInst *i) {
+void IRGenSILFunction::visitUnconditionalCheckedCastValueInst(
+    swift::UnconditionalCheckedCastValueInst *i) {
   llvm_unreachable("unsupported instruction during IRGen");
 }
 

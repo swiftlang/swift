@@ -1157,13 +1157,13 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitUnconditionalCheckedCastOpaqueInst(
-    UnconditionalCheckedCastOpaqueInst *Inst) {
+void SILCloner<ImplClass>::visitUnconditionalCheckedCastValueInst(
+    UnconditionalCheckedCastValueInst *Inst) {
   SILLocation OpLoc = getOpLocation(Inst->getLoc());
   SILValue OpValue = getOpValue(Inst->getOperand());
   SILType OpType = getOpType(Inst->getType());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst, getBuilder().createUnconditionalCheckedCastOpaque(
+  doPostProcess(Inst, getBuilder().createUnconditionalCheckedCastValue(
                           OpLoc, OpValue, OpType));
 }
 

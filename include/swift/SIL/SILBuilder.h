@@ -798,10 +798,10 @@ public:
         targetType));
   }
 
-  UnconditionalCheckedCastOpaqueInst *
-  createUnconditionalCheckedCastOpaque(SILLocation Loc, SILValue op,
-                                       SILType destTy) {
-    return insert(UnconditionalCheckedCastOpaqueInst::create(
+  UnconditionalCheckedCastValueInst *
+  createUnconditionalCheckedCastValue(SILLocation Loc, SILValue op,
+                                      SILType destTy) {
+    return insert(UnconditionalCheckedCastValueInst::create(
         getSILDebugLocation(Loc), op, destTy, F, OpenedArchetypes));
   }
 

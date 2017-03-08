@@ -1924,11 +1924,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                                      failureBB);
     break;
   }
-  case ValueKind::UnconditionalCheckedCastOpaqueInst: {
+  case ValueKind::UnconditionalCheckedCastValueInst: {
     SILValue Val = getLocalValue(
         ValID, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
     SILType Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
-    ResultVal = Builder.createUnconditionalCheckedCastOpaque(Loc, Val, Ty);
+    ResultVal = Builder.createUnconditionalCheckedCastValue(Loc, Val, Ty);
     break;
   }
   case ValueKind::UnconditionalCheckedCastAddrInst:
