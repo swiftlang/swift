@@ -38,6 +38,13 @@ bool SubstitutionMap::hasArchetypes() const {
   return false;
 }
 
+bool SubstitutionMap::hasOpenedExistential() const {
+  for (auto &entry : subMap)
+    if (entry.second->hasOpenedExistential())
+      return true;
+  return false;
+}
+
 bool SubstitutionMap::hasDynamicSelf() const {
   for (auto &entry : subMap)
     if (entry.second->hasDynamicSelfType())
@@ -209,17 +216,42 @@ addConformance(CanType type, ProtocolConformanceRef conformance) {
   conformanceMap[type.getPointer()].push_back(conformance);
 }
 
-ArrayRef<ProtocolConformanceRef> SubstitutionMap::
-getConformances(CanType type) const {
-  auto known = conformanceMap.find(type.getPointer());
-  if (known == conformanceMap.end()) return { };
-  return known->second;
-}
-
 void SubstitutionMap::
 addParent(CanType type, CanType parent, AssociatedTypeDecl *assocType) {
   assert(type && parent && assocType);
   parentMap[type.getPointer()].push_back(std::make_pair(parent, assocType));
+}
+
+
+SubstitutionMap SubstitutionMap::subst(const SubstitutionMap &subMap) const {
+  return subst(QuerySubstitutionMap{subMap},
+               LookUpConformanceInSubstitutionMap(subMap));
+}
+
+SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
+                                       LookupConformanceFn conformances) const {
+  SubstitutionMap result(*this);
+
+  for (auto iter = result.subMap.begin(),
+            end = result.subMap.end();
+       iter != end; ++iter) {
+    iter->second = iter->second.subst(subs, conformances,
+                                      SubstFlags::UseErrorType);
+  }
+
+  for (auto iter = result.conformanceMap.begin(),
+            end = result.conformanceMap.end();
+       iter != end; ++iter) {
+    auto origType = Type(iter->first).subst(
+        *this, SubstFlags::UseErrorType);
+    for (auto citer = iter->second.begin(),
+              cend = iter->second.end();
+         citer != cend; ++citer) {
+      *citer = citer->subst(origType, subs, conformances);
+    }
+  }
+
+  return result;
 }
 
 SubstitutionMap

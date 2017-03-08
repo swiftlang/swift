@@ -590,7 +590,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
     auto conformance =
            ctx.getSpecializedConformance(conformingType,
                                          genericConformance.getConcrete(),
-                                         ctx.AllocateCopy(substitutions));
+                                         substitutions);
     return ProtocolConformanceRef(conformance);
   }
 
