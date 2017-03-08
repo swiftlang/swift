@@ -296,8 +296,8 @@ const RequirementSource *RequirementSource::forAbstract(
 }
 
 const RequirementSource *RequirementSource::forExplicit(
-                                             PotentialArchetype *root,
-                                             WrittenRequirementLoc writtenLoc) {
+    PotentialArchetype *root,
+    GenericSignatureBuilder::WrittenRequirementLoc writtenLoc) {
   auto &builder = *root->getBuilder();
   REQUIREMENT_SOURCE_FACTORY_BODY(
                         (nodeID, Explicit, nullptr, root,
@@ -363,10 +363,9 @@ static Type rerootOnProtocolSelf(Type depTy, ProtocolDecl *protocol) {
 }
 
 const RequirementSource *RequirementSource::viaProtocolRequirement(
-                                     GenericSignatureBuilder &builder,
-                                     Type dependentType,
-                                     ProtocolDecl *protocol,
-                                     WrittenRequirementLoc writtenLoc) const {
+    GenericSignatureBuilder &builder, Type dependentType,
+    ProtocolDecl *protocol,
+    GenericSignatureBuilder::WrittenRequirementLoc writtenLoc) const {
   // Re-root the dependent type on the protocol.
   // FIXME: we really want to canonicalize w.r.t. the requirement signature of
   // the protocol, but it might not have been computed yet.
