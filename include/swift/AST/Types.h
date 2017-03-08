@@ -869,11 +869,17 @@ public:
   /// the context of the extension above will produce substitutions T
   /// -> Int and U -> String suitable for mapping the type of
   /// \c SomeArray.
+  ///
+  /// \param genericEnv If non-null and the type is nested inside of a
+  /// generic function, generic parameters of the outer context are
+  /// mapped to context archetypes of this generic environment.
   SubstitutionMap getContextSubstitutionMap(ModuleDecl *module,
-                                            const DeclContext *dc);
+                                            const DeclContext *dc,
+                                            GenericEnvironment *genericEnv=nullptr);
 
   /// Deprecated version of the above.
-  TypeSubstitutionMap getContextSubstitutions(const DeclContext *dc);
+  TypeSubstitutionMap getContextSubstitutions(const DeclContext *dc,
+                                              GenericEnvironment *genericEnv=nullptr);
 
   /// Get the substitutions to apply to the type of the given member as seen
   /// from this base type.

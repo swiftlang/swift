@@ -3022,7 +3022,9 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
   llvm_unreachable("no inheritance relationship between given classes");
 }
 
-TypeSubstitutionMap TypeBase::getContextSubstitutions(const DeclContext *dc) {
+TypeSubstitutionMap
+TypeBase::getContextSubstitutions(const DeclContext *dc,
+                                  GenericEnvironment *genericEnv) {
   assert(dc->isTypeContext());
   Type baseTy(this);
 
@@ -3101,16 +3103,32 @@ TypeSubstitutionMap TypeBase::getContextSubstitutions(const DeclContext *dc) {
     llvm_unreachable("Bad base type");
   }
 
+  if (genericEnv) {
+    auto *parentDC = dc;
+    while (parentDC->isTypeContext())
+      parentDC = parentDC->getParent();
+    if (auto *outerSig = parentDC->getGenericSignatureOfContext()) {
+      for (auto gp : outerSig->getGenericParams()) {
+        auto result = substitutions.insert(
+          {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
+           genericEnv->mapTypeIntoContext(gp)});
+        assert(result.second);
+        (void) result;
+      }
+    }
+  }
+
   return substitutions;
 }
 
 SubstitutionMap TypeBase::getContextSubstitutionMap(
-    ModuleDecl *module, const DeclContext *dc) {
+    ModuleDecl *module, const DeclContext *dc,
+    GenericEnvironment *genericEnv) {
   auto *genericSig = dc->getGenericSignatureOfContext();
   if (genericSig == nullptr)
     return SubstitutionMap();
   return genericSig->getSubstitutionMap(
-      QueryTypeSubstitutionMap{getContextSubstitutions(dc)},
+      QueryTypeSubstitutionMap{getContextSubstitutions(dc, genericEnv)},
       LookUpConformanceInModule(module));
 }
 
@@ -3123,7 +3141,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(
 
   // Compute the set of member substitutions to apply.
   if (memberDC->isTypeContext())
-    substitutions = getContextSubstitutions(memberDC);
+    substitutions = getContextSubstitutions(memberDC, genericEnv);
 
   // If the member itself is generic, preserve its generic parameters.
   // We need this since code completion and diagnostics want to be able
