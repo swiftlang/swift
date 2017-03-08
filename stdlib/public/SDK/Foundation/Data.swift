@@ -875,11 +875,11 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 #else
             switch self {
             case .virtualMemory:
-                return { NSDataDeallocatorVM($0, UInt($1)) }
+                return { NSDataDeallocatorVM($0, $1) }
             case .unmap:
-                return { NSDataDeallocatorUnmap($0, UInt($1)) }
+                return { NSDataDeallocatorUnmap($0, $1) }
             case .free:
-                return { NSDataDeallocatorFree($0, UInt($1)) }
+                return { NSDataDeallocatorFree($0, $1) }
             case .none:
                 return { _, _ in }
             case .custom(let b):
