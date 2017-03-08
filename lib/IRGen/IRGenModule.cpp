@@ -274,9 +274,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     FunctionPtrTy,
     RefCountedPtrTy,
   });
-  
-  OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
-                  ->getPointerTo(DefaultAS);
+
+  OpaqueTy = llvm::StructType::create(LLVMContext, "swift.opaque");
+  OpaquePtrTy = OpaqueTy->getPointerTo(DefaultAS);
 
   ProtocolConformanceRecordTy
     = createStructType(*this, "swift.protocol_conformance", {

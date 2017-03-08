@@ -450,6 +450,7 @@ public:
     llvm::PointerType *UnknownRefCountedPtrTy;
   };
   llvm::PointerType *BridgeObjectPtrTy; /// %swift.bridge*
+  llvm::StructType *OpaqueTy;           /// %swift.opaque
   llvm::PointerType *OpaquePtrTy;      /// %swift.opaque*
   llvm::StructType *ObjCClassStructTy; /// %objc_class
   llvm::PointerType *ObjCClassPtrTy;   /// %objc_class*
@@ -655,7 +656,8 @@ public:
   llvm::Constant *getOrCreateHelperFunction(StringRef name,
                                             llvm::Type *resultType,
                                             ArrayRef<llvm::Type*> paramTypes,
-                        llvm::function_ref<void(IRGenFunction &IGF)> generate);
+                        llvm::function_ref<void(IRGenFunction &IGF)> generate,
+                        bool setIsNoInline = false);
 
 private:
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,

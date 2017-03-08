@@ -3328,7 +3328,8 @@ IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
 
 /// Should we be defining the given helper function?
 static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
-                                          llvm::Constant *fn) {
+                                          llvm::Constant *fn,
+                                          bool setIsNoInline) {
   llvm::Function *def = dyn_cast<llvm::Function>(fn);
   if (!def) return nullptr;
   if (!def->empty()) return nullptr;
@@ -3338,6 +3339,8 @@ static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
   def->setDLLStorageClass(llvm::GlobalVariable::DefaultStorageClass);
   def->setDoesNotThrow();
   def->setCallingConv(IGM.DefaultCC);
+  if(setIsNoInline)
+    def->addFnAttr(llvm::Attribute::NoInline);
   return def;
 }
 
@@ -3352,13 +3355,14 @@ static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
 llvm::Constant *
 IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
                                        ArrayRef<llvm::Type*> paramTys,
-                        llvm::function_ref<void(IRGenFunction &IGF)> generate) {
+                        llvm::function_ref<void(IRGenFunction &IGF)> generate,
+                        bool setIsNoInline) {
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(resultTy, paramTys, false);
 
   llvm::Constant *fn = Module.getOrInsertFunction(fnName, fnTy);
 
-  if (llvm::Function *def = shouldDefineHelper(*this, fn)) {
+  if (llvm::Function *def = shouldDefineHelper(*this, fn, setIsNoInline)) {
     IRGenFunction IGF(*this, def);
     if (DebugInfo)
       DebugInfo->emitArtificialFunction(IGF, def);
