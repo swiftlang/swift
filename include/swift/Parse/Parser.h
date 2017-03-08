@@ -1296,6 +1296,10 @@ public:
       SourceLoc &WhereLoc, SmallVectorImpl<RequirementRepr> &Requirements,
       bool &FirstTypeInComplete, bool AllowLayoutConstraints = false);
 
+  ParserStatus
+  parseProtocolOrAssociatedTypeWhereClause(TrailingWhereClause *&trailingWhere,
+                                           bool isProtocol);
+
   //===--------------------------------------------------------------------===//
   // Availability Specification Parsing
 

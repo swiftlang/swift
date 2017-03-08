@@ -2689,11 +2689,11 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
 
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
                            SourceLoc NameLoc, Identifier Name,
-                           MutableArrayRef<TypeLoc> Inherited)
-  : NominalTypeDecl(DeclKind::Protocol, DC, Name, NameLoc, Inherited,
-                    nullptr),
-    ProtocolLoc(ProtocolLoc)
-{
+                           MutableArrayRef<TypeLoc> Inherited,
+                           TrailingWhereClause *TrailingWhere)
+    : NominalTypeDecl(DeclKind::Protocol, DC, Name, NameLoc, Inherited,
+                      nullptr),
+      ProtocolLoc(ProtocolLoc), TrailingWhere(TrailingWhere) {
   ProtocolDeclBits.RequiresClassValid = false;
   ProtocolDeclBits.RequiresClass = false;
   ProtocolDeclBits.ExistentialConformsToSelfValid = false;
