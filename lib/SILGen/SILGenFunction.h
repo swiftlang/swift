@@ -934,6 +934,13 @@ public:
                             llvm::function_ref<ManagedValue (SGFContext)> F,
                             bool allowEmbeddedNSError = true);
 
+  RValue emitCollectionConversion(SILLocation loc,
+                                  FuncDecl *fn,
+                                  CanType fromCollection,
+                                  CanType toCollection,
+                                  ManagedValue mv,
+                                  SGFContext C);
+
   //===--------------------------------------------------------------------===//
   // Recursive entry points
   //===--------------------------------------------------------------------===//
@@ -1303,7 +1310,7 @@ public:
 
   RValue emitApplyOfLibraryIntrinsic(SILLocation loc,
                                      FuncDecl *fn,
-                                     SubstitutionList subs,
+                                     const SubstitutionMap &subMap,
                                      ArrayRef<ManagedValue> args,
                                      SGFContext ctx);
 
@@ -1693,10 +1700,6 @@ public:
   
   /// Get the _Pointer protocol used for pointer argument operations.
   ProtocolDecl *getPointerProtocol();
-  
-  /// Produce a substitution for invoking a pointer argument conversion
-  /// intrinsic.
-  Substitution getPointerSubstitution(Type pointerType);
 };
 
 

@@ -1339,10 +1339,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   auto BridgedProto =
       M.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
   auto Conf =
-      M.getSwiftModule()->lookupConformance(Target, BridgedProto, nullptr);
-  assert(Conf && "_ObjectiveCBridgeable conformance should exist");
-
-  auto *Conformance = Conf->getConcrete();
+      *M.getSwiftModule()->lookupConformance(Target, BridgedProto, nullptr);
 
   auto ParamTypes = BridgedFunc->getLoweredFunctionType()->getParameters();
 
@@ -1354,14 +1351,11 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   SmallVector<SILValue, 1> Args;
 
   // Add substitutions
-  auto Conformances =
-    M.getASTContext().AllocateUninitialized<ProtocolConformanceRef>(1);
-  Conformances[0] = ProtocolConformanceRef(Conformance);
-  Substitution Subs[1] = {
-    Substitution(Target, Conformances)
-  };
+  auto SubMap = SubstitutionMap::getProtocolSubstitutions(
+      Conf.getRequirement(), Target, Conf);
+
   auto SILFnTy = FuncRef->getType();
-  SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
+  SILType SubstFnTy = SILFnTy.substGenericArgs(M, SubMap);
   SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(), M);
   SILType ResultTy = substConv.getSILResultType();
 
@@ -1393,6 +1387,9 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   Args.push_back(InOutOptionalParam);
   Args.push_back(SrcOp);
   Args.push_back(MetaTyVal);
+
+  SmallVector<Substitution, 4> Subs;
+  Conf.getRequirement()->getGenericSignature()->getSubstitutions(SubMap, Subs);
 
   auto *AI = Builder.createApply(Loc, FuncRef, SubstFnTy, ResultTy, Subs, Args,
                                  false);

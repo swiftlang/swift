@@ -499,7 +499,13 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
   // Call into the stdlib intrinsic.
   if (auto bridgeAnything =
         gen.getASTContext().getBridgeAnythingToObjectiveC(nullptr)) {
-    Substitution sub(loweredNativeTy, {});
+    auto *genericSig = bridgeAnything->getGenericSignature();
+    auto subMap = genericSig->getSubstitutionMap(
+      [&](SubstitutableType *t) -> Type {
+        return loweredNativeTy;
+      },
+      MakeAbstractConformanceForGenericType());
+
     // Put the value into memory if necessary.
     assert(v.getType().isTrivial(gen.SGM.M) || v.hasCleanup());
     if (v.getType().isObject()) {
@@ -507,7 +513,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
       v.forwardInto(gen, loc, tmp);
       v = gen.emitManagedBufferWithCleanup(tmp);
     }
-    return gen.emitApplyOfLibraryIntrinsic(loc, bridgeAnything, sub, v,
+    return gen.emitApplyOfLibraryIntrinsic(loc, bridgeAnything, subMap, v,
                                            SGFContext())
       .getAsSingleValue(gen, loc);
   }
@@ -768,7 +774,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
     auto optionalMV = ManagedValue(optionalV, v.getCleanup());
     return gen.emitApplyOfLibraryIntrinsic(loc,
                            gen.getASTContext().getBridgeAnyObjectToAny(nullptr),
-                           {}, optionalMV, SGFContext())
+                           SubstitutionMap(), optionalMV, SGFContext())
       .getAsSingleValue(gen, loc);
   }
 

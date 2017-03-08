@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -4533,9 +4534,13 @@ RValue SILGenFunction::emitApplyExpr(Expr *e, SGFContext c) {
 RValue
 SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                                             FuncDecl *fn,
-                                            SubstitutionList subs,
+                                            const SubstitutionMap &subMap,
                                             ArrayRef<ManagedValue> args,
                                             SGFContext ctx) {
+  SmallVector<Substitution, 4> subs;
+  if (auto *genericSig = fn->getGenericSignature())
+    genericSig->getSubstitutions(subMap, subs);
+
   auto callee = Callee::forDirect(*this, SILDeclRef(fn), loc);
   callee.setSubstitutions(subs);
 
@@ -4785,13 +4790,11 @@ SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
   auto &Ctx = getASTContext();
   auto allocate = Ctx.getAllocateUninitializedArray(nullptr);
 
-  auto arrayElementTy = ArrayTy->castTo<BoundGenericType>()
-    ->getGenericArgs()[0];
-
   // Invoke the intrinsic, which returns a tuple.
-  Substitution sub{arrayElementTy, {}};
+  auto subMap = ArrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
+                                                   Ctx.getArrayDecl());
   auto result = emitApplyOfLibraryIntrinsic(Loc, allocate,
-                                            sub,
+                                            subMap,
                                             ManagedValue::forUnmanaged(Length),
                                             SGFContext());
 
@@ -4808,12 +4811,12 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
   auto &Ctx = getASTContext();
   auto deallocate = Ctx.getDeallocateUninitializedArray(nullptr);
 
-  CanType arrayElementTy =
-    array->getType().castTo<BoundGenericType>().getGenericArgs()[0];
+  CanType arrayTy = array->getType().getSwiftRValueType();
 
   // Invoke the intrinsic.
-  Substitution sub{arrayElementTy, {}};
-  emitApplyOfLibraryIntrinsic(loc, deallocate, sub,
+  auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
+                                                   Ctx.getArrayDecl());
+  emitApplyOfLibraryIntrinsic(loc, deallocate, subMap,
                               ManagedValue::forUnmanaged(array),
                               SGFContext());
 }
