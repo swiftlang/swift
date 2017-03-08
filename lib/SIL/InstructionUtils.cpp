@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-inst-utils"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/Projection.h"
@@ -241,11 +242,17 @@ void ConformanceCollector::scanType(Type type) {
           Visited.insert(NT);
         }
 
+        auto *Sig = NT->getGenericSignature();
+        if (!Sig)
+          return;
+
         // Also inserts the type passed to scanType().
         Visited.insert(SubType.getPointer());
-        auto substs = SubType->gatherAllSubstitutions(M.getSwiftModule(),
-                                                     nullptr);
-        scanSubsts(substs);
+        auto SubMap = SubType->getContextSubstitutionMap(M.getSwiftModule(),
+                                                         NT);
+        SmallVector<Substitution, 4> Subs;
+        Sig->getSubstitutions(SubMap, Subs);
+        scanSubsts(Subs);
       }
     }
   });

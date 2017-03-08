@@ -505,13 +505,22 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   ManagedValue initVal;
   SILType initTy;
 
-  SubstitutionList subs;
   // Call the initializer.
-  SubstitutionList forwardingSubs;
-  if (auto *genericEnv = ctor->getGenericEnvironmentOfContext())
-    forwardingSubs = genericEnv->getForwardingSubstitutions();
-  std::tie(initVal, initTy, subs)
-    = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
+  SubstitutionMap subMap;
+  SmallVector<Substitution, 4> subs;
+  if (auto *genericEnv = ctor->getGenericEnvironmentOfContext()) {
+    auto *genericSig = genericEnv->getGenericSignature();
+    subMap = genericSig->getSubstitutionMap(
+      [&](SubstitutableType *t) -> Type {
+        return genericEnv->mapTypeIntoContext(
+          t->castTo<GenericTypeParamType>());
+      },
+      MakeAbstractConformanceForGenericType());
+    genericSig->getSubstitutions(subMap, subs);
+  }
+
+  std::tie(initVal, initTy)
+    = emitSiblingMethodRef(Loc, selfValue, initConstant, subMap);
 
   SILValue initedSelfValue = emitApplyWithRethrow(Loc, initVal.forward(*this),
                                                   initTy, subs, args);

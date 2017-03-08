@@ -15,6 +15,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "llvm/ADT/Statistic.h"
 
 STATISTIC(NumReleasesDevirtualized, "Number of devirtualized releases");
@@ -144,13 +145,11 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
     return false;
 
   CanSILFunctionType DeallocType = Dealloc->getLoweredFunctionType();
-  SubstitutionList AllocSubsts = AllocType.gatherAllSubstitutions(M);
+  auto *NTD = AllocType.getSwiftRValueType()->getAnyNominal();
+  auto AllocSubMap = AllocType.getSwiftRValueType()
+    ->getContextSubstitutionMap(M.getSwiftModule(), NTD);
 
-  assert(!AllocSubsts.empty() == DeallocType->isPolymorphic() &&
-         "dealloc of generic class is not polymorphic or vice versa");
-
-  if (DeallocType->isPolymorphic())
-    DeallocType = DeallocType->substGenericArgs(M, AllocSubsts);
+  DeallocType = DeallocType->substGenericArgs(M, AllocSubMap);
 
   SILType ReturnType = Dealloc->getConventions().getSILResultType();
   SILType DeallocSILType = SILType::getPrimitiveObjectType(DeallocType);
@@ -167,6 +166,11 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
   // Create the call to the destructor with the allocated object as self
   // argument.
   auto *MI = B.createFunctionRef(ReleaseInst->getLoc(), Dealloc);
+
+  SmallVector<Substitution, 4> AllocSubsts;
+  if (auto *Sig = NTD->getGenericSignature())
+    Sig->getSubstitutions(AllocSubMap, AllocSubsts);
+
   B.createApply(ReleaseInst->getLoc(), MI, DeallocSILType, ReturnType,
                 AllocSubsts, { object }, false);
 

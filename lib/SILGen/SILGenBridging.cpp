@@ -61,38 +61,19 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
   auto witnessFnTy = witnessRef->getType();
 
   // Compute the substitutions.
-  SubstitutionList witnessSubstitutions = witness.getSubstitutions();
-  SubstitutionList typeSubstitutions =
-      swiftValueType->gatherAllSubstitutions(gen.SGM.SwiftModule, nullptr);
 
-  // FIXME: Witness substitutions get dropped via serialization, so we end up
-  // trying to reconstitute them here.
-  SubstitutionList substitutions;
-  SmallVector<Substitution, 4> substitutionsBuf;
-  if (typeSubstitutions.empty()) {
-    substitutions = witnessSubstitutions;
-  } else if (witnessSubstitutions.empty()) {
-    substitutions = typeSubstitutions;
-  } else {
-    // FIXME: Substitute the type substitutions into the witness, because
-    // SpecializedProtocolConformance::getWitness() doesn't do it for us.
-    GenericEnvironment *witnessEnv = witness.getSyntheticEnvironment();
-    SubstitutionMap typeSubMap = witnessEnv
-      ->getSubstitutionMap(typeSubstitutions);
-    SubstitutionMap witnessSubMap;
-    if (auto *genericSig = cast<FuncDecl>(witness.getDecl())
-          ->getGenericSignature()) {
-      witnessSubMap = genericSig->getSubstitutionMap(witnessSubstitutions);
-      witnessSubMap = witnessSubMap.subst(typeSubMap);
-      genericSig->getSubstitutions(witnessSubMap, substitutionsBuf);
-    }
-    substitutions = substitutionsBuf;
-  }
+  // FIXME: Figure out the right SubstitutionMap stuff if the witness
+  // has generic parameters of its own.
+  assert(!cast<FuncDecl>(witness.getDecl())->isGeneric() &&
+         "Generic witnesses not supported");
 
-  if (!substitutions.empty()) {
-    // Substitute into the witness function type.
-    witnessFnTy = witnessFnTy.substGenericArgs(gen.SGM.M, substitutions);
-  }
+  auto *dc = cast<FuncDecl>(witness.getDecl())->getDeclContext();
+  auto *genericSig = dc->getGenericSignatureOfContext();
+  auto typeSubMap = swiftValueType->getContextSubstitutionMap(
+      gen.SGM.SwiftModule, dc);
+
+  // Substitute into the witness function type.
+  witnessFnTy = witnessFnTy.substGenericArgs(gen.SGM.M, typeSubMap);
 
   // The witness may be more abstract than the concrete value we're bridging,
   // for instance, if the value is a concrete instantiation of a generic type.
@@ -110,10 +91,14 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
     swiftValue = ManagedValue::forUnmanaged(tmp);
   }
 
+  SmallVector<Substitution, 4> subs;
+  if (genericSig)
+    genericSig->getSubstitutions(typeSubMap, subs);
+
   // Call the witness.
   SILType resultTy = gen.getLoweredType(objcType);
   SILValue bridgedValue =
-      gen.B.createApply(loc, witnessRef, witnessFnTy, resultTy, substitutions,
+      gen.B.createApply(loc, witnessRef, witnessFnTy, resultTy, subs,
                         swiftValue.borrow(gen, loc).getValue());
   return gen.emitManagedRValueWithCleanup(bridgedValue);
 }
@@ -143,13 +128,13 @@ emitBridgeObjectiveCToNative(SILGenFunction &gen,
   auto witnessFnTy = witnessRef->getType().castTo<SILFunctionType>();
 
   Type swiftValueType = conformance->getType();
-  SubstitutionList substitutions =
-      swiftValueType->gatherAllSubstitutions(
-          gen.SGM.SwiftModule, nullptr);
+  auto *decl = swiftValueType->getAnyNominal();
+  auto *genericSig = decl->getGenericSignature();
+  auto typeSubMap = swiftValueType->getContextSubstitutionMap(
+    gen.SGM.SwiftModule, decl);
 
   // Substitute into the witness function type.
-  if (!substitutions.empty())
-    witnessFnTy = witnessFnTy->substGenericArgs(gen.SGM.M, substitutions);
+  witnessFnTy = witnessFnTy->substGenericArgs(gen.SGM.M, typeSubMap);
 
   // If the Objective-C value isn't optional, wrap it in an optional.
   Type objcValueType = objcValue.getType().getSwiftRValueType();
@@ -170,19 +155,21 @@ emitBridgeObjectiveCToNative(SILGenFunction &gen,
   auto witnessCI = gen.getConstantInfo(witnessConstant);
   CanType formalResultTy = witnessCI.LoweredInterfaceType.getResult();
 
-  // Set up the generic signature.
-  CanGenericSignature witnessGenericSignature;
-  if (auto genericSig =
-        cast<AbstractFunctionDecl>(witness.getDecl())->getGenericSignature())
-    witnessGenericSignature = genericSig->getCanonicalSignature();
+  SmallVector<Substitution, 4> subs;
+  if (genericSig)
+    genericSig->getSubstitutions(typeSubMap, subs);
 
+  // Set up the generic signature, since formalResultTy is an interface type.
+  CanGenericSignature canGenericSig;
+  if (genericSig)
+    canGenericSig = genericSig->getCanonicalSignature();
   GenericContextScope genericContextScope(gen.SGM.Types,
-                                          witnessGenericSignature);
+                                          canGenericSig);
   return gen.emitApply(loc, ManagedValue::forUnmanaged(witnessRef),
-                       substitutions,
+                       subs,
                        { objcValue, ManagedValue::forUnmanaged(metatypeValue) },
                        witnessFnTy,
-                       AbstractionPattern(witnessGenericSignature,
+                       AbstractionPattern(canGenericSig,
                                           formalResultTy),
                        swiftValueType->getCanonicalType(),
                        ApplyOptions::None, None, None,
@@ -512,7 +499,13 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
   // Call into the stdlib intrinsic.
   if (auto bridgeAnything =
         gen.getASTContext().getBridgeAnythingToObjectiveC(nullptr)) {
-    Substitution sub(loweredNativeTy, {});
+    auto *genericSig = bridgeAnything->getGenericSignature();
+    auto subMap = genericSig->getSubstitutionMap(
+      [&](SubstitutableType *t) -> Type {
+        return loweredNativeTy;
+      },
+      MakeAbstractConformanceForGenericType());
+
     // Put the value into memory if necessary.
     assert(v.getType().isTrivial(gen.SGM.M) || v.hasCleanup());
     if (v.getType().isObject()) {
@@ -520,7 +513,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
       v.forwardInto(gen, loc, tmp);
       v = gen.emitManagedBufferWithCleanup(tmp);
     }
-    return gen.emitApplyOfLibraryIntrinsic(loc, bridgeAnything, sub, v,
+    return gen.emitApplyOfLibraryIntrinsic(loc, bridgeAnything, subMap, v,
                                            SGFContext())
       .getAsSingleValue(gen, loc);
   }
@@ -781,7 +774,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
     auto optionalMV = ManagedValue(optionalV, v.getCleanup());
     return gen.emitApplyOfLibraryIntrinsic(loc,
                            gen.getASTContext().getBridgeAnyObjectToAny(nullptr),
-                           {}, optionalMV, SGFContext())
+                           SubstitutionMap(), optionalMV, SGFContext())
       .getAsSingleValue(gen, loc);
   }
 

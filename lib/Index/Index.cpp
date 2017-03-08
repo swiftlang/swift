@@ -1070,9 +1070,6 @@ bool IndexSwiftASTWalker::initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D, S
   if (!CurrentE)
     return false;
 
-  if (!(CurrentE->getReferencedDecl() == D))
-    return true;
-
   AccessKind Kind = CurrentE->hasLValueAccessKind() ? CurrentE->getLValueAccessKind() : AccessKind::Read;
   switch (Kind) {
   case swift::AccessKind::Read:

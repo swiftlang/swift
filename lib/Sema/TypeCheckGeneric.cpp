@@ -558,13 +558,9 @@ static bool isSelfDerivedOrConcrete(Type protoSelf, Type type) {
   if (!type->hasTypeParameter())
     return true;
 
-  // Unwrap dependent member types.
-  while (auto depMem = type->getAs<DependentMemberType>()) {
-    type = depMem->getBase();
-  }
-
-  if (type->is<GenericTypeParamType>())
-    return type->isEqual(protoSelf);
+  if (type->isTypeParameter() &&
+      type->getRootGenericParam()->isEqual(protoSelf))
+    return true;
 
   return false;
 }

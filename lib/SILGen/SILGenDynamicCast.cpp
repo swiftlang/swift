@@ -583,21 +583,19 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
                                          SGFContext C,
                                          bool conditional) {
   // Compute substitutions for the intrinsic call.
-  auto fromCollection = cast<BoundGenericStructType>(
-                          sourceType->getCanonicalType());
-  auto toCollection = cast<BoundGenericStructType>(
-                        destType->getCanonicalType());
+  auto fromCollection = sourceType->getCanonicalType();
+  auto toCollection = destType->getCanonicalType();
   // Get the intrinsic function.
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
-  if (fromCollection->getDecl() == ctx.getArrayDecl()) {
+  if (fromCollection->getAnyNominal() == ctx.getArrayDecl()) {
     fn = conditional ? SGF.SGM.getArrayConditionalCast(loc)
                      : SGF.SGM.getArrayForceCast(loc);
-  } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
+  } else if (fromCollection->getAnyNominal() == ctx.getDictionaryDecl()) {
     fn = (conditional
            ? SGF.SGM.getDictionaryDownCastConditional(loc)
            : SGF.SGM.getDictionaryDownCast(loc));
-  } else if (fromCollection->getDecl() == ctx.getSetDecl()) {
+  } else if (fromCollection->getAnyNominal() == ctx.getSetDecl()) {
     fn = (conditional
            ? SGF.SGM.getSetDownCastConditional(loc)
            : SGF.SGM.getSetDownCast(loc));
@@ -605,24 +603,8 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
     llvm_unreachable("unsupported collection upcast kind");
   }
 
-  // This will have been diagnosed by the accessors above.
-  if (!fn) return SGF.emitUndefRValue(loc, destType);
-
-  auto fnGenericParams = fn->getGenericSignature()->getGenericParams();
-  auto fromSubsts = fromCollection->gatherAllSubstitutions(
-      SGF.SGM.SwiftModule, nullptr);
-  auto toSubsts = toCollection->gatherAllSubstitutions(
-      SGF.SGM.SwiftModule, nullptr);
-  assert(fnGenericParams.size() == fromSubsts.size() + toSubsts.size() &&
-         "wrong number of generic collection parameters");
-  (void) fnGenericParams;
-
-  // Form type parameter substitutions.
-  SmallVector<Substitution, 4> subs;
-  subs.append(fromSubsts.begin(), fromSubsts.end());
-  subs.append(toSubsts.begin(), toSubsts.end());
-
-  return SGF.emitApplyOfLibraryIntrinsic(loc, fn, subs, {source}, C);
+  return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection,
+                                      source, C);
 }
 
 static ManagedValue
