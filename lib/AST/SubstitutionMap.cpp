@@ -38,6 +38,13 @@ bool SubstitutionMap::hasArchetypes() const {
   return false;
 }
 
+bool SubstitutionMap::hasOpenedExistential() const {
+  for (auto &entry : subMap)
+    if (entry.second->hasOpenedExistential())
+      return true;
+  return false;
+}
+
 bool SubstitutionMap::hasDynamicSelf() const {
   for (auto &entry : subMap)
     if (entry.second->hasDynamicSelfType())

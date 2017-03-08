@@ -199,15 +199,14 @@ static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
         auto PAISubs = PAI->getSubstitutions();
         if (PAISubs.empty())
           continue;
+
         // Check if any of substitutions would contain open existentials
         // after inlining.
-        for (auto PAISub : PAISubs) {
-          if (!PAISub.getReplacement()->hasArchetype())
-            continue;
-          auto NewPAISub = PAISub.subst(SubsMap);
-          if (NewPAISub.getReplacement()->hasOpenedExistential())
-            return true;
-        }
+        auto PAISubMap = PAI->getOrigCalleeType()
+          ->getGenericSignature()->getSubstitutionMap(PAISubs);
+        PAISubMap = PAISubMap.subst(SubsMap);
+        if (PAISubMap.hasOpenedExistential())
+          return true;
       }
     }
   }
@@ -405,11 +404,12 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
 
         // Create the list of substitutions as they will be after
         // inlining.
+        auto Sig = FAI.getOrigCalleeType()->getGenericSignature();
+        auto SubMap = Sig->getSubstitutionMap(Subs);
+        SubMap = SubMap.subst(CalleeSubstMap);
+
         SmallVector<Substitution, 4> NewSubs;
-        for (auto Sub : Subs) {
-          auto NewSub = Sub.subst(CalleeSubstMap);
-          NewSubs.push_back(NewSub);
-        }
+        Sig->getSubstitutions(SubMap, NewSubs);
 
         // Check if the call can be devirtualized.
         if (isa<ClassMethodInst>(def) || isa<WitnessMethodInst>(def) ||

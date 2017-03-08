@@ -54,15 +54,6 @@ public:
              const PrintOptions &PO = PrintOptions()) const;
   void dump() const;
   void dump(llvm::raw_ostream &os, unsigned indent = 0) const;
-  
-  /// Apply a substitution to this substitution's replacement type and
-  /// conformances.
-  Substitution subst(const SubstitutionMap &subMap) const;
-  Substitution subst(TypeSubstitutionFn subs,
-                     LookupConformanceFn conformances) const;
-
-private:
-  friend class ProtocolConformance;
 };
 
 } // end namespace swift
