@@ -913,16 +913,27 @@ public:
 
     // Check the signature of F to make sure that it is a function that we
     // can specialize. These are conditions independent of the call graph.
-    if (!canSpecializeFunction(F)) {
+    // No need for CallerAnalysis if we are not optimizing for partial
+    // applies.
+    if (!OptForPartialApply &&
+        !canSpecializeFunction(F, nullptr, OptForPartialApply)) {
+      DEBUG(llvm::dbgs() << "  cannot specialize function -> abort\n");
+      return;
+    }
+
+    CallerAnalysis *CA = PM->getAnalysis<CallerAnalysis>();
+    const CallerAnalysis::FunctionInfo &FuncInfo = CA->getCallerInfo(F);
+
+    // Check the signature of F to make sure that it is a function that we
+    // can specialize. These are conditions independent of the call graph.
+    if (OptForPartialApply &&
+        !canSpecializeFunction(F, &FuncInfo, OptForPartialApply)) {
       DEBUG(llvm::dbgs() << "  cannot specialize function -> abort\n");
       return;
     }
 
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
-    CallerAnalysis *CA = PM->getAnalysis<CallerAnalysis>();
     auto *EA = PM->getAnalysis<EpilogueARCAnalysis>();
-
-    const CallerAnalysis::FunctionInfo &FuncInfo = CA->getCallerInfo(F);
 
     // Lock BCA so it's not invalidated along with the rest of the call graph.
     AnalysisPreserver BCAP(PM->getAnalysis<BasicCalleeAnalysis>());
