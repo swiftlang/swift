@@ -193,6 +193,10 @@ public extension DispatchSource {
 		return __dispatch_source_create(_swift_dispatch_source_type_DATA_OR(), 0, 0, queue) as DispatchSourceUserDataOr
 	}
 
+	public class func makeUserDataReplaceSource(queue: DispatchQueue? = nil) -> DispatchSourceUserDataReplace {
+		return __dispatch_source_create(_swift_dispatch_source_type_DATA_REPLACE(), 0, 0, queue) as DispatchSourceUserDataReplace
+	}
+
 	public class func makeFileSystemObjectSource(
 		fileDescriptor: Int32, eventMask: FileSystemEvent, queue: DispatchQueue? = nil) -> DispatchSourceFileSystemObject 
 	{
@@ -299,35 +303,35 @@ public extension DispatchSourceFileSystemObject {
 }
 
 public extension DispatchSourceUserDataAdd {
-	/// @function mergeData
+	/// Merges data into a dispatch source of type `DISPATCH_SOURCE_TYPE_DATA_ADD`
+	/// and submits its event handler block to its target queue.
 	///
-	/// @abstract
-	/// Merges data into a dispatch source of type DISPATCH_SOURCE_TYPE_DATA_ADD or
-	/// DISPATCH_SOURCE_TYPE_DATA_OR and submits its event handler block to its
-	/// target queue.
-	///
-	/// @param value
-	/// The value to coalesce with the pending data using a logical OR or an ADD
-	/// as specified by the dispatch source type. A value of zero has no effect
-	/// and will not result in the submission of the event handler block.
+	/// - parameter data: the value to add to the current pending data. A value of zero
+	///		has no effect and will not result in the submission of the event handler block.
 	public func add(data: UInt) {
 		__dispatch_source_merge_data(self as! DispatchSource, data)
 	}
 }
 
 public extension DispatchSourceUserDataOr {
-	/// @function mergeData
+	/// Merges data into a dispatch source of type `DISPATCH_SOURCE_TYPE_DATA_OR` and
+	/// submits its event handler block to its target queue.
 	///
-	/// @abstract
-	/// Merges data into a dispatch source of type DISPATCH_SOURCE_TYPE_DATA_ADD or
-	/// DISPATCH_SOURCE_TYPE_DATA_OR and submits its event handler block to its
-	/// target queue.
-	///
-	/// @param value
-	/// The value to coalesce with the pending data using a logical OR or an ADD
-	/// as specified by the dispatch source type. A value of zero has no effect
-	/// and will not result in the submission of the event handler block.
+	/// - parameter data: The value to OR into the current pending data. A value of zero
+	///		has no effect and will not result in the submission of the event handler block.
 	public func or(data: UInt) {
+		__dispatch_source_merge_data(self as! DispatchSource, data)
+	}
+}
+
+public extension DispatchSourceUserDataReplace {
+	/// Merges data into a dispatch source of type `DISPATCH_SOURCE_TYPE_DATA_REPLACE`
+	/// and submits its event handler block to its target queue.
+	///
+	/// - parameter data: The value that will replace the current pending data.
+	///		A value of zero will be stored but will not result in the submission of the event
+	///		handler block.
+	public func replace(data: UInt) {
 		__dispatch_source_merge_data(self as! DispatchSource, data)
 	}
 }
