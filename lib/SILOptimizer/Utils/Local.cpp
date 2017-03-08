@@ -14,6 +14,7 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -1544,11 +1545,11 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     return nullptr;
 
   // Get substitutions, if source is a bound generic type.
-  SubstitutionList Subs =
-      Source->gatherAllSubstitutions(
-          M.getSwiftModule(), nullptr);
+  auto SubMap =
+    Source->getContextSubstitutionMap(M.getSwiftModule(),
+                                      BridgeFuncDecl->getDeclContext());
 
-  SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
+  SILType SubstFnTy = SILFnTy.substGenericArgs(M, SubMap);
   SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(), M);
   SILType ResultTy = substConv.getSILResultType();
 
@@ -1634,6 +1635,10 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
 
   if (needRetainBeforeCall)
     Builder.createRetainValue(Loc, Src, Builder.getDefaultAtomicity());
+
+  SmallVector<Substitution, 4> Subs;
+  if (auto *Sig = Source->getAnyNominal()->getGenericSignature())
+    Sig->getSubstitutions(SubMap, Subs);
 
   // Generate a code to invoke the bridging function.
   auto *NewAI = Builder.createApply(Loc, FnRef, SubstFnTy, ResultTy, Subs, Src,

@@ -423,6 +423,13 @@ public:
   SILType substGenericArgs(SILModule &M,
                            SubstitutionList Subs) const;
 
+  /// Transform the function type SILType by replacing all of its interface
+  /// generic args with the appropriate item from the substitution.
+  ///
+  /// Only call this with function types!
+  SILType substGenericArgs(SILModule &M,
+                           const SubstitutionMap &SubMap) const;
+
   /// If the original type is generic, pass the signature as genericSig.
   ///
   /// If the replacement types are generic, you must push a generic context
@@ -433,10 +440,6 @@ public:
                 CanGenericSignature genericSig=CanGenericSignature()) const;
 
   SILType subst(SILModule &silModule, const SubstitutionMap &subs) const;
-
-  /// If this is a specialized generic type, return all substitutions used to
-  /// generate it.
-  SubstitutionList gatherAllSubstitutions(SILModule &M);
 
   /// Return true if this type references a "ref" type that has a single pointer
   /// representation. Class existentials do not always qualify.

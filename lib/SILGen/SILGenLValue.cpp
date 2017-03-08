@@ -1959,8 +1959,13 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
   SILGenLValue sgl(*this);
   LValue lv;
 
-  SubstitutionList subs =
-      base.getType().gatherAllSubstitutions(SGM.M);
+  auto baseType = base.getType().getSwiftRValueType();
+  auto subMap = baseType->getContextSubstitutionMap(
+      SGM.M.getSwiftModule(), ivar->getDeclContext());
+
+  SmallVector<Substitution, 4> subs;
+  if (auto *genericSig = ivar->getDeclContext()->getGenericSignatureOfContext())
+    genericSig->getSubstitutions(subMap, subs);
 
   LValueTypeData baseTypeData = getValueTypeData(baseFormalType,
                                                  base.getValue());
@@ -1968,13 +1973,12 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
   // Refer to 'self' as the base of the lvalue.
   lv.add<ValueComponent>(base, baseTypeData);
 
-  auto substFormalType = base.getType().getSwiftRValueType()
-    ->getTypeOfMember(F.getModule().getSwiftModule(),
-                      ivar, nullptr)
+  auto substFormalType = ivar->getInterfaceType().subst(subMap)
     ->getCanonicalType();
 
   AccessStrategy strategy =
     ivar->getAccessStrategy(semantics, accessKind);
+
 
   // Use the property accessors if the variable has accessors and this
   // isn't a direct access to underlying storage.

@@ -721,7 +721,7 @@ DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
 //                        Witness Method Optimization
 //===----------------------------------------------------------------------===//
 
-static SubstitutionList
+static SubstitutionMap
 getSubstitutionsForProtocolConformance(ProtocolConformanceRef CRef) {
   auto C = CRef.getConcrete();
 
@@ -751,13 +751,16 @@ getSubstitutionsForProtocolConformance(ProtocolConformanceRef CRef) {
   // If the normal conformance is for a generic type, and we didn't hit a
   // specialized conformance, collect the substitutions from the generic type.
   // FIXME: The AST should do this for us.
-  if (NormalC->getType()->isSpecialized() && Subs.empty()) {
-    Subs = NormalC->getType()
-      ->gatherAllSubstitutions(NormalC->getDeclContext()->getParentModule(),
-                               nullptr);
+  if (!NormalC->getType()->isSpecialized())
+    return SubstitutionMap();
+
+  if (Subs.empty()) {
+    auto *DC = NormalC->getDeclContext();
+    return NormalC->getType()
+      ->getContextSubstitutionMap(DC->getParentModule(), DC);
   }
-  
-  return Subs;
+
+  return NormalC->getGenericSignature()->getSubstitutionMap(Subs);
 }
 
 /// Compute substitutions for making a direct call to a SIL function with
@@ -796,23 +799,15 @@ static void getWitnessMethodSubstitutions(
   assert(!conformanceRef.isAbstract());
   auto conformance = conformanceRef.getConcrete();
 
-  // Take apart substitutions from the conforming type.
-  SubstitutionList witnessSubs;
-  auto *rootConformance = conformance->getRootNormalConformance();
-  auto *witnessSig = rootConformance->getGenericSignature();
-
   // If `Self` maps to a bound generic type, this gives us the
   // substitutions for the concrete type's generic parameters.
-  witnessSubs = getSubstitutionsForProtocolConformance(conformanceRef);
+  auto baseSubMap = getSubstitutionsForProtocolConformance(conformanceRef);
 
-  SubstitutionMap baseSubMap;
   unsigned baseDepth = 0;
-  if (!witnessSubs.empty()) {
-    baseSubMap = witnessSig->getSubstitutionMap(witnessSubs);
+  auto *rootConformance = conformance->getRootNormalConformance();
+  if (auto *witnessSig = rootConformance->getGenericSignature())
     baseDepth = witnessSig->getGenericParams().back()->getDepth() + 1;
-  }
 
-  // Next, take apart caller-side substitutions.
   auto origDepth = 1;
   auto origSubMap = requirementSig->getSubstitutionMap(origSubs);
 

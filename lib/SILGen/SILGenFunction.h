@@ -1232,14 +1232,12 @@ public:
   RValue emitLoadOfLValue(SILLocation loc, LValue &&src, SGFContext C,
                           bool isGuaranteedValid = false);
 
-  /// Emit a reference to a method from within another method of the type, and
-  /// gather all the substitutions necessary to invoke it, without
-  /// dynamic dispatch.
-  std::tuple<ManagedValue, SILType, SubstitutionList>
+  /// Emit a reference to a method from within another method of the type.
+  std::tuple<ManagedValue, SILType>
   emitSiblingMethodRef(SILLocation loc,
                        SILValue selfValue,
                        SILDeclRef methodConstant,
-                       SubstitutionList innerSubstitutions);
+                       const SubstitutionMap &subMap);
   
   SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
   

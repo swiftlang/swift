@@ -16,6 +16,7 @@
 #include "SILGenFunction.h"
 #include "Scope.h"
 #include "SwitchCaseFullExpr.h"
+#include "swift/AST/SubstitutionMap.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -93,11 +94,18 @@ MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
   case MetatypeRepresentation::ObjC: {
     // Walk the type recursively to look for substitutions we may need.
     theMetatype.getInstanceType().findIf([&](Type t) -> bool {
-      if (!t->getAnyNominal())
+      auto *decl = t->getAnyNominal();
+      if (!decl)
         return false;
 
-      auto subs =
-          t->gatherAllSubstitutions(getSILGenModule().SwiftModule, nullptr);
+      auto *genericSig = decl->getGenericSignature();
+      if (!genericSig)
+        return false;
+
+      auto subMap = t->getContextSubstitutionMap(getSILGenModule().SwiftModule,
+                                                 decl);
+      SmallVector<Substitution, 4> subs;
+      genericSig->getSubstitutions(subMap, subs);
       getSILGenModule().useConformancesFromSubstitutions(subs);
       return false;
     });
